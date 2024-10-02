@@ -2,16 +2,13 @@
 
 use holochain::{conductor::api::NetworkInfo, prelude::*};
 use human_repr::{HumanCount, HumanThroughput};
+use kitsune_p2p::dependencies::kitsune_p2p_types::tx_utils::ProxyUrl;
 use kitsune_p2p::gossip::sharded_gossip::{NodeId, RegionDiffs};
 use kitsune_p2p::metrics::{CompletedRound, CurrentRound, PeerNodeHistory};
 use kitsune_p2p::KitsuneDiagnostics;
 use kitsune_p2p::{
-    dependencies::{
-        kitsune_p2p_proxy,
-        kitsune_p2p_types::{dependencies::tokio::time::Instant as TokioInstant, Tx2Cert},
-    },
-    dht::region::Region,
-    metrics::Metrics,
+    dependencies::kitsune_p2p_types::dependencies::tokio::time::Instant as TokioInstant,
+    dht::region::Region, metrics::Metrics,
 };
 use std::{
     sync::Arc,
@@ -73,7 +70,7 @@ impl Node {
             .url_list
             .iter()
             .filter_map(|url| {
-                kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
+                ProxyUrl::from_full(url.as_str())
                     .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
                     .ok()
                     .map(|purl| purl.digest().cloned_inner())

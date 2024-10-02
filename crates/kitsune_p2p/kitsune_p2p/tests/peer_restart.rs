@@ -13,7 +13,6 @@ use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 // When Kitsune restarts, it will create a new connection to the signal server. That means a new
 // peer URL will be distributed with the agent info. The connection via the old peer URL should be
 // closed by other peers when they get the new agent info.
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky on CI"]
 async fn connection_close_on_peer_restart() {

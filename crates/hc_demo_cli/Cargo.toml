@@ -57,7 +57,6 @@ build_demo = [
   "holochain",
   "holochain_types",
   "holochain/test_utils",
-  "holochain/tx5",
   "holochain/sqlite-encrypted",
   "holochain/metrics_influxive",
   "holochain_keystore",

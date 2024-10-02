@@ -233,7 +233,7 @@ impl HarnessControlApiHandler for HarnessActor {
         nick: String,
     ) -> HarnessControlApiHandlerResult<(Arc<KitsuneAgent>, ghost_actor::GhostSender<KitsuneP2p>)>
     {
-        let mut proxy_agent_config = KitsuneP2pConfig::default();
+        let mut proxy_agent_config = KitsuneP2pConfig::empty();
         proxy_agent_config
             .transport_pool
             .push(TransportConfig::Proxy {
@@ -261,7 +261,7 @@ impl HarnessControlApiHandler for HarnessActor {
         nick: String,
     ) -> HarnessControlApiHandlerResult<(Arc<KitsuneAgent>, ghost_actor::GhostSender<KitsuneP2p>)>
     {
-        let mut direct_agent_config = KitsuneP2pConfig::default();
+        let mut direct_agent_config = KitsuneP2pConfig::empty();
         direct_agent_config
             .transport_pool
             .push(TransportConfig::Proxy {
@@ -325,7 +325,7 @@ impl HarnessControlApiHandler for HarnessActor {
         proxy_url: url2::Url2,
     ) -> HarnessControlApiHandlerResult<(Arc<KitsuneAgent>, ghost_actor::GhostSender<KitsuneP2p>)>
     {
-        let mut nat_agent_config = KitsuneP2pConfig::default();
+        let mut nat_agent_config = KitsuneP2pConfig::empty();
         nat_agent_config
             .transport_pool
             .push(TransportConfig::Proxy {

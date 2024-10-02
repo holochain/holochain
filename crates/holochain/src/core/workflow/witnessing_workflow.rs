@@ -8,7 +8,7 @@ use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
-use kitsune_p2p_types::tx2::tx2_utils::Share;
+use kitsune_p2p_types::tx_utils::Share;
 use std::collections::HashMap;
 
 /// A cheaply cloneable, thread-safe and in-memory store for

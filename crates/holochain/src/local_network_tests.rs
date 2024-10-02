@@ -74,7 +74,7 @@ async fn conductors_call_remote(num_conductors: usize) {
 #[test_case(10, 10, 1)]
 #[ignore = "Don't want network tests running on ci"]
 fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::empty();
     network.transport_pool = vec![TransportConfig::Quic {
         bind_to: None,
         override_host: None,
@@ -101,7 +101,7 @@ fn conductors_local_gossip(num_committers: usize, num_conductors: usize, new_con
 #[test_case(10, 10, 1)]
 #[ignore = "Don't want network tests running on ci"]
 fn conductors_boot_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::empty();
     network.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
     network.transport_pool = vec![TransportConfig::Quic {
         bind_to: None,
@@ -133,7 +133,7 @@ fn conductors_local_boot_gossip(
     num_conductors: usize,
     new_conductors: usize,
 ) {
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::empty();
     network.bootstrap_service = Some(url2::url2!("http://localhost:8787"));
     network.transport_pool = vec![TransportConfig::Quic {
         bind_to: None,
@@ -161,7 +161,7 @@ fn conductors_local_boot_gossip(
 #[test_case(10, 10, 1)]
 #[ignore = "Don't want network tests running on ci"]
 fn conductors_remote_gossip(num_committers: usize, num_conductors: usize, new_conductors: usize) {
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::empty();
     let transport = TransportConfig::Quic {
         bind_to: None,
         override_port: None,
@@ -212,7 +212,7 @@ fn conductors_remote_boot_gossip(
     num_conductors: usize,
     new_conductors: usize,
 ) {
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::empty();
     let transport = TransportConfig::Quic {
         bind_to: None,
         override_port: None,

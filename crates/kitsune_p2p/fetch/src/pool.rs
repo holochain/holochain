@@ -14,7 +14,7 @@ use indexmap::map::Entry;
 use std::{collections::HashMap, sync::Arc};
 use tokio::time::{Duration, Instant};
 
-use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KSpace};
+use kitsune_p2p_types::{tx_utils::ShareOpen, KSpace};
 
 use crate::{
     queue::MapQueue,

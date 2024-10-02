@@ -1,26 +1,17 @@
 #![allow(clippy::field_reassign_with_default)]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::single_match)]
-use std::sync::Arc;
+
 use std::time::{Duration, Instant};
 
 use hdk::prelude::*;
-use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::*;
 use holochain::test_utils::inline_zomes::{
     batch_create_zome, simple_create_read_zome, simple_crud_zome,
 };
-use holochain::test_utils::network_simulation::{data_zome, generate_test_data};
 use holochain::test_utils::WaitFor;
-use holochain::{
-    conductor::ConductorBuilder, test_utils::consistency::local_machine_session_with_hashes,
-};
 use holochain_p2p::*;
-use holochain_sqlite::prelude::*;
-use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::gossip::sharded_gossip::test_utils::{check_ops_bloom, create_agent_bloom};
 use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::RECENT_THRESHOLD_DEFAULT;
 
 fn make_tuning(
@@ -301,10 +292,13 @@ async fn test_zero_arc_get_links() {
     // Standard config with arc clamped to zero
     let mut tuning = make_tuning(true, true, true, None);
     tuning.gossip_arc_clamping = "empty".into();
-    let config = SweetConductorConfig::standard().set_tuning_params(tuning);
+    let config = SweetConductorConfig::rendezvous(false)
+        .apply_shared_rendezvous()
+        .await
+        .set_tuning_params(tuning);
 
     let mut conductor0 = SweetConductor::from_config(config).await;
-    let mut conductor1 = SweetConductor::from_standard_config().await;
+    let mut conductor1 = SweetConductor::shared_rendezvous().await;
 
     let tw = holochain_wasm_test_utils::TestWasm::Link;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![tw]).await;
@@ -598,16 +592,19 @@ async fn test_gossip_shutdown() {
             Run it again in the future to see if it fails, and if so, rewrite it without sleeps."]
 async fn test_gossip_startup() {
     holochain_trace::test_run();
-    let config = || {
-        SweetConductorConfig::standard().tune(|t| {
-            t.danger_gossip_recent_threshold_secs = 1;
-            t.default_rpc_single_timeout_ms = 3_000;
-        })
+    let config = || async move {
+        SweetConductorConfig::rendezvous(false)
+            .apply_shared_rendezvous()
+            .await
+            .tune(|t| {
+                t.danger_gossip_recent_threshold_secs = 1;
+                t.default_rpc_single_timeout_ms = 3_000;
+            })
     };
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let mk_conductor = || async {
-        let cfg = config();
+        let cfg = config().await;
         assert!(cfg.network.is_tx5());
         let mut conductor =
             SweetConductor::from_config_rendezvous(cfg, SweetLocalRendezvous::new().await).await;
@@ -852,6 +849,51 @@ async fn fullsync_sharded_local_gossip() -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+/*
+
+TODO: rewrite for tx5, or simply learn from it and remove it / rewrite it.
+      either way, this is quite old and has not been used since 2022.
+
+
+
+
+#[cfg(feature = "test_utils")]
+async fn run_bootstrap(
+    peer_data: impl Iterator<Item = kitsune_p2p::agent_store::AgentInfoSigned>,
+) -> (url2::Url2, kitsune_p2p_bootstrap::BootstrapShutdown) {
+    let mut url = url2::url2!("http://127.0.0.1:0");
+    let (driver, addr, shutdown) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), vec![])
+        .await
+        .unwrap();
+    tokio::spawn(driver);
+    let client = reqwest::Client::new();
+    url.set_port(Some(addr.port())).unwrap();
+    for info in peer_data {
+        let _: Option<()> = do_api(url.clone(), "put", info, &client).await.unwrap();
+    }
+    (url, shutdown)
+}
+
+async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
+    url: kitsune_p2p::dependencies::url2::Url2,
+    op: &str,
+    input: I,
+    client: &reqwest::Client,
+) -> Option<O> {
+    let mut body_data = Vec::new();
+    kitsune_p2p_types::codec::rmp_encode(&mut body_data, &input).unwrap();
+    let res = client
+        .post(url.as_str())
+        .body(body_data)
+        .header("X-Op", op)
+        .header(reqwest::header::CONTENT_TYPE, "application/octet")
+        .send()
+        .await
+        .unwrap();
+
+    Some(kitsune_p2p_types::codec::rmp_decode(&mut res.bytes().await.unwrap().as_ref()).unwrap())
 }
 
 #[cfg(feature = "test_utils")]
@@ -1272,12 +1314,12 @@ async fn mock_network_sharded_gossip() {
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::empty();
     network.transport_pool = vec![TransportConfig::Mock {
         mock_network: mock_network.into(),
     }];
     network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
+    let mut config = ConductorConfig::empty();
     config.network = network;
 
     // Add it to the conductor builder.
@@ -1784,13 +1826,13 @@ async fn mock_network_sharding() {
     tuning.gossip_strategy = "sharded-gossip".to_string();
     tuning.gossip_dynamic_arcs = true;
 
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::empty();
     network.bootstrap_service = Some(bootstrap);
     network.transport_pool = vec![TransportConfig::Mock {
         mock_network: mock_network.into(),
     }];
     network.tuning_params = Arc::new(tuning);
-    let mut config = ConductorConfig::default();
+    let mut config = ConductorConfig::empty();
     config.network = network;
 
     // Add it to the conductor builder.
@@ -1856,39 +1898,4 @@ async fn mock_network_sharding() {
     }
 }
 
-#[cfg(feature = "test_utils")]
-async fn run_bootstrap(
-    peer_data: impl Iterator<Item = kitsune_p2p::agent_store::AgentInfoSigned>,
-) -> (url2::Url2, kitsune_p2p_bootstrap::BootstrapShutdown) {
-    let mut url = url2::url2!("http://127.0.0.1:0");
-    let (driver, addr, shutdown) = kitsune_p2p_bootstrap::run(([127, 0, 0, 1], 0), vec![])
-        .await
-        .unwrap();
-    tokio::spawn(driver);
-    let client = reqwest::Client::new();
-    url.set_port(Some(addr.port())).unwrap();
-    for info in peer_data {
-        let _: Option<()> = do_api(url.clone(), "put", info, &client).await.unwrap();
-    }
-    (url, shutdown)
-}
-
-async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
-    url: kitsune_p2p::dependencies::url2::Url2,
-    op: &str,
-    input: I,
-    client: &reqwest::Client,
-) -> Option<O> {
-    let mut body_data = Vec::new();
-    kitsune_p2p_types::codec::rmp_encode(&mut body_data, &input).unwrap();
-    let res = client
-        .post(url.as_str())
-        .body(body_data)
-        .header("X-Op", op)
-        .header(reqwest::header::CONTENT_TYPE, "application/octet")
-        .send()
-        .await
-        .unwrap();
-
-    Some(kitsune_p2p_types::codec::rmp_decode(&mut res.bytes().await.unwrap().as_ref()).unwrap())
-}
+*/

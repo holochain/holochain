@@ -55,7 +55,7 @@ impl ShardedGossipLocal {
                 .url_list
                 .iter()
                 .filter_map(|url| {
-                    kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
+                    kitsune_p2p_types::tx_utils::ProxyUrl::from_full(url.as_str())
                         .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
                         .ok()
                         .map(|purl| (info.clone(), purl.digest().0.into(), url.to_string()))
@@ -217,7 +217,7 @@ mod tests {
             .map(|_| {
                 let info = random_agent_info(&mut rng);
                 let url = info.url_list.first().unwrap().clone();
-                let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
+                let purl = kitsune_p2p_types::tx_utils::ProxyUrl::from_full(url.as_str()).unwrap();
                 Node {
                     agent_info_list: vec![info],
                     cert: NodeCert::from(purl.digest().0),

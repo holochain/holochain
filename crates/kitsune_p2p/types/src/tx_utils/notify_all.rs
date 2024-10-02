@@ -1,4 +1,6 @@
-use crate::tx2::tx2_utils::*;
+#![allow(clippy::blocks_in_conditions)]
+
+use crate::tx_utils::*;
 use crate::*;
 
 /// Sync callback signature to be invoked on notify()

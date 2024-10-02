@@ -96,7 +96,7 @@ mod test {
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-        let config = SweetConductorConfig::standard().no_dpki()
+        let config = SweetConductorConfig::rendezvous(false).apply_shared_rendezvous().await.no_dpki()
             .tune(|tune| {
                 tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
                 tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;

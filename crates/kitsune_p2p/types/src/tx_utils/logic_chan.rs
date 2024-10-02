@@ -1,4 +1,4 @@
-use crate::tx2::tx2_utils::*;
+use crate::tx_utils::*;
 use crate::*;
 use futures::future::{BoxFuture, FutureExt};
 use futures::stream::futures_unordered::FuturesUnordered;
@@ -114,7 +114,7 @@ impl<E: 'static + Send> LogicChanHandle<E> {
 /// ```
 /// # #[tokio::main(flavor = "multi_thread")]
 /// # async fn main() {
-/// # use kitsune_p2p_types::tx2::tx2_utils::*;
+/// # use kitsune_p2p_types::tx_utils::*;
 /// # use futures::stream::StreamExt;
 /// let chan = <LogicChan<&'static str>>::new(32);
 /// let hnd = chan.handle().clone();

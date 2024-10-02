@@ -1,6 +1,5 @@
 use std::sync::{atomic::AtomicUsize, Arc};
 
-use crate::sweettest::SweetRendezvous;
 use holochain_conductor_api::{
     conductor::{ConductorConfig, ConductorTuningParams},
     AdminInterfaceConfig, InterfaceDriver,
@@ -8,21 +7,30 @@ use holochain_conductor_api::{
 use holochain_types::websocket::AllowedOrigins;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
-use super::SweetConductor;
+use super::{shared_rendezvous, DynSweetRendezvous, SweetConductor};
 
 pub(crate) static NUM_CREATED: AtomicUsize = AtomicUsize::new(0);
 
 /// Wrapper around ConductorConfig with some helpful builder methods
-#[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    derive_more::Deref,
-    derive_more::DerefMut,
-    derive_more::From,
-    derive_more::Into,
-)]
-pub struct SweetConductorConfig(ConductorConfig);
+#[derive(Clone, derive_more::Deref, derive_more::DerefMut, derive_more::Into)]
+pub struct SweetConductorConfig {
+    #[deref]
+    #[deref_mut]
+    #[into]
+    config: ConductorConfig,
+
+    // Helps to keep owned references alive
+    rendezvous: Option<DynSweetRendezvous>,
+}
+
+impl From<ConductorConfig> for SweetConductorConfig {
+    fn from(config: ConductorConfig) -> Self {
+        Self {
+            config,
+            rendezvous: None,
+        }
+    }
+}
 
 impl From<KitsuneP2pConfig> for SweetConductorConfig {
     fn from(network: KitsuneP2pConfig) -> Self {
@@ -39,17 +47,17 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
                 countersigning_resolution_retry_delay: Some(std::time::Duration::from_secs(3)),
                 countersigning_resolution_retry_limit: None,
             }),
-            ..Default::default()
+            ..ConductorConfig::empty()
         }
         .into()
     }
 }
 
 impl SweetConductorConfig {
-    /// Convert into a ConductorConfig.
-    pub async fn into_conductor_config(self, rendezvous: &dyn SweetRendezvous) -> ConductorConfig {
-        let mut config = self.0;
-        let network = &mut config.network;
+    /// Rewrite the config to point to the given rendezvous server
+    pub fn apply_rendezvous(mut self, rendezvous: &DynSweetRendezvous) -> Self {
+        self.rendezvous = Some(rendezvous.clone());
+        let network = &mut self.network;
 
         if network.bootstrap_service.is_some()
             && network.bootstrap_service.as_ref().unwrap().to_string() == "rendezvous:"
@@ -57,7 +65,6 @@ impl SweetConductorConfig {
             network.bootstrap_service = Some(url2::url2!("{}", rendezvous.bootstrap_addr()));
         }
 
-        #[cfg(feature = "tx5")]
         {
             for t in network.transport_pool.iter_mut() {
                 if let kitsune_p2p_types::config::TransportConfig::WebRTC { signal_url, .. } = t {
@@ -68,12 +75,17 @@ impl SweetConductorConfig {
             }
         }
 
-        config
+        self
+    }
+
+    /// Rewrite the config to point to the shared local rendezvous server
+    pub async fn apply_shared_rendezvous(self) -> Self {
+        self.apply_rendezvous(&shared_rendezvous().await)
     }
 
     /// Standard config for SweetConductors
-    pub fn standard() -> Self {
-        let mut c = SweetConductorConfig::from(KitsuneP2pConfig::default())
+    fn standard() -> Self {
+        let mut c = SweetConductorConfig::from(KitsuneP2pConfig::empty())
             .tune(|tune| {
                 tune.gossip_loop_iteration_delay_ms = 500;
                 tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
@@ -116,16 +128,6 @@ impl SweetConductorConfig {
             config.network.bootstrap_service = Some(url2::url2!("rendezvous:"));
         }
 
-        /*#[cfg(not(feature = "tx5"))]
-        {
-            config.network.transport_pool = vec![TransportConfig::Quic {
-                bind_to: None,
-                override_host: None,
-                override_port: None,
-            }];
-        }*/
-
-        #[cfg(feature = "tx5")]
         {
             config.network.transport_pool =
                 vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
@@ -135,6 +137,11 @@ impl SweetConductorConfig {
         }
 
         config
+    }
+
+    /// Getter
+    pub fn get_rendezvous(&self) -> Option<DynSweetRendezvous> {
+        self.rendezvous.clone()
     }
 
     /// Build a SweetConductor from this config
@@ -147,7 +154,7 @@ impl SweetConductorConfig {
         mut self,
         f: impl FnOnce(&mut kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams),
     ) -> Self {
-        let r = &mut self.0.network.tuning_params;
+        let r = &mut self.network.tuning_params;
         let mut tuning = (**r).clone();
         f(&mut tuning);
         *r = Arc::new(tuning);
@@ -159,13 +166,13 @@ impl SweetConductorConfig {
         mut self,
         tuning_params: kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams,
     ) -> Self {
-        self.0.network.tuning_params = Arc::new(tuning_params);
+        self.network.tuning_params = Arc::new(tuning_params);
         self
     }
 
     /// Apply a function to the conductor's tuning parameters to customise them.
     pub fn tune_conductor(mut self, f: impl FnOnce(&mut ConductorTuningParams)) -> Self {
-        if let Some(ref mut params) = self.0.tuning_params {
+        if let Some(ref mut params) = self.tuning_params {
             f(params);
         }
         self
@@ -173,7 +180,7 @@ impl SweetConductorConfig {
 
     /// Completely disable networking
     pub fn no_networking(mut self) -> Self {
-        self.0.network = self.0.network.clone().tune(|mut tp| {
+        self.network = self.network.clone().tune(|mut tp| {
             tp.disable_publish = true;
             tp.disable_recent_gossip = true;
             tp.disable_historical_gossip = true;
@@ -184,7 +191,7 @@ impl SweetConductorConfig {
 
     /// Disable publishing
     pub fn no_publish(mut self) -> Self {
-        self.0.network = self.0.network.clone().tune(|mut tp| {
+        self.network = self.network.clone().tune(|mut tp| {
             tp.disable_publish = true;
             tp
         });
@@ -193,7 +200,7 @@ impl SweetConductorConfig {
 
     /// Disable publishing and recent gossip
     pub fn historical_only(mut self) -> Self {
-        self.0.network = self.0.network.clone().tune(|mut tp| {
+        self.network = self.network.clone().tune(|mut tp| {
             tp.disable_publish = true;
             tp.disable_recent_gossip = true;
             tp
@@ -203,7 +210,7 @@ impl SweetConductorConfig {
 
     /// Disable recent op gossip, but keep agent gossip
     pub fn historical_and_agent_gossip_only(mut self) -> Self {
-        self.0.network = self.0.network.clone().tune(|mut tp| {
+        self.network = self.network.clone().tune(|mut tp| {
             tp.disable_publish = true;
             // keep recent gossip for agent gossip, but gossip no ops.
             tp.danger_gossip_recent_threshold_secs = 0;
@@ -214,7 +221,7 @@ impl SweetConductorConfig {
 
     /// Disable publishing and historical gossip
     pub fn recent_only(mut self) -> Self {
-        self.0.network = self.0.network.clone().tune(|mut tp| {
+        self.network = self.network.clone().tune(|mut tp| {
             tp.disable_publish = true;
             tp.disable_historical_gossip = true;
             tp
