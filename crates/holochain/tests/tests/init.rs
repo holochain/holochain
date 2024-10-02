@@ -97,3 +97,71 @@ async fn call_init_from_init_across_cells() {
 
     assert_eq!(inits.load(Ordering::SeqCst), 2);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic(expected = "error: Serialize(Deserialize(\"invalid value: integer `42`")]
+async fn call_init_with_invalid_return_type() {
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let zome = SweetInlineZomes::new(vec![], 0)
+        .function("init", |_, _: ()| Ok(42))
+        .function("touch", |_, _: ()| {
+            // Simple Zome to just trigger a call to init.
+            Ok(())
+        });
+
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
+    let app = conductor
+        .setup_app_for_agent("app", agent, &[dna])
+        .await
+        .unwrap();
+    let (cell,) = app.into_tuple();
+
+    let () = conductor
+        .call(&cell.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic(expected = "error: Serialize(Deserialize(\\\"invalid value: integer `42`")]
+async fn call_init_with_invalid_return_type_across_cells() {
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let zome_1 = SweetInlineZomes::new(vec![], 0)
+        .function("init", move |_, _: ()| Ok(42))
+        .function("touch", |_, _: ()| {
+            // Simple Zome to just trigger a call to init.
+            Ok(())
+        });
+    let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
+    let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
+
+    let zome_2 = SweetInlineZomes::new(vec![], 0)
+        .function("init", move |api, _: ()| {
+            api.call(vec![Call {
+                target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
+                zome_name: SweetInlineZomes::COORDINATOR.into(),
+                fn_name: "touch".into(),
+                cap_secret: None,
+                payload: ExternIO::encode(()).unwrap(),
+            }])?;
+            Ok(InitCallbackResult::Pass)
+        })
+        .function("touch", |_, _: ()| {
+            // Simple Zome to just trigger a call to init.
+            Ok(())
+        });
+    let (dna_2, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_2).await;
+
+    let app = conductor
+        .setup_app_for_agent("app", agent, &[dna_1, dna_2])
+        .await
+        .unwrap();
+    let (_cell_1, cell_2) = app.into_tuple();
+
+    let () = conductor
+        .call(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .await;
+}
