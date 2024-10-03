@@ -824,6 +824,7 @@ impl InstalledAppCommon {
 
     /// Constructor for apps not using a manifest.
     /// Allows for cloning up to 256 times and implies immediate provisioning.
+    #[cfg(feature = "test_utils")]
     pub fn new_legacy<S: ToString, I: IntoIterator<Item = InstalledCell>>(
         installed_app_id: S,
         installed_cells: I,
