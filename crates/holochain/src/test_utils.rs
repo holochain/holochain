@@ -1049,7 +1049,7 @@ pub async fn fake_genesis_for_agent(
 }
 
 /// Force all dht ops without enough validation receipts to be published.
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn force_publish_dht_ops(
     vault: &DbWrite<DbKindAuthored>,
     publish_trigger: &mut TriggerSender,

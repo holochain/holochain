@@ -3084,7 +3084,7 @@ mod misc_impls {
         //       the local head. In [`ChainHeadOrdering::Relaxed`] mode, we have the opportunity to rebase the current
         //       scratch records onto the incoming grafted records from the CHC. We can also make use of the validation
         //       and integration that already runs for flushed records, rather than re-implementing those here.
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn graft_records_onto_source_chain(
             self: Arc<Self>,
             cell_id: CellId,
