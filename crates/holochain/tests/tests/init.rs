@@ -1,9 +1,39 @@
-use std::sync::atomic::AtomicU8;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 
 use holochain::prelude::*;
 use holochain::sweettest::*;
+
+#[tokio::test(flavor = "multi_thread")]
+async fn call_to_init_passes() {
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let is_init_called = Arc::new(AtomicBool::new(false));
+    let is_init_called_clone = is_init_called.clone();
+    let zome = SweetInlineZomes::new(vec![], 0)
+        .function("init", move |_, _: ()| {
+            is_init_called_clone.store(true, Ordering::Relaxed);
+            Ok(InitCallbackResult::Pass)
+        })
+        .function("touch", |_, _: ()| {
+            // Simple Zome to just trigger a call to init.
+            Ok(())
+        });
+
+    let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
+    let app = conductor
+        .setup_app_for_agent("app", agent, &[dna])
+        .await
+        .unwrap();
+    let (cell,) = app.into_tuple();
+
+    let () = conductor
+        .call(&cell.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .await;
+
+    assert!(is_init_called.load(Ordering::Relaxed));
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_from_init_across_cells() {
