@@ -520,14 +520,13 @@ async fn acquire_semaphore_permit(
     semaphore: Arc<Semaphore>,
 ) -> DatabaseResult<OwnedSemaphorePermit> {
     let id = nanoid::nanoid!(7);
-    tracing::trace!(?id, "???     acquire semaphore permit");
+    tracing::debug!(?id, "???     acquire semaphore permit");
     let permit = tokio::time::timeout(
         std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
         semaphore.acquire_owned(),
     )
     .await;
-    tracing::trace!(?id, ?permit, "    !!! semaphore permit obtained");
-    let permit_dbg = format!("{:?}", permit);
+    tracing::debug!(?id, ?permit, "    !!! semaphore permit obtained");
     match permit {
         Ok(Ok(s)) => Ok(s),
         Ok(Err(e)) => {
@@ -538,11 +537,7 @@ async fn acquire_semaphore_permit(
             Err(DatabaseError::Other(e.into()))
         }
         Err(e) => {
-            tracing::error!(
-                ?id,
-                permit = permit_dbg,
-                "Timed out waiting for semaphore permit"
-            );
+            tracing::error!(?id, "Timed out waiting for semaphore permit");
             Err(DatabaseError::Timeout(e))
         }
     }

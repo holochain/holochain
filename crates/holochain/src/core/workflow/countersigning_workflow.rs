@@ -754,6 +754,7 @@ async fn apply_timeout(
     Ok(())
 }
 
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 async fn force_abandon_session(
     space: Space,
     author: &AgentPubKey,
@@ -847,6 +848,7 @@ pub async fn countersigning_publish(
 }
 
 /// Abandon a countersigning session.
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 async fn abandon_session(
     authored_db: DbWrite<DbKindAuthored>,
     author: AgentPubKey,

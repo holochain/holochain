@@ -239,6 +239,7 @@ impl Cell {
         &self.holochain_p2p_cell
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
         let authored_db = match self.get_or_create_authored_db() {
             Ok(db) => db,
@@ -963,7 +964,6 @@ impl Cell {
     /// Check if each Zome's init callback has been run, and if not, run it.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub(crate) async fn check_or_run_zome_init(&self) -> CellResult<()> {
-        tracing::info!("check_or_run_zome_init CALLED");
         // Ensure that only one init check is run at a time
         let _guard = tokio::time::timeout(
             std::time::Duration::from_secs(INIT_MUTEX_TIMEOUT_SECS),

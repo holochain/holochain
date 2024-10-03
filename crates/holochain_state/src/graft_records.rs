@@ -1,4 +1,5 @@
 use holochain_chc::{ChcError, ChcImpl};
+use tokio::sync::OwnedSemaphorePermit;
 
 use crate::prelude::*;
 use crate::source_chain::SourceChain;
@@ -15,33 +16,37 @@ impl SourceChain {
         &self,
         chc: ChcImpl,
         new_records: Vec<Record>,
-    ) -> SourceChainResult<()> {
-        tracing::warn!(dbg = true);
+        permit: Option<OwnedSemaphorePermit>,
+    ) -> SourceChainResult<OwnedSemaphorePermit> {
+        let permit = if let Some(permit) = permit {
+            permit
+        } else {
+            self.author_db().acquire_write_permit().await?
+        };
         let res = chc.clone().add_records(new_records).await;
-        tracing::warn!(dbg = true);
         if let Err(ChcError::InvalidChain(_seq, hash)) = &res {
-            tracing::warn!(dbg = true);
             let records = chc.clone().get_record_data(Some(hash.clone())).await?;
-            tracing::warn!(dbg = true);
-            self.graft_records_onto_source_chain(records).await?;
-            tracing::warn!(dbg = true);
+            let (_, permit) = self
+                .graft_records_onto_source_chain(records, permit)
+                .await?;
+            Ok(permit)
+        } else {
+            res?;
+            Ok(permit)
         }
-        Ok(res?)
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn graft_records_onto_source_chain(
         &self,
         records: Vec<Record>,
-    ) -> SourceChainResult<Vec<(DhtOpHash, AnyLinkableHash)>> {
+        permit: OwnedSemaphorePermit,
+    ) -> SourceChainResult<(Vec<(DhtOpHash, AnyLinkableHash)>, OwnedSemaphorePermit)> {
         let cell_id = (*self.cell_id()).clone();
         tracing::warn!(dbg = true, "WAIT FOR TXN");
         self.author_db()
-            .write_async(|txn| {
-                tracing::warn!(dbg = true, "BEGIN TXN");
-                let r = Self::graft_records_onto_source_chain_txn(txn, records, cell_id);
-                tracing::warn!(dbg = true, "END TXN");
-                r
+            .write_async_with_permit(permit, move |txn| {
+                Self::graft_records_onto_source_chain_txn(txn, records, cell_id)
             })
             .await
     }

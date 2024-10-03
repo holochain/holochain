@@ -258,7 +258,7 @@ mod tests {
 
     // TODO: run this against a remote CHC too
     #[tokio::test(flavor = "multi_thread")]
-    async fn multi_conductor_chc_sync() {
+    async fn multi_conductor_chc_sync_with_genesis() {
         holochain_trace::test_run_timed().unwrap();
         // holochain_trace::test_run();
 

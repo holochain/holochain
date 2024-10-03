@@ -278,6 +278,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 }
 
 /// Insert ops directly into the database and mark integrated as valid
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn fill_db<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
     db.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.to_hash();
@@ -291,6 +292,7 @@ pub async fn fill_db<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed
 }
 
 /// Insert ops directly into the database and mark integrated as rejected
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
     db.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.to_hash();
@@ -304,6 +306,7 @@ pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: Chai
 }
 
 /// Insert ops directly into the database and mark valid and pending integration
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
     db.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.to_hash();
@@ -316,6 +319,7 @@ pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: Chain
 }
 
 /// Insert ops into the authored database
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn fill_db_as_author(db: &DbWrite<DbKindAuthored>, op: ChainOpHashed) {
     db.write_async(move |txn| -> DatabaseResult<()> {
         insert_op(txn, &op.downcast()).unwrap();

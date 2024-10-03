@@ -287,62 +287,68 @@ impl SourceChain {
 
         // Take out a write lock as late as possible, after doing everything we can in memory and
         // before starting any database read/write operations.
-        let write_permit = self.vault.acquire_write_permit().await?;
+        let write_permit = {
+            let permit = self.vault.acquire_write_permit().await?;
 
-        // If there are records to write, then we need to respect the chain lock and push to the CHC
-        if !records.is_empty() {
-            self.vault
-                .read_async({
-                    let author = author.clone();
-                    move |txn| {
-                        let chain_lock = get_chain_lock(&txn, author.as_ref())?;
-                        match chain_lock {
-                            Some(chain_lock) => {
-                                // If the chain is locked, the lock must be for this entry.
-                                if chain_lock.subject() != lock_subject {
-                                    return Err(SourceChainError::ChainLocked);
-                                }
-                                // If the lock is expired then we can't write this countersigning session.
-                                else if chain_lock.is_expired_at(now) {
-                                    return Err(SourceChainError::LockExpired);
-                                }
+            // If there are records to write, then we need to respect the chain lock and push to the CHC
+            if !records.is_empty() {
+                self.vault
+                    .read_async({
+                        let author = author.clone();
+                        move |txn| {
+                            let chain_lock = get_chain_lock(&txn, author.as_ref())?;
+                            match chain_lock {
+                                Some(chain_lock) => {
+                                    // If the chain is locked, the lock must be for this entry.
+                                    if chain_lock.subject() != lock_subject {
+                                        return Err(SourceChainError::ChainLocked);
+                                    }
+                                    // If the lock is expired then we can't write this countersigning session.
+                                    else if chain_lock.is_expired_at(now) {
+                                        return Err(SourceChainError::LockExpired);
+                                    }
 
-                                // Otherwise, the lock matches this entry and has not expired. We can proceed!
-                            }
-                            None => {
-                                // If this is a countersigning entry but there is no chain lock then maybe
-                                // the session expired before the entry could be written or maybe the app
-                                // has just made a mistake. Either way, it's not valid to write this entry!
-                                if is_countersigning_session {
-                                    return Err(
-                                        SourceChainError::CountersigningWriteWithoutSession,
-                                    );
+                                    // Otherwise, the lock matches this entry and has not expired. We can proceed!
+                                }
+                                None => {
+                                    // If this is a countersigning entry but there is no chain lock then maybe
+                                    // the session expired before the entry could be written or maybe the app
+                                    // has just made a mistake. Either way, it's not valid to write this entry!
+                                    if is_countersigning_session {
+                                        return Err(
+                                            SourceChainError::CountersigningWriteWithoutSession,
+                                        );
+                                    }
                                 }
                             }
+
+                            Ok(())
                         }
+                    })
+                    .await?;
 
-                        Ok(())
+                // Sync with CHC, if CHC is present
+                if let Some(chc) = network.chc() {
+                    // Skip the CHC sync if this is a countersigning session.
+                    // If the session times out, we might roll the chain back to the previous head, and so
+                    // we don't want the record to exist remotely.
+                    if is_countersigning_session {
+                        tracing::debug!(
+                            "Skipping CHC push for countersigning session: {:?}",
+                            records
+                        );
+                        permit
+                    } else {
+                        self.sync_records(chc, records.clone(), Some(permit))
+                            .await?
                     }
-                })
-                .await?;
-
-            // Sync with CHC, if CHC is present
-            if let Some(chc) = network.chc() {
-                // Skip the CHC sync if this is a countersigning session.
-                // If the session times out, we might roll the chain back to the previous head, and so
-                // we don't want the record to exist remotely.
-                if is_countersigning_session {
-                    tracing::debug!(
-                        "Skipping CHC push for countersigning session: {:?}",
-                        records
-                    );
                 } else {
-                    tracing::warn!(dbg = true);
-                    self.sync_records(chc, records.clone()).await?;
-                    tracing::warn!(dbg = true);
+                    permit
                 }
+            } else {
+                permit
             }
-        }
+        };
 
         let chain_flush_result = self
             .vault
@@ -1229,10 +1235,11 @@ pub async fn genesis(
         )
         .await?;
         let records = vec![dna_record, agent_validation_record, agent_record];
-        chain
-            .sync_records(chc, records)
+        let _permit = chain
+            .sync_records(chc, records, None)
             .await
             .map_err(SourceChainError::other)?;
+        drop(_permit);
     }
 
     let ops_to_integrate = authored
