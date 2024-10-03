@@ -1581,7 +1581,7 @@ mod app_impls {
                     agent_key.clone(),
                     roles,
                     manifest,
-                    installed_at: Timestamp::now(),
+                    Timestamp::now(),
                 )?;
 
                 let (_, app) = self
@@ -1602,7 +1602,7 @@ mod app_impls {
                         agent_key.clone(),
                         roles,
                         manifest,
-                        installed_at: Timestamp::now(),
+                        Timestamp::now(),
                     )?;
 
                     // Update the db

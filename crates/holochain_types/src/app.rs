@@ -886,7 +886,7 @@ impl InstalledAppCommon {
             agent_key,
             role_assignments,
             manifest,
-            Timestamp::now(),
+            installed_at: Timestamp::now(),
         })
     }
 

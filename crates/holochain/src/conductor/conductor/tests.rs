@@ -1363,7 +1363,6 @@ async fn test_deferred_memproof_provisioning_uninstall() {
     assert_eq!(conductor.list_apps(None).await.unwrap().len(), 0);
 }
 
-
 #[tokio::test(flavor = "multi_thread")]
 async fn test_list_apps_sorted_consistently() {
     holochain_trace::test_run();
@@ -1385,12 +1384,8 @@ async fn test_list_apps_sorted_consistently() {
     let app2 = conductor.setup_app("app2", [&dna1]).await.unwrap();
     let app3 = conductor.setup_app("app3", [&dna1]).await.unwrap();
 
-    let list_apps = |conductor: ConductorHandle| async move {
-        conductor
-            .list_apps()
-            .await
-            .unwrap()
-    };
+    let list_apps =
+        |conductor: ConductorHandle| async move { conductor.list_apps().await.unwrap() };
 
     // Ensure that ordering is sorted by installed_at descending
     assert_eq!(
