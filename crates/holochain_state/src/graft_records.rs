@@ -24,14 +24,15 @@ impl SourceChain {
             self.author_db().acquire_write_permit().await?
         };
         let res = chc.clone().add_records(new_records).await;
-        if let Err(ChcError::InvalidChain(_seq, hash)) = &res {
+        if let Err(ChcError::InvalidChain(seq, hash)) = &res {
+            tracing::warn!(seq, ?hash, "out of sync with CHC, syncing records");
             let records = chc.clone().get_record_data(Some(hash.clone())).await?;
             let (_, permit) = self
                 .graft_records_onto_source_chain(records, permit)
                 .await?;
-            Ok(permit)
+            res.map(move |()| permit).map_err(Into::into)
         } else {
-            res?;
+            // res is Ok
             Ok(permit)
         }
     }
@@ -43,7 +44,6 @@ impl SourceChain {
         permit: OwnedSemaphorePermit,
     ) -> SourceChainResult<(Vec<(DhtOpHash, AnyLinkableHash)>, OwnedSemaphorePermit)> {
         let cell_id = (*self.cell_id()).clone();
-        tracing::warn!(dbg = true, "WAIT FOR TXN");
         self.author_db()
             .write_async_with_permit(permit, move |txn| {
                 Self::graft_records_onto_source_chain_txn(txn, records, cell_id)
@@ -57,7 +57,6 @@ impl SourceChain {
         records: Vec<Record>,
         cell_id: CellId,
     ) -> SourceChainResult<Vec<(DhtOpHash, AnyLinkableHash)>> {
-        tracing::warn!(dbg = true, "BEGIN graft_records_onto_source_chain_txn");
         let existing = Self::query_txn(
             txn,
             ChainQueryFilter::new().descending(),
@@ -125,7 +124,6 @@ impl SourceChain {
             );
         }
 
-        tracing::warn!(dbg = true, "END graft_records_onto_source_chain_txn");
         Ok(ops_to_integrate)
     }
 }
