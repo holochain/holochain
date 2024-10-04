@@ -749,6 +749,14 @@ macro_rules! do_callback {
                     <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
                         .map_err(|e| -> RuntimeError { WasmHostError(e).into() })?,
                 ),
+                Some(Err((
+                    _zome,
+                    RibosomeError::InlineZomeError(InlineZomeError::SerializationError(
+                        SerializedBytesError::Deserialize(_),
+                    )),
+                ))) => {
+                    return Err(RibosomeError::CallbackInvalidDeclaration);
+                }
                 Some(Err((_zome, other_error))) => return Err(other_error),
                 None => {
                     break;

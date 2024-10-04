@@ -192,9 +192,6 @@ async fn call_init_with_invalid_return_type_across_cells() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[should_panic(
-    expected = "SerializationError(Deserialize(\"invalid type: unit value, expected usize\"))"
-)]
 async fn call_init_with_invalid_parameters() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
@@ -213,15 +210,16 @@ async fn call_init_with_invalid_parameters() {
         .unwrap();
     let (cell,) = app.into_tuple();
 
-    let () = conductor
-        .call(&cell.zome(SweetInlineZomes::COORDINATOR), "touch", ())
-        .await;
+    let err = conductor
+        .call_fallible::<_, ()>(&cell.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .await
+        .unwrap_err();
+
+    let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
+    assert!(let WorkflowError::RibosomeError(RibosomeError::CallbackInvalidDeclaration) = *workflow_err);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[should_panic(
-    expected = "error: Host(\"Deserialize(\\\"invalid type: unit value, expected usize\\\")\")"
-)]
 async fn call_init_with_invalid_parameters_across_cells() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
@@ -258,7 +256,24 @@ async fn call_init_with_invalid_parameters_across_cells() {
         .unwrap();
     let (_cell_1, cell_2) = app.into_tuple();
 
-    let () = conductor
-        .call(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
-        .await;
+    let err = conductor
+        .call_fallible::<_, ()>(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .await
+        .unwrap_err();
+
+    let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
+    let_assert!(
+        WorkflowError::RibosomeError(RibosomeError::InlineZomeError(
+            InlineZomeError::HostFnApiError(HostFnApiError::RibosomeError(wasm_runtime_err))
+        )) = *workflow_err
+    );
+    let_assert!(
+        WasmError { error, .. } = wasm_runtime_err
+            .source()
+            .unwrap()
+            .downcast_ref::<WasmError>()
+            .unwrap()
+    );
+    let_assert!(WasmErrorInner::Host(err_msg) = error);
+    assert!(err_msg == "The callback has an invalid declaration");
 }
