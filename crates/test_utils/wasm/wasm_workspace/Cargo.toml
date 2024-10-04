@@ -31,6 +31,7 @@ members = [
   "hdk_extern",
   "init_fail",
   "init_invalid_return",
+  "init_invalid_params",
   "init_pass",
   "integrity_zome",
   "link",

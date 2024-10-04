@@ -237,7 +237,7 @@ mod slow_tests {
     use crate::sweettest::SweetZome;
     use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
-    use assert2::assert;
+    use assert2::{assert, check, let_assert};
     use holo_hash::ActionHash;
     use holochain_types::app::DisableCloneCellPayload;
     use holochain_types::prelude::CreateCloneCellPayload;
@@ -332,6 +332,25 @@ mod slow_tests {
             .unwrap_err();
 
         assert!(let RibosomeError::CallbackInvalidDeclaration = err);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_init_implemented_invalid_params() {
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitInvalidParams]))
+            .next()
+            .unwrap();
+        let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
+        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
+
+        let host_access = fixt!(InitHostAccess);
+        let result = ribosome
+            .run_init(host_access, init_invocation)
+            .await
+            .unwrap();
+
+        let_assert!(InitResult::Fail(zome, err_msg) = result);
+        check!(zome == TestWasm::InitInvalidParams.into());
+        check!(err_msg == "WasmError { file: \"init_invalid_params/src/lib.rs\", line: 3, error: Deserialize([192]) }");
     }
 
     #[tokio::test(flavor = "multi_thread")]
