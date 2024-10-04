@@ -1378,8 +1378,9 @@ async fn test_list_apps_sorted_consistently() {
     let _ = conductor.setup_app("app2", [&dna1]).await.unwrap();
     let _ = conductor.setup_app("app3", [&dna1]).await.unwrap();
 
-    let list_app_ids = |conductor: ConductorHandle| async move { 
-        conductor.list_apps(None)
+    let list_app_ids = |conductor: ConductorHandle| async move {
+        conductor
+            .list_apps(None)
             .await
             .unwrap()
             .into_iter()
