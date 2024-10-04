@@ -226,6 +226,7 @@ mod test {
 mod slow_tests {
     use super::InitResult;
     use crate::conductor::api::error::ConductorApiResult;
+    use crate::core::ribosome::RibosomeError;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
@@ -236,6 +237,7 @@ mod slow_tests {
     use crate::sweettest::SweetZome;
     use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
+    use assert2::assert;
     use holo_hash::ActionHash;
     use holochain_types::app::DisableCloneCellPayload;
     use holochain_types::prelude::CreateCloneCellPayload;
@@ -329,11 +331,7 @@ mod slow_tests {
             .await
             .unwrap_err();
 
-        assert_eq!(
-            err.to_string(),
-            "The callback has an invalid declaration",
-            "err was {err:?}"
-        );
+        assert!(let RibosomeError::CallbackInvalidDeclaration = err);
     }
 
     #[tokio::test(flavor = "multi_thread")]

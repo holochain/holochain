@@ -1,6 +1,12 @@
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 
+use assert2::{assert, let_assert};
+use hdk::prelude::{WasmError, WasmErrorInner};
+use holochain::conductor::api::error::ConductorApiError;
+use holochain::conductor::CellError;
+use holochain::core::ribosome::error::RibosomeError;
+use holochain::core::workflow::WorkflowError;
 use holochain::prelude::*;
 use holochain::sweettest::*;
 
@@ -122,11 +128,8 @@ async fn call_init_with_invalid_return_type() {
         .await
         .unwrap_err();
 
-    assert_eq!(
-        err.to_string(),
-        "The callback has an invalid declaration",
-        "err was {err:?}"
-    );
+    let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
+    assert!(let WorkflowError::RibosomeError(RibosomeError::CallbackInvalidDeclaration) = *workflow_err);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -171,11 +174,21 @@ async fn call_init_with_invalid_return_type_across_cells() {
         .await
         .unwrap_err();
 
-    assert_eq!(
-        err.to_string(),
-        "The callback has an invalid declaration",
-        "err was {err:?}"
+    let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
+    let_assert!(
+        WorkflowError::RibosomeError(RibosomeError::InlineZomeError(
+            InlineZomeError::HostFnApiError(HostFnApiError::RibosomeError(wasm_runtime_err))
+        )) = *workflow_err
     );
+    let_assert!(
+        WasmError { error, .. } = wasm_runtime_err
+            .source()
+            .unwrap()
+            .downcast_ref::<WasmError>()
+            .unwrap()
+    );
+    let_assert!(WasmErrorInner::Host(err_msg) = error);
+    assert!(err_msg == "The callback has an invalid declaration");
 }
 
 #[tokio::test(flavor = "multi_thread")]
