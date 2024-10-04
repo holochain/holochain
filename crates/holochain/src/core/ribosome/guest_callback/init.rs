@@ -237,7 +237,7 @@ mod slow_tests {
     use crate::sweettest::SweetZome;
     use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
-    use assert2::{assert, check, let_assert};
+    use assert2::assert;
     use holo_hash::ActionHash;
     use holochain_types::app::DisableCloneCellPayload;
     use holochain_types::prelude::CreateCloneCellPayload;
@@ -343,14 +343,12 @@ mod slow_tests {
         init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
-        let result = ribosome
+        let err = ribosome
             .run_init(host_access, init_invocation)
             .await
-            .unwrap();
+            .unwrap_err();
 
-        let_assert!(InitResult::Fail(zome, err_msg) = result);
-        check!(zome == TestWasm::InitInvalidParams.into());
-        check!(err_msg == "WasmError { file: \"init_invalid_params/src/lib.rs\", line: 3, error: Deserialize([192]) }");
+        assert!(let RibosomeError::CallbackInvalidDeclaration = err);
     }
 
     #[tokio::test(flavor = "multi_thread")]

@@ -744,11 +744,18 @@ macro_rules! do_callback {
                     }
                     Err(e) => return Err(RibosomeError::WasmRuntimeError(wasm_error!(e).into())),
                 },
-                Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => (
-                    zome.into(),
-                    <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
-                        .map_err(|e| -> RuntimeError { WasmHostError(e).into() })?,
-                ),
+                Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => {
+                    let wasm_error: WasmError = runtime_error.downcast()?;
+                    if let WasmErrorInner::Deserialize(_) = wasm_error.error {
+                        return Err(RibosomeError::CallbackInvalidDeclaration);
+                    }
+
+                    (
+                        zome.into(),
+                        <$callback_result>::try_from_wasm_error(wasm_error)
+                            .map_err(|e| -> RuntimeError { WasmHostError(e).into() })?,
+                    )
+                }
                 Some(Err((
                     _zome,
                     RibosomeError::InlineZomeError(InlineZomeError::SerializationError(
