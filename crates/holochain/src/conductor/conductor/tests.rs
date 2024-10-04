@@ -1391,12 +1391,12 @@ async fn test_list_apps_sorted_consistently() {
     // Ensure that ordering is sorted by installed_at descending
     assert_eq!(
         list_app_ids(conductor.clone()).await,
-        ["app1".to_string(), "app2".to_string(), "app3".to_string()]
+        ["app3".to_string(), "app2".to_string(), "app1".to_string()]
     );
 
     // Ensure that ordering is consistent every time
     assert_eq!(
         list_app_ids(conductor.clone()).await,
-        ["app1".to_string(), "app2".to_string(), "app3".to_string()]
+        ["app3".to_string(), "app2".to_string(), "app1".to_string()]
     );
 }
