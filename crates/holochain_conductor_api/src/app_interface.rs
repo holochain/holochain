@@ -328,7 +328,7 @@ pub struct AppInfo {
     /// The original AppManifest used to install the app, which can also be used to
     /// install the app again under a new agent.
     pub manifest: AppManifest,
-    /// The timestamp when this app was installed
+    /// The timestamp when this app was installed.
     pub installed_at: Timestamp,
 }
 
