@@ -1,6 +1,6 @@
 [package]
 name = "holochain_chc"
-version = "0.1.0-dev.8"
+version = "0.1.0"
 description = "Defines the Chain Head Coordinator (CHC) API for Holochain and provides an HTTP client implementation."
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,9 +14,9 @@ async-trait = "0.1"
 derive_more = "0.99"
 futures = "0.3"
 getrandom = "0.2.7"
-holochain_keystore = { version = "^0.4.0-dev.24", path = "../holochain_keystore", default-features = false }
-holochain_nonce = { version = "^0.4.0-dev.7", path = "../holochain_nonce" }
-holochain_types = { path = "../holochain_types", version = "^0.4.0-dev.27" }
+holochain_keystore = { version = "^0.4.0", path = "../holochain_keystore", default-features = false }
+holochain_nonce = { version = "^0.4.0", path = "../holochain_nonce" }
+holochain_types = { path = "../holochain_types", version = "^0.4.0" }
 one_err = "0.0.8"
 must_future = "0.1.1"
 parking_lot = "0.12"
@@ -37,7 +37,7 @@ reqwest = { version = "0.12", features = [
 [dev-dependencies]
 holochain_chc = { path = ".", features = ["test_utils"] }
 
-fixt = { version = "^0.4.0-dev.4", path = "../fixt" }
+fixt = { version = "^0.4.0", path = "../fixt" }
 pretty_assertions = "1.4"
 tokio = { version = "1.36.0", features = ["full"] }
 
