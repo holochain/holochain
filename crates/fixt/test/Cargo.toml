@@ -12,5 +12,5 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-fixt = { path = ".." ,version = "^0.3.3-rc.0"}
+fixt = { path = ".." ,version = "^0.3.3"}
 paste = "1.0.12"
