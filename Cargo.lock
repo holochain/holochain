@@ -2977,7 +2977,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.4.0-dev.28"
+version = "0.4.0"
 dependencies = [
  "aitia",
  "anyhow",

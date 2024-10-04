@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.4.0-dev.28"
+version = "0.4.0"
 description = "Holochain, a framework for distributed applications"
 license = "CAL-1.0"
 repository = "https://github.com/holochain/holochain"
