@@ -106,6 +106,9 @@ pub enum RibosomeError {
 
     #[error(transparent)]
     IO(#[from] std::io::Error),
+
+    #[error("The callback has an invalid declaration")]
+    CallbackInvalidDeclaration,
 }
 
 /// Type alias

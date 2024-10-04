@@ -316,7 +316,6 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[should_panic(expected = "invalid type: unit value, expected variant identifier")]
     async fn test_init_implemented_invalid_return() {
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitInvalidReturn]))
             .next()
@@ -325,10 +324,16 @@ mod slow_tests {
         init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
 
         let host_access = fixt!(InitHostAccess);
-        let _result = ribosome
+        let err = ribosome
             .run_init(host_access, init_invocation)
             .await
-            .unwrap();
+            .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "The callback has an invalid declaration",
+            "err was {err:?}"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

@@ -99,7 +99,6 @@ async fn call_init_from_init_across_cells() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[should_panic(expected = "error: Serialize(Deserialize(\"invalid value: integer `42`")]
 async fn call_init_with_invalid_return_type() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
@@ -118,13 +117,19 @@ async fn call_init_with_invalid_return_type() {
         .unwrap();
     let (cell,) = app.into_tuple();
 
-    let () = conductor
-        .call(&cell.zome(SweetInlineZomes::COORDINATOR), "touch", ())
-        .await;
+    let err = conductor
+        .call_fallible::<_, ()>(&cell.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "The callback has an invalid declaration",
+        "err was {err:?}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[should_panic(expected = "error: Serialize(Deserialize(\\\"invalid value: integer `42`")]
 async fn call_init_with_invalid_return_type_across_cells() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
@@ -161,9 +166,16 @@ async fn call_init_with_invalid_return_type_across_cells() {
         .unwrap();
     let (_cell_1, cell_2) = app.into_tuple();
 
-    let () = conductor
-        .call(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
-        .await;
+    let err = conductor
+        .call_fallible::<_, ()>(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .await
+        .unwrap_err();
+
+    assert_eq!(
+        err.to_string(),
+        "The callback has an invalid declaration",
+        "err was {err:?}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
