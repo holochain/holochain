@@ -1834,15 +1834,14 @@ mod app_impls {
                     .collect(),
             };
 
-            let app_infos: Vec<AppInfo> = apps_ids
+            let mut app_infos: Vec<AppInfo> = apps_ids
                 .into_iter()
                 .map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .flatten()
-                .sort_by_key(|app_info| app_info.installed_at)
-                .reverse()
                 .collect();
+            app_infos.sort_by_key(|app_info| std::cmp::Reverse(app_info.installed_at));
 
             Ok(app_infos)
         }

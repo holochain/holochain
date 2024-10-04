@@ -341,7 +341,7 @@ impl AppInfo {
         let status = app.status().clone().into();
         let agent_pub_key = app.agent_key().to_owned();
         let mut manifest = app.manifest().clone();
-        let installed_at = app.installed_at().clone();
+        let installed_at = *app.installed_at();
 
         let mut cell_info: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
         app.roles().iter().for_each(|(role_name, role_assignment)| {
