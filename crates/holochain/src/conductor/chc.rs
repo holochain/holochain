@@ -220,6 +220,10 @@ mod tests {
             .lock()
             .insert(cell_id.clone(), flaky_chc.clone());
 
+        // Assert that the installed CHC is now bad
+        let chc = conductor.get_chc(&cell_id).unwrap();
+        chc.get_record_data(None).await.unwrap_err();
+
         // The app can't be installed, because of a CHC error during genesis
         let err = conductor
             .setup_app_for_agent("app", agent.clone(), [&dna_file])
@@ -259,8 +263,7 @@ mod tests {
     // TODO: run this against a remote CHC too
     #[tokio::test(flavor = "multi_thread")]
     async fn multi_conductor_chc_sync_with_genesis() {
-        holochain_trace::test_run_timed().unwrap();
-        // holochain_trace::test_run();
+        holochain_trace::test_run();
 
         let mut config = SweetConductorConfig::standard().no_dpki();
         // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/"));

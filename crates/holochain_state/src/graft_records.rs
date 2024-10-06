@@ -24,13 +24,19 @@ impl SourceChain {
             self.author_db().acquire_write_permit().await?
         };
         let res = chc.clone().add_records(new_records).await;
-        if let Err(ChcError::InvalidChain(seq, hash)) = &res {
-            tracing::warn!(seq, ?hash, "out of sync with CHC, syncing records");
-            let records = chc.clone().get_record_data(Some(hash.clone())).await?;
-            let (_, permit) = self
-                .graft_records_onto_source_chain(records, permit)
-                .await?;
-            res.map(move |()| permit).map_err(Into::into)
+        if let Err(err) = &res {
+            // If the chain is out of sync, perform a sync to get the local chain back in sync,
+            // and then return the out-of-sync error
+            if let ChcError::InvalidChain(seq, hash) = err {
+                tracing::warn!(seq, ?hash, "out of sync with CHC, syncing records");
+                let records = chc.clone().get_record_data(Some(hash.clone())).await?;
+                let (_, permit) = self
+                    .graft_records_onto_source_chain(records, permit)
+                    .await?;
+                res.map(move |()| permit).map_err(Into::into)
+            } else {
+                res.map(move |()| permit).map_err(Into::into)
+            }
         } else {
             // res is Ok
             Ok(permit)
