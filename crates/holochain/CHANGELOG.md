@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   can continue to send further valid message. There is another issue to track partial deserialization #4251 so we can
   respond with an error message instead of a timeout. #4252
   
+## 0.4.0
+
 ## 0.4.0-dev.28
 
 ## 0.4.0-dev.27
