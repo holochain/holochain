@@ -231,6 +231,7 @@ mod slow_tests {
     use super::ValidateResult;
     use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::core::ribosome::RibosomeError;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::curve::Zomes;
@@ -238,6 +239,7 @@ mod slow_tests {
     use ::fixt::prelude::*;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
+    use assert2::{assert, let_assert};
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::op::Op;
@@ -274,6 +276,25 @@ mod slow_tests {
             .await
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_validate_implemented_invalid_return() {
+        let mut u = Unstructured::new(&NOISE);
+        let mut validate_invocation = ValidateInvocation::arbitrary(&mut u).unwrap();
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalidReturn]))
+            .next()
+            .unwrap();
+        validate_invocation.zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidReturn).erase_type());
+
+        let err = ribosome
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
+            .unwrap_err();
+
+        let_assert!(RibosomeError::CallbackInvalidReturnType(err_msg) = err);
+        assert!(err_msg == "invalid value: integer `42`, expected variant index 0 <= i < 3");
     }
 
     #[tokio::test(flavor = "multi_thread")]
