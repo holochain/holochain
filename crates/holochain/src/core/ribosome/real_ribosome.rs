@@ -748,8 +748,8 @@ macro_rules! do_callback {
                 Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => {
                     let wasm_error: WasmError = runtime_error.downcast()?;
                     if let WasmErrorInner::Deserialize(_) = wasm_error.error {
-                        // Error returned when callback called via ribosome
-                        return Err(RibosomeError::CallbackInvalidParameters);
+                        // Error returned when callback called via ribosome with invalid parameters
+                        return Err(RibosomeError::CallbackInvalidParameters(String::default()));
                     }
 
                     (
@@ -761,10 +761,11 @@ macro_rules! do_callback {
                 Some(Err((
                     _zome,
                     RibosomeError::InlineZomeError(InlineZomeError::SerializationError(
-                        SerializedBytesError::Deserialize(_),
+                        SerializedBytesError::Deserialize(err_msg),
                     )),
                 ))) => {
-                    return Err(RibosomeError::CallbackInvalidDeclaration);
+                    // Error returned when callback called via zome call with invalid parameters
+                    return Err(RibosomeError::CallbackInvalidParameters(err_msg));
                 }
                 Some(Err((_zome, other_error))) => return Err(other_error),
                 None => {

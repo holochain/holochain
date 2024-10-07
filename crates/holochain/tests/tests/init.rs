@@ -220,7 +220,11 @@ async fn call_init_with_invalid_parameters() {
         .unwrap_err();
 
     let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
-    assert!(let WorkflowError::RibosomeError(RibosomeError::CallbackInvalidDeclaration) = *workflow_err);
+    let_assert!(
+        WorkflowError::RibosomeError(RibosomeError::CallbackInvalidParameters(err_msg)) =
+            *workflow_err
+    );
+    assert!(err_msg == "invalid type: unit value, expected usize");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -279,5 +283,7 @@ async fn call_init_with_invalid_parameters_across_cells() {
             .unwrap()
     );
     let_assert!(WasmErrorInner::Host(err_msg) = error);
-    assert!(err_msg == "The callback has an invalid declaration");
+    assert!(
+        err_msg == "The callback has invalid parameters: invalid type: unit value, expected usize"
+    );
 }
