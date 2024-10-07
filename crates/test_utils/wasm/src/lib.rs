@@ -75,6 +75,7 @@ pub enum TestWasm {
     ValidateCreateLinkValid,
     ValidateRejectAppTypes,
     ValidateInvalidReturn,
+    ValidateInvalidParams,
     WhoAmI,
     ZomeInfo,
 }
@@ -188,6 +189,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidateCreateLinkValid => "validate_link_add_valid",
             TestWasm::ValidateRejectAppTypes => "validate_reject_app_types",
             TestWasm::ValidateInvalidReturn => "validate_invalid_return",
+            TestWasm::ValidateInvalidParams => "validate_invalid_params",
             TestWasm::WhoAmI => "whoami",
             TestWasm::ZomeInfo => "zome_info",
         })
@@ -302,6 +304,7 @@ impl From<TestWasm> for PathBuf {
                 "wasm32-unknown-unknown/release/test_wasm_validate_reject_app_types.wasm"
             }
             TestWasm::ValidateInvalidReturn => "wasm32-unknown-unknown/release/test_wasm_validate_invalid_return.wasm",
+            TestWasm::ValidateInvalidParams => "wasm32-unknown-unknown/release/test_wasm_validate_invalid_params.wasm",
             TestWasm::WhoAmI => "wasm32-unknown-unknown/release/test_wasm_whoami.wasm",
             TestWasm::ZomeInfo => "wasm32-unknown-unknown/release/test_wasm_zome_info.wasm",
         })

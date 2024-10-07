@@ -298,6 +298,25 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn test_validate_implemented_invalid_params() {
+        let mut u = Unstructured::new(&NOISE);
+        let mut validate_invocation = ValidateInvocation::arbitrary(&mut u).unwrap();
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalidParams]))
+            .next()
+            .unwrap();
+        validate_invocation.zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidParams).erase_type());
+
+        let err = ribosome
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
+            .unwrap_err();
+
+        let_assert!(RibosomeError::CallbackInvalidParameters(err_msg) = err);
+        assert!(err_msg == String::default());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_multi() {
         let mut u = Unstructured::new(&NOISE);
 
