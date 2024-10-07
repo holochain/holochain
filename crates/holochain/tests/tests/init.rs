@@ -129,7 +129,11 @@ async fn call_init_with_invalid_return_type() {
         .unwrap_err();
 
     let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
-    assert!(let WorkflowError::RibosomeError(RibosomeError::CallbackInvalidDeclaration) = *workflow_err);
+    let_assert!(
+        WorkflowError::RibosomeError(RibosomeError::CallbackInvalidReturnType(err_msg)) =
+            *workflow_err
+    );
+    assert!(err_msg == "invalid value: integer `42`, expected variant index 0 <= i < 3");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -188,7 +192,7 @@ async fn call_init_with_invalid_return_type_across_cells() {
             .unwrap()
     );
     let_assert!(WasmErrorInner::Host(err_msg) = error);
-    assert!(err_msg == "The callback has an invalid declaration");
+    assert!(err_msg == "The callback has an invalid return type: invalid value: integer `42`, expected variant index 0 <= i < 3");
 }
 
 #[tokio::test(flavor = "multi_thread")]

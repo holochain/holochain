@@ -237,7 +237,7 @@ mod slow_tests {
     use crate::sweettest::SweetZome;
     use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
-    use assert2::assert;
+    use assert2::{assert, let_assert};
     use holo_hash::ActionHash;
     use holochain_types::app::DisableCloneCellPayload;
     use holochain_types::prelude::CreateCloneCellPayload;
@@ -331,7 +331,8 @@ mod slow_tests {
             .await
             .unwrap_err();
 
-        assert!(let RibosomeError::CallbackInvalidDeclaration = err);
+        let_assert!(RibosomeError::CallbackInvalidReturnType(err_msg) = err);
+        assert!(err_msg == "invalid type: unit value, expected variant identifier");
     }
 
     #[tokio::test(flavor = "multi_thread")]

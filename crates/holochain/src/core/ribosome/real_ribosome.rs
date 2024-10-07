@@ -739,8 +739,9 @@ macro_rules! do_callback {
             {
                 Some(Ok((zome, extern_io))) => match extern_io.decode() {
                     Ok(callback_result) => (zome.into(), callback_result),
-                    Err(SerializedBytesError::Deserialize(_)) => {
-                        return Err(RibosomeError::CallbackInvalidDeclaration);
+                    Err(SerializedBytesError::Deserialize(err_msg)) => {
+                        // Error returned when deserialization fails due to an invalid return type
+                        return Err(RibosomeError::CallbackInvalidReturnType(err_msg));
                     }
                     Err(e) => return Err(RibosomeError::WasmRuntimeError(wasm_error!(e).into())),
                 },
