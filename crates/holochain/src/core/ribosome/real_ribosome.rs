@@ -748,7 +748,8 @@ macro_rules! do_callback {
                 Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => {
                     let wasm_error: WasmError = runtime_error.downcast()?;
                     if let WasmErrorInner::Deserialize(_) = wasm_error.error {
-                        return Err(RibosomeError::CallbackInvalidDeclaration);
+                        // Error returned when callback called via ribosome
+                        return Err(RibosomeError::CallbackInvalidParameters);
                     }
 
                     (

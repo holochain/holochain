@@ -349,7 +349,7 @@ mod slow_tests {
             .await
             .unwrap_err();
 
-        assert!(let RibosomeError::CallbackInvalidDeclaration = err);
+        assert!(let RibosomeError::CallbackInvalidParameters = err);
     }
 
     #[tokio::test(flavor = "multi_thread")]

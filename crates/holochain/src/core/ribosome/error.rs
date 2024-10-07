@@ -112,6 +112,9 @@ pub enum RibosomeError {
 
     #[error("The callback has an invalid return type: {0}")]
     CallbackInvalidReturnType(String),
+
+    #[error("The callback has invalid parameters")]
+    CallbackInvalidParameters,
 }
 
 /// Type alias
