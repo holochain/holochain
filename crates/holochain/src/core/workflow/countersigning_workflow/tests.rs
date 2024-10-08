@@ -410,6 +410,143 @@ async fn receive_valid_and_invalid_signatures_and_complete() {
     test_harness.expect_scheduling_complete();
 }
 
+// Checks that when there are multiple authorities returning signature bundles and multiple sessions
+// happening between a pair of agents, the extra signature bundles beyond the first one received
+// are correctly handled. I.e. receiving further signature bundles after a new session has started
+// will not impact the new session.
+#[tokio::test(flavor = "multi_thread")]
+async fn ignore_signature_bundles_from_previous_session() {
+    holochain_trace::test_run();
+
+    let dna_hash = fixt!(DnaHash);
+    let mut test_harness = TestHarness::new(dna_hash, None).await;
+
+    // Prepare network mock to expect two sessions to complete during this test
+    test_harness.reconfigure_network({
+        move |mut net| {
+            net.expect_chc().times(2).returning(|| None);
+
+            net.expect_publish_countersign()
+                .times(2)
+                .returning(|_, _, _| Ok(()));
+
+            net
+        }
+    });
+
+    let bob = test_harness.new_remote_agent().await;
+
+    let request = test_preflight_request(&test_harness, Duration::from_secs(60), &bob);
+    let my_acceptance = test_harness
+        .accept_countersigning_request(request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let bob_acceptance = bob
+        .accept_preflight_request(request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) =
+        test_harness.build_session_data(request.clone(), vec![my_acceptance, bob_acceptance]);
+
+    // Receive the signatures for this session.
+    let signatures = vec![
+        bob.produce_signature(&session_data, &entry_hash, test_harness.keystore.clone())
+            .await,
+        test_harness
+            .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+            .await,
+    ];
+    countersigning_success(
+        test_harness.test_space.space.clone(),
+        test_harness.author.clone(),
+        signatures.clone(),
+        test_harness.countersigning_tx.clone(),
+    )
+    .await;
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    // The session gets completed by the first signature bundle we received
+    test_harness.expect_success_signal().await;
+    test_harness.expect_publish_and_integrate();
+    test_harness.expect_no_pending_signals();
+    test_harness.expect_empty_workspace();
+    test_harness.expect_scheduling_complete();
+
+    // Now we can start a new session
+    let new_request = test_preflight_request(&test_harness, Duration::from_secs(60), &bob);
+    let new_my_acceptance = test_harness
+        .accept_countersigning_request(new_request.clone())
+        .await
+        .unwrap();
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    let new_bob_acceptance = bob
+        .accept_preflight_request(new_request.clone(), test_harness.keystore.clone())
+        .await;
+
+    let (session_data, entry, entry_hash) = test_harness.build_session_data(
+        new_request.clone(),
+        vec![new_my_acceptance, new_bob_acceptance],
+    );
+
+    test_harness.expect_session_accepted();
+
+    // Receive the previous signatures again, they should be ignored.
+    countersigning_success(
+        test_harness.test_space.space.clone(),
+        test_harness.author.clone(),
+        signatures.clone(),
+        test_harness.countersigning_tx.clone(),
+    )
+    .await;
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    // Is this ideal? We're accepting the signatures
+    test_harness.expect_session_in_signatures_collected();
+
+    // Receive the right signatures for this session.
+    let new_signatures = vec![
+        bob.produce_signature(&session_data, &entry_hash, test_harness.keystore.clone())
+            .await,
+        test_harness
+            .commit_countersigning_entry(&session_data, entry.clone(), entry_hash.clone())
+            .await,
+    ];
+
+    countersigning_success(
+        test_harness.test_space.space.clone(),
+        test_harness.author.clone(),
+        new_signatures.clone(),
+        test_harness.countersigning_tx.clone(),
+    )
+    .await;
+
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+
+    // Now the session should complete with the new signatures
+    test_harness.expect_success_signal().await;
+    test_harness.expect_publish_and_integrate();
+    test_harness.expect_no_pending_signals();
+    test_harness.expect_empty_workspace();
+    test_harness.expect_scheduling_complete();
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn attempts_resolution_if_only_invalid_signatures_received() {
     holochain_trace::test_run();

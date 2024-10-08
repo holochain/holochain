@@ -63,7 +63,11 @@ pub(crate) async fn inner_countersigning_session_complete(
                     }
 
                     let transaction: holochain_state::prelude::CascadeTxnWrapper = txn.into();
-                    // TODO already looked up in current_countersigning_session?
+
+                    // Ensure that the entry is present in the database.
+                    // We've looked up the session as a Record, but that permits the entry to be
+                    // missing. The cs_entry_hash is stored on the action rather than being a
+                    // guarantee that the action is present.
                     if transaction.contains_entry(&entry_hash)? {
                         return Ok(Some((session_record, session_data)));
                     }
