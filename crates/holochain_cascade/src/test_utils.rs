@@ -332,7 +332,7 @@ pub fn handle_get_entry_txn(
     _options: holochain_p2p::event::GetOptions,
 ) -> WireEntryOps {
     let query = GetEntryOpsQuery::new(hash);
-    query.run(Txn::from(txn)).unwrap()
+    query.run(CascadeTxnWrapper::from(txn)).unwrap()
 }
 
 /// Utility for network simulation response to get record.
@@ -342,7 +342,7 @@ pub fn handle_get_record_txn(
     options: holochain_p2p::event::GetOptions,
 ) -> WireRecordOps {
     let query = GetRecordOpsQuery::new(hash, options);
-    query.run(Txn::from(txn)).unwrap()
+    query.run(CascadeTxnWrapper::from(txn)).unwrap()
 }
 
 /// Utility for network simulation response to get.

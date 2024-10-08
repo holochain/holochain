@@ -46,7 +46,7 @@ pub(crate) async fn inner_countersigning_session_complete(
     let reader_closure = {
         let entry_hash = entry_hash.clone();
         let author = author.clone();
-        move |txn: &Ta<DbKindAuthored>| {
+        move |txn: &Txn<DbKindAuthored>| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
             if let Some((session_record, cs_entry_hash, session_data)) =
                 current_countersigning_session(txn, Arc::new(author.clone()))?
@@ -62,7 +62,7 @@ pub(crate) async fn inner_countersigning_session_complete(
                         return SourceChainResult::Ok(None);
                     }
 
-                    let transaction: holochain_state::prelude::Txn = txn.into();
+                    let transaction: holochain_state::prelude::CascadeTxnWrapper = txn.into();
                     // TODO already looked up in current_countersigning_session?
                     if transaction.contains_entry(&entry_hash)? {
                         return Ok(Some((session_record, session_data)));

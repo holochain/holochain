@@ -40,6 +40,7 @@ pub mod prelude {
     pub use super::from_blob;
     pub use super::get_entry_from_db;
     pub use super::to_blob;
+    pub use super::CascadeTxnWrapper;
     pub use super::Params;
     pub use super::Query;
     pub use super::StateQueryResult;
@@ -47,7 +48,6 @@ pub mod prelude {
     pub use super::Stores;
     pub use super::StoresIter;
     pub use super::Transactions;
-    pub use super::Txn;
     pub use super::Txns;
     pub use holochain_sqlite::rusqlite::named_params;
     pub use holochain_sqlite::rusqlite::Row;
@@ -204,13 +204,13 @@ pub trait StoresIter<T> {
 
 /// Wrapper around a transaction reference, to which trait impls are attached
 #[derive(derive_more::Deref, derive_more::DerefMut)]
-pub struct Txn<'borrow, 'txn> {
+pub struct CascadeTxnWrapper<'borrow, 'txn> {
     txn: &'borrow Transaction<'txn>,
 }
 
 /// Wrapper around a collection of Txns, to which trait impls are attached
 pub struct Txns<'borrow, 'txn> {
-    txns: Vec<Txn<'borrow, 'txn>>,
+    txns: Vec<CascadeTxnWrapper<'borrow, 'txn>>,
 }
 
 /// Alias for an array of Transaction references
@@ -229,7 +229,7 @@ where
     filtered_scratch: FilteredScratch,
 }
 
-impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
+impl<'stmt, Q: Query> Stores<Q> for CascadeTxnWrapper<'stmt, '_> {
     type O = QueryStmt<'stmt, Q>;
 
     fn get_initial_data(&self, query: Q) -> StateQueryResult<Self::O> {
@@ -237,7 +237,7 @@ impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
     }
 }
 
-impl<'stmt> Store for Txn<'stmt, '_> {
+impl<'stmt> Store for CascadeTxnWrapper<'stmt, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         get_entry_from_db(self.txn, hash)
     }
@@ -450,7 +450,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     }
 }
 
-impl<'stmt> Txn<'stmt, '_> {
+impl<'stmt> CascadeTxnWrapper<'stmt, '_> {
     fn get_exact_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
         let record = self.txn.query_row(
             "
@@ -851,13 +851,13 @@ impl<'borrow, 'txn> DbScratch<'borrow, 'txn> {
     }
 }
 
-impl<'borrow, 'txn> From<&'borrow Transaction<'txn>> for Txn<'borrow, 'txn> {
+impl<'borrow, 'txn> From<&'borrow Transaction<'txn>> for CascadeTxnWrapper<'borrow, 'txn> {
     fn from(txn: &'borrow Transaction<'txn>) -> Self {
         Self { txn }
     }
 }
 
-impl<'borrow, 'txn> From<&'borrow mut Transaction<'txn>> for Txn<'borrow, 'txn> {
+impl<'borrow, 'txn> From<&'borrow mut Transaction<'txn>> for CascadeTxnWrapper<'borrow, 'txn> {
     fn from(txn: &'borrow mut Transaction<'txn>) -> Self {
         Self { txn }
     }
@@ -865,19 +865,26 @@ impl<'borrow, 'txn> From<&'borrow mut Transaction<'txn>> for Txn<'borrow, 'txn> 
 
 impl<'borrow, 'txn> From<&'borrow Transactions<'borrow, 'txn>> for Txns<'borrow, 'txn> {
     fn from(txns: &'borrow Transactions<'borrow, 'txn>) -> Self {
-        let txns = txns.iter().map(|&txn| Txn::from(txn)).collect();
+        let txns = txns
+            .iter()
+            .map(|&txn| CascadeTxnWrapper::from(txn))
+            .collect();
         Self { txns }
     }
 }
 
-impl<'borrow, 'txn, D: DbKindT> From<&'borrow Ta<'borrow, 'txn, D>> for Txn<'borrow, 'txn> {
-    fn from(txn: &'borrow Ta<'borrow, 'txn, D>) -> Self {
+impl<'borrow, 'txn, D: DbKindT> From<&'borrow Txn<'borrow, 'txn, D>>
+    for CascadeTxnWrapper<'borrow, 'txn>
+{
+    fn from(txn: &'borrow Txn<'borrow, 'txn, D>) -> Self {
         Self { txn }
     }
 }
 
-impl<'borrow, 'txn, D: DbKindT> From<&'borrow mut Ta<'borrow, 'txn, D>> for Txn<'borrow, 'txn> {
-    fn from(txn: &'borrow mut Ta<'borrow, 'txn, D>) -> Self {
+impl<'borrow, 'txn, D: DbKindT> From<&'borrow mut Txn<'borrow, 'txn, D>>
+    for CascadeTxnWrapper<'borrow, 'txn>
+{
+    fn from(txn: &'borrow mut Txn<'borrow, 'txn, D>) -> Self {
         Self { txn }
     }
 }

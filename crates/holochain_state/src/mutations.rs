@@ -92,7 +92,7 @@ pub fn insert_record_scratch(
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Authored database.
 pub fn insert_op_authored(
-    txn: &mut Ta<DbKindAuthored>,
+    txn: &mut Txn<DbKindAuthored>,
     op: &DhtOpHashed,
 ) -> StateMutationResult<()> {
     insert_op_when(txn, op, Timestamp::now(), None)
@@ -103,7 +103,7 @@ pub fn insert_op_authored(
 /// If `transfer_data` is None, that means that the Op was locally validated
 /// and is being included in the DHT by self-authority
 pub fn insert_op_dht(
-    txn: &mut Ta<DbKindDht>,
+    txn: &mut Txn<DbKindDht>,
     op: &DhtOpHashed,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
@@ -116,7 +116,7 @@ pub fn insert_op_unchecked(txn: &mut Transaction, op: &DhtOpHashed) -> StateMuta
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Cache database.
 pub fn insert_op_cache(
-    txn: &mut Ta<DbKindCache>,
+    txn: &mut Txn<DbKindCache>,
     op: &DhtOpHashed,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
@@ -188,7 +188,7 @@ pub fn insert_op_when(
 /// we need the data in the same shape.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
 pub fn insert_op_lite_into_authored(
-    txn: &mut Ta<DbKindAuthored>,
+    txn: &mut Txn<DbKindAuthored>,
     op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
@@ -504,7 +504,7 @@ pub fn set_dependency(
 
 /// Set the whether or not a receipt is required of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_require_receipt(
-    txn: &mut Ta<DbKindDht>,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     require_receipt: bool,
 ) -> StateMutationResult<()> {
@@ -1056,7 +1056,7 @@ mod tests {
 
     use holochain_types::prelude::*;
 
-    use crate::prelude::{Store, Txn};
+    use crate::prelude::{CascadeTxnWrapper, Store};
 
     use super::insert_op_authored;
 
@@ -1109,7 +1109,7 @@ mod tests {
         });
 
         db.test_read(move |txn| {
-            let warrants: Vec<DhtOp> = Txn::from(txn)
+            let warrants: Vec<DhtOp> = CascadeTxnWrapper::from(txn)
                 .get_warrants_for_basis(&action_author.into(), false)
                 .unwrap()
                 .into_iter()

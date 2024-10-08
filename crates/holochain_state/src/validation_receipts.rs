@@ -295,7 +295,7 @@ mod tests {
     async fn create_modified_op(
         vault: DbWrite<DbKindDht>,
         modifier: fn(
-            txn: &mut Ta<DbKindDht>,
+            txn: &mut Txn<DbKindDht>,
             op_hash: HoloHashOf<DhtOp>,
         ) -> StateMutationResult<()>,
     ) -> StateMutationResult<DhtOpHash> {

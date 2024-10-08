@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 fn insert_action_and_op(
-    txn: &mut Ta<DbKindDht>,
+    txn: &mut Txn<DbKindDht>,
     u: &mut Unstructured,
     action: &Action,
 ) -> DhtOpHash {
