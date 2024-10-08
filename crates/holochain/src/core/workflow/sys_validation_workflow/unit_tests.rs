@@ -16,7 +16,6 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
-use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::db::DbKindCache;
@@ -376,12 +375,6 @@ impl TestCase {
 
         let actual_network = self.actual_network.take().unwrap_or_default();
 
-        // XXX: this isn't quite right, since none of these config settings inform
-        // anything else about the TestCase. It's currently only needed for the node_id
-        // as used by hc_sleuth
-        let config = ConductorConfig::default();
-        let config = Arc::new(config);
-
         sys_validation_workflow(
             Arc::new(workspace),
             self.current_validation_dependencies.clone(),
@@ -389,7 +382,6 @@ impl TestCase {
             self.publish_trigger.0.clone(),
             self.self_trigger.0.clone(),
             actual_network,
-            config,
             self.keystore.clone(),
             self.agent.clone(),
         )
