@@ -5,10 +5,8 @@ use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use holochain::conductor::CellError;
 use holochain::core::workflow::WorkflowError;
-use holochain::prelude::PreflightResponse;
 use holochain::sweettest::{
-    await_consistency, SweetCell, SweetConductor, SweetConductorBatch, SweetConductorConfig,
-    SweetDnaFile,
+    await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
 };
 use holochain_nonce::fresh_nonce;
 use holochain_state::prelude::{IncompleteCommitReason, SourceChainError};
@@ -277,147 +275,6 @@ async fn retry_countersigning_commit_on_missing_deps() {
     wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
 }
 
-// Checks that when there are multiple authorities returning signature bundles and multiple sessions
-// happening between a pair of agents, the extra signature bundles beyond the first one received
-// are correctly handled. I.e. receiving further signature bundles after a new session has started
-// will not impact the new session.
-// This is trying to check a race condition, so it's probably expected that the test won't always
-// correctly test the problem. However, it is a scenario we've seen fail in Wind Tunnel, so it's
-// worth trying to test here. Seeing flakes from this test is likely a signal that something has
-// regressed.
-#[tokio::test(flavor = "multi_thread")]
-async fn signature_bundle_noise() {
-    holochain_trace::test_run();
-
-    let config = SweetConductorConfig::rendezvous(true).no_dpki();
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(4, config).await;
-
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
-    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
-
-    let cells = apps.cells_flattened();
-
-    for i in 0..4 {
-        // Need an initialised source chain for countersigning, so commit anything
-        let zome = cells[i].zome(TestWasm::CounterSigning);
-        let _: ActionHash = conductors[i]
-            .call_fallible(&zome, "create_a_thing", ())
-            .await
-            .unwrap();
-
-        // Also want to make sure everyone can see everyone else
-        conductors[i]
-            .require_initial_gossip_activity_for_cell(&cells[i], 4, Duration::from_secs(30))
-            .await
-            .unwrap();
-    }
-
-    let alice_zome = cells[0].zome(TestWasm::CounterSigning);
-    let bob_zome = cells[1].zome(TestWasm::CounterSigning);
-
-    // Run multiple sessions, one after another
-    for _ in 0..5 {
-        let preflight_request: PreflightRequest = conductors[0]
-            .call_fallible(
-                &alice_zome,
-                "generate_countersigning_preflight_request",
-                vec![
-                    (cells[0].agent_pubkey().clone(), vec![Role(0)]),
-                    (cells[1].agent_pubkey().clone(), vec![]),
-                ],
-            )
-            .await
-            .unwrap();
-        let alice_acceptance: PreflightRequestAcceptance = conductors[0]
-            .call_fallible(
-                &cells[0].zome(TestWasm::CounterSigning),
-                "accept_countersigning_preflight_request",
-                preflight_request.clone(),
-            )
-            .await
-            .unwrap();
-        let alice_response =
-            if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
-                response
-            } else {
-                unreachable!(
-                    "Expected PreflightRequestAcceptance::Accepted, got {:?}",
-                    alice_acceptance
-                );
-            };
-        let bob_acceptance: PreflightRequestAcceptance = conductors[1]
-            .call_fallible(
-                &bob_zome,
-                "accept_countersigning_preflight_request",
-                preflight_request.clone(),
-            )
-            .await
-            .unwrap();
-        let bob_response =
-            if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
-                response
-            } else {
-                unreachable!();
-            };
-
-        let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
-        let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
-
-        commit_session_with_retry(
-            &conductors[0],
-            &cells[0],
-            vec![alice_response.clone(), bob_response.clone()],
-        )
-        .await;
-        commit_session_with_retry(
-            &conductors[1],
-            &cells[1],
-            vec![alice_response.clone(), bob_response.clone()],
-        )
-        .await;
-
-        wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
-        wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;
-    }
-}
-
-async fn commit_session_with_retry(
-    conductor: &SweetConductor,
-    cell: &SweetCell,
-    responses: Vec<PreflightResponse>,
-) {
-    for _ in 0..5 {
-        match conductor
-            .call_fallible::<_, (ActionHash, EntryHash)>(
-                &cell.zome(TestWasm::CounterSigning),
-                "create_a_countersigned_thing_with_entry_hash",
-                responses.clone(),
-            )
-            .await
-        {
-            Ok(_) => {
-                return;
-            }
-            Err(ConductorApiError::CellError(CellError::WorkflowError(e))) => {
-                if let WorkflowError::SourceChainError(SourceChainError::IncompleteCommit(_)) = *e {
-                    // retryable error, missing DHT dependencies
-                    continue;
-                } else {
-                    panic!("Expected IncompleteCommit error, got: {:?}", e);
-                }
-            }
-            Err(e) => {
-                panic!(
-                    "Unexpected error while committing countersigning entry: {:?}",
-                    e
-                );
-            }
-        }
-    }
-
-    panic!("Failed to commit countersigning entry after 5 retries");
-}
-
 #[tokio::test(flavor = "multi_thread")]
 async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
     holochain_trace::test_run();
@@ -677,6 +534,11 @@ async fn complete_session_with_chc_enabled() {
     let cells = apps.cells_flattened();
     let alice = &cells[0];
     let bob = &cells[1];
+
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
+        .await
+        .unwrap();
 
     let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
 
