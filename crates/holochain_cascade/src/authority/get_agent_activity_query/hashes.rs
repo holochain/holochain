@@ -1,5 +1,5 @@
 use crate::authority::get_agent_activity_query::{fold, render, Item, State};
-use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, WarrantHash};
+use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
 use holochain_p2p::dht::op::Timestamp;
 use holochain_p2p::event::GetActivityOptions;
 use holochain_sqlite::rusqlite::{named_params, Row};
@@ -7,11 +7,8 @@ use holochain_state::prelude::{from_blob, ActionHashed, Query, StateQueryResult,
 use holochain_state::query::QueryData;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::{ChainOpType, DhtOpType};
-use holochain_types::prelude::WarrantOpType;
 use holochain_zome_types::judged::Judged;
-use holochain_zome_types::prelude::{
-    ChainQueryFilter, SignedAction, SignedWarrant, ValidationStatus,
-};
+use holochain_zome_types::prelude::*;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -39,7 +36,21 @@ impl Query for GetAgentActivityHashesQuery {
     type Output = AgentActivityResponse;
 
     fn query(&self) -> String {
-        "
+        let warrant_clause = if cfg!(feature = "hcf_warrants") {
+            "
+            (
+                -- is an integrated, valid warrant
+                DhtOp.basis_hash = :author_basis
+                AND DhtOp.type = :warrant_op_type
+                AND DhtOp.validation_status = :valid_status
+                AND DhtOp.when_integrated IS NOT NULL
+            )
+            "
+        } else {
+            ""
+        };
+        format!(
+            "
             SELECT
             Action.hash,
             Action.blob AS action_blob,
@@ -54,29 +65,33 @@ impl Query for GetAgentActivityHashesQuery {
                 Action.author = :author
                 AND DhtOp.type = :chain_op_type
             )
-            OR
-            (
-                -- is an integrated, valid warrant
-                DhtOp.basis_hash = :author_basis
-                AND DhtOp.type = :warrant_op_type
-                AND DhtOp.validation_status = :valid_status
-                AND DhtOp.when_integrated IS NOT NULL
-            )
+            {warrant_clause}
             ORDER BY Action.seq ASC
         "
-        .to_string()
+        )
     }
 
     fn params(&self) -> Vec<holochain_state::query::Params> {
-        let params = named_params! {
-            ":author": self.agent,
-            ":author_basis": self.agent_basis,
-            ":chain_op_type": ChainOpType::RegisterAgentActivity,
-            ":warrant_op_type": WarrantOpType::ChainIntegrityWarrant,
-            ":valid_status": ValidationStatus::Valid,
-        };
-
-        params.to_vec()
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "hcf_warrants")] {
+                let params = named_params! {
+                    ":author": self.agent,
+                    ":author_basis": self.agent_basis,
+                    ":chain_op_type": ChainOpType::RegisterAgentActivity,
+                    ":valid_status": ValidationStatus::Valid,
+                    ":warrant_op_type": holochain_types::prelude::WarrantOpType::ChainIntegrityWarrant,
+                };
+                params.to_vec()
+            } else {
+                let params = named_params! {
+                    ":author": self.agent,
+                    ":author_basis": self.agent_basis,
+                    ":chain_op_type": ChainOpType::RegisterAgentActivity,
+                    ":valid_status": ValidationStatus::Valid,
+                };
+                params.to_vec()
+            }
+        }
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
@@ -106,6 +121,7 @@ impl Query for GetAgentActivityHashesQuery {
                         Judged::raw(item, validation_status)
                     })
                 }
+                #[cfg(feature = "hcf_warrants")]
                 DhtOpType::Warrant(_) => {
                     let _hash: WarrantHash = row.get("hash")?;
                     from_blob::<SignedWarrant>(row.get("action_blob")?).map(|warrant| {

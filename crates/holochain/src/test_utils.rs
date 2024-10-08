@@ -44,7 +44,6 @@ use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::sync::Arc;
@@ -516,8 +515,9 @@ async fn delay(elapsed: Duration) {
 /// the consistency check will not proceed until all publishing expectations have occurred.
 #[derive(Debug, Default, Clone)]
 pub struct ConsistencyConditions {
+    #[cfg(feature = "hcf_warrants")]
     /// This many warrants must have been published against the keyed agent.
-    warrants_issued: HashMap<AgentPubKey, usize>,
+    warrants_issued: std::collections::HashMap<AgentPubKey, usize>,
 }
 
 impl From<()> for ConsistencyConditions {
@@ -527,9 +527,10 @@ impl From<()> for ConsistencyConditions {
 }
 
 impl From<Vec<(AgentPubKey, usize)>> for ConsistencyConditions {
-    fn from(items: Vec<(AgentPubKey, usize)>) -> Self {
+    fn from(_items: Vec<(AgentPubKey, usize)>) -> Self {
         Self {
-            warrants_issued: items.iter().cloned().collect(),
+            #[cfg(feature = "hcf_warrants")]
+            warrants_issued: _items.iter().cloned().collect(),
         }
     }
 }
@@ -537,32 +538,39 @@ impl From<Vec<(AgentPubKey, usize)>> for ConsistencyConditions {
 impl ConsistencyConditions {
     fn check<'a>(
         &self,
-        published_ops: impl Iterator<Item = &'a DhtOp>,
+        _published_ops: impl Iterator<Item = &'a DhtOp>,
     ) -> Result<bool, ConsistencyError> {
-        let mut checked = self.warrants_issued.clone();
-        for v in checked.values_mut() {
-            *v = 0;
-        }
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "hcf_warrants")] {
+                let mut checked = self.warrants_issued.clone();
+                for v in checked.values_mut() {
+                    *v = 0;
+                }
 
-        for op in published_ops {
-            if let DhtOp::WarrantOp(op) = op {
-                let author = &op.action_author();
-                if let Some(count) = checked.get_mut(author) {
-                    *count += 1;
-                    if *count > *self.warrants_issued.get(author).unwrap() {
-                        return Err(format!(
-                            "Expected exactly {} warrants to be published against agent {author}, but found more",
-                            self.warrants_issued.get(author).unwrap(),
-                        )
-                    .into());
+                for op in _published_ops {
+                    if let DhtOp::WarrantOp(op) = op {
+                        let author = &op.action_author();
+                        if let Some(count) = checked.get_mut(author) {
+                            *count += 1;
+                            if *count > *self.warrants_issued.get(author).unwrap() {
+                                return Err(format!(
+                                    "Expected exactly {} warrants to be published against agent {author}, but found more",
+                                    self.warrants_issued.get(author).unwrap(),
+                                )
+                            .into());
+                            }
+                        }
                     }
                 }
+
+                Ok(checked == self.warrants_issued)
+            } else {
+                Ok(true)
             }
         }
-
-        Ok(checked == self.warrants_issued)
     }
 
+    #[cfg(feature = "hcf_warrants")]
     /// Return the total number of warrants expected to be published
     pub fn num_warrants(&self) -> usize {
         self.warrants_issued.values().sum()
@@ -761,6 +769,7 @@ fn display_op(op: &DhtOp) -> String {
             op.get_type(),
             op.action().action_type(),
         ),
+        #[cfg(feature = "hcf_warrants")]
         DhtOp::WarrantOp(op) => {
             format!("{} WARRANT ({})", op.author, op.get_type(),)
         }

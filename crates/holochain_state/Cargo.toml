@@ -10,6 +10,7 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
+cfg-if = "1.0"
 chrono = { version = "0.4.22", default-features = false, features = [
   "clock",
   "std",
@@ -108,3 +109,5 @@ sqlite = [
   "holochain_zome_types/sqlite",
   "kitsune_p2p/sqlite",
 ]
+
+hcf_warrants = []

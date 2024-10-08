@@ -40,7 +40,10 @@ fn merge_activity_responses(
     } else {
         ChainItems::NotRequested
     };
+
+    #[cfg(feature = "hcf_warrants")]
     let mut warrants = Vec::new();
+
     let mut merged_highest_observed = None;
     for result in results {
         let AgentActivityResponse {
@@ -48,14 +51,16 @@ fn merge_activity_responses(
             highest_observed,
             valid_activity,
             rejected_activity,
-            warrants: these_warrants,
             status: _,
+            #[cfg(feature = "hcf_warrants")]
+                warrants: these_warrants,
         } = result;
 
         if the_agent != agent {
             continue;
         }
 
+        #[cfg(feature = "hcf_warrants")]
         warrants.extend(these_warrants);
 
         match (merged_highest_observed.take(), highest_observed) {
@@ -210,8 +215,10 @@ fn merge_activity_responses(
         agent,
         valid_activity: valid,
         rejected_activity: rejected,
-        warrants,
         highest_observed: merged_highest_observed,
+
+        #[cfg(feature = "hcf_warrants")]
+        warrants,
     }
 }
 
@@ -364,7 +371,9 @@ fn merge_status_only(
         agent,
         valid_activity: ChainItems::NotRequested,
         rejected_activity: ChainItems::NotRequested,
-        warrants: vec![],
         highest_observed: merged_highest_observed,
+
+        #[cfg(feature = "hcf_warrants")]
+        warrants: vec![],
     }
 }

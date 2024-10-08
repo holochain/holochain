@@ -13,8 +13,8 @@ use crate::authority::get_agent_activity_query::records::GetAgentActivityRecords
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_state::query::link::GetLinksQuery;
+use holochain_state::query::Query;
 use holochain_state::query::Txn;
-use holochain_state::query::{Query, Store};
 use holochain_types::prelude::*;
 use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
 
@@ -64,10 +64,7 @@ pub async fn handle_get_agent_activity(
         .read_async(move |txn| -> CascadeResult<AgentActivityResponse> {
             let txn = Txn::from(&txn);
 
-            let warrants =
-                txn.get_warrants_for_basis(&AnyLinkableHash::from(agent.clone()), true)?;
-
-            let mut activity_response = if options.include_full_records {
+            let activity_response = if options.include_full_records {
                 // If the caller wanted records, prioritise giving those back.
                 GetAgentActivityRecordsQuery::new(agent, query, options).run(txn)?
             } else {
@@ -75,6 +72,12 @@ pub async fn handle_get_agent_activity(
                 GetAgentActivityHashesQuery::new(agent, query, options).run(txn)?
             };
 
+            #[cfg(feature = "hcf_warrants")]
+            let warrants =
+                txn.get_warrants_for_basis(&AnyLinkableHash::from(agent.clone()), true)?;
+            #[cfg(feature = "hcf_warrants")]
+            let mut activity_response = activity_response;
+            #[cfg(feature = "hcf_warrants")]
             if !warrants.is_empty() {
                 // TODO why did we retrieve warrants in the activity query if we're going to overwrite them here?
                 activity_response.warrants =

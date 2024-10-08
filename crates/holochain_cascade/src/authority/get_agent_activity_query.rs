@@ -3,13 +3,7 @@ use holo_hash::{ActionHash, AgentPubKey};
 use holochain_p2p::event::GetActivityOptions;
 use holochain_state::prelude::ActionSequenceAndHash;
 use holochain_state::query::StateQueryResult;
-use holochain_types::prelude::{
-    ActionHashedContainer, AgentActivityResponse, ChainItems, ChainItemsSource,
-};
-use holochain_zome_types::prelude::{
-    ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HasValidationStatus, HighestObserved,
-    Judged, ValidationStatus, Warrant,
-};
+use holochain_types::prelude::*;
 
 pub mod deterministic;
 pub mod hashes;
@@ -21,8 +15,10 @@ pub struct State<T> {
     pub(super) valid: Vec<T>,
     pub(super) rejected: Vec<T>,
     pub(super) pending: Vec<T>,
-    pub(super) warrants: Vec<Warrant>,
     pub(super) status: Option<ChainStatus>,
+
+    #[cfg(feature = "hcf_warrants")]
+    pub(super) warrants: Vec<Warrant>,
 }
 
 impl<T> Default for State<T> {
@@ -31,8 +27,10 @@ impl<T> Default for State<T> {
             valid: Vec::new(),
             rejected: Vec::new(),
             pending: Vec::new(),
-            warrants: Vec::new(),
             status: None,
+
+            #[cfg(feature = "hcf_warrants")]
+            warrants: Vec::new(),
         }
     }
 }
@@ -41,6 +39,7 @@ impl<T> Default for State<T> {
 pub enum Item<T> {
     Integrated(T),
     Pending(T),
+    #[cfg(feature = "hcf_warrants")]
     Warrant(Warrant),
 }
 
@@ -82,6 +81,8 @@ fn fold<T: ActionHashedContainer>(
             state.rejected.push(action);
         }
         (_, Item::Pending(data)) => state.pending.push(data),
+
+        #[cfg(feature = "hcf_warrants")]
         (_, Item::Warrant(warrant)) => state.warrants.push(warrant),
         _ => (),
     }
@@ -159,6 +160,7 @@ where
         ChainItems::NotRequested
     };
 
+    #[cfg(feature = "hcf_warrants")]
     let warrants = if options.include_warrants {
         state.warrants
     } else {
@@ -169,8 +171,9 @@ where
         agent,
         valid_activity,
         rejected_activity,
-        warrants,
         status,
         highest_observed,
+        #[cfg(feature = "hcf_warrants")]
+        warrants,
     })
 }

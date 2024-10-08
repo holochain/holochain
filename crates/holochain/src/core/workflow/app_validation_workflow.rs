@@ -154,7 +154,7 @@ mod types;
     instrument(skip(
         workspace,
         trigger_integration,
-        trigger_publish,
+        _trigger_publish,
         conductor_handle,
         network,
         dht_query_cache,
@@ -165,7 +165,7 @@ pub async fn app_validation_workflow(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
     trigger_integration: TriggerSender,
-    trigger_publish: TriggerSender,
+    _trigger_publish: TriggerSender,
     conductor_handle: ConductorHandle,
     network: HolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
@@ -185,9 +185,10 @@ pub async fn app_validation_workflow(
         trigger_integration.trigger(&"app_validation_workflow");
     }
 
+    #[cfg(feature = "hcf_warrants")]
     // If ops have been warranted, trigger publishing.
     if outcome_summary.warranted > 0 {
-        trigger_publish.trigger(&"app_validation_workflow");
+        _trigger_publish.trigger(&"app_validation_workflow");
     }
 
     Ok(
@@ -217,9 +218,13 @@ async fn app_validation_workflow_inner(
     let accepted_ops = Arc::new(AtomicUsize::new(0));
     let awaiting_ops = Arc::new(AtomicUsize::new(0));
     let rejected_ops = Arc::new(AtomicUsize::new(0));
-    let warranted_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity = vec![];
+
+    #[cfg(feature = "hcf_warrants")]
+    let warranted_ops = Arc::new(AtomicUsize::new(0));
+
+    #[cfg(feature = "hcf_warrants")]
     let mut warrant_op_hashes = vec![];
 
     // Validate ops sequentially
@@ -276,6 +281,7 @@ async fn app_validation_workflow_inner(
                 let awaiting_ops = awaiting_ops.clone();
                 let rejected_ops = rejected_ops.clone();
 
+                #[cfg(feature = "hcf_warrants")]
                 if let Outcome::Rejected(_) = &outcome {
                     let warrant_op =
                         crate::core::workflow::sys_validation_workflow::make_warrant_op(
@@ -349,6 +355,7 @@ async fn app_validation_workflow_inner(
         }
     }
 
+    #[cfg(feature = "hcf_warrants")]
     // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
     holochain_state::integrate::authored_ops_to_dht_db(
         network,
@@ -378,12 +385,14 @@ async fn app_validation_workflow_inner(
     let accepted_ops = accepted_ops.load(Ordering::SeqCst);
     let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
     let rejected_ops = rejected_ops.load(Ordering::SeqCst);
-    let warranted_ops = warranted_ops.load(Ordering::SeqCst);
     let ops_validated = accepted_ops + rejected_ops;
     let failed_ops = Arc::try_unwrap(failed_ops)
         .expect("must be only reference")
         .into_inner();
     tracing::info!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected, failed ops {failed_ops:?}.");
+
+    #[cfg(feature = "hcf_warrants")]
+    let warranted_ops = warranted_ops.load(Ordering::SeqCst);
 
     let outcome_summary = OutcomeSummary {
         ops_to_validate: num_ops_to_validate,
@@ -391,8 +400,10 @@ async fn app_validation_workflow_inner(
         accepted: accepted_ops,
         missing: awaiting_ops,
         rejected: rejected_ops,
-        warranted: warranted_ops,
         failed: failed_ops,
+
+        #[cfg(feature = "hcf_warrants")]
+        warranted: warranted_ops,
     };
     Ok(outcome_summary)
 }
@@ -823,8 +834,10 @@ struct OutcomeSummary {
     accepted: usize,
     missing: usize,
     rejected: usize,
-    warranted: usize,
     failed: HashSet<DhtOpHash>,
+
+    #[cfg(feature = "hcf_warrants")]
+    warranted: usize,
 }
 
 impl OutcomeSummary {
@@ -835,8 +848,10 @@ impl OutcomeSummary {
             accepted: 0,
             missing: 0,
             rejected: 0,
-            warranted: 0,
             failed: HashSet::new(),
+
+            #[cfg(feature = "hcf_warrants")]
+            warranted: 0,
         }
     }
 }

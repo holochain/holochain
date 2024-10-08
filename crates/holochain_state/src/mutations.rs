@@ -113,6 +113,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     let op_order = OpOrder::new(op_type, op.timestamp());
     let deps = op.sys_validation_dependencies();
 
+    #[allow(unused_mut)]
     let mut create_op = true;
 
     match op {
@@ -128,6 +129,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
             let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
             insert_action(txn, &action_hashed)?;
         }
+        #[cfg(feature = "hcf_warrants")]
         DhtOp::WarrantOp(warrant_op) => {
             let warrant = (***warrant_op).clone();
             let inserted = insert_warrant(txn, warrant)?;
@@ -185,6 +187,7 @@ pub fn insert_op_lite(
                 "op_order": order,
             })?;
         }
+        #[cfg(feature = "hcf_warrants")]
         DhtOpLite::Warrant(op) => {
             let warrant_hash = op.warrant().to_hash();
             sql_insert!(txn, DhtOp, {

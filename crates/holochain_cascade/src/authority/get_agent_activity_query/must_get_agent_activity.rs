@@ -36,7 +36,6 @@ pub fn get_bounded_activity(
 ) -> StateQueryResult<BoundedMustGetAgentActivityResponse> {
     // Find the bounds of the range specified in the filter.
     let txn = Txn::from(txn);
-    let warrants = txn.get_warrants_for_basis(&AnyLinkableHash::from(author.clone()), true)?;
 
     match find_bounds(&txn, scratch, author, filter)? {
         Sequences::Found(filter) => {
@@ -45,7 +44,9 @@ pub fn get_bounded_activity(
                 BoundedMustGetAgentActivityResponse::Activity {
                     activity,
                     filter,
-                    warrants,
+                    #[cfg(feature = "hcf_warrants")]
+                    warrants: txn
+                        .get_warrants_for_basis(&AnyLinkableHash::from(author.clone()), true)?,
                 }
             })
         }
@@ -67,11 +68,17 @@ pub fn filter_then_check(
         BoundedMustGetAgentActivityResponse::Activity {
             activity,
             filter,
+            #[cfg(feature = "hcf_warrants")]
             warrants,
         } => {
             // Filter the activity from the database and check the invariants of the
             // filter still hold.
-            filter.filter_then_check(activity, warrants)
+
+            #[cfg(feature = "hcf_warrants")]
+            return filter.filter_then_check(activity, warrants);
+
+            #[cfg(not(feature = "hcf_warrants"))]
+            return filter.filter_then_check(activity);
         }
         BoundedMustGetAgentActivityResponse::IncompleteChain => {
             MustGetAgentActivityResponse::IncompleteChain

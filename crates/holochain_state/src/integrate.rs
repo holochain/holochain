@@ -114,8 +114,16 @@ fn insert_locally_validated_op(
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "hcf_warrants")] {
+            let immediately_integratable = deps.is_empty() || matches!(op_type, DhtOpType::Warrant(_));
+        } else {
+            let immediately_integratable = deps.is_empty();
+        }
+    };
+
     // If this op has no dependencies or is a warrant, we can mark it integrated immediately.
-    if deps.is_empty() || matches!(op_type, DhtOpType::Warrant(_)) {
+    if immediately_integratable {
         // This set the validation stage to pending which is correct when
         // it's integrated.
         set_validation_stage(txn, hash, ValidationStage::Pending)?;

@@ -231,9 +231,9 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: SysValDeps,
-    network: &impl HolochainP2pDnaT,
-    keystore: MetaLairClient,
-    representative_agent: AgentPubKey,
+    #[allow(unused_variables)] network: &impl HolochainP2pDnaT,
+    #[allow(unused_variables)] keystore: MetaLairClient,
+    #[allow(unused_variables)] representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
@@ -302,8 +302,7 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    let mut warrants = vec![];
-
+    #[allow(unused_mut, unused_variables)]
     let (mut summary, invalid_ops, forked_pairs) = workspace
         .dht_db
         .write_async(move |txn| {
@@ -339,6 +338,7 @@ async fn sys_validation_workflow_inner(
                             DhtOpType::Chain(_) => {
                                 put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
                             }
+                            #[cfg(feature = "hcf_warrants")]
                             DhtOpType::Warrant(_) => {
                                 // XXX: integrate accepted warrants immediately, because we don't
                                 //      want them to go to app validation.
@@ -367,52 +367,58 @@ async fn sys_validation_workflow_inner(
         })
         .await?;
 
-    for (_, op) in invalid_ops {
-        if let Some(chain_op) = op.as_chain_op() {
-            let warrant_op = crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op_inner(
-                &keystore,
-                representative_agent.clone(),
-                chain_op,
-                ValidationType::Sys,
-            )
-            .await?;
+    #[cfg(feature = "hcf_warrants")]
+    {
+        // Handle warrants
+        let mut warrants = vec![];
+
+        for (_, op) in invalid_ops {
+            if let Some(chain_op) = op.as_chain_op() {
+                let warrant_op = crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op_inner(
+                    &keystore,
+                    representative_agent.clone(),
+                    chain_op,
+                    ValidationType::Sys,
+                )
+                .await?;
+                warrants.push(warrant_op);
+            }
+        }
+
+        for (author, pair) in forked_pairs {
+            let warrant_op =
+                make_fork_warrant_op_inner(&keystore, representative_agent.clone(), author, pair)
+                    .await?;
             warrants.push(warrant_op);
         }
-    }
 
-    for (author, pair) in forked_pairs {
-        let warrant_op =
-            make_fork_warrant_op_inner(&keystore, representative_agent.clone(), author, pair)
-                .await?;
-        warrants.push(warrant_op);
-    }
+        let warrant_op_hashes = warrants
+            .iter()
+            .map(|w| (w.as_hash().clone(), w.dht_basis()))
+            .collect::<Vec<_>>();
 
-    let warrant_op_hashes = warrants
-        .iter()
-        .map(|w| (w.as_hash().clone(), w.dht_basis()))
-        .collect::<Vec<_>>();
+        workspace
+            .authored_db
+            .write_async(move |txn| {
+                for warrant_op in warrants {
+                    insert_op(txn, &warrant_op)?;
+                    summary.warranted += 1;
+                }
+                StateMutationResult::Ok(())
+            })
+            .await?;
 
-    workspace
-        .authored_db
-        .write_async(move |txn| {
-            for warrant_op in warrants {
-                insert_op(txn, &warrant_op)?;
-                summary.warranted += 1;
-            }
-            StateMutationResult::Ok(())
-        })
-        .await?;
-
-    if let Some(cache) = workspace.dht_query_cache.as_ref() {
-        // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
-        holochain_state::integrate::authored_ops_to_dht_db(
-            network,
-            warrant_op_hashes,
-            workspace.authored_db.clone().into(),
-            workspace.dht_db.clone(),
-            cache,
-        )
-        .await?;
+        if let Some(cache) = workspace.dht_query_cache.as_ref() {
+            // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
+            holochain_state::integrate::authored_ops_to_dht_db(
+                network,
+                warrant_op_hashes,
+                workspace.authored_db.clone().into(),
+                workspace.dht_db.clone(),
+                cache,
+            )
+            .await?;
+        }
     }
 
     tracing::debug!(
@@ -580,6 +586,7 @@ fn get_dependency_hashes_from_ops(ops: impl Iterator<Item = DhtOpHashed>) -> Vec
                     }
                     _ => None,
                 },
+                #[cfg(feature = "hcf_warrants")]
                 DhtOp::WarrantOp(op) => match &op.proof {
                     WarrantProof::ChainIntegrity(warrant) => match warrant {
                         ChainIntegrityWarrant::InvalidChainOp {
@@ -622,6 +629,7 @@ pub(crate) async fn validate_op(
 ) -> WorkflowResult<Outcome> {
     let result = match op {
         DhtOp::ChainOp(op) => validate_chain_op(op, dna_def, validation_dependencies, dpki).await,
+        #[cfg(feature = "hcf_warrants")]
         DhtOp::WarrantOp(op) => validate_warrant_op(op, dna_def, validation_dependencies).await,
     };
     match result {
@@ -801,6 +809,7 @@ fn check_agent_validity(agent: &AgentPubKey, prev_action: &Action) -> SysValidat
     Ok(())
 }
 
+#[cfg(feature = "hcf_warrants")]
 // TODO: should this check DPKI for agent validity?
 async fn validate_warrant_op(
     op: &WarrantOp,
@@ -1011,6 +1020,7 @@ pub async fn counterfeit_check_action(
     Ok(())
 }
 
+#[cfg(feature = "hcf_warrants")]
 /// Check if the warrant op has valid signature and author.
 pub async fn counterfeit_check_warrant(warrant_op: &WarrantOp) -> SysValidationResult<()> {
     verify_warrant_signature(warrant_op).await?;
@@ -1404,6 +1414,7 @@ pub fn put_integrated(
     Ok(())
 }
 
+#[cfg(feature = "hcf_warrants")]
 pub async fn make_warrant_op(
     conductor: &Conductor,
     dna_hash: &DnaHash,
@@ -1426,6 +1437,7 @@ pub fn get_representative_agent(conductor: &Conductor, dna_hash: &DnaHash) -> Op
         .map(|id| id.agent_pubkey().clone())
 }
 
+#[cfg(feature = "hcf_warrants")]
 pub async fn make_invalid_chain_warrant_op_inner(
     keystore: &MetaLairClient,
     warrant_author: AgentPubKey,
@@ -1450,6 +1462,7 @@ pub async fn make_invalid_chain_warrant_op_inner(
     Ok(op)
 }
 
+#[cfg(feature = "hcf_warrants")]
 pub async fn make_fork_warrant_op_inner(
     keystore: &MetaLairClient,
     warrant_author: AgentPubKey,

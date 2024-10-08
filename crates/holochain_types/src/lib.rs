@@ -11,6 +11,10 @@
 #![allow(clippy::ptr_arg)]
 // TODO - address the underlying issue:
 #![allow(clippy::result_large_err)]
+#![cfg_attr(
+    not(feature = "hcf_warrants"),
+    allow(unreachable_patterns, irrefutable_let_patterns)
+)]
 
 pub mod access;
 pub mod action;
@@ -35,9 +39,11 @@ pub mod signal;
 #[warn(missing_docs)]
 pub mod sql;
 pub mod validation_receipt;
-pub mod warrant;
 pub mod web_app;
 pub mod zome_types;
+
+#[cfg(feature = "hcf_warrants")]
+pub mod warrant;
 
 #[cfg(feature = "fixturators")]
 pub mod fixt;

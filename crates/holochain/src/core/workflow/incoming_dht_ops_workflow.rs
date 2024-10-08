@@ -1,7 +1,7 @@
 //! The workflow and queue consumer for DhtOp integration
 
+use super::error::WorkflowResult;
 use super::sys_validation_workflow::counterfeit_check_action;
-use super::{error::WorkflowResult, sys_validation_workflow::counterfeit_check_warrant};
 use crate::{conductor::space::Space, core::queue_consumer::TriggerSender};
 use holo_hash::DhtOpHash;
 use holochain_sqlite::error::DatabaseResult;
@@ -218,7 +218,10 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
             let signature = op.signature();
             counterfeit_check_action(signature, &action).await?;
         }
-        DhtOp::WarrantOp(op) => counterfeit_check_warrant(op).await?,
+        #[cfg(feature = "hcf_warrants")]
+        DhtOp::WarrantOp(op) => {
+            super::sys_validation_workflow::counterfeit_check_warrant(op).await?
+        }
     }
     Ok(())
 }
