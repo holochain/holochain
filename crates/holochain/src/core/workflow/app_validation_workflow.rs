@@ -908,7 +908,7 @@ impl AppValidationWorkspace {
 }
 
 pub fn put_validation_limbo(
-    txn: &mut Ta<DbKindDht>,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     status: ValidationStage,
 ) -> WorkflowResult<()> {
@@ -917,7 +917,7 @@ pub fn put_validation_limbo(
 }
 
 pub fn put_integration_limbo(
-    txn: &mut Ta<DbKindDht>,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
@@ -927,7 +927,7 @@ pub fn put_integration_limbo(
 }
 
 pub fn put_integrated(
-    txn: &mut Ta<DbKindDht>,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     status: ValidationStatus,
 ) -> WorkflowResult<()> {

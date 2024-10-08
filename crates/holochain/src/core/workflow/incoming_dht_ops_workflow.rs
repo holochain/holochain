@@ -69,7 +69,7 @@ impl Drop for OpsClaim {
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
 fn batch_process_entry(
-    txn: &mut Ta<DbKindDht>,
+    txn: &mut Txn<DbKindDht>,
     request_validation_receipt: bool,
     ops: Vec<DhtOpHashed>,
 ) -> WorkflowResult<()> {
@@ -224,7 +224,7 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
 }
 
 fn add_to_pending(
-    txn: &mut Ta<DbKindDht>,
+    txn: &mut Txn<DbKindDht>,
     ops: &[DhtOpHashed],
     request_validation_receipt: bool,
 ) -> StateMutationResult<()> {

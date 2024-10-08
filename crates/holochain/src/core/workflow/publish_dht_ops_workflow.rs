@@ -428,7 +428,7 @@ mod tests {
 
                 source_chain.flush(&dna_network).await.unwrap();
                 let (entry_create_action, entry_update_action) = db.write_async(move |writer| -> StateQueryResult<(SignedActionHashed, SignedActionHashed)> {
-                        let store = Txn::from(writer.deref());
+                        let store = CascadeTxnWrapper::from(writer.deref());
                         let ech = store.get_action(&original_action_address).unwrap().unwrap();
                         let euh = store.get_action(&entry_update_hash).unwrap().unwrap();
                         Ok((ech, euh))

@@ -299,7 +299,7 @@ impl Db {
                             Some(link_add.tag.clone()),
                             GetLinksFilter::default(),
                         );
-                        let res = query.run(Txn::from(txn)).unwrap();
+                        let res = query.run(CascadeTxnWrapper::from(txn)).unwrap();
                         assert_eq!(res.len(), 0, "{}", here);
                     }
                 }

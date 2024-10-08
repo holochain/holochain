@@ -1246,7 +1246,7 @@ pub fn chain_head_db(
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<Option<HeadInfo>> {
     let chain_head = ChainHeadQuery::new(author);
-    Ok(chain_head.run(Txn::from(txn))?)
+    Ok(chain_head.run(CascadeTxnWrapper::from(txn))?)
 }
 
 /// Get the current chain head of the database.
@@ -1271,7 +1271,7 @@ pub fn current_countersigning_session(
         Err(e) => Err(e),
         Ok(None) => Ok(None),
         Ok(Some(HeadInfo { action: hash, .. })) => {
-            let txn: Txn = txn.into();
+            let txn: CascadeTxnWrapper = txn.into();
             // Get the session data from the database.
             let record = match txn.get_record(&hash.into())? {
                 Some(record) => record,
@@ -1651,7 +1651,7 @@ mod tests {
 
         db.read_async(move |txn| -> DatabaseResult<()> {
             // get the full record
-            let store = Txn::from(txn);
+            let store = CascadeTxnWrapper::from(txn);
             let h1_record_entry_fetched = store
                 .get_record(&h1.clone().into())
                 .expect("error retrieving")
@@ -2296,7 +2296,7 @@ mod tests {
                         check_h2
                     );
                     // get the full record
-                    let store = Txn::from(txn);
+                    let store = CascadeTxnWrapper::from(txn);
                     let h1_record_fetched = store
                         .get_record(&check_h1.clone().into())
                         .expect("error retrieving")

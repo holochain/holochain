@@ -21,7 +21,7 @@ use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::insert_op_dht;
 use holochain_state::prelude::{from_blob, insert_op_cache, StateQueryResult};
-use holochain_state::query::{Store, Txn};
+use holochain_state::query::{CascadeTxnWrapper, Store};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::DhtOpHashed;
@@ -1046,7 +1046,7 @@ async fn app_validation_produces_warrants() {
     //- Ensure that bob authored a warrant
     let alice_pubkey = alice.agent_pubkey().clone();
     conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
-        let store = Txn::from(txn);
+        let store = CascadeTxnWrapper::from(txn);
 
         let warrants = store
             .get_warrants_for_basis(&alice_pubkey.into(), false)
@@ -1076,7 +1076,7 @@ async fn app_validation_produces_warrants() {
                 .dht_db(dna_hash)
                 .unwrap()
                 .test_read(move |txn| {
-                    let store = Txn::from(txn);
+                    let store = CascadeTxnWrapper::from(txn);
                     store.get_warrants_for_basis(&basis, true).unwrap()
                 })
                 .len()

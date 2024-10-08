@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_fetch"
-version = "0.4.0-dev.14"
+version = "0.4.0"
 description = "Kitsune P2p Fetch Pool Logic"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,8 +14,8 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 derive_more = "0.99"
-kitsune_p2p_timestamp = { version = "^0.4.0-dev.4", path = "../timestamp" }
-kitsune_p2p_types = { version = "^0.4.0-dev.14", path = "../types" }
+kitsune_p2p_timestamp = { version = "^0.4.0", path = "../timestamp" }
+kitsune_p2p_types = { version = "^0.4.0", path = "../types" }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1.29"
@@ -36,7 +36,7 @@ kitsune_p2p_fetch = { path = ".", features = [
 ] }
 
 holochain_serialized_bytes = "=0.0.55"
-holochain_trace = { version = "^0.4.0-dev.6", path = "../../holochain_trace" }
+holochain_trace = { version = "^0.4.0", path = "../../holochain_trace" }
 pretty_assertions = "1.4.0"
 test-case = "3.3"
 tokio = { version = "1.27", features = ["full", "test-util"] }
