@@ -33,7 +33,6 @@ pub mod chain_lock;
 #[allow(missing_docs)]
 pub mod dna_def;
 pub mod entry_def;
-pub mod event;
 pub mod host_fn_workspace;
 pub mod integrate;
 pub mod mutations;
