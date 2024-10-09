@@ -3,8 +3,19 @@ use std::path::PathBuf;
 /// The location of all our sql scrips
 const SQL_DIR: &str = "./src/sql";
 
+/// An env var that will trigger a SQL check.
+const CHK_SQL_FMT: Option<&str> = option_env!("CHK_SQL_FMT");
+
 /// An env var that will trigger a SQL format.
 const FIX_SQL_FMT: Option<&str> = option_env!("FIX_SQL_FMT");
+
+fn chk_sql_fmt() -> bool {
+    if let Some(csf) = CHK_SQL_FMT {
+        !csf.is_empty()
+    } else {
+        false
+    }
+}
 
 fn fix_sql_fmt() -> bool {
     if let Some(fsf) = FIX_SQL_FMT {
@@ -55,7 +66,7 @@ fn check_fmt(path: &std::path::Path) {
     let opt = sqlformat::FormatOptions {
         indent: sqlformat::Indent::Spaces(2),
         uppercase: false,
-        lines_between_queries: 1,
+        lines_between_queries: 2,
     };
 
     let fmt_sql = sqlformat::format(src_sql, &sqlformat::QueryParams::None, opt);
@@ -70,7 +81,7 @@ fn check_fmt(path: &std::path::Path) {
                 path.to_string_lossy()
             );
         }
-    } else {
+    } else if chk_sql_fmt() {
         panic_on_diff(path, src_sql, fmt_sql);
     }
 }
@@ -95,6 +106,7 @@ fn _check_migrations() {
 }
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=CHK_SQL_FMT");
     println!("cargo:rerun-if-env-changed=FIX_SQL_FMT");
     let all_sql = find_sql(std::path::Path::new(SQL_DIR));
     for sql in all_sql {
