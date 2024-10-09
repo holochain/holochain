@@ -10,7 +10,6 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-aitia = { version = "^0.4.0-dev.0", path = "../aitia" }
 chrono = { version = "0.4.22", default-features = false, features = [
   "clock",
   "std",
@@ -23,7 +22,6 @@ holo_hash = { version = "^0.5.0-dev.0", path = "../holo_hash", features = [
   "full",
 ] }
 fallible-iterator = "0.3.0"
-hc_sleuth = { version = "^0.5.0-dev.0", path = "../hc_sleuth" }
 holochain_chc = { version = "^0.2.0-dev.0", path = "../holochain_chc" }
 holochain_keystore = { version = "^0.5.0-dev.0", path = "../holochain_keystore" }
 holochain_serialized_bytes = "=0.0.55"

@@ -12,13 +12,11 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-aitia = { version = "^0.4.0-dev.0", path = "../aitia" }
 async-trait = "0.1"
 derive_more = "0.99"
 fixt = { path = "../fixt", version = "^0.5.0-dev.0" }
 futures = "0.3"
 ghost_actor = "0.3.0-alpha.6"
-hc_sleuth = { version = "^0.5.0-dev.0", path = "../hc_sleuth" }
 holo_hash = { version = "^0.5.0-dev.0", path = "../holo_hash" }
 holochain_chc = { version = "^0.2.0-dev.0", path = "../holochain_chc" }
 holochain_keystore = { version = "^0.5.0-dev.0", path = "../holochain_keystore" }

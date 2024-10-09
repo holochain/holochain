@@ -85,27 +85,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aitia"
-version = "0.4.0-dev.0"
-dependencies = [
- "anyhow",
- "derive_more",
- "holochain_trace",
- "maplit",
- "parking_lot 0.12.3",
- "petgraph",
- "pretty_assertions",
- "regex",
- "serde",
- "serde_json",
- "test-case",
- "tracing",
- "tracing-core",
- "tracing-serde",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "aliasable"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -896,16 +875,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "chashmap"
-version = "2.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff41a3c2c1e39921b9003de14bf0439c7b63a9039637c291e1a64925d8ddfa45"
-dependencies = [
- "owning_ref",
- "parking_lot 0.4.8",
-]
-
-[[package]]
 name = "chrono"
 version = "0.4.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1208,7 +1177,7 @@ dependencies = [
  "gimli 0.26.2",
  "log",
  "regalloc2",
- "smallvec 1.13.2",
+ "smallvec",
  "target-lexicon",
 ]
 
@@ -1238,7 +1207,7 @@ dependencies = [
  "hashbrown 0.12.3",
  "indexmap 1.9.3",
  "log",
- "smallvec 1.13.2",
+ "smallvec",
 ]
 
 [[package]]
@@ -1255,7 +1224,7 @@ checksum = "0d70abacb8cfef3dc8ff7e8836e9c1d70f7967dfdac824a4cd5e30223415aca6"
 dependencies = [
  "cranelift-codegen",
  "log",
- "smallvec 1.13.2",
+ "smallvec",
  "target-lexicon",
 ]
 
@@ -1380,22 +1349,6 @@ name = "crossbeam-utils"
 version = "0.8.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22ec99545bb0ed0ea7bb9b8e1e9122ea386ff8a48c0922e43f36d45ab09e0e80"
-
-[[package]]
-name = "crossterm"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e64e6c0fbe2c17357405f7c758c1ef960fce08bdfb2c03d88d2a18d7e09c4b67"
-dependencies = [
- "bitflags 1.3.2",
- "crossterm_winapi",
- "libc",
- "mio 0.8.11",
- "parking_lot 0.12.3",
- "signal-hook",
- "signal-hook-mio",
- "winapi 0.3.9",
-]
 
 [[package]]
 name = "crossterm"
@@ -1752,23 +1705,6 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn 2.0.77",
-]
-
-[[package]]
-name = "diagnostic_tests"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chashmap",
- "colored",
- "crossterm 0.27.0",
- "futures",
- "holochain_diagnostics",
- "holochain_trace",
- "kitsune_p2p",
- "tokio",
- "tokio-stream",
- "tui",
 ]
 
 [[package]]
@@ -2467,7 +2403,7 @@ dependencies = [
  "parking_lot 0.11.2",
  "quanta",
  "rand 0.8.5",
- "smallvec 1.13.2",
+ "smallvec",
 ]
 
 [[package]]
@@ -2611,7 +2547,7 @@ dependencies = [
  "rkyv",
  "self_cell",
  "shared-buffer",
- "smallvec 1.13.2",
+ "smallvec",
  "thiserror",
  "windows-sys 0.59.0",
  "xxhash-rust",
@@ -2759,29 +2695,6 @@ dependencies = [
  "tx5-go-pion",
  "tx5-signal",
  "url2",
-]
-
-[[package]]
-name = "hc_sleuth"
-version = "0.5.0-dev.0"
-dependencies = [
- "aitia",
- "anyhow",
- "arbitrary",
- "derive_more",
- "hc_sleuth",
- "holochain_trace",
- "holochain_types",
- "kitsune_p2p",
- "once_cell",
- "parking_lot 0.12.3",
- "petgraph",
- "pretty_assertions",
- "regex",
- "serde",
- "structopt",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -2979,7 +2892,6 @@ dependencies = [
 name = "holochain"
 version = "0.5.0-dev.0"
 dependencies = [
- "aitia",
  "anyhow",
  "arbitrary",
  "assert_cmd",
@@ -3005,7 +2917,6 @@ dependencies = [
  "ghost_actor",
  "hc-wasmer",
  "hc_deepkey_sdk",
- "hc_sleuth",
  "hdk",
  "holo_hash",
  "holochain",
@@ -3296,21 +3207,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be0aa773b74c40ef5e4e02f414d8cbfc4e92520a93511055a3fbccc12d2dd045"
 
 [[package]]
-name = "holochain_diagnostics"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "crossterm 0.27.0",
- "holochain",
- "human-repr",
- "kitsune_p2p",
- "rand 0.8.5",
- "tracing",
- "tracing-subscriber",
- "tui",
-]
-
-[[package]]
 name = "holochain_integrity_types"
 version = "0.5.0-dev.0"
 dependencies = [
@@ -3392,13 +3288,11 @@ dependencies = [
 name = "holochain_p2p"
 version = "0.5.0-dev.0"
 dependencies = [
- "aitia",
  "async-trait",
  "derive_more",
  "fixt",
  "futures",
  "ghost_actor",
- "hc_sleuth",
  "holo_hash",
  "holochain_chc",
  "holochain_keystore",
@@ -3509,7 +3403,6 @@ dependencies = [
 name = "holochain_state"
 version = "0.5.0-dev.0"
 dependencies = [
- "aitia",
  "anyhow",
  "arbitrary",
  "async-recursion",
@@ -3520,7 +3413,6 @@ dependencies = [
  "derive_more",
  "fallible-iterator 0.3.0",
  "fixt",
- "hc_sleuth",
  "holo_hash",
  "holochain_chc",
  "holochain_keystore",
@@ -3940,7 +3832,7 @@ dependencies = [
  "httparse",
  "itoa",
  "pin-project-lite",
- "smallvec 1.13.2",
+ "smallvec",
  "tokio",
  "want",
 ]
@@ -5009,12 +4901,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "maybe-uninit"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
-
-[[package]]
 name = "mdns"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5641,29 +5527,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
-name = "owning_ref"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdf84f41639e037b484f93433aa3897863b561ed65c6e59c7073d7c561710f37"
-dependencies = [
- "stable_deref_trait",
-]
-
-[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f38d5652c16fde515bb1ecef450ab0f6a219d619a7274976324d5e377f7dceba"
-
-[[package]]
-name = "parking_lot"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "149d8f5b97f3c1133e3cfcd8886449959e856b557ff281e292b733d7c69e005e"
-dependencies = [
- "owning_ref",
- "parking_lot_core 0.2.14",
-]
 
 [[package]]
 name = "parking_lot"
@@ -5688,18 +5555,6 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4db1a8ccf734a7bce794cc19b3df06ed87ab2f3907036b693c68f56b4d4537fa"
-dependencies = [
- "libc",
- "rand 0.4.6",
- "smallvec 0.6.14",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "parking_lot_core"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60a2cfe6f0ad2bfc16aefa463b497d5c7a5ecd44a23efa72aa342d90177356dc"
@@ -5708,7 +5563,7 @@ dependencies = [
  "instant",
  "libc",
  "redox_syscall 0.2.16",
- "smallvec 1.13.2",
+ "smallvec",
  "winapi 0.3.9",
 ]
 
@@ -5721,7 +5576,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "redox_syscall 0.5.5",
- "smallvec 1.13.2",
+ "smallvec",
  "windows-targets 0.52.6",
 ]
 
@@ -6427,7 +6282,7 @@ dependencies = [
  "fxhash",
  "log",
  "slice-group-by",
- "smallvec 1.13.2",
+ "smallvec",
 ]
 
 [[package]]
@@ -6731,7 +6586,7 @@ dependencies = [
  "fallible-streaming-iterator",
  "hashlink",
  "libsqlite3-sys",
- "smallvec 1.13.2",
+ "smallvec",
 ]
 
 [[package]]
@@ -7408,15 +7263,6 @@ name = "slice-group-by"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "826167069c09b99d56f31e9ae5c99049e932a98c9dc2dac47645b08dbbf76ba7"
-
-[[package]]
-name = "smallvec"
-version = "0.6.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b97fcaeba89edba30f044a10c6a3cc39df9c3f17d7cd829dd1446cab35f890e0"
-dependencies = [
- "maybe-uninit",
-]
 
 [[package]]
 name = "smallvec"
@@ -8289,7 +8135,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sharded-slab",
- "smallvec 1.13.2",
+ "smallvec",
  "thread_local",
  "time",
  "tracing",
@@ -8322,19 +8168,6 @@ dependencies = [
  "serde_json",
  "termcolor",
  "toml",
-]
-
-[[package]]
-name = "tui"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccdd26cbd674007e649a272da4475fb666d3aa0ad0531da7136db6fab0e5bad1"
-dependencies = [
- "bitflags 1.3.2",
- "cassowary",
- "crossterm 0.25.0",
- "unicode-segmentation",
- "unicode-width",
 ]
 
 [[package]]
@@ -8917,7 +8750,7 @@ dependencies = [
  "rkyv",
  "self_cell",
  "shared-buffer",
- "smallvec 1.13.2",
+ "smallvec",
  "thiserror",
  "wasmer-types",
  "wasmer-vm",
@@ -8938,7 +8771,7 @@ dependencies = [
  "gimli 0.26.2",
  "more-asserts",
  "rayon",
- "smallvec 1.13.2",
+ "smallvec",
  "target-lexicon",
  "tracing",
  "wasmer-compiler",
