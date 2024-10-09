@@ -42,6 +42,51 @@ async fn call_to_init_passes() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn call_init_across_cells() {
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let is_init_called = Arc::new(AtomicBool::new(false));
+    let is_init_called_clone = is_init_called.clone();
+    let zome_1 = SweetInlineZomes::new(vec![], 0)
+        .function("init", move |_, _: ()| {
+            is_init_called_clone.store(true, Ordering::Relaxed);
+            Ok(InitCallbackResult::Pass)
+        })
+        .function("touch", |_, _: ()| {
+            // Just triggers init
+            Ok(())
+        });
+    let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
+    let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
+
+    let zome_2 = SweetInlineZomes::new(vec![], 0).function("touch", move |api, _: ()| {
+        // Just calls into the other zome.
+        api.call(vec![Call {
+            target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
+            zome_name: SweetInlineZomes::COORDINATOR.into(),
+            fn_name: "touch".into(),
+            cap_secret: None,
+            payload: ExternIO::encode(()).unwrap(),
+        }])?;
+        Ok(())
+    });
+    let (dna_2, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_2).await;
+
+    let app = conductor
+        .setup_app_for_agent("app", agent, &[dna_1, dna_2])
+        .await
+        .unwrap();
+    let (_cell_1, cell_2) = app.into_tuple();
+
+    let () = conductor
+        .call(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .await;
+
+    assert!(is_init_called.load(Ordering::Relaxed));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn call_init_from_init_across_cells() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
@@ -137,6 +182,49 @@ async fn call_init_with_invalid_return_type() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn call_init_with_invalid_return_type_across_cells() {
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let zome_1 = SweetInlineZomes::new(vec![], 0)
+        .function("init", move |_, _: ()| Ok(42))
+        .function("touch", |_, _: ()| {
+            // Simple Zome to just trigger a call to init.
+            Ok(())
+        });
+    let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
+    let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
+
+    let zome_2 = SweetInlineZomes::new(vec![], 0).function("touch", move |api, _: ()| {
+        // Just call the other zome.
+        api.call(vec![Call {
+            target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
+            zome_name: SweetInlineZomes::COORDINATOR.into(),
+            fn_name: "touch".into(),
+            cap_secret: None,
+            payload: ExternIO::encode(()).unwrap(),
+        }])?;
+        Ok(())
+    });
+    let (dna_2, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_2).await;
+
+    let app = conductor
+        .setup_app_for_agent("app", agent, &[dna_1, dna_2])
+        .await
+        .unwrap();
+    let (_cell_1, cell_2) = app.into_tuple();
+
+    let err = conductor
+        .call_fallible::<_, ()>(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .await
+        .unwrap_err();
+
+    let_assert!(ConductorApiError::Other(other_err) = err);
+    // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
+    assert!(other_err.to_string().contains("The callback has an invalid return type: invalid value: integer `42`, expected variant index 0 <= i < 3"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_return_type_from_init_across_cells() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
@@ -225,6 +313,51 @@ async fn call_init_with_invalid_parameters() {
             *workflow_err
     );
     assert!(err_msg == "invalid type: unit value, expected usize");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn call_init_with_invalid_parameters_across_cells() {
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+    let agent = SweetAgents::one(conductor.keystore()).await;
+    let zome_1 = SweetInlineZomes::new(vec![], 0)
+        .function("init", move |_, _: usize| Ok(InitCallbackResult::Pass))
+        .function("touch", |_, _: ()| {
+            // Simple Zome to just trigger a call to init.
+            Ok(())
+        });
+    let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
+    let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
+
+    let zome_2 = SweetInlineZomes::new(vec![], 0).function("touch", move |api, _: ()| {
+        // Simple Zome to just call the other zome.
+        api.call(vec![Call {
+            target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
+            zome_name: SweetInlineZomes::COORDINATOR.into(),
+            fn_name: "touch".into(),
+            cap_secret: None,
+            payload: ExternIO::encode(()).unwrap(),
+        }])?;
+        Ok(())
+    });
+    let (dna_2, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_2).await;
+
+    let app = conductor
+        .setup_app_for_agent("app", agent, &[dna_1, dna_2])
+        .await
+        .unwrap();
+    let (_cell_1, cell_2) = app.into_tuple();
+
+    let err = conductor
+        .call_fallible::<_, ()>(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .await
+        .unwrap_err();
+
+    let_assert!(ConductorApiError::Other(other_err) = err);
+    // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
+    assert!(other_err
+        .to_string()
+        .contains("The callback has invalid parameters: invalid type: unit value, expected usize"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
