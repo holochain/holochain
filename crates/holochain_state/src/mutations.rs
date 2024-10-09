@@ -207,7 +207,7 @@ pub fn insert_op_lite(
     hash: &DhtOpHash,
     order: &OpOrder,
     authored_timestamp: &Timestamp,
-    _transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
     insert_op_lite_when(
         txn,
@@ -216,7 +216,7 @@ pub fn insert_op_lite(
         order,
         authored_timestamp,
         Timestamp::now(),
-        _transfer_data,
+        transfer_data,
     )
 }
 
