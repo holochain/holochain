@@ -1,6 +1,6 @@
 SELECT
   DhtOp.hash,
-  LENGTH(Action.blob) AS action_size,
+  LENGTH(Action.blob) AS action_size, --
   -- We need to only account for entry data in the size count when the op contains the entry itself.
   -- Other ops refer to actions that refer to entries, but we don't want to include that in the size.
   CASE
