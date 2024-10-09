@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Fix sql formatting to resolve new complaints thrown by `sqlformat` 0.2.6. Pin `sqlformat` dependency to 0.2.4 to avoid these new complaints in upstream crates. 
+
 ## 0.3.3
 
 ## 0.3.3-rc.0
