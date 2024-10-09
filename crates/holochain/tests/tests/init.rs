@@ -137,7 +137,7 @@ async fn call_init_with_invalid_return_type() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn call_init_with_invalid_return_type_across_cells() {
+async fn call_init_with_invalid_return_type_from_init_across_cells() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
@@ -228,7 +228,7 @@ async fn call_init_with_invalid_parameters() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn call_init_with_invalid_parameters_across_cells() {
+async fn call_init_with_invalid_parameters_from_init_across_cells() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
