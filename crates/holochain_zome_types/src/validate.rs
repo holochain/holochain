@@ -11,6 +11,7 @@ pub use holochain_integrity_types::validate::*;
 #[derive(
     Clone, Copy, Hash, serde::Serialize, serde::Deserialize, PartialOrd, Ord, Debug, Eq, PartialEq,
 )]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "full", derive(num_enum::TryFromPrimitive))]
 #[cfg_attr(feature = "full", repr(i32))]
 pub enum ValidationStatus {
