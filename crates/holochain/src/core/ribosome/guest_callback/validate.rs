@@ -341,6 +341,26 @@ mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn test_adding_entry_when_validate_implemented_invalid_params() {
+        holochain_trace::test_run();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::ValidateInvalidParams).await;
+
+        let err = conductor
+            .call_fallible::<_, Record>(&alice, "create_entry_to_validate", ())
+            .await
+            .unwrap_err();
+
+        let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
+        let_assert!(
+            WorkflowError::SourceChainError(SourceChainError::Other(other_err)) = *workflow_err
+        );
+        // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
+        assert!(other_err.to_string() == "The callback has invalid parameters: ");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_multi() {
         let mut u = Unstructured::new(&NOISE);
 

@@ -2141,6 +2141,7 @@ name = "test_wasm_validate_invalid_params"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "serde",
 ]
 
 [[package]]
