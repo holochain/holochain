@@ -10,8 +10,6 @@ use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
 use ::fixt::prelude::*;
-use aitia::Fact;
-use hc_sleuth::SleuthId;
 use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
@@ -574,7 +572,7 @@ impl ConsistencyConditions {
 /// Wait for all cell envs to reach consistency, meaning that every op
 /// published by every cell has been integrated by every node
 pub async fn wait_for_integration_diff<AuthorDb, DhtDb>(
-    cells: &[(&SleuthId, &AgentPubKey, &AuthorDb, Option<&DhtDb>)],
+    cells: &[(&AgentPubKey, &AuthorDb, Option<&DhtDb>)],
     timeout: Duration,
     conditions: ConsistencyConditions,
 ) -> ConsistencyResult
@@ -591,7 +589,7 @@ where
     while start.elapsed() < timeout {
         if !publish_complete {
             published = HashSet::new();
-            for (_, _author, db, _) in cells.iter() {
+            for (_author, db, _) in cells.iter() {
                 // Providing the author is redundant
                 let p = request_published_ops(*db, None /*Some((*author).to_owned())*/)
                     .await
@@ -614,7 +612,7 @@ where
                 tracing::info!("*** All expected ops were published ***");
             }
             // Compare the published ops to the integrated ops for each node
-            for (i, (_node_id, _, _, dht_db)) in cells.iter().enumerate() {
+            for (i, (_, _, dht_db)) in cells.iter().enumerate() {
                 if done.contains(&i) {
                     continue;
                 }
@@ -686,46 +684,11 @@ where
     let (unintegrated, unpublished) = diff_ops(published.iter(), integrated.iter());
     let diff = diff_report(unintegrated, unpublished);
 
-    if let Some(s) = hc_sleuth::SUBSCRIBER.get() {
-        // If hc_sleuth has been initialized, print a sleuthy report
-
-        let other_node_ids: Vec<String> = cells
-            .iter()
-            .enumerate()
-            .filter_map(|(i, (node_id, _, _, d))| {
-                if c != i {
-                    None
-                } else {
-                    d.is_some().then_some((*node_id).to_owned())
-                }
-            })
-            .collect();
-
-        let ctx = s.lock();
-        for fact in published
-            .iter()
-            .map(DhtOpHash::with_data_sync)
-            .flat_map(|hash| {
-                other_node_ids
-                    .iter()
-                    .map(move |node_id| hc_sleuth::Event::Integrated {
-                        by: node_id.to_owned(),
-                        op: hash.clone(),
-                    })
-            })
-        {
-            let tr = fact.clone().traverse(&ctx);
-            if let Some(report) = aitia::simple_report(&tr) {
-                println!("aitia report for {fact:#?}:\n\n{report}")
-            }
-        }
-    }
-
     #[allow(clippy::comparison_chain)]
     if integrated.len() > published.len() {
         Err(format!("{report}\nnum integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test. Consistency may not be complete. Report:\n\n{header}\n{diff}", integrated.len(), published.len()).into())
     } else if integrated.len() < published.len() {
-        let db = cells[c].3.as_ref().expect("DhtDb must be provided");
+        let db = cells[c].2.as_ref().expect("DhtDb must be provided");
         let integration_dump = integration_dump(*db).await.unwrap();
 
         Err(format!(
