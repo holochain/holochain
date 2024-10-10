@@ -106,8 +106,6 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
     }
 
     /// Do something whenever a batch of op hashes was received and stored in the FetchPool
-    // NOTE: currently only needed for aitia, could be removed and the aitia log could be created
-    // directly in kitsune.
     fn handle_op_hash_received(
         &self,
         _space: &KitsuneSpace,
@@ -117,8 +115,6 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
     }
 
     /// Do something whenever a batch of op hashes was sent to another node
-    // NOTE: currently only needed for aitia, could be removed and the aitia log could be created
-    // directly in kitsune.
     fn handle_op_hash_transmitted(
         &self,
         _space: &KitsuneSpace,
