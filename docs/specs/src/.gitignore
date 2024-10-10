@@ -1,0 +1,15 @@
+!*.svg
+media/*
+*.fdb_latexmk
+*.synctex.gz
+*.pdf
+*.fls
+*.tex
+*.aux
+*.docx
+*.bib
+*.bbl
+*.blg
+*.out
+hwp.*
+!hwp_alpha.tex
