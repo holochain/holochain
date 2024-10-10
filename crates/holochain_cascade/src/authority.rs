@@ -34,7 +34,9 @@ pub async fn handle_get_entry(
     _options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireEntryOps> {
     let query = GetEntryOpsQuery::new(hash);
-    let results = db.read_async(move |txn| query.run(CascadeTxnWrapper::from(txn))).await?;
+    let results = db
+        .read_async(move |txn| query.run(CascadeTxnWrapper::from(txn)))
+        .await?;
     Ok(results)
 }
 
@@ -46,7 +48,9 @@ pub async fn handle_get_record(
     options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireRecordOps> {
     let query = GetRecordOpsQuery::new(hash, options);
-    let results = env.read_async(move |txn| query.run(CascadeTxnWrapper::from(txn))).await?;
+    let results = env
+        .read_async(move |txn| query.run(CascadeTxnWrapper::from(txn)))
+        .await?;
     Ok(results)
 }
 
@@ -105,7 +109,9 @@ pub async fn handle_get_agent_activity_deterministic(
     options: holochain_p2p::event::GetActivityOptions,
 ) -> CascadeResult<DeterministicGetAgentActivityResponse> {
     let query = DeterministicGetAgentActivityQuery::new(agent, filter, options);
-    let results = env.read_async(move |txn| query.run(CascadeTxnWrapper::from(txn))).await?;
+    let results = env
+        .read_async(move |txn| query.run(CascadeTxnWrapper::from(txn)))
+        .await?;
     Ok(results)
 }
 
@@ -117,7 +123,9 @@ pub async fn handle_get_links(
     _options: holochain_p2p::event::GetLinksOptions,
 ) -> CascadeResult<WireLinkOps> {
     let query = GetLinksOpsQuery::new(link_key);
-    let results = env.read_async(move |txn| query.run(CascadeTxnWrapper::from(txn))).await?;
+    let results = env
+        .read_async(move |txn| query.run(CascadeTxnWrapper::from(txn)))
+        .await?;
     Ok(results)
 }
 
