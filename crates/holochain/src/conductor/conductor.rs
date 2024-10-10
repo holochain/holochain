@@ -1581,6 +1581,7 @@ mod app_impls {
                     agent_key.clone(),
                     roles,
                     manifest,
+                    Timestamp::now(),
                 )?;
 
                 let (_, app) = self
@@ -1601,6 +1602,7 @@ mod app_impls {
                         agent_key.clone(),
                         roles,
                         manifest,
+                        Timestamp::now(),
                     )?;
 
                     // Update the db
@@ -1789,7 +1791,8 @@ mod app_impls {
                 .collect())
         }
 
-        /// List Apps with their information
+        /// List Apps with their information,
+        /// sorted by their installed_at timestamp, in descending order
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_apps(
             &self,
@@ -1831,13 +1834,14 @@ mod app_impls {
                     .collect(),
             };
 
-            let app_infos: Vec<AppInfo> = apps_ids
+            let mut app_infos: Vec<AppInfo> = apps_ids
                 .into_iter()
                 .map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .flatten()
                 .collect();
+            app_infos.sort_by_key(|app_info| std::cmp::Reverse(app_info.installed_at));
 
             Ok(app_infos)
         }

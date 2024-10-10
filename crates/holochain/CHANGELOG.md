@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- AdminRequest::ListApps is now sorted by the new AppInfo field `installed_at`, in descending order
+
 ## 0.5.0-dev.0
 
 ## 0.4.0
