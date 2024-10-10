@@ -53,7 +53,3 @@ pub mod workspace;
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "test_utils"))]
 pub mod test_utils;
-
-// Experimental, and requires sqlite
-#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
-pub mod event;
