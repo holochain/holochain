@@ -4,12 +4,14 @@ use std::ops::RangeInclusive;
 
 use crate::activity::AgentActivityResponse;
 use crate::activity::ChainItems;
-use crate::warrant::WarrantOp;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
+
+#[cfg(feature = "hcf_warrants")]
+use crate::warrant::WarrantOp;
 
 #[cfg(all(test, feature = "test_utils"))]
 pub mod test;
@@ -28,6 +30,7 @@ pub trait AgentActivityExt {
             status: ChainStatus::Empty,
             // TODO: Add the actual highest observed in a follow up PR
             highest_observed: None,
+            #[cfg(feature = "hcf_warrants")]
             warrants: vec![],
         }
     }
@@ -99,7 +102,9 @@ pub enum MustGetAgentActivityResponse {
     Activity {
         /// The actions performed by the agent.
         activity: Vec<RegisterAgentActivity>,
+
         /// Any warrants issued to the agent for this activity.
+        #[cfg(feature = "hcf_warrants")]
         warrants: Vec<WarrantOp>,
     },
     /// The requested chain range was incomplete.
@@ -116,6 +121,7 @@ impl MustGetAgentActivityResponse {
     pub fn activity(activity: Vec<RegisterAgentActivity>) -> Self {
         Self::Activity {
             activity,
+            #[cfg(feature = "hcf_warrants")]
             warrants: vec![],
         }
     }
@@ -131,7 +137,9 @@ pub enum BoundedMustGetAgentActivityResponse {
     Activity {
         /// The actions performed by the agent.
         activity: Vec<RegisterAgentActivity>,
+
         /// Any warrants issued to the agent for this activity.
+        #[cfg(feature = "hcf_warrants")]
         warrants: Vec<WarrantOp>,
         /// The filter used to produce this response.
         filter: ChainFilterRange,
@@ -160,6 +168,7 @@ impl BoundedMustGetAgentActivityResponse {
         Self::Activity {
             activity: actions,
             filter,
+            #[cfg(feature = "hcf_warrants")]
             warrants: vec![],
         }
     }
@@ -182,22 +191,29 @@ pub fn merge_bounded_agent_activity_responses(
             BoundedMustGetAgentActivityResponse::Activity {
                 activity: responses,
                 filter: chain_filter,
+                #[cfg(feature = "hcf_warrants")]
                 warrants,
             },
             BoundedMustGetAgentActivityResponse::Activity {
                 activity: more_responses,
                 filter: other_chain_filter,
-                warrants: more_warrants,
+                #[cfg(feature = "hcf_warrants")]
+                    warrants: more_warrants,
             },
         ) => {
             if chain_filter == other_chain_filter {
                 let mut merged_responses = responses.clone();
                 merged_responses.extend(more_responses.to_owned());
-                let mut merged_warrants = warrants.clone();
-                merged_warrants.extend(more_warrants.to_owned());
+
+                #[cfg(feature = "hcf_warrants")]
+                {
+                    let mut merged_warrants = warrants.clone();
+                    merged_warrants.extend(more_warrants.to_owned());
+                }
                 let mut merged_activity = BoundedMustGetAgentActivityResponse::Activity {
                     activity: merged_responses,
                     filter: chain_filter.clone(),
+                    #[cfg(feature = "hcf_warrants")]
                     warrants: merged_warrants,
                 };
                 merged_activity.normalize();
@@ -437,7 +453,7 @@ impl ChainFilterRange {
     pub fn filter_then_check(
         self,
         chain: Vec<RegisterAgentActivity>,
-        warrants: Vec<WarrantOp>,
+        #[cfg(feature = "hcf_warrants")] warrants: Vec<WarrantOp>,
     ) -> MustGetAgentActivityResponse {
         let until_hashes = self.filter.get_until().cloned();
 
@@ -464,6 +480,7 @@ impl ChainFilterRange {
                 // The constraints are met the activity can be returned.
                 MustGetAgentActivityResponse::Activity {
                     activity: actions,
+                    #[cfg(feature = "hcf_warrants")]
                     warrants,
                 }
             }

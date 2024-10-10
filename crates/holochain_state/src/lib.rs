@@ -26,6 +26,10 @@
 
 // TODO - address the underlying issue:
 #![allow(clippy::result_large_err)]
+#![cfg_attr(
+    not(feature = "hcf_warrants"),
+    allow(unreachable_patterns, irrefutable_let_patterns)
+)]
 
 #[allow(missing_docs)]
 pub mod block;

@@ -22,6 +22,10 @@
 //!     This is a more "raw" form of fetching data.
 //!
 #![warn(missing_docs)]
+#![cfg_attr(
+    not(feature = "hcf_warrants"),
+    allow(unreachable_patterns, irrefutable_let_patterns)
+)]
 
 use error::CascadeResult;
 use holo_hash::ActionHash;
@@ -396,9 +400,11 @@ impl CascadeImpl {
         let RenderedOps {
             ops,
             entry,
+            #[cfg(feature = "hcf_warrants")]
             warrant,
         } = ops;
 
+        #[cfg(feature = "hcf_warrants")]
         if let Some(warrant) = warrant {
             let op = DhtOpHashed::from_content_sync(warrant.clone());
             insert_op(txn, &op)?;
@@ -504,14 +510,20 @@ impl CascadeImpl {
 
         // Commit the activity to the chain.
         match response {
-            Some(MustGetAgentActivityResponse::Activity { activity, warrants }) => {
+            Some(MustGetAgentActivityResponse::Activity {
+                activity,
+                #[cfg(feature = "hcf_warrants")]
+                warrants,
+            }) => {
                 // TODO: Avoid this clone by committing the ops as references to the db.
                 cache
                     .write_async({
                         let activity = activity.clone();
+                        #[cfg(feature = "hcf_warrants")]
                         let warrants = warrants.clone();
                         move |txn| {
                             Self::insert_activity(txn, activity)?;
+                            #[cfg(feature = "hcf_warrants")]
                             for warrant in warrants {
                                 let op = DhtOpHashed::from_content_sync(warrant);
                                 insert_op(txn, &op)?;
@@ -521,7 +533,11 @@ impl CascadeImpl {
                         }
                     })
                     .await?;
-                Ok(MustGetAgentActivityResponse::Activity { activity, warrants })
+                Ok(MustGetAgentActivityResponse::Activity {
+                    activity,
+                    #[cfg(feature = "hcf_warrants")]
+                    warrants,
+                })
             }
             Some(response) => Ok(response),
             // Got no responses so the chain is incomplete.
@@ -1098,6 +1114,7 @@ impl CascadeImpl {
             mut rejected_activity,
             status,
             highest_observed,
+            #[cfg(feature = "hcf_warrants")]
             warrants,
         } = merged_response;
 
@@ -1120,6 +1137,7 @@ impl CascadeImpl {
             rejected_activity,
             status,
             highest_observed,
+            #[cfg(feature = "hcf_warrants")]
             warrants,
         };
 

@@ -25,6 +25,8 @@ pub use crate::metadata::*;
 pub use crate::record::*;
 pub use crate::signal::*;
 pub use crate::validation_receipt::*;
+
+#[cfg(feature = "hcf_warrants")]
 pub use crate::warrant::*;
 
 #[cfg(feature = "fixturators")]

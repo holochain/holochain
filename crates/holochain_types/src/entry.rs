@@ -111,6 +111,7 @@ impl WireEntryOps {
                 Ok(RenderedOps {
                     entry: Some(entry_hashed),
                     ops,
+                    #[cfg(feature = "hcf_warrants")]
                     warrant: None,
                 })
             }

@@ -189,6 +189,8 @@ async fn get_links() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+// TODO: split this test apart so the non-warrant stuff can be tested separately
+#[cfg(feature = "hcf_warrants")]
 async fn get_agent_activity() {
     use ::fixt::fixt;
     use holochain_state::mutations::*;

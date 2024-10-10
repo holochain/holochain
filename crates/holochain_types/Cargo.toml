@@ -16,7 +16,7 @@ async-trait = "0.1"
 automap = { version = "0.1", features = ["serde"] }
 backtrace = "0.3.27"
 base64 = "0.13"
-cfg-if = "0.1"
+cfg-if = "1.0"
 chrono = { version = "0.4", default-features = false, features = [
   "clock",
   "std",
@@ -133,3 +133,5 @@ sqlite = [
   "holochain_zome_types/sqlite",
   "kitsune_p2p_dht/sqlite",
 ]
+
+hcf_warrants = []
