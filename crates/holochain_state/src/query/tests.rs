@@ -199,6 +199,7 @@ async fn insert_op_equivalence() {
         op.as_hash(),
         &op_order,
         &create_action.timestamp,
+        None,
     )
     .unwrap();
 

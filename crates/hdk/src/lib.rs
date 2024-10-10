@@ -73,7 +73,7 @@
 //! The only way to execute logic inside WASM is by having the conductor (host) call a function that is marked as an `extern` by the zome (guest).
 //!
 //! > Note: From the perspective of hApp development in WASM, the "guest" is the WASM and the "host" is the running Holochain conductor.
-//!   The host is _not_ the "host operating system" in this context.
+//! > The host is _not_ the "host operating system" in this context.
 //!
 //! Similarly, the only way for the guest to do anything other than process data and calculations is to call functions the host provides to it at runtime.
 //!

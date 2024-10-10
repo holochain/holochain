@@ -4,13 +4,17 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::CascadeImpl;
-use holochain_state::mutations::insert_op;
+use holochain_state::mutations::insert_op_cache;
+use holochain_state::prelude::todo_no_transfer_data;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context)))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(_ribosome, call_context))
+)]
 pub fn must_get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -62,7 +66,7 @@ pub fn must_get_agent_activity(
                             if let Some(db) = cascade.cache() {
                                 db.write_async(|txn| {
                                     for warrant in warrants {
-                                        insert_op(txn, &DhtOpHashed::from_content_sync(warrant))?;
+                                        insert_op_cache(txn, &DhtOpHashed::from_content_sync(warrant), todo_no_transfer_data())?;
                                     }
                                     crate::conductor::error::ConductorResult::Ok(())
                                 }).await.map_err(|e| -> RuntimeError { wasm_error!(e).into() })?;

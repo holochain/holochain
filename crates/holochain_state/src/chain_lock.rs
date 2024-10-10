@@ -78,7 +78,7 @@ mod tests {
         let lock = db
             .read_async({
                 let agent_pub_key = agent_pub_key.clone();
-                move |txn| get_chain_lock(&txn, &agent_pub_key)
+                move |txn| get_chain_lock(txn, &agent_pub_key)
             })
             .await
             .unwrap();
@@ -99,7 +99,7 @@ mod tests {
         let lock = db
             .read_async({
                 let agent_pub_key = agent_pub_key.clone();
-                move |txn| get_chain_lock(&txn, &agent_pub_key)
+                move |txn| get_chain_lock(txn, &agent_pub_key)
             })
             .await
             .unwrap();
@@ -123,7 +123,7 @@ mod tests {
         let lock = db
             .read_async({
                 let agent_pub_key = agent_pub_key.clone();
-                move |txn| get_chain_lock(&txn, &agent_pub_key)
+                move |txn| get_chain_lock(txn, &agent_pub_key)
             })
             .await
             .unwrap();
@@ -190,7 +190,7 @@ mod tests {
         let lock = db
             .read_async({
                 let agent_pub_key = agent_pub_key.clone();
-                move |txn| get_chain_lock(&txn, &agent_pub_key)
+                move |txn| get_chain_lock(txn, &agent_pub_key)
             })
             .await
             .unwrap();

@@ -49,7 +49,7 @@ pub async fn refresh_workspace_state(
         let lock = authored_db
             .read_async({
                 let agent = agent.clone();
-                move |txn| get_chain_lock(&txn, &agent)
+                move |txn| get_chain_lock(txn, &agent)
             })
             .await
             .ok()
