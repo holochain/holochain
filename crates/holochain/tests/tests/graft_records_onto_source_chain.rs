@@ -11,7 +11,7 @@ use holochain::test_utils::inline_zomes::simple_crud_zome;
 use holochain_keystore::MetaLairClient;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
-use holochain_state::prelude::{StateMutationError, Store, CascadeTxnWrapper};
+use holochain_state::prelude::{CascadeTxnWrapper, StateMutationError, Store};
 use holochain_types::record::SignedActionHashedExt;
 
 /// Test that records can be manually grafted onto a source chain.
