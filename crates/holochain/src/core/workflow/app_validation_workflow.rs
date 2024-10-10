@@ -213,8 +213,6 @@ async fn app_validation_workflow_inner(
     let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
     let num_ops_to_validate = sorted_dht_ops.len();
 
-    let sleuth_id = conductor.config.sleuth_id();
-
     let cascade = Arc::new(workspace.full_cascade(network.clone()));
     let accepted_ops = Arc::new(AtomicUsize::new(0));
     let awaiting_ops = Arc::new(AtomicUsize::new(0));
@@ -261,7 +259,6 @@ async fn app_validation_workflow_inner(
             Err(OutcomeOrError::Err(err)) => AppValidationResult::Err(err),
         };
 
-        let sleuth_id = sleuth_id.clone();
         match validation_outcome {
             Ok(outcome) => {
                 // Collect all agent activity.
@@ -307,16 +304,9 @@ async fn app_validation_workflow_inner(
                     .write_async(move|txn| match outcome {
                         Outcome::Accepted => {
                             accepted_ops.fetch_add(1, Ordering::SeqCst);
-                            aitia::trace!(&hc_sleuth::Event::AppValidated {
-                                by: sleuth_id.clone(),
-                                op: dht_op_hash.clone()
-                            });
+
 
                             if deps.is_empty() {
-                                aitia::trace!(&hc_sleuth::Event::Integrated {
-                                    by: sleuth_id.clone(),
-                                    op: dht_op_hash.clone()
-                                });
 
                                 put_integrated(txn, &dht_op_hash, ValidationStatus::Valid)
                             } else {

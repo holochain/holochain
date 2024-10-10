@@ -104,6 +104,15 @@ pub fn insert_record_scratch(
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
 pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
+    insert_op_when(txn, op, Timestamp::now())
+}
+
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
+pub fn insert_op_when(
+    txn: &mut Transaction,
+    op: &DhtOpHashed,
+    when_stored: Timestamp,
+) -> StateMutationResult<()> {
     let hash = op.as_hash();
     let op = op.as_content();
     let op_type = op.get_type();
@@ -137,7 +146,7 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
         }
     }
     if create_op {
-        insert_op_lite(txn, &op_lite, hash, &op_order, &timestamp)?;
+        insert_op_lite_when(txn, &op_lite, hash, &op_order, &timestamp, when_stored)?;
         set_dependency(txn, hash, deps)?;
     }
     Ok(())
@@ -154,9 +163,9 @@ pub fn insert_op_lite_into_authored(
     op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
-    timestamp: &Timestamp,
+    authored_timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    insert_op_lite(txn, op_lite, hash, order, timestamp)?;
+    insert_op_lite(txn, op_lite, hash, order, authored_timestamp)?;
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
@@ -168,7 +177,26 @@ pub fn insert_op_lite(
     op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
-    timestamp: &Timestamp,
+    authored_timestamp: &Timestamp,
+) -> StateMutationResult<()> {
+    insert_op_lite_when(
+        txn,
+        op_lite,
+        hash,
+        order,
+        authored_timestamp,
+        Timestamp::now(),
+    )
+}
+
+/// Insert a [`DhtOpLite`] into the database.
+pub fn insert_op_lite_when(
+    txn: &mut Transaction,
+    op_lite: &DhtOpLite,
+    hash: &DhtOpHash,
+    order: &OpOrder,
+    authored_timestamp: &Timestamp,
+    when_stored: Timestamp,
 ) -> StateMutationResult<()> {
     let basis = op_lite.dht_basis();
     match op_lite {
@@ -178,7 +206,8 @@ pub fn insert_op_lite(
                 "hash": hash,
                 "type": op_lite.get_type(),
                 "storage_center_loc": basis.get_loc(),
-                "authored_timestamp": timestamp,
+                "authored_timestamp": authored_timestamp,
+                "when_stored": when_stored,
                 "basis_hash": basis,
                 "action_hash": action_hash,
                 "require_receipt": 0,
@@ -191,7 +220,8 @@ pub fn insert_op_lite(
                 "hash": hash,
                 "type": op_lite.get_type(),
                 "storage_center_loc": basis.get_loc(),
-                "authored_timestamp": timestamp,
+                "authored_timestamp": authored_timestamp,
+                "when_stored": when_stored,
                 "basis_hash": basis,
                 "action_hash": warrant_hash,
                 "require_receipt": 0,
@@ -207,6 +237,15 @@ pub fn insert_validation_receipt(
     txn: &mut Transaction,
     receipt: SignedValidationReceipt,
 ) -> StateMutationResult<()> {
+    insert_validation_receipt_when(txn, receipt, Timestamp::now())
+}
+
+/// Insert a [`SignedValidationReceipt`] into the database.
+pub fn insert_validation_receipt_when(
+    txn: &mut Transaction,
+    receipt: SignedValidationReceipt,
+    timestamp: Timestamp,
+) -> StateMutationResult<()> {
     let op_hash = receipt.receipt.dht_op_hash.clone();
     let bytes: UnsafeBytes = SerializedBytes::try_from(receipt)?.into();
     let bytes: Vec<u8> = bytes.into();
@@ -215,6 +254,7 @@ pub fn insert_validation_receipt(
         "hash": hash,
         "op_hash": op_hash,
         "blob": bytes,
+        "when_received": timestamp,
     })?;
     Ok(())
 }
@@ -469,6 +509,30 @@ pub fn set_validation_stage(
             ":hash": hash,
         },
     )?;
+    Ok(())
+}
+
+/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was sys validated.
+pub fn set_when_sys_validated(
+    txn: &mut Transaction,
+    hash: &DhtOpHash,
+    time: Timestamp,
+) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "when_sys_validated": time,
+    })?;
+    Ok(())
+}
+
+/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was app validated.
+pub fn set_when_app_validated(
+    txn: &mut Transaction,
+    hash: &DhtOpHash,
+    time: Timestamp,
+) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "when_app_validated": time,
+    })?;
     Ok(())
 }
 

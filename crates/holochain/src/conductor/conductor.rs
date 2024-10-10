@@ -1579,6 +1579,7 @@ mod app_impls {
                     agent_key.clone(),
                     roles,
                     manifest,
+                    Timestamp::now(),
                 )?;
 
                 let (_, app) = self
@@ -1599,6 +1600,7 @@ mod app_impls {
                         agent_key.clone(),
                         roles,
                         manifest,
+                        Timestamp::now(),
                     )?;
 
                     // Update the db
@@ -1787,7 +1789,8 @@ mod app_impls {
                 .collect())
         }
 
-        /// List Apps with their information
+        /// List Apps with their information,
+        /// sorted by their installed_at timestamp, in descending order
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_apps(
             &self,
@@ -1829,13 +1832,14 @@ mod app_impls {
                     .collect(),
             };
 
-            let app_infos: Vec<AppInfo> = apps_ids
+            let mut app_infos: Vec<AppInfo> = apps_ids
                 .into_iter()
                 .map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .flatten()
                 .collect();
+            app_infos.sort_by_key(|app_info| std::cmp::Reverse(app_info.installed_at));
 
             Ok(app_infos)
         }
@@ -2506,7 +2510,6 @@ mod app_status_impls {
             // Add agents to local agent store in kitsune
 
             future::join_all(new_cells.iter().enumerate().map(|(i, (cell, _))| {
-                let sleuth_id = self.config.sleuth_id();
                 async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
                     let cell_id = cell.id().clone();
@@ -2529,10 +2532,8 @@ mod app_status_impls {
                         Ok(r) => {
                             match r {
                                 Ok(_) => {
-                                    aitia::trace!(&hc_sleuth::Event::AgentJoined {
-                                        node: sleuth_id,
-                                        agent: cell_id.agent_pubkey().clone()
-                                    });
+                                    // all good
+
                                 }
                                 Err(e) => {
                                     tracing::error!(

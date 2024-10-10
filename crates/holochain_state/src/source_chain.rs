@@ -386,17 +386,13 @@ impl SourceChain {
                 for shh in actions.iter() {
                     insert_action(txn, shh)?;
                 }
-                for (op, op_hash, op_order, timestamp, dep) in &ops {
+                for (op, op_hash, op_order, timestamp, _dep) in &ops {
                     insert_op_lite_into_authored(txn, op, op_hash, op_order, timestamp)?;
                     // If this is a countersigning session we want to withhold
                     // publishing the ops until the session is successful.
                     if is_countersigning_session {
                         set_withhold_publish(txn, op_hash)?;
                     }
-                    aitia::trace!(&hc_sleuth::Event::Authored {
-                        by: (*author).clone(),
-                        op: hc_sleuth::OpInfo::new(op.clone(), op_hash.clone(), dep.clone()),
-                    });
                 }
                 SourceChainResult::Ok(actions)
             })
