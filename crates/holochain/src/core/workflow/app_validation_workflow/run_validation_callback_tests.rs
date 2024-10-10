@@ -14,7 +14,7 @@ use fixt::fixt;
 use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
 use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
 use holochain_sqlite::exports::FallibleIterator;
-use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, mutations::insert_op_dht};
+use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, prelude::insert_op_cache};
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
     db::{DbKindCache, DbWrite},
@@ -108,7 +108,7 @@ async fn validation_callback_must_get_action() {
     let dht_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
     test_space.space.cache_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_op_hashed, None).unwrap();
+        insert_op_cache(txn, &dht_op_hashed, None).unwrap();
     });
 
     // the same validation should now successfully validate the op

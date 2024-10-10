@@ -110,7 +110,7 @@ pub fn insert_op_dht(
     insert_op_when(txn, op, Timestamp::now(), transfer_data)
 }
 
-pub fn insert_op_unchecked(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
+pub fn insert_op_untyped(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
     insert_op_when(txn, op, Timestamp::now(), None)
 }
 
