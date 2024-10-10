@@ -716,7 +716,10 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         timeout_ms: Option<u64>,
     ) -> KitsuneP2pHandlerResult<Vec<u8>> {
         let space_sender = match self.spaces.get_mut(&space) {
-            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            None => {
+                tracing::error!(?space, "unhandled space");
+                return Err(KitsuneP2pError::RoutingSpaceError(space));
+            }
             Some(space) => space.get(),
         };
         Ok(async move {
@@ -735,7 +738,11 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         input: actor::RpcMulti,
     ) -> KitsuneP2pHandlerResult<Vec<actor::RpcMultiResponse>> {
         let space_sender = match self.spaces.get_mut(&input.space) {
-            None => return Err(KitsuneP2pError::RoutingSpaceError(input.space)),
+            None => {
+                let space = input.space;
+                tracing::error!(?space, "unhandled space");
+                return Err(KitsuneP2pError::RoutingSpaceError(space));
+            }
             Some(space) => space.get(),
         };
         Ok(async move {
@@ -754,7 +761,10 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         data: BroadcastData,
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
-            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            None => {
+                tracing::error!(?space, "unhandled space");
+                return Err(KitsuneP2pError::RoutingSpaceError(space));
+            }
             Some(space) => space.get(),
         };
         Ok(async move {
@@ -774,7 +784,10 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         drop_at_limit: bool,
     ) -> KitsuneP2pHandlerResult<()> {
         let space_sender = match self.spaces.get_mut(&space) {
-            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            None => {
+                tracing::error!(?space, "unhandled space");
+                return Err(KitsuneP2pError::RoutingSpaceError(space));
+            }
             Some(space) => space.get(),
         };
         Ok(async move {
@@ -810,7 +823,10 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         basis: Arc<KitsuneBasis>,
     ) -> KitsuneP2pHandlerResult<bool> {
         let space_sender = match self.spaces.get_mut(&space) {
-            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            None => {
+                tracing::error!(?space, "unhandled space");
+                return Err(KitsuneP2pError::RoutingSpaceError(space));
+            }
             Some(space) => space.get(),
         };
         Ok(async move {
@@ -947,7 +963,10 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         // gossip_type: GossipModuleType,
     ) -> KitsuneP2pHandlerResult<KitsuneDiagnostics> {
         let space_sender = match self.spaces.get_mut(&space) {
-            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            None => {
+                tracing::error!(?space, "unhandled space");
+                return Err(KitsuneP2pError::RoutingSpaceError(space));
+            }
             Some(space) => space.get(),
         };
         Ok(async move {
