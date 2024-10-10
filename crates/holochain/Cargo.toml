@@ -156,7 +156,7 @@ serde_json = { version = "1.0.51" }
 toml = "0.8"
 chrono = { version = "0.4.6", features = ["serde"] }
 hostname = "0.4"
-lair_keystore = { version = "0.4.5", default-features = false, features = [
+lair_keystore = { version = "0.4.6", default-features = false, features = [
   "rusqlite-bundled-sqlcipher-vendored-openssl",
 ] }
 
