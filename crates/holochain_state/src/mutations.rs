@@ -1027,12 +1027,12 @@ mod tests {
 
     use holochain_types::prelude::*;
 
-    use crate::prelude::{Store, Txn};
-
     use super::insert_op;
 
     #[test]
+    #[cfg(feature = "hcf_warrants")]
     fn can_write_and_read_warrants() {
+        use crate::prelude::{Store, Txn};
         let dir = tempfile::tempdir().unwrap();
 
         let cell_id = Arc::new(fixt!(CellId));

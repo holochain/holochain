@@ -126,7 +126,11 @@ fn test_filter_then_check(
 ) -> MustGetAgentActivityResponse {
     let chain = chain_to_ops(chain);
     match Sequences::find_sequences::<_, ()>(filter, |a| Ok(f(a))) {
-        Ok(Sequences::Found(s)) => s.filter_then_check(chain, vec![]),
+        Ok(Sequences::Found(s)) => s.filter_then_check(
+            chain,
+            #[cfg(feature = "hcf_warrants")]
+            vec![],
+        ),
         _ => unreachable!(),
     }
 }

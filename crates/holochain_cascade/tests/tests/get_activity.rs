@@ -34,9 +34,11 @@ macro_rules! assert_agent_activity_responses_eq {
         }
         assert_eq!($expected.valid_activity, $actual.valid_activity);
         assert_eq!($expected.rejected_activity, $actual.rejected_activity);
-        assert_eq!($expected.warrants, $actual.warrants);
         assert_eq!($expected.status, $actual.status);
         assert_eq!($expected.highest_observed, $actual.highest_observed);
+
+        #[cfg(feature = "hcf_warrants")]
+        assert_eq!($expected.warrants, $actual.warrants);
     };
 }
 
@@ -178,9 +180,11 @@ async fn fill_records_entries() {
         agent: test_data.agent.clone(),
         valid_activity: test_data.valid_records.clone(),
         rejected_activity: ChainItems::NotRequested,
-        warrants: vec![],
         status: ChainStatus::Valid(test_data.chain_head.clone()),
         highest_observed: Some(test_data.highest_observed.clone()),
+
+        #[cfg(feature = "hcf_warrants")]
+        warrants: vec![],
     };
     assert_agent_activity_responses_eq!(expected, r);
 }
@@ -336,6 +340,7 @@ async fn filter_out_entries_with_chain_query() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "hcf_warrants")]
 async fn get_activity_with_warrants() {
     holochain_trace::test_run();
 
@@ -452,9 +457,12 @@ struct Data {
     authored: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     cache: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     dht: Vec<(AgentPubKey, Vec<TestChainItem>)>,
+
+    #[cfg(feature = "hcf_warrants")]
     warrants: Vec<WarrantOp>,
 }
 
+#[cfg(feature = "hcf_warrants")]
 fn warrant(author: u8, action: u8) -> WarrantOp {
     let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
         action_author: AgentPubKey::from_raw_36(vec![author; 36]),
@@ -570,14 +578,6 @@ impl GetActivityTestScenario {
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
     => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2")]
 #[test_case(
-    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(1, 1)], ..Default::default() },
-    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2 with 1 unrelated chain warrant")]
-#[test_case(
-    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0, 0)], ..Default::default() },
-    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 1; "1 to genesis with dht 0 till 2 with 1 chain warrant")]
-#[test_case(
     Data { cache: agent_chain(&[(0, 0..3)]), ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
     => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with cache 0 till 2")]
@@ -593,6 +593,14 @@ impl GetActivityTestScenario {
     Data { authored: agent_chain(&[(0, 0..6)]), ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).take(4).until(action_hash(&[0]))
     => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 4; "4 take 4 until 0 with authored 0 till 5")]
+#[cfg_attr(feature = "hcf_warrants", test_case(
+        Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(1, 1)], ..Default::default() },
+        agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+        => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2 with 1 unrelated chain warrant"))]
+#[cfg_attr(feature = "hcf_warrants", test_case(
+        Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0, 0)], ..Default::default() },
+        agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+        => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 1; "1 to genesis with dht 0 till 2 with 1 chain warrant"))]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_must_get_agent_activity(
     data: Data,
@@ -604,6 +612,7 @@ async fn test_must_get_agent_activity(
         authored,
         cache,
         dht,
+        #[cfg(feature = "hcf_warrants")]
         warrants,
     } = data;
     let dht = commit_chain(DbKindDht(Arc::new(DnaHash::from_raw_36(vec![0; 36]))), dht);
