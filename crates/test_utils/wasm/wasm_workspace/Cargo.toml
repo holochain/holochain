@@ -30,6 +30,8 @@ members = [
   "hash_path",
   "hdk_extern",
   "init_fail",
+  "init_invalid_return",
+  "init_invalid_params",
   "init_pass",
   "integrity_zome",
   "link",
@@ -56,6 +58,8 @@ members = [
   "validate_link_add_valid",
   "validate_valid",
   "validate_reject_app_types",
+  "validate_invalid_return",
+  "validate_invalid_params",
   "whoami",
   "zome_info",
 ]
