@@ -668,7 +668,7 @@ impl ChainOp {
         Ok(r)
     }
 
-    /// "Normalize" the op by running it through `from_type` to give a sensisble
+    /// "Normalize" the op by running it through `from_type` to give a sensible
     /// interpretation of the potential absence of an entry.
     ///
     /// If the action contains no entry but an entry is provided anyway, ignore

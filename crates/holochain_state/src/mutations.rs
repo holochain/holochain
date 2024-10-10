@@ -348,7 +348,7 @@ pub fn insert_entry_def(
 /// Insert [`ConductorState`](https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html)
 /// into the database.
 pub fn insert_conductor_state(
-    txn: &mut Ta<DbKindConductor>,
+    txn: &mut Txn<DbKindConductor>,
     bytes: SerializedBytes,
 ) -> StateMutationResult<()> {
     let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
@@ -406,7 +406,7 @@ fn pluck_overlapping_block_bounds(
     Ok(maybe_min_maybe_max)
 }
 
-fn insert_block_inner(txn: &mut Ta<DbKindConductor>, block: Block) -> DatabaseResult<()> {
+fn insert_block_inner(txn: &mut Txn<DbKindConductor>, block: Block) -> DatabaseResult<()> {
     sql_insert!(txn, BlockSpan, {
         "target_id": BlockTargetId::from(block.target().clone()),
         "target_reason": BlockTargetReason::from(block.target().clone()),
@@ -416,7 +416,7 @@ fn insert_block_inner(txn: &mut Ta<DbKindConductor>, block: Block) -> DatabaseRe
     Ok(())
 }
 
-pub fn insert_block(txn: &mut Ta<DbKindConductor>, block: Block) -> DatabaseResult<()> {
+pub fn insert_block(txn: &mut Txn<DbKindConductor>, block: Block) -> DatabaseResult<()> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, block.clone())?;
 
     // Build one new block from the extremums.
@@ -438,7 +438,7 @@ pub fn insert_block(txn: &mut Ta<DbKindConductor>, block: Block) -> DatabaseResu
     )
 }
 
-pub fn insert_unblock(txn: &mut Ta<DbKindConductor>, unblock: Block) -> DatabaseResult<()> {
+pub fn insert_unblock(txn: &mut Txn<DbKindConductor>, unblock: Block) -> DatabaseResult<()> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, unblock.clone())?;
 
     // Reinstate anything outside the unblock bounds.
@@ -602,7 +602,7 @@ pub fn set_when_integrated(
 
 /// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was last publish time
 pub fn set_last_publish_time(
-    txn: &mut Ta<DbKindAuthored>,
+    txn: &mut Txn<DbKindAuthored>,
     hash: &DhtOpHash,
     unix_epoch: std::time::Duration,
 ) -> StateMutationResult<()> {
@@ -614,7 +614,7 @@ pub fn set_last_publish_time(
 
 /// Set withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn set_withhold_publish(
-    txn: &mut Ta<DbKindAuthored>,
+    txn: &mut Txn<DbKindAuthored>,
     hash: &DhtOpHash,
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
@@ -625,7 +625,7 @@ pub fn set_withhold_publish(
 
 /// Unset withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn unset_withhold_publish(
-    txn: &mut Ta<DbKindAuthored>,
+    txn: &mut Txn<DbKindAuthored>,
     hash: &DhtOpHash,
 ) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
@@ -636,7 +636,7 @@ pub fn unset_withhold_publish(
 
 /// Set the receipt count for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn set_receipts_complete(
-    txn: &mut Ta<DbKindAuthored>,
+    txn: &mut Txn<DbKindAuthored>,
     hash: &DhtOpHash,
     complete: bool,
 ) -> StateMutationResult<()> {
