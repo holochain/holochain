@@ -346,10 +346,8 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         // this timeout should prevent the caller being blocked by this await that may not finish.
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
             log_elapsed!([10, 100, 1000], start, "write_async:before-closure");
-            // tracing::warn!(dbg = true, "OPEN TXN");
             let r = conn.execute_in_exclusive_rw_txn(f);
             log_elapsed!([10, 100, 1000], start, "write_async:after-closure");
-            // tracing::warn!(dbg = true, "CLOSE TXN");
             r.map(|r| (r, permit))
         }).in_current_span()).in_current_span().await.map_err(|e| {
             tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");

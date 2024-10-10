@@ -911,10 +911,7 @@ impl Cell {
             .map_or(true, |w| !w.called_from_init())
         {
             // Check if init has run if not run it
-            tracing::info!("check_or_run_zome_init CALLED");
-            let r = self.check_or_run_zome_init().await;
-            tracing::info!("check_or_run_zome_init DONE");
-            r?
+            self.check_or_run_zome_init().await?
         }
 
         let keystore = self.conductor_api.keystore().clone();
@@ -993,7 +990,6 @@ impl Cell {
 
         // Check if initialization has run
         if workspace.source_chain().zomes_initialized().await? {
-            tracing::info!("NOT running init, zomes initialized");
             return Ok(());
         }
         trace!("running init");

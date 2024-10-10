@@ -339,6 +339,11 @@ impl SourceChain {
                         );
                         permit
                     } else {
+                        // XXX: this async call happens while a semaphore permit is held, extending the
+                        //      time that the DB is locked.
+                        //
+                        // Is there a way to restructure the interaction between CHC and countersigning
+                        // so that it doesn't all have to happen atomically?
                         self.sync_records(chc, records.clone(), Some(permit))
                             .await?
                     }
