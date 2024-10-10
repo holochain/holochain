@@ -1351,6 +1351,7 @@ impl HolochainP2pHandler for HolochainP2pActor {
                         timeout,
                         BroadcastData::Publish {
                             source,
+                            transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                             op_hash_list,
                             context: fetch_context,
                         },

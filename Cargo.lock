@@ -4618,6 +4618,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "rand 0.8.5",
+ "rusqlite",
  "serde",
  "test-case",
  "tokio",

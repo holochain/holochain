@@ -830,7 +830,12 @@ impl Cell {
                             // Don't fail here if this doesn't work, it's only informational. Getting
                             // the same flag set in the authored db is what will stop the publish
                             // workflow from republishing this op.
-                            set_receipts_complete(txn, &receipt_op_hash, true).ok();
+                            set_receipts_complete_redundantly_in_dht_db(
+                                txn,
+                                &receipt_op_hash,
+                                true,
+                            )
+                            .ok();
                         }
 
                         Ok(receipt_count)

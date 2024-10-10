@@ -91,6 +91,7 @@ ghost_actor::ghost_chan! {
             space: KSpace,
             to_agent: KAgent,
             source: KAgent,
+            transfer_method: kitsune_p2p_fetch::TransferMethod,
             op_hash_list: OpHashList,
             context: kitsune_p2p_fetch::FetchContext,
             maybe_delegate: MaybeDelegate,
@@ -492,6 +493,7 @@ impl SpaceInternalHandler for Space {
         space: KSpace,
         to_agent: KAgent,
         source: KAgent,
+        transfer_method: kitsune_p2p_fetch::TransferMethod,
         op_hash_list: OpHashList,
         context: kitsune_p2p_fetch::FetchContext,
         maybe_delegate: MaybeDelegate,
@@ -527,6 +529,7 @@ impl SpaceInternalHandler for Space {
                                 *mod_cnt,
                                 BroadcastData::Publish {
                                     source: source.clone(),
+                                    transfer_method,
                                     op_hash_list: vec![op_hash],
                                     context,
                                 },
@@ -564,6 +567,7 @@ impl SpaceInternalHandler for Space {
                                 mod_cnt: *mod_cnt,
                                 data: BroadcastData::Publish {
                                     source: source.clone(),
+                                    transfer_method,
                                     op_hash_list: vec![op_hash],
                                     context,
                                 },
