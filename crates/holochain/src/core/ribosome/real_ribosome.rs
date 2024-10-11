@@ -733,24 +733,45 @@ macro_rules! do_callback {
         // fallible iterator syntax instead of for loop
         let mut call_stream = $self.call_stream($access.into(), $invocation);
         loop {
-            let (zome_name, callback_result): (ZomeName, $callback_result) =
-                match call_stream.next().await {
-                    Some(Ok((zome, extern_io))) => (
-                        zome.into(),
-                        extern_io
-                            .decode()
-                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
-                    ),
-                    Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => (
-                        zome.into(),
-                        <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
-                            .map_err(|e| -> RuntimeError { WasmHostError(e).into() })?,
-                    ),
-                    Some(Err((_zome, other_error))) => return Err(other_error),
-                    None => {
-                        break;
+            let (zome_name, callback_result): (ZomeName, $callback_result) = match call_stream
+                .next()
+                .await
+            {
+                Some(Ok((zome, extern_io))) => match extern_io.decode() {
+                    Ok(callback_result) => (zome.into(), callback_result),
+                    Err(SerializedBytesError::Deserialize(err_msg)) => {
+                        // Error returned when deserialization fails due to an invalid return type
+                        return Err(RibosomeError::CallbackInvalidReturnType(err_msg));
                     }
-                };
+                    Err(e) => return Err(RibosomeError::WasmRuntimeError(wasm_error!(e).into())),
+                },
+                Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => {
+                    let wasm_error: WasmError = runtime_error.downcast()?;
+                    if let WasmErrorInner::Deserialize(_) = wasm_error.error {
+                        // Error returned when callback called via ribosome with invalid parameters
+                        return Err(RibosomeError::CallbackInvalidParameters(String::default()));
+                    }
+
+                    (
+                        zome.into(),
+                        <$callback_result>::try_from_wasm_error(wasm_error)
+                            .map_err(|e| -> RuntimeError { WasmHostError(e).into() })?,
+                    )
+                }
+                Some(Err((
+                    _zome,
+                    RibosomeError::InlineZomeError(InlineZomeError::SerializationError(
+                        SerializedBytesError::Deserialize(err_msg),
+                    )),
+                ))) => {
+                    // Error returned when callback called via zome call with invalid parameters
+                    return Err(RibosomeError::CallbackInvalidParameters(err_msg));
+                }
+                Some(Err((_zome, other_error))) => return Err(other_error),
+                None => {
+                    break;
+                }
+            };
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
             if callback_result.is_definitive() {
