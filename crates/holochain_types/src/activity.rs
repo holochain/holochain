@@ -20,6 +20,8 @@ pub struct AgentActivityResponse {
     /// The highest chain action that has
     /// been observed by this authority.
     pub highest_observed: Option<HighestObserved>,
+
+    #[cfg(feature = "hcf_warrants")]
     /// Any warrants at the basis of this agent.
     pub warrants: Vec<Warrant>,
 }
@@ -38,6 +40,7 @@ impl AgentActivityResponse {
             rejected_activity: convert_activity(&other.rejected_activity),
             status: ChainStatus::Empty,
             highest_observed: other.highest_observed,
+            #[cfg(feature = "hcf_warrants")]
             warrants: other.warrants,
         }
     }
@@ -50,6 +53,7 @@ impl AgentActivityResponse {
             rejected_activity: ChainItems::NotRequested,
             status: ChainStatus::Empty,
             highest_observed: other.highest_observed,
+            #[cfg(feature = "hcf_warrants")]
             warrants: other.warrants,
         }
     }
@@ -72,6 +76,7 @@ impl AgentActivityResponse {
             rejected_activity: convert_activity(other.rejected_activity),
             status: other.status,
             highest_observed: other.highest_observed,
+            #[cfg(feature = "hcf_warrants")]
             warrants: other.warrants,
         }
     }
@@ -111,6 +116,7 @@ impl From<AgentActivityResponse> for AgentActivity {
             rejected_activity,
             status: a.status,
             highest_observed: a.highest_observed,
+            #[cfg(feature = "hcf_warrants")]
             warrants: a.warrants,
         }
     }

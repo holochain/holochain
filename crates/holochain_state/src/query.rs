@@ -158,6 +158,7 @@ pub trait Store {
     /// Get an [`SignedActionHashed`] from this store.
     fn get_action(&self, hash: &ActionHash) -> StateQueryResult<Option<SignedActionHashed>>;
 
+    #[cfg(feature = "hcf_warrants")]
     /// Get a [`Warrant`] from this store.
     /// The second parameter determines whether the warrant op should be checked for validity.
     /// It should be set to false if reading from an Authored DB, where everything is valid,
@@ -347,6 +348,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
         }
     }
 
+    #[cfg(feature = "hcf_warrants")]
     fn get_warrants_for_basis(
         &self,
         hash: &AnyLinkableHash,
@@ -673,6 +675,7 @@ impl<'stmt> Store for Txns<'stmt, '_> {
         Ok(None)
     }
 
+    #[cfg(feature = "hcf_warrants")]
     fn get_warrants_for_basis(
         &self,
         hash: &AnyLinkableHash,
@@ -784,6 +787,7 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
         }
     }
 
+    #[cfg(feature = "hcf_warrants")]
     fn get_warrants_for_basis(
         &self,
         hash: &AnyLinkableHash,
@@ -1091,6 +1095,7 @@ pub fn map_sql_dht_op_common(
 
             Ok(Some(ChainOp::from_type(op_type, action, entry)?.into()))
         }
+        #[cfg(feature = "hcf_warrants")]
         DhtOpType::Warrant(_) => {
             let warrant = from_blob::<SignedWarrant>(row.get("action_blob")?)?;
             Ok(Some(warrant.into()))

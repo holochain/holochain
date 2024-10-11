@@ -122,6 +122,7 @@ pub fn insert_op_when(
     let op_order = OpOrder::new(op_type, op.timestamp());
     let deps = op.sys_validation_dependencies();
 
+    #[allow(unused_mut)]
     let mut create_op = true;
 
     match op {
@@ -137,6 +138,7 @@ pub fn insert_op_when(
             let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
             insert_action(txn, &action_hashed)?;
         }
+        #[cfg(feature = "hcf_warrants")]
         DhtOp::WarrantOp(warrant_op) => {
             let warrant = (***warrant_op).clone();
             let inserted = insert_warrant(txn, warrant)?;
@@ -214,6 +216,7 @@ pub fn insert_op_lite_when(
                 "op_order": order,
             })?;
         }
+        #[cfg(feature = "hcf_warrants")]
         DhtOpLite::Warrant(op) => {
             let warrant_hash = op.warrant().to_hash();
             sql_insert!(txn, DhtOp, {
@@ -1024,12 +1027,12 @@ mod tests {
 
     use holochain_types::prelude::*;
 
-    use crate::prelude::{Store, Txn};
-
     use super::insert_op;
 
     #[test]
+    #[cfg(feature = "hcf_warrants")]
     fn can_write_and_read_warrants() {
+        use crate::prelude::{Store, Txn};
         let dir = tempfile::tempdir().unwrap();
 
         let cell_id = Arc::new(fixt!(CellId));

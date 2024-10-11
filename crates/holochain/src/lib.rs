@@ -5,6 +5,10 @@
 // We have a lot of usages of type aliases to `&String`, which clippy objects to.
 #![allow(clippy::ptr_arg)]
 #![recursion_limit = "256"]
+#![cfg_attr(
+    not(feature = "hcf_warrants"),
+    allow(unreachable_patterns, irrefutable_let_patterns)
+)]
 
 #[cfg(doc)]
 pub mod docs;

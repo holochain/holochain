@@ -4,12 +4,14 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 use crate::prelude::*;
-use crate::warrant::Warrant;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
 use holochain_integrity_types::{LinkTag, LinkTypeFilter};
 pub use holochain_serialized_bytes::prelude::*;
+
+#[cfg(feature = "hcf_warrants")]
+use crate::warrant::Warrant;
 
 /// Defines several ways that queries can be restricted to a range.
 /// Notably hash bounded ranges disambiguate forks whereas sequence indexes do
@@ -118,6 +120,8 @@ pub struct AgentActivity {
     /// The highest chain action that has
     /// been observed by this authority.
     pub highest_observed: Option<HighestObserved>,
+
+    #[cfg(feature = "hcf_warrants")]
     /// Warrants about this AgentActivity.
     /// Placeholder for future.
     pub warrants: Vec<Warrant>,

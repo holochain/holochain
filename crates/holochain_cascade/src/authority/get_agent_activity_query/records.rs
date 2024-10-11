@@ -31,7 +31,22 @@ impl Query for GetAgentActivityRecordsQuery {
     type Output = AgentActivityResponse;
 
     fn query(&self) -> String {
-        "
+        let warrant_clause = if cfg!(feature = "hcf_warrants") {
+            "
+            OR
+            (
+                -- is an integrated, valid warrant
+                DhtOp.basis_hash = :author_basis
+                AND DhtOp.type = :warrant_op_type
+                AND DhtOp.validation_status = :valid_status
+                AND DhtOp.when_integrated IS NOT NULL
+            )
+            "
+        } else {
+            ""
+        };
+        format!(
+            "
             SELECT
             Action.hash,
             Action.blob AS action_blob,
@@ -49,29 +64,33 @@ impl Query for GetAgentActivityRecordsQuery {
                 Action.author = :author
                 AND DhtOp.type = :chain_op_type
             )
-            OR
-            (
-                -- is an integrated, valid warrant
-                DhtOp.basis_hash = :author_basis
-                AND DhtOp.type = :warrant_op_type
-                AND DhtOp.validation_status = :valid_status
-                AND DhtOp.when_integrated IS NOT NULL
-            )
+            {warrant_clause}
             ORDER BY Action.seq ASC
         "
-        .to_string()
+        )
     }
 
     fn params(&self) -> Vec<holochain_state::query::Params> {
-        let params = named_params! {
-            ":author": self.agent,
-            ":author_basis": self.agent_basis,
-            ":chain_op_type": ChainOpType::RegisterAgentActivity,
-            ":warrant_op_type": WarrantOpType::ChainIntegrityWarrant,
-            ":valid_status": ValidationStatus::Valid,
-        };
-
-        params.to_vec()
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "hcf_warrants")] {
+                let params = named_params! {
+                    ":author": self.agent,
+                    ":author_basis": self.agent_basis,
+                    ":chain_op_type": ChainOpType::RegisterAgentActivity,
+                    ":valid_status": ValidationStatus::Valid,
+                    ":warrant_op_type": WarrantOpType::ChainIntegrityWarrant,
+                };
+                params.to_vec()
+            } else {
+                let params = named_params! {
+                    ":author": self.agent,
+                    ":author_basis": self.agent_basis,
+                    ":chain_op_type": ChainOpType::RegisterAgentActivity,
+                    ":valid_status": ValidationStatus::Valid,
+                };
+                params.to_vec()
+            }
+        }
     }
 
     fn init_fold(&self) -> StateQueryResult<Self::State> {
@@ -121,6 +140,7 @@ impl Query for GetAgentActivityRecordsQuery {
                         Judged::raw(item, validation_status)
                     })
                 }
+                #[cfg(feature = "hcf_warrants")]
                 DhtOpType::Warrant(_) => {
                     let _hash: WarrantHash = row.get("hash")?;
                     from_blob::<SignedWarrant>(row.get("action_blob")?).map(|warrant| {

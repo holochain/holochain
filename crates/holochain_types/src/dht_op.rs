@@ -9,7 +9,6 @@ use std::str::FromStr;
 use crate::action::NewEntryAction;
 use crate::prelude::*;
 use crate::record::RecordGroup;
-use crate::warrant::WarrantOp;
 use holo_hash::*;
 use holochain_sqlite::rusqlite::types::FromSql;
 use holochain_sqlite::rusqlite::ToSql;
@@ -22,6 +21,13 @@ use serde::Serialize;
 
 mod error;
 pub use error::*;
+
+#[cfg(feature = "hcf_warrants")]
+use crate::warrant::WarrantOp;
+#[cfg(feature = "hcf_warrants")]
+mod warrant_op;
+#[cfg(feature = "hcf_warrants")]
+pub use warrant_op::*;
 
 #[cfg(test)]
 mod tests;
@@ -38,7 +44,9 @@ mod tests;
 pub enum DhtOp {
     /// An op representing storage of some record information.
     ChainOp(Box<ChainOp>),
-    /// TODO, new type of op
+
+    /// An op representing a warrant against an agent.
+    #[cfg(feature = "hcf_warrants")]
     WarrantOp(Box<WarrantOp>),
 }
 
@@ -133,18 +141,6 @@ impl From<ChainOp> for DhtOp {
     }
 }
 
-impl From<WarrantOp> for DhtOp {
-    fn from(op: WarrantOp) -> Self {
-        DhtOp::WarrantOp(Box::new(op))
-    }
-}
-
-impl From<SignedWarrant> for DhtOp {
-    fn from(op: SignedWarrant) -> Self {
-        DhtOp::WarrantOp(Box::new(WarrantOp::from(op)))
-    }
-}
-
 impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
     fn loc(&self) -> Loc {
         self.dht_basis().get_loc()
@@ -170,6 +166,7 @@ impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
 pub enum DhtOpLite {
     Chain(Box<ChainOpLite>),
     /// Note: WarrantOps are already "lite", as they only contain hashes
+    #[cfg(feature = "hcf_warrants")]
     Warrant(Box<WarrantOp>),
 }
 
@@ -204,18 +201,6 @@ impl From<ChainOpLite> for DhtOpLite {
     }
 }
 
-impl From<WarrantOp> for DhtOpLite {
-    fn from(op: WarrantOp) -> Self {
-        DhtOpLite::Warrant(Box::new(op))
-    }
-}
-
-impl From<SignedWarrant> for DhtOpLite {
-    fn from(warrant: SignedWarrant) -> Self {
-        DhtOpLite::Warrant(Box::new(warrant.into()))
-    }
-}
-
 impl PartialEq for ChainOpLite {
     fn eq(&self, other: &Self) -> bool {
         // The ops are the same if they are the same type on the same action hash.
@@ -239,6 +224,7 @@ impl std::hash::Hash for ChainOpLite {
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, Hash, derive_more::From)]
 pub enum DhtOpType {
     Chain(ChainOpType),
+    #[cfg(feature = "hcf_warrants")]
     Warrant(WarrantOpType),
 }
 
@@ -248,6 +234,7 @@ impl ToSql for DhtOpType {
     ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
         match self {
             DhtOpType::Chain(op) => op.to_sql(),
+            #[cfg(feature = "hcf_warrants")]
             DhtOpType::Warrant(op) => op.to_sql(),
         }
     }
@@ -259,10 +246,17 @@ impl FromSql for DhtOpType {
     ) -> holochain_sqlite::rusqlite::types::FromSqlResult<Self> {
         String::column_result(value)
             .and_then(|string| {
-                ChainOpType::from_str(&string)
-                    .map(DhtOpType::from)
-                    .or_else(|_| WarrantOpType::from_str(&string).map(DhtOpType::from))
-                    .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
+                let op_type = ChainOpType::from_str(&string).map(DhtOpType::from);
+
+                cfg_if::cfg_if! {
+                    if #[cfg(feature = "hcf_warrants")] {
+                        op_type.or_else(|_| WarrantOpType::from_str(&string).map(DhtOpType::from))
+                            .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
+                    } else {
+                        op_type
+                            .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
+                    }
+                }
             })
             .map(Into::into)
     }
@@ -361,6 +355,8 @@ impl DhtOp {
     pub fn as_chain_op(&self) -> Option<&ChainOp> {
         match self {
             Self::ChainOp(op) => Some(op),
+
+            #[cfg(feature = "hcf_warrants")]
             _ => None,
         }
     }
@@ -369,6 +365,7 @@ impl DhtOp {
     pub fn get_type(&self) -> DhtOpType {
         match self {
             Self::ChainOp(op) => DhtOpType::Chain(op.get_type()),
+            #[cfg(feature = "hcf_warrants")]
             Self::WarrantOp(op) => DhtOpType::Warrant(op.get_type()),
         }
     }
@@ -377,6 +374,7 @@ impl DhtOp {
     pub fn dht_basis(&self) -> OpBasis {
         match self {
             Self::ChainOp(op) => op.as_unique_form().basis(),
+            #[cfg(feature = "hcf_warrants")]
             Self::WarrantOp(op) => op.dht_basis(),
         }
     }
@@ -385,6 +383,7 @@ impl DhtOp {
     pub fn signature(&self) -> &Signature {
         match self {
             Self::ChainOp(op) => op.signature(),
+            #[cfg(feature = "hcf_warrants")]
             Self::WarrantOp(op) => op.signature(),
         }
     }
@@ -392,6 +391,7 @@ impl DhtOp {
     fn to_order(&self) -> OpOrder {
         match self {
             Self::ChainOp(op) => OpOrder::new(op.get_type(), op.timestamp()),
+            #[cfg(feature = "hcf_warrants")]
             Self::WarrantOp(op) => OpOrder::new(op.get_type(), op.timestamp()),
         }
     }
@@ -400,6 +400,7 @@ impl DhtOp {
     pub fn author(&self) -> AgentPubKey {
         match self {
             Self::ChainOp(op) => op.action().author().clone(),
+            #[cfg(feature = "hcf_warrants")]
             Self::WarrantOp(op) => op.author.clone(),
         }
     }
@@ -408,6 +409,7 @@ impl DhtOp {
     pub fn timestamp(&self) -> Timestamp {
         match self {
             Self::ChainOp(op) => op.timestamp(),
+            #[cfg(feature = "hcf_warrants")]
             Self::WarrantOp(op) => op.timestamp(),
         }
     }
@@ -416,6 +418,7 @@ impl DhtOp {
     pub fn to_lite(&self) -> DhtOpLite {
         match self {
             Self::ChainOp(op) => DhtOpLite::Chain(op.to_lite().into()),
+            #[cfg(feature = "hcf_warrants")]
             Self::WarrantOp(op) => DhtOpLite::Warrant(op.clone()),
         }
     }
@@ -424,6 +427,7 @@ impl DhtOp {
     pub fn sys_validation_dependencies(&self) -> SysValDeps {
         match self {
             Self::ChainOp(op) => op.get_type().sys_validation_dependencies(&op.action()),
+            #[cfg(feature = "hcf_warrants")]
             Self::WarrantOp(op) => match &op.proof {
                 WarrantProof::ChainIntegrity(w) => match w {
                     ChainIntegrityWarrant::InvalidChainOp {
@@ -763,6 +767,7 @@ impl DhtOpLite {
     pub fn dht_basis(&self) -> OpBasis {
         match self {
             Self::Chain(op) => op.dht_basis().clone(),
+            #[cfg(feature = "hcf_warrants")]
             Self::Warrant(op) => op.dht_basis(),
         }
     }
@@ -779,6 +784,7 @@ impl DhtOpLite {
     pub fn get_type(&self) -> DhtOpType {
         match self {
             Self::Chain(op) => op.get_type().into(),
+            #[cfg(feature = "hcf_warrants")]
             Self::Warrant(op) => op.get_type().into(),
         }
     }
@@ -794,6 +800,7 @@ impl DhtOpLite {
                 ChainOpLite::StoreEntry(_, entry_hash, _) => vec![entry_hash.clone().into()],
                 other => vec![other.action_hash().clone().into()],
             },
+            #[cfg(feature = "hcf_warrants")]
             Self::Warrant(op) => match &op.proof {
                 WarrantProof::ChainIntegrity(w) => match w {
                     ChainIntegrityWarrant::InvalidChainOp {
@@ -1282,6 +1289,7 @@ impl HashableContent for DhtOp {
     fn hashable_content(&self) -> HashableContentBytes {
         match self {
             DhtOp::ChainOp(op) => op.hashable_content(),
+            #[cfg(feature = "hcf_warrants")]
             DhtOp::WarrantOp(op) => op.hashable_content(),
         }
     }
@@ -1330,6 +1338,7 @@ pub enum WireOps {
     Record(WireRecordOps),
     /// A warrant in place of data in the case that the data is invalid.
     /// There is no "wire" version because this is about as compact as it gets.
+    #[cfg(feature = "hcf_warrants")]
     Warrant(Box<WarrantOp>),
 }
 
@@ -1339,6 +1348,7 @@ impl WireOps {
         match self {
             WireOps::Entry(o) => o.render(),
             WireOps::Record(o) => o.render(),
+            #[cfg(feature = "hcf_warrants")]
             WireOps::Warrant(warrant) => Ok(RenderedOps {
                 entry: Default::default(),
                 ops: Default::default(),
@@ -1395,6 +1405,7 @@ pub struct RenderedOps {
     pub entry: Option<EntryHashed>,
     /// Op data to insert.
     pub ops: Vec<RenderedOp>,
+    #[cfg(feature = "hcf_warrants")]
     /// Warrant, if the data is invalid.
     /// If this is Some, all other fields should be empty, and vice versa.
     // TODO: RenderedOps really should be an enum, for the valid and invalid cases.
@@ -1466,6 +1477,7 @@ impl OpOrder {
             DhtOpType::Chain(ChainOpType::RegisterRemoveLink) => {
                 OpNumericalOrder::RegisterRemoveLink
             }
+            #[cfg(feature = "hcf_warrants")]
             DhtOpType::Warrant(WarrantOpType::ChainIntegrityWarrant) => {
                 OpNumericalOrder::ChainIntegrityWarrant
             }

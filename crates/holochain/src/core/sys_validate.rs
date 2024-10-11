@@ -44,6 +44,7 @@ pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysVal
     }
 }
 
+#[cfg(feature = "hcf_warrants")]
 /// Verify the signature for this warrant
 pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationResult<()> {
     if warrant_op
