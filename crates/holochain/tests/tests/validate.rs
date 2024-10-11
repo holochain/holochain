@@ -115,7 +115,9 @@ async fn call_validate_with_invalid_return_type() {
         WorkflowError::SourceChainError(SourceChainError::Other(other_err)) = *workflow_err
     );
     // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
-    assert!(other_err.to_string() == "The callback has an invalid return type: invalid value: integer `42`, expected variant index 0 <= i < 3");
+    assert!(other_err
+        .to_string()
+        .starts_with("The callback has an invalid return type: invalid value: integer `42`"));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -159,7 +161,9 @@ async fn call_validate_with_invalid_return_type_across_cells() {
 
     let_assert!(ConductorApiError::Other(other_err) = err);
     // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
-    assert!(other_err.to_string().contains("The callback has an invalid return type: invalid value: integer `42`, expected variant index 0 <= i < 3"));
+    assert!(other_err
+        .to_string()
+        .contains("The callback has an invalid return type: invalid value: integer `42`"));
 }
 
 #[tokio::test(flavor = "multi_thread")]

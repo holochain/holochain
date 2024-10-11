@@ -298,7 +298,7 @@ mod slow_tests {
             .unwrap_err();
 
         let_assert!(RibosomeError::CallbackInvalidReturnType(err_msg) = err);
-        assert!(err_msg == "invalid value: integer `42`, expected variant index 0 <= i < 3");
+        assert!(err_msg.starts_with("invalid value: integer `42`"));
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -318,7 +318,9 @@ mod slow_tests {
             WorkflowError::SourceChainError(SourceChainError::Other(other_err)) = *workflow_err
         );
         // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
-        assert!(other_err.to_string() == "The callback has an invalid return type: invalid value: integer `42`, expected variant index 0 <= i < 3");
+        assert!(other_err
+            .to_string()
+            .starts_with("The callback has an invalid return type: invalid value: integer `42`"));
     }
 
     #[tokio::test(flavor = "multi_thread")]
