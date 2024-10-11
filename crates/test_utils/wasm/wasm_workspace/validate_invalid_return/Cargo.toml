@@ -1,7 +1,7 @@
 [package]
 name = "test_wasm_validate_invalid_return"
 version = "0.0.1"
-authors = ["Callum Dunster <cdunster@users.noreply.github.com>"]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
 [lib]
