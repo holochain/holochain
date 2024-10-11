@@ -4556,9 +4556,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0da3e3e1bd2644dc2974ef622743cd83f2c661b3c6c67acb00cda4725646def"
+checksum = "1e3ce2bfd2af30dddc1cd4fd4f7b6ed098a949222c59ccb986162ecc41a96472"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions",
@@ -4572,9 +4572,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9519a48df54d2041f8697bba7c3957263a5f2bb720ae6c4954004bad51693c61"
+checksum = "433083f77dcae8f66bc06934c18e9ae2804bccfa74a6c75bb89a3f8057d93267"
 dependencies = [
  "base64 0.22.1",
  "dunce",
@@ -8390,9 +8390,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.14-alpha"
+version = "0.0.15-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "051fbfe67420948106357c27a54f8bbe25a5f62e56a8f0192b11b2aae7e16a78"
+checksum = "26db071e98ea6e59b2f4776c3695f7ac76fe3e49e1831bc1c694aeb12132dff2"
 dependencies = [
  "bit_field",
  "bytes",
@@ -8415,9 +8415,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-core"
-version = "0.0.14-alpha"
+version = "0.0.15-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1e51435e31233dc38b06ff3dc495f6ba027cd6ec917c3a15796c9aec6f3a433"
+checksum = "2ebfac463c45038a97f4680577dc4fa834e09cd8e71ee9afc885542e7f59e281"
 dependencies = [
  "app_dirs2",
  "base64 0.13.1",
@@ -8434,9 +8434,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.0.14-alpha"
+version = "0.0.15-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e54f8ed72ab6ca33b4f70c81744cebc2690203df1544e07053185adb8b5b771d"
+checksum = "7671dfde166b4cd952ad4768514e3755253e0af72c24e1469c743e0f9a77f2a0"
 dependencies = [
  "futures",
  "parking_lot 0.12.3",
@@ -8448,9 +8448,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.14-alpha"
+version = "0.0.15-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad305853b0675d30b18183d072f4b3e326ea186ab38e2778a7a5d40072271853"
+checksum = "12c9feca91791769d1b25ba46efa89493a648572dce6b79fdde2dbad73deb45a"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -8467,9 +8467,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-turn"
-version = "0.0.14-alpha"
+version = "0.0.15-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2de1a96047debfde1da5e1ce230f4e4d39d18d707190c04ccec2fdd9ae356e24"
+checksum = "bb92ddd44e049708d79e4315bf1c44b6992cd3a3cf95296ad24afd446daa3746"
 dependencies = [
  "base64 0.13.1",
  "dirs",
@@ -8485,9 +8485,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.14-alpha"
+version = "0.0.15-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3036e0df28f280990fd12c569244c25c7ab6e3b9f436ca617fbf5b1d3a6dc761"
+checksum = "3f4c7f15970697c26916e3063266e20052056315077cf742d501f0c283ea02a2"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -8514,9 +8514,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal-srv"
-version = "0.0.14-alpha"
+version = "0.0.15-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afa882b51d1c4b4e86c9a43134674b856a8248c147d889c70c6d0f9d88541012"
+checksum = "fc6add3578c5b9f8c361629acec50d155593ed6da02971bb2385b43412a21d38"
 dependencies = [
  "clap 4.5.9",
  "dirs",
