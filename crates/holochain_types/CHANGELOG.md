@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- InstalledAppCommon now includes a field `installed_at` with the timestamp that the app was installed
+
+## 0.4.0
+
+## 0.4.0-dev.27
+
+## 0.4.0-dev.26
+
 ## 0.4.0-dev.25
 
 ## 0.4.0-dev.24

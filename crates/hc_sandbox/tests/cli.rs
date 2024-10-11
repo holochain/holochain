@@ -1,4 +1,6 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
+use holochain_cli_sandbox::config::read_config;
+use holochain_conductor_api::conductor::{ConductorConfig, DpkiConfig};
 use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
 use holochain_types::app::InstalledAppId;
@@ -12,10 +14,11 @@ use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio::process::Command;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, Command};
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -165,16 +168,12 @@ async fn generate_sandbox_and_connect() {
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
     println!("@@ {cmd:?}");
 
-    let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-
-    let mut child_stdin = hc_admin.stdin.take().unwrap();
-    child_stdin.write_all(b"test-phrase\n").await.unwrap();
-    drop(child_stdin);
+    let hc_admin = input_piped_password(&mut cmd).await;
 
     let launch_info = get_launch_info(hc_admin).await;
 
@@ -207,13 +206,10 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("tests/fixtures/my-app/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
-    let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-    let mut child_stdin = hc_admin.stdin.take().unwrap();
-    child_stdin.write_all(b"test-phrase\n").await.unwrap();
-    drop(child_stdin);
+    let hc_admin = input_piped_password(&mut cmd).await;
 
     let launch_info = get_launch_info(hc_admin).await;
 
@@ -252,13 +248,10 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
         .arg("tests/fixtures/my-app-deferred/")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
-    let mut hc_admin = cmd.spawn().expect("Failed to spawn holochain");
-    let mut child_stdin = hc_admin.stdin.take().unwrap();
-    child_stdin.write_all(b"test-phrase\n").await.unwrap();
-    drop(child_stdin);
+    let hc_admin = input_piped_password(&mut cmd).await;
 
     let launch_info = get_launch_info(hc_admin).await;
 
@@ -274,6 +267,101 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
 
     let exit_code = hc_call.wait().await.unwrap();
     assert!(exit_code.success());
+}
+
+/// Create a new default sandbox which should have DPKI enabled in the conductor config.
+#[tokio::test(flavor = "multi_thread")]
+async fn default_sandbox_has_dpki_enabled() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("create")
+        .arg("--in-process-lair")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut sandbox_process = input_piped_password(&mut cmd).await;
+    let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
+    assert!(!conductor_config.dpki.no_dpki);
+}
+
+/// Create a new sandbox with DPKI disabled in the conductor config.
+#[tokio::test(flavor = "multi_thread")]
+async fn create_sandbox_without_dpki() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("create")
+        .arg("--in-process-lair")
+        .arg("--no-dpki")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut sandbox_process = input_piped_password(&mut cmd).await;
+    let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
+    assert!(conductor_config.dpki.no_dpki);
+}
+
+/// Create a new default sandbox which should have a test network seed set for DPKI.
+#[tokio::test(flavor = "multi_thread")]
+async fn create_default_sandbox_with_dpki_test_network_seed() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("create")
+        .arg("--in-process-lair")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut sandbox_process = input_piped_password(&mut cmd).await;
+    let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
+    assert_eq!(
+        conductor_config.dpki.network_seed,
+        DpkiConfig::testing().network_seed
+    );
+}
+
+/// Create a new sandbox with a custom DPKI network seed.
+#[tokio::test(flavor = "multi_thread")]
+async fn create_sandbox_with_custom_dpki_network_seed() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let network_seed = "sandbox_test_dpki";
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("create")
+        .arg("--in-process-lair")
+        .arg("--dpki-network-seed")
+        .arg(network_seed)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut sandbox_process = input_piped_password(&mut cmd).await;
+    let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
+    assert_eq!(conductor_config.dpki.network_seed, network_seed);
 }
 
 include!(concat!(env!("OUT_DIR"), "/target.rs"));
@@ -316,15 +404,35 @@ async fn get_launch_info(mut child: tokio::process::Child) -> LaunchInfo {
             return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();
         }
     }
-
-    let mut buf = String::new();
-    BufReader::new(child.stderr.take().unwrap())
-        .read_to_string(&mut buf)
-        .await
-        .unwrap();
-    eprintln!("{buf}");
-
     panic!("Unable to find launch info in sandbox output. See stderr above.")
+}
+
+async fn input_piped_password(cmd: &mut Command) -> Child {
+    let mut child_process = cmd.spawn().expect("Failed to spawn holochain");
+    let mut child_stdin = child_process.stdin.take().unwrap();
+    child_stdin.write_all(b"test-phrase\n").await.unwrap();
+    child_process
+}
+
+async fn get_created_conductor_config(process: &mut Child) -> ConductorConfig {
+    let stdout = process.stdout.take().unwrap();
+    let mut lines = BufReader::new(stdout).lines();
+    while let Ok(Some(line)) = lines.next_line().await {
+        println!("@@@-{line}-@@@");
+        if let Some(index) = line.find("ConfigRootPath") {
+            let config_root_path_debug_output = line[index..].trim();
+            let config_root_path = config_root_path_debug_output
+                .strip_prefix("ConfigRootPath(\"")
+                .unwrap()
+                .strip_suffix("\")]")
+                .unwrap();
+            let config = read_config(PathBuf::from_str(config_root_path).unwrap().into())
+                .unwrap()
+                .unwrap();
+            return config;
+        }
+    }
+    panic!("getting created conductor config failed");
 }
 
 struct WsPoll(tokio::task::JoinHandle<()>);

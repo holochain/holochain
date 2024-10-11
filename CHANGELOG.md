@@ -14,6 +14,111 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20241002.004426
+
+## [hcterm-0.4.0-dev.28](crates/hcterm/CHANGELOG.md#0.4.0-dev.28)
+
+## [holochain\_cli-0.4.0-dev.28](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.28)
+
+## [holochain-0.4.0-dev.28](crates/holochain/CHANGELOG.md#0.4.0-dev.28)
+
+## [holochain\_cli\_bundle-0.4.0-dev.27](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.27)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.28](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.28)
+
+## [holochain\_cascade-0.4.0-dev.28](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.28)
+
+## [holochain\_conductor\_api-0.4.0-dev.28](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.28)
+
+## [holochain\_conductor\_services-0.3.0-dev.28](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.28)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.27](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.27)
+
+## [holochain\_websocket-0.4.0-dev.27](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.27)
+
+## [holochain\_state-0.4.0-dev.28](crates/holochain_state/CHANGELOG.md#0.4.0-dev.28)
+
+## [holochain\_p2p-0.4.0-dev.28](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.28)
+
+## [hc\_sleuth-0.4.0-dev.27](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.27)
+
+## [holochain\_chc-0.1.0-dev.8](crates/holochain_chc/CHANGELOG.md#0.1.0-dev.8)
+
+## [holochain\_types-0.4.0-dev.27](crates/holochain_types/CHANGELOG.md#0.4.0-dev.27)
+
+# 20240926.150323
+
+## [hc\_service\_check-0.1.0-dev.19](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.19)
+
+## [hcterm-0.4.0-dev.27](crates/hcterm/CHANGELOG.md#0.4.0-dev.27)
+
+## [holochain\_cli-0.4.0-dev.27](crates/holochain_cli/CHANGELOG.md#0.4.0-dev.27)
+
+## [holochain-0.4.0-dev.27](crates/holochain/CHANGELOG.md#0.4.0-dev.27)
+
+- HC sandbox: Fix `--no-dpki` option which previously enabled DPKI in the conductor when set, instead of disabling it.
+- Remove the out-dated `validation_callback_allow_multiple_identical_agent_activity_fetches` test. Originally, it was to test that an identical op is only fetched from the network once and then looked up in the cache. After a refactor of production code this was no longer the case and so the test was refactored to check that it can fetch from the network multiple times. There can be no guarantee that it will do one over the other so the test is naturally flaky.
+- Update the following tests to add a wait for gossip before creating ops. This adds an extra delay and makes sure that the conductors see each other before continuing with the tests.
+  - `multi_create_link_validation`
+  - `session_rollback_with_chc_enabled`
+  - `alice_can_recover_from_a_session_timeout`
+  - `should_be_able_to_schedule_functions_during_session`
+- Update Makefile default recipe to use the new recipes that build and test the workspace with the feature flags `wasmer_sys` and `wasmer_wamr`. \#4284
+- Add support for parsing the lint-level as a set in the Nix holochain module. e.g. `nursery = { level = "allow", priority = -1 }`. \#4284
+- Add the `nix/` directory as a watch point for `direnv` so it reloads the `devShell` if a file changes in that directory. \#4284
+
+## [holochain\_cli\_bundle-0.4.0-dev.26](crates/holochain_cli_bundle/CHANGELOG.md#0.4.0-dev.26)
+
+## [holochain\_cli\_run\_local\_services-0.4.0-dev.18](crates/holochain_cli_run_local_services/CHANGELOG.md#0.4.0-dev.18)
+
+## [holochain\_cli\_sandbox-0.4.0-dev.27](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.0-dev.27)
+
+## [holochain\_cascade-0.4.0-dev.27](crates/holochain_cascade/CHANGELOG.md#0.4.0-dev.27)
+
+## [holochain\_conductor\_api-0.4.0-dev.27](crates/holochain_conductor_api/CHANGELOG.md#0.4.0-dev.27)
+
+## [holochain\_conductor\_services-0.3.0-dev.27](crates/holochain_conductor_services/CHANGELOG.md#0.3.0-dev.27)
+
+## [holochain\_test\_wasm\_common-0.4.0-dev.19](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.0-dev.19)
+
+## [holochain\_wasm\_test\_utils-0.4.0-dev.26](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.0-dev.26)
+
+## [holochain\_websocket-0.4.0-dev.26](crates/holochain_websocket/CHANGELOG.md#0.4.0-dev.26)
+
+## [hc\_deepkey\_sdk-0.7.0-dev.8](crates/hc_deepkey_sdk/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_state-0.4.0-dev.27](crates/holochain_state/CHANGELOG.md#0.4.0-dev.27)
+
+## [hc\_deepkey\_types-0.8.0-dev.8](crates/hc_deepkey_types/CHANGELOG.md#0.8.0-dev.8)
+
+## [hdk-0.4.0-dev.19](crates/hdk/CHANGELOG.md#0.4.0-dev.19)
+
+## [holochain\_p2p-0.4.0-dev.27](crates/holochain_p2p/CHANGELOG.md#0.4.0-dev.27)
+
+## [hc\_sleuth-0.4.0-dev.26](crates/hc_sleuth/CHANGELOG.md#0.4.0-dev.26)
+
+## [hdi-0.5.0-dev.17](crates/hdi/CHANGELOG.md#0.5.0-dev.17)
+
+## [holochain\_chc-0.1.0-dev.7](crates/holochain_chc/CHANGELOG.md#0.1.0-dev.7)
+
+## [holochain\_types-0.4.0-dev.26](crates/holochain_types/CHANGELOG.md#0.4.0-dev.26)
+
+## [kitsune\_p2p-0.4.0-dev.23](crates/kitsune_p2p/CHANGELOG.md#0.4.0-dev.23)
+
+## [holochain\_keystore-0.4.0-dev.24](crates/holochain_keystore/CHANGELOG.md#0.4.0-dev.24)
+
+## [holochain\_sqlite-0.4.0-dev.23](crates/holochain_sqlite/CHANGELOG.md#0.4.0-dev.23)
+
+## [kitsune\_p2p\_bootstrap\_client-0.4.0-dev.16](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.4.0-dev.16)
+
+## [kitsune\_p2p\_fetch-0.4.0-dev.15](crates/kitsune_p2p_fetch/CHANGELOG.md#0.4.0-dev.15)
+
+## [kitsune\_p2p\_proxy-0.4.0-dev.15](crates/kitsune_p2p_proxy/CHANGELOG.md#0.4.0-dev.15)
+
+## [kitsune\_p2p\_bootstrap-0.3.0-dev.16](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.3.0-dev.16)
+
+## [kitsune\_p2p\_types-0.4.0-dev.15](crates/kitsune_p2p_types/CHANGELOG.md#0.4.0-dev.15)
+
 # 20240925.004452
 
 ## [hc\_service\_check-0.1.0-dev.18](crates/hc_service_check/CHANGELOG.md#0.1.0-dev.18)
