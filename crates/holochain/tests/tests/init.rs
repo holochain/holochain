@@ -11,7 +11,7 @@ use holochain::prelude::*;
 use holochain::sweettest::*;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn call_to_init_passes() {
+async fn call_init_in_inline_zomes_passes() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
@@ -42,7 +42,7 @@ async fn call_to_init_passes() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn call_init_across_cells() {
+async fn call_init_across_cells_passes() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
@@ -150,7 +150,7 @@ async fn call_init_from_init_across_cells() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn call_init_with_invalid_return_type() {
+async fn call_init_with_invalid_return_type_in_inline_zomes() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
@@ -288,7 +288,7 @@ async fn call_init_with_invalid_return_type_from_init_across_cells() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn call_init_with_invalid_parameters() {
+async fn call_init_with_invalid_parameters_in_inline_zomes() {
     let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
