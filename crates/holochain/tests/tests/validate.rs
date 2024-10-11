@@ -59,7 +59,7 @@ async fn call_validate_across_cells_passes() {
     let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
     let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
 
-    let zome_2 = SweetInlineZomes::new(vec![], 0).function("touch", move |api, _: ()| {
+    let zome_2 = SweetInlineZomes::new(vec![], 0).function("cross_cell_call", move |api, _: ()| {
         // Simple Zome to just call the other zome.
         api.call(vec![Call {
             target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
@@ -80,7 +80,11 @@ async fn call_validate_across_cells_passes() {
     let (_cell_1, cell_2) = app.into_tuple();
 
     let () = conductor
-        .call(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .call(
+            &cell_2.zome(SweetInlineZomes::COORDINATOR),
+            "cross_cell_call",
+            (),
+        )
         .await;
 
     assert!(is_validate_called.load(Ordering::Relaxed));
@@ -134,7 +138,7 @@ async fn call_validate_with_invalid_return_type_across_cells() {
     let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
     let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
 
-    let zome_2 = SweetInlineZomes::new(vec![], 0).function("touch", move |api, _: ()| {
+    let zome_2 = SweetInlineZomes::new(vec![], 0).function("cross_cell_call", move |api, _: ()| {
         // Simple Zome to just trigger a call to validate.
         api.call(vec![Call {
             target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
@@ -155,7 +159,11 @@ async fn call_validate_with_invalid_return_type_across_cells() {
     let (_cell_1, cell_2) = app.into_tuple();
 
     let err = conductor
-        .call_fallible::<_, ()>(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .call_fallible::<_, ()>(
+            &cell_2.zome(SweetInlineZomes::COORDINATOR),
+            "cross_cell_call",
+            (),
+        )
         .await
         .unwrap_err();
 
@@ -217,7 +225,7 @@ async fn call_validate_with_invalid_parameters_across_cells() {
     let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
     let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
 
-    let zome_2 = SweetInlineZomes::new(vec![], 0).function("touch", move |api, _: ()| {
+    let zome_2 = SweetInlineZomes::new(vec![], 0).function("cross_cell_call", move |api, _: ()| {
         // Simple Zome to call the other zome
         api.call(vec![Call {
             target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
@@ -238,7 +246,11 @@ async fn call_validate_with_invalid_parameters_across_cells() {
     let (_cell_1, cell_2) = app.into_tuple();
 
     let err = conductor
-        .call_fallible::<_, ()>(&cell_2.zome(SweetInlineZomes::COORDINATOR), "touch", ())
+        .call_fallible::<_, ()>(
+            &cell_2.zome(SweetInlineZomes::COORDINATOR),
+            "cross_cell_call",
+            (),
+        )
         .await
         .unwrap_err();
 
