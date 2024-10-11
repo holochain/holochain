@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - AdminRequest::ListApps is now sorted by the new AppInfo field `installed_at`, in descending order
+- Return a `RibosomeError` when there is a serialisation error invoking a zome callback. For example, if they have an invalid return type or parameters. This error bubbles-up and causes the zome call to fail, giving nicer errors and removing the panic which crashed the conductor in these situations. \#3803
 
 ## 0.5.0-dev.0
 
