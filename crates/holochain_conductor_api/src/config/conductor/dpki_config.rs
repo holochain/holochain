@@ -14,6 +14,8 @@ const DPKI_NETWORK_SEED_TESTING: &str = "deepkey-testing";
 
 /// Configure which app instance ID to treat as the DPKI application handler
 /// as well as what parameters to pass it on its initialization.
+/// Note that these settings have an effect on network compatibility,
+/// see [`holochain_p2p::spawn::NetworkCompatParams`].
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub struct DpkiConfig {
     /// Path to a DNA which implements the DPKI service, i.e. Deepkey.
