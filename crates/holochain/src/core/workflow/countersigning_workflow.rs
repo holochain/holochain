@@ -735,9 +735,9 @@ async fn force_abandon_session(
     let abandon_fingerprint = preflight_request.fingerprint()?;
 
     let maybe_session_data = authored_db
-        .write_async({
+        .read_async({
             let author = author.clone();
-            move |txn| current_countersigning_session(txn, Arc::new(author.clone()))
+            move |txn| current_countersigning_session(&txn, Arc::new(author.clone()))
         })
         .await?;
 
