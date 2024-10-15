@@ -828,6 +828,8 @@ impl InstalledAppCommon {
         installed_app_id: S,
         installed_cells: I,
     ) -> AppResult<Self> {
+        use itertools::Itertools;
+
         let installed_app_id = installed_app_id.to_string();
         let installed_cells: Vec<_> = installed_cells.into_iter().collect();
 
