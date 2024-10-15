@@ -315,6 +315,9 @@ chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_chc/http"]
 # Transitional feature flag for code that is only ready when DPKI integration lands.
 dpki = []
 
+# Enable sharding for large networks (> 100 nodes)
+network-sharding = []
+
 sweettest = ["test_utils", "sqlite"]
 
 deepkey-wasm-cache = []
