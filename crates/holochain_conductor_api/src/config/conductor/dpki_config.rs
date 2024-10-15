@@ -14,6 +14,8 @@ const DPKI_NETWORK_SEED_TESTING: &str = "deepkey-testing";
 
 /// Configure which app instance ID to treat as the DPKI application handler
 /// as well as what parameters to pass it on its initialization.
+/// Note that these settings have an effect on network compatibility,
+/// see [`holochain_p2p::spawn::NetworkCompatParams`].
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub struct DpkiConfig {
     /// Path to a DNA which implements the DPKI service, i.e. Deepkey.
@@ -77,11 +79,17 @@ impl DpkiConfig {
 
 impl Default for DpkiConfig {
     fn default() -> Self {
-        Self {
-            dna_path: None,
-            network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
-            allow_throwaway_random_dpki_agent_key: false,
-            no_dpki: false,
+        cfg_if! {
+            if #[cfg(feature = "dpki")] {
+                Self {
+                    dna_path: None,
+                    network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
+                    allow_throwaway_random_dpki_agent_key: false,
+                    no_dpki: false,
+                }
+            } else {
+                Self::disabled()
+            }
         }
     }
 }
