@@ -748,8 +748,8 @@ async fn validate_chain_op(
             store_record(action, validation_dependencies)
         }
         ChainOp::RegisterUpdatedContent(_, action, entry) => {
-            register_updated_content(action, validation_dependencies.clone())?;
             if let Some(entry) = entry.as_option() {
+                register_updated_content(action, validation_dependencies.clone())?;
                 store_entry(
                     NewEntryActionRef::Update(action),
                     entry,
@@ -761,8 +761,8 @@ async fn validate_chain_op(
             Ok(())
         }
         ChainOp::RegisterUpdatedRecord(_, action, entry) => {
-            register_updated_record(action, validation_dependencies.clone())?;
             if let Some(entry) = entry.as_option() {
+                register_updated_record(action, validation_dependencies.clone())?;
                 store_entry(
                     NewEntryActionRef::Update(action),
                     entry,
@@ -774,9 +774,11 @@ async fn validate_chain_op(
             Ok(())
         }
         ChainOp::RegisterDeletedBy(_, action) => {
+            // TODO: cannot properly handle deleting private entries without including EntryType in the Delete
             register_deleted_by(action, validation_dependencies)
         }
         ChainOp::RegisterDeletedEntryAction(_, action) => {
+            // TODO: cannot properly handle deleting private entries without including EntryType in the Delete
             register_deleted_entry_action(action, validation_dependencies)
         }
         ChainOp::RegisterAddLink(_, action) => register_add_link(action),
