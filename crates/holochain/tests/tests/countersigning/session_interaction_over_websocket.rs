@@ -290,8 +290,19 @@ async fn countersigning_session_interaction_calls() {
 
     // Attach app interface to Alice's conductor.
     let (alice_app_tx, mut alice_app_rx) = alice.connect_app_interface().await;
-    // Spawn task listening to app socket messages, preventing app socket to be dropped.
-    tokio::spawn(async move { while alice_app_rx.recv::<AppResponse>().await.is_ok() {} });
+    // Spawn task listening to system signal of abandoned session.
+    let (alice_session_abandonded_tx, mut alice_session_abandonded_rx) =
+        tokio::sync::mpsc::channel(1);
+    tokio::spawn(async move {
+        while let Ok(ReceiveMessage::Signal(signal)) = alice_app_rx.recv::<AppResponse>().await {
+            match Signal::try_from_vec(signal).unwrap() {
+                Signal::System(SystemSignal::AbandonedCountersigning(entry_hash)) => {
+                    let _ = alice_session_abandonded_tx.send(entry_hash).await;
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
 
     // Alice's session should be in state unresolved with 1 attempted resolution.
     tokio::time::timeout(Duration::from_secs(5), async {
@@ -326,6 +337,20 @@ async fn countersigning_session_interaction_calls() {
     .await;
     assert_matches!(response, AppResponse::CountersigningSessionAbandoned);
 
+    // Expect app signal of session abandoned for Alice.
+    let force_abandoned_session_entry_hash =
+        tokio::time::timeout(Duration::from_secs(30), alice_session_abandonded_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+    assert_eq!(
+        force_abandoned_session_entry_hash,
+        preflight_request.app_entry_hash
+    );
+
+    // Alice's session should be gone from memory.
+    assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
+
     // Session should be abandoned and can not be abandoned again.
     let response: AppResponse = request(
         AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
@@ -339,9 +364,6 @@ async fn countersigning_session_interaction_calls() {
         .into(),
     );
     assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
-
-    // Alice's session should be gone.
-    assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
     // Bob's session should still be in Accepted state.
     assert_matches!(
         get_session_state(&bob.cell_id, &bob_app_tx).await,

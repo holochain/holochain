@@ -1187,7 +1187,7 @@ async fn should_be_able_to_schedule_functions_during_session() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_after_shutdown() {
+async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_after_shutdown() {
     holochain_trace::test_run();
 
     let config = SweetConductorConfig::rendezvous(true)
@@ -1221,7 +1221,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
 
     await_consistency(30, vec![alice, bob]).await.unwrap();
 
-    // Set up the session and accept it for both agents
+    // Set up the session and accept it for both agents.
     let preflight_request: PreflightRequest = conductors[0]
         .call_fallible(
             &alice_zome,
@@ -1261,7 +1261,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         unreachable!();
     };
 
-    // Alice makes her commit, but before Bob can do the same, disaster strikes...
+    // Alice makes her commit and shuts down.
     let (_, _): (ActionHash, EntryHash) = conductors[0]
         .call_fallible(
             &alice_zome,
@@ -1270,10 +1270,162 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         )
         .await
         .unwrap();
-
     conductors[0].shutdown().await;
 
-    // Bob can't know what has happened to Alice and makes his commit
+    // Alice comes back online.
+    conductors[0].startup().await;
+
+    println!("here we are");
+
+    // Wait until Alice's session has been attempted to be resolved.
+    tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            let state = conductors[0]
+            .raw_handle()
+            .get_countersigning_session_state(alice.cell_id())
+            .await
+            .unwrap();
+            if matches!(
+                state,
+                Some(CountersigningSessionState::Unknown { resolution, .. }) if resolution.attempts >= 1
+            ) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    println!("here we are again");
+
+    let mut alice_app_signal_rx = conductors[0].subscribe_to_app_signals(app_id.to_string());
+    let mut bob_app_signal_rx = conductors[1].subscribe_to_app_signals(app_id.to_string());
+
+    // Alice abandons the session.
+    conductors[0]
+        .abandon_countersigning_session(alice.cell_id())
+        .await
+        .unwrap();
+
+    // Await countersigning session abandoned signal for Alice.
+    match alice_app_signal_rx.recv().await.unwrap() {
+        Signal::System(SystemSignal::AbandonedCountersigning(entry_hash)) => {
+            assert_eq!(entry_hash, preflight_request.app_entry_hash.clone());
+        }
+        _ => panic!("Expected System signal"),
+    }
+    // Alice's session should be gone from memory.
+    let alice_state = conductors[0]
+        .raw_handle()
+        .get_countersigning_session_state(alice.cell_id())
+        .await
+        .unwrap();
+    assert_matches!(alice_state, None);
+
+    // Await countersigning session abandoned signal for Bob.
+    match bob_app_signal_rx.recv().await.unwrap() {
+        Signal::System(SystemSignal::AbandonedCountersigning(entry_hash)) => {
+            assert_eq!(entry_hash, preflight_request.app_entry_hash.clone());
+        }
+        _ => panic!("Expected System signal"),
+    }
+    // Bob's session should be gone from memory.
+    let bob_state = conductors[1]
+        .raw_handle()
+        .get_countersigning_session_state(bob.cell_id())
+        .await
+        .unwrap();
+    assert_matches!(bob_state, None);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_after_shutdown() {
+    holochain_trace::test_run();
+
+    let config = SweetConductorConfig::rendezvous(true)
+        .tune_conductor(|c| {
+            c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
+        })
+        .tune(|params| {
+            // Incredible, but true: set the timeout for a network
+            params.tx2_implicit_timeout_ms = 3_000;
+        });
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
+    let app_id = "app";
+    let apps = conductors.setup_app(app_id, &[dna]).await.unwrap();
+    let cells = apps.cells_flattened();
+    let alice = &cells[0];
+    let bob = &cells[1];
+
+    // Need an initialised source chain for countersigning, so commit anything
+    let alice_zome = alice.zome(TestWasm::CounterSigning);
+    let _: ActionHash = conductors[0]
+        .call_fallible(&alice_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+    let bob_zome = bob.zome(TestWasm::CounterSigning);
+    let _: ActionHash = conductors[1]
+        .call_fallible(&bob_zome, "create_a_thing", ())
+        .await
+        .unwrap();
+
+    await_consistency(30, vec![alice, bob]).await.unwrap();
+
+    // Set up the session and accept it for both agents.
+    let preflight_request: PreflightRequest = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "generate_countersigning_preflight_request_fast",
+            vec![
+                (alice.agent_pubkey().clone(), vec![Role(0)]),
+                (bob.agent_pubkey().clone(), vec![]),
+            ],
+        )
+        .await
+        .unwrap();
+    let alice_acceptance: PreflightRequestAcceptance = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "accept_countersigning_preflight_request",
+            preflight_request.clone(),
+        )
+        .await
+        .unwrap();
+    let alice_response =
+        if let PreflightRequestAcceptance::Accepted(ref response) = alice_acceptance {
+            response
+        } else {
+            unreachable!();
+        };
+    let bob_acceptance: PreflightRequestAcceptance = conductors[1]
+        .call_fallible(
+            &bob_zome,
+            "accept_countersigning_preflight_request",
+            preflight_request.clone(),
+        )
+        .await
+        .unwrap();
+    let bob_response = if let PreflightRequestAcceptance::Accepted(ref response) = bob_acceptance {
+        response
+    } else {
+        unreachable!();
+    };
+
+    // Alice makes her commit and shuts down.
+    let (_, _): (ActionHash, EntryHash) = conductors[0]
+        .call_fallible(
+            &alice_zome,
+            "create_a_countersigned_thing_with_entry_hash",
+            vec![alice_response.clone(), bob_response.clone()],
+        )
+        .await
+        .unwrap();
+    conductors[0].shutdown().await;
+
+    // Bob can't know what has happened to Alice, makes his commit and shuts down.
     let (_, _): (ActionHash, EntryHash) = conductors[1]
         .call_fallible(
             &bob_zome,
@@ -1282,7 +1434,6 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         )
         .await
         .unwrap();
-
     conductors[1].shutdown().await;
 
     // Alice comes back online.

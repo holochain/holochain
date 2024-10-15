@@ -76,6 +76,8 @@ pub enum CountersigningSessionState {
         preflight_request: PreflightRequest,
         /// Summary of the attempts to resolve this session.
         resolution: SessionResolutionSummary,
+        /// Flag if the session is programmed to be force-abandoned on the next countersigning workflow run.
+        force_abandon: bool,
         /// Flag if the session is programmed to be force-published on the next countersigning workflow run.
         force_publish: bool,
     },

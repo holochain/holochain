@@ -63,6 +63,35 @@ impl CountersigningWorkspace {
             .unwrap()
     }
 
+    pub fn mark_countersigning_session_for_force_abandon(
+        &self,
+        cell_id: &CellId,
+    ) -> Result<(), CountersigningError> {
+        self.inner
+            .share_mut(|inner, _| {
+                Ok(if let Some(session) = inner.session.as_mut() {
+                    if let CountersigningSessionState::Unknown {
+                        resolution,
+                        force_abandon,
+                        ..
+                    } = session
+                    {
+                        if resolution.attempts >= 1 {
+                            *force_abandon = true;
+                            Ok(())
+                        } else {
+                            Err(CountersigningError::SessionNotUnresolved(cell_id.clone()))
+                        }
+                    } else {
+                        Err(CountersigningError::SessionNotUnresolved(cell_id.clone()))
+                    }
+                } else {
+                    Err(CountersigningError::SessionNotFound(cell_id.clone()))
+                })
+            })
+            .unwrap()
+    }
+
     pub fn mark_countersigning_session_for_force_publish(
         &self,
         cell_id: &CellId,
@@ -223,6 +252,7 @@ pub(crate) async fn countersigning_workflow(
                                 *session = CountersigningSessionState::Unknown {
                                     preflight_request: preflight_request.clone(),
                                     resolution: resolution.clone().unwrap_or_default(),
+                                    force_abandon: false,
                                     force_publish: false,
                                 };
                             }
@@ -237,25 +267,48 @@ pub(crate) async fn countersigning_workflow(
         }
     } else {
         // No signature bundles.
+        // If the session is marked to be force-abandoned, execute that and send signal to the client.
+
         // If the session is marked to be force-published, execute that and set the completed status
         // for later removal of the session.
-        if let Ok(Some((force_publish, preflight_request))) = workspace.inner.share_ref(|inner| {
-            Ok(inner.session.as_ref().and_then(|session| {
-                // To set the force publish flag, attempts to resolve must be > 0, so it does not have
-                // to be checked again now.
-                if let CountersigningSessionState::Unknown {
-                    force_publish,
-                    preflight_request,
-                    ..
-                } = session
-                {
-                    Some((force_publish.clone(), preflight_request.clone()))
-                } else {
-                    None
-                }
-            }))
-        }) {
-            if force_publish {
+
+        // Get flags and preflight_request from session first if it is unresolved.
+        if let Ok(Some((force_abandon, force_publish, preflight_request))) =
+            workspace.inner.share_ref(|inner| {
+                Ok(inner.session.as_ref().and_then(|session| {
+                    // To set the force-abandon or force-publish flag, attempts to resolve must be > 0, so it does not have
+                    // to be checked again now.
+                    if let CountersigningSessionState::Unknown {
+                        force_abandon,
+                        force_publish,
+                        preflight_request,
+                        ..
+                    } = session
+                    {
+                        Some((*force_abandon, *force_publish, preflight_request.clone()))
+                    } else {
+                        None
+                    }
+                }))
+            })
+        {
+            if force_abandon {
+                force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request)
+                    .await?;
+                workspace
+                    .inner
+                    .share_mut(|inner, _| {
+                        inner.session = None;
+                        Ok(())
+                    })
+                    .unwrap();
+                // Then let the client know.
+                signal_tx
+                    .send(Signal::System(SystemSignal::AbandonedCountersigning(
+                        preflight_request.app_entry_hash,
+                    )))
+                    .ok();
+            } else if force_publish {
                 complete::force_publish_countersigning_session(
                     space.clone(),
                     network.clone(),
@@ -587,6 +640,7 @@ async fn apply_timeout(
                                         required_reason: ResolutionRequiredReason::Timeout,
                                         ..Default::default()
                                     },
+                                    force_abandon: false,
                                     force_publish: false,
                                 };
                                 false
@@ -614,6 +668,7 @@ async fn apply_timeout(
                                     required_reason: ResolutionRequiredReason::Timeout,
                                     ..Default::default()
                                 },
+                                force_abandon: false,
                                 force_publish: false,
                             };
                         }

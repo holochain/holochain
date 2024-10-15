@@ -3277,10 +3277,7 @@ mod authenticate_token_impls {
 /// Methods for bridging from host calls to workflows for countersigning
 mod countersigning_impls {
     use super::*;
-    use crate::core::workflow::{
-        self,
-        countersigning_workflow::{force_abandon_session, CountersigningWorkspace},
-    };
+    use crate::core::workflow::{self, countersigning_workflow::CountersigningWorkspace};
 
     impl Conductor {
         /// Accept a countersigning session
@@ -3328,21 +3325,14 @@ mod countersigning_impls {
             cell_id: &CellId,
         ) -> ConductorResult<()> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
-            let (preflight_request, countersigning_workspace) = self
+            let (_, countersigning_workspace) = self
                 .get_preflight_request_with_workspace_from_unresolved_session(&space, cell_id)
                 .await?;
-            force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request)
-                .await?;
-            // Remove countersigning session from the workspace.
-            if countersigning_workspace
-                .remove_countersigning_session()
-                .is_none()
-            {
-                tracing::error!(
-                    ?cell_id,
-                    "Could not remove countersigning session from workspace after abandoning it."
-                );
-            }
+            let cell = self.cell_by_id(cell_id).await?;
+            countersigning_workspace.mark_countersigning_session_for_force_abandon(cell_id)?;
+            cell.triggers()
+                .countersigning
+                .trigger(&"force_abandon_session");
             Ok(())
         }
 
