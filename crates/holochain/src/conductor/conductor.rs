@@ -3325,8 +3325,8 @@ mod countersigning_impls {
             cell_id: &CellId,
         ) -> ConductorResult<()> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
-            let (_, countersigning_workspace) = self
-                .get_preflight_request_with_workspace_from_unresolved_session(&space, cell_id)
+            let countersigning_workspace = self
+                .get_workspace_of_unresolved_session(&space, cell_id)
                 .await?;
             let cell = self.cell_by_id(cell_id).await?;
             countersigning_workspace.mark_countersigning_session_for_force_abandon(cell_id)?;
@@ -3342,8 +3342,8 @@ mod countersigning_impls {
             cell_id: &CellId,
         ) -> ConductorResult<()> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
-            let (_, countersigning_workspace) = self
-                .get_preflight_request_with_workspace_from_unresolved_session(&space, cell_id)
+            let countersigning_workspace = self
+                .get_workspace_of_unresolved_session(&space, cell_id)
                 .await?;
             let cell = self.cell_by_id(cell_id).await?;
             countersigning_workspace.mark_countersigning_session_for_force_publish(cell_id)?;
@@ -3353,11 +3353,11 @@ mod countersigning_impls {
             Ok(())
         }
 
-        async fn get_preflight_request_with_workspace_from_unresolved_session(
+        async fn get_workspace_of_unresolved_session(
             &self,
             space: &Space,
             cell_id: &CellId,
-        ) -> ConductorResult<(PreflightRequest, Arc<CountersigningWorkspace>)> {
+        ) -> ConductorResult<Arc<CountersigningWorkspace>> {
             let maybe_countersigning_workspace =
                 space.countersigning_workspaces.lock().get(cell_id).cloned();
             match maybe_countersigning_workspace {
@@ -3369,13 +3369,9 @@ mod countersigning_impls {
                         None => Err(ConductorError::CountersigningError(
                             CountersigningError::SessionNotFound(cell_id.clone()),
                         )),
-                        Some(CountersigningSessionState::Unknown {
-                            resolution,
-                            preflight_request,
-                            ..
-                        }) => {
+                        Some(CountersigningSessionState::Unknown { resolution, .. }) => {
                             if resolution.attempts >= 1 {
-                                Ok((preflight_request, countersigning_workspace))
+                                Ok(countersigning_workspace)
                             } else {
                                 Err(ConductorError::CountersigningError(
                                     CountersigningError::SessionNotUnresolved(cell_id.clone()),
