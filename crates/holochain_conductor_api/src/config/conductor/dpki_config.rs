@@ -77,11 +77,17 @@ impl DpkiConfig {
 
 impl Default for DpkiConfig {
     fn default() -> Self {
-        Self {
-            dna_path: None,
-            network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
-            allow_throwaway_random_dpki_agent_key: false,
-            no_dpki: false,
+        cfg_if! {
+            if #[cfg(feature = "dpki")] {
+                Self {
+                    dna_path: None,
+                    network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
+                    allow_throwaway_random_dpki_agent_key: false,
+                    no_dpki: false,
+                }
+            } else {
+                Self::disabled()
+            }
         }
     }
 }
