@@ -3279,9 +3279,7 @@ mod countersigning_impls {
     use super::*;
     use crate::core::workflow::{
         self,
-        countersigning_workflow::{
-            force_abandon_session, force_publish_countersigning_session, CountersigningWorkspace,
-        },
+        countersigning_workflow::{force_abandon_session, CountersigningWorkspace},
     };
 
     impl Conductor {
@@ -3310,7 +3308,8 @@ mod countersigning_impls {
             )
         }
 
-        pub(crate) async fn get_countersigning_session_state(
+        /// Get in-memory state of an ongoing countersigning session.
+        pub async fn get_countersigning_session_state(
             &self,
             cell_id: &CellId,
         ) -> ConductorResult<Option<CountersigningSessionState>> {
@@ -3323,13 +3322,14 @@ mod countersigning_impls {
             }
         }
 
-        pub(crate) async fn abandon_countersigning_session(
+        /// Abandon an ongoing countersigning session when it can not be automatically resolved.
+        pub async fn abandon_countersigning_session(
             &self,
             cell_id: &CellId,
         ) -> ConductorResult<()> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
             let (preflight_request, countersigning_workspace) = self
-                .get_preflight_request_with_workspace_from_unresolvable_session(&space, cell_id)
+                .get_preflight_request_with_workspace_from_unresolved_session(&space, cell_id)
                 .await?;
             force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request)
                 .await?;
@@ -3346,40 +3346,24 @@ mod countersigning_impls {
             Ok(())
         }
 
-        pub(crate) async fn publish_countersigning_session(
+        /// Publish an ongoing countersigning session when it has not be automatically resolved.
+        pub async fn publish_countersigning_session(
             &self,
             cell_id: &CellId,
         ) -> ConductorResult<()> {
             let space = self.get_or_create_space(cell_id.dna_hash())?;
-            let (preflight_request, countersigning_workspace) = self
-                .get_preflight_request_with_workspace_from_unresolvable_session(&space, cell_id)
+            let (_, countersigning_workspace) = self
+                .get_preflight_request_with_workspace_from_unresolved_session(&space, cell_id)
                 .await?;
             let cell = self.cell_by_id(cell_id).await?;
-            let network = Arc::new(cell.holochain_p2p_dna().clone());
-            force_publish_countersigning_session(
-                space,
-                network,
-                self.keystore().clone(),
-                cell.triggers().integrate_dht_ops.clone(),
-                cell.triggers().publish_dht_ops.clone(),
-                cell_id.clone(),
-                preflight_request,
-            )
-            .await?;
-            if countersigning_workspace
-                .remove_countersigning_session()
-                .is_none()
-            {
-                // The session exists in the space as previously checked, so this case must never happen.
-                tracing::error!(
-                    ?cell_id,
-                    "Could not remove countersigning session from workspace after publishing it."
-                );
-            }
+            countersigning_workspace.mark_countersigning_session_for_force_publish(cell_id)?;
+            cell.triggers()
+                .countersigning
+                .trigger(&"force_publish_session");
             Ok(())
         }
 
-        async fn get_preflight_request_with_workspace_from_unresolvable_session(
+        async fn get_preflight_request_with_workspace_from_unresolved_session(
             &self,
             space: &Space,
             cell_id: &CellId,
@@ -3398,17 +3382,18 @@ mod countersigning_impls {
                         Some(CountersigningSessionState::Unknown {
                             resolution,
                             preflight_request,
+                            ..
                         }) => {
                             if resolution.attempts >= 1 {
                                 Ok((preflight_request, countersigning_workspace))
                             } else {
                                 Err(ConductorError::CountersigningError(
-                                    CountersigningError::SessionNotUnresolvable(cell_id.clone()),
+                                    CountersigningError::SessionNotUnresolved(cell_id.clone()),
                                 ))
                             }
                         }
                         _ => Err(ConductorError::CountersigningError(
-                            CountersigningError::SessionNotUnresolvable(cell_id.clone()),
+                            CountersigningError::SessionNotUnresolved(cell_id.clone()),
                         )),
                     }
                 }

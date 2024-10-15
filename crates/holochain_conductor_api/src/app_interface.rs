@@ -49,9 +49,35 @@ pub enum AppRequest {
 
     /// Publish an unresolved countersigning session.
     ///
+    /// If the current session has not been resolved automatically, it can be forcefully published.
+    /// A condition for this call to succeed is that at least one attempt has been made to resolve
+    /// it automatically.
+    ///
     /// # Returns
     ///
-    /// [`AppResponse::CountersigningSessionPublished`]
+    /// [`AppResponse::PublishCountersigningSessionTriggered`]
+    ///
+    /// The session is marked for publishing and the countersigning workflow was triggered. The session
+    /// has not been published yet.
+    ///
+    /// Upon successful publishing the system signal [`SystemSignal::SuccessfulCountersigning`] will
+    /// be emitted and the session removed from state, so that [`AppRequest::GetCountersigningSessionState`]
+    /// would return `None`.
+    ///
+    /// In the countersigning workflow it will first be attempted to resolve the session with incoming
+    /// signatures of the countersigned entries, before force-publishing the session. In a very rare event
+    /// it could happen that in just the moment where the [`AppRequest::PublishCountersigningSession`]
+    /// is made, signatures for this session come in. If they are valid, the session will be resolved and
+    /// published as usual. Should they be invalid, however, the flag to publish the session is erased.
+    /// In such cases this request can be retried until the session has been published successfully.
+    ///
+    /// # Errors
+    ///
+    /// [`CountersigningError::WorkspaceDoesNotExist`] or [`CountersigningError::SessionNotFound`]
+    /// when no ongoing session could be found for the provided cell id.
+    ///
+    /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
+    /// automatically has not been made.
     PublishCountersigningSession(Box<CellId>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
@@ -160,7 +186,7 @@ pub enum AppResponse {
     CountersigningSessionAbandoned,
 
     /// The successful response to an [`AppRequest::PublishCountersigningSession`].
-    CountersigningSessionPublished,
+    PublishCountersigningSessionTriggered,
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///

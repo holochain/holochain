@@ -76,6 +76,8 @@ pub enum CountersigningSessionState {
         preflight_request: PreflightRequest,
         /// Summary of the attempts to resolve this session.
         resolution: SessionResolutionSummary,
+        /// Flag if the session is programmed to be force-published on the next countersigning workflow run.
+        force_publish: bool,
     },
 }
 
@@ -197,7 +199,7 @@ pub enum CountersigningError {
     /// No countersigning session found for the cell.
     #[error("No countersigning session found for cell id {0:?}")]
     SessionNotFound(CellId),
-    /// Countersigning session in a resolvable state cannot be abandoned or published.
-    #[error("Countersigning session for cell id {0:?} is resolvable. Only unresolvable sessions can be abandoned or published.")]
-    SessionNotUnresolvable(CellId),
+    /// Countersigning session must be in an unresolved state to be abandoned or published.
+    #[error("Countersigning session for cell id {0:?} is not unresolved. Only unresolved sessions can be abandoned or published.")]
+    SessionNotUnresolved(CellId),
 }

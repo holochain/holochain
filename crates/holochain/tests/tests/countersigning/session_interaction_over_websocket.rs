@@ -25,7 +25,7 @@ use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
-use kitsune_p2p_types::config::TransportConfig;
+use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
 
 use arbitrary::Arbitrary;
 use ed25519_dalek::SigningKey;
@@ -104,7 +104,11 @@ async fn countersigning_session_interaction_calls() {
     .await
     .unwrap();
 
-    tracing::info!("Agents set up and aware of each other.\n");
+    println!(
+        "Agents Alice {} and Bob {} set up and see each other.\n",
+        alice.cell_id.agent_pubkey(),
+        bob.cell_id.agent_pubkey()
+    );
 
     // Initialize Alice's source chain.
     let _: ActionHash = alice.call_zome(&alice_app_tx, "create_a_thing", &()).await;
@@ -233,7 +237,7 @@ async fn countersigning_session_interaction_calls() {
     .await;
     let expected_error = AppResponse::Error(
         ConductorApiError::ConductorError(ConductorError::CountersigningError(
-            CountersigningError::SessionNotUnresolvable(alice.cell_id.clone()),
+            CountersigningError::SessionNotUnresolved(alice.cell_id.clone()),
         ))
         .into(),
     );
@@ -247,7 +251,7 @@ async fn countersigning_session_interaction_calls() {
     .await;
     let expected_error = AppResponse::Error(
         ConductorApiError::ConductorError(ConductorError::CountersigningError(
-            CountersigningError::SessionNotUnresolvable(alice.cell_id.clone()),
+            CountersigningError::SessionNotUnresolved(alice.cell_id.clone()),
         ))
         .into(),
     );
@@ -463,15 +467,41 @@ async fn countersigning_session_interaction_calls() {
 
     // Attach app interface to Alice's conductor.
     let (alice_app_tx, mut alice_app_rx) = alice.connect_app_interface().await;
-    // Spawn task listening for signals.
-    tokio::spawn(async move { while alice_app_rx.recv::<AppResponse>().await.is_ok() {} });
+    // Spawn task listening for countersigning success signal.
+    let (alice_successful_session_tx, mut alice_successful_session_rx) =
+        tokio::sync::mpsc::channel(1);
+    tokio::spawn(async move {
+        while let Ok(ReceiveMessage::Signal(signal)) = alice_app_rx.recv::<AppResponse>().await {
+            match Signal::try_from_vec(signal).unwrap() {
+                Signal::System(SystemSignal::SuccessfulCountersigning(entry)) => {
+                    let _ = alice_successful_session_tx.clone().send(entry).await;
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
+
+    // Bring Bob back up.
+    let mut bob = Agent::startup(bob_config).await;
+
+    let (bob_app_tx, mut bob_app_rx) = bob.connect_app_interface().await;
+    // Spawn task listening for successful countersigning session signal.
+    let (bob_successful_session_tx, mut bob_successful_session_rx) = tokio::sync::mpsc::channel(1);
+    tokio::spawn(async move {
+        while let Ok(ReceiveMessage::Signal(signal)) = bob_app_rx.recv::<AppResponse>().await {
+            match Signal::try_from_vec(signal).unwrap() {
+                Signal::System(SystemSignal::SuccessfulCountersigning(entry)) => {
+                    let _ = bob_successful_session_tx.clone().send(entry).await;
+                }
+                _ => unreachable!(),
+            }
+        }
+    });
 
     // Alice's session should be in state unresolved.
     // Leave some time for the countersigning workflow to attempt to resolve the session.
-    tokio::time::timeout(Duration::from_secs(20), async {
+    tokio::time::timeout(Duration::from_secs(30), async {
         loop {
-            let state = get_session_state(&alice.cell_id, &alice_app_tx).await;
-            println!("state is {state:?}");
             if matches!(
                 get_session_state(&alice.cell_id, &alice_app_tx).await,
                 Some(CountersigningSessionState::Unknown { resolution, .. }) if resolution.attempts >= 1
@@ -484,48 +514,43 @@ async fn countersigning_session_interaction_calls() {
     .await
     .unwrap();
 
-    tracing::info!("Alice about to force-publish countersigned entry.\n");
-
-    // Alice publishes the unresolved session.
+    // Alice forcefully publishes the session.
     let response: AppResponse = request(
         AppRequest::PublishCountersigningSession(Box::new(alice.cell_id.clone())),
         &alice_app_tx,
     )
     .await;
-    assert_matches!(response, AppResponse::CountersigningSessionPublished);
+    assert_matches!(response, AppResponse::PublishCountersigningSessionTriggered);
 
+    // Expect app signal of countersigning success for Alice.
+    let force_published_session_entry_hash =
+        tokio::time::timeout(Duration::from_secs(30), alice_successful_session_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+    assert_eq!(
+        force_published_session_entry_hash,
+        preflight_request.app_entry_hash
+    );
+    // Alice's session should be gone from memory.
     assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
 
-    tracing::info!("Alice published entry. Starting up Bob again.\n");
+    tracing::info!("Alice published session.\n");
 
-    // Bring Bob back up.
-    let mut bob = Agent::startup(bob_config).await;
-
-    let (bob_app_tx, mut bob_app_rx) = bob.connect_app_interface().await;
-    // Spawn task listening for successful countersigning session signal.
-    let (bob_successful_session_tx, mut bob_successful_session_rx) = tokio::sync::mpsc::channel(1);
-    tokio::spawn(async move {
-        while let Ok(ReceiveMessage::Signal(signal)) = bob_app_rx.recv::<AppResponse>().await {
-            match Signal::try_from_vec(signal).unwrap() {
-                Signal::System(SystemSignal::SuccessfulCountersigning(entry)) => {
-                    tracing::info!("Bob received countersigning session success signal.\n");
-                    let _ = bob_successful_session_tx.clone().send(entry).await;
-                }
-                _ => unreachable!(),
-            }
-        }
-    });
-
-    tokio::time::timeout(Duration::from_secs(30), bob_successful_session_rx.recv())
-        .await
-        .unwrap();
-
+    // Expect app signal of countersigning success for Bob.
+    let bob_session_entry_hash =
+        tokio::time::timeout(Duration::from_secs(30), bob_successful_session_rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+    assert_eq!(bob_session_entry_hash, preflight_request.app_entry_hash);
+    // Bob's session should be gone from memory.
     assert_matches!(get_session_state(&bob.cell_id, &bob_app_tx).await, None);
 
     tracing::info!("Sessions resolved successfully. Awaiting DHT sync...");
 
     // Syncing takes long because Alice's publish loop pauses for a minute.
-    tokio::time::timeout(Duration::from_secs(120), await_dht_sync(&[&alice, &bob]))
+    tokio::time::timeout(Duration::from_secs(30), await_dht_sync(&[&alice, &bob]))
         .await
         .unwrap();
 }
@@ -548,6 +573,10 @@ impl Agent {
         let path = tmp_dir.into_path();
         let environment_path = path.clone();
         let mut config = create_config(admin_port, environment_path.into());
+        config.network = KitsuneP2pConfig::default().tune(|mut kc| {
+            kc.tx2_implicit_timeout_ms = 3_000;
+            kc
+        });
         config.keystore = KeystoreConfig::LairServerInProc { lair_root: None };
         config.tuning_params = Some(ConductorTuningParams {
             countersigning_resolution_retry_delay: Some(Duration::from_secs(5)),

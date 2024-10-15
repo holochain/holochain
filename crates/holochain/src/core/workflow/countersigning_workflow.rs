@@ -32,7 +32,6 @@ mod success;
 mod tests;
 
 pub(crate) use accept::accept_countersigning_request;
-pub(crate) use complete::force_publish_countersigning_session;
 use holochain_keystore::MetaLairClient;
 use holochain_state::chain_lock::get_chain_lock;
 pub(crate) use success::countersigning_success;
@@ -61,6 +60,35 @@ impl CountersigningWorkspace {
     pub fn get_countersigning_session_state(&self) -> Option<CountersigningSessionState> {
         self.inner
             .share_ref(|inner| Ok(inner.session.clone()))
+            .unwrap()
+    }
+
+    pub fn mark_countersigning_session_for_force_publish(
+        &self,
+        cell_id: &CellId,
+    ) -> Result<(), CountersigningError> {
+        self.inner
+            .share_mut(|inner, _| {
+                Ok(if let Some(session) = inner.session.as_mut() {
+                    if let CountersigningSessionState::Unknown {
+                        resolution,
+                        force_publish,
+                        ..
+                    } = session
+                    {
+                        if resolution.attempts >= 1 {
+                            *force_publish = true;
+                            Ok(())
+                        } else {
+                            Err(CountersigningError::SessionNotUnresolved(cell_id.clone()))
+                        }
+                    } else {
+                        Err(CountersigningError::SessionNotUnresolved(cell_id.clone()))
+                    }
+                } else {
+                    Err(CountersigningError::SessionNotFound(cell_id.clone()))
+                })
+            })
             .unwrap()
     }
 
@@ -133,7 +161,8 @@ pub(crate) async fn countersigning_workflow(
     )
     .await?;
 
-    let maybe_completed_session = workspace
+    // If there are new signature bundles, verify them to complete the session.
+    let maybe_signature_bundles = workspace
         .inner
         .share_mut(|inner, _| {
             Ok(match &mut inner.session {
@@ -145,9 +174,8 @@ pub(crate) async fn countersigning_workflow(
         })
         .unwrap();
 
-    if let Some(signature_bundles) = maybe_completed_session {
-        let mut completed = false;
-
+    let mut completed = false;
+    if let Some(signature_bundles) = maybe_signature_bundles {
         for signature_bundle in signature_bundles {
             // Try to complete the session using this signature bundle.
 
@@ -162,26 +190,7 @@ pub(crate) async fn countersigning_workflow(
             )
             .await
             {
-                Ok(Some(cs_entry_hash)) => {
-                    // The session completed successfully this bundle, so we can remove the session
-                    // from the workspace.
-                    workspace
-                        .inner
-                        .share_mut(|inner, _| {
-                            tracing::trace!("Countersigning session completed successfully, removing from the workspace for agent: {:?}", cell_id.agent_pubkey());
-                            inner.session = None;
-                            Ok(())
-                        })
-                        .unwrap();
-
-                    // Signal to the UI.
-                    // If there are no active connections this won't emit anything.
-                    signal_tx
-                        .send(Signal::System(SystemSignal::SuccessfulCountersigning(
-                            cs_entry_hash,
-                        )))
-                        .ok();
-
+                Ok(Some(_)) => {
                     completed = true;
                     break;
                 }
@@ -214,6 +223,7 @@ pub(crate) async fn countersigning_workflow(
                                 *session = CountersigningSessionState::Unknown {
                                     preflight_request: preflight_request.clone(),
                                     resolution: resolution.clone().unwrap_or_default(),
+                                    force_publish: false,
                                 };
                             }
                         }
@@ -224,6 +234,64 @@ pub(crate) async fn countersigning_workflow(
                 }
                 Ok(())
             }).unwrap();
+        }
+    } else {
+        // No signature bundles.
+        // If the session is marked to be force-published, execute that and set the completed status
+        // for later removal of the session.
+        if let Ok(Some((force_publish, preflight_request))) = workspace.inner.share_ref(|inner| {
+            Ok(inner.session.as_ref().and_then(|session| {
+                // To set the force publish flag, attempts to resolve must be > 0, so it does not have
+                // to be checked again now.
+                if let CountersigningSessionState::Unknown {
+                    force_publish,
+                    preflight_request,
+                    ..
+                } = session
+                {
+                    Some((force_publish.clone(), preflight_request.clone()))
+                } else {
+                    None
+                }
+            }))
+        }) {
+            if force_publish {
+                complete::force_publish_countersigning_session(
+                    space.clone(),
+                    network.clone(),
+                    keystore.clone(),
+                    integration_trigger.clone(),
+                    publish_trigger.clone(),
+                    cell_id.clone(),
+                    preflight_request.clone(),
+                )
+                .await?;
+                completed = true;
+            }
+        }
+    }
+
+    // Session is complete, either by incoming signature bundles or by force.
+    if completed {
+        // The session completed successfully, so we can remove it from the workspace.
+        let countersigned_entry_hash = workspace
+            .inner
+            .share_mut(|inner, _| {
+                let countersigned_entry_hash = inner.session.as_ref().and_then(|session| Some(session.session_app_entry_hash().clone()));
+                tracing::trace!("Countersigning session completed successfully, removing from the workspace for agent: {:?}", cell_id.agent_pubkey());
+                inner.session = None;
+                Ok(countersigned_entry_hash)
+            })
+            .unwrap();
+
+        // Signal to the UI.
+        // If there are no active connections, this won't emit anything.
+        if let Some(entry_hash) = countersigned_entry_hash {
+            signal_tx
+                .send(Signal::System(SystemSignal::SuccessfulCountersigning(
+                    entry_hash,
+                )))
+                .ok();
         }
     }
 
@@ -247,7 +315,7 @@ pub(crate) async fn countersigning_workflow(
         })
         .unwrap();
 
-    tracing::trace!("End time: {:?}", maybe_end_time);
+    tracing::info!("End time: {:?}", maybe_end_time);
 
     if let Some(end_time) = maybe_end_time {
         reschedule_self(workspace, self_trigger, end_time);
@@ -519,6 +587,7 @@ async fn apply_timeout(
                                         required_reason: ResolutionRequiredReason::Timeout,
                                         ..Default::default()
                                     },
+                                    force_publish: false,
                                 };
                                 false
                             } else {
@@ -545,6 +614,7 @@ async fn apply_timeout(
                                     required_reason: ResolutionRequiredReason::Timeout,
                                     ..Default::default()
                                 },
+                                force_publish: false,
                             };
                         }
 

@@ -123,7 +123,7 @@ impl AppInterfaceApi {
                     .clone()
                     .publish_countersigning_session(&payload)
                     .await?;
-                Ok(AppResponse::CountersigningSessionPublished)
+                Ok(AppResponse::PublishCountersigningSessionTriggered)
             }
             AppRequest::CreateCloneCell(payload) => {
                 let clone_cell = self

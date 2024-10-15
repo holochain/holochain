@@ -298,7 +298,7 @@ fn get_countersigning_op_hashes(
 
 /// When it has been attempted to resolve a countersigning session unsuccessfully by querying peer state,
 /// the session becomes unresolved and can be forcefully completed and published anyway.
-pub async fn force_publish_countersigning_session(
+pub(super) async fn force_publish_countersigning_session(
     space: Space,
     network: Arc<impl HolochainP2pDnaT>,
     keystore: MetaLairClient,
@@ -345,6 +345,7 @@ pub async fn force_publish_countersigning_session(
             return Ok(false);
         }
     };
+
     let this_cells_action_hash = session_record.action_hashed().hash.clone();
 
     reveal_countersigning_session(

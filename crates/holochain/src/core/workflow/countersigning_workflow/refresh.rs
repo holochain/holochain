@@ -111,6 +111,7 @@ pub async fn refresh_workspace_state(
                                                 required_reason: ResolutionRequiredReason::Unknown,
                                                 ..Default::default()
                                             },
+                                            force_publish: false,
                                         });
 
                                         Ok(())
