@@ -41,6 +41,165 @@ use tracing::*;
 
 use super::ConductorHandle;
 
+/// The main interface for interacting with a task manager.
+/// Contains functions for adding tasks to groups, stopping task groups,
+/// and shutting down the task manager.
+#[derive(Clone)]
+pub struct TaskManagerClient {
+    tm: Arc<Mutex<Option<task_motel::TaskManager<TaskGroup, TaskOutcome>>>>,
+}
+
+impl TaskManagerClient {
+    /// Construct the TaskManager and the outcome channel receiver
+    pub fn new(tx: OutcomeSender, scope: String) -> Self {
+        let span = tracing::info_span!("managed task", scope = scope);
+        let tm = task_motel::TaskManager::new_instrumented(span, tx, |g| match g {
+            TaskGroup::Conductor => None,
+            TaskGroup::Dna(_) => Some(TaskGroup::Conductor),
+            TaskGroup::Cell(cell_id) => Some(TaskGroup::Dna(Arc::new(cell_id.dna_hash().clone()))),
+        });
+        Self {
+            tm: Arc::new(Mutex::new(Some(tm))),
+        }
+    }
+
+    /// Stop all managed tasks and await their completion.
+    pub fn stop_all_tasks(&self) -> ShutdownHandle {
+        if let Some(tm) = self.tm.lock().as_mut() {
+            tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
+        } else {
+            tracing::warn!("Tried to shutdown task manager while it's already shutting down");
+            tokio::spawn(async move {})
+        }
+    }
+
+    /// Stop all tasks associated with a Cell and await their completion.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
+    pub fn stop_cell_tasks(&self, cell_id: CellId) -> ShutdownHandle {
+        if let Some(tm) = self.tm.lock().as_mut() {
+            tokio::spawn(tm.stop_group(&TaskGroup::Cell(cell_id)).in_current_span())
+        } else {
+            tracing::warn!("Tried to shutdown cell's tasks while they're already shutting down");
+            tokio::spawn(async move {})
+        }
+    }
+
+    /// Stop all tasks and prevent any new tasks from being added to the manager.
+    /// Returns a future to await completion of all tasks.
+    pub fn shutdown(&mut self) -> ShutdownHandle {
+        if let Some(mut tm) = self.tm.lock().take() {
+            tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
+        } else {
+            // already shutting down
+            tokio::spawn(async move {})
+        }
+    }
+
+    /// Add a conductor-level task whose outcome is ignored.
+    pub fn add_conductor_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        f: impl FnOnce() -> Fut + Send + 'static,
+    ) {
+        self.add_conductor_task(name, TaskKind::Ignore, move |stop| async move {
+            tokio::select! {
+                _ = stop => (),
+                _ = f() => (),
+            }
+            Ok(())
+        })
+    }
+
+    /// Add a conductor-level task which will cause the conductor to shut down if it fails
+    pub fn add_conductor_task_unrecoverable<
+        Fut: Future<Output = ManagedTaskResult> + Send + 'static,
+    >(
+        &self,
+        name: &str,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        self.add_conductor_task(name, TaskKind::Unrecoverable, f)
+    }
+
+    /// Add a DNA-level task which will cause all cells under that DNA to be disabled if
+    /// the task fails
+    pub fn add_dna_task_critical<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        dna_hash: Arc<DnaHash>,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        self.add_dna_task(name, TaskKind::DnaCritical(dna_hash.clone()), dna_hash, f)
+    }
+
+    /// Add a Cell-level task whose outcome is ignored
+    pub fn add_cell_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        cell_id: CellId,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        self.add_cell_task(name, TaskKind::Ignore, cell_id, f)
+    }
+
+    /// Add a Cell-level task which will cause that to be disabled if the task fails
+    pub fn add_cell_task_critical<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        cell_id: CellId,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        self.add_cell_task(name, TaskKind::CellCritical(cell_id.clone()), cell_id, f)
+    }
+
+    fn add_conductor_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        task_kind: TaskKind,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        let name = name.to_string();
+        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
+        self.add_task(TaskGroup::Conductor, f)
+    }
+
+    fn add_dna_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        task_kind: TaskKind,
+        dna_hash: Arc<DnaHash>,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        let name = name.to_string();
+        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
+        self.add_task(TaskGroup::Dna(dna_hash), f)
+    }
+
+    fn add_cell_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
+        &self,
+        name: &str,
+        task_kind: TaskKind,
+        cell_id: CellId,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        let name = name.to_string();
+        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
+        self.add_task(TaskGroup::Cell(cell_id), f)
+    }
+
+    fn add_task<Fut: Future<Output = TaskOutcome> + Send + 'static>(
+        &self,
+        group: TaskGroup,
+        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+    ) {
+        if let Some(tm) = self.tm.lock().as_mut() {
+            tm.add_task(group, f)
+        } else {
+            tracing::warn!("Tried to add task while task manager is shutting down.");
+        }
+    }
+}
+
 /// The "kind" of a managed task determines how the Result from the task's
 /// completion will be handled.
 pub enum TaskKind {
@@ -286,165 +445,6 @@ pub enum TaskGroup {
 pub type OutcomeSender = futures::channel::mpsc::Sender<(TaskGroup, TaskOutcome)>;
 /// Channel receiver for task outcomes
 pub type OutcomeReceiver = futures::channel::mpsc::Receiver<(TaskGroup, TaskOutcome)>;
-
-/// The main interface for interacting with a task manager.
-/// Contains functions for adding tasks to groups, stopping task groups,
-/// and shutting down the task manager.
-#[derive(Clone)]
-pub struct TaskManagerClient {
-    tm: Arc<Mutex<Option<task_motel::TaskManager<TaskGroup, TaskOutcome>>>>,
-}
-
-impl TaskManagerClient {
-    /// Construct the TaskManager and the outcome channel receiver
-    pub fn new(tx: OutcomeSender, scope: String) -> Self {
-        let span = tracing::info_span!("managed task", scope = scope);
-        let tm = task_motel::TaskManager::new_instrumented(span, tx, |g| match g {
-            TaskGroup::Conductor => None,
-            TaskGroup::Dna(_) => Some(TaskGroup::Conductor),
-            TaskGroup::Cell(cell_id) => Some(TaskGroup::Dna(Arc::new(cell_id.dna_hash().clone()))),
-        });
-        Self {
-            tm: Arc::new(Mutex::new(Some(tm))),
-        }
-    }
-
-    /// Stop all managed tasks and await their completion.
-    pub fn stop_all_tasks(&self) -> ShutdownHandle {
-        if let Some(tm) = self.tm.lock().as_mut() {
-            tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
-        } else {
-            tracing::warn!("Tried to shutdown task manager while it's already shutting down");
-            tokio::spawn(async move {})
-        }
-    }
-
-    /// Stop all tasks associated with a Cell and await their completion.
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    pub fn stop_cell_tasks(&self, cell_id: CellId) -> ShutdownHandle {
-        if let Some(tm) = self.tm.lock().as_mut() {
-            tokio::spawn(tm.stop_group(&TaskGroup::Cell(cell_id)).in_current_span())
-        } else {
-            tracing::warn!("Tried to shutdown cell's tasks while they're already shutting down");
-            tokio::spawn(async move {})
-        }
-    }
-
-    /// Stop all tasks and prevent any new tasks from being added to the manager.
-    /// Returns a future to await completion of all tasks.
-    pub fn shutdown(&mut self) -> ShutdownHandle {
-        if let Some(mut tm) = self.tm.lock().take() {
-            tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
-        } else {
-            // already shutting down
-            tokio::spawn(async move {})
-        }
-    }
-
-    /// Add a conductor-level task whose outcome is ignored.
-    pub fn add_conductor_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
-        &self,
-        name: &str,
-        f: impl FnOnce() -> Fut + Send + 'static,
-    ) {
-        self.add_conductor_task(name, TaskKind::Ignore, move |stop| async move {
-            tokio::select! {
-                _ = stop => (),
-                _ = f() => (),
-            }
-            Ok(())
-        })
-    }
-
-    /// Add a conductor-level task which will cause the conductor to shut down if it fails
-    pub fn add_conductor_task_unrecoverable<
-        Fut: Future<Output = ManagedTaskResult> + Send + 'static,
-    >(
-        &self,
-        name: &str,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
-    ) {
-        self.add_conductor_task(name, TaskKind::Unrecoverable, f)
-    }
-
-    /// Add a DNA-level task which will cause all cells under that DNA to be disabled if
-    /// the task fails
-    pub fn add_dna_task_critical<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
-        &self,
-        name: &str,
-        dna_hash: Arc<DnaHash>,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
-    ) {
-        self.add_dna_task(name, TaskKind::DnaCritical(dna_hash.clone()), dna_hash, f)
-    }
-
-    /// Add a Cell-level task whose outcome is ignored
-    pub fn add_cell_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
-        &self,
-        name: &str,
-        cell_id: CellId,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
-    ) {
-        self.add_cell_task(name, TaskKind::Ignore, cell_id, f)
-    }
-
-    /// Add a Cell-level task which will cause that to be disabled if the task fails
-    pub fn add_cell_task_critical<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
-        &self,
-        name: &str,
-        cell_id: CellId,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
-    ) {
-        self.add_cell_task(name, TaskKind::CellCritical(cell_id.clone()), cell_id, f)
-    }
-
-    fn add_conductor_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
-        &self,
-        name: &str,
-        task_kind: TaskKind,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
-    ) {
-        let name = name.to_string();
-        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
-        self.add_task(TaskGroup::Conductor, f)
-    }
-
-    fn add_dna_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
-        &self,
-        name: &str,
-        task_kind: TaskKind,
-        dna_hash: Arc<DnaHash>,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
-    ) {
-        let name = name.to_string();
-        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
-        self.add_task(TaskGroup::Dna(dna_hash), f)
-    }
-
-    fn add_cell_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
-        &self,
-        name: &str,
-        task_kind: TaskKind,
-        cell_id: CellId,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
-    ) {
-        let name = name.to_string();
-        let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
-        self.add_task(TaskGroup::Cell(cell_id), f)
-    }
-
-    fn add_task<Fut: Future<Output = TaskOutcome> + Send + 'static>(
-        &self,
-        group: TaskGroup,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
-    ) {
-        if let Some(tm) = self.tm.lock().as_mut() {
-            tm.add_task(group, f)
-        } else {
-            tracing::warn!("Tried to add task while task manager is shutting down.");
-        }
-    }
-}
 
 /// A future which awaits the completion of all managed tasks
 pub type ShutdownHandle = JoinHandle<()>;
