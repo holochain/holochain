@@ -3047,21 +3047,6 @@ mod misc_impls {
             Ok(())
         }
 
-        /// Inject records into a source chain for a cell.
-        /// If the records form a chain segment that can be "grafted" onto the existing chain, it will be.
-        /// Otherwise, a new chain will be formed using the specified records.
-        pub async fn graft_records_onto_source_chain(
-            self: Arc<Self>,
-            cell_id: CellId,
-            validate: bool,
-            records: Vec<Record>,
-        ) -> ConductorApiResult<()> {
-            graft_records_onto_source_chain::graft_records_onto_source_chain(
-                self, cell_id, validate, records,
-            )
-            .await
-        }
-
         /// Update coordinator zomes on an existing dna.
         pub async fn update_coordinators(
             &self,
