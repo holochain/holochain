@@ -1,9 +1,30 @@
-//! We want to have control over certain long running
-//! tasks that we care about.
-//! If a task that is added to the task manager ends
-//! then a reaction can be set.
-//! An example would be a websocket closes with an error
-//! and you want to restart it.
+//! Holochain Task Manager
+//!
+//! The TaskManager is used to manage long running tasks that are critical to the
+//! operation of the conductor.
+//!
+//! Tasks added to the manager can be in one of three groups:
+//!
+//! - Conductor: Tasks which are associated with the conductor as a whole
+//! - Dna: Tasks which are associated with a particular DNA
+//! - Cell: Tasks which are associated with a particular Cell
+//!
+//! The outcome of a task in a group can affect the other tasks in its group.
+//! Tasks which are critical to the operation of its group level will cause
+//! the other tasks in that group to be stopped.
+//!
+//! For instance, the tasks which run the workflows for a cell are critical
+//! to the cell's functioning, so if any of these tasks fail, then the cell
+//! is no longer able to function. The task failure is a signal that the cell
+//! needs to be shut down, so the task manager takes the steps necessary to
+//! accomplish that:
+//!
+//! 1. Stop all other tasks related to the cell, so they don't continue in the background.
+//! 2. Pause or disable any apps which depend on the cell, because the app cannot
+//!     function without the proper functioning of that cell
+//!
+//! See [`crate::conductor::Conductor::reconcile_app_status_with_cell_status`] for more details
+//! on how app status is related to cell status.
 
 mod error;
 pub use error::*;
@@ -54,7 +75,7 @@ pub enum TaskOutcome {
 /// Spawn a task which performs some action after each task has completed,
 /// as recieved by the outcome channel produced by the task manager.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-pub fn spawn_task_outcome_handler(
+pub(crate) fn spawn_task_outcome_handler(
     conductor: ConductorHandle,
     mut outcomes: OutcomeReceiver,
 ) -> JoinHandle<TaskManagerResult> {
@@ -266,8 +287,9 @@ pub type OutcomeSender = futures::channel::mpsc::Sender<(TaskGroup, TaskOutcome)
 /// Channel receiver for task outcomes
 pub type OutcomeReceiver = futures::channel::mpsc::Receiver<(TaskGroup, TaskOutcome)>;
 
-/// A collection of channels and handles used by the Conductor to talk to the
-/// TaskManager task
+/// The main interface for interacting with a task manager.
+/// Contains functions for adding tasks to groups, stopping task groups,
+/// and shutting down the task manager.
 #[derive(Clone)]
 pub struct TaskManagerClient {
     tm: Arc<Mutex<Option<task_motel::TaskManager<TaskGroup, TaskOutcome>>>>,
@@ -287,7 +309,7 @@ impl TaskManagerClient {
         }
     }
 
-    /// Stop all tasks and await their completion.
+    /// Stop all managed tasks and await their completion.
     pub fn stop_all_tasks(&self) -> ShutdownHandle {
         if let Some(tm) = self.tm.lock().as_mut() {
             tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
@@ -297,7 +319,7 @@ impl TaskManagerClient {
         }
     }
 
-    /// Stop all tasks for a Cell and await their completion.
+    /// Stop all tasks associated with a Cell and await their completion.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub fn stop_cell_tasks(&self, cell_id: CellId) -> ShutdownHandle {
         if let Some(tm) = self.tm.lock().as_mut() {
@@ -308,8 +330,8 @@ impl TaskManagerClient {
         }
     }
 
-    /// Stop all tasks and return a future to await their completion,
-    /// and prevent any new tasks from being added to the manager.
+    /// Stop all tasks and prevent any new tasks from being added to the manager.
+    /// Returns a future to await completion of all tasks.
     pub fn shutdown(&mut self) -> ShutdownHandle {
         if let Some(mut tm) = self.tm.lock().take() {
             tokio::spawn(tm.stop_group(&TaskGroup::Conductor))
