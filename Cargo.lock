@@ -8219,12 +8219,12 @@ dependencies = [
 [[package]]
 name = "tx5"
 version = "0.1.3-beta"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37f5c8ae702c58cd1a127fe5785db014ddba783e18c87ad936275bb6e4023a13"
 dependencies = [
  "base64 0.22.1",
+ "futures",
  "influxive-otel-atomic-obs",
  "serde",
+ "slab",
  "tokio",
  "tracing",
  "tx5-connection",
@@ -8235,8 +8235,6 @@ dependencies = [
 [[package]]
 name = "tx5-connection"
 version = "0.1.3-beta"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f97d4960fe1d84c6cf6335df355841a43377feb57df4b4996e24d0f50e07774"
 dependencies = [
  "bit_field",
  "futures",
@@ -8250,8 +8248,6 @@ dependencies = [
 [[package]]
 name = "tx5-core"
 version = "0.1.3-beta"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc52d9b50b494b1d92b6a12ab9d3f98d420d549e85b128f671abfb67c1cf8cba"
 dependencies = [
  "app_dirs2",
  "base64 0.22.1",
@@ -8269,8 +8265,6 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion"
 version = "0.1.3-beta"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "450fffbc9207428bd387e319aa88fe226cad0950937e773f9bbf0672c6d0104e"
 dependencies = [
  "futures",
  "parking_lot 0.12.3",
@@ -8283,8 +8277,6 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.1.3-beta"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23094d66b8570e86418520c9317fe8d16c0b45ed3156bb01b5e14ed674136da9"
 dependencies = [
  "Inflector",
  "base64 0.22.1",
@@ -8302,8 +8294,6 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-turn"
 version = "0.1.3-beta"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c2acad1aec5d8b8272e1e6c3ddcf4f154163a59429d9c58124b025b53d8c914"
 dependencies = [
  "base64 0.22.1",
  "dirs",
@@ -8320,8 +8310,6 @@ dependencies = [
 [[package]]
 name = "tx5-signal"
 version = "0.1.3-beta"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c67250845c61754644c82d76e5644cfdb21226f6c036ff7aa8d159db411e2b6"
 dependencies = [
  "rand 0.8.5",
  "sbd-e2e-crypto-client",

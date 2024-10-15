@@ -246,6 +246,8 @@ pub(super) async fn create_meta_net(
     #[cfg(feature = "tx5")]
     if ep_hnd.is_none() && config.is_tx5() {
         tracing::trace!("tx5");
+        let mut tune: kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams =
+            (*config.tuning_params).clone();
         let (signal_url, webrtc_config) = match config.transport_pool.first().unwrap() {
             TransportConfig::WebRTC {
                 signal_url,
@@ -257,10 +259,14 @@ pub(super) async fn create_meta_net(
                     .unwrap_or_else(|| DEFAULT_WEBRTC_CONFIG.to_string());
                 (signal_url.clone(), webrtc_config)
             }
+            TransportConfig::Mem {} => {
+                tune.tx5_backend_module = "mem".to_string();
+                ("wss://fake.fake".to_string(), "{}".to_string())
+            }
             _ => unreachable!(),
         };
         let (h, e, p) = MetaNet::new_tx5(
-            config.tuning_params.clone(),
+            Arc::new(tune),
             host.clone(),
             internal_sender.clone(),
             signal_url,
@@ -1043,21 +1049,6 @@ mod tests {
     use std::net::SocketAddr;
     use std::sync::Arc;
     use url2::url2;
-
-    #[cfg(feature = "tx2")]
-    #[tokio::test(flavor = "multi_thread")]
-    async fn create_tx2_with_mdns_meta_net() {
-        // Anything other than WebRTC will do here but the tx2 transport isn't available any more
-        let mut config = KitsuneP2pConfig::default();
-        config.transport_pool = vec![TransportConfig::Mem {}];
-        config.bootstrap_service = None;
-        config.network_type = NetworkType::QuicMdns;
-
-        let (_, _, bootstrap_net) = test_create_meta_net(config).await.unwrap();
-
-        // Not the most interesting check but we mostly care that the above function produces a result given a valid config.
-        assert_eq!(BootstrapNet::Tx2, bootstrap_net);
-    }
 
     #[cfg(feature = "tx5")]
     #[tokio::test(flavor = "multi_thread")]
