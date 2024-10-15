@@ -293,21 +293,14 @@ pub(crate) async fn countersigning_workflow(
             })
         {
             if force_abandon {
-                force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request)
-                    .await?;
-                workspace
-                    .inner
-                    .share_mut(|inner, _| {
-                        inner.session = None;
-                        Ok(())
-                    })
-                    .unwrap();
-                // Then let the client know.
-                signal_tx
-                    .send(Signal::System(SystemSignal::AbandonedCountersigning(
-                        preflight_request.app_entry_hash,
-                    )))
-                    .ok();
+                force_abandon_session(
+                    space.clone(),
+                    cell_id.agent_pubkey(),
+                    &preflight_request,
+                    workspace.clone(),
+                    &signal_tx,
+                )
+                .await?;
             } else if force_publish {
                 complete::force_publish_countersigning_session(
                     space.clone(),
@@ -467,28 +460,10 @@ async fn try_recover_failed_session(
                             space.clone(),
                             cell_id.agent_pubkey(),
                             &preflight_request,
+                            workspace.clone(),
+                            signal_tx,
                         )
                         .await?;
-
-                        // The session state has been resolved, so we can remove it from the workspace.
-                        workspace
-                            .inner
-                            .share_mut(|inner, _| {
-                                tracing::trace!(
-                                    "Abandoning countersigning session for agent: {:?}",
-                                    cell_id.agent_pubkey()
-                                );
-
-                                inner.session = None;
-                                Ok(())
-                            })
-                            .unwrap();
-
-                        signal_tx
-                            .send(Signal::System(SystemSignal::AbandonedCountersigning(
-                                preflight_request.app_entry_hash.clone(),
-                            )))
-                            .ok();
                     }
                 }
             }
@@ -693,32 +668,20 @@ async fn apply_timeout(
             cell_id.agent_pubkey()
         );
 
-        match force_abandon_session(space.clone(), cell_id.agent_pubkey(), &preflight_request).await
+        if let Err(e) = force_abandon_session(
+            space.clone(),
+            cell_id.agent_pubkey(),
+            &preflight_request,
+            workspace.clone(),
+            &signal_tx,
+        )
+        .await
         {
-            Ok(_) => {
-                // Only once we've managed to remove the session do we remove the state for it.
-                workspace
-                    .inner
-                    .share_mut(|inner, _| {
-                        inner.session = None;
-                        Ok(())
-                    })
-                    .unwrap();
-
-                // Then let the client know.
-                signal_tx
-                    .send(Signal::System(SystemSignal::AbandonedCountersigning(
-                        preflight_request.app_entry_hash,
-                    )))
-                    .ok();
-            }
-            Err(e) => {
-                tracing::error!(
-                    "Error abandoning countersigning session for agent: {:?}: {:?}",
-                    cell_id.agent_pubkey(),
-                    e
-                );
-            }
+            tracing::error!(
+                "Error abandoning countersigning session for agent: {:?}: {:?}",
+                cell_id.agent_pubkey(),
+                e
+            );
         }
     }
 
@@ -729,6 +692,8 @@ async fn force_abandon_session(
     space: Space,
     author: &AgentPubKey,
     preflight_request: &PreflightRequest,
+    workspace: Arc<CountersigningWorkspace>,
+    signal_tx: &Sender<Signal>,
 ) -> SourceChainResult<()> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
 
@@ -779,6 +744,23 @@ async fn force_abandon_session(
                 .await?;
         }
     }
+
+    // Only once we've managed to remove the session do we remove the state for it.
+    workspace
+        .inner
+        .share_mut(|inner, _| {
+            tracing::trace!("Abandoning countersigning session for agent: {:?}", author);
+            inner.session = None;
+            Ok(())
+        })
+        .unwrap();
+
+    // Then let the client know.
+    signal_tx
+        .send(Signal::System(SystemSignal::AbandonedCountersigning(
+            preflight_request.app_entry_hash.clone(),
+        )))
+        .ok();
 
     Ok(())
 }

@@ -1275,8 +1275,6 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
     // Alice comes back online.
     conductors[0].startup().await;
 
-    println!("here we are");
-
     // Wait until Alice's session has been attempted to be resolved.
     tokio::time::timeout(Duration::from_secs(30), async {
         loop {
@@ -1296,8 +1294,6 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
     })
     .await
     .unwrap();
-
-    println!("here we are again");
 
     let mut alice_app_signal_rx = conductors[0].subscribe_to_app_signals(app_id.to_string());
     let mut bob_app_signal_rx = conductors[1].subscribe_to_app_signals(app_id.to_string());
