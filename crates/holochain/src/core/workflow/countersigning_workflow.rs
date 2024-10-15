@@ -330,7 +330,7 @@ pub(crate) async fn countersigning_workflow(
         let countersigned_entry_hash = workspace
             .inner
             .share_mut(|inner, _| {
-                let countersigned_entry_hash = inner.session.as_ref().and_then(|session| Some(session.session_app_entry_hash().clone()));
+                let countersigned_entry_hash = inner.session.as_ref().map(|session| session.session_app_entry_hash().clone());
                 tracing::trace!("Countersigning session completed successfully, removing from the workspace for agent: {:?}", cell_id.agent_pubkey());
                 inner.session = None;
                 Ok(countersigned_entry_hash)
