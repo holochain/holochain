@@ -878,6 +878,16 @@ impl MetaNet {
             comparator: user_data_cmp,
         } = preflight_user_data;
 
+        let backend_module = match tuning_params.tx5_backend_module.as_str() {
+            "mem" => tx5::backend::BackendModule::Mem,
+            _ => tx5::backend::BackendModule::GoPion,
+        };
+
+        let backend_module_config = Some(
+            serde_json::from_str(&tuning_params.tx5_backend_module_config)
+                .map_err(std::io::Error::other)?,
+        );
+
         let evt_sender = host.legacy.clone();
         let tx5_config = tx5::Config {
             // TODO: once we implement local discovery, we should only
@@ -964,6 +974,8 @@ impl MetaNet {
                     }
                 }),
             )),
+            backend_module,
+            backend_module_config,
             //..Default::default()
         };
 
