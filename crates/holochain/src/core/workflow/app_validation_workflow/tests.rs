@@ -154,7 +154,7 @@ async fn main_workflow() {
     // insert dependent create op in dht cache db
     // as cascade would do with fetched dependent ops
     app_validation_workspace.cache.test_write(move |txn| {
-        insert_op_cache(txn, &dht_create_op_hashed, None).unwrap();
+        insert_op_cache(txn, &dht_create_op_hashed).unwrap();
     });
 
     // there is still the 1 delete op to be validated

@@ -1199,6 +1199,8 @@ pub async fn genesis(
     Ok(())
 }
 
+/// Should only be used to put items into the Authored DB.
+/// Hash transfer fields (source, transfer_method, transfer_time) are not set.
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,

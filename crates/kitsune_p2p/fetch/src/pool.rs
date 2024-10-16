@@ -11,6 +11,7 @@
 //! interval.
 
 use indexmap::map::Entry;
+use kitsune_p2p_timestamp::Timestamp;
 use std::{collections::HashMap, sync::Arc};
 use tokio::time::{Duration, Instant};
 
@@ -19,7 +20,7 @@ use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KSpace};
 use crate::{
     queue::MapQueue,
     source::{FetchSource, SourceState, Sources},
-    FetchContext, FetchKey, FetchPoolPush, RoughInt,
+    FetchContext, FetchKey, FetchPoolPush, RoughInt, TransferMethod,
 };
 
 mod pool_reader;
@@ -214,7 +215,7 @@ impl State {
             space,
             source,
             size,
-            ..
+            transfer_method,
         } = args;
 
         // Register sources once as they are discovered, with a default initial state
@@ -227,6 +228,7 @@ impl State {
                     sources,
                     space,
                     size,
+                    first_transfer_info: (transfer_method, Timestamp::now()),
                     context,
                     pending_response: None,
                 };
@@ -416,6 +418,10 @@ pub struct FetchPoolItem {
     space: KSpace,
     /// Approximate size of the item. If set, the item will be counted towards overall progress.
     size: Option<RoughInt>,
+    /// The timestamp of and method by which this item was first transferred.
+    /// Does not capture the case where an item is transferred by multiple sources
+    /// and multiple methods.
+    first_transfer_info: (TransferMethod, Timestamp),
     /// Opaque user data specified by the host
     pub context: Option<FetchContext>,
     /// If there is a response pending for this item then track the source and when the request was made.
@@ -437,6 +443,7 @@ mod tests {
     use crate::TransferMethod;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
+    use kitsune_p2p_types::GossipType;
     use pretty_assertions::assert_eq;
     use rand::RngCore;
     use std::collections::HashSet;
@@ -455,6 +462,7 @@ mod tests {
             sources: Sources::new(sources),
             space: Arc::new(KitsuneSpace::new(vec![0; 36])),
             context,
+            first_transfer_info: (TransferMethod::Publish, Timestamp::now()),
             size: None,
             pending_response: None,
         }
@@ -697,7 +705,7 @@ mod tests {
             source: unavailable_sources.iter().last().cloned().unwrap(),
             size: None, // Not important for this test
             context: test_ctx(u32::arbitrary(&mut u).unwrap()),
-            transfer_method: TransferMethod::Gossip,
+            transfer_method: TransferMethod::Gossip(GossipType::Recent),
         });
 
         let mut failed_count = 0;
@@ -710,7 +718,7 @@ mod tests {
                     source: test_source(u8::arbitrary(&mut u).unwrap()),
                     size: None, // Not important for this test
                     context: test_ctx(u32::arbitrary(&mut u).unwrap()),
-                    transfer_method: TransferMethod::Gossip,
+                    transfer_method: TransferMethod::Gossip(GossipType::Recent),
                 });
             }
 
@@ -777,7 +785,7 @@ mod tests {
                     source: test_source(j),
                     size: None, // Not important for this test
                     context: test_ctx(0),
-                    transfer_method: TransferMethod::Gossip,
+                    transfer_method: TransferMethod::Gossip(GossipType::Recent),
                 });
             }
         }
@@ -806,7 +814,7 @@ mod tests {
             source: test_source(1),
             size: None,
             context: test_ctx(0),
-            transfer_method: TransferMethod::Gossip,
+            transfer_method: TransferMethod::Gossip(GossipType::Recent),
         });
 
         // Second op with two sources
@@ -816,7 +824,7 @@ mod tests {
             source: test_source(1),
             size: None,
             context: test_ctx(0),
-            transfer_method: TransferMethod::Gossip,
+            transfer_method: TransferMethod::Gossip(GossipType::Recent),
         });
 
         // Add the second source to the op above
@@ -826,7 +834,7 @@ mod tests {
             source: test_source(2),
             size: None,
             context: test_ctx(0),
-            transfer_method: TransferMethod::Gossip,
+            transfer_method: TransferMethod::Gossip(GossipType::Recent),
         });
 
         // Send enough ops for the first source to be put on a backoff
@@ -854,7 +862,7 @@ mod tests {
             source: test_source(2),
             size: None,
             context: test_ctx(0),
-            transfer_method: TransferMethod::Gossip,
+            transfer_method: TransferMethod::Gossip(GossipType::Recent),
         });
 
         // Verify the item is in the pool and remove it again to mark a successful fetch for source 2

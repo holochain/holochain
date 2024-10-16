@@ -108,7 +108,7 @@ async fn validation_callback_must_get_action() {
     let dht_op = ChainOp::RegisterAgentActivity(fixt!(Signature), create_action.clone());
     let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
     test_space.space.cache_db.test_write(move |txn| {
-        insert_op_cache(txn, &dht_op_hashed, None).unwrap();
+        insert_op_cache(txn, &dht_op_hashed).unwrap();
     });
 
     // the same validation should now successfully validate the op

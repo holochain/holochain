@@ -3,7 +3,7 @@
 use crate::source::FetchSource;
 use crate::{FetchContext, FetchKey, FetchPoolPush, TransferMethod};
 use kitsune_p2p_types::bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash, KitsuneSpace};
-use kitsune_p2p_types::{KOpHash, KSpace};
+use kitsune_p2p_types::{GossipType, KOpHash, KSpace};
 use std::sync::Arc;
 
 #[cfg(test)]
@@ -42,7 +42,7 @@ pub fn test_req_op(n: u8, context: Option<FetchContext>, source: FetchSource) ->
         space: test_space(0),
         source,
         size: None,
-        transfer_method: TransferMethod::Gossip,
+        transfer_method: TransferMethod::Gossip(GossipType::Recent),
     }
 }
 

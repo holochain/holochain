@@ -80,6 +80,9 @@ pub enum BroadcastData {
         /// Source (origin) agent that sent this publish.
         source: Arc<super::KitsuneAgent>,
 
+        /// Method used to send this publish.
+        transfer_method: kitsune_p2p_fetch::TransferMethod,
+
         /// List of hashes being published.
         op_hash_list: Vec<kitsune_p2p_fetch::OpHashSized>,
 

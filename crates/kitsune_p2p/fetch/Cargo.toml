@@ -1,7 +1,7 @@
 [package]
 name = "kitsune_p2p_fetch"
 version = "0.5.0-dev.1"
-description = "Kitsune P2p Fetch Queue Logic"
+description = "Kitsune P2p Fetch Pool Logic"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/kitsune_p2p_fetch"
@@ -26,6 +26,7 @@ human-repr = { version = "1", optional = true }
 arbitrary = { version = "1", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
+rusqlite = { version = "0.32.1", optional = true }
 
 [dev-dependencies]
 kitsune_p2p_fetch = { path = ".", features = [
@@ -57,5 +58,9 @@ test_utils = ["human-repr", "kitsune_p2p_types/test_utils"]
 
 default = []
 
-sqlite-encrypted = ["kitsune_p2p_types/sqlite-encrypted"]
-sqlite = ["kitsune_p2p_types/sqlite"]
+sqlite-encrypted = [
+  "rusqlite",
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "kitsune_p2p_types/sqlite-encrypted",
+]
+sqlite = ["rusqlite", "rusqlite/bundled", "kitsune_p2p_types/sqlite"]
