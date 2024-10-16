@@ -12,7 +12,7 @@ use holochain::sweettest::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_in_inline_zomes_passes() {
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::rendezvous(false).no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let is_init_called = Arc::new(AtomicBool::new(false));
@@ -43,7 +43,7 @@ async fn call_init_in_inline_zomes_passes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_across_cells_passes() {
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::rendezvous(false).no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let is_init_called = Arc::new(AtomicBool::new(false));
@@ -158,7 +158,7 @@ async fn call_init_from_init_across_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_return_type_in_inline_zomes() {
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::rendezvous(false).no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome = SweetInlineZomes::new(vec![], 0)
@@ -190,7 +190,7 @@ async fn call_init_with_invalid_return_type_in_inline_zomes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_return_type_across_cells() {
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::rendezvous(false).no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome_1 = SweetInlineZomes::new(vec![], 0)
@@ -239,7 +239,7 @@ async fn call_init_with_invalid_return_type_across_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_return_type_from_init_across_cells() {
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::rendezvous(false).no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome_1 = SweetInlineZomes::new(vec![], 0)
@@ -300,7 +300,7 @@ async fn call_init_with_invalid_return_type_from_init_across_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_parameters_in_inline_zomes() {
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::rendezvous(false).no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome = SweetInlineZomes::new(vec![], 0)
@@ -332,7 +332,7 @@ async fn call_init_with_invalid_parameters_in_inline_zomes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_parameters_across_cells() {
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::rendezvous(false).no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome_1 = SweetInlineZomes::new(vec![], 0)
@@ -381,7 +381,7 @@ async fn call_init_with_invalid_parameters_across_cells() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_with_invalid_parameters_from_init_across_cells() {
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::rendezvous(false).no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let zome_1 = SweetInlineZomes::new(vec![], 0)

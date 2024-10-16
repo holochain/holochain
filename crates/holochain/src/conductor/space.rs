@@ -246,8 +246,8 @@ impl Spaces {
                 agent.url_list.iter().any(|url| {
                     kitsune_p2p_types::tx_utils::ProxyUrl::from(url.as_str())
                         .digest()
-                        .0
-                        == *node_id
+                        .map(|u| u.0 == *node_id)
+                        .unwrap_or(false)
                 })
             })
             .map(|agent_info| {

@@ -315,8 +315,7 @@ mod tests {
     }
 
     fn insert_new_state(state_map: &mut RoundStateMap, u: &mut Unstructured) -> NodeCert {
-        let cert = NodeCert::arbitrary(u).unwrap();
-        let key: NodeCert = cert.into();
+        let key = NodeCert::arbitrary(u).unwrap();
         state_map.insert(key.clone(), test_round_state());
 
         key

@@ -73,7 +73,7 @@ impl Node {
                 ProxyUrl::from_full(url.as_str())
                     .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
                     .ok()
-                    .map(|purl| purl.digest().cloned_inner())
+                    .map(|purl| purl.digest().unwrap().cloned_inner())
             })
             .collect();
         assert_eq!(ids.len(), 1);

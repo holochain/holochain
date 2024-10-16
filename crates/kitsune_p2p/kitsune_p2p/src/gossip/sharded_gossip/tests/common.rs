@@ -263,11 +263,12 @@ pub async fn agent_info(agent: Arc<KitsuneAgent>) -> AgentInfoSigned {
 }
 
 /// Get an agents cert from their agent info
-pub fn cert_from_info(info: AgentInfoSigned) -> Tx2Cert {
+pub fn cert_from_info(info: AgentInfoSigned) -> NodeCert {
     let digest = kitsune_p2p_types::tx_utils::ProxyUrl::from_full(info.url_list[0].as_str())
         .unwrap()
-        .digest();
-    Tx2Cert::from(digest)
+        .digest()
+        .unwrap();
+    NodeCert::from(digest.0)
 }
 
 pub fn empty_bloom() -> EncodedTimedBloomFilter {

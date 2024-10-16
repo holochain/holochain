@@ -856,11 +856,18 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
 
             for peer in all_peers {
                 for peer in peer? {
-                    if let Some(net_key) = peer.url_list.first().map(|u| {
-                        kitsune_p2p_types::tx_utils::ProxyUrl::from(u.as_url2())
-                            .digest()
-                            .to_string()
-                    }) {
+                    if let Some(net_key) = peer
+                        .url_list
+                        .first()
+                        .map(|u| {
+                            KitsuneResult::Ok(
+                                kitsune_p2p_types::tx_utils::ProxyUrl::from(u.as_url2())
+                                    .digest()?
+                                    .to_string(),
+                            )
+                        })
+                        .transpose()?
+                    {
                         if net_key == this_id {
                             continue;
                         }

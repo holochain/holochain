@@ -140,21 +140,27 @@ impl ProxyUrl {
     }
 
     /// Extract the cert digest from the url
-    pub fn digest(&self) -> CertDigest {
+    pub fn digest(&self) -> KitsuneResult<CertDigest> {
         let scheme = self.full.scheme();
         if scheme == "wss" || scheme == "ws" {
             // override for tx5
             if let Some(mut i) = self.full.path_segments() {
                 if let Some(u) = i.next() {
-                    let digest = base64::prelude::BASE64_URL_SAFE_NO_PAD.decode(u).unwrap();
-                    return CertDigest::from_slice(&digest);
+                    let digest = base64::prelude::BASE64_URL_SAFE_NO_PAD
+                        .decode(u)
+                        .map_err(KitsuneError::other)?;
+                    return Ok(CertDigest::from_slice(&digest));
                 }
             }
         }
         let digest = base64::prelude::BASE64_URL_SAFE_NO_PAD
-            .decode(self.full.host_str().unwrap())
-            .unwrap();
-        CertDigest::from_slice(&digest)
+            .decode(
+                self.full
+                    .host_str()
+                    .ok_or_else(|| KitsuneError::other("no host string in URL"))?,
+            )
+            .map_err(KitsuneError::other)?;
+        Ok(CertDigest::from_slice(&digest))
     }
 
     /// Get a short-hash / first six characters of tls digest for logging

@@ -1387,7 +1387,7 @@ async fn test_list_apps_sorted_consistently() {
 
     // Install two apps on the Conductor:
     // Both share a CellId in common, and also include a distinct CellId each.
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::shared_rendezvous().await;
     let _ = conductor.setup_app("app1", [&dna1]).await.unwrap();
     let _ = conductor.setup_app("app2", [&dna1]).await.unwrap();
     let _ = conductor.setup_app("app3", [&dna1]).await.unwrap();
