@@ -59,7 +59,7 @@ jobs:
           - cmd:
               pkgs:
                 - build-release-automation-tests-repo
-              extra_arg: "--override-input repo-git 'path:.git'"
+              extra_arg: "--override-input versions ./versions/weekly --override-input repo-git 'path:.git'"
             platform:
               system: x86_64-linux
 
