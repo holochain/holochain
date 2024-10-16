@@ -19,7 +19,7 @@
 
       # holochain_scaffolding_cli
       scaffolding = {
-        url = "github:holochain/scaffolding/holochain-weekly";
+        url = "github:holochain/scaffolding/8a6d1dab0f1668c2781a46d93a5ad638fcf25598";
         flake = false;
       };
     };
