@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.5.0-dev.1
+
+- AdminRequest::ListApps is now sorted by the new AppInfo field `installed_at`, in descending order
+- Return a `RibosomeError` when there is a serialisation error invoking a zome callback. For example, if they have an invalid return type or parameters. This error bubbles-up and causes the zome call to fail, giving nicer errors and removing the panic which crashed the conductor in these situations. \#3803
+
+## 0.5.0-dev.0
+
+## 0.4.0
+
+## 0.4.0-dev.28
+
 ## 0.4.0-dev.27
 
 - HC sandbox: Fix `--no-dpki` option which previously enabled DPKI in the conductor when set, instead of disabling it.

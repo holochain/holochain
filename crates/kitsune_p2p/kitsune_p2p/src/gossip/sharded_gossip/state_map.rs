@@ -100,7 +100,6 @@ mod tests {
     use crate::NOISE;
     use arbitrary::{Arbitrary, Unstructured};
     use kitsune_p2p_types::dht::arq::ArqSet;
-    use kitsune_p2p_types::Tx2Cert;
     use std::collections::HashSet;
     use std::sync::Arc;
     use std::time::Duration;

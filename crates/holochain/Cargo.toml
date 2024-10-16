@@ -1,6 +1,6 @@
 [package]
 name = "holochain"
-version = "0.4.0-dev.27"
+version = "0.5.0-dev.1"
 description = "Holochain, a framework for distributed applications"
 license = "CAL-1.0"
 repository = "https://github.com/holochain/holochain"
@@ -26,43 +26,43 @@ fallible-iterator = "0.3.0"
 futures = "0.3"
 getrandom = "0.2.7"
 ghost_actor = "0.3.0-alpha.6"
-hc_deepkey_sdk = { version = "^0.7.0-dev.8", path = "../hc_deepkey_sdk" }
-holo_hash = { version = "^0.4.0-dev.13", path = "../holo_hash", features = [
+hc_deepkey_sdk = { version = "^0.8.0-dev.1", path = "../hc_deepkey_sdk" }
+holo_hash = { version = "^0.5.0-dev.1", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_cascade = { version = "^0.4.0-dev.27", path = "../holochain_cascade" }
-holochain_chc = { version = "^0.1.0-dev.7", path = "../holochain_chc", default-features = false }
-holochain_conductor_api = { version = "^0.4.0-dev.27", path = "../holochain_conductor_api" }
+holochain_cascade = { version = "^0.5.0-dev.1", path = "../holochain_cascade" }
+holochain_chc = { version = "^0.2.0-dev.1", path = "../holochain_chc", default-features = false }
+holochain_conductor_api = { version = "^0.5.0-dev.1", path = "../holochain_conductor_api" }
 holochain_deepkey_dna = "0.0.8-dev.2"
-holochain_keystore = { version = "^0.4.0-dev.24", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.4.0-dev.27", path = "../holochain_p2p" }
-holochain_sqlite = { version = "^0.4.0-dev.23", path = "../holochain_sqlite" }
+holochain_keystore = { version = "^0.5.0-dev.1", path = "../holochain_keystore", default-features = false }
+holochain_p2p = { version = "^0.5.0-dev.1", path = "../holochain_p2p" }
+holochain_sqlite = { version = "^0.5.0-dev.1", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_state = { version = "^0.4.0-dev.27", path = "../holochain_state" }
-holochain_types = { version = "^0.4.0-dev.26", path = "../holochain_types" }
-holochain_util = { version = "^0.4.0-dev.5", path = "../holochain_util" }
+holochain_state = { version = "^0.5.0-dev.1", path = "../holochain_state" }
+holochain_types = { version = "^0.5.0-dev.1", path = "../holochain_types" }
+holochain_util = { version = "^0.5.0-dev.0", path = "../holochain_util" }
 holochain_wasmer_host = { version = "=0.0.96", default-features = false, features = [
   "error_as_host",
 ] }
-holochain_websocket = { version = "^0.4.0-dev.26", path = "../holochain_websocket" }
-holochain_zome_types = { version = "^0.4.0-dev.18", path = "../holochain_zome_types", features = [
+holochain_websocket = { version = "^0.5.0-dev.1", path = "../holochain_websocket" }
+holochain_zome_types = { version = "^0.5.0-dev.1", path = "../holochain_zome_types", features = [
   "full",
 ] }
-holochain_nonce = { version = "^0.4.0-dev.7", path = "../holochain_nonce" }
-holochain_secure_primitive = { version = "^0.4.0-dev.1", path = "../holochain_secure_primitive" }
-holochain_conductor_services = { version = "^0.3.0-dev.27", path = "../holochain_conductor_services" }
+holochain_nonce = { version = "^0.5.0-dev.0", path = "../holochain_nonce" }
+holochain_secure_primitive = { version = "^0.5.0-dev.0", path = "../holochain_secure_primitive" }
+holochain_conductor_services = { version = "^0.4.0-dev.1", path = "../holochain_conductor_services" }
 human-panic = "2.0"
 itertools = { version = "0.12" }
-kitsune_p2p = { version = "^0.4.0-dev.23", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
-kitsune_p2p_bin_data = { version = "^0.4.0-dev.12", path = "../kitsune_p2p/bin_data" }
-kitsune_p2p_types = { version = "^0.4.0-dev.15", path = "../kitsune_p2p/types" }
-kitsune_p2p_block = { version = "^0.4.0-dev.12", path = "../kitsune_p2p/block" }
+kitsune_p2p = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
+kitsune_p2p_bin_data = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/bin_data" }
+kitsune_p2p_types = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/types" }
+kitsune_p2p_block = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/block" }
 mockall = "0.11.3"
-mr_bundle = { version = "^0.4.0-dev.8", path = "../mr_bundle" }
+mr_bundle = { version = "^0.5.0-dev.0", path = "../mr_bundle" }
 must_future = "0.1.1"
 nanoid = "0.4"
-holochain_trace = { version = "^0.4.0-dev.6", path = "../holochain_trace" }
-holochain_metrics = { version = "^0.4.0-dev.4", path = "../holochain_metrics", default-features = false }
+holochain_trace = { version = "^0.5.0-dev.1", path = "../holochain_trace" }
+holochain_metrics = { version = "^0.5.0-dev.0", path = "../holochain_metrics", default-features = false }
 once_cell = "1.4.1"
 one_err = "0.0.8"
 parking_lot = "0.12"
@@ -99,15 +99,15 @@ wasmer = { version = "=4.3.6", optional = true, default-features = false }
 wasmer-middlewares = { version = "=4.3.6", optional = true, default-features = false }
 
 # Dependencies for test_utils / other optional deps
-fixt = { version = "^0.4.0-dev.4", path = "../fixt", optional = true }
+fixt = { version = "^0.5.0-dev.0", path = "../fixt", optional = true }
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 diff = { version = "0.1", optional = true }
-hdk = { version = "^0.4.0-dev.19", path = "../hdk", optional = true }
+hdk = { version = "^0.5.0-dev.1", path = "../hdk", optional = true }
 matches = { version = "0.1.8", optional = true }
-holochain_wasm_test_utils = { version = "^0.4.0-dev.26", path = "../test_utils/wasm", optional = true }
-holochain_test_wasm_common = { version = "^0.4.0-dev.19", path = "../test_utils/wasm_common", optional = true }
-kitsune_p2p_bootstrap = { version = "^0.3.0-dev.16", path = "../kitsune_p2p/bootstrap", optional = true }
+holochain_wasm_test_utils = { version = "^0.5.0-dev.1", path = "../test_utils/wasm", optional = true }
+holochain_test_wasm_common = { version = "^0.5.0-dev.1", path = "../test_utils/wasm_common", optional = true }
+kitsune_p2p_bootstrap = { version = "^0.4.0-dev.1", path = "../kitsune_p2p/bootstrap", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
 sbd-server = { version = "=0.0.6-alpha", optional = true }
 tx5-go-pion-turn = { version = "=0.1.3-beta", optional = true }
@@ -121,9 +121,6 @@ reqwest = { version = "0.12", features = [
   "native-tls-vendored",
 ], optional = true }
 
-# TODO: make optional?
-aitia = { version = "^0.3.0-dev.6", path = "../aitia" }
-hc_sleuth = { version = "^0.4.0-dev.26", path = "../hc_sleuth" }
 
 # fact deps
 petgraph = { version = "0.6.0", features = ["quickcheck", "stable_graph"] }
@@ -160,9 +157,10 @@ test-case = "3.3"
 tokio-tungstenite = "0.21"
 tx5 = "0.1.3-beta"
 predicates = "3.1"
+assert2 = "0.3.15"
 
 [build-dependencies]
-hdk = { version = "^0.4.0-dev.19", path = "../hdk" }
+hdk = { version = "^0.5.0-dev.1", path = "../hdk" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.51" }
 toml = "0.8"

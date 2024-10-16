@@ -209,11 +209,6 @@ impl ConductorConfig {
         self.network.tracing_scope.clone()
     }
 
-    /// Get the string used for hc_sleuth logging
-    pub fn sleuth_id(&self) -> String {
-        self.tracing_scope().unwrap_or("<NONE>".to_string())
-    }
-
     /// Get the data directory for this config or say something nice and die.
     pub fn data_root_path_or_die(&self) -> DataRootPath {
         match &self.data_root_path {
