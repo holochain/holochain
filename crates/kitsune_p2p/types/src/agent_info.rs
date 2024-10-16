@@ -228,6 +228,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
 
 impl AgentInfoSigned {
     /// Construct and sign a new AgentInfoSigned instance.
+    #[allow(clippy::too_many_arguments)]
     pub async fn sign<'a, R, F>(
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,

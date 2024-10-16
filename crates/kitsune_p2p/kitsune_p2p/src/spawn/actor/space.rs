@@ -1603,7 +1603,6 @@ impl Space {
 
             // Broadcast the new zero-arc agent info
             i_s.publish_agent_info_signed(PutAgentInfoSignedEvt {
-                space,
                 peer_data: vec![agent_info_signed.clone()],
             }).await?;
 
