@@ -106,6 +106,12 @@ pub enum RibosomeError {
 
     #[error(transparent)]
     IO(#[from] std::io::Error),
+
+    #[error("The callback has an invalid return type: {0}")]
+    CallbackInvalidReturnType(String),
+
+    #[error("The callback has invalid parameters: {0}")]
+    CallbackInvalidParameters(String),
 }
 
 /// Type alias
