@@ -460,6 +460,9 @@ pub struct InstalledAppCommon {
 
     /// The manifest used to install the app.
     pub manifest: AppManifest,
+
+    /// The timestamp when this app was installed
+    pub installed_at: Timestamp,
 }
 
 impl InstalledAppCommon {
@@ -469,6 +472,7 @@ impl InstalledAppCommon {
         agent_key: AgentPubKey,
         role_assignments: I,
         manifest: AppManifest,
+        installed_at: Timestamp,
     ) -> AppResult<Self> {
         let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
         // ensure no role name contains a clone id delimiter
@@ -483,6 +487,7 @@ impl InstalledAppCommon {
             agent_key,
             role_assignments,
             manifest,
+            installed_at,
         })
     }
 
@@ -819,6 +824,7 @@ impl InstalledAppCommon {
 
     /// Constructor for apps not using a manifest.
     /// Allows for cloning up to 256 times and implies immediate provisioning.
+    #[cfg(feature = "test_utils")]
     pub fn new_legacy<S: ToString, I: IntoIterator<Item = InstalledCell>>(
         installed_app_id: S,
         installed_cells: I,
@@ -880,6 +886,7 @@ impl InstalledAppCommon {
             agent_key,
             role_assignments,
             manifest,
+            installed_at: Timestamp::now(),
         })
     }
 
@@ -893,6 +900,11 @@ impl InstalledAppCommon {
     /// Return the list of role assignments
     pub fn role_assignments(&self) -> &HashMap<RoleName, AppRoleAssignment> {
         &self.role_assignments
+    }
+
+    /// Accessor
+    pub fn installed_at(&self) -> &Timestamp {
+        &self.installed_at
     }
 }
 
@@ -1277,6 +1289,7 @@ mod tests {
                 AppRolePrimary::new(fixt!(DnaHash), false, 0).into(),
             )],
             AppManifest::arbitrary(&mut u).unwrap(),
+            Timestamp::now(),
         );
         assert!(result.is_err())
     }
@@ -1295,6 +1308,7 @@ mod tests {
             agent.clone(),
             vec![(role_name.clone(), role1)],
             manifest,
+            Timestamp::now(),
         )
         .unwrap()
         .into();

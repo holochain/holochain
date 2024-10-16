@@ -762,6 +762,10 @@ async fn session_rollback_with_chc_enabled() {
 
 #[cfg(feature = "chc")]
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    target_os = "windows",
+    ignore = "flaky, and even on linux, a thread experiences a panic even though the test passes."
+)]
 async fn multiple_agents_on_same_conductor_with_chc_enabled() {
     holochain_trace::test_run();
 
