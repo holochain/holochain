@@ -156,9 +156,15 @@ impl DnaFile {
     }
 
     /// Construct a DnaFile from its constituent parts
-    #[cfg(feature = "fixturators")]
+    #[cfg(feature = "test_utils")]
     pub fn from_parts(dna: DnaDefHashed, code: WasmMap) -> Self {
         Self { dna, code }
+    }
+
+    /// Split a DnaFile into its constituent parts
+    #[cfg(feature = "test_utils")]
+    pub fn into_parts(self) -> (DnaDefHashed, WasmMap) {
+        (self.dna, self.code)
     }
 
     /// The DnaDef along with its hash
@@ -183,27 +189,6 @@ impl DnaFile {
             .map_err(|hash| DnaError::DnaHashMismatch(self.dna.as_hash().clone(), hash))
     }
 
-    /// Load dna_file bytecode into this rust struct.
-    #[deprecated = "remove after app bundles become standard; use DnaBundle instead"]
-    pub async fn from_file_content(data: &[u8]) -> Result<Self, DnaError> {
-        // Not super efficient memory-wise, but doesn't block any threads
-        let data = data.to_vec();
-        // Block because gzipping could take some time
-        let dna_file = tokio::task::spawn_blocking(move || {
-            let mut gz = flate2::read::GzDecoder::new(&data[..]);
-            let mut bytes = Vec::new();
-            use std::io::Read;
-            gz.read_to_end(&mut bytes)?;
-            let sb: SerializedBytes = UnsafeBytes::from(bytes).into();
-            let dna_file: DnaFile = sb.try_into()?;
-            DnaResult::Ok(dna_file)
-        })
-        .await
-        .expect("blocking thread panicked - panicking here too")?;
-        dna_file.verify_hash()?;
-        Ok(dna_file)
-    }
-
     /// Transform this DnaFile into a new DnaFile with different properties
     /// and, hence, a different DnaHash.
     pub async fn with_properties(self, properties: SerializedBytes) -> Self {
@@ -226,27 +211,10 @@ impl DnaFile {
     }
 
     /// Fetch the Webassembly byte code for a zome.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn get_wasm_for_zome(&self, zome_name: &ZomeName) -> Result<&wasm::DnaWasm, DnaError> {
         let wasm_hash = self.dna.get_wasm_zome_hash(zome_name)?;
         self.code.0.get(&wasm_hash).ok_or(DnaError::InvalidWasmHash)
-    }
-
-    #[deprecated = "remove after app bundles become standard; use DnaBundle instead"]
-    /// Render this dna_file as bytecode to send over the wire, or store in a file.
-    pub async fn to_file_content(&self) -> Result<Vec<u8>, DnaError> {
-        // Not super efficient memory-wise, but doesn't block any threads
-        let dna_file = self.clone();
-        dna_file.verify_hash()?;
-        // Block because gzipping could take some time
-        tokio::task::spawn_blocking(move || {
-            let data: SerializedBytes = dna_file.try_into()?;
-            let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
-            use std::io::Write;
-            enc.write_all(data.bytes())?;
-            Ok(enc.finish()?)
-        })
-        .await
-        .expect("blocking thread panic!d - panicing here too")
     }
 
     /// Set the DNA's name.
@@ -256,8 +224,7 @@ impl DnaFile {
         clone
     }
 
-    /// Change the DNA modifiers -- the network seed, origin time and properties -- while
-    /// leaving the actual DNA code intact.
+    /// Change the DNA modifiers while leaving the actual DNA code intact.
     pub fn update_modifiers(&self, dna_modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
         clone.dna = DnaDefHashed::from_content_sync(clone.dna.update_modifiers(dna_modifiers));

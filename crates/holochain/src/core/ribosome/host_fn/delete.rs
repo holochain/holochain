@@ -67,14 +67,14 @@ pub fn delete<'a>(
 pub(crate) fn get_original_entry_data(
     call_context: Arc<CallContext>,
     address: ActionHash,
-) -> Result<(EntryHash, EntryType), WasmError> {
+) -> Result<(EntryHash, EntryType), WasmHostError> {
     let network = call_context.host_context.network().clone();
     let workspace = call_context.host_context.workspace();
 
     tokio_helper::block_forever_on(async move {
         let cascade = CascadeImpl::from_workspace_and_network(&workspace, network);
         let maybe_original_record: Option<SignedActionHashed> = cascade
-            .get_details(address.clone().into(), GetOptions::content())
+            .get_details(address.clone().into(), GetOptions::local())
             .await?
             .map(|el| {
                 match el {
@@ -113,8 +113,8 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn ribosome_delete_entry_test<'a>() {
-        holochain_trace::test_run().ok();
+    async fn ribosome_delete_entry_test() {
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::Crd).await;

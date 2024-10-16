@@ -56,21 +56,11 @@ pub enum AppRoleManifestValidated {
         modifiers: DnaModifiersOpt,
         installed_hash: Option<DnaHashB64>,
     },
-    /// Require that a Cell is already installed with a specified DNA hash,
-    /// and which has an Agent that's associated with this App's agent
-    /// via DPKI. If no such Cell exists, *app installation fails*.
+    /// Require that a Cell is already installed which has a DNA that's compatible with the
+    /// `compatible_hash` specified in the manifest.
     UseExisting {
-        clone_limit: u32,
-        deferred: bool,
-        installed_hash: DnaHashB64,
-    },
-    /// Try `UseExisting`, and if that fails, fallback to `Create`
-    CreateIfNotExists {
-        clone_limit: u32,
-        deferred: bool,
-        location: DnaLocation,
-        modifiers: DnaModifiersOpt,
-        installed_hash: DnaHashB64,
+        compatible_hash: DnaHashB64,
+        protected: bool,
     },
     /// Install or locate the DNA, but never create a Cell for this DNA.
     /// Only allow clones to be created from the DNA specified.

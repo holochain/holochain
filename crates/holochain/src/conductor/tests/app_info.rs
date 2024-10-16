@@ -3,7 +3,7 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use matches::matches;
 
-use crate::sweettest::{SweetAgents, SweetConductor, SweetDnaFile};
+use crate::sweettest::{SweetConductor, SweetDnaFile};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_info_returns_all_cells_with_info() {
@@ -11,15 +11,13 @@ async fn app_info_returns_all_cells_with_info() {
     let (dna_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let (dna_2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
-    let agent_pub_key = SweetAgents::one(conductor.keystore()).await;
 
     let app_id: InstalledAppId = "app".into();
     let role_name_1: RoleName = "role_1".into();
     let role_name_2: RoleName = "role_2".into();
-    conductor
-        .setup_app_for_agent(
+    let app = conductor
+        .setup_app(
             &app_id,
-            agent_pub_key.clone(),
             [
                 &(role_name_1.clone(), dna_1.clone()),
                 &(role_name_2.clone(), dna_2.clone()),
@@ -27,17 +25,20 @@ async fn app_info_returns_all_cells_with_info() {
         )
         .await
         .unwrap();
+    let agent_pub_key = app.agent().clone();
 
     // create 1 clone cell for role 1 = clone cell 1
     let clone_cell_1 = conductor
         .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app_id.clone(),
-            role_name: role_name_1.clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("seed numero uno".to_string()),
-            membrane_proof: None,
-            name: None,
-        })
+        .create_clone_cell(
+            &app_id,
+            CreateCloneCellPayload {
+                role_name: role_name_1.clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("seed numero uno".to_string()),
+                membrane_proof: None,
+                name: None,
+            },
+        )
         .await
         .unwrap();
     assert_eq!(clone_cell_1.original_dna_hash, dna_1.dna_hash().clone());
@@ -45,23 +46,27 @@ async fn app_info_returns_all_cells_with_info() {
     // create 1 clone cell for role 2 = clone cell 2
     let clone_cell_2 = conductor
         .clone()
-        .create_clone_cell(CreateCloneCellPayload {
-            app_id: app_id.clone(),
-            role_name: role_name_2.clone(),
-            modifiers: DnaModifiersOpt::none().with_network_seed("seed numero dos".to_string()),
-            membrane_proof: None,
-            name: None,
-        })
+        .create_clone_cell(
+            &app_id,
+            CreateCloneCellPayload {
+                role_name: role_name_2.clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("seed numero dos".to_string()),
+                membrane_proof: None,
+                name: None,
+            },
+        )
         .await
         .unwrap();
     assert_eq!(clone_cell_2.original_dna_hash, dna_2.dna_hash().clone());
 
     // disable clone cell 2
     conductor
-        .disable_clone_cell(&DisableCloneCellPayload {
-            app_id: app_id.clone(),
-            clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
-        })
+        .disable_clone_cell(
+            &app_id,
+            &DisableCloneCellPayload {
+                clone_cell_id: CloneCellId::DnaHash(clone_cell_2.cell_id.dna_hash().clone()),
+            },
+        )
         .await
         .unwrap();
 
@@ -116,10 +121,12 @@ async fn app_info_returns_all_cells_with_info() {
     // tests that the enable_clone_cell fn returns the right DNA hash
     let reenabled_clone_cell = conductor
         .clone()
-        .enable_clone_cell(&EnableCloneCellPayload {
-            app_id: app_id.clone(),
-            clone_cell_id: CloneCellId::CellId(clone_cell_2.cell_id.clone()),
-        })
+        .enable_clone_cell(
+            &app_id,
+            &EnableCloneCellPayload {
+                clone_cell_id: CloneCellId::DnaHash(clone_cell_2.cell_id.dna_hash().clone()),
+            },
+        )
         .await
         .unwrap();
     assert_eq!(

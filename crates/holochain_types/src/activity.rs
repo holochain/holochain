@@ -7,27 +7,27 @@ use holochain_zome_types::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain records returned from a agent_activity_query
-pub struct AgentActivityResponse<T = SignedActionHashed> {
+pub struct AgentActivityResponse {
     /// The agent this activity is for
     pub agent: AgentPubKey,
     /// Valid actions on this chain.
-    pub valid_activity: ChainItems<T>,
+    pub valid_activity: ChainItems,
     /// Actions that were rejected by the agent activity
     /// authority and therefor invalidate the chain.
-    pub rejected_activity: ChainItems<T>,
+    pub rejected_activity: ChainItems,
     /// The status of this chain.
     pub status: ChainStatus,
     /// The highest chain action that has
     /// been observed by this authority.
     pub highest_observed: Option<HighestObserved>,
+    /// Any warrants at the basis of this agent.
+    pub warrants: Vec<Warrant>,
 }
 
-holochain_serial!(AgentActivityResponse<ActionHash>);
-
-impl<A> AgentActivityResponse<A> {
+impl AgentActivityResponse {
     /// Convert an empty response to a different type.
-    pub fn from_empty<B>(other: AgentActivityResponse<B>) -> Self {
-        let convert_activity = |items: &ChainItems<B>| match items {
+    pub fn from_empty(other: AgentActivityResponse) -> Self {
+        let convert_activity = |items: &ChainItems| match items {
             ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
             ChainItems::Hashes(_) => ChainItems::Hashes(Vec::with_capacity(0)),
             ChainItems::NotRequested => ChainItems::NotRequested,
@@ -38,24 +38,31 @@ impl<A> AgentActivityResponse<A> {
             rejected_activity: convert_activity(&other.rejected_activity),
             status: ChainStatus::Empty,
             highest_observed: other.highest_observed,
+            warrants: other.warrants,
         }
     }
 
-    /// Convert an status only response to a different type.
-    pub fn status_only<B>(other: AgentActivityResponse<B>) -> Self {
+    /// Convert to a status only response.
+    pub fn status_only(other: AgentActivityResponse) -> Self {
         AgentActivityResponse {
             agent: other.agent,
             valid_activity: ChainItems::NotRequested,
             rejected_activity: ChainItems::NotRequested,
             status: ChainStatus::Empty,
             highest_observed: other.highest_observed,
+            warrants: other.warrants,
         }
     }
 
-    /// Convert an hashes only response to a different type.
-    pub fn hashes_only<B>(other: AgentActivityResponse<B>) -> Self {
-        let convert_activity = |items: ChainItems<B>| match items {
-            ChainItems::Full(_) => ChainItems::Full(Vec::with_capacity(0)),
+    /// Convert to a [ChainItems::Hashes] response.
+    pub fn hashes_only(other: AgentActivityResponse) -> Self {
+        let convert_activity = |items: ChainItems| match items {
+            ChainItems::Full(records) => ChainItems::Hashes(
+                records
+                    .into_iter()
+                    .map(|r| (r.action().action_seq(), r.address().clone()))
+                    .collect(),
+            ),
             ChainItems::Hashes(h) => ChainItems::Hashes(h),
             ChainItems::NotRequested => ChainItems::NotRequested,
         };
@@ -65,23 +72,24 @@ impl<A> AgentActivityResponse<A> {
             rejected_activity: convert_activity(other.rejected_activity),
             status: other.status,
             highest_observed: other.highest_observed,
+            warrants: other.warrants,
         }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// The type of agent activity returned in this request
-pub enum ChainItems<T = SignedActionHashed> {
-    /// The full actions
-    Full(Vec<T>),
+pub enum ChainItems {
+    /// The full records
+    Full(Vec<Record>),
     /// Just the hashes
     Hashes(Vec<(u32, ActionHash)>),
     /// Activity was not requested
     NotRequested,
 }
 
-impl From<AgentActivityResponse<Record>> for holochain_zome_types::query::AgentActivity {
-    fn from(a: AgentActivityResponse<Record>) -> Self {
+impl From<AgentActivityResponse> for AgentActivity {
+    fn from(a: AgentActivityResponse) -> Self {
         let valid_activity = match a.valid_activity {
             ChainItems::Full(records) => records
                 .into_iter()
@@ -103,7 +111,36 @@ impl From<AgentActivityResponse<Record>> for holochain_zome_types::query::AgentA
             rejected_activity,
             status: a.status,
             highest_observed: a.highest_observed,
-            warrants: Vec::with_capacity(0),
+            warrants: a.warrants,
         }
+    }
+}
+
+/// A helper trait to allow [Record]s, [SignedActionHashed]s, and [ActionHashed]s to be converted into [ChainItems]
+/// without needing to know which source type is being operated on.
+pub trait ChainItemsSource {
+    /// Convert a source type into a [ChainItems] value.
+    fn to_chain_items(self) -> ChainItems;
+}
+
+impl ChainItemsSource for Vec<Record> {
+    fn to_chain_items(self) -> ChainItems {
+        ChainItems::Full(self)
+    }
+}
+
+impl ChainItemsSource for Vec<ActionHashed> {
+    fn to_chain_items(self) -> ChainItems {
+        ChainItems::Hashes(
+            self.into_iter()
+                .map(|a| (a.action_seq(), a.as_hash().clone()))
+                .collect(),
+        )
+    }
+}
+
+impl ChainItemsSource for Vec<(u32, ActionHash)> {
+    fn to_chain_items(self) -> ChainItems {
+        ChainItems::Hashes(self)
     }
 }

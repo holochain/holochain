@@ -54,6 +54,8 @@ use hdi::prelude::*;
             &self,
             input: MustGetAgentActivityInput,
         ) -> ExternResult<Vec<RegisterAgentActivity>>;
+        // DPKI
+        fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool>;
         // Info
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -68,6 +70,10 @@ use hdi::prelude::*;
             &self,
             x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
         ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+        fn ed_25519_x_salsa20_poly1305_decrypt(
+            &self,
+            ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+        ) -> ExternResult<XSalsa20Poly1305Data>;
     }
 
 }

@@ -1,6 +1,6 @@
 [package]
 name = "holochain_state"
-version = "0.3.0-beta-dev.33"
+version = "0.5.0-dev.0"
 description = "Holochain persisted state datatypes and functions"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -8,46 +8,46 @@ documentation = "https://docs.rs/holochain_state"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-aitia = { version = "^0.2.0-beta-dev.2", path = "../aitia" }
-byteorder = "1.3.4"
-cfg-if = "0.1"
-chrono = { version = "0.4.22", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
-derive_more = { workspace = true }
-either = "1.5"
-holochain_sqlite = { version = "^0.3.0-beta-dev.31", path = "../holochain_sqlite" }
-holo_hash = { version = "^0.3.0-beta-dev.20", path = "../holo_hash", features = ["full"] }
-fallible-iterator = "0.2.0"
-futures = "0.3"
-hc_sleuth = { version = "^0.2.0-beta-dev.4", path = "../hc_sleuth" }
-holochain_keystore = { version = "^0.3.0-beta-dev.26", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.53"
-holochain_p2p = { version = "^0.3.0-beta-dev.33", path = "../holochain_p2p" }
-holochain_types = { version = "^0.3.0-beta-dev.31", path = "../holochain_types" }
-holochain_util = { version = "^0.3.0-beta-dev.3", path = "../holochain_util" }
-holochain_zome_types = { version = "^0.3.0-beta-dev.25", path = "../holochain_zome_types", features = [
-    "full",
+chrono = { version = "0.4.22", default-features = false, features = [
+  "clock",
+  "std",
+  "oldtime",
+  "serde",
 ] }
-kitsune_p2p = { version = "^0.3.0-beta-dev.29", path = "../kitsune_p2p/kitsune_p2p" }
-holochain_state_types = { version = "^0.3.0-beta-dev.31", path = "../holochain_state_types" }
-holochain_nonce = {version = "^0.3.0-beta-dev.22", path = "../holochain_nonce"}
-mockall = "0.11.3"
+derive_more = "0.99"
+holochain_sqlite = { version = "^0.5.0-dev.0", path = "../holochain_sqlite" }
+holo_hash = { version = "^0.5.0-dev.0", path = "../holo_hash", features = [
+  "full",
+] }
+fallible-iterator = "0.3.0"
+holochain_chc = { version = "^0.2.0-dev.0", path = "../holochain_chc" }
+holochain_keystore = { version = "^0.5.0-dev.0", path = "../holochain_keystore" }
+holochain_serialized_bytes = "=0.0.55"
+holochain_p2p = { version = "^0.5.0-dev.0", path = "../holochain_p2p" }
+holochain_types = { version = "^0.5.0-dev.0", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.5.0-dev.0", path = "../holochain_zome_types", features = [
+  "full",
+] }
+kitsune_p2p = { version = "^0.5.0-dev.0", path = "../kitsune_p2p/kitsune_p2p" }
+holochain_state_types = { version = "^0.5.0-dev.0", path = "../holochain_state_types" }
+holochain_nonce = { version = "^0.5.0-dev.0", path = "../holochain_nonce" }
+maplit = "1"
 one_err = "0.0.8"
-parking_lot = "0.10"
+parking_lot = "0.12"
 shrinkwraprs = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
 thiserror = "1.0.22"
-tokio = { version = "1.27", features = ["full"] }
+tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1.26"
-tracing-futures = "0.2.5"
-cron = "0.9"
-async-recursion = "0.3"
-rand = "0.8.5"
+cron = "0.12"
+async-recursion = "1.1"
 
 tempfile = { version = "3.3", optional = true }
-base64 = { version = "0.13", optional = true }
-nanoid = { version = "0.3", optional = true }
+base64 = { version = "0.22", optional = true }
+nanoid = { version = "0.4", optional = true }
 
 # contrafact
 contrafact = { version = "0.2.0-rc.1", optional = true }
@@ -55,51 +55,59 @@ contrafact = { version = "0.2.0-rc.1", optional = true }
 [dev-dependencies]
 holochain_state = { path = ".", features = ["test_utils"] }
 
-anyhow = "1.0.26"
+anyhow = "1.0"
 arbitrary = "1.0"
 fixt = { path = "../fixt" }
-holochain_wasm_test_utils = { path = "../test_utils/wasm" }
+kitsune_p2p_timestamp = { version = "^0.5.0-dev.0", path = "../kitsune_p2p/timestamp", features = [
+  "full",
+] }
+holochain_wasm_test_utils = { path = "../test_utils/wasm", features = [
+  "build",
+] }
+holochain_trace = { version = "^0.5.0-dev.0", path = "../holochain_trace" }
 matches = "0.1.8"
-holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
 pretty_assertions = "1.4"
 
 tempfile = "3.3"
 
+[lints]
+workspace = true
+
 [features]
 default = []
 
-fuzzing = [
-    "holochain_types/fuzzing",
-    "holochain_zome_types/fuzzing",
-]
+fuzzing = ["holochain_types/fuzzing", "holochain_zome_types/fuzzing"]
 
 test_utils = [
-    "holochain_keystore/test_utils",
-    "holochain_types/test_utils",
-    "holochain_zome_types/test_utils",
-    "holochain_sqlite/test_utils",
-    "holochain_p2p/test_utils",
-    "base64",
-    "contrafact",
-    "tempfile",
-    "nanoid",
+  "holochain_chc/test_utils",
+  "holochain_keystore/test_utils",
+  "holochain_types/test_utils",
+  "holochain_zome_types/test_utils",
+  "holochain_sqlite/test_utils",
+  "holochain_p2p/test_utils",
+  "base64",
+  "contrafact",
+  "tempfile",
+  "nanoid",
 ]
 
+instrument = []
+
 sqlite-encrypted = [
-    "holo_hash/sqlite-encrypted",
-    "holochain_sqlite/sqlite-encrypted",
-    "holochain_keystore/sqlite-encrypted",
-    "holochain_p2p/sqlite-encrypted",
-    "holochain_types/sqlite-encrypted",
-    "holochain_zome_types/sqlite-encrypted",
-    "kitsune_p2p/sqlite-encrypted",
+  "holo_hash/sqlite-encrypted",
+  "holochain_sqlite/sqlite-encrypted",
+  "holochain_keystore/sqlite-encrypted",
+  "holochain_p2p/sqlite-encrypted",
+  "holochain_types/sqlite-encrypted",
+  "holochain_zome_types/sqlite-encrypted",
+  "kitsune_p2p/sqlite-encrypted",
 ]
 sqlite = [
-    "holo_hash/sqlite",
-    "holochain_sqlite/sqlite",
-    "holochain_keystore/sqlite",
-    "holochain_p2p/sqlite",
-    "holochain_types/sqlite",
-    "holochain_zome_types/sqlite",
-    "kitsune_p2p/sqlite",
+  "holo_hash/sqlite",
+  "holochain_sqlite/sqlite",
+  "holochain_keystore/sqlite",
+  "holochain_p2p/sqlite",
+  "holochain_types/sqlite",
+  "holochain_zome_types/sqlite",
+  "kitsune_p2p/sqlite",
 ]

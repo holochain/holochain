@@ -25,6 +25,11 @@ pub fn simple_create_read_zome() -> InlineIntegrityZome {
                 .map(|e| e.into_iter().next().unwrap())
                 .map_err(Into::into)
         })
+        .function("read_details", |api, hash: ActionHash| {
+            api.get_details(vec![GetInput::new(hash.into(), GetOptions::default())])
+                .map(|e| e.into_iter().next().unwrap())
+                .map_err(Into::into)
+        })
 }
 
 /// An InlineZome with a function to create many random entries at once,
@@ -115,7 +120,7 @@ pub fn simple_crud_zome() -> InlineZomeSet {
             Ok(hash)
         })
         .function("create_bytes", move |api, bs: Bytes| {
-            let entry = Entry::app(UnsafeBytes::try_from(bs.to_vec()).unwrap().into()).unwrap();
+            let entry = Entry::app(UnsafeBytes::from(bs.to_vec()).into()).unwrap();
             let hash = api.create(CreateInput::new(
                 InlineZomeSet::get_entry_location(&api, EntryDefIndex(2)),
                 EntryVisibility::Public,

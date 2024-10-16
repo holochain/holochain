@@ -86,6 +86,9 @@ wasm_io_types! {
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
+    // DPKI
+    fn get_agent_key_lineage (AgentPubKey) -> Vec<AgentPubKey>;
+
     fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
     fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
@@ -100,6 +103,9 @@ wasm_io_types! {
 
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
+
+    // Check if agent key 2 is of the same lineage as agent key 2.
+    fn is_same_agent ((AgentPubKey, AgentPubKey)) -> bool;
 
     // Retreive a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> zt::record::Record;
@@ -176,10 +182,37 @@ wasm_io_types! {
     // Recipient, Sender, Encrypted data.
     fn x_25519_x_salsa20_poly1305_decrypt(zt::x_salsa20_poly1305::X25519XSalsa20Poly1305Decrypt) -> Option<zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data>;
 
+    // Sender, Recipient, Data.
+    fn ed_25519_x_salsa20_poly1305_encrypt(zt::x_salsa20_poly1305::Ed25519XSalsa20Poly1305Encrypt) -> zt::x_salsa20_poly1305::encrypted_data::XSalsa20Poly1305EncryptedData;
+
+    // Recipient, Sender, Encrypted data.
+    fn ed_25519_x_salsa20_poly1305_decrypt(zt::x_salsa20_poly1305::Ed25519XSalsa20Poly1305Decrypt) -> zt::x_salsa20_poly1305::data::XSalsa20Poly1305Data;
+
     // The zome and agent info are constants specific to the current zome and chain.
     // All the information is provided by core so there is no input value.
     // These are constant for the lifetime of a zome call.
     fn zome_info (()) -> zt::info::ZomeInfo;
+
+    // Create a clone of an existing cell.
+    fn create_clone_cell(zt::clone::CreateCloneCellInput) -> zt::clone::ClonedCell;
+
+    // Disable a clone cell.
+    fn disable_clone_cell(zt::clone::DisableCloneCellInput) -> ();
+
+    // Enable a clone cell.
+    fn enable_clone_cell(zt::clone::EnableCloneCellInput) -> zt::clone::ClonedCell;
+
+    // Delete a clone cell.
+    fn delete_clone_cell(zt::clone::DeleteCloneCellInput) -> ();
+
+    // Close your source chain, indicating that you are migrating to a new DNA
+    fn close_chain(zt::chain::CloseChainInput) -> holo_hash::ActionHash;
+
+    // Open your chain, pointing to the previous DNA
+    fn open_chain(zt::chain::OpenChainInput) -> holo_hash::ActionHash;
+
+    // Get validation receipts for an action
+    fn get_validation_receipts(zt::validate::GetValidationReceiptsInput) -> Vec<zt::validate::ValidationReceiptSet>;
 }
 
 /// Anything that can go wrong while calling a HostFnApi method
@@ -231,6 +264,23 @@ pub enum ZomeCallResponse {
     /// A countersigning session has failed to start.
     CountersigningSession(String),
 }
+
+impl std::fmt::Display for ZomeCallResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+#[cfg(feature = "test_utils")]
+impl ZomeCallResponse {
+    pub fn unwrap(self) -> ExternIO {
+        match self {
+            ZomeCallResponse::Ok(output) => output,
+            _ => panic!("Attempted to unwrap a non-Ok ZomeCallResponse"),
+        }
+    }
+}
+
 /// Zome calls need to be signed regardless of how they are called.
 /// This defines exactly what needs to be signed.
 #[derive(Serialize, Deserialize, Debug, Clone)]

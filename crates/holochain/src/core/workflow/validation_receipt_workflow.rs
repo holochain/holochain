@@ -21,7 +21,10 @@ mod tests;
 #[cfg(test)]
 mod unit_tests;
 
-#[instrument(skip(vault, network, keystore, apply_block))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(vault, network, keystore, apply_block))
+)]
 /// Send validation receipts to their authors in serial and without waiting for responses.
 pub async fn validation_receipt_workflow<B>(
     dna_hash: Arc<DnaHash>,
@@ -188,6 +191,7 @@ where
     Ok(())
 }
 
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 async fn pending_receipts(
     vault: &DbRead<DbKindDht>,
     validators: Vec<AgentPubKey>,

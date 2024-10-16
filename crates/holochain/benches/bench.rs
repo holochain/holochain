@@ -5,7 +5,6 @@ use criterion::Criterion;
 use criterion::Throughput;
 use hdk::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
-use holochain::core::ribosome::RibosomeT;
 use holochain::core::ribosome::ZomeCallInvocation;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;
@@ -27,7 +26,7 @@ static REAL_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::real_ribosome::RealR
     Lazy::new(|| {
         Mutex::new(
             holochain::fixt::RealRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![
-                TestWasm::Bench.into(),
+                TestWasm::Bench,
             ]))
             .next()
             .unwrap(),
@@ -59,10 +58,10 @@ static HOST_ACCESS_FIXTURATOR: Lazy<
 pub fn wasm_call_n(c: &mut Criterion) {
     let mut group = c.benchmark_group("wasm_call_n");
 
-    for n in vec![
+    for n in [
         1,         // 1 byte
-        1_000,     // 1 kb
-        1_000_000, // 1 mb
+        1_000,     // 1 kB
+        1_000_000, // 1 MB
     ] {
         group.throughput(Throughput::Bytes(n as _));
 
@@ -77,7 +76,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
                 let i = ZomeCallInvocation {
                     cell_id: CELL_ID.lock().unwrap().clone(),
                     zome: zome.clone(),
-                    cap_secret: Some(CAP.lock().unwrap().clone()),
+                    cap_secret: Some(*CAP.lock().unwrap()),
                     fn_name: "echo_bytes".into(),
                     payload: ExternIO::encode(&bytes).unwrap(),
                     provenance: AGENT_KEY.lock().unwrap().clone(),
@@ -85,12 +84,9 @@ pub fn wasm_call_n(c: &mut Criterion) {
                     nonce: [0; 32].into(),
                     signature: [0; 64].into(),
                 };
-                REAL_RIBOSOME
-                    .lock()
-                    .unwrap()
-                    .clone()
-                    .maybe_call(ha.clone().into(), &i, &zome, &i.fn_name)
-                    .unwrap();
+                let ribosome = REAL_RIBOSOME.lock().unwrap().clone();
+                let fut = ribosome.maybe_call(ha.clone().into(), &i, zome, i.fn_name.clone());
+                futures::executor::block_on(fut).unwrap();
             });
         });
     }

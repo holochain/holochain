@@ -4,8 +4,8 @@
 //! A Conductor is a dynamically changing group of [Cell]s.
 //!
 //! A Conductor can be managed:
-//! - externally, via an [`AppInterfaceApi`](super::api::AppInterfaceApi)
-//! - from within a [`Cell`](super::Cell), via [`CellConductorApi`](super::api::CellConductorApi)
+//! - externally, via an [`AppInterfaceApi`]
+//! - from within a [`Cell`], via [`CellConductorApi`](super::api::CellConductorApi)
 //!
 //! In normal use cases, a single Holochain user runs a single Conductor in a single process.
 //! However, there's no reason we can't have multiple Conductors in a single process, simulating multiple
@@ -15,9 +15,11 @@
 //! async fn async_main () {
 //! use holochain_state::test_utils::test_db_dir;
 //! use holochain::conductor::{Conductor, ConductorBuilder};
+//! use holochain::conductor::ConductorHandle;
+//!
 //! let env_dir = test_db_dir();
-//! let conductor: Conductor = ConductorBuilder::new()
-//!    .test(env_dir.path(), &[])
+//! let conductor: ConductorHandle = ConductorBuilder::new()
+//!    .test(&[])
 //!    .await
 //!    .unwrap();
 //!
@@ -27,67 +29,43 @@
 //! assert_eq!(conductor.list_dnas(), vec![]);
 //! conductor.shutdown();
 //!
-//! # }
+//! }
 //! ```
-//!
+
+/// Name of the wasm cache folder within the data root directory.
+pub const WASM_CACHE: &str = "wasm-cache";
 
 pub use self::share::RwShare;
-use super::api::RealAppInterfaceApi;
-use super::api::ZomeCall;
-use super::config::AdminInterfaceConfig;
-use super::config::InterfaceDriver;
-use super::entry_def_store::get_entry_defs;
-use super::error::ConductorError;
-use super::interface::error::InterfaceResult;
-use super::interface::websocket::spawn_admin_interface_tasks;
-use super::interface::websocket::spawn_app_interface_task;
-use super::interface::websocket::spawn_websocket_listener;
-use super::interface::websocket::SIGNAL_BUFFER_SIZE;
-use super::interface::AppInterfaceRuntime;
-use super::interface::SignalBroadcaster;
-use super::manager::TaskManagerResult;
-use super::p2p_agent_store;
-use super::p2p_agent_store::P2pBatch;
-use super::p2p_agent_store::*;
-use super::ribosome_store::RibosomeStore;
-use super::space::Space;
-use super::space::Spaces;
-use super::state::AppInterfaceConfig;
-use super::state::AppInterfaceId;
-use super::state::ConductorState;
-use super::CellError;
-use super::{api::RealAdminInterfaceApi, manager::TaskManagerClient};
-use crate::conductor::cell::Cell;
-use crate::conductor::config::ConductorConfig;
-use crate::conductor::error::ConductorResult;
-use crate::conductor::metrics::create_p2p_event_duration_metric;
-use crate::conductor::p2p_agent_store::get_single_agent_info;
-use crate::conductor::p2p_agent_store::list_all_agent_info;
-use crate::conductor::p2p_agent_store::query_peer_density;
-use crate::core::queue_consumer::InitialQueueTriggers;
-use crate::core::queue_consumer::QueueConsumerMap;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
-use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
-use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
-use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::ZomeCallResult;
-use crate::{
-    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
-};
-pub use builder::*;
+use super::api::error::ConductorApiError;
+
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+use std::time::Instant;
+
 use futures::future;
 use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
+use holochain_wasmer_host::module::ModuleCache;
+use itertools::Itertools;
+use rusqlite::Transaction;
+use tokio::sync::mpsc::error::SendError;
+use tokio::task::JoinHandle;
+use tracing::*;
+
+pub use agent_key_operations::RevokeAgentKeyForAppResult;
+pub use builder::*;
 use holo_hash::DnaHash;
-use holochain_conductor_api::conductor::KeystoreConfig;
+use holochain_conductor_api::conductor::{DpkiConfig, KeystoreConfig};
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
-use holochain_conductor_api::ClonedCell;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
+pub use holochain_conductor_services::*;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
 use holochain_keystore::MetaLairClient;
@@ -101,49 +79,79 @@ use holochain_state::nonce::witness_nonce;
 use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
-use holochain_wasmer_host::module::ModuleCache;
-use itertools::Itertools;
+pub use holochain_types::share;
+use holochain_zome_types::prelude::{ClonedCell, Signature, Timestamp};
 use kitsune_p2p::agent_store::AgentInfoSigned;
-use parking_lot::{Mutex, RwLock};
-use rusqlite::Transaction;
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
-use std::time::Instant;
-use tokio::sync::mpsc::error::SendError;
-use tokio::task::JoinHandle;
-use tracing::*;
 
+use crate::conductor::cell::Cell;
+use crate::conductor::conductor::app_auth_token_store::AppAuthTokenStore;
+use crate::conductor::conductor::app_broadcast::AppBroadcast;
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::error::ConductorResult;
+use crate::conductor::metrics::create_p2p_event_duration_metric;
+use crate::conductor::p2p_agent_store::get_single_agent_info;
+use crate::conductor::p2p_agent_store::list_all_agent_info;
+use crate::conductor::p2p_agent_store::query_peer_density;
+use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::queue_consumer::QueueConsumerMap;
 #[cfg(any(test, feature = "test_utils"))]
 use crate::core::queue_consumer::QueueTriggers;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
+use crate::core::ribosome::real_ribosome::ModuleCacheLock;
+use crate::core::ribosome::RibosomeT;
+use crate::core::workflow::ZomeCallResult;
+use crate::{
+    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
+};
 
-pub use holochain_types::share;
+use super::api::AppInterfaceApi;
+use super::api::ZomeCall;
+use super::config::AdminInterfaceConfig;
+use super::config::InterfaceDriver;
+use super::entry_def_store::get_entry_defs;
+use super::error::ConductorError;
+use super::interface::error::InterfaceResult;
+use super::interface::websocket::spawn_admin_interface_tasks;
+use super::interface::websocket::spawn_app_interface_task;
+use super::interface::websocket::spawn_websocket_listener;
+use super::manager::TaskManagerResult;
+use super::p2p_agent_store;
+use super::p2p_agent_store::P2pBatch;
+use super::p2p_agent_store::*;
+use super::ribosome_store::RibosomeStore;
+use super::space::Space;
+use super::space::Spaces;
+use super::state::AppInterfaceConfig;
+use super::state::AppInterfaceId;
+use super::state::ConductorState;
+use super::CellError;
+use super::{api::AdminInterfaceApi, manager::TaskManagerClient};
 
 mod builder;
 
-pub use builder::*;
-
 mod chc;
 
-pub use chc::*;
-
-pub use holochain_conductor_services::*;
-
-pub use accessor_impls::*;
-pub use app_impls::*;
-pub use app_status_impls::*;
-pub use cell_impls::*;
-pub use clone_cell_impls::*;
-pub use dna_impls::*;
-pub use interface_impls::*;
-pub use misc_impls::*;
-pub use network_impls::*;
-pub use scheduler_impls::*;
-pub use startup_shutdown_impls::*;
-pub use state_impls::*;
-
 mod graft_records_onto_source_chain;
+
+mod app_auth_token_store;
+
+/// Operations to manipulate agent keys.
+///
+/// Agent keys are handled in 2 places in Holochain, on the source chain of a cell and in the
+/// Deepkey service, should it be installed. Operations to manipulate these keys include key
+/// revocation and key update.
+///
+/// When revoking a key, it becomes invalid and the source chain can no longer be written to.
+/// Clone cells can not be created any more either. This source chain state if final and can not
+/// be reverted or changed.
+mod agent_key_operations;
+
+pub(crate) mod app_broadcast;
+
+#[cfg(test)]
+pub mod tests;
 
 /// How long we should attempt to achieve a "network join" when first activating a cell,
 /// before moving on and letting the network health activity go on in the background.
@@ -229,9 +237,6 @@ pub struct Conductor {
     /// the dynamically allocated port later.
     admin_websocket_ports: RwShare<Vec<u16>>,
 
-    /// Collection app interface data, keyed by id
-    app_interfaces: RwShare<HashMap<AppInterfaceId, AppInterfaceRuntime>>,
-
     /// The interface to the task manager
     task_manager: TaskManagerClient,
 
@@ -253,11 +258,16 @@ pub struct Conductor {
 
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 
-    pub(crate) services: RwShare<Option<ConductorServices>>,
+    pub(crate) running_services: RwShare<ConductorServices>,
 
     /// File system and in-memory cache for wasmer modules.
     // Used in ribosomes but kept here as a single instance.
-    pub(crate) wasmer_module_cache: Arc<RwLock<ModuleCache>>,
+    pub(crate) wasmer_module_cache: Arc<ModuleCacheLock>,
+
+    app_auth_token_store: RwShare<AppAuthTokenStore>,
+
+    /// Container to connect app signals to app interfaces, by installed app id.
+    app_broadcast: AppBroadcast,
 }
 
 impl Conductor {
@@ -269,9 +279,6 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
-    use std::ops::Deref;
-
-    use kitsune_p2p_types::box_fut_plain;
 
     use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
 
@@ -292,17 +299,21 @@ mod startup_shutdown_impls {
             outcome_sender: OutcomeSender,
         ) -> Self {
             let tracing_scope = config.tracing_scope().unwrap_or_default();
-            let maybe_data_root_path = config
-                .data_root_path
-                .clone()
-                .map(|path| PathBuf::from(path.deref()));
+            let maybe_data_root_path = config.data_root_path.clone().map(|path| (*path).clone());
+
+            if let Some(path) = &maybe_data_root_path {
+                let mut path = path.clone();
+                path.push(WASM_CACHE);
+
+                // best effort to ensure the cache dir exists if configured
+                let _ = std::fs::create_dir_all(&path);
+            }
 
             Self {
                 spaces,
                 running_cells: RwShare::new(HashMap::new()),
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
-                app_interfaces: RwShare::new(HashMap::new()),
                 task_manager: TaskManagerClient::new(outcome_sender, tracing_scope),
                 // Must be initialized later, since it requires an Arc<Conductor>
                 outcomes_task: RwShare::new(None),
@@ -312,8 +323,12 @@ mod startup_shutdown_impls {
                 keystore,
                 holochain_p2p,
                 post_commit,
-                services: RwShare::new(None),
-                wasmer_module_cache: Arc::new(RwLock::new(ModuleCache::new(maybe_data_root_path))),
+                running_services: RwShare::new(ConductorServices::default()),
+                wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
+                    maybe_data_root_path.map(|p| p.join(WASM_CACHE)),
+                ))),
+                app_auth_token_store: RwShare::default(),
+                app_broadcast: AppBroadcast::default(),
             }
         }
 
@@ -353,12 +368,15 @@ mod startup_shutdown_impls {
             })
         }
 
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope=self.config.network.tracing_scope)))]
         pub(crate) async fn initialize_conductor(
             self: Arc<Self>,
             outcome_rx: OutcomeReceiver,
             admin_configs: Vec<AdminInterfaceConfig>,
         ) -> ConductorResult<CellStartupErrors> {
             self.load_dnas().await?;
+
+            info!("Conductor startup: DNAs loaded.");
 
             // Start the task manager
             self.outcomes_task.share_mut(|lock| {
@@ -369,29 +387,23 @@ mod startup_shutdown_impls {
                 *lock = Some(task);
             });
 
-            self.services.share_mut(|services| {
-                let mut dpki = MockDpkiService::new();
-                dpki.expect_is_key_valid()
-                    .returning(|_, _| box_fut_plain(Ok(true)));
-                dpki.expect_key_mutation()
-                    .returning(|_, _| box_fut_plain(Ok(())));
-
-                let app_store = MockAppStoreService::new();
-
-                *services = Some(ConductorServices {
-                    dpki: Arc::new(dpki),
-                    app_store: Arc::new(app_store),
-                });
-            });
-
+            self.clone().initialize_services().await?;
             self.clone().add_admin_interfaces(admin_configs).await?;
+
+            info!("Conductor startup: admin interface(s) added.");
+
             self.clone().startup_app_interfaces().await?;
+
+            info!("Conductor startup: app interfaces started.");
 
             // We don't care what fx are returned here, since all cells need to
             // be spun up
             let _ = self.start_paused_apps().await?;
+            let res = self.process_app_status_fx(AppStatusFx::SpinUp, None).await;
 
-            self.process_app_status_fx(AppStatusFx::SpinUp, None).await
+            info!("Conductor startup: apps started.");
+
+            res
         }
     }
 }
@@ -399,15 +411,18 @@ mod startup_shutdown_impls {
 /// Methods related to conductor interfaces
 mod interface_impls {
     use super::*;
+    use holochain_conductor_api::AppInterfaceInfo;
+    use holochain_types::websocket::AllowedOrigins;
 
     impl Conductor {
         /// Spawn all admin interface tasks, register them with the TaskManager,
         /// and modify the conductor accordingly, based on the config passed in
-        pub(crate) async fn add_admin_interfaces(
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        pub async fn add_admin_interfaces(
             self: Arc<Self>,
             configs: Vec<AdminInterfaceConfig>,
-        ) -> ConductorResult<()> {
-            let admin_api = RealAdminInterfaceApi::new(self.clone());
+        ) -> ConductorResult<Vec<u16>> {
+            let admin_api = AdminInterfaceApi::new(self.clone());
             let tm = self.task_manager();
 
             // Closure to process each admin config item
@@ -416,13 +431,14 @@ mod interface_impls {
                 let tm = tm.clone();
                 async move {
                     match driver {
-                        InterfaceDriver::Websocket { port } => {
-                            let (listener_handle, listener) =
-                                spawn_websocket_listener(port).await?;
-                            let port = listener_handle.local_addr().port().unwrap_or(port);
+                        InterfaceDriver::Websocket {
+                            port,
+                            allowed_origins,
+                        } => {
+                            let listener = spawn_websocket_listener(port, allowed_origins).await?;
+                            let port = listener.local_addrs()?[0].port();
                             spawn_admin_interface_tasks(
                                 tm.clone(),
-                                listener_handle,
                                 listener,
                                 admin_api.clone(),
                                 port,
@@ -444,56 +460,54 @@ mod interface_impls {
             // Exit if the admin interfaces fail to be created
             let ports = ports.map_err(Box::new)?;
 
-            for p in ports {
-                self.add_admin_port(p);
+            for p in &ports {
+                self.add_admin_port(*p);
             }
-            Ok(())
+
+            Ok(ports)
         }
 
         /// Spawn a new app interface task, register it with the TaskManager,
-        /// and modify the conductor accordingly, based on the config passed in
-        /// which is just a networking port number (or 0 to auto-select one).
+        /// and modify the conductor accordingly, based on the config passed in.
+        ///
         /// Returns the given or auto-chosen port number if giving an Ok Result
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn add_app_interface(
             self: Arc<Self>,
             port: either::Either<u16, AppInterfaceId>,
+            allowed_origins: AllowedOrigins,
+            installed_app_id: Option<InstalledAppId>,
         ) -> ConductorResult<u16> {
             let interface_id = match port {
                 either::Either::Left(port) => AppInterfaceId::new(port),
                 either::Either::Right(id) => id,
             };
             let port = interface_id.port();
-            tracing::debug!("Attaching interface {}", port);
-            let app_api = RealAppInterfaceApi::new(self.clone());
-            // This receiver is thrown away because we can produce infinite new
-            // receivers from the Sender
-            let (signal_tx, _r) = tokio::sync::broadcast::channel(SIGNAL_BUFFER_SIZE);
+            debug!("Attaching interface {}", port);
+            let app_api = AppInterfaceApi::new(self.clone());
 
             let tm = self.task_manager();
 
             // TODO: RELIABILITY: Handle this task by restarting it if it fails and log the error
-            let port = spawn_app_interface_task(tm.clone(), port, app_api, signal_tx.clone())
-                .await
-                .map_err(Box::new)?;
-            let interface = AppInterfaceRuntime::Websocket { signal_tx };
+            let port = spawn_app_interface_task(
+                tm.clone(),
+                port,
+                allowed_origins.clone(),
+                installed_app_id.clone(),
+                app_api,
+                self.app_broadcast.clone(),
+            )
+            .await
+            .map_err(Box::new)?;
 
-            self.app_interfaces.share_mut(|app_interfaces| {
-                if app_interfaces.contains_key(&interface_id) {
-                    return Err(ConductorError::AppInterfaceIdCollision(
-                        interface_id.clone(),
-                    ));
-                }
-
-                app_interfaces.insert(interface_id.clone(), interface);
-                Ok(())
-            })?;
-            let config = AppInterfaceConfig::websocket(port);
+            let config = AppInterfaceConfig::websocket(port, allowed_origins, installed_app_id);
             self.update_state(|mut state| {
                 state.app_interfaces.insert(interface_id, config);
+
                 Ok(state)
             })
             .await?;
-            tracing::debug!("App interface added at port: {}", port);
+            debug!("App interface added at port: {}", port);
             Ok(port)
         }
 
@@ -504,23 +518,36 @@ mod interface_impls {
         }
 
         /// Give a list of networking ports taken up as running app interface tasks
-        pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<u16>> {
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        pub async fn list_app_interfaces(&self) -> ConductorResult<Vec<AppInterfaceInfo>> {
             Ok(self
                 .get_state()
                 .await?
                 .app_interfaces
                 .values()
-                .map(|config| config.driver.port())
+                .map(|config| AppInterfaceInfo {
+                    port: config.driver.port(),
+                    allowed_origins: config.driver.allowed_origins().clone(),
+                    installed_app_id: config.installed_app_id.clone(),
+                })
                 .collect())
         }
 
         /// Start all app interfaces currently in state.
         /// This should only be run at conductor initialization.
         #[allow(irrefutable_let_patterns)]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn startup_app_interfaces(self: Arc<Self>) -> ConductorResult<()> {
-            for id in self.get_state().await?.app_interfaces.keys().cloned() {
-                tracing::debug!("Starting up app interface: {:?}", id);
-                let _ = self.clone().add_app_interface(either::Right(id)).await?;
+            for (id, config) in &self.get_state().await?.app_interfaces {
+                debug!("Starting up app interface: {:?}", id);
+                let _ = self
+                    .clone()
+                    .add_app_interface(
+                        either::Right(id.clone()),
+                        config.driver.allowed_origins().clone(),
+                        config.installed_app_id.clone(),
+                    )
+                    .await?;
             }
             Ok(())
         }
@@ -529,27 +556,33 @@ mod interface_impls {
 
 /// DNA-related methods
 mod dna_impls {
-    use std::borrow::BorrowMut;
-
     use super::*;
 
     impl Conductor {
         /// Get the list of hashes of installed Dnas in this Conductor
         pub fn list_dnas(&self) -> Vec<DnaHash> {
-            self.ribosome_store().share_ref(|ds| ds.list())
+            let dpki_dna_hash = self
+                .running_services()
+                .dpki
+                .map(|dpki| dpki.cell_id.dna_hash().clone());
+            let mut hashes = self.ribosome_store().share_ref(|ds| ds.list());
+            if let Some(dpki_dna_hash) = dpki_dna_hash {
+                hashes.retain(|h| *h != dpki_dna_hash);
+            }
+            hashes
         }
 
-        /// Get a [`DnaDef`](holochain_types::prelude::DnaDef) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
+        /// Get a [`DnaDef`] from the [`RibosomeStore`]
         pub fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
             self.ribosome_store().share_ref(|ds| ds.get_dna_def(hash))
         }
 
-        /// Get a [`DnaFile`](holochain_types::dna::DnaFile) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
+        /// Get a [`DnaFile`] from the [`RibosomeStore`]
         pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
             self.ribosome_store().share_ref(|ds| ds.get_dna_file(hash))
         }
 
-        /// Get an [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
+        /// Get an [`EntryDef`] from the [`EntryDefBufferKey`]
         pub fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
             self.ribosome_store().share_ref(|ds| ds.get_entry_def(key))
         }
@@ -655,7 +688,8 @@ mod dna_impls {
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
-                let ribosome = RealRibosome::new(dna_file, self.wasmer_module_cache.clone())?;
+                let ribosome =
+                    RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
             let dnas = futures::future::try_join_all(wasms).await?;
@@ -693,6 +727,7 @@ mod dna_impls {
         }
 
         /// Restart every paused app
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn start_paused_apps(&self) -> ConductorResult<AppStatusFx> {
             let (_, delta) = self
                 .update_state_prime(|mut state| {
@@ -727,6 +762,7 @@ mod dna_impls {
             self.put_wasm_code(dna_def, code, zome_defs).await
         }
 
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn put_wasm_code(
             &self,
             dna: DnaDefHashed,
@@ -762,6 +798,7 @@ mod dna_impls {
             Ok(zome_defs)
         }
 
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn load_dnas(&self) -> ConductorResult<()> {
             let (ribosomes, entry_defs) = self.load_wasms_into_dna_files().await?;
             self.ribosome_store().share_mut(|ds| {
@@ -771,16 +808,22 @@ mod dna_impls {
             Ok(())
         }
 
-        /// Install a [`DnaFile`](holochain_types::dna::DnaFile) in this Conductor
+        /// Install a [`DnaFile`] in this Conductor
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
             if self.get_ribosome(dna.dna_hash()).is_ok() {
                 // ribosome for dna is already registered in store
                 return Ok(());
             }
-            let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone())?;
+
+            let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone()).await?;
+
             let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
+
             self.register_dna_entry_defs(entry_defs);
+
             self.add_ribosome_to_store(ribosome);
+
             Ok(())
         }
     }
@@ -788,15 +831,20 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use holochain_conductor_api::{DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo};
+    use std::time::Duration;
+
+    use futures::future::join_all;
+    use rusqlite::params;
+
+    use holochain_conductor_api::{
+        CellInfo, DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo,
+    };
     use holochain_p2p::HolochainP2pSender;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
     use kitsune_p2p::KitsuneAgent;
     use kitsune_p2p::KitsuneBinType;
-    use rusqlite::params;
-    use std::time::Duration;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -890,6 +938,7 @@ mod network_impls {
 
         pub(crate) async fn network_info(
             &self,
+            installed_app_id: &InstalledAppId,
             payload: &NetworkInfoRequestPayload,
         ) -> ConductorResult<Vec<NetworkInfo>> {
             use holochain_sqlite::sql::sql_cell::SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP;
@@ -899,6 +948,27 @@ mod network_impls {
                 dnas,
                 last_time_queried,
             } = payload;
+
+            let app_info = self
+                .get_app_info(installed_app_id)
+                .await?
+                .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
+
+            if agent_pub_key != &app_info.agent_pub_key
+                && !app_info
+                    .cell_info
+                    .values()
+                    .flatten()
+                    .any(|cell_info| match cell_info {
+                        CellInfo::Provisioned(cell) => cell.cell_id.agent_pubkey() == agent_pub_key,
+                        _ => false,
+                    })
+            {
+                return Err(ConductorError::AppAccessError(
+                    installed_app_id.clone(),
+                    Box::new(agent_pub_key.clone()),
+                ));
+            }
 
             futures::future::join_all(dnas.iter().map(|dna| async move {
                 let diagnostics = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
@@ -923,12 +993,12 @@ mod network_impls {
                             )? {
                                 None => (0.0, 0),
                                 Some(agent) => {
-                                    let arc_size = agent.storage_arc.coverage();
+                                    let arc_size = agent.storage_arc().coverage();
                                     let agents_in_arc = txn.p2p_gossip_query_agents(
                                         space.clone(),
                                         u64::MIN,
                                         u64::MAX,
-                                        agent.storage_arc.inner().into(),
+                                        agent.storage_arc().inner().into(),
                                     )?;
                                     let number_of_agents_in_arc = agents_in_arc.len();
                                     let total_network_peers = if number_of_agents_in_arc == 0 {
@@ -1015,23 +1085,23 @@ mod network_impls {
             .collect::<Result<Vec<_>, _>>()
         }
 
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn storage_info(&self) -> ConductorResult<StorageInfo> {
             let state = self.get_state().await?;
 
             let all_dna: HashMap<DnaHash, Vec<InstalledAppId>> = HashMap::new();
-            let all_dna =
-                state
-                    .installed_apps()
-                    .iter()
-                    .fold(all_dna, |mut acc, (installed_app_id, app)| {
-                        for dna_hash in app.all_cells().map(|cell_id| cell_id.dna_hash()) {
-                            acc.entry(dna_hash.clone())
-                                .or_default()
-                                .push(installed_app_id.clone());
-                        }
+            let all_dna = state.installed_apps_and_services().iter().fold(
+                all_dna,
+                |mut acc, (installed_app_id, app)| {
+                    for cell_id in app.all_cells() {
+                        acc.entry(cell_id.dna_hash().clone())
+                            .or_default()
+                            .push(installed_app_id.clone());
+                    }
 
-                        acc
-                    });
+                    acc
+                },
+            );
 
             let app_data_blobs =
                 futures::future::join_all(all_dna.iter().map(|(dna_hash, used_by)| async {
@@ -1051,19 +1121,31 @@ mod network_impls {
             dna_hash: &DnaHash,
             used_by: &Vec<InstalledAppId>,
         ) -> ConductorResult<StorageBlob> {
-            let authored_db = self.spaces.authored_db(dna_hash)?;
+            let authored_dbs = self.spaces.get_all_authored_dbs(dna_hash)?;
             let dht_db = self.spaces.dht_db(dna_hash)?;
             let cache_db = self.spaces.cache(dna_hash)?;
 
             Ok(StorageBlob::Dna(DnaStorageInfo {
-                authored_data_size_on_disk: authored_db
-                    .read_async(get_size_on_disk)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
-                authored_data_size: authored_db
-                    .read_async(get_used_size)
-                    .map_err(ConductorError::DatabaseError)
-                    .await?,
+                authored_data_size_on_disk: join_all(
+                    authored_dbs
+                        .iter()
+                        .map(|db| db.read_async(get_size_on_disk)),
+                )
+                .await
+                .into_iter()
+                .map(|r| r.map_err(ConductorError::DatabaseError))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .sum(),
+                authored_data_size: join_all(
+                    authored_dbs.iter().map(|db| db.read_async(get_used_size)),
+                )
+                .await
+                .into_iter()
+                .map(|r| r.map_err(ConductorError::DatabaseError))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .sum(),
                 dht_data_size_on_disk: dht_db
                     .read_async(get_size_on_disk)
                     .map_err(ConductorError::DatabaseError)
@@ -1084,7 +1166,7 @@ mod network_impls {
             }))
         }
 
-        #[instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn dispatch_holochain_p2p_event(
             &self,
             event: holochain_p2p::event::HolochainP2pEvent,
@@ -1318,7 +1400,7 @@ mod network_impls {
             let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
             let now = Timestamp::now();
             let (nonce, expires_at) =
-                holochain_nonce::fresh_nonce(now).map_err(|e| ConductorApiError::Other(e))?;
+                holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
             let call_unsigned = ZomeCallUnsigned {
                 cell_id,
                 zome_name: zome_name.into(),
@@ -1341,84 +1423,136 @@ mod network_impls {
     }
 }
 
+/// Flags for [`Conductor::install_app_common`]
+#[derive(Default)]
+pub struct InstallAppCommonFlags {
+    /// From [`AppManifestV1::defer_memproofs`]
+    pub defer_memproofs: bool,
+    /// From [`InstallAppPayload::ignore_genesis_failure`]
+    pub ignore_genesis_failure: bool,
+    /// From [`InstallAppPayload::allow_throwaway_random_agent_key`]
+    pub allow_throwaway_random_agent_key: bool,
+}
+
 /// Methods related to app installation and management
 mod app_impls {
+    use holochain_types::deepkey_roundtrip_backward;
+    use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairEntryInfo;
+
+    use crate::conductor::state::is_app;
+
     use super::*;
 
     impl Conductor {
-        #[cfg(feature = "test_utils")]
-        // FIXME: can rewrite now in terms of `get_install_app_payload_from_dnas`
-        pub(crate) async fn install_app_legacy(
+        /// Install an app from minimal elements, without needing construct a whole AppBundle.
+        /// (This function constructs a bundle under the hood.)
+        /// This is just a convenience for testing.
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
             installed_app_id: InstalledAppId,
-            cell_data: Vec<(InstalledCell, Option<MembraneProof>)>,
-        ) -> ConductorResult<()> {
-            crate::conductor::conductor::genesis_cells(
-                self.clone(),
-                cell_data
-                    .iter()
-                    .map(|(c, p)| (c.as_id().clone(), p.clone()))
-                    .collect(),
-            )
-            .await?;
+            agent: Option<AgentPubKey>,
+            data: &[(impl DnaWithRole, Option<MembraneProof>)],
+            network_seed: Option<NetworkSeed>,
+        ) -> ConductorResult<AgentPubKey> {
+            let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
+            let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false, network_seed);
 
-            let cell_data = cell_data.into_iter().map(|(c, _)| c);
-            let app = InstalledAppCommon::new_legacy(installed_app_id, cell_data)?;
+            let (dnas_to_register, role_assignments): (Vec<_>, Vec<_>) = data
+                .iter()
+                .map(|(dr, mp)| {
+                    let dna = dr.dna().clone();
+                    let dna_hash = dna.dna_hash().clone();
+                    let dnas_to_register = (dna, mp.clone());
+                    let role_assignments =
+                        (dr.role(), AppRolePrimary::new(dna_hash, true, 255).into());
+                    (dnas_to_register, role_assignments)
+                })
+                .unzip();
 
-            // Update the db
-            let _ = self.add_disabled_app_to_db(app).await?;
-
-            Ok(())
-        }
-
-        /// Install DNAs and set up Cells as specified by an AppBundle
-        pub async fn install_app_bundle(
-            self: Arc<Self>,
-            payload: InstallAppPayload,
-        ) -> ConductorResult<StoppedApp> {
-            #[cfg(feature = "chc")]
-            let ignore_genesis_failure = payload.ignore_genesis_failure;
-            #[cfg(not(feature = "chc"))]
-            let ignore_genesis_failure = false;
-
-            let InstallAppPayload {
-                source,
-                agent_key,
-                installed_app_id,
-                membrane_proofs,
-                network_seed,
-                ..
-            } = payload;
-
-            let bundle = {
-                let original_bundle = source.resolve().await?;
-                if let Some(network_seed) = network_seed {
-                    let mut manifest = original_bundle.manifest().to_owned();
-                    manifest.set_network_seed(network_seed);
-                    AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
-                } else {
-                    original_bundle
-                }
+            let ops = AppRoleResolution {
+                dnas_to_register,
+                role_assignments,
             };
 
-            let manifest = bundle.manifest().clone();
-
-            let installed_app_id =
-                installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
-
-            let local_dnas = self
-                .ribosome_store()
-                .share_ref(|store| bundle.get_all_dnas_from_store(store));
-            let ops = bundle
-                .resolve_cells(&local_dnas, agent_key.clone(), membrane_proofs)
+            let app = self
+                .install_app_common(
+                    installed_app_id,
+                    manifest,
+                    agent.clone(),
+                    ops,
+                    InstallAppCommonFlags {
+                        defer_memproofs: false,
+                        ignore_genesis_failure: false,
+                        allow_throwaway_random_agent_key: true,
+                    },
+                )
                 .await?;
 
-            let cells_to_create = ops.cells_to_create();
+            Ok(app.agent_key().clone())
+        }
+
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        async fn install_app_common(
+            self: Arc<Self>,
+            installed_app_id: InstalledAppId,
+            manifest: AppManifest,
+            agent_key: Option<AgentPubKey>,
+            ops: AppRoleResolution,
+            flags: InstallAppCommonFlags,
+        ) -> ConductorResult<InstalledApp> {
+            let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
+                if let Some(agent_key) = agent_key {
+                    // Key doesn't need to be generated: it will be registered later
+                    (agent_key, None)
+                } else if let Some(lair_tag) = self.get_config().device_seed_lair_tag.clone() {
+                    // no agent key given, we must derive a new one
+
+                    let (_, app_index) = self
+                        .update_state_prime(|mut state| {
+                            let index = state.derived_agent_key_count;
+                            state.derived_agent_key_count += 1;
+                            Ok((state, index))
+                        })
+                        .await?;
+
+                    // register a new key derivation for this app
+                    let derivation_details = DerivationDetails {
+                        app_index,
+                        key_index: 0,
+                    };
+
+                    let derivation_path = derivation_details.to_derivation_path();
+                    let derivation_bytes = derivation_path
+                        .iter()
+                        .flat_map(|c| c.to_be_bytes())
+                        .collect();
+
+                    let seed = self
+                        .derive_from_device_seed_and_create_if_allowed(lair_tag, derivation_path)
+                        .await?;
+
+                    let derivation = DerivationDetailsInput {
+                        app_index: derivation_details.app_index,
+                        key_index: derivation_details.key_index,
+                        derivation_seed: seed.clone(),
+                        derivation_bytes,
+                    };
+
+                    (AgentPubKey::from_raw_32(seed), Some(derivation))
+                } else if flags.allow_throwaway_random_agent_key {
+                    // no agent key given, we generate a random throwaway one
+                    (self.keystore.new_sign_keypair_random().await?, None)
+                } else {
+                    return Err(ConductorError::other("Unable to install app. If `device_seed_lair_tag` is not specified in config, an agent key must be provided when installing an app."));
+                };
+
+            let cells_to_create = ops.cells_to_create(agent_key.clone());
 
             // check if cells_to_create contains a cell identical to an existing one
             let state = self.get_state().await?;
             let all_cells: HashSet<_> = state
-                .installed_apps()
+                .installed_apps_and_services()
                 .values()
                 .flat_map(|app| app.all_cells())
                 .collect();
@@ -1440,51 +1574,226 @@ mod app_impls {
                 .map(|(cell_id, _)| cell_id.clone())
                 .collect();
 
-            let genesis_result =
-                crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
-
-            if genesis_result.is_ok() || ignore_genesis_failure {
+            let app_result = if flags.defer_memproofs {
                 let roles = ops.role_assignments;
-                let app = InstalledAppCommon::new(installed_app_id, agent_key, roles, manifest)?;
+                let app = InstalledAppCommon::new(
+                    installed_app_id.clone(),
+                    agent_key.clone(),
+                    roles,
+                    manifest,
+                    Timestamp::now(),
+                )?;
 
-                // Update the db
-                let stopped_app = self.add_disabled_app_to_db(app).await?;
-
-                // Return the result, which be may an error if no_rollback was specified
-                genesis_result.map(|()| stopped_app)
-            } else if let Err(err) = genesis_result {
-                // Rollback created cells on error
-                self.remove_cells(&cell_ids).await;
-                Err(err)
+                let (_, app) = self
+                    .update_state_prime(move |mut state| {
+                        let app = state.add_app_awaiting_memproofs(app)?;
+                        Ok((state, app))
+                    })
+                    .await?;
+                Ok(app)
             } else {
-                unreachable!()
+                let genesis_result =
+                    crate::conductor::conductor::genesis_cells(self.clone(), cells_to_create).await;
+
+                if genesis_result.is_ok() || flags.ignore_genesis_failure {
+                    let roles = ops.role_assignments;
+                    let app = InstalledAppCommon::new(
+                        installed_app_id.clone(),
+                        agent_key.clone(),
+                        roles,
+                        manifest,
+                        Timestamp::now(),
+                    )?;
+
+                    // Update the db
+                    let stopped_app = self.add_disabled_app_to_db(app).await?;
+
+                    // Return the result, which be may be an error if no_rollback was specified
+                    genesis_result.map(|()| stopped_app.into())
+                } else if let Err(err) = genesis_result {
+                    // Rollback created cells on error
+                    self.remove_cells(&cell_ids).await;
+                    Err(err)
+                } else {
+                    unreachable!()
+                }
+            };
+
+            if app_result.is_ok() {
+                // Register initial agent key in DPKI
+                if let Some(dpki) = self.running_services().dpki.clone() {
+                    let dpki_agent = dpki.cell_id.agent_pubkey();
+
+                    // This is the signature Deepkey requires
+                    let signature = agent_key
+                        .sign_raw(&self.keystore, dpki_agent.get_raw_39().into())
+                        .await
+                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
+
+                    let signature = deepkey_roundtrip_backward!(Signature, &signature);
+
+                    let dna_hashes = cell_ids
+                        .iter()
+                        .map(|c| deepkey_roundtrip_backward!(DnaHash, c.dna_hash()))
+                        .collect();
+
+                    let agent_key = deepkey_roundtrip_backward!(AgentPubKey, &agent_key);
+
+                    let input = CreateKeyInput {
+                        key_generation: KeyGeneration {
+                            new_key: agent_key,
+                            new_key_signing_of_author: signature,
+                        },
+                        app_binding: AppBindingInput {
+                            app_name: installed_app_id.clone(),
+                            installed_app_id,
+                            dna_hashes,
+                            metadata: Default::default(), // TODO: pass in necessary metadata
+                        },
+                        derivation_details,
+                        create_only: false,
+                    };
+
+                    dpki.state().await.register_key(input).await?;
+                }
             }
+
+            app_result
         }
 
-        /// Uninstall an app
-        #[tracing::instrument(skip(self))]
+        /// Install DNAs and set up Cells as specified by an AppBundle
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        pub async fn install_app_bundle(
+            self: Arc<Self>,
+            payload: InstallAppPayload,
+        ) -> ConductorResult<InstalledApp> {
+            let InstallAppPayload {
+                source,
+                agent_key,
+                installed_app_id,
+                membrane_proofs,
+                existing_cells,
+                network_seed,
+                ignore_genesis_failure,
+                allow_throwaway_random_agent_key,
+            } = payload;
+
+            let bundle = {
+                let original_bundle = source.resolve().await?;
+                if let Some(network_seed) = network_seed {
+                    let mut manifest = original_bundle.manifest().to_owned();
+                    manifest.set_network_seed(network_seed);
+                    AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
+                } else {
+                    original_bundle
+                }
+            };
+            let manifest = bundle.manifest().clone();
+
+            // Use deferred memproofs only if no memproofs are provided.
+            // If a memproof map is provided, it will override the allow_deferred_memproofs setting,
+            // and the provided memproofs will be used immediately.
+            let defer_memproofs = match &manifest {
+                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_none(),
+            };
+
+            let flags = InstallAppCommonFlags {
+                defer_memproofs,
+                ignore_genesis_failure,
+                allow_throwaway_random_agent_key,
+            };
+
+            let membrane_proofs = membrane_proofs.unwrap_or_default();
+
+            let installed_app_id =
+                installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
+
+            if installed_app_id == DPKI_APP_ID {
+                return Err(ConductorError::Other(
+                    "Can't install app with reserved id 'DPKI'"
+                        .to_string()
+                        .into(),
+                ));
+            }
+
+            // NOTE: for testing with inline zomes when the conductor is restarted, it's
+            //       essential that the installed_hash is included in the app manifest,
+            //       so that the local DNAs with inline zomes can be loaded from
+            //       local storage
+            let local_dnas = self
+                .ribosome_store()
+                .share_ref(|store| bundle.get_all_dnas_from_store(store));
+
+            let ops = bundle
+                .resolve_cells(&local_dnas, membrane_proofs, existing_cells)
+                .await?;
+
+            self.clone()
+                .install_app_common(installed_app_id, manifest, agent_key, ops, flags)
+                .await
+        }
+
+        /// Uninstall an app, removing all traces of it including its cells.
+        ///
+        /// This will fail if the app is depended upon by other apps via the UseExisting
+        /// cell provisioning strategy, in which case the dependent app(s) would first need
+        /// to be uninstalled, or the `force` param can be set to true.
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn uninstall_app(
             self: Arc<Self>,
             installed_app_id: &InstalledAppId,
+            force: bool,
         ) -> ConductorResult<()> {
-            let self_clone = self.clone();
-            let app = self.remove_app_from_db(installed_app_id).await?;
-            tracing::debug!(msg = "Removed app from db.", app = ?app);
+            let deps = self
+                .get_state()
+                .await?
+                .get_dependent_apps(installed_app_id, true)?;
 
-            // Remove cells which may now be dangling due to the removed app
-            self_clone
-                .process_app_status_fx(AppStatusFx::SpinDown, None)
-                .await?;
-            Ok(())
+            // Only uninstall the app if there are no protected dependents,
+            // or if force is used
+            if force || deps.is_empty() {
+                let self_clone = self.clone();
+                let app = self.remove_app_from_db(installed_app_id).await?;
+                tracing::debug!(msg = "Removed app from db.", app = ?app);
+
+                // Remove cells which may now be dangling due to the removed app
+                self_clone
+                    .process_app_status_fx(AppStatusFx::SpinDown, None)
+                    .await?;
+
+                let installed_app_ids = self
+                    .get_state()
+                    .await?
+                    .installed_apps_and_services()
+                    .iter()
+                    .filter(|(app_id, _)| is_app(app_id))
+                    .map(|(app_id, _)| app_id.clone())
+                    .collect::<HashSet<_>>();
+                self.app_broadcast.retain(installed_app_ids);
+
+                Ok(())
+            } else {
+                Err(ConductorError::AppHasDependents(
+                    installed_app_id.clone(),
+                    deps,
+                ))
+            }
         }
 
         /// List active AppIds
         pub async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
             let state = self.get_state().await?;
-            Ok(state.running_apps().map(|(id, _)| id).cloned().collect())
+            Ok(state
+                .running_apps()
+                .filter(|(id, _)| is_app(id))
+                .map(|(id, _)| id)
+                .cloned()
+                .collect())
         }
 
-        /// List Apps with their information
+        /// List Apps with their information,
+        /// sorted by their installed_at timestamp, in descending order
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_apps(
             &self,
             status_filter: Option<AppStatusFilter>,
@@ -1493,26 +1802,52 @@ mod app_impls {
             let conductor_state = self.get_state().await?;
 
             let apps_ids: Vec<&String> = match status_filter {
-                Some(Enabled) => conductor_state.enabled_apps().map(|(id, _)| id).collect(),
-                Some(Disabled) => conductor_state.disabled_apps().map(|(id, _)| id).collect(),
-                Some(Running) => conductor_state.running_apps().map(|(id, _)| id).collect(),
-                Some(Stopped) => conductor_state.stopped_apps().map(|(id, _)| id).collect(),
-                Some(Paused) => conductor_state.paused_apps().map(|(id, _)| id).collect(),
-                None => conductor_state.installed_apps().keys().collect(),
+                Some(Enabled) => conductor_state
+                    .enabled_apps()
+                    .filter(|(id, _)| is_app(id))
+                    .map(|(id, _)| id)
+                    .collect(),
+                Some(Disabled) => conductor_state
+                    .disabled_apps()
+                    .filter(|(id, _)| is_app(id))
+                    .map(|(id, _)| id)
+                    .collect(),
+                Some(Running) => conductor_state
+                    .running_apps()
+                    .filter(|(id, _)| is_app(id))
+                    .map(|(id, _)| id)
+                    .collect(),
+                Some(Stopped) => conductor_state
+                    .stopped_apps()
+                    .filter(|(id, _)| is_app(id))
+                    .map(|(id, _)| id)
+                    .collect(),
+                Some(Paused) => conductor_state
+                    .paused_apps()
+                    .filter(|(id, _)| is_app(id))
+                    .map(|(id, _)| id)
+                    .collect(),
+                None => conductor_state
+                    .installed_apps_and_services()
+                    .keys()
+                    .filter(|id| is_app(id))
+                    .collect(),
             };
 
-            let app_infos: Vec<AppInfo> = apps_ids
+            let mut app_infos: Vec<AppInfo> = apps_ids
                 .into_iter()
                 .map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .flatten()
                 .collect();
+            app_infos.sort_by_key(|app_info| std::cmp::Reverse(app_info.installed_at));
 
             Ok(app_infos)
         }
 
         /// Get the IDs of all active installed Apps which use this Cell
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_running_apps_for_dependent_cell_id(
             &self,
             cell_id: &CellId,
@@ -1521,13 +1856,14 @@ mod app_impls {
                 .get_state()
                 .await?
                 .running_apps()
-                .filter(|(_, v)| v.all_cells().any(|i| i == cell_id))
+                .filter(|(_, v)| v.all_cells().any(|i| i == *cell_id))
                 .map(|(k, _)| k)
                 .cloned()
                 .collect())
         }
 
         /// Find the ID of the first active installed App which uses this Cell
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn find_cell_with_role_alongside_cell(
             &self,
             cell_id: &CellId,
@@ -1537,18 +1873,20 @@ mod app_impls {
                 .get_state()
                 .await?
                 .running_apps()
-                .find(|(_, running_app)| running_app.all_cells().any(|i| i == cell_id))
+                .find(|(_, running_app)| running_app.all_cells().any(|i| i == *cell_id))
                 .and_then(|(_, running_app)| {
-                    running_app
-                        .into_common()
-                        .role(role_name)
-                        .ok()
-                        .map(|role| role.cell_id())
-                        .cloned()
+                    let app = running_app.clone().into_common();
+                    app.role(role_name).ok().map(|role| match role {
+                        AppRoleAssignment::Primary(primary) => {
+                            CellId::new(primary.dna_hash().clone(), running_app.agent_key().clone())
+                        }
+                        AppRoleAssignment::Dependency(dependency) => dependency.cell_id.clone(),
+                    })
                 }))
         }
 
         /// Get the IDs of all active installed Apps which use this Dna
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_running_apps_for_dependent_dna_hash(
             &self,
             dna_hash: &DnaHash,
@@ -1573,24 +1911,179 @@ mod app_impls {
             Ok(maybe_app_info)
         }
 
+        /// Run genesis for cells of an app which was installed using `allow_deferred_memproofs`
+        pub async fn provide_memproofs(
+            self: Arc<Self>,
+            installed_app_id: &InstalledAppId,
+            mut memproofs: MemproofMap,
+        ) -> ConductorResult<()> {
+            let state = self.get_state().await?;
+
+            let app = state.get_app(installed_app_id)?;
+            let cells_to_genesis = app
+                .primary_roles()
+                .map(|(role_name, role)| {
+                    (
+                        CellId::new(role.dna_hash().clone(), app.agent_key.clone()),
+                        memproofs.remove(role_name),
+                    )
+                })
+                .collect();
+
+            crate::conductor::conductor::genesis_cells(self.clone(), cells_to_genesis).await?;
+
+            self.update_state({
+                let installed_app_id = installed_app_id.clone();
+                move |mut state| {
+                    let app = state.get_app_mut(&installed_app_id)?;
+                    app.status =
+                        AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs);
+                    Ok(state)
+                }
+            })
+            .await?;
+
+            self.clone()
+                .create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
+                .await?;
+            let app_ids: HashSet<_> = [installed_app_id.to_owned()].into_iter().collect();
+            let delta = self
+                .clone()
+                .reconcile_app_status_with_cell_status(Some(app_ids.clone()))
+                .await?;
+            self.process_app_status_fx(delta, Some(app_ids)).await?;
+            Ok(())
+        }
+
+        /// Update the agent key for an installed app
+        // TODO: fully implement after DPKI is available
+        #[allow(unused)]
+        pub async fn rotate_app_agent_key(
+            &self,
+            installed_app_id: &InstalledAppId,
+        ) -> ConductorResult<AgentPubKey> {
+            // TODO: use key derivation for DPKI
+            let new_agent_key = self.keystore().new_sign_keypair_random().await?;
+            let ret = new_agent_key.clone();
+            self.update_state({
+                let installed_app_id = installed_app_id.clone();
+                move |mut state| {
+                    let app = state.get_app_mut(&installed_app_id)?;
+                    app.agent_key = new_agent_key;
+                    // TODO: update all cell IDs in the roles
+                    Ok(state)
+                }
+            })
+            .await?;
+            unimplemented!("this is a partial implementation for reference only")
+        }
+
         fn get_app_info_inner(
             &self,
             app_id: &InstalledAppId,
             state: &ConductorState,
         ) -> ConductorResult<Option<AppInfo>> {
-            match state.installed_apps().get(app_id) {
-                None => Ok(None),
-                Some(app) => {
+            match state.get_app(app_id) {
+                Err(_) => Ok(None),
+                Ok(app) => {
                     let dna_definitions = self.get_dna_definitions(app)?;
                     Ok(Some(AppInfo::from_installed_app(app, &dna_definitions)))
                 }
             }
+        }
+
+        /// Derive a new key from a device seed, or create a new seed from randomness
+        /// if no device seed is specified and
+        /// [`ConductorConfig::danger_generate_throwaway_device_seed`] is set
+        pub async fn derive_from_device_seed_and_create_if_allowed(
+            &self,
+            lair_tag: String,
+            derivation_path: Vec<u32>,
+        ) -> ConductorResult<Vec<u8>> {
+            let config = self.get_config();
+
+            // if derivation_path is [1, 2, 3], this will be "1.2.3"
+            let dst_tag_suffix = derivation_path
+                .iter()
+                .map(|b| format!("{b}"))
+                .collect::<Vec<String>>()
+                .join(".");
+
+            let dst_tag = format!("{lair_tag}.{dst_tag_suffix}");
+
+            let entry_info = self
+                .keystore()
+                .lair_client()
+                .get_entry(dst_tag.clone().into())
+                .await;
+            let seed_info = match entry_info {
+                Ok(LairEntryInfo::Seed { seed_info, .. }) => {
+                    // If the seed already exists, we don't need to create it again.
+                    seed_info
+                }
+                Ok(_) => {
+                    return Err(ConductorError::other(
+                        "DPKI could not be installed because the device seed points to an entry in lair that is not a seed.",
+                    ));
+                }
+                // Errors on not found, so try to create the seed and if that fails because there's
+                // some issue connecting to Lair then we'll get the error from trying to derive the seed.
+                Err(_) => {
+                    let result = self
+                        .keystore()
+                        .lair_client()
+                        .derive_seed(
+                            lair_tag.clone().into(),
+                            None,
+                            dst_tag.clone().into(),
+                            None,
+                            derivation_path.clone().into_boxed_slice(),
+                        )
+                        .await;
+
+                    match result {
+                        Ok(info) => info,
+                        Err(err) => {
+                            // If the seed could not be derived, assume that this is because there was no device seed
+                            // to derive from and attempt to create a throwaway seed if that was set in the config
+                            if config.danger_generate_throwaway_device_seed {
+                                tracing::info!("Failed to derive seed from lair, falling back to random seed. This is to be expected. Error: {:?}", err);
+
+                                self.keystore()
+                                    .lair_client()
+                                    .new_seed(lair_tag.clone().into(), None, false)
+                                    .await?;
+
+                                self.keystore()
+                                    .lair_client()
+                                    .derive_seed(
+                                        lair_tag.into(),
+                                        None,
+                                        dst_tag.into(),
+                                        None,
+                                        derivation_path.into_boxed_slice(),
+                                    )
+                                    .await?
+                            } else {
+                                return Err(err.into());
+                            }
+                        }
+                    }
+                }
+            };
+
+            let seed = seed_info.ed25519_pub_key.0.to_vec();
+            Ok(seed)
         }
     }
 }
 
 /// Methods related to cell access
 mod cell_impls {
+    use std::collections::BTreeSet;
+
+    use holochain_conductor_api::CompatibleCells;
+
     use super::*;
 
     impl Conductor {
@@ -1604,10 +2097,10 @@ mod cell_impls {
                 let present = self
                     .get_state()
                     .await?
-                    .installed_apps()
+                    .installed_apps_and_services()
                     .values()
                     .flat_map(|app| app.all_cells())
-                    .any(|id| id == cell_id);
+                    .any(|id| id == *cell_id);
                 if present {
                     Err(ConductorError::CellDisabled(cell_id.clone()))
                 } else {
@@ -1625,32 +2118,76 @@ mod cell_impls {
             self.running_cells
                 .share_ref(|cells| cells.keys().cloned().collect())
         }
+
+        /// Returns all installed cells which are forward compatible with the specified DNA,
+        /// including direct matches, by examining the "lineage" specified by DNAs of currently installed cells.
+        ///
+        /// Each DnaDef specifies a "lineage" field of DNA hashes, which indicates that the DNA is forward-compatible
+        /// with the DNAs specified in its lineage. If the DnaHash parameter is contained within the lineage of any
+        /// installed cell's DNA, that cell will be returned in the result set, since it has declared
+        /// itself forward-compatible.
+        pub async fn cells_by_dna_lineage(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> ConductorResult<CompatibleCells> {
+            // TODO: OPTIMIZE: cache the DNA lineages
+            Ok(self
+                .get_state()
+                .await?
+                // Look in all installed apps
+                .installed_apps_and_services()
+                .values()
+                .filter_map(|app| {
+                    let cells_in_lineage: BTreeSet<_> = app
+                        // Look in all cells for the app
+                        .all_cells()
+                        .filter_map(|cell_id| {
+                            let cell_dna_hash = cell_id.dna_hash();
+                            if cell_dna_hash == dna_hash {
+                                // If a direct hit, include this CellId in the list of candidates
+                                Some(cell_id.clone())
+                            } else {
+                                // If this cell *contains* the given DNA in *its* lineage, include it.
+                                self.get_dna_def(cell_id.dna_hash())
+                                    .map(|dna_def| dna_def.lineage.contains(dna_hash))
+                                    .unwrap_or(false)
+                                    .then(|| cell_id.clone())
+                            }
+                        })
+                        .collect();
+                    if cells_in_lineage.is_empty() {
+                        None
+                    } else {
+                        Some((app.installed_app_id.clone(), cells_in_lineage))
+                    }
+                })
+                .collect())
+        }
     }
 }
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
-    use holochain_conductor_api::ClonedCell;
+    use holochain_zome_types::prelude::ClonedCell;
 
     use super::*;
 
     impl Conductor {
         /// Create a new cell in an existing app based on an existing DNA.
         ///
-        /// # Returns
-        ///
-        /// A struct with the created cell's clone id and cell id.
+        /// Cells of an invalid agent key cannot be cloned.
         pub async fn create_clone_cell(
             self: Arc<Self>,
+            installed_app_id: &InstalledAppId,
             payload: CreateCloneCellPayload,
         ) -> ConductorResult<ClonedCell> {
             let CreateCloneCellPayload {
-                app_id,
                 role_name,
                 modifiers,
                 membrane_proof,
                 name,
             } = payload;
+
             if !modifiers.has_some_option_set() {
                 return Err(ConductorError::CloneCellError(
                     "neither network_seed nor properties nor origin_time provided for clone cell"
@@ -1658,10 +2195,44 @@ mod clone_cell_impls {
                 ));
             }
 
+            let state = self.get_state().await?;
+            let app = state.get_app(installed_app_id)?;
+            let app_role = app.primary_role(&role_name)?;
+            // If base cell has been provisioned, check first in Deepkey if agent key is valid
+            if app_role.is_provisioned {
+                if let Some(dpki) = self.running_services().dpki {
+                    let agent_key = app.agent_key().clone();
+                    let key_state = dpki
+                        .state()
+                        .await
+                        .key_state(agent_key.clone(), Timestamp::now())
+                        .await?;
+                    if let KeyState::Invalid(_) = key_state {
+                        return Err(DpkiServiceError::DpkiAgentInvalid(
+                            agent_key,
+                            Timestamp::now(),
+                        )
+                        .into());
+                    }
+                }
+
+                // Check source chain if agent key is valid
+                let source_chain = SourceChain::new(
+                    self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
+                    self.get_or_create_dht_db(app_role.dna_hash())?,
+                    self.get_or_create_space(app_role.dna_hash())?
+                        .dht_query_cache,
+                    self.keystore.clone(),
+                    app.agent_key().clone(),
+                )
+                .await?;
+                source_chain.valid_create_agent_key_action().await?;
+            }
+
             // add cell to app
             let clone_cell = self
                 .add_clone_cell_to_app(
-                    app_id.clone(),
+                    installed_app_id.clone(),
                     role_name.clone(),
                     modifiers.serialized()?,
                     name,
@@ -1671,28 +2242,28 @@ mod clone_cell_impls {
             // run genesis on cloned cell
             let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
-            self.create_and_add_initialized_cells_for_running_apps(Some(&app_id))
+            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
                 .await?;
             Ok(clone_cell)
         }
 
         /// Disable a clone cell.
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn disable_clone_cell(
             &self,
-            DisableCloneCellPayload {
-                app_id,
-                clone_cell_id,
-            }: &DisableCloneCellPayload,
+            installed_app_id: &InstalledAppId,
+            DisableCloneCellPayload { clone_cell_id }: &DisableCloneCellPayload,
         ) -> ConductorResult<()> {
             let (_, removed_cell_id) = self
                 .update_state_prime({
-                    let app_id = app_id.to_owned();
+                    let app_id = installed_app_id.clone();
                     let clone_cell_id = clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
                         let clone_id = app.get_clone_id(&clone_cell_id)?;
-                        let cell_id = app.get_clone_cell_id(&clone_cell_id)?;
+                        let dna_hash = app.get_clone_dna_hash(&clone_cell_id)?;
                         app.disable_clone_cell(&clone_id)?;
+                        let cell_id = CellId::new(dna_hash, app.agent_key().clone());
                         Ok((state, cell_id))
                     }
                 })
@@ -1702,20 +2273,22 @@ mod clone_cell_impls {
         }
 
         /// Enable a disabled clone cell.
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn enable_clone_cell(
             self: Arc<Self>,
+            installed_app_id: &InstalledAppId,
             payload: &EnableCloneCellPayload,
         ) -> ConductorResult<ClonedCell> {
             let conductor = self.clone();
             let (_, enabled_cell) = self
                 .update_state_prime({
-                    let app_id = payload.app_id.to_owned();
+                    let app_id = installed_app_id.clone();
                     let clone_cell_id = payload.clone_cell_id.to_owned();
                     move |mut state| {
                         let app = state.get_app_mut(&app_id)?;
                         let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
                         let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
-                        let app_role = app.role(&clone_id.as_base_role_name())?;
+                        let app_role = app.primary_role(&clone_id.as_base_role_name())?;
                         let original_dna_hash = app_role.dna_hash().clone();
                         let ribosome = conductor.get_ribosome(cell_id.dna_hash())?;
                         let dna = ribosome.dna_file.dna();
@@ -1734,12 +2307,13 @@ mod clone_cell_impls {
                 })
                 .await?;
 
-            self.create_and_add_initialized_cells_for_running_apps(Some(&payload.app_id))
+            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
                 .await?;
             Ok(enabled_cell)
         }
 
         /// Delete a clone cell.
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn delete_clone_cell(
             &self,
             DeleteCloneCellPayload {
@@ -1766,15 +2340,16 @@ mod clone_cell_impls {
 
 /// Methods related to management of app and cell status
 mod app_status_impls {
-    use super::*;
     use holochain_p2p::AgentPubKeyExt;
+
+    use super::*;
 
     impl Conductor {
         /// Adjust which cells are present in the Conductor (adding and removing as
         /// needed) to match the current reality of all app statuses.
         /// - If a Cell is used by at least one Running app, then ensure it is added
         /// - If a Cell is used by no running apps, then ensure it is removed.
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn reconcile_cell_status_with_app_status(
             self: Arc<Self>,
         ) -> ConductorResult<CellStartupErrors> {
@@ -1787,7 +2362,7 @@ mod app_status_impls {
         }
 
         /// Enable an app
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn enable_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
@@ -1802,7 +2377,7 @@ mod app_status_impls {
         }
 
         /// Disable an app
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn disable_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
@@ -1817,7 +2392,7 @@ mod app_status_impls {
         }
 
         /// Start an app
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn start_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
@@ -1831,6 +2406,7 @@ mod app_status_impls {
         }
 
         /// Register an app as disabled in the database
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn add_disabled_app_to_db(
             &self,
             app: InstalledAppCommon,
@@ -1845,7 +2421,7 @@ mod app_status_impls {
         }
 
         /// Transition an app's status to a new state.
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn transition_app_status(
             &self,
             app_id: InstalledAppId,
@@ -1862,7 +2438,7 @@ mod app_status_impls {
         }
 
         /// Pause an app
-        #[tracing::instrument(skip(self))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         #[cfg(any(test, feature = "test_utils"))]
         pub async fn pause_app(
             self: Arc<Self>,
@@ -1879,6 +2455,7 @@ mod app_status_impls {
 
         /// Create any Cells which are missing for any running apps, then initialize
         /// and join them. (Joining could take a while.)
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn create_and_add_initialized_cells_for_running_apps(
             self: Arc<Self>,
             app_id: Option<&InstalledAppId>,
@@ -1903,38 +2480,48 @@ mod app_status_impls {
 
             // Add agents to local agent store in kitsune
 
-            future::join_all(new_cells.iter().map(|(cell, _)| {
-                let sleuth_id = self.config.sleuth_id();
+            future::join_all(new_cells.iter().enumerate().map(|(i, (cell, _))| {
                 async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
                     let cell_id = cell.id().clone();
                     let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = match p2p_agents_db.p2p_get_agent(&kagent).await {
-                        Ok(maybe_info) => maybe_info,
-                        _ => None,
-                    };
-                    let maybe_initial_arc = maybe_agent_info.clone().map(|i| i.storage_arc);
+                    let maybe_agent_info = p2p_agents_db.p2p_get_agent(&kagent).await.ok().flatten();
+                    let maybe_initial_arq = maybe_agent_info.clone().map(|i| i.storage_arq);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
-                    if cell
-                        .holochain_p2p_dna()
-                        .clone()
-                        .join(agent_pubkey, maybe_agent_info, maybe_initial_arc)
-                        .await
-                        .is_ok()
-                    {
-                        aitia::trace!(&hc_sleuth::Event::AgentJoined {
-                            node: sleuth_id,
-                            agent: cell_id.agent_pubkey().clone()
-                        });
-                    } else {
-                        tracing::error!(
-                            "Network join failed for {cell_id}. This should never happen."
-                        );
+                    let res = tokio::time::timeout(
+                        JOIN_NETWORK_WAITING_PERIOD,
+                        cell.holochain_p2p_dna().clone().join(
+                            agent_pubkey,
+                            maybe_agent_info,
+                            maybe_initial_arq,
+                        ),
+                    )
+                        .await;
+
+                    match res {
+                        Ok(r) => {
+                            match r {
+                                Ok(_) => {
+                                    // all good
+
+                                }
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Network join failed for {cell_id}. This should never happen. Error: {e:?}"
+                                    );
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            tracing::warn!(
+                                "Network join took longer than {JOIN_NETWORK_WAITING_PERIOD:?} for {cell_id}. Cell startup proceeding anyway."
+                            );
+                        }
                     }
-                }
+                }.instrument(tracing::info_span!("network join task", ?i))
             }))
-            .await;
+                .await;
 
             // Add the newly created cells to the Conductor
             self.add_and_initialize_cells(new_cells);
@@ -1949,6 +2536,7 @@ mod app_status_impls {
         ///     then set it to Running
         /// - If an app is Running but at least one of its (required) Cells are off,
         ///     then set it to Paused
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn reconcile_app_status_with_cell_status(
             &self,
             app_ids: Option<HashSet<InstalledAppId>>,
@@ -1971,12 +2559,16 @@ mod app_status_impls {
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
-                    let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
-                        app_ids
-                            .as_ref()
-                            .map(|ids| ids.contains(&**id))
-                            .unwrap_or(true)
-                    });
+                    let apps =
+                        state
+                            .installed_apps_and_services_mut()
+                            .iter_mut()
+                            .filter(|(id, _)| {
+                                app_ids
+                                    .as_ref()
+                                    .map(|ids| ids.contains(&**id))
+                                    .unwrap_or(true)
+                            });
                     let delta = apps
                         .into_iter()
                         .map(|(_app_id, app)| {
@@ -1999,7 +2591,7 @@ mod app_status_impls {
                                 }
                                 Paused(_) => {
                                     // If all required cells are now running, restart the app
-                                    if app.required_cells().all(|id| cell_ids.contains(id)) {
+                                    if app.required_cells().all(|id| cell_ids.contains(&id)) {
                                         app.status.transition(Start)
                                     } else {
                                         AppStatusFx::NoChange
@@ -2009,6 +2601,7 @@ mod app_status_impls {
                                     // Disabled status should never automatically change.
                                     AppStatusFx::NoChange
                                 }
+                                AwaitingMemproofs => AppStatusFx::NoChange,
                             }
                         })
                         .fold(AppStatusFx::default(), AppStatusFx::combine);
@@ -2021,18 +2614,151 @@ mod app_status_impls {
 }
 
 /// Methods related to management of Conductor state
+mod service_impls {
+    use super::*;
+
+    impl Conductor {
+        /// Access the current conductor services
+        pub fn running_services(&self) -> ConductorServices {
+            self.running_services.share_ref(|s| s.clone())
+        }
+
+        #[cfg(feature = "test_utils")]
+        /// Access the current conductor services mutably
+        pub fn running_services_mutex(&self) -> &RwShare<ConductorServices> {
+            &self.running_services
+        }
+
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        pub(crate) async fn initialize_services(self: Arc<Self>) -> ConductorResult<()> {
+            self.initialize_service_dpki().await?;
+            Ok(())
+        }
+
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        pub(crate) async fn initialize_service_dpki(self: Arc<Self>) -> ConductorResult<()> {
+            if let Some(installation) = self.get_state().await?.conductor_services.dpki {
+                self.running_services.share_mut(|s| {
+                    s.dpki = Some(Arc::new(DpkiService::new_deepkey(
+                        installation,
+                        self.clone(),
+                    )));
+                });
+            }
+            Ok(())
+        }
+
+        /// Install the DPKI service using the given Deepkey DNA.
+        /// Note, this currently is done automatically when the conductor is first initialized,
+        /// using the DpkiConfig in the conductor config. We may also provide this as an admin
+        /// method some day.
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        pub async fn install_dpki(
+            self: Arc<Self>,
+            dna: DnaFile,
+            enable: bool,
+        ) -> ConductorResult<()> {
+            // Don't install twice
+            if self.running_services().dpki.is_some() {
+                return Ok(());
+            }
+
+            let dna_hash = dna.dna_hash().clone();
+
+            self.register_dna(dna.clone()).await?;
+
+            let config = self.get_config();
+
+            let agent = if let Some(device_seed_lair_tag) = config.device_seed_lair_tag.clone() {
+                // Derive the DPKI agent key from the device seed.
+                // The initial agent key is the first derivation from the device seed.
+                // Updated DPKI agent keys (currently unsupported) would be sequential derivations
+                // from the same device seed.
+                let derivation_path = [0].into();
+
+                let seed = self
+                    .derive_from_device_seed_and_create_if_allowed(
+                        device_seed_lair_tag,
+                        derivation_path,
+                    )
+                    .await?;
+
+                holo_hash::AgentPubKey::from_raw_32(seed)
+            } else if config.dpki.allow_throwaway_random_dpki_agent_key {
+                self.keystore().new_sign_keypair_random().await?
+            } else {
+                return Err(ConductorError::other(
+"DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config. 
+If using DPKI, a device seed must be created in lair, and the tag specified in the conductor config.
+
+(If this is a throwaway test environment, you can also set the config `dpki.allow_throwaway_random_dpki_agent_key`
+to `true` instead of instead of setting up a `device_seed_lair_tag`, but then you will lose the ability to recover 
+your agent keys if you lose access to your device. This is not recommended!!)
+"));
+            };
+
+            let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+
+            self.clone()
+                .install_app_minimal(
+                    DPKI_APP_ID.into(),
+                    Some(agent),
+                    &[(dna, None)],
+                    Some(config.dpki.network_seed.clone()),
+                )
+                .await?;
+
+            // In multi-conductor tests, we often want to delay enabling DPKI until all conductors
+            // have exchanged peer info, so that the initial DPKI publish can go more smoothly.
+            if enable {
+                self.clone().enable_app(DPKI_APP_ID.into()).await?;
+            }
+
+            // Ensure that the space is created for DPKI, in case it's not enabled
+            self.spaces.get_or_create_space(&dna_hash)?;
+
+            assert!(self
+                .spaces
+                .get_from_spaces(|s| (*s.dna_hash).clone())
+                .contains(&dna_hash));
+
+            let installation = DeepkeyInstallation { cell_id };
+            self.update_state(move |mut state| {
+                state.conductor_services.dpki = Some(installation);
+                Ok(state)
+            })
+            .await?;
+
+            self.clone().initialize_service_dpki().await?;
+
+            if enable {
+                if let Ok(Some(info)) = self.get_app_info(&DPKI_APP_ID.into()).await {
+                    assert_eq!(info.status, holochain_conductor_api::AppInfoStatus::Running);
+                } else {
+                    panic!("DPKI service not installed!");
+                }
+            }
+
+            Ok(())
+        }
+    }
+}
+
+/// Methods related to management of Conductor state
 mod state_impls {
     use super::*;
 
     impl Conductor {
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn get_state(&self) -> ConductorResult<ConductorState> {
             self.spaces.get_state().await
         }
 
         /// Update the internal state with a pure function mapping old state to new
-        pub(crate) async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        pub(crate) async fn update_state<F>(&self, f: F) -> ConductorResult<ConductorState>
         where
-            F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
+            F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
         {
             self.spaces.update_state(f).await
         }
@@ -2040,6 +2766,7 @@ mod state_impls {
         /// Update the internal state with a pure function mapping old state to new,
         /// which may also produce an output value which will be the output of
         /// this function
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn update_state_prime<F, O>(
             &self,
             f: F,
@@ -2071,13 +2798,25 @@ mod scheduler_impls {
         /// Calling this will:
         /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
         /// - Add an interval that runs IN ADDITION to previous invocations
-        /// So ideally this would be called ONCE per conductor lifecyle ONLY.
-        pub(crate) async fn start_scheduler(self: Arc<Self>, interval_period: std::time::Duration) {
+        ///
+        /// So ideally this would be called ONCE per conductor lifecycle ONLY.
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
+        pub(crate) async fn start_scheduler(
+            self: Arc<Self>,
+            interval_period: std::time::Duration,
+        ) -> StateMutationResult<()> {
             // Clear all ephemeral cruft in all cells before starting a scheduler.
-            let tasks = self.spaces.get_from_spaces(|space| {
-                let db = space.authored_db.clone();
-                async move { db.write_async(delete_all_ephemeral_scheduled_fns).await }
-            });
+            let tasks = self
+                .spaces
+                .get_from_spaces(|space| {
+                    let all_dbs = space.get_all_authored_dbs();
+
+                    all_dbs.into_iter().map(|db| async move {
+                        db.write_async(delete_all_ephemeral_scheduled_fns).await
+                    })
+                })
+                .into_iter()
+                .flatten();
 
             futures::future::join_all(tasks).await;
 
@@ -2092,6 +2831,8 @@ mod scheduler_impls {
                         .await;
                 }
             }));
+
+            Ok(())
         }
 
         /// The scheduler wants to dispatch any functions that are due.
@@ -2127,11 +2868,18 @@ mod misc_impls {
         pub async fn grant_zome_call_capability(
             &self,
             payload: GrantZomeCallCapabilityPayload,
-        ) -> ConductorApiResult<()> {
+        ) -> ConductorApiResult<ActionHash> {
             let GrantZomeCallCapabilityPayload { cell_id, cap_grant } = payload;
 
+            // Must init before committing a grant
+            let cell = self.cell_by_id(&cell_id).await?;
+            cell.check_or_run_zome_init().await?;
+
             let source_chain = SourceChain::new(
-                self.get_or_create_authored_db(cell_id.dna_hash())?,
+                self.get_or_create_authored_db(
+                    cell_id.dna_hash(),
+                    cell.id().agent_pubkey().clone(),
+                )?,
                 self.get_or_create_dht_db(cell_id.dna_hash())?,
                 self.get_or_create_space(cell_id.dna_hash())?
                     .dht_query_cache,
@@ -2147,7 +2895,7 @@ mod misc_impls {
                 entry_hash,
             };
 
-            source_chain
+            let action_hash = source_chain
                 .put_weightless(
                     action_builder,
                     Some(cap_grant_entry),
@@ -2158,13 +2906,14 @@ mod misc_impls {
             let cell = self.cell_by_id(&cell_id).await?;
             source_chain.flush(cell.holochain_p2p_dna()).await?;
 
-            Ok(())
+            Ok(action_hash)
         }
 
         /// Create a JSON dump of the cell's state
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             let cell = self.cell_by_id(cell_id).await?;
-            let authored_db = cell.authored_db();
+            let authored_db = cell.get_or_create_authored_db()?;
             let dht_db = cell.dht_db();
             let space = cell_id.dna_hash();
             let p2p_agents_db = self.p2p_agents_db(space);
@@ -2204,6 +2953,8 @@ mod misc_impls {
                 state: ConductorState,
             }
 
+            let conductor_state = self.get_state().await?;
+
             let conductor = ConductorSerialized {
                 running_cells: self.running_cells.share_ref(|c| {
                     c.clone()
@@ -2216,14 +2967,12 @@ mod misc_impls {
                 }),
                 shutting_down: self.shutting_down.load(Ordering::SeqCst),
                 admin_websocket_ports: self.admin_websocket_ports.share_ref(|p| p.clone()),
-                app_interfaces: self
-                    .app_interfaces
-                    .share_ref(|i| i.keys().cloned().collect()),
+                app_interfaces: conductor_state.app_interfaces.keys().cloned().collect(),
             };
 
             let dump = ConductorDump {
                 conductor,
-                state: self.get_state().await?,
+                state: conductor_state,
             };
 
             let out = serde_json::to_string_pretty(&dump)?;
@@ -2237,7 +2986,8 @@ mod misc_impls {
             cell_id: &CellId,
             dht_ops_cursor: Option<u64>,
         ) -> ConductorApiResult<FullStateDump> {
-            let authored_db = self.get_or_create_authored_db(cell_id.dna_hash())?;
+            let authored_db =
+                self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let dht_db = self.get_or_create_dht_db(cell_id.dna_hash())?;
             let dna_hash = cell_id.dna_hash();
             let p2p_agents_db = self.spaces.p2p_agents_db(dna_hash)?;
@@ -2354,6 +3104,7 @@ mod misc_impls {
 /// Pure accessor methods
 mod accessor_impls {
     use super::*;
+    use tokio::sync::broadcast;
 
     impl Conductor {
         pub(crate) fn ribosome_store(&self) -> &RwShare<RibosomeStore> {
@@ -2364,13 +3115,17 @@ mod accessor_impls {
             self.spaces.queue_consumer_map.clone()
         }
 
-        /// Access to the signal broadcast channel, to create
-        /// new subscriptions
-        pub fn signal_broadcaster(&self) -> SignalBroadcaster {
-            let senders = self
-                .app_interfaces
-                .share_ref(|ai| ai.values().map(|i| i.signal_tx()).cloned().collect());
-            SignalBroadcaster::new(senders)
+        /// Get a signal broadcast sender for a cell.
+        pub async fn get_signal_tx(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<broadcast::Sender<Signal>> {
+            let app = self
+                .find_app_containing_cell(cell_id)
+                .await?
+                .ok_or_else(|| ConductorError::CellMissing(cell_id.clone()))?;
+
+            Ok(self.app_broadcast.create_send_handle(app.id().clone()))
         }
 
         /// Instantiate a Ribosome for use with a DNA
@@ -2390,8 +3145,9 @@ mod accessor_impls {
         pub(crate) fn get_or_create_authored_db(
             &self,
             dna_hash: &DnaHash,
+            author: AgentPubKey,
         ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
-            self.spaces.authored_db(dna_hash)
+            self.spaces.get_or_create_authored_db(dna_hash, author)
         }
 
         pub(crate) fn get_or_create_dht_db(
@@ -2446,6 +3202,138 @@ mod accessor_impls {
         pub fn task_manager(&self) -> TaskManagerClient {
             self.task_manager.clone()
         }
+
+        /// Find the app which contains the given cell by its [CellId].
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+        pub async fn find_app_containing_cell(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<InstalledApp>> {
+            Ok(self
+                .get_state()
+                .await?
+                .find_app_containing_cell(cell_id)
+                .cloned())
+        }
+    }
+}
+
+/// Methods related to app authentication tokens
+mod authenticate_token_impls {
+    use super::*;
+    use holochain_conductor_api::{
+        AppAuthenticationToken, AppAuthenticationTokenIssued, IssueAppAuthenticationTokenPayload,
+    };
+
+    impl Conductor {
+        /// Issue a new app interface authentication token for the given `installed_app_id`.
+        pub fn issue_app_authentication_token(
+            &self,
+            payload: IssueAppAuthenticationTokenPayload,
+        ) -> ConductorResult<AppAuthenticationTokenIssued> {
+            let (token, expires_at) = self.app_auth_token_store.share_mut(|app_connection_auth| {
+                app_connection_auth.issue_token(
+                    payload.installed_app_id,
+                    payload.expiry_seconds,
+                    payload.single_use,
+                )
+            });
+
+            Ok(AppAuthenticationTokenIssued {
+                token,
+                expires_at: expires_at
+                    .and_then(|i| i.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| Timestamp::saturating_from_dur(&d)),
+            })
+        }
+
+        /// Revoke an app interface authentication token.
+        pub fn revoke_app_authentication_token(
+            &self,
+            token: AppAuthenticationToken,
+        ) -> ConductorResult<()> {
+            self.app_auth_token_store
+                .share_mut(|app_connection_auth| app_connection_auth.revoke_token(token));
+
+            Ok(())
+        }
+
+        /// Authenticate the app interface authentication `token`, optionally requiring the token to
+        /// have been issued for a specific `app_id`.
+        ///
+        /// Returns the [InstalledAppId] that the token was issued for.
+        pub fn authenticate_app_token(
+            &self,
+            token: Vec<u8>,
+            app_id: Option<InstalledAppId>,
+        ) -> ConductorResult<InstalledAppId> {
+            self.app_auth_token_store.share_mut(|app_connection_auth| {
+                app_connection_auth.authenticate_token(token, app_id)
+            })
+        }
+    }
+}
+
+/// Methods for bridging from host calls to workflows for countersigning
+mod countersigning_impls {
+    use super::*;
+    use crate::core::workflow;
+
+    impl Conductor {
+        /// Accept a countersigning session
+        pub(crate) async fn accept_countersigning_session(
+            &self,
+            cell_id: CellId,
+            request: PreflightRequest,
+        ) -> ConductorResult<PreflightRequestAcceptance> {
+            let countersigning_trigger = self.cell_by_id(&cell_id).await?.countersigning_trigger();
+
+            Ok(
+                workflow::countersigning_workflow::accept_countersigning_request(
+                    self.spaces.get_or_create_space(cell_id.dna_hash())?,
+                    self.keystore.clone(),
+                    cell_id.agent_pubkey().clone(),
+                    request,
+                    countersigning_trigger,
+                )
+                .await?,
+            )
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl holochain_conductor_services::CellRunner for Conductor {
+    async fn call_zome(
+        &self,
+        provenance: &AgentPubKey,
+        cap_secret: Option<CapSecret>,
+        cell_id: CellId,
+        zome_name: ZomeName,
+        fn_name: FunctionName,
+        payload: ExternIO,
+    ) -> anyhow::Result<ExternIO> {
+        let now = Timestamp::now();
+        let (nonce, expires_at) =
+            holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
+        let call_unsigned = ZomeCallUnsigned {
+            cell_id,
+            zome_name,
+            fn_name,
+            cap_secret,
+            provenance: provenance.clone(),
+            payload,
+            nonce,
+            expires_at,
+        };
+        let call = ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
+        let response = self.call_zome(call).await;
+        match response {
+            Ok(Ok(ZomeCallResponse::Ok(bytes))) => Ok(bytes),
+            Ok(Ok(other)) => Err(anyhow::anyhow!(other.clone())),
+            Ok(Err(error)) => Err(error.into()),
+            Err(error) => Err(error.into()),
+        }
     }
 }
 
@@ -2457,6 +3345,7 @@ impl Conductor {
 
     /// Add fully constructed cells to the cell map in the Conductor
     #[allow(deprecated)]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn add_and_initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
         let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
         self.running_cells.share_mut(|cells| {
@@ -2478,20 +3367,26 @@ impl Conductor {
     }
 
     /// Remove all Cells which are not referenced by any Enabled app.
-    /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed)
+    /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed).
+    ///
+    /// Additionally, if the cell is being removed because the last app referencing it was uninstalled,
+    /// all data used by that cell (across Authored, DHT, and Cache databases) will also be removed.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn remove_dangling_cells(&self) -> ConductorResult<()> {
         let state = self.get_state().await?;
 
-        let keepers: HashSet<&CellId> = state
-            .enabled_apps()
+        let keepers: HashSet<CellId> = state
+            .enabled_apps_and_services()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
 
-        let all_cells: HashSet<&CellId> = state
-            .installed_apps()
+        let all_cells: HashSet<CellId> = state
+            .installed_apps_and_services()
             .iter()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
+
+        let all_dnas: HashSet<_> = all_cells.iter().map(|cell_id| cell_id.dna_hash()).collect();
 
         // Clean up all cells that will be dropped (leave network, etc.)
         let cells_to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
@@ -2509,46 +3404,72 @@ impl Conductor {
                 .collect()
         });
 
+        if !cells_to_cleanup.is_empty() {
+            tracing::debug!(?cells_to_cleanup, "Cleaning up cells");
+        }
+
         // Stop all long-running tasks for cells about to be dropped
         for cell in cells_to_cleanup.iter() {
             cell.cleanup().await?;
         }
 
-        // Find any DNAs from cleaned up cells which don't have representation in any cells
-        // in any app. In other words, find the DNAs which are *only* represented in uninstalled apps.
-        let all_dnas: HashSet<_> = all_cells
-            .into_iter()
-            .map(|cell_id| cell_id.dna_hash())
+        // Find any cleaned up cells which are no longer used by any app,
+        // so that we can remove their data from the databases.
+        let cells_to_purge: Vec<_> = cells_to_cleanup
+            .iter()
+            .filter_map(|cell| (!all_cells.contains(cell.id())).then_some(cell.id().clone()))
             .collect();
-        let dnas_to_cleanup = cells_to_cleanup
+
+        // Find any DNAs from cleaned up cells which don't have representation in any cells
+        // in any installed app, so that we can remove their data from the databases.
+        let dnas_to_purge: Vec<_> = cells_to_cleanup
             .iter()
             .map(|cell| cell.id().dna_hash())
-            .filter(|dna| !all_dnas.contains(dna));
+            .filter(|dna| !all_dnas.contains(dna))
+            .collect();
 
-        // For any unrepresented DNAs, clean up those DNA-specific databases
-        for dna_hash in dnas_to_cleanup {
+        if !cells_to_purge.is_empty() {
+            tracing::info!(?cells_to_purge, "Purging cells");
+        }
+        if !dnas_to_purge.is_empty() {
+            tracing::info!(?dnas_to_purge, "Purging DNAs");
+        }
+
+        // Delete all data from authored databases which are longer installed
+        for cell_id in cells_to_purge {
+            let db = self
+                .spaces
+                .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
+            let mut path = db.path().clone();
+            if let Err(err) = ffs::remove_file(&path).await {
+                tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
+                db.write_async(purge_data).await?;
+            }
+            path.set_extension("");
+            let stem = path.to_string_lossy();
+            for ext in ["db-shm", "db-wal"] {
+                let path = PathBuf::from(format!("{stem}.{ext}"));
+                if let Err(err) = ffs::remove_file(&path).await {
+                    let err = err.remove_backtrace();
+                    tracing::warn!(?err, "Failed to remove DB file");
+                }
+            }
+        }
+
+        // For any DNAs no longer represented in any installed app,
+        // purge data from those DNA-specific databases
+        for dna_hash in dnas_to_purge {
             futures::future::join_all(
                 [
                     self.spaces
-                        .authored_db(dna_hash)
-                        .unwrap()
-                        .write_async(|txn| {
-                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
-                        })
-                        .boxed(),
-                    self.spaces
                         .dht_db(dna_hash)
                         .unwrap()
-                        .write_async(|txn| {
-                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
-                        })
+                        .write_async(purge_data)
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
                         .unwrap()
-                        .write_async(|txn| {
-                            DatabaseResult::Ok(txn.execute("DELETE FROM Action", ())?)
-                        })
+                        .write_async(purge_data)
                         .boxed(),
                     // TODO: also delete stale Wasms
                 ]
@@ -2556,7 +3477,7 @@ impl Conductor {
             )
             .await
             .into_iter()
-            .collect::<Result<Vec<usize>, _>>()?;
+            .collect::<Result<Vec<()>, _>>()?;
         }
 
         Ok(())
@@ -2570,6 +3491,8 @@ impl Conductor {
     ///
     /// Returns a Result for each attempt so that successful creations can be
     /// handled alongside the failures.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    #[allow(clippy::complexity)]
     async fn create_cells_for_running_apps(
         self: Arc<Self>,
         app_id: Option<&InstalledAppId>,
@@ -2581,7 +3504,7 @@ impl Conductor {
             Some(app_id) => {
                 let app = state.get_app(app_id)?;
                 if app.status().is_running() {
-                    app.all_enabled_cells().cloned().collect()
+                    app.all_enabled_cells().collect()
                 } else {
                     HashSet::new()
                 }
@@ -2590,11 +3513,10 @@ impl Conductor {
             // Collect all CellIds across all apps, deduped
             {
                 state
-                    .installed_apps()
+                    .installed_apps_and_services()
                     .iter()
                     .filter(|(_, app)| app.status().is_running())
-                    .flat_map(|(_id, app)| app.all_enabled_cells().collect::<Vec<&CellId>>())
-                    .cloned()
+                    .flat_map(|(_id, app)| app.all_enabled_cells())
                     .collect()
             }
         };
@@ -2607,7 +3529,7 @@ impl Conductor {
 
         let tasks = app_cells.difference(&on_cells).map(|cell_id| {
             let handle = self.clone();
-            let chc = handle.chc(self.keystore().clone(), cell_id);
+            let chc = handle.get_chc(cell_id);
             async move {
                 let holochain_p2p_cell =
                     handle.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
@@ -2617,19 +3539,33 @@ impl Conductor {
                     .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))
                     .map_err(|err| (cell_id.clone(), err))?;
 
-                Cell::create(cell_id.clone(), handle, space, holochain_p2p_cell)
+                let signal_tx = handle
+                    .get_signal_tx(cell_id)
                     .await
-                    .map_err(|err| (cell_id.clone(), err))
+                    .map_err(|err| (cell_id.clone(), CellError::ConductorError(Box::new(err))))?;
+
+                tracing::info!(?cell_id, "Creating a cell");
+                Cell::create(
+                    cell_id.clone(),
+                    handle,
+                    space,
+                    holochain_p2p_cell,
+                    signal_tx,
+                )
+                .in_current_span()
+                .await
+                .map_err(|err| (cell_id.clone(), err))
             }
         });
 
         // Join on all apps and return a list of
-        // apps that had succelly created cells
+        // apps that had successfully created cells
         // and any apps that encounted errors
         Ok(futures::future::join_all(tasks).await)
     }
 
     /// Deal with the side effects of an app status state transition
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     async fn process_app_status_fx(
         self: Arc<Self>,
         delta: AppStatusFx,
@@ -2667,6 +3603,7 @@ impl Conductor {
                     }
                     (delta, errors)
                 }
+                Error(err) => return Err(ConductorError::AppStatusError(err)),
             };
         }
 
@@ -2674,6 +3611,7 @@ impl Conductor {
     }
 
     /// Entirely remove an app from the database, returning the removed app.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn remove_app_from_db(&self, app_id: &InstalledAppId) -> ConductorResult<InstalledApp> {
         let (_state, app) = self
             .update_state_prime({
@@ -2688,6 +3626,7 @@ impl Conductor {
     }
 
     /// Associate a new clone cell with an existing app.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn add_clone_cell_to_app(
         &self,
         app_id: InstalledAppId,
@@ -2703,7 +3642,7 @@ impl Conductor {
                 let role_name = role_name.clone();
                 move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
-                    let app_role = app.role(&role_name)?;
+                    let app_role = app.primary_role(&role_name)?;
                     if app_role.is_clone_limit_reached() {
                         return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
                             app_role.clone_limit(),
@@ -2737,22 +3676,22 @@ impl Conductor {
             .update_state_prime(move |mut state| {
                 let state_copy = state.clone();
                 let app = state.get_app_mut(&app_id)?;
-                let agent_key = app.role(&role_name)?.agent_key().to_owned();
+                let agent_key = app.agent_key().to_owned();
                 let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
 
                 // if cell id of new clone cell already exists, reject as duplicate
                 if state_copy
-                    .installed_apps()
+                    .installed_apps_and_services()
                     .iter()
                     .flat_map(|(_, app)| app.all_cells())
-                    .any(|cell_id| *cell_id == clone_cell_id)
+                    .any(|cell_id| cell_id == clone_cell_id)
                 {
                     return Err(ConductorError::AppError(AppError::DuplicateCellId(
                         clone_cell_id,
                     )));
                 }
 
-                let clone_id = app.add_clone(&role_name, &clone_cell_id)?;
+                let clone_id = app.add_clone(&role_name, clone_cell_id.dna_hash())?;
                 let installed_clone_cell = ClonedCell {
                     cell_id: clone_cell_id,
                     clone_id,
@@ -2770,7 +3709,7 @@ impl Conductor {
         Ok(installed_clone_cell)
     }
 
-    /// Print the current setup in a machine readable way
+    /// Print the current setup in a machine-readable way
     fn print_setup(&self) {
         use std::fmt::Write;
         let mut out = String::new();
@@ -2790,32 +3729,18 @@ impl Conductor {
 #[allow(missing_docs)]
 mod test_utils_impls {
     use super::*;
+    use tokio::sync::broadcast;
 
     impl Conductor {
         pub async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
             self.get_state().await
         }
 
-        pub async fn add_test_app_interface<I: Into<AppInterfaceId>>(
+        pub fn subscribe_to_app_signals(
             &self,
-            id: I,
-        ) -> ConductorResult<()> {
-            let id = id.into();
-            let (signal_tx, _r) = tokio::sync::broadcast::channel(1000);
-            self.app_interfaces.share_mut(|app_interfaces| {
-                if app_interfaces.contains_key(&id) {
-                    return Err(ConductorError::AppInterfaceIdCollision(id));
-                }
-                let _ = app_interfaces.insert(id, AppInterfaceRuntime::Test { signal_tx });
-                Ok(())
-            })
-        }
-
-        pub fn get_authored_db(
-            &self,
-            dna_hash: &DnaHash,
-        ) -> ConductorApiResult<DbWrite<DbKindAuthored>> {
-            Ok(self.get_or_create_authored_db(dna_hash)?)
+            installed_app_id: InstalledAppId,
+        ) -> broadcast::Receiver<Signal> {
+            self.app_broadcast.subscribe(installed_app_id)
         }
 
         pub fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
@@ -2858,6 +3783,17 @@ mod test_utils_impls {
     }
 }
 
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+fn purge_data(txn: &mut Transaction) -> DatabaseResult<()> {
+    txn.execute("DELETE FROM DhtOp", ())?;
+    txn.execute("DELETE FROM Action", ())?;
+    txn.execute("DELETE FROM Entry", ())?;
+    txn.execute("DELETE FROM ValidationReceipt", ())?;
+    txn.execute("DELETE FROM ChainLock", ())?;
+    txn.execute("DELETE FROM ScheduledFunctions", ())?;
+    Ok(())
+}
+
 /// Perform Genesis on the source chains for each of the specified CellIds.
 ///
 /// If genesis fails for any cell, this entire function fails, and all other
@@ -2875,10 +3811,11 @@ pub(crate) async fn genesis_cells(
                 .get_or_create_space(cell_id_inner.dna_hash())
                 .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
 
-            let authored_db = space.authored_db;
+            let authored_db =
+                space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
             let dht_db = space.dht_db;
             let dht_db_cache = space.dht_query_cache;
-            let chc = conductor.chc(conductor.keystore().clone(), &cell_id_inner);
+            let chc = conductor.get_chc(&cell_id_inner);
             let ribosome = conductor
                 .get_ribosome(cell_id_inner.dna_hash())
                 .map_err(Box::new)?;
@@ -2915,6 +3852,54 @@ pub(crate) async fn genesis_cells(
     } else {
         Ok(())
     }
+}
+
+/// Get the DPKI DNA from the filesystem or use the built-in one.
+pub(crate) async fn get_dpki_dna(config: &DpkiConfig) -> DnaResult<DnaBundle> {
+    if let Some(dna_path) = config.dna_path.as_ref() {
+        DnaBundle::read_from_file(dna_path).await
+    } else {
+        DnaBundle::decode(holochain_deepkey_dna::DEEPKEY_DNA_BUNDLE_BYTES)
+    }
+}
+
+/// Get a "standard" AppBundle from a single DNA, with Create provisioning,
+/// with no modifiers, and arbitrary role names.
+/// Allows setting the clone_limit for every DNA.
+pub fn app_manifest_from_dnas(
+    dnas_with_roles: &[impl DnaWithRole],
+    clone_limit: u32,
+    memproofs_deferred: bool,
+    network_seed: Option<String>,
+) -> AppManifest {
+    let roles: Vec<_> = dnas_with_roles
+        .iter()
+        .map(|dr| {
+            let dna = dr.dna();
+            let path = PathBuf::from(format!("{}", dna.dna_hash()));
+            let mut modifiers = DnaModifiersOpt::none();
+            modifiers.network_seed = network_seed.clone();
+            AppRoleManifest {
+                name: dr.role(),
+                dna: AppRoleDnaManifest {
+                    location: Some(DnaLocation::Bundled(path.clone())),
+                    modifiers,
+                    installed_hash: Some(dr.dna().dna_hash().clone().into()),
+                    clone_limit,
+                },
+                provisioning: Some(CellProvisioning::Create { deferred: false }),
+            }
+        })
+        .collect();
+
+    AppManifestCurrentBuilder::default()
+        .name("[generated]".into())
+        .description(None)
+        .roles(roles)
+        .allow_deferred_memproofs(memproofs_deferred)
+        .build()
+        .unwrap()
+        .into()
 }
 
 /// Dump the integration json state.
@@ -2995,7 +3980,7 @@ fn query_dht_ops_from_statement(
     dht_ops_cursor: Option<u64>,
 ) -> ConductorApiResult<Vec<DhtOp>> {
     let final_stmt_str = match dht_ops_cursor {
-        Some(cursor) => format!("{} AND rowid > {}", stmt_str, cursor),
+        Some(cursor) => format!("{} AND DhtOp.rowid > {}", stmt_str, cursor),
         None => stmt_str.into(),
     };
 
@@ -3003,25 +3988,13 @@ fn query_dht_ops_from_statement(
 
     let r: Vec<DhtOp> = stmt
         .query_and_then([], |row| {
-            let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-            let op_type: DhtOpType = row.get("dht_type")?;
-            let entry = match action.0.entry_type().map(|et| et.visibility()) {
-                Some(EntryVisibility::Public) => {
-                    let entry: Option<Vec<u8>> = row.get("entry_blob")?;
-                    match entry {
-                        Some(entry) => Some(from_blob::<Entry>(entry)?),
-                        None => None,
-                    }
-                }
-                _ => None,
-            };
-            Ok(DhtOp::from_type(op_type, action, entry)?)
+            holochain_state::query::map_sql_dht_op(false, "dht_type", row)
         })?
         .collect::<StateQueryResult<Vec<_>>>()?;
     Ok(r)
 }
 
-// #[instrument(skip(p2p_evt, handle))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(p2p_evt, handle)))]
 async fn p2p_event_task(
     p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
     handle: ConductorHandle,
@@ -3084,6 +4057,3 @@ async fn p2p_event_task(
 
     tracing::info!("p2p_event_task has ended");
 }
-
-#[cfg(test)]
-pub mod tests;

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use super::app_validation_workflow;
 use super::app_validation_workflow::AppValidationError;
 use super::app_validation_workflow::Outcome;
@@ -7,8 +5,9 @@ use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
-use crate::conductor::interface::SignalBroadcaster;
+use crate::conductor::api::DpkiApi;
 use crate::conductor::ConductorHandle;
+use crate::core::check_dpki_agent_validity_for_record;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
@@ -18,13 +17,13 @@ use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::WorkflowError;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDna;
-use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
+use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
-use holochain_zome_types::record::Record;
-
 use holochain_types::prelude::*;
-use tracing::instrument;
+use holochain_zome_types::record::Record;
+use std::sync::Arc;
+use tokio::sync::broadcast;
 
 #[cfg(test)]
 mod validation_test;
@@ -35,20 +34,13 @@ pub type ZomeCallResult = RibosomeResult<ZomeCallResponse>;
 pub struct CallZomeWorkflowArgs<RibosomeT> {
     pub ribosome: RibosomeT,
     pub invocation: ZomeCallInvocation,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
     pub conductor_handle: ConductorHandle,
     pub is_root_zome_call: bool,
     pub cell_id: CellId,
 }
 
-#[instrument(skip(
-    workspace,
-    network,
-    keystore,
-    args,
-    trigger_publish_dht_ops,
-    trigger_integrate_dht_ops
-))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn call_zome_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
     network: HolochainP2pDna,
@@ -56,6 +48,7 @@ pub async fn call_zome_workflow<Ribosome>(
     args: CallZomeWorkflowArgs<Ribosome>,
     trigger_publish_dht_ops: TriggerSender,
     trigger_integrate_dht_ops: TriggerSender,
+    trigger_countersigning: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
 where
     Ribosome: RibosomeT + 'static,
@@ -64,27 +57,35 @@ where
         .ribosome
         .dna_def()
         .get_coordinator_zome(args.invocation.zome.zome_name())
+        .or_else(|_| {
+            args.ribosome
+                .dna_def()
+                .get_integrity_zome(args.invocation.zome.zome_name())
+                .map(CoordinatorZome::from)
+        })
         .ok();
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
-    let result =
-        call_zome_workflow_inner(workspace.clone(), network.clone(), keystore.clone(), args)
-            .await?;
-
+    let maybe_dpki = args.conductor_handle.running_services().dpki;
+    let signal_tx = args.signal_tx.clone();
+    let result = call_zome_workflow_inner(
+        workspace.clone(),
+        maybe_dpki,
+        network.clone(),
+        keystore.clone(),
+        args,
+        trigger_countersigning,
+    )
+    .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // commit the workspace
     if should_write {
-        let is_empty = workspace.source_chain().is_empty()?;
         let countersigning_op = workspace.source_chain().countersigning_op()?;
-        match HostFnWorkspace::from(workspace.clone())
-            .flush(&network)
-            .await
-        {
+        match workspace.source_chain().flush(&network).await {
             Ok(flushed_actions) => {
-                // Q: what is the purpose of checking for an empty chain? When would this ever happen? The chain should
-                //    be genesis'd by now, right?
-                if !is_empty {
+                // Skip if nothing was written
+                if !flushed_actions.is_empty() {
                     match countersigning_op {
                         Some(op) => {
                             if let Err(error_response) =
@@ -106,19 +107,20 @@ where
                             trigger_integrate_dht_ops.trigger(&"call_zome_workflow");
                         }
                     }
-                }
 
-                // Only send post commit if this is a coordinator zome.
-                if let Some(coordinator_zome) = coordinator_zome {
-                    send_post_commit(
-                        conductor_handle,
-                        workspace,
-                        network,
-                        keystore,
-                        flushed_actions,
-                        vec![coordinator_zome],
-                    )
-                    .await?;
+                    // Only send post commit if this is a coordinator zome.
+                    if let Some(coordinator_zome) = coordinator_zome {
+                        send_post_commit(
+                            conductor_handle,
+                            workspace,
+                            network,
+                            keystore,
+                            flushed_actions,
+                            vec![coordinator_zome],
+                            signal_tx,
+                        )
+                        .await?;
+                    }
                 }
             }
             err => {
@@ -126,15 +128,16 @@ where
             }
         }
     };
-
     Ok(result)
 }
 
 async fn call_zome_workflow_inner<Ribosome>(
     workspace: SourceChainWorkspace,
+    dpki: DpkiApi,
     network: HolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome>,
+    trigger_countersigning: TriggerSender,
 ) -> WorkflowResult<ZomeCallResult>
 where
     Ribosome: RibosomeT + 'static,
@@ -155,6 +158,7 @@ where
     let host_access = ZomeCallHostAccess::new(
         workspace.clone().into(),
         keystore,
+        dpki,
         network.clone(),
         signal_tx,
         call_zome_handle,
@@ -168,6 +172,8 @@ where
 
     // If the validation failed remove any active chain lock that matches the
     // entry that failed validation.
+    // Note that missing dependencies will not produce an `InvalidCommit` but an `IncompleteCommit`
+    // so that the commit can be retried later without terminating the countersigning session.
     if matches!(
         validation_result,
         Err(WorkflowError::SourceChainError(
@@ -176,22 +182,34 @@ where
     ) {
         let scratch_records = workspace.source_chain().scratch_records()?;
         if scratch_records.len() == 1 {
-            let lock = holochain_state::source_chain::lock_for_entry(
+            let lock_subject = holochain_state::source_chain::chain_lock_subject_for_entry(
                 scratch_records[0].entry().as_option(),
             )?;
-            if !lock.is_empty()
-                && workspace
-                    .source_chain()
-                    .is_chain_locked(Vec::with_capacity(0))
-                    .await?
-                && !workspace.source_chain().is_chain_locked(lock).await?
-            {
-                if let Err(error) = workspace.source_chain().unlock_chain().await {
-                    tracing::error!(?error);
+
+            // If this wasn't a countersigning commit then the lock will be empty.
+            if !lock_subject.is_empty() {
+                // Otherwise, we can check whether the chain was locked with a subject matching
+                // the entry that failed validation.
+                if let Some(chain_lock) = workspace.source_chain().get_chain_lock().await? {
+                    // Here we know the chain is locked, and if the lock subject matches the entry
+                    // that the app was trying to commit then we can unlock the chain.
+                    if chain_lock.subject() == lock_subject {
+                        if let Err(error) = workspace.source_chain().unlock_chain().await {
+                            tracing::error!(?error);
+                        }
+
+                        // Immediately unlocking the chain is safe because we know that the
+                        // countersigning commit hasn't been written to the source chain here.
+                        // We still need to clean up the session state in the countersigning workspace
+                        // though, so trigger the countersigning workflow and let it figure out
+                        // what happened.
+                        trigger_countersigning.trigger(&"invalid_countersigning_commit");
+                    }
                 }
             }
         }
     }
+
     validation_result?;
     Ok(result)
 }
@@ -210,11 +228,8 @@ where
 {
     match invocation.is_authorized(&host_access).await? {
         ZomeCallAuthorization::Authorized => {
-            tokio::task::spawn_blocking(|| {
-                let r = ribosome.call_zome_function(host_access, invocation);
-                Ok((ribosome, r))
-            })
-            .await?
+            let r = ribosome.call_zome_function(host_access, invocation).await;
+            Ok((ribosome, r))
         }
         not_authorized_reason => Ok((
             ribosome,
@@ -241,12 +256,31 @@ where
 {
     let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
         &workspace,
-        network.clone(),
+        Arc::new(network.clone()),
     ));
 
-    let to_app_validate = {
+    let scratch_records = workspace.source_chain().scratch_records()?;
+
+    if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
+        // Don't check DPKI validity on DPKI itself!
+        if !dpki.is_deepkey_dna(workspace.source_chain().cell_id().dna_hash()) {
+            // Check the validity of the author as-at the first and the last record to be committed.
+            // If these are valid, then the author is valid for the entire commit.
+            let first = scratch_records.first();
+            let last = scratch_records.last();
+            if let Some(r) = first {
+                check_dpki_agent_validity_for_record(&dpki, r).await?;
+            }
+            if let Some(r) = last {
+                if first != last {
+                    check_dpki_agent_validity_for_record(&dpki, r).await?;
+                }
+            }
+        }
+    }
+
+    let records = {
         // collect all the records we need to validate in wasm
-        let scratch_records = workspace.source_chain().scratch_records()?;
         let mut to_app_validate: Vec<Record> = Vec::with_capacity(scratch_records.len());
         // Loop forwards through all the new records
         for record in scratch_records {
@@ -254,20 +288,23 @@ where
                 .await
                 // If the was en error exit
                 // If the validation failed, exit with an InvalidCommit
+                // If the validation failed with a retryable error, exit with an IncompleteCommit
                 // If it was ok continue
-                .or_else(|outcome_or_err| outcome_or_err.invalid_call_zome_commit())?;
+                .or_else(|outcome_or_err| outcome_or_err.into_workflow_error())?;
             to_app_validate.push(record);
         }
 
         to_app_validate
     };
 
-    for mut chain_record in to_app_validate {
+    let dpki = conductor_handle.running_services().dpki;
+
+    for mut chain_record in records {
         for op_type in action_to_op_types(chain_record.action()) {
-            let op =
+            let outcome =
                 app_validation_workflow::record_to_op(chain_record, op_type, cascade.clone()).await;
 
-            let (op, omitted_entry) = match op {
+            let (op, _, omitted_entry) = match outcome {
                 Ok(op) => op,
                 Err(outcome_or_err) => return map_outcome(Outcome::try_from(outcome_or_err)),
             };
@@ -278,37 +315,76 @@ where
                 &network,
                 &ribosome,
                 &conductor_handle,
+                dpki.clone(),
+                true, // is_inline
             )
             .await;
             let outcome = outcome.or_else(Outcome::try_from);
             map_outcome(outcome)?;
-            chain_record = app_validation_workflow::op_to_record(op, omitted_entry);
+            chain_record = op_to_record(op, omitted_entry);
         }
     }
 
     Ok(())
 }
 
-fn map_outcome(
-    outcome: Result<app_validation_workflow::Outcome, AppValidationError>,
-) -> WorkflowResult<()> {
+fn op_to_record(op: Op, omitted_entry: Option<Entry>) -> Record {
+    match op {
+        Op::StoreRecord(StoreRecord { mut record }) => {
+            if let Some(e) = omitted_entry {
+                // NOTE: this is only possible in this situation because we already removed
+                // this exact entry from this Record earlier. DON'T set entries on records
+                // anywhere else without recomputing hashes and signatures!
+                record.entry = RecordEntry::Present(e);
+            }
+            record
+        }
+        Op::StoreEntry(StoreEntry { action, entry }) => {
+            Record::new(SignedActionHashed::raw_from_same_hash(action), Some(entry))
+        }
+        Op::RegisterUpdate(RegisterUpdate {
+            update, new_entry, ..
+        }) => Record::new(SignedActionHashed::raw_from_same_hash(update), new_entry),
+        Op::RegisterDelete(RegisterDelete { delete, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(delete),
+            omitted_entry,
+        ),
+        Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(action),
+            omitted_entry,
+        ),
+        Op::RegisterCreateLink(RegisterCreateLink { create_link, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(create_link),
+            omitted_entry,
+        ),
+        Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => Record::new(
+            SignedActionHashed::raw_from_same_hash(delete_link),
+            omitted_entry,
+        ),
+    }
+}
+
+fn map_outcome(outcome: Result<Outcome, AppValidationError>) -> WorkflowResult<()> {
     match outcome.map_err(SourceChainError::other)? {
         app_validation_workflow::Outcome::Accepted => {}
         app_validation_workflow::Outcome::Rejected(reason) => {
-            return Err(SourceChainError::InvalidCommit(reason).into());
-        }
-        // when the wasm is being called directly in a zome invocation any
-        // state other than valid is not allowed for new entries
-        // e.g. we require that all dependencies are met when committing an
-        // entry to a local source chain
-        // this is different to the case where we are validating data coming in
-        // from the network where unmet dependencies would need to be
-        // rescheduled to attempt later due to partitions etc.
-        app_validation_workflow::Outcome::AwaitingDeps(hashes) => {
             return Err(SourceChainError::InvalidCommit(format!(
-                "Awaiting deps {:?} but this is not allowed when committing entries to the source chain",
-                hashes
+                "Validation failed while committing: {reason}"
             ))
+            .into());
+        }
+        // When the wasm is being called directly in a zome invocation, any state other than valid
+        // is not allowed for new entries. E.g. we require that all dependencies are met when
+        // committing an entry to a local source chain.
+        // This is different to the case where we are validating data coming in from the network
+        // where unmet dependencies would be rescheduled to attempt later due to partitions etc.
+        // To allow the client to decide whether to retry later, we return a different error
+        // variant here. This indicates that the validation did not fail because the data is
+        // definitely invalid, but because validation could not make a decision yet.
+        Outcome::AwaitingDeps(hashes) => {
+            return Err(SourceChainError::IncompleteCommit(
+                IncompleteCommitReason::DepMissingFromDht(hashes),
+            )
             .into());
         }
     }

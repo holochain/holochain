@@ -5,10 +5,13 @@ use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
-use tracing::error;
 use wasmer::RuntimeError;
 
 #[allow(clippy::extra_unused_lifetimes)]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(_ribosome, call_context))
+)]
 pub fn accept_countersigning_preflight_request<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -25,75 +28,20 @@ pub fn accept_countersigning_preflight_request<'a>(
             if let Err(e) = input.check_integrity() {
                 return Ok(PreflightRequestAcceptance::Invalid(e.to_string()));
             }
-            let author = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
-                .agent_latest_pubkey;
             tokio_helper::block_forever_on(async move {
-                if (holochain_zome_types::prelude::Timestamp::now() + SESSION_TIME_FUTURE_MAX)
+                if (Timestamp::now() + SESSION_TIME_FUTURE_MAX)
                     .unwrap_or(Timestamp::MAX)
                     < *input.session_times.start()
                 {
                     return Ok(PreflightRequestAcceptance::UnacceptableFutureStart);
                 }
 
-                let agent_index = match input
-                    .signing_agents
-                    .iter()
-                    .position(|(agent, _)| agent == &author)
-                {
-                    Some(agent_index) => agent_index as u8,
-                    None => return Ok(PreflightRequestAcceptance::UnacceptableAgentNotFound),
-                };
-                let countersigning_agent_state = call_context
-                    .host_context
-                    .workspace_write()
-                    .source_chain()
-                    .as_ref()
-                    .expect("Must have source chain if write_workspace access is given")
-                    .accept_countersigning_preflight_request(input.clone(), agent_index)
-                    .await
-                    .map_err(|source_chain_error| -> RuntimeError {
-                        wasm_error!(WasmErrorInner::Host(source_chain_error.to_string())).into()
-                    })?;
-                let signature: Signature = match call_context
-                    .host_context
-                    .keystore()
-                    .sign(
-                        author,
-                        PreflightResponse::encode_fields_for_signature(
-                            &input,
-                            &countersigning_agent_state,
-                        )
-                        .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?
-                        .into(),
-                    )
-                    .await
-                {
-                    Ok(signature) => signature,
-                    Err(e) => {
-                        // Attempt to unlock the chain again.
-                        // If this fails the chain will remain locked until the session end time.
-                        // But also we're handling a keystore error already so we should return that.
-                        if let Err(unlock_result) = call_context
-                            .host_context
-                            .workspace_write()
-                            .source_chain()
-                            .as_ref()
-                            .expect("Must have source chain if write_workspace access is given")
-                            .unlock_chain()
-                            .await
-                        {
-                            error!(?unlock_result);
-                        }
-                        return Err(wasm_error!(WasmErrorInner::Host(e.to_string())).into());
-                    }
-                };
+                let cell_id = call_context.host_context.call_zome_handle().cell_id();
 
-                Ok(PreflightRequestAcceptance::Accepted(
-                    PreflightResponse::try_new(input, countersigning_agent_state, signature)
-                        .map_err(|e| -> RuntimeError {
-                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                        })?,
-                ))
+                call_context.host_context.call_zome_handle().accept_countersigning_session(cell_id.clone(), input.clone()).await
+                    .map_err(|e| -> RuntimeError {
+                        wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                    })
             })
         }
         _ => Err(wasm_error!(WasmErrorInner::Host(
@@ -111,15 +59,14 @@ pub fn accept_countersigning_preflight_request<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
+    use matches::assert_matches;
     use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::api::ZomeCall;
     use crate::conductor::CellError;
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::WorkflowError;
-    use crate::sweettest::SweetConductorBatch;
-    use crate::sweettest::SweetDnaFile;
-    use crate::test_utils::consistency_10s;
+    use crate::sweettest::*;
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
@@ -142,14 +89,14 @@ pub mod wasm_test {
     }
 
     /// Allow LockExpired error, panic on anything else
-    fn expect_chain_lock_expired<T>(result: Result<T, ConductorApiError>)
+    fn expect_error_for_write_without_lock<T>(result: Result<T, ConductorApiError>)
     where
         T: std::fmt::Debug,
     {
         match result {
             Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
                 match *workflow_error {
-                    WorkflowError::SourceChainError(SourceChainError::LockExpired) => {}
+                    WorkflowError::SourceChainError(SourceChainError::CountersigningWriteWithoutSession) => {}
                     _ => panic!("{:?}", workflow_error),
                 }
             }
@@ -159,8 +106,9 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn unlock_timeout_session() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -219,7 +167,7 @@ pub mod wasm_test {
             )
             .await;
 
-        // Everyone accepts a short lived session.
+        // Everyone accepts a short-lived session.
         let preflight_request: PreflightRequest = conductor
             .call(
                 &alice,
@@ -270,7 +218,7 @@ pub mod wasm_test {
             .await;
 
         // Bob tries to do the same thing but after timeout.
-        tokio::time::sleep(std::time::Duration::from_millis(10000)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(10500)).await;
         let bob_result: Result<ActionHash, _> = conductor
             .call_fallible(
                 &bob,
@@ -278,7 +226,7 @@ pub mod wasm_test {
                 vec![alice_response.clone(), bob_response.clone()],
             )
             .await;
-        expect_chain_lock_expired(bob_result);
+        expect_error_for_write_without_lock(bob_result);
 
         // At this point Alice's session entry is a liability so can't exist.
         let alice_agent_activity_alice_observed_after: AgentActivity = conductor
@@ -344,6 +292,9 @@ pub mod wasm_test {
         );
 
         // @TODO - the following all pass but perhaps we do NOT want them to?
+        // @TODO updated: You can no longer get these entries after the session has expired but
+        //       this comment is still relevant during the session, once a commit has been done
+        //       and before the session has timed out.
         // It's not immediately clear what direct requests by hash should do in all cases here.
         //
         // If an author does a must_get during a zome call like we do in this test, should it
@@ -367,28 +318,28 @@ pub mod wasm_test {
         // headers created it?
         //
         // etc. etc. I'm just leaving this commentary here to germinate future headaches and self doubt.
-        let _alice_action: SignedActionHashed = conductor
-            .call(
+        conductor
+            .call_fallible::<_, SignedActionHashed>(
                 &alice,
                 "must_get_action",
                 countersigned_action_hash_alice.clone(),
             )
-            .await;
+            .await.unwrap();
 
-        let _alice_record: Record = conductor
-            .call(
+        conductor
+            .call_fallible::<_, Record>(
                 &alice,
                 "must_get_valid_record",
                 countersigned_action_hash_alice.clone(),
             )
-            .await;
-        let _alice_entry: EntryHashed = conductor
-            .call(
+            .await.unwrap();
+        conductor
+            .call_fallible::<_, EntryHashed>(
                 &alice,
                 "must_get_entry",
                 countersigned_entry_hash_alice.clone(),
             )
-            .await;
+            .await.unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -397,7 +348,7 @@ pub mod wasm_test {
     async fn unlock_invalid_session() {
         use holochain_nonce::fresh_nonce;
 
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -509,15 +460,17 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
-        assert!(matches!(countersign_fail_create_alice, Err(_)));
+        assert!(countersign_fail_create_alice.is_err());
         let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
+    #[cfg_attr(target_os = "windows", ignore = "stack overflow on windows")]
     async fn lock_chain() {
         use holochain_nonce::fresh_nonce;
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -597,10 +550,10 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
-        assert!(matches!(
+        assert_matches!(
             preflight_acceptance_fail,
             Ok(Err(RibosomeError::WasmRuntimeError(RuntimeError { .. })))
-        ));
+        );
 
         // Bob can also accept the preflight request.
         let bob_acceptance: PreflightRequestAcceptance = conductor
@@ -797,7 +750,9 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        await_consistency(60, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         assert_eq!(alice_activity.valid_activity.len(), 7);
         assert_eq!(
@@ -828,7 +783,7 @@ pub mod wasm_test {
     #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
     async fn lock_chain_failure() {
         use holochain_nonce::fresh_nonce;
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -1106,7 +1061,9 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         assert_eq!(alice_activity.valid_activity.len(), 8);
         assert_eq!(
@@ -1151,7 +1108,7 @@ pub mod wasm_test {
     }
 
     async fn enzymatic_session_success(force_init: bool) {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -1264,7 +1221,9 @@ pub mod wasm_test {
             )
             .await;
 
-        consistency_10s([&alice_cell, &bob_cell]).await;
+        await_consistency(10, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         // Now the action appears in alice's activty.
         let alice_activity: AgentActivity = conductor
@@ -1305,14 +1264,14 @@ pub mod wasm_test {
     #[cfg(feature = "slow_tests")]
     #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
     async fn enzymatic_session_failure() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
 
         let mut conductors = SweetConductorBatch::from_standard_config(3).await;
         let apps = conductors
-            .setup_app("countersigning", &[dna_file.clone()])
+            .setup_app("countersigning", [&dna_file])
             .await
             .unwrap();
 
@@ -1334,7 +1293,9 @@ pub mod wasm_test {
 
         // NON ENZYMATIC
         {
-            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+                .await
+                .unwrap();
 
             // The countersigned entry does NOT appear in alice's activity yet.
             let alice_activity_pre: AgentActivity = bob_conductor
@@ -1404,7 +1365,9 @@ pub mod wasm_test {
                     unreachable!();
                 };
 
-            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+                .await
+                .unwrap();
 
             // Alice commits the action.
             let _countersigned_action_hash_alice: ActionHash = alice_conductor
@@ -1424,7 +1387,9 @@ pub mod wasm_test {
                 )
                 .await;
 
-            consistency_10s([&alice_cell, &bob_cell, &carol_cell]).await;
+            await_consistency(10, [&alice_cell, &bob_cell, &carol_cell])
+                .await
+                .unwrap();
 
             // Now the action appears in alice's activty.
             let alice_activity: AgentActivity = bob_conductor

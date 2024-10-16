@@ -4,17 +4,16 @@ use kitsune_p2p::event::{
     full_time_window, FetchOpDataEvt, FetchOpDataEvtQuery, KitsuneP2pEvent, PutAgentInfoSignedEvt,
     QueryAgentsEvt, QueryOpHashesEvt, SignNetworkDataEvt,
 };
-use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneOpData, KitsuneSignature, KitsuneSpace};
+use kitsune_p2p_bin_data::{
+    KitsuneAgent, KitsuneBinType, KitsuneOpData, KitsuneSignature, KitsuneSpace,
+};
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_timestamp::Timestamp;
+use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     dependencies::lair_keystore_api::LairClient,
-    dht::{
-        arq::LocalStorageConfig,
-        spacetime::{Dimension, Topology},
-        ArqStrat, PeerStrat,
-    },
+    dht::{spacetime::*, ArqStrat, PeerStrat},
     dht_arc::{DhtArc, DhtArcRange},
     KAgent,
 };
@@ -26,7 +25,7 @@ use std::{
     },
 };
 
-use super::TestHostOp;
+use super::{dht_location, TestHostOp};
 
 pub struct TestLegacyHost {
     handle: Option<tokio::task::JoinHandle<()>>,
@@ -69,18 +68,47 @@ impl TestLegacyHost {
                     match evt {
                         KitsuneP2pEvent::PutAgentInfoSigned { respond, input, .. } => {
                             let mut store = agent_store.write();
-                            let incoming_agents: HashSet<_> =
-                                input.peer_data.iter().map(|p| p.agent.clone()).collect();
-                            store.retain(|p: &AgentInfoSigned| !incoming_agents.contains(&p.agent));
+                            let incoming_agents = input
+                                .peer_data
+                                .iter()
+                                .map(|p| (p.agent.clone(), p))
+                                .collect::<HashMap<_, _>>();
+
+                            let mut agent_info_puts = Vec::new();
+                            store.retain(|p: &AgentInfoSigned| {
+                                let keep = !incoming_agents.contains_key(&p.agent);
+
+                                // If we're not keeping it, we're replacing it so check for a URL change
+                                if !keep {
+                                    let existing_urls =
+                                        p.url_list.iter().cloned().collect::<HashSet<_>>();
+                                    let new_urls = incoming_agents
+                                        .get(&p.agent)
+                                        .unwrap()
+                                        .url_list
+                                        .iter()
+                                        .cloned()
+                                        .collect::<HashSet<_>>();
+
+                                    agent_info_puts.push(AgentInfoPut {
+                                        removed_urls: existing_urls
+                                            .difference(&new_urls)
+                                            .cloned()
+                                            .collect(),
+                                    });
+                                }
+
+                                keep
+                            });
                             store.extend(input.peer_data);
-                            respond.respond(Ok(async move { Ok(()) }.boxed().into()))
+                            respond.respond(Ok(async move { Ok(agent_info_puts) }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryAgents { respond, input, .. } => {
                             let kitsune_p2p::event::QueryAgentsEvt {
                                 space,
                                 agents,
                                 window,
-                                arc_set,
+                                arq_set: arc_set,
                                 near_basis,
                                 limit,
                             } = input;
@@ -94,7 +122,7 @@ impl TestLegacyHost {
                                         .iter()
                                         .filter_map(|v| {
                                             if v.is_active() {
-                                                Some((v.storage_arc.dist(basis.as_u32()), v))
+                                                Some((v.storage_arc().dist(basis.as_u32()), v))
                                             } else {
                                                 None
                                             }
@@ -105,13 +133,14 @@ impl TestLegacyHost {
 
                                     out
                                         .into_iter()
+                                        .filter(|(dist, _)| *dist != u32::MAX) // Filter out Zero arcs
                                         .take(limit as usize)
                                         .map(|(_, v)| v.clone())
                                         .collect()
                                 }
 
                                 // Handle as a "gossip agents" query.
-                                (_agents, window, Some(arc_set), None, None) => {
+                                (_agents, window, Some(arq_set), None, None) => {
                                     let window = window.unwrap_or_else(full_time_window);
                                     let since_ms = window.start.as_millis().max(0) as u64;
                                     let until_ms = window.end.as_millis().max(0) as u64;
@@ -129,8 +158,8 @@ impl TestLegacyHost {
                                             return None;
                                         }
 
-                                        let interval = DhtArcRange::from(info.storage_arc);
-                                        if !arc_set.overlap(&interval.into()) {
+                                        let interval = DhtArcRange::from(info.storage_arc());
+                                        if !arq_set.to_dht_arc_set_std().overlap(&interval.into()) {
                                             return None;
                                         }
 
@@ -167,13 +196,13 @@ impl TestLegacyHost {
                         KitsuneP2pEvent::QueryPeerDensity {
                             respond,
                             space,
-                            dht_arc,
+                            dht_arc: _,
                             ..
                         } => {
                             let cutoff = std::time::Duration::from_secs(60 * 15);
                             let topology = Topology {
-                                space: Dimension::standard_space(),
-                                time: Dimension::time(std::time::Duration::from_secs(60 * 5)),
+                                space: SpaceDimension::standard(),
+                                time: TimeDimension::new(std::time::Duration::from_secs(60 * 5)),
                                 time_origin: Timestamp::now(),
                                 time_cutoff: cutoff,
                             };
@@ -183,17 +212,15 @@ impl TestLegacyHost {
                                 .iter()
                                 .filter_map(|agent: &AgentInfoSigned| {
                                     if agent.space == space && now < agent.expires_at_ms {
-                                        Some(agent.storage_arc.clone())
+                                        Some(agent.storage_arq)
                                     } else {
                                         None
                                     }
                                 })
                                 .collect::<Vec<_>>();
 
-                            let strat = PeerStrat::Quantized(ArqStrat::standard(
-                                LocalStorageConfig::default(),
-                            ));
-                            let view = strat.view(topology, dht_arc, &arcs);
+                            let strat = PeerStrat::Quantized(ArqStrat::default());
+                            let view = strat.view(topology, &arcs);
 
                             respond.respond(Ok(async move { Ok(view) }.boxed().into()))
                         }
@@ -218,7 +245,7 @@ impl TestLegacyHost {
                             respond.respond(Ok(async move { Ok(()) }.boxed().into()))
                         }
                         KitsuneP2pEvent::QueryOpHashes { respond, input, .. } => {
-                            tracing::info!("QueryOpHashes: {:?}", input);
+                            tracing::debug!("QueryOpHashes: {:?}", input);
                             let op_store = op_store.read();
                             let selected_ops: Vec<TestHostOp> = op_store
                                 .iter()
@@ -241,8 +268,15 @@ impl TestLegacyHost {
                                         for interval in intervals {
                                             match interval {
                                                 DhtArcRange::Bounded(lower, upper) => {
-                                                    if lower < op.location()
-                                                        && op.location() < upper
+                                                    if lower <= upper {
+                                                        if lower <= op.location()
+                                                            && op.location() <= upper
+                                                        {
+                                                            in_any = true;
+                                                            break;
+                                                        }
+                                                    } else if lower < op.location()
+                                                        || op.location() < upper
                                                     {
                                                         in_any = true;
                                                         break;
@@ -266,7 +300,7 @@ impl TestLegacyHost {
                                 .cloned()
                                 .collect();
 
-                            if selected_ops.len() > 0 {
+                            if !selected_ops.is_empty() {
                                 let low_time = selected_ops.first().unwrap().authored_at();
                                 let high_time = selected_ops.last().unwrap().authored_at();
 
@@ -309,7 +343,7 @@ impl TestLegacyHost {
                         }
                         KitsuneP2pEvent::SignNetworkData { respond, input, .. } => {
                             let mut key = [0; 32];
-                            key.copy_from_slice(&input.agent.0.as_slice());
+                            key.copy_from_slice(&input.agent.0[0..32]);
                             let sig = keystore
                                 .sign_by_pub_key(
                                     key.into(),
@@ -331,11 +365,18 @@ impl TestLegacyHost {
         self.handle = Some(handle);
     }
 
+    pub fn shutdown(&mut self) {
+        if let Some(handle) = self.handle.take() {
+            handle.abort();
+        }
+    }
+
     pub async fn drain_events(&self) -> Vec<RecordedKitsuneP2pEvent> {
         let mut events = self.events.lock().await;
         std::mem::take(&mut *events)
     }
 
+    #[allow(dead_code)]
     pub fn duplicate_ops_received_count(&self) -> u32 {
         self.duplicate_ops_received_count.load(Ordering::Acquire)
     }
@@ -347,7 +388,10 @@ impl TestLegacyHost {
             .new_seed(tag.into(), None, false)
             .await
             .unwrap();
-        Arc::new(KitsuneAgent(info.ed25519_pub_key.0.to_vec()))
+        let mut pub_key_bytes = info.ed25519_pub_key.0.to_vec();
+        let loc = dht_location(&pub_key_bytes[0..32].try_into().unwrap());
+        pub_key_bytes.extend(&loc);
+        Arc::new(KitsuneAgent::new(pub_key_bytes))
     }
 }
 
@@ -414,7 +458,7 @@ async fn record_event(
         KitsuneP2pEvent::QueryPeerDensity { space, dht_arc, .. } => {
             events.push(RecordedKitsuneP2pEvent::QueryPeerDensity {
                 space: space.clone(),
-                dht_arc: dht_arc.clone(),
+                dht_arc: *dht_arc,
             });
         }
         KitsuneP2pEvent::Call {
@@ -450,7 +494,7 @@ async fn record_event(
             events.push(RecordedKitsuneP2pEvent::ReceiveOps {
                 space: space.clone(),
                 ops: ops.clone(),
-                context: context.clone(),
+                context: *context,
             });
         }
         KitsuneP2pEvent::QueryOpHashes { input, .. } => {

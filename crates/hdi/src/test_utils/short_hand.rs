@@ -72,15 +72,8 @@ pub fn s_entry(action: EntryCreationAction, entry: Entry) -> Op {
 }
 
 /// Create [`Op::RegisterUpdate`].
-pub fn r_update(
-    original_action: EntryCreationAction,
-    original_entry: Option<Entry>,
-    update: Update,
-    new_entry: Option<Entry>,
-) -> Op {
+pub fn r_update(update: Update, new_entry: Option<Entry>) -> Op {
     Op::RegisterUpdate(RegisterUpdate {
-        original_action,
-        original_entry,
         update: SignedHashed {
             hashed: HoloHashed {
                 content: update,
@@ -93,7 +86,7 @@ pub fn r_update(
 }
 
 /// Create [`Op::RegisterDelete`].
-pub fn r_delete(original_entry_type: EntryType, original_entry: Option<Entry>) -> Op {
+pub fn r_delete() -> Op {
     Op::RegisterDelete(RegisterDelete {
         delete: SignedHashed {
             hashed: HoloHashed {
@@ -110,8 +103,6 @@ pub fn r_delete(original_entry_type: EntryType, original_entry: Option<Entry>) -
             },
             signature: Signature([0u8; 64]),
         },
-        original_action: EntryCreationAction::Create(c(original_entry_type)),
-        original_entry,
     })
 }
 
@@ -227,24 +218,25 @@ pub fn dna(dna_hash: DnaHash) -> Dna {
 }
 
 /// Create [`OpenChain`].
-pub fn oc(previous_dna_hash: DnaHash) -> OpenChain {
+pub fn oc(prev_target: MigrationTarget, close_hash: ActionHash) -> OpenChain {
     OpenChain {
         author: ak(0),
         timestamp: Timestamp(0),
         action_seq: 1,
         prev_action: ah(0),
-        prev_dna_hash: previous_dna_hash,
+        prev_target,
+        close_hash,
     }
 }
 
 /// Create [`CloseChain`].
-pub fn cc(new_dna_hash: DnaHash) -> CloseChain {
+pub fn cc(new_target: Option<MigrationTarget>) -> CloseChain {
     CloseChain {
         author: ak(0),
         timestamp: Timestamp(0),
         action_seq: 1,
         prev_action: ah(0),
-        new_dna_hash,
+        new_target,
     }
 }
 

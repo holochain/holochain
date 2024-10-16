@@ -40,7 +40,7 @@ struct Opt {
     config_path: Option<PathBuf>,
 
     /// Instead of the normal "interactive" method of passphrase
-    /// retreival, read the passphrase from stdin. Be careful
+    /// retrieval, read the passphrase from stdin. Be careful
     /// how you make use of this, as it could be less secure,
     /// for example, make sure it is not saved in your
     /// `~/.bash_history`.
@@ -52,6 +52,13 @@ struct Opt {
         help = "Display version information such as git revision and HDK version"
     )]
     build_info: bool,
+
+    /// WARNING!! DANGER!! This exposes your database decryption secrets!
+    /// Print the database decryption secrets to stderr.
+    /// With these PRAGMA commands, you'll be able to run sqlcipher
+    /// directly to manipulate holochain databases.
+    #[structopt(long)]
+    pub danger_print_db_secrets: bool,
 }
 
 fn main() {
@@ -90,6 +97,8 @@ async fn async_main() {
         .await;
 
     kitsune_p2p_types::metrics::init_sys_info_poll();
+
+    info!("Conductor startup: metrics loop spawned.");
 
     let conductor = conductor_handle_from_config(&opt, config).await;
 
@@ -147,6 +156,7 @@ async fn conductor_handle_from_config(opt: &Opt, config: ConductorConfig) -> Con
     match Conductor::builder()
         .config(config)
         .passphrase(passphrase)
+        .danger_print_db_secrets(opt.danger_print_db_secrets)
         .build()
         .await
     {

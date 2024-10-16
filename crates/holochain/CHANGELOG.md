@@ -1,20 +1,262 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- There is no longer a notion of "joining the network". Previously, apps could fail to be enabled, accompanied by an error "Timed out trying to join the network" or "Error while trying to join the network". Now, apps never fail to start for this reason. If the network cannot be reached, the app starts anyway. It is up to the UI to determine whether the node is in an "online" state via `AppRequest::NetworkInfo` (soon-to-be improved with richer information).
-- CellStatus is deprecated and only remains in areas where deserialization would break if it were removed. The only valid CellStatus now is `CellStatus::Joined`. 
+
+- AdminRequest::ListApps is now sorted by the new AppInfo field `installed_at`, in descending order
+- Return a `RibosomeError` when there is a serialisation error invoking a zome callback. For example, if they have an invalid return type or parameters. This error bubbles-up and causes the zome call to fail, giving nicer errors and removing the panic which crashed the conductor in these situations. \#3803
+
+## 0.5.0-dev.0
+
+## 0.4.0
+
+## 0.4.0-dev.28
+
+## 0.4.0-dev.27
+
+- HC sandbox: Fix `--no-dpki` option which previously enabled DPKI in the conductor when set, instead of disabling it.
+- Remove the out-dated `validation_callback_allow_multiple_identical_agent_activity_fetches` test. Originally, it was to test that an identical op is only fetched from the network once and then looked up in the cache. After a refactor of production code this was no longer the case and so the test was refactored to check that it can fetch from the network multiple times. There can be no guarantee that it will do one over the other so the test is naturally flaky.
+- Update the following tests to add a wait for gossip before creating ops. This adds an extra delay and makes sure that the conductors see each other before continuing with the tests.
+  - `multi_create_link_validation`
+  - `session_rollback_with_chc_enabled`
+  - `alice_can_recover_from_a_session_timeout`
+  - `should_be_able_to_schedule_functions_during_session`
+- Update Makefile default recipe to use the new recipes that build and test the workspace with the feature flags `wasmer_sys` and `wasmer_wamr`. \#4284
+- Add support for parsing the lint-level as a set in the Nix holochain module. e.g. `nursery = { level = "allow", priority = -1 }`. \#4284
+- Add the `nix/` directory as a watch point for `direnv` so it reloads the `devShell` if a file changes in that directory. \#4284
+
+## 0.4.0-dev.26
+
+- Countersigning sessions no longer unlock at the end time without checking the outcome. There is a new workflow which will take appropriate actions when the session completes or times out. The majority of the logic is unchanged except for timeouts. If a timeout occurs and Holochain has been up throughout the session then the session will be abandoned. If Holochain crashes or is restarted during the session but is able to recover state from the database, it will attempt to discover what the other participants did. This changes a failure mode that used to be silent to one that will explicitly prevent new writes to your source chain. We are going to provide tooling to resolve this situation in the following change. \#4188
+- Internal rework of chain locking logic. This is used when a countersigning session is in progress, to prevent other actions from being committed during the session. There was a race condition where two countersigning sessions being run one after another could result in responses relevant to the first session accidentally unlocking the new session. That effectively meant that on a larger network, countersigning sessions would get cancelled when nothing had actually gone wrong. The rework of locking made fixing the bug simpler, but the key to the fix was in the `countersigning_success` function. That now checks that incoming signatures are actually for the current session. \#4148
+
+## 0.4.0-dev.25
+
+## 0.4.0-dev.24
+
+- Add `danger_generate_throwaway_device_seed` to allow creation and use of a random device seed for test situations, where a proper device seed is not needed. \#4238
+- Add `allow_throwaway_random_dpki_agent_key` to allow creation of a random (unrecoverable) DPKI agent when a device seed is not specified. \#4238
+- Fixes issue \#3679 where websocket connections would be closed if a message was received that failed to deserialize. The new behaviour isn’t perfect because you will get a timeout instead, but the websocket will remain open and you can continue to send further valid message. There is another issue to track partial deserialization \#4251 so we can respond with an error message instead of a timeout. \#4252
+
+## 0.4.0-dev.23
+
+- Fixes issue \#3679 where websocket connections would be closed if a message was received that failed to deserialize. The new behaviour isn’t perfect because you will get a timeout instead, but the websocket will remain open and you can continue to send further valid message. There is another issue to track partial deserialization \#4251 so we can respond with an error message instead of a timeout. \#4252
+
+## 0.4.0-dev.22
+
+- `device_seed_lair_tag` is now part of `ConductorConfig`. This was previously a field as part of the optional DPKI config. Now, a device seed should be specified even if not using DPKI. If the device seed is specified, when installing an app without providing an agent key, a new agent key will be generated by deriving a key from the device seed using the total number of apps ever installed as part of the derivation path. If the device seed is not specified, it will not be possible to install an app without specifying an agent key (app installation will error out).
+- `allow_throwaway_random_agent_key` can be set in the `InstallAppPayload` to override the aforementioned behavior, allowing an agent key to not be specified even if a device seed is not specified in the conductor. This is a safety mechanism, and should only be used in test situations where the generated agent key is a throwaway and will never need to be recovered.
+- Holochain now actually makes use of the device seed, which was previously ignored
+- Holochain now makes sure to properly register in DPKI any pregenerated agent key which is provided in app installation, when DPKI is enabled.
+- **BREAKING:** Modifies `Action::CloseChain` and `Action::OpenChain` to be able to represent both DNA migrations and Agent migrations:
+  - CloseChain can be used on its own, with no forward reference, to make a chain read-only.
+  - CloseChain can include a forward reference to either a new AgentPubKey or a new DNA hash, which represent a migration to a new chain. The new chain is expected to begin with a corresponding OpenChain which has a backward reference to the CloseChain action. (This will become a validation rule in future work.)
+- Internal rework of `get_agent_activity`. This is not a breaking change for the HDK function of the same name, but it is a breaking change to the previous version of Holochain because the network response for agent activity has been changed. A future change will be made to the HDK function to expose the new functionality. \#4221
+- Add feature flags `wasmer_sys` and `wasmer_wamr` to toggle between using the current wasm compiler and the new, experimental wasm interpreter. `wasmer_sys` is enabled as a default feature to preserve existing behavior.
+
+## 0.4.0-dev.21
+
+- HDK: Add call to get an agent key lineage. A key lineage includes all keys of an agent that have been generated by creating and updating the key.
+- Remove obsolete host context `MigrateAgentHostAccess`. It is not used anywhere.
+
+## 0.4.0-dev.20
+
+- **BREAKING\!** Enables dynamic database encryption. (as opposed to the hard-coded key that was previously being used.) NOTE - this is incompatible with all previous holochain databases, they will not open, and must be deleted. NOTE - this is incompatible with all previous lair databases, they will not open and must be deleted. [\#4198](https://github.com/holochain/holochain/pull/4198)
+
+## 0.4.0-dev.19
+
+- Adds DPKI support. This is not fully hooked up, so the main implication for this particular implementation is that you must be using the same DPKI implementation as all other nodes on the network that you wish to talk to. If the DPKI version mismatches, you cannot establish connections, and will see so as an error in the logs. This work is in preparation for future work which will make it possible to restore your keys if you lose your device, and to revoke and replace your keys if your device is stolen or compromised.
+- Add feature to revoke agent keys. A new call `AdminRequest::RevokeAgentKey` is exposed on the Admin API. Revoking a key for an app will render the key invalid from that moment on and make the source chain of all cells of the app read-only. The key is revoked in the Deepkey service if installed and deleted on all cells’ source chains. No more actions can be written to any of these source chains. Further it will fail to clone a cell of the app.
+- App validation workflow: Remove tracking of missing dependencies. Tracking them introduces higher complexity and the possibility of ops under validation to be stuck. The delay before re-triggering app validation is increased to 100-3000 ms, giving the background task that fetches missing dependencies a chance to complete.
+
+## 0.4.0-dev.18
+
+## 0.4.0-dev.17
+
+## 0.4.0-dev.16
+
+- App manifest field `membrane_proofs_deferred` renamed to `allow_deferred_memproofs`, and the semantics are changed accordingly: if this field is set and memproofs are not provided at installation time (i.e. None is used), then the app will go into the deferred memproof state. Otherwise, if the field is set and memproofs are provided, installation will proceed as if the field were not set.
+- Add HDI call to check if two agent keys are of the same key lineage. It will be possible for an agent to update their key. This new key as well as the old key are part of the same lineage, they belong to the same agent. With the new HDI call `is_same_agent`, app validation can check if two agent keys belong to the same agent. Key updates are exclusive to conductors with a DPKI service installed. If DPKI is not installed. `is_same_agent` compares the two provided keys for equality.
+- Adds the [`UseExisting`](https://github.com/holochain/holochain/blob/293d6e775b3f02285b831626c9911802207a8d85/crates/holochain_types/src/app/app_manifest/app_manifest_v1.rs#L155-L165) cell provisioning strategy, an alternative to `Create`, allowing an app to depend on a cell from another installed app. Read the rustdocs for more info on this new type of provisioning.
+- Possible performance improvement: better async handling of wasm function calls which should allow more concurrent throughput system during long-running zome calls \#4111
+- New protections are put in place for apps which are depended upon by other apps via `UseExisting`. Any “protected” inter-app dependency will prevent a dependency app from being uninstalled until the dependent app is also uninstalled, or if the `force` parameter is set to true in the `UninstallApp` call.
+- CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the
+- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
+- Based on the change above, about adding `IncompleteCommit`, a countersigning session will no longer terminate on missing dependencies. You may retry committing the countersigned entry if you get this error. \#4129
+- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. \#4124
+
+## 0.4.0-dev.15
+
+- *BREAKING* Introduced a new workflow error, `IncompleteCommit`. When inline validation fails with missing dependencies. I.e. Validation for actions that are being committed to the source chain during a zome call discovers missing dependencies. The generic `InvalidCommit` is replaced by this new error. That allows the caller to distinguish between errors that are fatal and errors that can be retried. For now, the only retryable error is caused by missing dependencies. \#4129
+- Based on the change above, about adding `IncompleteCommit`, a countersigning session will no longer terminate on missing dependencies. You may retry committing the countersigned entry if you get this error. \#4129
+- *BREAKING* CountersigningSuccess signal that is emitted when a countersigning session is successfully completed now includes the `app_entry_hash` from the `PreflightRequest` rather than the `EntryHash` that is created when you commit the countersigned entry. This value is easier for clients to get at and use to check that the countersigning session they joined has succeeded. \#4124
+
+## 0.4.0-dev.14
+
+## 0.4.0-dev.13
+
+## 0.4.0-dev.12
+
+- When uninstalling an app or removing a clone cell, only some of the data used by that cell was deleted. Now all data is deleted, freeing up disk space.
+- Adds a new `DisabledAppReason::NotStartedAfterProvidingMemproofs` variant which effectively allows a new app status, corresponding to the specific state where a UI has just called `AppRequest::ProvideMemproofs`, but the app has not yet been Enabled for the first time.
+- Adds a new app interface method `AppRequest::EnableAfterMemproofsProvided`, which allows enabling an app only if the app is in the `AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)` state. Attempting to enable the app from other states (other than Running) will fail.
+- Warrants are used under-the-hood in more places now:
+  - When gossiping amongst authorities, if an authority has a warrant for some data being requested, they will send the warrant instead of the data to indicate the invalid status of that data
+  - When requesting data through must\_get calls, warrants will be returned with the data. The data returned to the client remains the same, but under the hood any warrants will be cached for later use.
+- Adds a `lineage` field to the DNA manifest, which declares forward compatibility for any hash in that list with this DNA
+- Adds a `AdminRequest::GetCompatibleCells` method which returns CellId for all installed cells which use a DNA that is forward-compatible with a given DNA hash. This can be used to find a compatible cell for use with the `UseExisting` cell provisioning method (still to be implemented)
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+- Warrants: When an authority rejects another agent’s authored data, that authority creates a Warrant which is gossiped to the offending agent’s Agent Activity Authority, who then serves that warrant along with any `get_agent_activity` request.
+- The `warrants` field of `AgentActivity` is now populated with warrants for that agent.
+- Authorities author ChainFork warrants when detecting two actions by the same author with the same `prev_action`
+
+## 0.4.0-dev.8
+
+## 0.4.0-dev.7
+
+- App manifest now includes a new `membrane_proofs_deferred: bool` field, which allows the membrane proofs for the app’s cells to be provided at a time after installation, allowing the app’s UI to guide the process of creating membrane proofs.
+- Adds new `AppStatus::AwaitingMemproofs` to indicate an app which was installed with `membrane_proofs_deferred`
+- Adds new app websocket method `ProvideMemproofs` for use with `membrane_proofs_deferred`
+
+## 0.4.0-dev.6
+
+## 0.4.0-dev.5
+
+- Moved the WASM cache from the data directory to a subdirectory of the data directory named `wasm-cache`. Old content won’t be removed and WASMs will have to be recompiled into the new cache. \#3920
+- Remove deprecated functions `consistency_10s` and `consistency_60s`. Use `await_consistency` instead.
+- Remove deprecated type `SweetEasyInline`. Use `SweetInlineZomes` instead.
+- Remove deprecated methods `SweetInlineZomes::callback` and `SweetInlineZomes::integrity_callback`. Use `SweetInlineZomes::function` and `SweetInlineZomes::integrity_function` instead.
+
+## 0.4.0-dev.4
+
+- Rename feature `sweetest` in Holochain crate to `sweettest` to match the crate name.
+- App validation workflow: Reduce interval to re-trigger when dependencies are missing from 10 seconds to 100-1000 ms, according to number of missing dependencies.
+
+## 0.4.0-dev.3
+
+- App validation workflow: Fix bug where ops were stuck in app validation when multiple ops were requiring the same action or entry hash. Such ops were erroneously filtered out from validation for being marked as ops awaiting hashes and not unmarked as awaiting once the hashes had arrived.
+
+## 0.4.0-dev.2
+
+- System validation: Added a new rule that no new actions are allowed following a chain close action.
+- App validation workflow: Add module-level documentation.
+- Validation: Remove unused type `DhtOpOrder`. This type is superseded by `OpOrder`.
+
+## 0.4.0-dev.1
+
+- **BREAKING** - Serialization: Update of serialization packages `holochain-serialization` and `holochain-wasmer-*` leads to general message format change for enums. Previously an enum value like
+
+<!-- end list -->
+
+``` rust
+enum Enum {
+  Variant1,
+  Variant2,
+}
+let value = Enum::Variant1;
+```
+
+was serialized as (JSON representation)
+
+``` json
+{
+  "value": {
+    "variant1": null
+  }
+}
+```
+
+Now it serializes to
+
+``` json
+{
+  "value": "variant1"
+}
+```
+
+- Adds a new admin interface call `RevokeAppAuthenticationToken` to revoke issued app authentication tokens. \#3765
+- App validation workflow: Validate ops in sequence instead of in parallel. Ops validated one after the other have a higher chance of being validated if they depend on earlier ops. When validated in parallel, they potentially needed to await a next workflow run when the dependent op would have been validated.
+
+## 0.4.0-dev.0
+
+## 0.3.0
+
+## 0.3.0-beta-dev.48
+
+## 0.3.0-beta-dev.47
+
+- Connections to Holochain app interfaces are now app specific, so anywhere that you used to have to provide an `installed_app_id` or `app_id` in requests, that is no longer required and has been removed. For example, `AppRequest::AppInfo` no longer takes any parameters and will return information about the app the connection is authenticated with. \#3643
+- Signals are now only sent to clients that are connected to the app emitting the signal. When a cell is created by the conductor, it gets the ability to broadcast signals to any clients that are connected to the app that the cell is part of. When a client authenticates a connection to an app interface, the broadcaster for that app is found and attached to the connection. Previously all connected clients saw all signals, and there was no requirement to authenticate before receiving them. This is important to be aware of - if you connect to an app interface for signals only, you will still have to authenticate before receiving signals. \#3643
+- App websocket connections now require authentication. There is a new admin operation `AdminRequest::IssueAppAuthenticationToken` which must be used to issue a connection token for a specific app. That token can be used with any app interface that will permit a connection to that app. After establishing a client connection, the first message must be an Authenticate message (rather than Request or Signal) and contain an `AppAuthenticationRequest` as its payload. \#3622
+- When creating an app interface with `AdminRequest::AttachAppInterface` it is possible to specify an `installed_app_id` which will require that connections to that app interface are for the specified app. \#3622
+- `AdminRequest::ListAppInterfaces` has been changed from returning a list of ports to return a list of `AppInterfaceInfo` which includes the port as well as the `installed_app_id` and `allowed_origins` for that interface. \#3622
+
+## 0.3.0-beta-dev.46
+
+## 0.3.0-beta-dev.45
+
+- App validation workflow: Mock network in unit tests using new type `GenericNetwork` to properly test `must_get_agent_activity`. Previously that was not possible, as all peers in a test case were authorities for each other and `must_get_agent_activity` would therefore not send requests to the network.
+- App validation workflow: Skip ops that have missing dependencies. If an op is awaiting dependencies to be fetched, it will be excluded from app validation.
+- App validation workflow: Integration workflow is only triggered when some ops have been validated (either accepted or rejected).
+- App validation workflow: While op dependencies are missing and being fetched, the workflow is re-triggering itself periodically. It’ll terminate this re-triggering after an interval in which no more missing dependencies could be fetched.
+
+## 0.3.0-beta-dev.44
+
+- App validation workflow: Refactored to not wait for ops that the op being validated depends on, that are being fetched and thus keep the workflow occupied. The workflow no longer awaits the dependencies and instead sends off fetch requests in the background.
+- `consistency_10s` and `consistency_60s` from `holochain::sweettest` are deprecated. Use `await_consistency` instead.
+
+## 0.3.0-beta-dev.43
+
+- BREAKING: Holochain websockets now require an `allowed_origins` configuration to be provided. When connecting to the websocket a matching origin must be specified in the connection request `Origin` header. [\#3460](https://github.com/holochain/holochain/pull/3460)
+  - The `ConductorConfiguration` has been changed so that specifying an admin interface requires an `allowed_origins` as well as the port it already required.
+  - `AdminRequest::AddAdminInterfaces` has been updated as per the previous point.
+  - `AdminRequest::AttachAppInterface` has also been updated so that attaching app ports requires an `allowed_origins` as well as the port it already required.
+- BREAKING: Split the authored database by author. It was previous partitioned by DNA only and each agent that shared a DB because they were running the same DNA would have to share the write lock. This is a pretty serious bottleneck when the same app is being run for multiple agents on the same conductor. They are now separate files on disk and writes can proceed independently. There is no migration path for this change, if you have existing databases they will not be found. [\#3450](https://github.com/holochain/holochain/pull/3450)
+
+## 0.3.0-beta-dev.42
+
+## 0.3.0-beta-dev.41
+
+## 0.3.0-beta-dev.40
+
+## 0.3.0-beta-dev.39
+
+## 0.3.0-beta-dev.38
+
+- Some of the function signatures around SweetConductor app installation have changed slightly. You may need to use a slice (`&[x]`) instead of a collection of references (`[&x]`), or vice versa, in some places. If this is cumbersome please open an issue. [\#3310](https://github.com/holochain/holochain/pull/3310)
+- Start refactoring app validation workflow by simplifying main validation loop. All op validations are awaited at once now instead of creating a stream of tasks and processing it in the background.
+
+## 0.3.0-beta-dev.37
+
+## 0.3.0-beta-dev.36
+
+- Added `lair_keystore_version_req` to the output of `--build-info` for Holochain.
+- BREAKING: Changed `post_commit` behavior so that it only gets called after a commit to the source chain. Previously, it would get called after every zome call, regardless of if a commit happened. [\#3302](https://github.com/holochain/holochain/pull/3302)
+- Fixed a performance bug: various extra tasks were being triggered after every zome call which are only necessary if the zome call resulted in commits to the source chain. The fix should improve performance for read-only zome calls. [\#3302](https://github.com/holochain/holochain/pull/3302)
+- Fixed a bug during the admin call `GrantZomeCallCapability`, where if the source chain had not yet been initialized, it was possible to create a capability grant before the `init()` callback runs. Now, `init()` is guaranteed to run before any cap grants are created.
+- Updates sys validation to allow the timestamps of two actions on the same chain to be equal, rather than requiring them to strictly increasing.
+
+## 0.3.0-beta-dev.35
+
+- There is no longer a notion of “joining the network”. Previously, apps could fail to be enabled, accompanied by an error “Timed out trying to join the network” or “Error while trying to join the network”. Now, apps never fail to start for this reason. If the network cannot be reached, the app starts anyway. It is up to the UI to determine whether the node is in an “online” state via `AppRequest::NetworkInfo` (soon-to-be improved with richer information).
+- CellStatus is deprecated and only remains in areas where deserialization would break if it were removed. The only valid CellStatus now is `CellStatus::Joined`.
 
 ## 0.3.0-beta-dev.34
 
 - Fix: Wasmer cache was deserializing modules for every zome call which slowed them down. Additionally the instance cache that was supposed to store callable instances of modules was not doing that correctly. A cache for deserialized modules has been re-introduced and the instance cache was removed, following recommendation from the wasmer team regarding caching.
 - Fix: Call contexts of internal callbacks like `validate` were not cleaned up from an in-memory map. Now external as well as internal callbacks remove the call contexts from memory. This is covered by a test.
 - **BREAKING CHANGE:** Wasmer-related items from `holochain_types` have been moved to crate `holochain_wasmer_host::module`.
-- Refactor: Every ribosome used to create a separate wasmer module cache. During app installation of multiple agents on the same conductor, the caches weren't used, regardless of whether that DNA is already registered or not. The module cache is now moved to the conductor and kept there as a single instance.
+- Refactor: Every ribosome used to create a separate wasmer module cache. During app installation of multiple agents on the same conductor, the caches weren’t used, regardless of whether that DNA is already registered or not. The module cache is now moved to the conductor and kept there as a single instance.
 
 ## 0.3.0-beta-dev.33
 

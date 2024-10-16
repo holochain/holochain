@@ -1,7 +1,7 @@
 //! # Database Cache
 //! This is an in-memory cache that is used to store the state of the DHT database.
 
-use crate::dht_op::DhtOpType;
+use crate::dht_op::ChainOpType;
 use crate::share::RwShare;
 use holo_hash::*;
 use holochain_sqlite::prelude::*;
@@ -79,6 +79,7 @@ impl DhtDbQueryCache {
     }
 
     /// Lazily initiate the activity cache.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn get_or_try_init(&self) -> DatabaseResult<&ActivityCache> {
         self.activity
             .get_or_try_init(|| {
@@ -93,7 +94,7 @@ impl DhtDbQueryCache {
                             )?
                             .query_map(
                                 named_params! {
-                                    ":register_activity": DhtOpType::RegisterAgentActivity,
+                                    ":register_activity": ChainOpType::RegisterAgentActivity,
                                 },
                                 |row| {
                                     Ok((
@@ -115,7 +116,7 @@ impl DhtDbQueryCache {
                                 )?
                                 .query_map(
                                     named_params! {
-                                        ":register_activity": DhtOpType::RegisterAgentActivity,
+                                        ":register_activity": ChainOpType::RegisterAgentActivity,
                                     },
                                     |row| Ok(Arc::new(row.get::<_, AgentPubKey>(0)?)),
                                 )?
@@ -134,7 +135,7 @@ impl DhtDbQueryCache {
                                 let awaiting_deps = stmt
                                     .query_map(
                                         named_params! {
-                                            ":register_activity": DhtOpType::RegisterAgentActivity,
+                                            ":register_activity": ChainOpType::RegisterAgentActivity,
                                             ":author": author,
                                         },
                                         |row| row.get::<_, u32>(0),
@@ -255,35 +256,35 @@ impl DhtDbQueryCache {
     pub async fn set_activity_ready_to_integrate(
         &self,
         agent: &AgentPubKey,
-        action_sequence: u32,
+        action_sequence: Option<u32>,
     ) -> DbCacheResult<()> {
         self.new_activity_inner(
             agent,
             ActivityBounds {
-                ready_to_integrate: Some(action_sequence),
+                ready_to_integrate: action_sequence,
                 ..Default::default()
             },
         )
         .await
     }
 
-    /// Set activity to to integrated.
+    /// Set activity to integrated.
     pub async fn set_activity_to_integrated(
         &self,
         agent: &AgentPubKey,
-        action_sequence: u32,
+        action_sequence: Option<u32>,
     ) -> DbCacheResult<()> {
         self.new_activity_inner(
             agent,
             ActivityBounds {
-                integrated: Some(action_sequence),
+                integrated: action_sequence,
                 ..Default::default()
             },
         )
         .await
     }
 
-    /// Add an authors activity.
+    /// Add an author's activity.
     async fn new_activity_inner(
         &self,
         agent: &AgentPubKey,

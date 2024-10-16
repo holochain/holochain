@@ -3,10 +3,10 @@ use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
+use holochain_conductor_services::DpkiServiceError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmErrorInner;
-use holochain_websocket::WebsocketError;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
@@ -22,6 +22,9 @@ pub enum ConductorError {
 
     #[error(transparent)]
     AppBundleError(#[from] AppBundleError),
+
+    #[error("App can't be disabled/uninstalled because it is protected by its dependents. App: {0} Dependents: {1:?}")]
+    AppHasDependents(InstalledAppId, Vec<InstalledAppId>),
 
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
@@ -46,6 +49,9 @@ pub enum ConductorError {
 
     #[error("Configuration consistency error: {0}")]
     ConfigError(String),
+
+    #[error("DPKI service error: {0}")]
+    DpkiError(#[from] DpkiServiceError),
 
     #[error("Config deserialization error: {0}")]
     SerializationError(#[from] serde_yaml::Error),
@@ -93,6 +99,9 @@ pub enum ConductorError {
     #[error("Tried to perform an operation on an app that was not running: {0}")]
     AppNotRunning(InstalledAppId),
 
+    #[error("App status could not be changed: {0}")]
+    AppStatusError(String),
+
     #[error(transparent)]
     HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
 
@@ -126,8 +135,11 @@ pub enum ConductorError {
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
 
-    #[error(transparent)]
-    WebsocketError(#[from] WebsocketError),
+    #[error("Authentication failed with reason: {0}")]
+    FailedAuthenticationError(String),
+
+    #[error("App {0} is not allowed to access: {1:?}")]
+    AppAccessError(InstalledAppId, Box<dyn std::fmt::Debug + Send + Sync>),
 
     /// Other
     #[error("Other: {0}")]
@@ -138,6 +150,9 @@ pub enum ConductorError {
 
     #[error("The conductor has no config directory.")]
     NoConfigPath,
+
+    #[error("A required trigger is missing: {0}")]
+    MissingTrigger(String),
 }
 
 impl ConductorError {

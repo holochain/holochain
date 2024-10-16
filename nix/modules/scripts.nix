@@ -35,12 +35,11 @@
         set -xeuo pipefail
         trap "cd $PWD" EXIT
 
-        export VERSIONS_DIR="./versions/''${1}"
-        export DEFAULT_VERSIONS_DIR="$(nix flake metadata --no-write-lock-file --json | jq --raw-output '.locks.nodes.versions.locked.path')"
+        export VERSIONS_DIR="versions/''${1}"
 
         (
           cd "$VERSIONS_DIR"
-          nix flake update --tarball-ttl 0
+          nix flake update --refresh
         )
 
         if [[ $(git diff -- "$VERSIONS_DIR"/flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
@@ -50,8 +49,14 @@
           git add "$VERSIONS_DIR"/flake.lock
         fi
 
-        if [[ "$VERSIONS_DIR" == "$DEFAULT_VERSIONS_DIR" ]]; then
-          nix flake lock --tarball-ttl 0 --update-input versions --override-input versions "path:$VERSIONS_DIR"
+        # Want to update the root flake.lock if we're updating the version that is currently the default.
+        if grep -qE "versions\.url = \".+\?dir=''${VERSIONS_DIR}\"" flake.nix; then
+          nix flake update --refresh versions
+
+          nix flake update --refresh versions/holochain
+          nix flake update --refresh versions/lair
+          nix flake update --refresh versions/launcher
+          nix flake update --refresh versions/scaffolding
         fi
 
         if [[ $(git diff -- flake.lock | grep -E '^[+-]\s+"' | grep -v lastModified --count) -eq 0 ]]; then
@@ -84,12 +89,12 @@
         ${self'.packages.release-automation}/bin/release-automation \
           --workspace-path=''${WORKSPACE_PATH} \
           --log-level=debug \
-          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy|hcterm)$" \
+          --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy|hcterm|hc_service_check)$" \
           release \
             --force-tag-creation \
             --force-branch-creation \
             --additional-manifests="crates/test_utils/wasm/wasm_workspace/Cargo.toml" \
-            --allowed-semver-increment-modes="!pre_minor beta-dev" \
+            --allowed-semver-increment-modes="!pre_minor dev" \
             --steps=CreateReleaseBranch,BumpReleaseVersions
 
         ${self'.packages.release-automation}/bin/release-automation \

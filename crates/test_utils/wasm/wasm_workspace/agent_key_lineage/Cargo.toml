@@ -1,0 +1,19 @@
+[package]
+name = "agent_key_lineage"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "test_wasm_agent_key_lineage"
+crate-type = ["cdylib", "rlib"]
+
+[[example]]
+name = "integrity_test_wasm_agent_key_lineage"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
+# reminder - do not use workspace deps
+[dependencies]
+hdk = { path = "../../../../hdk" }
+serde = "1.0"
+hdi = { path = "../../../../hdi" }

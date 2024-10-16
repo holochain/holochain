@@ -1,7 +1,12 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    cell::Cell,
+    collections::{hash_map, HashMap},
+    sync::Arc,
+    time::Duration,
+};
 
 use super::{
     conductor::RwShare,
@@ -9,13 +14,14 @@ use super::{
     p2p_agent_store::{self, P2pBatch},
 };
 use crate::conductor::{error::ConductorError, state::ConductorState};
+use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::{
     queue_consumer::QueueConsumerMap,
     workflow::{
-        countersigning_workflow::{incoming_countersigning, CountersigningWorkspace},
         incoming_dht_ops_workflow::{
             incoming_dht_ops_workflow, IncomingOpHashes, IncomingOpsBatch,
         },
+        witnessing_workflow::{receive_incoming_countersigning_ops, WitnessingWorkspace},
     },
 };
 use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
@@ -30,8 +36,9 @@ use holochain_p2p::{
     event::FetchOpDataQuery,
 };
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents,
-    DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite, ReadAccess,
+    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
+    DbKindP2pAgents, DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite,
+    PoolConfig, ReadAccess,
 };
 use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,
@@ -39,13 +46,13 @@ use holochain_state::{
     prelude::*,
     query::{map_sql_dht_op_common, StateQueryError},
 };
+use holochain_util::timed;
 use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
 use kitsune_p2p_block::NodeId;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
-use tracing::instrument;
 
 #[cfg(test)]
 mod tests;
@@ -62,6 +69,7 @@ pub struct Spaces {
     pub(crate) queue_consumer_map: QueueConsumerMap,
     pub(crate) conductor_db: DbWrite<DbKindConductor>,
     pub(crate) wasm_db: DbWrite<DbKindWasm>,
+    db_key: DbKey,
 }
 
 #[derive(Clone)]
@@ -80,9 +88,9 @@ pub struct Space {
     /// The conductor database. There is only one of these.
     pub conductor_db: DbWrite<DbKindConductor>,
 
-    /// The authored databases. These are shared across cells.
-    /// There is one per unique Dna.
-    pub authored_db: DbWrite<DbKindAuthored>,
+    /// The authored databases. These are per-agent.
+    /// There is one per unique combination of Dna and AgentPubKey.
+    pub authored_dbs: Arc<parking_lot::Mutex<HashMap<AgentPubKey, DbWrite<DbKindAuthored>>>>,
 
     /// The dht databases. These are shared across cells.
     /// There is one per unique Dna.
@@ -100,14 +108,21 @@ pub struct Space {
     /// A cache for slow database queries.
     pub dht_query_cache: DhtDbQueryCache,
 
-    /// Countersigning workspace that is shared across this cell.
-    pub countersigning_workspace: CountersigningWorkspace,
+    /// Countersigning workspace for session state.
+    pub countersigning_workspaces:
+        Arc<parking_lot::Mutex<HashMap<CellId, Arc<CountersigningWorkspace>>>>,
+
+    /// Witnessing workspace that is shared across this cell.
+    pub witnessing_workspace: WitnessingWorkspace,
 
     /// Incoming op hashes that are queued for processing.
     pub incoming_op_hashes: IncomingOpHashes,
 
     /// Incoming ops batch for this space.
     pub incoming_ops_batch: IncomingOpsBatch,
+
+    root_db_dir: Arc<PathBuf>,
+    db_key: DbKey,
 }
 
 #[cfg(test)]
@@ -122,23 +137,76 @@ pub struct TestSpace {
     _temp_dir: tempfile::TempDir,
 }
 
+thread_local!(static DANGER_PRINT_DB_SECRETS: Cell<bool> = const { Cell::new(false) });
+
+/// WARNING!! DANGER!! This exposes your database decryption secrets!
+/// Print the database decryption secrets to stderr.
+/// With these PRAGMA commands, you'll be able to run sqlcipher
+/// directly to manipulate holochain databases.
+pub fn set_danger_print_db_secrets(v: bool) {
+    DANGER_PRINT_DB_SECRETS.set(v);
+}
+
 impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
-    pub fn new(config: Arc<ConductorConfig>) -> ConductorResult<Self> {
+    pub async fn new(
+        config: Arc<ConductorConfig>,
+        passphrase: sodoken::BufRead,
+    ) -> ConductorResult<Self> {
+        // do this before any awaits
+        let danger_print_db_secrets = DANGER_PRINT_DB_SECRETS.get();
+        // clear the value
+        DANGER_PRINT_DB_SECRETS.set(false);
+
         let root_db_dir: DatabasesRootPath = config
             .data_root_path
             .clone()
             .ok_or(ConductorError::NoDataRootPath)?
             .try_into()?;
+
+        let db_key_path = root_db_dir.join("db.key");
+        let db_key = match tokio::fs::read_to_string(db_key_path.clone()).await {
+            Ok(locked) => DbKey::load(locked, passphrase).await?,
+            Err(_) => {
+                let db_key = DbKey::generate(passphrase).await?;
+                tokio::fs::write(db_key_path, db_key.locked.clone()).await?;
+                db_key
+            }
+        };
+
+        if danger_print_db_secrets {
+            eprintln!(
+                "--beg-db-secrets--{}--end-db-secrets--",
+                &String::from_utf8_lossy(&db_key.unlocked.read_lock())
+            );
+        }
+
         let db_sync_strategy = config.db_sync_strategy;
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
-        let conductor_db =
-            DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
-        let wasm_db =
-            DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindWasm, db_sync_level)?;
+
+        let (conductor_db, wasm_db) = tokio::task::block_in_place(|| {
+            let conductor_db = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindConductor,
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                },
+            )?;
+            let wasm_db = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindWasm,
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                },
+            )?;
+            ConductorResult::Ok((conductor_db, wasm_db))
+        })?;
+
         Ok(Spaces {
             map: RwShare::new(HashMap::new()),
             db_dir: Arc::new(root_db_dir),
@@ -146,6 +214,7 @@ impl Spaces {
             queue_consumer_map: QueueConsumerMap::new(),
             conductor_db,
             wasm_db,
+            db_key,
         })
     }
 
@@ -248,35 +317,24 @@ impl Spaces {
     }
 
     /// Get the holochain conductor state
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_state(&self) -> ConductorResult<ConductorState> {
-        let state = self
-            .conductor_db
-            .read_async(|txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                match state {
-                    Some(state) => ConductorResult::Ok(Some(from_blob(state)?)),
-                    None => ConductorResult::Ok(None),
-                }
-            })
-            .await?;
-
-        match state {
-            Some(state) => Ok(state),
-            // update_state will again try to read the state. It's a little
-            // inefficient in the infrequent case where we haven't saved the
-            // state yet, but more atomic, so worth it.
-            None => self.update_state(Ok).await,
-        }
+        timed!([1, 10, 1000], "get_state", {
+            match query_conductor_state(&self.conductor_db).await? {
+                Some(state) => Ok(state),
+                // update_state will again try to read the state. It's a little
+                // inefficient in the infrequent case where we haven't saved the
+                // state yet, but more atomic, so worth it.
+                None => self.update_state(Ok).await,
+            }
+        })
     }
 
     /// Update the internal state with a pure function mapping old state to new
-    pub async fn update_state<F: Send>(&self, f: F) -> ConductorResult<ConductorState>
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    pub async fn update_state<F>(&self, f: F) -> ConductorResult<ConductorState>
     where
-        F: FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
+        F: Send + FnOnce(ConductorState) -> ConductorResult<ConductorState> + 'static,
     {
         let (state, _) = self.update_state_prime(|s| Ok((f(s)?, ()))).await?;
         Ok(state)
@@ -285,29 +343,30 @@ impl Spaces {
     /// Update the internal state with a pure function mapping old state to new,
     /// which may also produce an output value which will be the output of
     /// this function
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn update_state_prime<F, O>(&self, f: F) -> ConductorResult<(ConductorState, O)>
     where
         F: FnOnce(ConductorState) -> ConductorResult<(ConductorState, O)> + Send + 'static,
         O: Send + 'static,
     {
-        let output = self
-            .conductor_db
-            .write_async(move |txn| {
-                let state = txn
-                    .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
-                        row.get("blob")
-                    })
-                    .optional()?;
-                let state = match state {
-                    Some(state) => from_blob(state)?,
-                    None => ConductorState::default(),
-                };
-                let (new_state, output) = f(state)?;
-                mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
-                Result::<_, ConductorError>::Ok((new_state, output))
-            })
-            .await?;
-        Ok(output)
+        timed!([1, 10, 1000], "update_state_prime", {
+            self.conductor_db
+                .write_async(move |txn| {
+                    let state = txn
+                        .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                            row.get("blob")
+                        })
+                        .optional()?;
+                    let state = match state {
+                        Some(state) => from_blob(state)?,
+                        None => ConductorState::default(),
+                    };
+                    let (new_state, output) = f(state)?;
+                    mutations::insert_conductor_state(txn, (&new_state).try_into()?)?;
+                    Result::<_, ConductorError>::Ok((new_state, output))
+                })
+                .await
+        })
     }
 
     /// Get something from every space
@@ -318,7 +377,7 @@ impl Spaces {
 
     /// Get the space if it exists or create it if it doesn't.
     pub fn get_or_create_space(&self, dna_hash: &DnaHash) -> DatabaseResult<Space> {
-        self.get_or_create_space_ref(dna_hash, Space::clone)
+        self.get_or_create_space_ref(dna_hash, |s| s.clone())
     }
 
     fn get_or_create_space_ref<F, R>(&self, dna_hash: &DnaHash, f: F) -> DatabaseResult<R>
@@ -330,12 +389,13 @@ impl Spaces {
             None => self
                 .map
                 .share_mut(|spaces| match spaces.entry(dna_hash.clone()) {
-                    std::collections::hash_map::Entry::Occupied(entry) => Ok(f(entry.get())),
-                    std::collections::hash_map::Entry::Vacant(entry) => {
+                    hash_map::Entry::Occupied(entry) => Ok(f(entry.get())),
+                    hash_map::Entry::Vacant(entry) => {
                         let space = Space::new(
                             Arc::new(dna_hash.clone()),
-                            &self.db_dir,
+                            self.db_dir.to_path_buf(),
                             self.config.db_sync_strategy,
+                            self.db_key.clone(),
                         )?;
 
                         let r = f(&space);
@@ -351,9 +411,23 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.cache_db.clone())
     }
 
-    /// Get the authored database (this will create the space if it doesn't already exist).
-    pub fn authored_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindAuthored>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.authored_db.clone())
+    /// Get or create the authored database for this author (this will create the space if it doesn't already exist).
+    pub fn get_or_create_authored_db(
+        &self,
+        dna_hash: &DnaHash,
+        author: AgentPubKey,
+    ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
+        self.get_or_create_space_ref(dna_hash, |space| {
+            space.get_or_create_authored_db(author.clone())
+        })?
+    }
+
+    /// Get all the authored databases for this space (this will create the space if it doesn't already exist).
+    pub fn get_all_authored_dbs(
+        &self,
+        dna_hash: &DnaHash,
+    ) -> DatabaseResult<Vec<DbWrite<DbKindAuthored>>> {
+        self.get_or_create_space_ref(dna_hash, |space| space.get_all_authored_dbs())
     }
 
     /// Get the dht database (this will create the space if it doesn't already exist).
@@ -379,7 +453,7 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.p2p_batch_sender.clone())
     }
 
-    #[instrument(skip(self))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// the network module is requesting a list of dht op hashes
     /// Get the [`DhtOpHash`]es and authored timestamps for a given time window.
     pub async fn handle_query_op_hashes(
@@ -476,7 +550,7 @@ impl Spaces {
         Ok(results)
     }
 
-    #[instrument(skip(self, query))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, query)))]
     /// The network module is requesting the content for dht ops
     pub async fn handle_fetch_op_data(
         &self,
@@ -498,7 +572,7 @@ impl Spaces {
         }
     }
 
-    #[instrument(skip(self, regions))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, regions)))]
     /// The network module is requesting the content for dht ops
     pub async fn handle_fetch_op_data_by_regions(
         &self,
@@ -525,7 +599,8 @@ impl Spaces {
                             |row| {
                                 let hash: DhtOpHash =
                                     row.get("hash").map_err(StateQueryError::from)?;
-                                Ok(map_sql_dht_op_common(row)?.map(|op| (hash, op)))
+                                Ok(map_sql_dht_op_common(false, false, "type", row)?
+                                    .map(|op| (hash, op)))
                             },
                         )
                         .map_err(StateQueryError::from)?
@@ -541,7 +616,7 @@ impl Spaces {
             .await?)
     }
 
-    #[instrument(skip(self, op_hashes))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, op_hashes)))]
     /// The network module is requesting the content for dht ops
     pub async fn handle_fetch_op_data_by_hashes(
         &self,
@@ -551,7 +626,9 @@ impl Spaces {
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         let mut sql = "
             SELECT DhtOp.hash, DhtOp.type AS dht_type,
-            Action.blob AS action_blob, Entry.blob AS entry_blob
+            Action.blob AS action_blob, 
+            Action.author as author,
+            Entry.blob AS entry_blob
             FROM DHtOp
             JOIN Action ON DhtOp.action_hash = Action.hash
             LEFT JOIN Entry ON Action.entry_hash = Entry.hash
@@ -577,25 +654,9 @@ impl Spaces {
                     let mut stmt = txn.prepare_cached(&sql)?;
                     let mut rows = stmt.query([hash])?;
                     if let Some(row) = rows.next()? {
-                        let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-                        let op_type: DhtOpType = row.get("dht_type")?;
+                        let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
                         let hash: DhtOpHash = row.get("hash")?;
-                        // Check the entry isn't private before gossiping it.
-                        let mut entry: Option<Entry> = None;
-                        if action
-                            .0
-                            .entry_type()
-                            .filter(|et| *et.visibility() == EntryVisibility::Public)
-                            .is_some()
-                        {
-                            let e: Option<Vec<u8>> = row.get("entry_blob")?;
-                            entry = match e {
-                                Some(entry) => Some(from_blob::<Entry>(entry)?),
-                                None => None,
-                            };
-                        }
-                        let op = DhtOp::from_type(op_type, action, entry)?;
-                        out.push((hash, op))
+                        out.push((hash, op));
                     } else {
                         return Err(holochain_state::query::StateQueryError::Sql(
                             rusqlite::Error::QueryReturnedNoRows,
@@ -608,7 +669,10 @@ impl Spaces {
         Ok(results)
     }
 
-    #[instrument(skip(self, request_validation_receipt, ops))]
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, request_validation_receipt, ops))
+    )]
     /// we are receiving a "publish" event from the network
     pub async fn handle_publish(
         &self,
@@ -622,26 +686,35 @@ impl Spaces {
         // send it to the incoming ops workflow.
         if countersigning_session {
             use futures::StreamExt;
-            let ops = futures::stream::iter(ops.into_iter().map(|op| {
-                let hash = DhtOpHash::with_data_sync(&op);
-                (hash, op)
+            let ops = futures::stream::iter(ops.into_iter().filter_map(|op| match op {
+                DhtOp::ChainOp(op) => {
+                    let hash = DhtOpHash::with_data_sync(&*op);
+                    Some((hash, *op))
+                }
+                _ => {
+                    tracing::warn!(
+                        ?op,
+                        "Invalid DhtOp in countersigning session, only ChainOps will be handled"
+                    );
+                    None
+                }
             }))
             .collect()
             .await;
 
             let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
                 (
-                    space.countersigning_workspace.clone(),
+                    space.witnessing_workspace.clone(),
                     self.queue_consumer_map
-                        .countersigning_trigger(space.dna_hash.clone()),
+                        .witnessing_trigger(space.dna_hash.clone()),
                 )
             })?;
             let trigger = match trigger {
                 Some(t) => t,
-                // If the workflow has not been spawned yet we can't handle incoming messages.
+                // If the workflow has not been spawned yet, we can't handle incoming messages.
                 None => return Ok(()),
             };
-            incoming_countersigning(ops, &workspace, trigger)?;
+            receive_incoming_countersigning_ops(ops, &workspace, trigger)?;
         } else {
             let space = self.get_or_create_space(dna_hash)?;
             let trigger = match self
@@ -673,41 +746,60 @@ impl Spaces {
 impl Space {
     fn new(
         dna_hash: Arc<DnaHash>,
-        root_db_dir: &PathBuf,
+        root_db_dir: PathBuf,
         db_sync_strategy: DbSyncStrategy,
+        db_key: DbKey,
     ) -> DatabaseResult<Self> {
         let space = dna_hash.to_kitsune();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
-        let cache = DbWrite::open_with_sync_level(
-            root_db_dir.as_ref(),
-            DbKindCache(dna_hash.clone()),
-            db_sync_level,
-        )?;
-        let authored_db = DbWrite::open_with_sync_level(
-            root_db_dir.as_ref(),
-            DbKindAuthored(dna_hash.clone()),
-            DbSyncLevel::Normal,
-        )?;
-        let dht_db = DbWrite::open_with_sync_level(
-            root_db_dir.as_ref(),
-            DbKindDht(dna_hash.clone()),
-            db_sync_level,
-        )?;
-        let p2p_agents_db = DbWrite::open_with_sync_level(
-            root_db_dir.as_ref(),
-            DbKindP2pAgents(space.clone()),
-            db_sync_level,
-        )?;
-        let p2p_metrics_db = DbWrite::open_with_sync_level(
-            root_db_dir.as_ref(),
-            DbKindP2pMetrics(space),
-            db_sync_level,
-        )?;
-        let conductor_db: DbWrite<DbKindConductor> =
-            DbWrite::open_with_sync_level(root_db_dir.as_ref(), DbKindConductor, db_sync_level)?;
+
+        let (cache, dht_db, p2p_agents_db, p2p_metrics_db, conductor_db) =
+            tokio::task::block_in_place(|| {
+                let cache = DbWrite::open_with_pool_config(
+                    root_db_dir.as_ref(),
+                    DbKindCache(dna_hash.clone()),
+                    PoolConfig {
+                        synchronous_level: db_sync_level,
+                        key: db_key.clone(),
+                    },
+                )?;
+                let dht_db = DbWrite::open_with_pool_config(
+                    root_db_dir.as_ref(),
+                    DbKindDht(dna_hash.clone()),
+                    PoolConfig {
+                        synchronous_level: db_sync_level,
+                        key: db_key.clone(),
+                    },
+                )?;
+                let p2p_agents_db = DbWrite::open_with_pool_config(
+                    root_db_dir.as_ref(),
+                    DbKindP2pAgents(space.clone()),
+                    PoolConfig {
+                        synchronous_level: db_sync_level,
+                        key: db_key.clone(),
+                    },
+                )?;
+                let p2p_metrics_db = DbWrite::open_with_pool_config(
+                    root_db_dir.as_ref(),
+                    DbKindP2pMetrics(space),
+                    PoolConfig {
+                        synchronous_level: db_sync_level,
+                        key: db_key.clone(),
+                    },
+                )?;
+                let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
+                    root_db_dir.as_ref(),
+                    DbKindConductor,
+                    PoolConfig {
+                        synchronous_level: db_sync_level,
+                        key: db_key.clone(),
+                    },
+                )?;
+                DatabaseResult::Ok((cache, dht_db, p2p_agents_db, p2p_metrics_db, conductor_db))
+            })?;
 
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         tokio::spawn(p2p_agent_store::p2p_put_all_batch(
@@ -716,23 +808,26 @@ impl Space {
         ));
         let p2p_batch_sender = tx;
 
-        let countersigning_workspace = CountersigningWorkspace::new();
+        let witnessing_workspace = WitnessingWorkspace::default();
         let incoming_op_hashes = IncomingOpHashes::default();
         let incoming_ops_batch = IncomingOpsBatch::default();
         let dht_query_cache = DhtDbQueryCache::new(dht_db.clone().into());
         let r = Self {
             dna_hash,
             cache_db: cache,
-            authored_db,
+            authored_dbs: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             dht_db,
             p2p_agents_db,
             p2p_metrics_db,
             p2p_batch_sender,
-            countersigning_workspace,
+            countersigning_workspaces: Default::default(),
+            witnessing_workspace,
             incoming_op_hashes,
             incoming_ops_batch,
             dht_query_cache,
             conductor_db,
+            root_db_dir: Arc::new(root_db_dir),
+            db_key,
         };
         Ok(r)
     }
@@ -744,7 +839,7 @@ impl Space {
         author: AgentPubKey,
     ) -> SourceChainResult<SourceChain> {
         SourceChain::raw_empty(
-            self.authored_db.clone(),
+            self.get_or_create_authored_db(author.clone())?,
             self.dht_db.clone(),
             self.dht_query_cache.clone(),
             keystore,
@@ -757,30 +852,79 @@ impl Space {
     pub async fn source_chain_workspace(
         &self,
         keystore: MetaLairClient,
-        agent_pubkey: AgentPubKey,
+        author: AgentPubKey,
         dna_def: Arc<DnaDef>,
     ) -> ConductorResult<SourceChainWorkspace> {
         Ok(SourceChainWorkspace::new(
-            self.authored_db.clone(),
+            self.get_or_create_authored_db(author.clone())?.clone(),
             self.dht_db.clone(),
             self.dht_query_cache.clone(),
             self.cache_db.clone(),
             keystore,
-            agent_pubkey,
+            author,
             dna_def,
         )
         .await?)
     }
+
+    /// Get or create the authored database for an agent in this space
+    pub fn get_or_create_authored_db(
+        &self,
+        author: AgentPubKey,
+    ) -> DatabaseResult<DbWrite<DbKindAuthored>> {
+        match self.authored_dbs.lock().entry(author.clone()) {
+            hash_map::Entry::Occupied(entry) => Ok(entry.get().clone()),
+            hash_map::Entry::Vacant(entry) => {
+                let db = tokio::task::block_in_place(|| {
+                    DbWrite::open_with_pool_config(
+                        self.root_db_dir.as_ref(),
+                        DbKindAuthored(Arc::new(CellId::new((*self.dna_hash).clone(), author))),
+                        PoolConfig {
+                            synchronous_level: DbSyncLevel::Normal,
+                            key: self.db_key.clone(),
+                        },
+                    )
+                })?;
+
+                entry.insert(db.clone());
+                Ok(db)
+            }
+        }
+    }
+
+    /// Gets authored databases for this space, for every author.
+    pub fn get_all_authored_dbs(&self) -> Vec<DbWrite<DbKindAuthored>> {
+        self.authored_dbs.lock().values().cloned().collect()
+    }
+}
+
+/// Get the holochain conductor state
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+pub async fn query_conductor_state(
+    db: &DbRead<DbKindConductor>,
+) -> ConductorResult<Option<ConductorState>> {
+    db.read_async(|txn| {
+        let state = txn
+            .query_row("SELECT blob FROM ConductorState WHERE id = 1", [], |row| {
+                row.get("blob")
+            })
+            .optional()?;
+        match state {
+            Some(state) => ConductorResult::Ok(Some(from_blob(state)?)),
+            None => ConductorResult::Ok(None),
+        }
+    })
+    .await
 }
 
 #[cfg(test)]
 impl TestSpaces {
-    pub fn new(dna_hashes: impl IntoIterator<Item = DnaHash>) -> Self {
+    pub async fn new(dna_hashes: impl IntoIterator<Item = DnaHash>) -> Self {
         let queue_consumer_map = QueueConsumerMap::new();
-        Self::with_queue_consumer(dna_hashes, queue_consumer_map)
+        Self::with_queue_consumer(dna_hashes, queue_consumer_map).await
     }
 
-    pub fn with_queue_consumer(
+    pub async fn with_queue_consumer(
         dna_hashes: impl IntoIterator<Item = DnaHash>,
         queue_consumer_map: QueueConsumerMap,
     ) -> Self {
@@ -798,7 +942,9 @@ impl TestSpaces {
                 ..Default::default()
             }
             .into(),
+            sodoken::BufRead::new_no_lock(b"passphrase"),
         )
+        .await
         .unwrap();
         spaces.map.share_mut(|map| {
             map.extend(
@@ -826,7 +972,8 @@ impl TestSpace {
         Self {
             space: Space::new(
                 Arc::new(dna_hash),
-                &temp_dir.path().to_path_buf().into(),
+                temp_dir.path().to_path_buf(),
+                Default::default(),
                 Default::default(),
             )
             .unwrap(),

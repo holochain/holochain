@@ -95,11 +95,11 @@ impl From<HashMap<NodeCert, RoundState>> for RoundStateMap {
 
 #[cfg(test)]
 mod tests {
-    use crate::dht_arc::DhtArcSet;
     use crate::gossip::sharded_gossip::state_map::RoundStateMap;
     use crate::gossip::sharded_gossip::{NodeCert, RoundState};
     use crate::NOISE;
     use arbitrary::{Arbitrary, Unstructured};
+    use kitsune_p2p_types::dht::arq::ArqSet;
     use kitsune_p2p_types::Tx2Cert;
     use std::collections::HashSet;
     use std::sync::Arc;
@@ -185,7 +185,7 @@ mod tests {
 
         {
             let state = state_map.get_mut(&key).unwrap();
-            state.last_touch = state.last_touch - Duration::from_secs(10);
+            state.last_touch -= Duration::from_secs(10);
             // Should be marked as timed out on next `round_exists`
             assert!(state.last_touch.elapsed() > state.round_timeout);
         }
@@ -208,7 +208,7 @@ mod tests {
 
         {
             let state = state_map.get_mut(&key).unwrap();
-            state.last_touch = state.last_touch - Duration::from_secs(10);
+            state.last_touch -= Duration::from_secs(10);
             // Should be marked as timed out on next `round_exists`
             assert!(state.last_touch.elapsed() > state.round_timeout);
         }
@@ -237,7 +237,7 @@ mod tests {
         // Mark the state for key_2 as timed out
         {
             let state = state_map.get_mut(&key_2).unwrap();
-            state.last_touch = state.last_touch - Duration::from_secs(10);
+            state.last_touch -= Duration::from_secs(10);
             // Should be marked as timed out on next `round_exists`
             assert!(state.last_touch.elapsed() > state.round_timeout);
         }
@@ -257,7 +257,7 @@ mod tests {
 
         {
             let state = state_map.get_mut(&key).unwrap();
-            state.last_touch = state.last_touch - Duration::from_secs(10);
+            state.last_touch -= Duration::from_secs(10);
             // Should be marked as timed out on next `round_exists`
             assert!(state.last_touch.elapsed() > state.round_timeout);
         }
@@ -309,7 +309,7 @@ mod tests {
     fn test_round_state() -> RoundState {
         RoundState::new(
             vec![],
-            Arc::new(DhtArcSet::new_empty()),
+            Arc::new(ArqSet::empty()),
             None,
             Duration::from_millis(5),
         )

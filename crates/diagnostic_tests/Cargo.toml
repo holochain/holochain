@@ -3,19 +3,30 @@ name = "diagnostic_tests"
 version = "0.1.0"
 description = "Collection of human-runnable, human-interpretable diagnostic situations for Holochain"
 license = "Apache-2.0"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-anyhow = { workspace = true }
+anyhow = "1.0"
 chashmap = "2.2"
-colored = "2"
-futures = { workspace = true }
-holochain_diagnostics = { path = "../holochain_diagnostics" }
-holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
-tokio = { version = "1.27", features = ["full"] }
+colored = "2.1"
+futures = "0.3"
+kitsune_p2p = { version = "^0.5.0-dev.0", path = "../kitsune_p2p/kitsune_p2p" }
+holochain_diagnostics = { path = "../holochain_diagnostics", default-features = false }
+holochain_trace = { version = "^0.5.0-dev.0", path = "../holochain_trace" }
+tokio = { version = "1.36.0", features = ["full"] }
 tokio-stream = "0.1"
 
 crossterm = "0.27"
 tui = "0.19"
+
+[lints]
+workspace = true
+
+[features]
+default = ["wasmer_sys"]
+
+wasmer_sys = ["holochain_diagnostics/wasmer_sys"]
+wasmer_wamr = ["holochain_diagnostics/wasmer_wamr"]

@@ -22,16 +22,35 @@ fn main() -> anyhow::Result<()> {
     args.validate()?;
 
     let (admin_client, app_client) = if let Some(admin_url) = &args.admin_url {
-        match block_on(
+        let connect_clients_result = block_on(
             async {
-                let mut admin_client = AdminClient::connect(admin_url).await?;
-                let app_client = admin_client.connect_app_client().await?;
+                let addr = if let url::Origin::Tuple(_, host, port) = admin_url.origin() {
+                    match tokio::net::lookup_host((host.to_string(), port)).await {
+                        Ok(mut addr_list) => addr_list.next(),
+                        Err(err) => return Err(anyhow!(err)),
+                    }
+                } else {
+                    None
+                };
+
+                let addr = match addr {
+                    None => return Err(anyhow!(format!("Invalid admin_url: {admin_url}"))),
+                    Some(addr) => addr,
+                };
+
+                let mut admin_client = AdminClient::connect(addr).await?;
+                let app_client = if let Some(app_id) = &args.app_id {
+                    Some(admin_client.connect_app_client(app_id.clone()).await?)
+                } else {
+                    None
+                };
 
                 Ok((admin_client, app_client))
             },
             Duration::from_secs(10),
-        ) {
-            Ok(Ok((admin_client, app_client))) => (Some(admin_client), Some(app_client)),
+        );
+        match connect_clients_result {
+            Ok(Ok((admin_client, app_client))) => (Some(admin_client), app_client),
             Ok(Err(e)) => {
                 return Err(e);
             }
@@ -43,9 +62,9 @@ fn main() -> anyhow::Result<()> {
         (None, None)
     };
 
-    let mut app = App::new(args, admin_client, app_client, 2);
+    let mut app = App::new(args, admin_client, app_client, 3);
 
-    let backend = CrosstermBackend::new(io::stderr());
+    let backend = CrosstermBackend::new(io::stdout());
     let terminal = Terminal::new(backend)?;
     let mut tui = Tui::new(terminal);
     tui.init()?;

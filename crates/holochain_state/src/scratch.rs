@@ -221,6 +221,16 @@ impl Store for Scratch {
             .cloned())
     }
 
+    fn get_warrants_for_basis(
+        &self,
+        _hash: &AnyLinkableHash,
+        _check_validity: bool,
+    ) -> StateQueryResult<Vec<WarrantOp>> {
+        unimplemented!(
+            "Warrants are not committed to the chain, so the scratch will never contain one."
+        )
+    }
+
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
         match hash.clone().into_primitive() {
             AnyDhtHashPrimitive::Entry(hash) => self.get_any_record(&hash),

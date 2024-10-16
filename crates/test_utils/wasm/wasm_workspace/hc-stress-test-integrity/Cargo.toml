@@ -7,7 +7,8 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 name = "files_integrity"
 
+# reminder - do not use workspace deps
 [dependencies]
-hdi = { workspace = true }
+hdi = { path = "../../../../hdi" }
 
-serde = { workspace = true }
+serde = "1.0"

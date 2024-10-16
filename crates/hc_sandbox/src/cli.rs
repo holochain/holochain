@@ -180,7 +180,13 @@ impl HcSandbox {
                 return result;
             }
             HcSandboxSubcommand::Call(call) => {
-                crate::calls::call(&self.holochain_path, call, self.structured).await?
+                crate::calls::call(
+                    &self.holochain_path,
+                    call,
+                    self.force_admin_ports,
+                    self.structured,
+                )
+                .await?
             }
             // HcSandboxSubcommand::Task => todo!("Running custom tasks is coming soon"),
             HcSandboxSubcommand::List { verbose } => {
@@ -193,6 +199,10 @@ impl HcSandbox {
                 root,
                 directories,
                 in_process_lair,
+                no_dpki,
+                dpki_network_seed,
+                #[cfg(feature = "chc")]
+                chc_url,
             }) => {
                 let mut paths = Vec::with_capacity(num_sandboxes);
                 msg!(
@@ -200,11 +210,16 @@ impl HcSandbox {
                     num_sandboxes
                 );
                 for i in 0..num_sandboxes {
+                    let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
                     let path = crate::generate::generate(
-                        network.clone().map(|n| n.into_inner().into()),
+                        network,
                         root.clone(),
                         directories.get(i).cloned(),
                         in_process_lair,
+                        no_dpki,
+                        dpki_network_seed.clone(),
+                        #[cfg(feature = "chc")]
+                        chc_url.clone(),
                     )?;
                     paths.push(path);
                 }

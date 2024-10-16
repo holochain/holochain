@@ -17,7 +17,7 @@ coordinator:
       bundled: zome-4.wasm
         "#;
 
-    let manifest = serde_yaml::from_str::<DnaManifest>(&manifest_yaml);
+    let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml);
     assert!(manifest.is_err());
 }
 
@@ -40,7 +40,7 @@ coordinator:
       bundled: zome-4.wasm
         "#;
 
-    let manifest = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap();
+    let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap();
     assert_matches!(
         ValidatedDnaManifest::try_from(manifest),
         Err(DnaError::DuplicateZomeNames(name)) if name.as_str() == "zome1"
@@ -72,7 +72,7 @@ coordinator:
       path: ../zome-5.wasm
         "#;
 
-    let manifest = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap();
+    let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap();
     assert_matches!(
         ValidatedDnaManifest::try_from(manifest),
         Err(DnaError::DanglingZomeDependency(dep, name)) if dep.as_str() == "zome20" && name.as_str() == "zome1"
@@ -103,7 +103,7 @@ coordinator:
       path: ../zome-5.wasm
         "#;
 
-    let manifest = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap();
+    let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap();
     assert_matches!(
         ValidatedDnaManifest::try_from(manifest),
         Err(DnaError::DanglingZomeDependency(dep, name)) if dep.as_str() == "zome4" && name.as_str() == "zome2"
@@ -134,7 +134,7 @@ coordinator:
       path: ../zome-5.wasm
         "#;
 
-    let manifest = serde_yaml::from_str::<DnaManifest>(&manifest_yaml).unwrap();
+    let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap();
     assert_matches!(
         ValidatedDnaManifest::try_from(manifest),
         Err(DnaError::DanglingZomeDependency(dep, name)) if dep.as_str() == "zome2" && name.as_str() == "zome2"

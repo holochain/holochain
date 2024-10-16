@@ -1,13 +1,11 @@
-use std::sync::Arc;
-
+use super::WireLinkKey;
 use holo_hash::AnyLinkableHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
 use holochain_types::sql::ToSqlStatement;
-
-use super::WireLinkKey;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct GetLinksOpsQuery {
@@ -31,7 +29,7 @@ impl GetLinksOpsQuery {
 
 pub struct Item {
     action: SignedAction,
-    op_type: DhtOpType,
+    op_type: ChainOpType,
 }
 
 impl Query for GetLinksOpsQuery {
@@ -97,12 +95,13 @@ impl Query for GetLinksOpsQuery {
     }
 
     fn params(&self) -> Vec<Params> {
-        named_params! {
-            ":create": DhtOpType::RegisterAddLink,
-            ":delete": DhtOpType::RegisterRemoveLink,
+        let params = named_params! {
+            ":create": ChainOpType::RegisterAddLink,
+            ":delete": ChainOpType::RegisterRemoveLink,
             ":base_hash": self.base,
-        }
-        .to_vec()
+        };
+
+        params.to_vec()
     }
 
     fn as_map(&self) -> Arc<dyn Fn(&Row) -> StateQueryResult<Self::Item>> {
@@ -122,13 +121,11 @@ impl Query for GetLinksOpsQuery {
 
     fn fold(&self, mut state: Self::State, dht_op: Self::Item) -> StateQueryResult<Self::State> {
         match &dht_op.data.op_type {
-            DhtOpType::RegisterAddLink => {
+            ChainOpType::RegisterAddLink => {
                 let validation_status = dht_op.validation_status();
                 let item = dht_op.data.action;
-                if let (
-                    SignedAction(Action::CreateLink(action), signature),
-                    Some(validation_status),
-                ) = (item, validation_status)
+                if let ((Action::CreateLink(action), signature), Some(validation_status)) =
+                    (item.into(), validation_status)
                 {
                     state.creates.push(WireCreateLink::condense(
                         action,
@@ -137,13 +134,11 @@ impl Query for GetLinksOpsQuery {
                     ));
                 }
             }
-            DhtOpType::RegisterRemoveLink => {
+            ChainOpType::RegisterRemoveLink => {
                 let validation_status = dht_op.validation_status();
                 let item = dht_op.data.action;
-                if let (
-                    SignedAction(Action::DeleteLink(action), signature),
-                    Some(validation_status),
-                ) = (item, validation_status)
+                if let ((Action::DeleteLink(action), signature), Some(validation_status)) =
+                    (item.into(), validation_status)
                 {
                     state.deletes.push(WireDeleteLink::condense(
                         action,

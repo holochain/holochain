@@ -1,3 +1,4 @@
+pub use crate::agent::is_same_agent;
 pub use crate::app_entry;
 pub use crate::chain::must_get_agent_activity;
 pub use crate::ed25519::verify_signature;
@@ -22,6 +23,7 @@ pub use crate::map_extern::ExternResult;
 pub use crate::map_extern_infallible;
 pub use crate::map_extern_preamble;
 pub use crate::op::*;
+pub use crate::x_salsa20_poly1305::ed_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_25519_x_salsa20_poly1305_decrypt;
 pub use crate::x_salsa20_poly1305::x_salsa20_poly1305_decrypt;
 pub use hdk_derive;
@@ -85,12 +87,14 @@ macro_rules! holochain_externs {
             zome_info:1,
             dna_info:1,
             dna_info:2,
+            is_same_agent:1,
             must_get_entry:1,
             must_get_valid_record:1,
             must_get_action:1,
             must_get_agent_activity:1,
             x_salsa20_poly1305_decrypt:1,
-            x_25519_x_salsa20_poly1305_decrypt:1
+            x_25519_x_salsa20_poly1305_decrypt:1,
+            ed_25519_x_salsa20_poly1305_decrypt:1
         );
     };
 }

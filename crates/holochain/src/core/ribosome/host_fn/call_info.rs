@@ -29,7 +29,7 @@ pub fn call_info(
                         let check_agent = provenance.clone();
                         let call_context = call_context.clone();
                         let cap_grant = tokio_helper::block_forever_on(async move {
-                            Result::<_, WasmError>::Ok(call_context
+                            Result::<_, WasmHostError>::Ok(call_context
                             .host_context
                             .workspace()
                             .source_chain()
@@ -99,7 +99,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_info_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::ZomeInfo).await;
@@ -110,7 +110,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_info_provenance_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,

@@ -1,31 +1,3 @@
-/*
-use std::convert::TryFrom;
-use std::sync::Arc;
-
-use crate::conductor::p2p_agent_store::all_agent_infos;
-use crate::conductor::p2p_agent_store::exchange_peer_info;
-use crate::conductor::ConductorHandle;
-use crate::test_utils::host_fn_caller::Post;
-use crate::test_utils::install_app;
-use crate::test_utils::new_zome_call;
-use crate::test_utils::setup_app_with_network;
-use crate::test_utils::wait_for_integration_with_others;
-use hdk::prelude::CellId;
-use holo_hash::AgentPubKey;
-use holochain_keystore::AgentPubKeyExt;
-use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
-use holochain_serialized_bytes::SerializedBytes;
-use holochain_types::prelude::*;
-use holochain_wasm_test_utils::TestZomes;
-use holochain_zome_types::ZomeCallResponse;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
-use matches::assert_matches;
-use shrinkwraprs::Shrinkwrap;
-use tempfile::TempDir;
-use tokio_helper;
-use tracing::debug_span;
-*/
-
 use crate::sweettest::*;
 use futures::StreamExt;
 use holo_hash::ActionHash;
@@ -35,23 +7,25 @@ use test_case::test_case;
 #[test_case(2)]
 #[test_case(4)]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn conductors_call_remote(num_conductors: usize) {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
+
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let mut conductors = SweetConductorBatch::from_standard_config(num_conductors).await;
-    let apps = conductors.setup_app("app", &[dna]).await.unwrap();
+
+    let config = SweetConductorConfig::rendezvous(true);
+
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(num_conductors, config).await;
+
+    let apps = conductors.setup_app("app", [&dna]).await.unwrap();
     let cells: Vec<_> = apps
         .into_inner()
         .into_iter()
         .map(|c| c.into_cells().into_iter().next().unwrap())
         .collect();
 
-    conductors.exchange_peer_info().await;
-
     // Make sure that genesis records are integrated now that conductors have discovered each other. This makes it
     // more likely that Kitsune knows about all the agents in the network to be able to make remote calls to them.
-    consistency_60s(cells.iter()).await;
+    await_consistency(60, cells.iter()).await.unwrap();
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 
@@ -83,7 +57,7 @@ async fn conductors_call_remote(num_conductors: usize) {
         .await;
 
     // Ensure that all the create requests were received and published.
-    consistency_60s(cells.iter()).await;
+    await_consistency(60, cells.iter()).await.unwrap();
 }
 
 // TODO - rewrite all these tests to use local sweettest
@@ -269,7 +243,7 @@ async fn conductors_gossip_inner(
     network: KitsuneP2pConfig,
     share_peers: bool,
 ) {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let network_seed = nanoid::nanoid!().to_string();
 
     let zomes = vec![TestWasm::Create];
@@ -441,7 +415,7 @@ async fn check_gossip(
     }
 }
 
-#[tracing::instrument(skip(envs))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(envs)))]
 async fn check_peers(envs: Vec<DbWrite<DbKindP2pAgents>>) {
     for (i, a) in envs.iter().enumerate() {
         let peers = all_agent_infos(a.clone().into()).await.unwrap();

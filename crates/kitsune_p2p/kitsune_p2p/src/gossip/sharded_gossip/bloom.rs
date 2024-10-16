@@ -6,20 +6,24 @@ impl ShardedGossipLocal {
     /// Generate a bloom filter of all agents.
     /// - Agents are only included if they are within the common arc set.
     /// - The bloom is `KitsuneAgent` + `signed_at_ms`. So multiple agent infos could
-    /// be in the same filter.
+    ///   be in the same filter.
     /// - Only create the filter if there are any agents matching the above criteria.
+    ///
     /// No empty bloom filters.
     /// - Bloom has a 1% chance of false positive (which will lead to agents not being sent back).
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.
     pub(super) async fn generate_agent_bloom(
         &self,
         state: RoundState,
+        agent_info_session: &mut AgentInfoSession,
     ) -> KitsuneResult<Option<BloomFilter>> {
-        let RoundState { common_arc_set, .. } = state;
+        let RoundState { common_arq_set, .. } = state;
+
         // Get the time range for this gossip.
         // Get all the agent info that is within the common arc set.
-        let agents_within_arc: Vec<_> =
-            get_agent_info(&self.host_api, &self.space, common_arc_set).await?;
+        let agents_within_arc: Vec<_> = agent_info_session
+            .agent_info_within_arc_set(&self.host_api, &self.space, (*common_arq_set).clone())
+            .await?;
 
         // There was no agents so we don't create a bloom.
         if agents_within_arc.is_empty() {
@@ -43,15 +47,18 @@ impl ShardedGossipLocal {
     /// - The bloom is `KitsuneOpHah`.
     /// - Ops are only included from local agents that are within the common arc set.
     /// - Only create the filter if there are any ops matching the above criteria.
+    ///
     /// No empty bloom filters.
     /// - Bloom has a 1% chance of false positive (which will lead to agents not being sent back).
     /// - Expect this function to complete in an average of 10 ms and worst case 100 ms.
     pub(super) async fn generate_op_blooms_for_time_window(
         &self,
-        common_arc_set: &Arc<DhtArcSet>,
+        common_arqs: &ArqSet,
         search_time_window: TimeWindow,
     ) -> KitsuneResult<Batch<TimedBloomFilter>> {
         use futures::TryStreamExt;
+
+        let common_arc_set = common_arqs.to_dht_arc_set_std();
 
         // If the common arc set is empty there's no
         // blooms to generate.
@@ -65,7 +72,7 @@ impl ShardedGossipLocal {
         let stream = store::hash_chunks_query(
             self.host_api.clone(),
             self.space.clone(),
-            (**common_arc_set).clone(),
+            common_arc_set.clone(),
             search_time_window.clone(),
             true,
         );
@@ -228,17 +235,6 @@ impl ShardedGossipLocal {
             None => Ok(Batch::Complete(Vec::with_capacity(0))),
         }
     }
-}
-
-async fn get_agent_info(
-    host_api: &HostApiLegacy,
-    space: &Arc<KitsuneSpace>,
-    arc_set: Arc<DhtArcSet>,
-) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    Ok(store::agent_info_within_arc_set(host_api, space, arc_set)
-        .await?
-        // Need to collect to know the length for the bloom filter.
-        .collect())
 }
 
 #[derive(Debug)]

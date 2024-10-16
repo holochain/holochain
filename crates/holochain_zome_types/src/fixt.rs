@@ -238,11 +238,6 @@ fixturator!(
 );
 
 fixturator!(
-    MigrateAgent;
-    unit variants [ Open Close ] empty Close;
-);
-
-fixturator!(
     GrantedFunction;
     curve Empty (
         ZomeNameFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
@@ -553,13 +548,18 @@ fixturator!(
 );
 
 fixturator!(
+    MigrationTarget;
+    variants [ Dna(DnaHash) Agent(AgentPubKey) ];
+);
+
+fixturator!(
     OpenChain;
-    constructor fn from_builder(ActionBuilderCommon, DnaHash);
+    constructor fn from_builder(ActionBuilderCommon, MigrationTarget, ActionHash);
 );
 
 fixturator!(
     CloseChain;
-    constructor fn from_builder(ActionBuilderCommon, DnaHash);
+    constructor fn from_builder(ActionBuilderCommon, MigrationTarget);
 );
 
 fixturator!(
@@ -655,7 +655,7 @@ fixturator!(
 
 fixturator!(
     ActionHashed;
-    constructor fn from_content_sync(Action);
+    constructor fn from_content_sync_exact(Action);
 );
 
 fixturator!(
@@ -742,6 +742,7 @@ fixturator!(
         coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        lineage: Default::default(),
     };
 
     curve Unpredictable DnaDef {
@@ -764,6 +765,8 @@ fixturator!(
         coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        // TODO: non-empty lineage
+        lineage: Default::default(),
     };
 
     curve Predictable DnaDef {
@@ -786,6 +789,8 @@ fixturator!(
         coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        // TODO: non-empty lineage
+        lineage: Default::default(),
     };
 );
 

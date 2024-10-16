@@ -1,5 +1,57 @@
 #![deny(missing_docs)]
-//! This module is used to configure the conductor
+//! This module is used to configure the conductor.
+//!
+//! #### Example minimum conductor config:
+//!
+//! ```rust
+//! let yaml = r#"---
+//!
+//! ## Configure the keystore to be used.
+//! keystore:
+//!
+//!   ## Use an in-process keystore with default database location.
+//!   type: lair_server_in_proc
+//!
+//! ## Configure an admin WebSocket interface at a specific port.
+//! admin_interfaces:
+//!   - driver:
+//!       type: websocket
+//!       port: 1234
+//!       allowed_origins: "*"
+//!
+//! ## Configure the network.
+//! network:
+//!
+//!   ## Use the Holo-provided default production bootstrap server.
+//!   bootstrap_service: https://bootstrap.holo.host
+//!
+//!   ## This currently has no effect on functionality but is required. Please just include as-is for now.
+//!   network_type: quic_bootstrap
+//!
+//!   ## Setup a specific network configuration.
+//!   transport_pool:
+//!     ## Use WebRTC, which is the only option for now.
+//!     - type: webrtc
+//!
+//!       ## Use the Holo-provided default production sbd (signal) server.
+//!       ## `signal_url` is REQUIRED.
+//!       signal_url: wss://sbd-0.main.infra.holo.host
+//!
+//!       ## Override the default WebRTC STUN configuration.
+//!       ## This is OPTIONAL. If this is not specified, it will default
+//!       ## to what you can see here:
+//!       webrtc_config: {
+//!         "iceServers": [
+//!           { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+//!           { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
+//!         ]
+//!       }
+//! "#;
+//!
+//!use holochain_conductor_api::conductor::ConductorConfig;
+//!
+//!let _: ConductorConfig = serde_yaml::from_str(yaml).unwrap();
+//! ```
 
 use crate::conductor::process::ERROR_CODE;
 use holochain_types::prelude::DbSyncStrategy;
@@ -43,13 +95,32 @@ pub struct ConductorConfig {
     /// The database and compiled wasm directories are derived from this path.
     pub data_root_path: Option<DataRootPath>,
 
+    /// The lair tag used to refer to the "device seed" which was used to generate
+    /// the AgentPubKey for the DPKI cell.
+    ///
+    /// This must not be changed once the conductor has been started for the first time.
+    pub device_seed_lair_tag: Option<String>,
+
+    /// If set, and if there is no seed in lair at the tag specified in `device_seed_lair_tag`,
+    /// the conductor will create a random seed and store it in lair at the specified tag.
+    /// This should only be used for test or throwaway environments, because this device seed
+    /// can never be regenerated, which defeats the purpose of having a device seed in the first place.
+    ///
+    /// If `device_seed_lair_tag` is not set, this setting has no effect.
+    #[serde(default)]
+    pub danger_generate_throwaway_device_seed: bool,
+
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
     pub keystore: KeystoreConfig,
 
-    /// Optional DPKI configuration if conductor is using a DPKI app to initalize and manage
-    /// keys for new instances.
-    pub dpki: Option<DpkiConfig>,
+    /// DPKI config for this conductor. This setting must not change once the conductor has been
+    /// started for the first time.
+    ///  
+    /// If `dna_path` is present, the DNA file at this path will be used to install the DPKI service upon first conductor startup.
+    /// If not present, the Deepkey DNA specified by the `holochain_deepkey_dna` crate and built into Holochain, will be used instead.
+    #[serde(default)]
+    pub dpki: DpkiConfig,
 
     /// Setup admin interfaces to control this conductor through a websocket connection.
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
@@ -111,11 +182,6 @@ impl ConductorConfig {
         self.network.tracing_scope.clone()
     }
 
-    /// Get the string used for hc_sleuth logging
-    pub fn sleuth_id(&self) -> String {
-        self.tracing_scope().unwrap_or("<NONE>".to_string())
-    }
-
     /// Get the data directory for this config or say something nice and die.
     pub fn data_root_path_or_die(&self) -> DataRootPath {
         match &self.data_root_path {
@@ -137,14 +203,41 @@ impl ConductorConfig {
     pub fn conductor_tuning_params(&self) -> ConductorTuningParams {
         self.tuning_params.clone().unwrap_or_default()
     }
+
+    /// Check if the config is set to use a rendezvous bootstrap server
+    pub fn has_rendezvous_bootstrap(&self) -> bool {
+        self.network.bootstrap_service == Some(url2::url2!("rendezvous:"))
+    }
 }
 
 /// Tuning parameters to adjust the behaviour of the conductor.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ConductorTuningParams {
     /// The delay between retries of sys validation when there are missing dependencies waiting to be found on the DHT.
+    ///
     /// Default: 10 seconds
     pub sys_validation_retry_delay: Option<std::time::Duration>,
+    /// The delay between retries attempts at resolving failed countersigning sessions.
+    ///
+    /// This is potentially a very heavy operation because it has to gather information from the network,
+    /// so it is recommended not to set this too low.
+    ///
+    /// Default: 5 minutes
+    pub countersigning_resolution_retry_delay: Option<std::time::Duration>,
+    /// The maximum number of times that Holochain should attempt to resolve a failed countersigning session.
+    ///
+    /// Note that this *only* applies to sessions that fail through a timeout. Sessions that fail because
+    /// of a conductor crash or otherwise will not be limited by this value. This is a safety measure to
+    /// make it less likely that timeout leads to a wrong decision because of a temporary network issue.
+    ///
+    /// Holochain will always try once, whatever value you set. The possible values for this setting are:
+    /// - `None`: Not set, then Holochain will just make a single attempt and then consider the session failed
+    ///    if it can't make a decision.
+    /// - `Some(0)`: Holochain will treat this the same as a session that failed after a crash. It will retry
+    ///   until it can make a decision or until the user forces a decision.
+    /// - `Some(n)`, n > 0: Holochain will retry `n` times, including the required first attempt. If
+    ///   it can't make a decision after `n` retries, it will consider the session failed.
+    pub countersigning_resolution_retry_limit: Option<usize>,
 }
 
 impl ConductorTuningParams {
@@ -152,6 +245,8 @@ impl ConductorTuningParams {
     pub fn new() -> Self {
         Self {
             sys_validation_retry_delay: None,
+            countersigning_resolution_retry_delay: None,
+            countersigning_resolution_retry_limit: None,
         }
     }
 
@@ -160,6 +255,12 @@ impl ConductorTuningParams {
         self.sys_validation_retry_delay
             .unwrap_or_else(|| std::time::Duration::from_secs(10))
     }
+
+    /// Get the current value of `countersigning_resolution_retry_delay` or its default value.
+    pub fn countersigning_resolution_retry_delay(&self) -> std::time::Duration {
+        self.countersigning_resolution_retry_delay
+            .unwrap_or_else(|| std::time::Duration::from_secs(60 * 5))
+    }
 }
 
 impl Default for ConductorTuningParams {
@@ -167,6 +268,10 @@ impl Default for ConductorTuningParams {
         let empty = Self::new();
         Self {
             sys_validation_retry_delay: Some(empty.sys_validation_retry_delay()),
+            countersigning_resolution_retry_delay: Some(
+                empty.countersigning_resolution_retry_delay(),
+            ),
+            countersigning_resolution_retry_limit: None,
         }
     }
 }
@@ -174,6 +279,7 @@ impl Default for ConductorTuningParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use holochain_types::websocket::AllowedOrigins;
     use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;
     use std::path::Path;
@@ -211,8 +317,10 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
+                device_seed_lair_tag: None,
+                danger_generate_throwaway_device_seed: false,
                 network: Default::default(),
-                dpki: None,
+                dpki: Default::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
@@ -225,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_config_complete_config() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let yaml = r#"---
     data_root_path: /path/to/env
@@ -237,19 +345,27 @@ mod tests {
       type: lair_server_in_proc
 
     dpki:
-      instance_id: some_id
-      init_params: some_params
+      dna_path: path/to/dna.dna
+      network_seed: "deepkey-main"
+      device_seed_lair_tag: "device-seed"
 
     admin_interfaces:
       - driver:
           type: websocket
           port: 1234
+          allowed_origins: "*"
 
     network:
       bootstrap_service: https://bootstrap-staging.holo.host
       transport_pool:
         - type: webrtc
-          signal_url: wss://signal.holotest.net
+          signal_url: wss://sbd-0.main.infra.holo.host
+          webrtc_config: {
+            "iceServers": [
+              { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+              { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
+            ]
+          }
       tuning_params:
         gossip_loop_iteration_delay_ms: 42
         default_rpc_single_timeout_ms: 42
@@ -269,7 +385,13 @@ mod tests {
         let mut network_config = KitsuneP2pConfig::default();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::WebRTC {
-            signal_url: "wss://signal.holotest.net".into(),
+            signal_url: "wss://sbd-0.main.infra.holo.host".into(),
+            webrtc_config: Some(serde_json::json!({
+              "iceServers": [
+                { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+                { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
+              ]
+            })),
         });
         let mut tuning_params =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
@@ -284,18 +406,20 @@ mod tests {
         tuning_params.tx5_min_ephemeral_udp_port = 40000;
         tuning_params.tx5_max_ephemeral_udp_port = 40255;
         network_config.tuning_params = std::sync::Arc::new(tuning_params);
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                dpki: Some(DpkiConfig {
-                    instance_id: "some_id".into(),
-                    init_params: "some_params".into()
-                }),
+                device_seed_lair_tag: None,
+                danger_generate_throwaway_device_seed: false,
+                dpki: DpkiConfig::production(Some("path/to/dna.dna".into())),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket { port: 1234 }
+                    driver: InterfaceDriver::Websocket {
+                        port: 1234,
+                        allowed_origins: AllowedOrigins::Any
+                    }
                 }]),
                 network: network_config,
                 db_sync_strategy: DbSyncStrategy::Fast,
@@ -322,13 +446,15 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
+                device_seed_lair_tag: None,
+                danger_generate_throwaway_device_seed: false,
                 network: Default::default(),
-                dpki: None,
+                dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
                 admin_interfaces: None,
-                db_sync_strategy: DbSyncStrategy::Fast,
+                db_sync_strategy: DbSyncStrategy::Resilient,
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,

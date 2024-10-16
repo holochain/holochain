@@ -36,6 +36,8 @@ pub trait HdiT: Send + Sync {
         &self,
         must_get_agent_activity_input: MustGetAgentActivityInput,
     ) -> ExternResult<Vec<RegisterAgentActivity>>;
+    // DPKI
+    fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool>;
     // Info
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
     fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;
@@ -50,6 +52,10 @@ pub trait HdiT: Send + Sync {
         &self,
         x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data>;
 }
 
 /// Used as a placeholder before any other Hdi is registered.
@@ -87,6 +93,9 @@ impl HdiT for ErrHdi {
     ) -> ExternResult<Vec<RegisterAgentActivity>> {
         Self::err("must_get_agent_activity")
     }
+    fn is_same_agent(&self, _: AgentPubKey, _: AgentPubKey) -> ExternResult<bool> {
+        Self::err("is_same_agent")
+    }
     fn dna_info(&self, _: ()) -> ExternResult<DnaInfo> {
         Self::err("dna_info")
     }
@@ -109,6 +118,12 @@ impl HdiT for ErrHdi {
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
         Self::err("x_25519_x_salsa20_poly1305_decrypt")
     }
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        _: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data> {
+        Self::err("ed_25519_x_salsa20_poly1305_decrypt")
+    }
 }
 
 /// The HDI implemented as externs provided by the host.
@@ -117,6 +132,12 @@ pub struct HostHdi;
 impl HostHdi {
     pub const fn new() -> Self {
         Self {}
+    }
+}
+
+impl Default for HostHdi {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -168,6 +189,9 @@ impl HdiT for HostHdi {
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         host_call::<(), ZomeInfo>(__hc__zome_info_1, ())
     }
+    fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
+        host_call::<(AgentPubKey, AgentPubKey), bool>(__hc__is_same_agent_1, (key_1, key_2))
+    }
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
         if cfg!(feature = "trace") {
             host_call::<TraceMsg, ()>(__hc__trace_1, trace_msg)
@@ -195,14 +219,23 @@ impl HdiT for HostHdi {
             x_25519_x_salsa20_poly1305_decrypt,
         )
     }
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data> {
+        host_call::<Ed25519XSalsa20Poly1305Decrypt, XSalsa20Poly1305Data>(
+            __hc__ed_25519_x_salsa20_poly1305_decrypt_1,
+            ed_25519_x_salsa20_poly1305_decrypt,
+        )
+    }
 }
 
 /// At any time the global HDI can be set to a different HDI.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_hdi<H: 'static>(hdi: H) -> Rc<dyn HdiT>
+pub fn set_hdi<H>(hdi: H) -> Rc<dyn HdiT>
 where
-    H: HdiT,
+    H: HdiT + 'static,
 {
     HDI.with(|h| std::mem::replace(&mut *h.borrow_mut(), Rc::new(hdi)))
 }

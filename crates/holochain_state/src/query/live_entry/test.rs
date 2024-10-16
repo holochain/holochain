@@ -10,7 +10,7 @@ use super::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_handle_update_in_scratch() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
@@ -22,7 +22,7 @@ async fn can_handle_update_in_scratch() {
     let td = EntryTestData::new();
 
     // - Create an entry on main db.
-    insert_valid_integrated_op(&mut txn, &td.update_store_entry_op).unwrap();
+    insert_valid_integrated_op(&mut txn, &td.update_store_entry_op.downcast()).unwrap();
     let r = td
         .query
         .run(Txn::from(&txn))

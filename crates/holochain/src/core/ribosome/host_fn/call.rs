@@ -5,7 +5,6 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
 use futures::future::join_all;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
@@ -133,9 +132,9 @@ pub fn call(
                                             .and_then(|c| {
                                                 c.ok_or_else(|| {
                                                     wasmer::RuntimeError::from(wasm_error!(
-                                                        WasmErrorInner::Host(
-                                                            "Role not found.".to_string()
-                                                        )
+                                                        WasmErrorInner::Host(format!(
+                                                            "Role not found: {role_name}"
+                                                        ))
                                                     ))
                                                 })
                                             })
@@ -231,15 +230,13 @@ pub mod wasm_test {
     use rusqlite::named_params;
 
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::sweettest::SweetAgents;
-    use crate::test_utils::conductor_setup::ConductorTestData;
     use crate::test_utils::new_zome_call_unsigned;
     use holochain_conductor_api::ZomeCall;
     use holochain_sqlite::prelude::DatabaseResult;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let test_wasm = TestWasm::WhoAmI;
         let (dna_file_1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
@@ -249,21 +246,20 @@ pub mod wasm_test {
             .await;
 
         let mut conductor = SweetConductor::from_standard_config().await;
-        let (alice_pubkey, _) = SweetAgents::alice_and_bob();
 
-        let apps = conductor
-            .setup_app_for_agents(
+        let app = conductor
+            .setup_app(
                 "app-",
-                &[alice_pubkey.clone()],
-                &[
-                    ("role1".to_string(), dna_file_1),
-                    ("role2".to_string(), dna_file_2),
+                [
+                    &("role1".to_string(), dna_file_1),
+                    &("role2".to_string(), dna_file_2),
                 ],
             )
             .await
             .unwrap();
 
-        let ((cell1, cell2),) = apps.into_tuples();
+        let agent_pubkey = app.agent().clone();
+        let (cell1, cell2) = app.into_tuple();
 
         let zome1 = cell1.zome(test_wasm);
         let zome2 = cell2.zome(test_wasm);
@@ -274,13 +270,13 @@ pub mod wasm_test {
             let agent_info: AgentInfo = conductor
                 .call(&zome1, "who_are_they_local", cell2.cell_id())
                 .await;
-            assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
-            assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
+            assert_eq!(agent_info.agent_initial_pubkey, agent_pubkey);
+            assert_eq!(agent_info.agent_latest_pubkey, agent_pubkey);
         }
         {
             let agent_info: AgentInfo = conductor.call(&zome1, "who_are_they_role", "role2").await;
-            assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
-            assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
+            assert_eq!(agent_info.agent_initial_pubkey, agent_pubkey);
+            assert_eq!(agent_info.agent_latest_pubkey, agent_pubkey);
         }
     }
 
@@ -289,16 +285,21 @@ pub mod wasm_test {
     /// when they are both writing (moving the source chain forward)
     #[tokio::test(flavor = "multi_thread")]
     async fn call_the_same_cell() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let zomes = vec![TestWasm::WhoAmI, TestWasm::Create];
-        let mut conductor_test = ConductorTestData::two_agents(zomes, false).await;
-        let handle = conductor_test.handle();
-        let alice_call_data = conductor_test.alice_call_data();
-        let alice_cell_id = &alice_call_data.cell_id;
+        let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(zomes).await;
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let (alice,) = conductor
+            .setup_app("app", &[dna])
+            .await
+            .unwrap()
+            .into_tuple();
+
+        let handle = conductor.raw_handle();
 
         let zome_call_unsigned =
-            new_zome_call_unsigned(&alice_cell_id, "call_create_entry", (), TestWasm::Create)
+            new_zome_call_unsigned(alice.cell_id(), "call_create_entry", (), TestWasm::Create)
                 .unwrap();
         let zome_call =
             ZomeCall::try_from_unsigned_zome_call(handle.keystore(), zome_call_unsigned)
@@ -314,8 +315,10 @@ pub mod wasm_test {
                 .unwrap();
 
         // Check alice's source chain contains the new value
-        let has_hash: bool = alice_call_data
-            .authored_db
+        let has_hash: bool = handle
+            .get_spaces()
+            .get_or_create_authored_db(alice.dna_hash(), alice.agent_pubkey().clone())
+            .unwrap()
             .read_async(move |txn| -> DatabaseResult<bool> {
                 Ok(txn.query_row(
                     "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
@@ -328,8 +331,6 @@ pub mod wasm_test {
             .await
             .unwrap();
         assert!(has_hash);
-
-        conductor_test.shutdown_conductor().await;
     }
 
     /// test calling a different zome
@@ -339,22 +340,19 @@ pub mod wasm_test {
     //        not be supported.
     #[tokio::test(flavor = "multi_thread")]
     async fn bridge_call() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
         let mut conductor = SweetConductor::from_standard_config().await;
-        let (alice, bob) = SweetAgents::two(conductor.keystore()).await;
 
-        let apps = conductor
-            .setup_app_for_agents("app", &[alice.clone(), bob.clone()], &[dna_file])
-            .await
-            .unwrap();
-        let ((alice,), (_bobbo,)) = apps.into_tuples();
+        let apps = conductor.setup_apps("app", 2, &[dna_file]).await.unwrap();
+        let ((alice,), (bobbo,)) = apps.into_tuples();
+        let bob_pubkey = bobbo.agent_pubkey().clone();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
         let apps = conductor
-            .setup_app_for_agents("app2", &[bob.clone()], &[dna_file])
+            .setup_app_for_agents("app2", &[bob_pubkey], &[dna_file])
             .await
             .unwrap();
         let ((bobbo2,),) = apps.into_tuples();
@@ -386,7 +384,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can call a fn on a remote
     async fn call_remote_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,

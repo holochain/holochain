@@ -1,6 +1,7 @@
 // use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
+use holochain_chc::ChcError;
 use holochain_p2p::HolochainP2pError;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::error::DatabaseError;
@@ -18,6 +19,9 @@ use super::HeadInfo;
 pub enum SourceChainError {
     #[error("The source chain is empty, but is expected to have been initialized")]
     ChainEmpty,
+
+    #[error("Agent key {0} invalid in cell {1}")]
+    InvalidAgentKey(AgentPubKey, CellId),
 
     #[error(
         "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {2:?}, Current head: {3:?}"
@@ -51,6 +55,9 @@ pub enum SourceChainError {
     #[error("Attempted to write anything other than the countersigning session entry at the same time as the session entry.")]
     DirtyCounterSigningWrite,
 
+    #[error("Attempted to write a countersigning session when there is no active session.")]
+    CountersigningWriteWithoutSession,
+
     #[error(
         "The source chain's structure is invalid. This error is not recoverable. Detail:\n{0}"
     )]
@@ -81,6 +88,9 @@ pub enum SourceChainError {
 
     #[error("InvalidCommit error: {0}")]
     InvalidCommit(String),
+
+    #[error("The commit could not be completed but may be retried: {0:?}")]
+    IncompleteCommit(IncompleteCommitReason),
 
     #[error("InvalidLink error: {0}")]
     InvalidLink(String),
@@ -162,6 +172,19 @@ pub enum ChainInvalidReason {
 
     #[error("Content was expected to definitely exist at this address, but didn't: {0}")]
     MissingData(EntryHash),
+}
+
+/// The reason that a commit could not be completed.
+///
+/// These errors are required to be retryable. They may not succeed in the future, so it is up to
+/// the caller to decide whether to retry, but they are not fatal errors.
+#[derive(Debug)]
+pub enum IncompleteCommitReason {
+    /// Inline validation failed because of missing dependencies.
+    ///
+    /// This may happen if you depend on something that has been created but not widely published
+    /// yet, so that doing a `get` for it might miss it.
+    DepMissingFromDht(Vec<AnyDhtHash>),
 }
 
 pub type SourceChainResult<T> = Result<T, SourceChainError>;

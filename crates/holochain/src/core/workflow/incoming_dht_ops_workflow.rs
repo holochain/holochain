@@ -1,7 +1,7 @@
 //! The workflow and queue consumer for DhtOp integration
 
-use super::error::WorkflowResult;
-use super::sys_validation_workflow::counterfeit_check;
+use super::sys_validation_workflow::counterfeit_check_action;
+use super::{error::WorkflowResult, sys_validation_workflow::counterfeit_check_warrant};
 use crate::{conductor::space::Space, core::queue_consumer::TriggerSender};
 use holo_hash::DhtOpHash;
 use holochain_sqlite::error::DatabaseResult;
@@ -9,7 +9,6 @@ use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use incoming_ops_batch::InOpBatchEntry;
 use std::{collections::HashSet, sync::Arc};
-use tracing::instrument;
 
 mod incoming_ops_batch;
 
@@ -68,7 +67,7 @@ impl Drop for OpsClaim {
     }
 }
 
-#[instrument(skip(txn, ops))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
 fn batch_process_entry(
     txn: &mut rusqlite::Transaction<'_>,
     request_validation_receipt: bool,
@@ -93,7 +92,10 @@ fn batch_process_entry(
 #[derive(Default, Clone)]
 pub struct IncomingOpHashes(Arc<parking_lot::Mutex<HashSet<DhtOpHash>>>);
 
-#[instrument(skip(space, sys_validation_trigger, ops))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(space, sys_validation_trigger, ops))
+)]
 pub async fn incoming_dht_ops_workflow(
     space: Space,
     sys_validation_trigger: TriggerSender,
@@ -125,7 +127,8 @@ pub async fn incoming_dht_ops_workflow(
     let mut filter_ops = Vec::with_capacity(num_ops);
     for op in ops {
         // It's cheaper to check if the signature is valid before proceeding to open a write transaction.
-        match should_keep(&op.content).await {
+        let keeper = should_keep(&op.content).await;
+        match keeper {
             Ok(()) => filter_ops.push(op),
             Err(e) => {
                 tracing::warn!(
@@ -206,12 +209,18 @@ pub async fn incoming_dht_ops_workflow(
         .map_err(|_| super::error::WorkflowError::RecvError)?
 }
 
-#[instrument(skip(op))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(op)))]
 /// If this op fails the counterfeit check it should be dropped
 async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
-    let action = op.action();
-    let signature = op.signature();
-    Ok(counterfeit_check(signature, &action).await?)
+    match op {
+        DhtOp::ChainOp(op) => {
+            let action = op.action();
+            let signature = op.signature();
+            counterfeit_check_action(signature, &action).await?;
+        }
+        DhtOp::WarrantOp(op) => counterfeit_check_warrant(op).await?,
+    }
+    Ok(())
 }
 
 fn add_to_pending(

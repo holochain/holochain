@@ -3,10 +3,11 @@ use crate::db::databases::DATABASE_HANDLES;
 use crate::db::guard::{PConnGuard, PTxnGuard};
 use crate::db::kind::{DbKind, DbKindT};
 use crate::db::pool::{
-    initialize_connection, new_connection_pool, num_read_threads, ConnectionPool, DbSyncLevel,
+    initialize_connection, new_connection_pool, num_read_threads, ConnectionPool, PoolConfig,
 };
 use crate::error::{DatabaseError, DatabaseResult};
 use derive_more::Into;
+use holochain_util::log_elapsed;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
@@ -16,6 +17,7 @@ use std::time::Instant;
 use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tracing::Instrument;
 
 use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
 
@@ -39,6 +41,7 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -56,6 +59,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
 
 #[async_trait::async_trait]
 impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -113,6 +117,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     ///
     /// Note that it is not enforced that your closure runs read-only operations or that it finishes quickly so it is
     /// up to the caller to use this function as intended.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
     pub async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
@@ -123,13 +128,20 @@ impl<Kind: DbKindT> DbRead<Kind> {
             .checkout_connection(self.read_semaphore.clone())
             .await?;
 
+        let start = tokio::time::Instant::now();
+        let span = tracing::info_span!("spawn_blocking");
+
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
-                conn.execute_in_read_txn(f)
-            })).await.map_err(|e| {
+                let _s = span.enter();
+                log_elapsed!([10, 100, 1000], start, "read_async:before-closure");
+                let r = conn.execute_in_read_txn(f);
+                log_elapsed!([10, 100, 1000], start, "read_async:after-closure");
+                r
+            }).in_current_span()).in_current_span().await.map_err(|e| {
                 tracing::error!("Failed to claim a thread to run the database read transaction. It's likely that the program is out of threads.");
-                DatabaseError::from(e)
+                DatabaseError::Timeout(e)
             })?.map_err(DatabaseError::from)?
     }
 
@@ -138,6 +150,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     /// reason.
     ///
     /// A valid reason for this is holding read transactions across multiple databases as part of a cascade query.
+    #[cfg_attr(feature = "instrument", tracing::instrument)]
     pub async fn get_read_txn(&self) -> DatabaseResult<PTxnGuard> {
         let conn = self
             .checkout_connection(self.long_read_semaphore.clone())
@@ -145,7 +158,9 @@ impl<Kind: DbKindT> DbRead<Kind> {
         Ok(conn.into())
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument)]
     async fn checkout_connection(&self, semaphore: Arc<Semaphore>) -> DatabaseResult<PConnGuard> {
+        // TODO: use semaphore for this message
         let waiting = self.num_readers.fetch_add(1, Ordering::Relaxed);
         if waiting > self.max_readers {
             let s = tracing::info_span!("holochain_perf", kind = ?self.kind().kind());
@@ -155,9 +170,11 @@ impl<Kind: DbKindT> DbRead<Kind> {
                     waiting as f64 / self.max_readers as f64 * 100.0
                 )
             });
+        } else {
+            tracing::trace!("checkout_connection ready to acquire semaphore");
         }
 
-        let permit = Self::acquire_reader_permit(semaphore).await?;
+        let permit = acquire_semaphore_permit(semaphore).await?;
 
         self.num_readers.fetch_sub(1, Ordering::Relaxed);
 
@@ -171,6 +188,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
 
     /// Get a connection from the pool.
     /// TODO: We should eventually swap this for an async solution.
+    #[cfg_attr(feature = "instrument", tracing::instrument)]
     fn get_connection_from_pool(&self) -> DatabaseResult<PConn> {
         let now = Instant::now();
         let r = Ok(PConn::new(self.connection_pool.get()?));
@@ -178,26 +196,10 @@ impl<Kind: DbKindT> DbRead<Kind> {
         if el.as_millis() > 20 {
             // TODO Convert to a metric
             tracing::info!("Connection pool took {:?} to be freed", el);
+        } else {
+            tracing::trace!("Got connection");
         }
         r
-    }
-
-    async fn acquire_reader_permit(
-        semaphore: Arc<Semaphore>,
-    ) -> DatabaseResult<OwnedSemaphorePermit> {
-        match tokio::time::timeout(
-            std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
-            semaphore.acquire_owned(),
-        )
-        .await
-        {
-            Ok(Ok(s)) => Ok(s),
-            Ok(Err(e)) => {
-                tracing::error!("Semaphore should not be closed but got an error while acquiring a permit, {:?}", e);
-                Err(DatabaseError::Other(e.into()))
-            }
-            Err(e) => Err(DatabaseError::Timeout(e)),
-        }
     }
 
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
@@ -221,25 +223,20 @@ impl<Kind: DbKindT> DbRead<Kind> {
 pub struct DbWrite<Kind: DbKindT>(DbRead<Kind>);
 
 impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
-    /// Create or open an existing database reference,
-    pub fn open(path_prefix: &Path, kind: Kind) -> DatabaseResult<Self> {
-        Self::open_with_sync_level(path_prefix, kind, DbSyncLevel::default())
-    }
-
-    pub fn open_with_sync_level(
+    pub fn open_with_pool_config(
         path_prefix: &Path,
         kind: Kind,
-        sync_level: DbSyncLevel,
+        pool_config: PoolConfig,
     ) -> DatabaseResult<Self> {
         DATABASE_HANDLES.get_or_insert(&kind, path_prefix, |kind| {
-            Self::new(Some(path_prefix), kind, sync_level, None)
+            Self::new(Some(path_prefix), kind, pool_config, None)
         })
     }
 
     pub fn new(
         path_prefix: Option<&Path>,
         kind: Kind,
-        sync_level: DbSyncLevel,
+        pool_config: PoolConfig,
         statement_trace_fn: Option<fn(&str)>,
     ) -> DatabaseResult<Self> {
         let path = match path_prefix {
@@ -254,24 +251,9 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                 }
                 // Check if the database is valid and take the appropriate
                 // action if it isn't.
-                match Self::check_database_file(&path, sync_level) {
+                match Self::check_database_file(&path, &pool_config) {
                     Ok(path) => path,
-                    // These are the two errors that can
-                    // occur if the database is not valid.
-                    err @ Err(Error::SqliteFailure(
-                        ffi::Error {
-                            code: ErrorCode::DatabaseCorrupt,
-                            ..
-                        },
-                        ..,
-                    ))
-                    | err @ Err(Error::SqliteFailure(
-                        ffi::Error {
-                            code: ErrorCode::NotADatabase,
-                            ..
-                        },
-                        ..,
-                    )) => {
+                    Err(err) => {
                         // Check if the database might be unencrypted.
                         if "true"
                             == std::env::var("HOLOCHAIN_MIGRATE_UNENCRYPTED")
@@ -279,31 +261,29 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
                                 .as_str()
                         {
                             #[cfg(feature = "sqlite-encrypted")]
-                            encrypt_unencrypted_database(&path)?;
+                            encrypt_unencrypted_database(&path, &pool_config)?;
                         }
                         // Check if this database kind requires wiping.
                         else if kind.if_corrupt_wipe() {
                             std::fs::remove_file(&path)?;
                         } else {
                             // If we don't wipe we need to return an error.
-                            err?;
+                            return Err(err.into());
                         }
 
                         // Now that we've taken the appropriate action we can try again.
-                        match Self::check_database_file(&path, sync_level) {
+                        match Self::check_database_file(&path, &pool_config) {
                             Ok(path) => path,
                             Err(e) => return Err(e.into()),
                         }
                     }
-                    // Another error has occurred when trying to open the db.
-                    Err(e) => return Err(e.into()),
                 }
             }
             None => None,
         };
 
         // Now we know the database file is valid we can open a connection pool.
-        let pool = new_connection_pool(path.as_ref().map(|p| p.as_ref()), sync_level);
+        let pool = new_connection_pool(path.as_ref().map(|p| p.as_ref()), pool_config);
         let mut conn = pool.get()?;
         // set to faster write-ahead-log mode
         conn.pragma_update(None, "journal_mode", "WAL".to_string())?;
@@ -336,29 +316,56 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         Ok(DbWrite(db_read))
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
         F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
-        let _g = tokio::time::timeout(
-            std::time::Duration::from_secs(10),
-            self.acquire_writer_permit(),
-        )
-        .await
-        .map_err(DatabaseError::from)?;
+        let permit = acquire_semaphore_permit(self.0.write_semaphore.clone()).await?;
+        self.write_async_with_permit(permit, f)
+            .await
+            .map(|(r, _permit)| r)
+    }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
+    pub async fn write_async_with_permit<E, R, F>(
+        &self,
+        permit: OwnedSemaphorePermit,
+        f: F,
+    ) -> Result<(R, OwnedSemaphorePermit), E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
         let mut conn = self.get_connection_from_pool()?;
+
+        let start = tokio::time::Instant::now();
+        let span = tracing::info_span!("spawn_blocking");
 
         // Once sync code starts in the spawn_blocking it cannot be cancelled BUT if we've run out of threads to execute blocking work on then
         // this timeout should prevent the caller being blocked by this await that may not finish.
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
-            conn.execute_in_exclusive_rw_txn(f)
-        })).await.map_err(|e| {
+            let _s = span.enter();
+            log_elapsed!([10, 100, 1000], start, "write_async:before-closure");
+            let r = conn.execute_in_exclusive_rw_txn(f);
+            log_elapsed!([10, 100, 1000], start, "write_async:after-closure");
+            r.map(|r| (r, permit))
+        }).in_current_span()).in_current_span().await.map_err(|e| {
             tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");
-            DatabaseError::from(e)
+            DatabaseError::Timeout(e)
         })?.map_err(DatabaseError::from)?
+    }
+
+    /// Acquire the single write permit for the database.
+    ///
+    /// This will prevent any other writes from proceeding until the semaphore is released.
+    /// It can be used to ensure that a read, followed by other operations, followed by another
+    /// write, will not be interleaved with some other write.
+    pub async fn acquire_write_permit(&self) -> DatabaseResult<OwnedSemaphorePermit> {
+        acquire_semaphore_permit(self.0.write_semaphore.clone()).await
     }
 
     pub fn available_writer_count(&self) -> usize {
@@ -367,15 +374,6 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
     pub fn available_reader_count(&self) -> usize {
         self.read_semaphore.available_permits()
-    }
-
-    async fn acquire_writer_permit(&self) -> OwnedSemaphorePermit {
-        self.0
-            .write_semaphore
-            .clone()
-            .acquire_owned()
-            .await
-            .expect("We don't ever close these semaphores")
     }
 
     fn get_write_semaphore(kind: DbKind) -> Arc<Semaphore> {
@@ -407,12 +405,12 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
     fn check_database_file(
         path: &Path,
-        sync_level: DbSyncLevel,
+        pool_config: &PoolConfig,
     ) -> rusqlite::Result<Option<PathBuf>> {
         Connection::open(path)
             // For some reason calling pragma_update is necessary to prove the database file is valid.
             .and_then(|mut c| {
-                initialize_connection(&mut c, sync_level)?;
+                initialize_connection(&mut c, pool_config)?;
                 c.pragma_update(None, "synchronous", "0".to_string())?;
                 Ok(c.path().map(PathBuf::from))
             })
@@ -422,12 +420,12 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     /// connection pool, useful for testing.
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test(path: &Path, kind: Kind) -> DatabaseResult<Self> {
-        Self::new(Some(path), kind, DbSyncLevel::default(), None)
+        Self::new(Some(path), kind, PoolConfig::default(), None)
     }
 
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test_in_mem(kind: Kind) -> DatabaseResult<Self> {
-        Self::new(None, kind, DbSyncLevel::default(), None)
+        Self::new(None, kind, PoolConfig::default(), None)
     }
 
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
@@ -446,7 +444,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
 // The method for this function is taken from https://discuss.zetetic.net/t/how-to-encrypt-a-plaintext-sqlite-database-to-use-sqlcipher-and-avoid-file-is-encrypted-or-is-not-a-database-errors/868
 #[cfg(feature = "sqlite-encrypted")]
-pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
+pub fn encrypt_unencrypted_database(path: &Path, pool_config: &PoolConfig) -> DatabaseResult<()> {
     // e.g. conductor/conductor.sqlite3 -> conductor/conductor-encrypted.sqlite3
     let encrypted_path = path
         .parent()
@@ -456,11 +454,7 @@ pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
                 .and_then(|s| s.to_str())
                 .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?
                 .to_string()
-                + "-encrypted."
-                + path
-                    .extension()
-                    .and_then(|s| s.to_str())
-                    .ok_or_else(|| DatabaseError::DatabaseMissing(path.to_owned()))?,
+                + "-encrypted",
         );
 
     tracing::warn!(
@@ -479,13 +473,29 @@ pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
         // Start an exclusive transaction to avoid anybody writing to the database while we're migrating it
         conn.execute("BEGIN EXCLUSIVE", ())?;
 
-        conn.execute(
-            "ATTACH DATABASE :db_name AS encrypted KEY :key",
-            rusqlite::named_params! {
-                ":db_name": encrypted_path.to_str(),
-                ":key": super::pool::FAKE_KEY,
-            },
-        )?;
+        {
+            let lock = pool_config.key.unlocked.read_lock();
+            conn.execute(
+                "ATTACH DATABASE :db_name AS encrypted KEY :key",
+                rusqlite::named_params! {
+                    ":db_name": encrypted_path.to_str(),
+                    // we have to pull out the hex encoded key
+                    // with the x'..' but NOT the surrounding
+                    // double quotes.
+                    ":key": &lock[15..82],
+                },
+            )?;
+        }
+
+        let mut batch = "PRAGMA encrypted.cipher_salt = \"x'".to_string();
+        for b in &*pool_config.key.salt.read_lock() {
+            batch.push_str(&format!("{b:02X}"));
+        }
+        batch.push_str("'\";\n");
+        batch.push_str("PRAGMA encrypted.cipher_compatibility = 4;\n");
+        batch.push_str("PRAGMA encrypted.cipher_plaintext_header_size = 32;\n");
+
+        conn.execute_batch(&batch)?;
 
         conn.query_row("SELECT sqlcipher_export('encrypted')", (), |_| Ok(0))?;
 
@@ -505,4 +515,29 @@ pub fn encrypt_unencrypted_database(path: &Path) -> DatabaseResult<()> {
 #[cfg(feature = "test_utils")]
 pub fn set_acquire_timeout(timeout_ms: u64) {
     ACQUIRE_TIMEOUT_MS.store(timeout_ms, Ordering::Relaxed);
+}
+
+#[cfg_attr(feature = "instrument", tracing::instrument)]
+async fn acquire_semaphore_permit(
+    semaphore: Arc<Semaphore>,
+) -> DatabaseResult<OwnedSemaphorePermit> {
+    let id = nanoid::nanoid!(7);
+    tracing::trace!(?id, "???     acquire semaphore permit");
+    let permit = tokio::time::timeout(
+        std::time::Duration::from_millis(ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)),
+        semaphore.acquire_owned(),
+    )
+    .await;
+    tracing::trace!(?id, ?permit, "    !!! semaphore permit obtained");
+    match permit {
+        Ok(Ok(s)) => Ok(s),
+        Ok(Err(e)) => {
+            tracing::error!(
+                "Semaphore should not be closed but got an error while acquiring a permit, {:?}",
+                e
+            );
+            Err(DatabaseError::Other(e.into()))
+        }
+        Err(e) => Err(DatabaseError::Timeout(e)),
+    }
 }

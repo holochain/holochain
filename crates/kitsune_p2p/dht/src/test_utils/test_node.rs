@@ -51,20 +51,22 @@ impl TestNode {
         self.arqs
             .iter()
             .enumerate()
-            .map(|(i, (_, arq))| {
-                format!(
+            .fold("".to_string(), |mut acc, (i, (_, arq))| {
+                acc += format!(
                     "{:>3}: |{}| {}/{} @ {}\n",
                     i,
                     add_location_ascii(
-                        arq.to_ascii(topo, len),
+                        arq.to_ascii(topo.space, len),
                         self.store.ops.iter().map(|o| o.loc).collect()
                     ),
                     arq.power(),
                     arq.count(),
                     arq.start_loc()
                 )
+                .as_str();
+
+                acc
             })
-            .collect()
     }
 }
 
@@ -106,7 +108,7 @@ impl AccessPeerStore for TestNode {
         ArqSet::new(
             self.arqs
                 .values()
-                .map(|arq| arq.to_bounds(&self.store.topo))
+                .map(|arq| arq.to_bounds(self.store.topo.space))
                 .collect(),
         )
     }

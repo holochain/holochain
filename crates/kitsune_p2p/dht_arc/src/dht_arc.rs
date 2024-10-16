@@ -238,7 +238,7 @@ impl<T: num_traits::AsPrimitive<u32>> DhtArcRange<T> {
         if len == 0 {
             DhtArcRange::Empty
         } else {
-            let end = start.wrapping_add(((len - 1) as u32).min(u32::MAX));
+            let end = start.wrapping_add((len - 1) as u32);
             DhtArcRange::from_bounds(start, end)
         }
     }
@@ -308,8 +308,13 @@ impl DhtArcRange<DhtLocation> {
         matches!(self, Self::Bounded(_, _))
     }
 
-    /// Get the min distance to a location.
-    /// Zero if Full, u32::MAX if Empty.
+    /// Get the min distance to a location to this range.
+    ///
+    /// If the range is empty, returns u32::MAX.
+    /// If the range is full, returns 0.
+    ///
+    /// If the range is Bounded and the target is within the range, returns 0.
+    /// Otherwise, returns the minimum distance to the start or end of the range.
     pub fn dist(&self, tgt: u32) -> u32 {
         match self {
             DhtArcRange::Empty => u32::MAX,
@@ -485,6 +490,7 @@ pub fn half_to_full_len(half_len: u32) -> u64 {
     if half_len == 0 {
         0
     } else if half_len >= MAX_HALF_LENGTH {
+        // TODO questionable check or should people who want the full length just pass in MAX_HALF_LENGTH rather than computing u32::MAX / 2 themselves?
         U32_LEN
     } else {
         (half_len as u64 * 2).wrapping_sub(1)
@@ -557,7 +563,7 @@ mod tests {
         );
 
         assert_eq!(
-            DhtArc::from_bounds(cent * 99, cent * 0).to_ascii(10),
+            DhtArc::from_bounds(cent * 99, 0).to_ascii(10),
             "-        @".to_string()
         );
     }

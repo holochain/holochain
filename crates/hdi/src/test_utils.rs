@@ -35,6 +35,10 @@ pub fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
             todo!()
         }
 
+        fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
+            todo!()
+        }
+
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo> {
             todo!()
         }
@@ -62,6 +66,13 @@ pub fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
             &self,
             x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
         ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+            todo!()
+        }
+
+        fn ed_25519_x_salsa20_poly1305_decrypt(
+            &self,
+            ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+        ) -> ExternResult<XSalsa20Poly1305Data> {
             todo!()
         }
 

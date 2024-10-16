@@ -9,13 +9,13 @@ on:
         type: string
         default: "."
       fail_fast:
-        description: "whether all tests will be stopped on first failure occurence or run to completion"
+        description: "whether all tests will be stopped on first failure occurrence or run to completion"
         required: false
         type: boolean
         default: false
     secrets:
       GITHUB_ACCESS_TOKEN:
-        description: "A GitHub access toekn which can be used for cloning the project"
+        description: "A GitHub access token which can be used for cloning the project"
         required: true
       CACHIX_AUTH_TOKEN_HOLOCHAIN_CI_INTERNAL:
         description: "The Cachix token for `holochain-ci-internal` to be used for caching Holochain CI runs"
@@ -29,23 +29,20 @@ jobs:
         cmd:
           # ensure functionality on multiple platforms
           - pkgs:
-              - build-holochain-tests-unit-all
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
 
           # ensure that any Nix changes on this branch don't cause problems for maintenance versions
           - pkgs:
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_1"
+            extra_arg: "--override-input versions ./versions/0_2"
           - pkgs:
               - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/0_2"
+            extra_arg: "--override-input versions ./versions/0_3"
           - pkgs:
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/weekly"
         platform:
-          # TODO temporarily disabled due to unexplained issues running builds on this platform.
-          # - system: x86_64-darwin
           - system: aarch64-darwin
           - system: x86_64-linux
 
@@ -53,7 +50,6 @@ jobs:
           # we only run repo consistency checks on x86_64-linux
           - cmd:
               pkgs:
-                - build-holochain-tests-static-all
                 - build-release-automation-tests-unit
               extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
             platform:
@@ -91,19 +87,27 @@ jobs:
 
           git status
 
-          # if a nix store path was passed, ensure it exists locally
+          # If a nix store path was passed, ensure it exists locally. This will fetch the path from cachix.
           if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
             nix-store --realise ${{inputs.repo_path }}
+
+            # Temporary workaround for https://github.com/NixOS/nix/issues/10202
+            git config --global --add safe.directory ${{ inputs.repo_path }}
           fi
 
           # first build all derivations. this could be enough for test derivations.
           nix build -L --show-trace \
             ${{ matrix.cmd.extra_arg }} \
             .#packages.${system}.${{ join(matrix.cmd.pkgs, ' .#packages.${system}.')}}
-          
+
+          # Temporary workaround for https://github.com/NixOS/nix/issues/10202
+          if [[ ${{ inputs.repo_path }} == "/nix/"* ]]; then
+            git config --global --unset safe.directory ${{ inputs.repo_path }}
+          fi
+
           # Don't exit if this fails so we can clean up the profile
           for i in result*; do
             cachix push holochain-ci-internal $i || true
           done
-          
+
           rm result*

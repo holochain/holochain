@@ -22,7 +22,7 @@ name: release holochain
 
 on:
   schedule:
-    - cron: "0 0 * * 3" # at 0 AM on wednesday
+    - cron: "0 0 * * 3" # At 12:00am on Wednesday
   workflow_dispatch:
     inputs:
       # holochain_url:
@@ -198,9 +198,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install nix
-        uses: cachix/install-nix-action@v20
+        uses: cachix/install-nix-action@v26
       - name: Setup cachix
-        uses: cachix/cachix-action@v12
+        uses: cachix/cachix-action@v14
         if: ${{ ! contains(matrix.platform.runs-on, 'self-hosted') }}
         with:
           name: holochain-ci
@@ -229,20 +229,20 @@ jobs:
           chmod --recursive u+w ${HOLOCHAIN_REPO}
           cp -v $HOME/work/holochain/holochain/.git/config ${HOLOCHAIN_REPO}/.git/config
 
-      - name: Restore cargo related state and build files
-        uses: steveeJ-forks/actions-cache/restore@retry
+      - name: Restore Cargo cache
+        uses: actions/cache@v4
         with:
+          # See https://doc.rust-lang.org/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci
+          # See https://github.com/actions/cache/blob/main/examples.md#rust---cargo
           path: |
-            /var/tmp/holochain_repo/.cargo/bin/
-            /var/tmp/holochain_repo/.cargo/registry/index/
-            /var/tmp/holochain_repo/.cargo/registry/cache/
-            /var/tmp/holochain_repo/.cargo/git/db/
-            /var/tmp/holochain_repo/target/
-          key: ${{ runner.os }}-prepare-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-test-
-            ${{ runner.os }}-prepare-
-          required: false
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ${{ env.HOLOCHAIN_REPO }}/target/
+          key: "${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Ensure the git credentials are set
         env:
@@ -313,6 +313,16 @@ jobs:
           cd "${HOLOCHAIN_REPO}"
 
           git status
+
+          # Push just the Holochain tag initially, so that GitHub Actions will create an event based on it.
+          # Pushing a batch larger than 3 tags will cause the event to be ignored -> https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#push
+          # TODO Once this has been tested, removed the `set +eu` and `set -eu` lines. That is just to prevent this from making the workflow fail.
+          set +eu
+          SEARCH_PATTERN="^holochain-[0-9]"
+          ALL_HOLOCHAIN_TAGS=$(git -c 'versionsort.suffix=-beta-dev' -c 'versionsort.suffix=-dev' -c 'versionsort.suffix=-rc' tag --sort='v:refname' | cut --delimiter='/' --fields=3)
+          LATEST_MATCHING_TAG=$(echo "$ALL_HOLOCHAIN_TAGS" | grep -E "$SEARCH_PATTERN" | tail -n 1)
+          git push origin ${LATEST_MATCHING_TAG}
+          set -eu
 
           git push origin ${HOLOCHAIN_TARGET_BRANCH} --tags
 
@@ -390,7 +400,7 @@ jobs:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow
           limit-access-to-actor: true
           ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
+          limit-access-to-users: steveeJ,jost-s,neonphog,maackle,ThetaSinner,cdunster
 
   github-actions-ci-jobs-succeed:
     if: ${{ always() && github.event_name == 'pull_request' }}

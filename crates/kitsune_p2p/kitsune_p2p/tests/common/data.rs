@@ -40,6 +40,13 @@ impl TestHostOp {
         self
     }
 
+    pub fn with_forced_location(mut self, loc: DhtLocation) -> Self {
+        assert_eq!(36, self.hash.len(), "Should already have a hash");
+        let x = loc.as_u32().to_le_bytes();
+        self.hash.0[32..].copy_from_slice(&x);
+        self
+    }
+
     pub fn space(&self) -> KSpace {
         self.space.clone()
     }
@@ -72,10 +79,8 @@ impl TestHostOp {
             if loc < bounds.x.0 || loc > bounds.x.1 {
                 return false;
             }
-        } else {
-            if loc > bounds.x.0 && loc < bounds.x.1 {
-                return false;
-            }
+        } else if loc > bounds.x.0 && loc < bounds.x.1 {
+            return false;
         }
 
         if time < bounds.t.0 || time > bounds.t.1 {
@@ -86,15 +91,15 @@ impl TestHostOp {
     }
 }
 
-impl Into<RoughSized<KOpHash>> for TestHostOp {
-    fn into(self) -> RoughSized<KOpHash> {
-        RoughSized::new(self.kitsune_hash().into(), Some(36.into()))
+impl From<TestHostOp> for RoughSized<KOpHash> {
+    fn from(val: TestHostOp) -> Self {
+        RoughSized::new(val.kitsune_hash().into(), Some(36.into()))
     }
 }
 
-impl Into<KOp> for TestHostOp {
-    fn into(self) -> KOp {
-        let str = serde_json::to_string(&self).unwrap();
+impl From<TestHostOp> for KOp {
+    fn from(val: TestHostOp) -> Self {
+        let str = serde_json::to_string(&val).unwrap();
         KitsuneOpData::new(str.into_bytes())
     }
 }
@@ -115,7 +120,6 @@ fn generated_hash() -> KitsuneOpHash {
 }
 
 // Ideally this would match the implementation in `holo_dht_location_bytes`
-#[cfg(feature = "test_utils")]
 pub fn dht_location(data: &[u8; 32]) -> [u8; 4] {
     let hash = blake2b_simd::Params::new()
         .hash_length(16)

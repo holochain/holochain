@@ -1,6 +1,3 @@
-use std::borrow::Borrow;
-use std::fmt::{Display, Formatter};
-
 use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
@@ -17,6 +14,9 @@ use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
+use std::borrow::Borrow;
+use std::fmt::{Display, Formatter};
+use std::hash::Hash;
 
 pub mod builder;
 pub mod conversions;
@@ -46,8 +46,8 @@ pub enum Action {
     InitZomesComplete(InitZomesComplete),
     CreateLink(CreateLink),
     DeleteLink(DeleteLink),
-    OpenChain(OpenChain),
     CloseChain(CloseChain),
+    OpenChain(OpenChain),
     Create(Create),
     Update(Update),
     Delete(Delete),
@@ -63,31 +63,31 @@ impl Display for Action {
             Action::AgentValidationPkg(avp) =>
                 write!(
                     f,
-                    "agent_validation_pkg=[author={}, timestamp={}]",
+                    "agent_validation_pkg=[author={}, timestamp={:?}]",
                     avp.author, avp.timestamp
                 ),
 
             Action::InitZomesComplete(izc) =>
                 write!(
                     f,
-                    "init_zomes_complete=[author={}, timestamp={}]",
+                    "init_zomes_complete=[author={}, timestamp={:?}]",
                     izc.author, izc.timestamp
                 ),
-            Action::CreateLink(link) => write!(f, "create_link=[author={}, timestamp={}, base_address={}, target_address={}, zome_index={}, link_type={:?}]", link.author, link.timestamp, link.base_address, link.target_address, link.zome_index, link.link_type),
-            Action::DeleteLink(link) => write!(f, "delete_link=[author={}, timestamp={}]", link.author, link.timestamp),
+            Action::CreateLink(link) => write!(f, "create_link=[author={}, timestamp={:?}, base_address={}, target_address={}, zome_index={}, link_type={:?}]", link.author, link.timestamp, link.base_address, link.target_address, link.zome_index, link.link_type),
+            Action::DeleteLink(link) => write!(f, "delete_link=[author={}, timestamp={:?}]", link.author, link.timestamp),
             Action::OpenChain(oc) => write!(
                 f,
-                "open_chain=[author={}, timestamp={}]",
+                "open_chain=[author={}, timestamp={:?}]",
                 oc.author, oc.timestamp
             ),
             Action::CloseChain(cc) => write!(
                 f,
-                "close_chain=[author={}, timestamp={}]",
+                "close_chain=[author={}, timestamp={:?}]",
                 cc.author, cc.timestamp
             ),
-            Action::Create(create) => write!(f, "create=[author={}, timestamp={}, entry_type={:?}, entry_hash={}]", create.author, create.timestamp, create.entry_type, create.entry_hash),
-            Action::Update(update) => write!(f, "create=[author={}, timestamp={}, original_action_address={}, original_entry_address={}, entry_type={:?}, entry_hash={}]", update.author, update.timestamp, update.original_action_address, update.original_entry_address, update.entry_type, update.entry_hash),
-            Action::Delete(delete) => write!(f, "create=[author={}, timestamp={}, deletes_address={}, deletes_entry_address={}]", delete.author, delete.timestamp, delete.deletes_address, delete.deletes_entry_address),
+            Action::Create(create) => write!(f, "create=[author={}, timestamp={:?}, entry_type={:?}, entry_hash={}]", create.author, create.timestamp, create.entry_type, create.entry_hash),
+            Action::Update(update) => write!(f, "create=[author={}, timestamp={:?}, original_action_address={}, original_entry_address={}, entry_type={:?}, entry_hash={}]", update.author, update.timestamp, update.original_action_address, update.original_entry_address, update.entry_type, update.entry_hash),
+            Action::Delete(delete) => write!(f, "create=[author={}, timestamp={:?}, deletes_address={}, deletes_entry_address={}]", delete.author, delete.timestamp, delete.deletes_address, delete.deletes_entry_address),
         }
     }
 }
@@ -111,6 +111,26 @@ pub(crate) enum ActionRef<'a> {
 }
 
 pub type ActionHashed = HoloHashed<Action>;
+
+impl ActionHashedContainer for ActionHashed {
+    fn action(&self) -> &Action {
+        self.as_content()
+    }
+
+    fn action_hash(&self) -> &ActionHash {
+        &self.hash
+    }
+}
+
+impl ActionSequenceAndHash for ActionHashed {
+    fn action_seq(&self) -> u32 {
+        self.content.action_seq()
+    }
+
+    fn address(&self) -> &ActionHash {
+        &self.hash
+    }
+}
 
 /// a utility wrapper to write intos for our data types
 macro_rules! write_into_action {
@@ -285,9 +305,30 @@ impl Action {
         self.into()
     }
 
-    /// returns the public key of the agent who signed this action.
+    /// Returns the public key of the agent who "authored" this action.
+    /// NOTE: This is not necessarily the agent who signed the action.
     pub fn author(&self) -> &AgentPubKey {
         match_action!(self => |i| { &i.author })
+    }
+
+    /// Returns the public key of the agent who signed this action.
+    /// NOTE: this is not necessarily the agent who "authored" the action.
+    pub fn signer(&self) -> &AgentPubKey {
+        match self {
+            // NOTE: We make an awkward special case for CloseChain actions during agent migrations,
+            // signing using the updated key rather than the author key. There are several reasons for this:
+            // - In order for CloseChain to be effective at all, the new key must be known, because the new key is pointed to from the CloseChain. A good way to prove that the forward reference is correct is to sign it with the forward reference.
+            // - We know that if the user is going to revoke/update their key in DPKI, it's likely that they don't even have access to their app chain, so they will want to revoke in DPKI before even modifying the app chain, especially if they're in a race with an attacker
+            // - Moreover, we don't want an attacker to close the chain on behalf of the user, because they would be pointing to some key that doesn't match the DPKI state.
+            // - We should let the author be the old key and make a special case for the signature check, because that prevents special cases in other areas, such as determining the agent activity basis hash (should be the old key), running sys validation for prev_action (prev and next author must match) and probably more.
+            Action::CloseChain(CloseChain {
+                new_target: Some(MigrationTarget::Agent(agent)),
+                ..
+            }) => agent,
+
+            // For all other actions, the signer is always the "author"
+            _ => self.author(),
+        }
     }
 
     /// returns the timestamp of when the action was created
@@ -314,6 +355,22 @@ impl Action {
 
     /// returns the previous action except for the DNA action which doesn't have a previous
     pub fn prev_action(&self) -> Option<&ActionHash> {
+        Some(match self {
+            Self::Dna(Dna { .. }) => return None,
+            Self::AgentValidationPkg(AgentValidationPkg { prev_action, .. }) => prev_action,
+            Self::InitZomesComplete(InitZomesComplete { prev_action, .. }) => prev_action,
+            Self::CreateLink(CreateLink { prev_action, .. }) => prev_action,
+            Self::DeleteLink(DeleteLink { prev_action, .. }) => prev_action,
+            Self::Delete(Delete { prev_action, .. }) => prev_action,
+            Self::CloseChain(CloseChain { prev_action, .. }) => prev_action,
+            Self::OpenChain(OpenChain { prev_action, .. }) => prev_action,
+            Self::Create(Create { prev_action, .. }) => prev_action,
+            Self::Update(Update { prev_action, .. }) => prev_action,
+        })
+    }
+
+    /// returns the previous action except for the DNA action which doesn't have a previous
+    pub fn prev_action_mut(&mut self) -> Option<&mut ActionHash> {
         Some(match self {
             Self::Dna(Dna { .. }) => return None,
             Self::AgentValidationPkg(AgentValidationPkg { prev_action, .. }) => prev_action,
@@ -483,7 +540,7 @@ pub struct AgentValidationPkg {
     pub membrane_proof: Option<MembraneProof>,
 }
 
-/// A action which declares that all zome init functions have successfully
+/// An action which declares that all zome init functions have successfully
 /// completed, and the chain is ready for commits. Contains no explicit data.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
@@ -538,24 +595,44 @@ pub struct DeleteLink {
     pub link_add_address: ActionHash,
 }
 
-/// When migrating to a new version of a DNA, this action is committed to the
-/// new chain to declare the migration path taken. **Currently unused**
+/// Description of how to find the previous or next CellId in a migration.
+/// In a migration, of the two components of the CellId (dna and agent),
+/// always one stays fixed while the other one changes.
+/// This enum represents the component that changed.
+///
+/// When used in CloseChain, this contains the new DNA hash or Agent key.
+/// When used in OpenChain, this contains the previous DNA hash or Agent key.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-pub struct OpenChain {
-    pub author: AgentPubKey,
-    pub timestamp: Timestamp,
-    pub action_seq: u32,
-    pub prev_action: ActionHash,
+pub enum MigrationTarget {
+    /// Represents a DNA migration, and contains the new or previous DNA hash.
+    Dna(DnaHash),
+    /// Represents an Agent migration, and contains the new or previous Agent key.
+    Agent(AgentPubKey),
+}
 
-    pub prev_dna_hash: DnaHash,
+impl From<DnaHash> for MigrationTarget {
+    fn from(dna: DnaHash) -> Self {
+        MigrationTarget::Dna(dna)
+    }
+}
+
+impl From<AgentPubKey> for MigrationTarget {
+    fn from(agent: AgentPubKey) -> Self {
+        MigrationTarget::Agent(agent)
+    }
 }
 
 /// When migrating to a new version of a DNA, this action is committed to the
-/// old chain to declare the migration path taken. **Currently unused**
+/// old chain to declare the migration path taken. This action can also be taken
+/// to simply close down a chain with no forward reference to a migration.
+///
+/// Note that if `MigrationTarget::Agent` is used, this action will be signed with
+/// that key rather than the authoring key, so that new key must be a valid keypair
+/// that you control in the keystore, so that the action can be signed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
     feature = "fuzzing",
@@ -567,10 +644,29 @@ pub struct CloseChain {
     pub action_seq: u32,
     pub prev_action: ActionHash,
 
-    pub new_dna_hash: DnaHash,
+    pub new_target: Option<MigrationTarget>,
 }
 
-/// A action which "speaks" Entry content into being. The same content can be
+/// When migrating to a new version of a DNA, this action is committed to the
+/// new chain to declare the migration path taken.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+)]
+pub struct OpenChain {
+    pub author: AgentPubKey,
+    pub timestamp: Timestamp,
+    pub action_seq: u32,
+    pub prev_action: ActionHash,
+
+    pub prev_target: MigrationTarget,
+    /// The hash of the `CloseChain` action on the old chain, to establish chain continuity
+    /// and disallow backlinks to multiple forks on the old chain.
+    pub close_hash: ActionHash,
+}
+
+/// An action which "speaks" Entry content into being. The same content can be
 /// referenced by multiple such actions.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(
@@ -589,7 +685,7 @@ pub struct Create<W = EntryRateWeight> {
     pub weight: W,
 }
 
-/// A action which specifies that some new Entry content is intended to be an
+/// An action which specifies that some new Entry content is intended to be an
 /// update to some old Entry.
 ///
 /// This action semantically updates an entry to a new entry.
@@ -713,15 +809,15 @@ impl EntryType {
 impl std::fmt::Display for EntryType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EntryType::AgentPubKey => writeln!(f, "AgentPubKey"),
-            EntryType::App(app_entry_def) => writeln!(
+            EntryType::AgentPubKey => write!(f, "AgentPubKey"),
+            EntryType::App(app_entry_def) => write!(
                 f,
                 "App({:?}, {:?})",
                 app_entry_def.entry_index(),
                 app_entry_def.visibility()
             ),
-            EntryType::CapClaim => writeln!(f, "CapClaim"),
-            EntryType::CapGrant => writeln!(f, "CapGrant"),
+            EntryType::CapClaim => write!(f, "CapClaim"),
+            EntryType::CapGrant => write!(f, "CapGrant"),
         }
     }
 }
@@ -791,5 +887,26 @@ impl std::ops::Deref for ZomeIndex {
 impl Borrow<u8> for ZomeIndex {
     fn borrow(&self) -> &u8 {
         &self.0
+    }
+}
+
+pub trait ActionHashedContainer: ActionSequenceAndHash {
+    fn action(&self) -> &Action;
+
+    fn action_hash(&self) -> &ActionHash;
+}
+
+pub trait ActionSequenceAndHash {
+    fn action_seq(&self) -> u32;
+    fn address(&self) -> &ActionHash;
+}
+
+impl ActionSequenceAndHash for (u32, ActionHash) {
+    fn action_seq(&self) -> u32 {
+        self.0
+    }
+
+    fn address(&self) -> &ActionHash {
+        &self.1
     }
 }

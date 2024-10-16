@@ -47,7 +47,6 @@ pub mod test {
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetZome;
-    use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
 
@@ -59,18 +58,8 @@ pub mod test {
         )
         .await;
 
-        let alice_pubkey = fixt!(AgentPubKey, Predictable, 0);
-        let bob_pubkey = fixt!(AgentPubKey, Predictable, 1);
-
         let mut conductor = SweetConductor::from_standard_config().await;
-        let apps = conductor
-            .setup_app_for_agents(
-                "app-",
-                &[alice_pubkey.clone(), bob_pubkey.clone()],
-                &[dna_file],
-            )
-            .await
-            .unwrap();
+        let apps = conductor.setup_apps("app-", 2, &[dna_file]).await.unwrap();
 
         let ((alice,), (bobbo,)) = apps.into_tuples();
         let alice = alice.zome(TestWasm::ZomeInfo);
@@ -80,10 +69,7 @@ pub mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dna_info_test_1() {
-        holochain_trace::test_run().ok();
-        // let RibosomeTestFixture {
-        //     conductor, alice, ..
-        // } = RibosomeTestFixture::new(TestWasm::ZomeInfo).await;
+        holochain_trace::test_run();
 
         let (conductor, alice) = test_conductor(SerializedBytes::default()).await;
 

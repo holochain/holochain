@@ -9,4 +9,9 @@ pub mod tokio_helper;
 #[cfg(feature = "pw")]
 pub mod pw;
 
+#[cfg(feature = "time")]
+pub mod time;
+
 pub mod hex;
+
+pub use ::colored;

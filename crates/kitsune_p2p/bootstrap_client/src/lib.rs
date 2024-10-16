@@ -2,15 +2,15 @@ use kitsune_p2p_bootstrap::error::BootstrapClientError;
 use kitsune_p2p_bootstrap::error::BootstrapClientResult;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::RandomQuery;
-use once_cell::sync::Lazy;
-use once_cell::sync::OnceCell;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::sync::OnceLock;
 use url2::Url2;
 
 pub mod prelude {
-    pub use super::{now, now_once, proxy_list, put, random, BootstrapNet};
     pub use kitsune_p2p_bootstrap::error::*;
+
+    pub use super::{now, now_once, proxy_list, put, random, BootstrapNet};
 }
 
 /// The "net" flag / bucket to use when talking to the bootstrap server.
@@ -30,14 +30,14 @@ impl BootstrapNet {
 }
 
 /// Reuse a single reqwest Client for efficiency as we likely need several connections.
-static CLIENT: Lazy<reqwest::Client> = Lazy::new(reqwest::Client::new);
+static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
 /// A cell to hold our local offset for calculating a 'now' that is compatible with the remote
 /// service. This is much less precise and comprehensive than NTP style calculations.
 /// We simply need to ensure that we don't sign things 'in the future' from the perspective of the
 /// remote service, and any inaccuracy caused by network latency or similar problems is negligible
 /// relative to the expiry times.
-pub static NOW_OFFSET_MILLIS: OnceCell<i64> = OnceCell::new();
+pub static NOW_OFFSET_MILLIS: OnceLock<i64> = OnceLock::new();
 
 /// The HTTP header name for setting the op on POST requests.
 const OP_HEADER: &str = "X-Op";
@@ -71,6 +71,7 @@ async fn do_api<I: serde::Serialize, O: serde::de::DeserializeOwned>(
             let url = format!("{}?net={}", url.as_str(), net.value());
 
             let res = CLIENT
+                .get_or_init(reqwest::Client::new)
                 .post(url.as_str())
                 .body(body_data)
                 .header(OP_HEADER, op)
@@ -208,14 +209,15 @@ pub async fn proxy_list(url: Url2, net: BootstrapNet) -> BootstrapClientResult<V
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use ed25519_dalek::ed25519::signature::Signature;
-    use ed25519_dalek::Keypair;
-    use ed25519_dalek::Signer;
+    use arbitrary::Arbitrary;
+    use ed25519_dalek::{Signer, SigningKey};
     use kitsune_p2p_bin_data::fixt::*;
     use kitsune_p2p_bin_data::KitsuneAgent;
     use kitsune_p2p_bin_data::KitsuneBinType;
     use kitsune_p2p_bin_data::KitsuneSignature;
+    use kitsune_p2p_types::dht::Arq;
     use kitsune_p2p_types::fixt::*;
+    use rand::rngs::OsRng;
     use std::convert::TryInto;
     use std::net::SocketAddr;
     use std::sync::Arc;
@@ -224,10 +226,11 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_bootstrap() {
         let (addr, abort_handle) = start_bootstrap().await;
+        let mut u = arbitrary::Unstructured::new(&[0; 1024]);
 
         let keypair = create_test_keypair();
         let space = fixt!(KitsuneSpace);
-        let agent = KitsuneAgent::new(keypair.public.as_bytes().to_vec());
+        let agent = KitsuneAgent::new(keypair.verifying_key().as_bytes().to_vec());
         let urls = fixt!(UrlList);
         let now = std::time::SystemTime::now();
         let millis = now
@@ -239,7 +242,7 @@ mod tests {
         let agent_info_signed = AgentInfoSigned::sign(
             Arc::new(space),
             Arc::new(agent),
-            u32::MAX,
+            Arq::arbitrary(&mut u).unwrap(),
             urls,
             signed_at_ms,
             expires_at_ms,
@@ -248,7 +251,7 @@ mod tests {
                 let d = Arc::new(d.to_vec());
                 async move {
                     Ok(Arc::new(KitsuneSignature(
-                        keypair.sign(d.clone().as_slice()).as_bytes().to_vec(),
+                        keypair.sign(d.clone().as_slice()).to_vec(),
                     )))
                 }
             },
@@ -316,6 +319,7 @@ mod tests {
     // thread 'spawn::actor::bootstrap::tests::test_random' panicked at 'dispatch dropped without returning error', /rustc/d3fb005a39e62501b8b0b356166e515ae24e2e54/src/libstd/macros.rs:13:23
     async fn test_random() {
         let (addr, abort_handle) = start_bootstrap().await;
+        let mut u = arbitrary::Unstructured::new(&[0; 1024]);
 
         let space = fixt!(KitsuneSpace, Unpredictable);
         let now = now(Some(url2::url2!("http://{:?}", addr)), BootstrapNet::Tx5)
@@ -327,13 +331,13 @@ mod tests {
 
         let mut expected: Vec<AgentInfoSigned> = Vec::new();
         for agent in vec![alice, bob] {
-            let kitsune_agent = KitsuneAgent::new(agent.public.as_bytes().to_vec());
+            let kitsune_agent = KitsuneAgent::new(agent.verifying_key().as_bytes().to_vec());
             let signed_at_ms = now;
             let expires_at_ms = now + 1000 * 60 * 20;
             let agent_info_signed = AgentInfoSigned::sign(
                 Arc::new(space.clone()),
                 Arc::new(kitsune_agent.clone()),
-                u32::MAX,
+                Arq::arbitrary(&mut u).unwrap(),
                 fixt!(UrlList),
                 signed_at_ms,
                 expires_at_ms,
@@ -342,7 +346,7 @@ mod tests {
                     let d = Arc::new(d.to_vec());
                     async move {
                         Ok(Arc::new(KitsuneSignature(
-                            agent.sign(d.clone().as_slice()).as_bytes().to_vec(),
+                            agent.sign(d.clone().as_slice()).to_vec(),
                         )))
                     }
                 },
@@ -410,8 +414,8 @@ mod tests {
         (bs_addr, abort_handle)
     }
 
-    fn create_test_keypair() -> Keypair {
-        let mut rng = rand_dalek::thread_rng();
-        Keypair::generate(&mut rng)
+    fn create_test_keypair() -> SigningKey {
+        let mut csprng = OsRng;
+        SigningKey::generate(&mut csprng)
     }
 }

@@ -13,7 +13,6 @@ pub use crate::activity::*;
 pub use crate::app::*;
 pub use crate::autonomic::*;
 pub use crate::chain::*;
-pub use crate::chc::*;
 pub use crate::combinators::*;
 pub use crate::db::*;
 pub use crate::db_cache::*;
@@ -23,10 +22,10 @@ pub use crate::dna::*;
 pub use crate::entry::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
-pub use crate::rate_limit::*;
 pub use crate::record::*;
 pub use crate::signal::*;
 pub use crate::validation_receipt::*;
+pub use crate::warrant::*;
 
 #[cfg(feature = "fixturators")]
 pub use crate::fixt::TimestampFixturator;

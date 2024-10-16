@@ -71,17 +71,19 @@ pub struct GetActivityOptions {
     pub include_valid_activity: bool,
     /// Include any rejected actions in the response.
     pub include_rejected_activity: bool,
-    /// Include the full signed actions and hashes in the response
-    /// instead of just the hashes.
-    pub include_full_actions: bool,
+    /// Include warrants in the response.
+    pub include_warrants: bool,
+    /// Include the full records, instead of just the hashes.
+    pub include_full_records: bool,
 }
 
 impl Default for GetActivityOptions {
     fn default() -> Self {
         Self {
             include_valid_activity: true,
+            include_warrants: true,
             include_rejected_activity: false,
-            include_full_actions: false,
+            include_full_records: false,
         }
     }
 }
@@ -90,8 +92,9 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
     fn from(a: &actor::GetActivityOptions) -> Self {
         Self {
             include_valid_activity: a.include_valid_activity,
+            include_warrants: a.include_warrants,
             include_rejected_activity: a.include_rejected_activity,
-            include_full_actions: a.include_full_actions,
+            include_full_records: a.include_full_records,
         }
     }
 }
@@ -104,7 +107,7 @@ pub enum CountersigningSessionNegotiationMessage {
     AuthorityResponse(Vec<SignedAction>),
     /// Counterparties are sending their signed action to an enzyme instead of
     /// authorities as part of an enzymatic session.
-    EnzymePush(Box<DhtOp>),
+    EnzymePush(Box<ChainOp>),
 }
 
 /// Multiple ways to fetch op data
@@ -148,9 +151,10 @@ ghost_actor::ghost_chan! {
     pub chan HolochainP2pEvent<super::HolochainP2pError> {
 
         /// We need to store signed agent info.
-        fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> ();
+        fn put_agent_info_signed(dna_hash: DnaHash, peer_data: Vec<AgentInfoSigned>) -> Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>;
 
         /// We need to get previously stored agent info.
+        /// The optional `agents` parameter is an include filter. This can be thought of as a way to filter a held list of agents against the current state of the store.
         fn query_agent_info_signed(dna_hash: DnaHash, agents: Option<std::collections::HashSet<Arc<kitsune_p2p::KitsuneAgent>>>, kitsune_space: Arc<kitsune_p2p::KitsuneSpace>) -> Vec<AgentInfoSigned>;
 
         /// We need to get agents that fit into an arc set for gossip.
@@ -229,7 +233,7 @@ ghost_actor::ghost_chan! {
             agent: AgentPubKey,
             query: ChainQueryFilter,
             options: GetActivityOptions,
-        ) -> AgentActivityResponse<ActionHash>;
+        ) -> AgentActivityResponse;
 
         /// A remote node is requesting agent activity from us.
         fn must_get_agent_activity(

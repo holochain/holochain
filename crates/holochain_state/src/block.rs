@@ -9,6 +9,7 @@ use holochain_types::prelude::Timestamp;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
     tracing::warn!(?input, "blocking node!");
 
@@ -16,6 +17,7 @@ pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResul
         .await
 }
 
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn unblock(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
     db.write_async(move |txn| mutations::insert_unblock(txn, input))
         .await
@@ -433,8 +435,7 @@ mod test {
     // Blocks only block their span.
     #[tokio::test(flavor = "multi_thread")]
     async fn block_not_block_is_not_blocked() {
-        for (start, check, end) in vec![
-            // before
+        for (start, check, end) in [
             (1, 0, 1),
             // after
             (0, 1, 0),
@@ -497,8 +498,7 @@ mod test {
     // no other target.
     #[tokio::test(flavor = "multi_thread")]
     async fn block_is_blocked() {
-        for (start, mid, end) in vec![
-            // block is inclusive
+        for (start, mid, end) in [
             (0, 0, 0),
             (1, 1, 1),
             (-1, -1, -1),

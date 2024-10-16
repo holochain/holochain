@@ -15,6 +15,8 @@ use crate::DnaHash;
 use crate::DnaHashB64;
 use crate::EntryHash;
 use crate::EntryHashB64;
+use crate::ExternalHash;
+use crate::ExternalHashB64;
 use crate::NetIdHash;
 use crate::NetIdHashB64;
 use crate::WasmHash;
@@ -84,7 +86,7 @@ fixturator!(
     curve Predictable {
         // these agent keys match what the mock keystore spits out for the first two agents
         // don't mess with this unless you also update the keystore!!!
-        let agents = vec![
+        let agents = [
             AgentPubKey::try_from("uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo")
             .unwrap(),
             AgentPubKey::try_from("uhCAk39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH")
@@ -170,4 +172,13 @@ fixturator!(
 fixturator!(
     AnyLinkableHashB64;
     constructor fn new(AnyLinkableHash);
+);
+
+fixturator!(
+    ExternalHash;
+    constructor fn from_raw_32(ThirtyTwoHashBytes);
+);
+fixturator!(
+    ExternalHashB64;
+    constructor fn new(ExternalHash);
 );

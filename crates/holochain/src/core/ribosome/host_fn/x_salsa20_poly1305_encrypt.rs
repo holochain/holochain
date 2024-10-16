@@ -60,7 +60,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "test_utils")]
     async fn xsalsa20_poly1305_shared_secret_round_trip() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
 
         // we need two conductors and two x25519 pub keys to do a round trip
 
@@ -97,8 +97,8 @@ pub mod wasm_test {
 
         // export the shared key to send to conductor2
         let exp_input = holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretExport::new(
-            alice1_x25519.clone(), // sender
-            alice2_x25519.clone(), // recipient
+            alice1_x25519, // sender
+            alice2_x25519, // recipient
             key_ref.clone(),
         );
         let secret_exp: XSalsa20Poly1305EncryptedData = conductor1
@@ -107,8 +107,8 @@ pub mod wasm_test {
 
         // ingest the shared key on conductor2
         let ing_input = holochain_zome_types::x_salsa20_poly1305::XSalsa20Poly1305SharedSecretIngest::new(
-            alice2_x25519.clone(), // recipient
-            alice1_x25519.clone(), // sender
+            alice2_x25519, // recipient
+            alice1_x25519, // sender
             secret_exp,
             Some(key_ref.clone()),
         );

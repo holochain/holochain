@@ -1,7 +1,7 @@
 use super::sys_validation_workflow;
+use super::validation_deps::SysValDeps;
 use super::validation_query::get_ops_to_app_validate;
 use super::SysValidationWorkspace;
-use super::ValidationDependencies;
 use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
 use crate::core::queue_consumer::TriggerSender;
@@ -16,7 +16,6 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holo_hash::HasHash;
-use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::db::DbKindCache;
@@ -24,6 +23,7 @@ use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::db::DbKindT;
 use holochain_sqlite::db::DbWrite;
 use holochain_state::mutations::StateMutationResult;
+use holochain_types::dht_op::ChainOp;
 use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::WireOps;
@@ -38,25 +38,24 @@ use holochain_zome_types::judged::Judged;
 use holochain_zome_types::record::SignedActionHashed;
 use holochain_zome_types::timestamp::Timestamp;
 use holochain_zome_types::Action;
-use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_no_dependency() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
     let dna_action = HdkDna {
         author: fixt!(AgentPubKey),
-        timestamp: Timestamp::now().into(),
+        timestamp: Timestamp::now(),
         hash: test_case.dna_hash(),
     };
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action));
 
     let op_hash = test_case
-        .save_op_to_db(test_case.dht_db_handle(), op)
+        .save_op_to_db(test_case.dht_db_handle(), op.into())
         .await
         .unwrap();
 
@@ -70,7 +69,7 @@ async fn validate_op_with_no_dependency() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_dependency_held_in_cache() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -87,7 +86,7 @@ async fn validate_op_with_dependency_held_in_cache() {
         .sign_action(Action::Create(prev_create_action.clone()))
         .await;
     let previous_op =
-        DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action));
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
     test_case
         .save_op_to_db(test_case.cache_db_handle(), previous_op)
         .await
@@ -98,13 +97,13 @@ async fn validate_op_with_dependency_held_in_cache() {
     create_action.author = previous_action.action().author().clone();
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now().into();
+    create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
     let op_hash = test_case
         .save_op_to_db(test_case.dht_db_handle(), op)
@@ -121,7 +120,7 @@ async fn validate_op_with_dependency_held_in_cache() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_dependency_not_held() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -143,13 +142,13 @@ async fn validate_op_with_dependency_not_held() {
     create_action.author = previous_action.action().author().clone();
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now().into();
+    create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
     let op_hash = test_case
         .save_op_to_db(test_case.dht_db_handle(), op)
@@ -176,7 +175,7 @@ async fn validate_op_with_dependency_not_held() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_dependency_not_found_on_the_dht() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
 
@@ -195,13 +194,13 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     create_action.author = previous_action.action().author().clone();
     create_action.action_seq = previous_action.action().action_seq() + 1;
     create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now().into();
+    create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
 
     test_case
         .save_op_to_db(test_case.dht_db_handle(), op)
@@ -225,9 +224,15 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_app_validation() {
-    holochain_trace::test_run().unwrap();
+    holochain_trace::test_run();
+
+    let mut network = MockHolochainP2pDnaT::new();
+    network
+        .expect_authority_for_hash()
+        .return_once(move |_| Ok(true));
 
     let mut test_case = TestCase::new().await;
+    test_case.with_network_behaviour(network);
 
     // Previous op, to be found in the cache
     let mut validation_package_action = fixt!(AgentValidationPkg);
@@ -238,10 +243,11 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
             validation_package_action.clone(),
         ))
         .await;
-    let previous_op = DhtOp::RegisterAgentActivity(
+    let previous_op = ChainOp::RegisterAgentActivity(
         fixt!(Signature),
         Action::AgentValidationPkg(validation_package_action),
-    );
+    )
+    .into();
     test_case
         .save_op_to_db(test_case.cache_db_handle(), previous_op)
         .await
@@ -252,13 +258,13 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
     create_action.author = previous_action.action().author().clone();
     create_action.action_seq = previous_action.action().action_seq() + 31;
     create_action.prev_action = previous_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now().into();
+    create_action.timestamp = Timestamp::now();
     create_action.entry_type = EntryType::App(AppEntryDef {
         entry_index: 0.into(),
         zome_index: 0.into(),
         visibility: EntryVisibility::Public,
     });
-    let op = DhtOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action));
+    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
     test_case
         .save_op_to_db(test_case.dht_db_handle(), op)
         .await
@@ -278,8 +284,9 @@ struct TestCase {
     test_space: TestSpace,
     keystore: MetaLairClient,
     agent: AgentPubKey,
-    current_validation_dependencies: Arc<Mutex<ValidationDependencies>>,
+    current_validation_dependencies: SysValDeps,
     app_validation_trigger: (TriggerSender, TriggerReceiver),
+    publish_trigger: (TriggerSender, TriggerReceiver),
     self_trigger: (TriggerSender, TriggerReceiver),
     actual_network: Option<MockHolochainP2pDnaT>,
 }
@@ -292,7 +299,7 @@ impl TestCase {
         let test_space = TestSpace::new(dna_hash.hash.clone());
 
         let keystore = holochain_keystore::test_keystore();
-        let agent = keystore.new_sign_keypair_random().await.unwrap().into();
+        let agent = keystore.new_sign_keypair_random().await.unwrap();
 
         Self {
             dna_def,
@@ -300,8 +307,9 @@ impl TestCase {
             test_space,
             keystore,
             agent,
-            current_validation_dependencies: Arc::new(Mutex::new(Default::default())),
+            current_validation_dependencies: SysValDeps::default(),
             app_validation_trigger: TriggerSender::new(),
+            publish_trigger: TriggerSender::new(),
             self_trigger: TriggerSender::new(),
             actual_network: None,
         }
@@ -353,32 +361,29 @@ impl TestCase {
 
     async fn run(&mut self) -> WorkComplete {
         let workspace = SysValidationWorkspace::new(
-            self.test_space.space.authored_db.clone().into(),
-            self.test_space.space.dht_db.clone().into(),
+            self.test_space
+                .space
+                .get_or_create_authored_db(self.agent.clone())
+                .unwrap(),
+            self.test_space.space.dht_db.clone(),
             self.test_space.space.dht_query_cache.clone(),
-            self.test_space.space.cache_db.clone().into(),
+            self.test_space.space.cache_db.clone(),
             Arc::new(self.dna_def.clone()),
+            None,
             std::time::Duration::from_secs(10),
         );
 
-        let actual_network = self
-            .actual_network
-            .take()
-            .unwrap_or_else(|| MockHolochainP2pDnaT::new());
-
-        // XXX: this isn't quite right, since none of these config settings inform
-        // anything else about the TestCase. It's currently only needed for the node_id
-        // as used by hc_sleuth
-        let config = ConductorConfig::default();
-        let config = Arc::new(config);
+        let actual_network = self.actual_network.take().unwrap_or_default();
 
         sys_validation_workflow(
             Arc::new(workspace),
             self.current_validation_dependencies.clone(),
             self.app_validation_trigger.0.clone(),
+            self.publish_trigger.0.clone(),
             self.self_trigger.0.clone(),
             actual_network,
-            config,
+            self.keystore.clone(),
+            self.agent.clone(),
         )
         .await
         .unwrap()

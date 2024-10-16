@@ -1,11 +1,15 @@
 [package]
 name = "holochain_cli_run_local_services"
-version = "0.3.0-beta-dev.20"
+version = "0.5.0-dev.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_run_local_services"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo"]
-categories = ["command-line-utilities", "development-tools::build-utils", "filesystem"]
+categories = [
+  "command-line-utilities",
+  "development-tools::build-utils",
+  "filesystem",
+]
 edition = "2021"
 license = "Apache-2.0"
 description = "Run a holochain webrtc signal server and bootstrap server."
@@ -14,12 +18,16 @@ description = "Run a holochain webrtc signal server and bootstrap server."
 name = "hc-run-local-services"
 path = "src/bin/hc-run-local-services.rs"
 
+# reminder - do not use workspace deps
 [dependencies]
-clap = { version = "4.0", features = [ "derive" ] }
-futures = "0.3.28"
-holochain_trace = { version = "^0.3.0-beta-dev.6", path = "../holochain_trace" }
-if-addrs = "0.10.1"
-kitsune_p2p_bootstrap = { version = "^0.2.0-beta-dev.19", path = "../kitsune_p2p/bootstrap" }
-tokio = { version = "1.27", features = ["full"] }
+clap = { version = "4.0", features = ["derive"] }
+futures = "0.3"
+holochain_trace = { version = "^0.5.0-dev.0", path = "../holochain_trace" }
+if-addrs = "0.12"
+kitsune_p2p_bootstrap = { version = "^0.4.0-dev.0", path = "../kitsune_p2p/bootstrap" }
+sbd-server = "=0.0.6-alpha"
+tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
-tx5-signal-srv = { workspace = true }
+
+[lints]
+workspace = true

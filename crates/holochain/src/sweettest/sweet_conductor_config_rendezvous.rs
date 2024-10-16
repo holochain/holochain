@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// How conductors should learn about each other / speak to each other.
 /// Signal/TURN + bootstrap in tx5 mode.
@@ -12,7 +12,7 @@ pub trait SweetRendezvous: 'static + Send + Sync {
 }
 
 /// Trait object rendezvous.
-pub type DynSweetRendezvous = Arc<dyn SweetRendezvous + 'static + Send + Sync>;
+pub type DynSweetRendezvous = Arc<dyn SweetRendezvous>;
 
 /// Local rendezvous infrastructure for unit testing.
 pub struct SweetLocalRendezvous {
@@ -24,7 +24,11 @@ pub struct SweetLocalRendezvous {
     #[cfg(feature = "tx5")]
     sig_addr: String,
     #[cfg(feature = "tx5")]
-    sig_shutdown: Option<tokio::task::JoinHandle<()>>,
+    sig_hnd: Mutex<Option<sbd_server::SbdServer>>,
+    #[cfg(feature = "tx5")]
+    sig_ip: std::net::IpAddr,
+    #[cfg(feature = "tx5")]
+    sig_port: u16,
 }
 
 impl Drop for SweetLocalRendezvous {
@@ -38,17 +42,37 @@ impl Drop for SweetLocalRendezvous {
                 let _ = s.stop().await;
             });
         }
-        #[cfg(feature = "tx5")]
-        if let Some(s) = self.sig_shutdown.take() {
-            s.abort();
-        }
     }
+}
+
+#[cfg(feature = "tx5")]
+async fn spawn_sig(ip: std::net::IpAddr, port: u16) -> (String, u16, sbd_server::SbdServer) {
+    let sig_hnd = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+        bind: vec![format!("{ip}:{port}")],
+        limit_clients: 100,
+        disable_rate_limiting: true,
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
+
+    let sig_addr = *sig_hnd.bind_addrs().first().unwrap();
+    let sig_port = sig_addr.port();
+    let sig_addr = format!("ws://{sig_addr}");
+    tracing::info!("RUNNING SIG: {sig_addr:?}");
+
+    (sig_addr, sig_port, sig_hnd)
 }
 
 impl SweetLocalRendezvous {
     /// Create a new local rendezvous instance.
     #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> DynSweetRendezvous {
+        Self::new_raw().await
+    }
+
+    /// Create a new local rendezvous instance.
+    pub async fn new_raw() -> Arc<Self> {
         let mut addr = None;
 
         for iface in get_if_addrs::get_if_addrs().expect("failed to get_if_addrs") {
@@ -81,35 +105,46 @@ impl SweetLocalRendezvous {
             let (turn_addr, turn_srv) = tx5_go_pion_turn::test_turn_server().await.unwrap();
             tracing::info!("RUNNING TURN: {turn_addr:?}");
 
-            let mut sig_conf = tx5_signal_srv::Config::default();
-            sig_conf.port = 0;
-            sig_conf.ice_servers = serde_json::json!({
-                "iceServers": [
-                    serde_json::from_str::<serde_json::Value>(&turn_addr).unwrap(),
-                ],
-            });
-            sig_conf.demo = false;
-            tracing::info!(
-                "RUNNING ICE SERVERS: {}",
-                serde_json::to_string_pretty(&sig_conf.ice_servers).unwrap()
-            );
+            let (sig_addr, sig_port, sig_hnd) = spawn_sig(addr, 0).await;
 
-            let (sig_driver, sig_addr_list, _sig_err_list) =
-                tx5_signal_srv::exec_tx5_signal_srv(sig_conf).unwrap();
-            let sig_port = sig_addr_list.get(0).unwrap().port();
-            let sig_addr: std::net::SocketAddr = (addr, sig_port).into();
-            let sig_shutdown = tokio::task::spawn(sig_driver);
-            let sig_addr = format!("ws://{sig_addr}");
-            tracing::info!("RUNNING SIG: {sig_addr:?}");
+            let sig_hnd = Mutex::new(Some(sig_hnd));
 
             Arc::new(Self {
                 bs_addr,
                 bs_shutdown: Some(bs_shutdown),
                 turn_srv: Some(turn_srv),
                 sig_addr,
-                sig_shutdown: Some(sig_shutdown),
+                sig_hnd,
+                sig_ip: addr,
+                sig_port,
             })
         }
+    }
+
+    /// Drop (shutdown) the signal server.
+    #[cfg(feature = "tx5")]
+    pub async fn drop_sig(&self) {
+        self.sig_hnd.lock().unwrap().take();
+
+        // wait up to 1 second until the socket is actually closed
+        for _ in 0..100 {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
+            match tokio::net::TcpStream::connect((self.sig_ip, self.sig_port)).await {
+                Ok(_) => (),
+                Err(_) => break,
+            }
+        }
+    }
+
+    /// Start (or restart) the signal server.
+    #[cfg(feature = "tx5")]
+    pub async fn start_sig(&self) {
+        self.drop_sig().await;
+
+        let (_, _, sig_hnd) = spawn_sig(self.sig_ip, self.sig_port).await;
+
+        *self.sig_hnd.lock().unwrap() = Some(sig_hnd);
     }
 }
 

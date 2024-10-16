@@ -5,10 +5,10 @@
     let
       rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.71.1";
+        version = "1.77.2";
       };
 
-      craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
 
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
@@ -21,7 +21,7 @@
 
         CARGO_PROFILE = "";
 
-        buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher ])
+        buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher cmake clang llvmPackages.libclang.lib ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
@@ -74,26 +74,6 @@
       });
 
       holochainTestsNextestArgs =
-        let
-          # e.g.
-          # "conductor::cell::gossip_test::gossip_test"
-          disabledTests = [
-            "core::ribosome::host_fn::remote_signal::tests::remote_signal_test"
-            "new_lair::test_new_lair_conductor_integration"
-            "conductor::cell::gossip_test::gossip_test"
-          ] ++ (lib.optionals (pkgs.system == "x86_64-darwin") [
-            "test_reconnect"
-            "timeout::tests::kitsune_backoff"
-            "test_util::switchboard::tests::transitive_peer_gossip"
-          ]) ++ (lib.optionals (pkgs.system == "aarch64-darwin") [
-            "test_reconnect"
-          ]);
-
-          # the space after the not is crucial or else nextest won't parse the expression
-          disabledTestsArg = '' \
-            -E 'not test(/${lib.concatStringsSep "|" disabledTests}/)' \
-          '';
-        in
         (commonArgs // {
           __noChroot = pkgs.stdenv.isLinux;
           cargoArtifacts = holochainNextestDeps;
@@ -108,8 +88,7 @@
             --profile ci \
             --config-file ${../../.config/nextest.toml} \
             ${import ../../.config/test-args.nix} \
-            ${import ../../.config/nextest-args.nix} \
-            ${disabledTestsArg} \
+            ${import ../../.config/nextest-args.nix}
           '';
 
           cargoNextestExtraArgs = builtins.getEnv "NEXTEST_EXTRA_ARGS";
@@ -143,7 +122,39 @@
         cargoArtifacts = holochainDeps;
         doCheck = false;
 
-        cargoClippyExtraArgs = "-- ${import ../../.config/clippy-args.nix}";
+        cargoClippyExtraArgs =
+          let
+            # contains a set with items like 'nursery = allow'
+            workspaceClippyLints = (builtins.fromTOML (builtins.readFile "${self}/Cargo.toml")).workspace.lints.clippy;
+            workspaceClippyLints1 = builtins.mapAttrs
+              (name: value:
+                builtins.concatStringsSep " " [
+                  (
+                    if builtins.typeOf value == "string" then
+                      if value == "allow" then "-A"
+                      else if value == "deny" then "-D"
+                      else throw "unsupported lint level: ${name} = ${value}"
+                    else if builtins.typeOf value == "set" && builtins.typeOf value.level == "string" then
+                      if value.level == "allow" then "-A"
+                      else if value.level == "deny" then "-D"
+                      else throw "unsupported lint level: ${name}.level = ${value.level}"
+                    else throw "unsupported value for lint: ${name}"
+                  )
+                  "clippy::${name}"
+                ]
+              )
+              workspaceClippyLints
+            ;
+
+            # contains a list of e.g. "-A clippy::nursery"
+            workspaceClippyLints2 = builtins.attrValues workspaceClippyLints1;
+
+            # contains the final argument string
+            workspaceClippyLints3 = builtins.concatStringsSep " " workspaceClippyLints2;
+          in
+          # the outcome will be: "-- -A clippy::nursery -D ..."
+          "-- ${workspaceClippyLints3}"
+        ;
 
         dontPatchELF = true;
         dontFixup = true;

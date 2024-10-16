@@ -54,32 +54,34 @@ pub mod guest_callback;
 pub mod host_fn;
 pub mod real_ribosome;
 
+mod check_clone_access;
+
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
+use crate::conductor::api::DpkiApi;
 use crate::conductor::api::ZomeCall;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
 use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::init::InitResult;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentInvocation;
-use crate::core::ribosome::guest_callback::migrate_agent::MigrateAgentResult;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::core::ribosome::guest_callback::CallIterator;
+use crate::core::ribosome::guest_callback::CallStream;
 use derive_more::Constructor;
 use error::RibosomeResult;
+use ghost_actor::dependencies::must_future::MustBoxFuture;
 use guest_callback::entry_defs::EntryDefsHostAccess;
 use guest_callback::init::InitHostAccess;
-use guest_callback::migrate_agent::MigrateAgentHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use holo_hash::AgentPubKey;
+use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::*;
 use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::HolochainP2pDnaT;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
@@ -90,6 +92,7 @@ use holochain_zome_types::block::BlockTargetId;
 use mockall::automock;
 use std::iter::Iterator;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 
 use self::guest_callback::{
     entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
@@ -145,7 +148,6 @@ pub enum HostContext {
     GenesisSelfCheckV1(GenesisSelfCheckHostAccessV1),
     GenesisSelfCheckV2(GenesisSelfCheckHostAccessV2),
     Init(InitHostAccess),
-    MigrateAgent(MigrateAgentHostAccess),
     PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
     Validate(ValidateHostAccess),
     ZomeCall(ZomeCallHostAccess),
@@ -160,7 +162,6 @@ impl From<&HostContext> for HostFnAccess {
             HostContext::Validate(access) => access.into(),
             HostContext::Init(access) => access.into(),
             HostContext::EntryDefs(access) => access.into(),
-            HostContext::MigrateAgent(access) => access.into(),
             HostContext::PostCommit(access) => access.into(),
         }
     }
@@ -169,15 +170,30 @@ impl From<&HostContext> for HostFnAccess {
 impl HostContext {
     /// Get the workspace, panics if none was provided
     pub fn workspace(&self) -> HostFnWorkspaceRead {
+        self.maybe_workspace().expect(
+            "Gave access to a host function that uses the workspace without providing a workspace",
+        )
+    }
+
+    /// Get the workspace if it was provided.
+    pub fn maybe_workspace(&self) -> Option<HostFnWorkspaceRead> {
         match self.clone() {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
-            | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
-            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace.into(),
-            Self::Validate(ValidateHostAccess { workspace, .. }) => workspace,
-            _ => panic!(
-                "Gave access to a host function that uses the workspace without providing a workspace"
-            ),
+            | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => Some(workspace.into()),
+            Self::Validate(ValidateHostAccess { workspace, .. }) => Some(workspace),
+            _ => None,
+        }
+    }
+
+    /// Get the DPKI service if installed.
+    pub fn maybe_dpki(&self) -> DpkiApi {
+        match self.clone() {
+            Self::ZomeCall(ZomeCallHostAccess { dpki, .. }) => dpki,
+            Self::Init(InitHostAccess { dpki, .. }) => dpki,
+            _ => {
+                panic!("Gave access to a host function that accesses DPKI without providing DPKI.")
+            }
         }
     }
 
@@ -186,7 +202,6 @@ impl HostContext {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { workspace, .. })
             | Self::Init(InitHostAccess { workspace, .. })
-            | Self::MigrateAgent(MigrateAgentHostAccess { workspace, .. })
             | Self::PostCommit(PostCommitHostAccess { workspace, .. }) => workspace,
             _ => panic!(
                 "Gave access to a host function that writes to the workspace without providing a workspace"
@@ -207,20 +222,20 @@ impl HostContext {
     }
 
     /// Get the network, panics if none was provided
-    pub fn network(&self) -> &HolochainP2pDna {
+    pub fn network(&self) -> Arc<dyn HolochainP2pDnaT> {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
-            | Self::PostCommit(PostCommitHostAccess { network, .. })
-            | Self::Validate(ValidateHostAccess { network, .. }) => network,
+            | Self::PostCommit(PostCommitHostAccess { network, .. }) => Arc::new(network.clone()),
+            Self::Validate(ValidateHostAccess { network, .. }) => network.clone(),
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
             ),
         }
     }
 
-    /// Get the signal broadcaster, panics if none was provided
-    pub fn signal_tx(&mut self) -> &mut SignalBroadcaster {
+    /// Get the signal sender, panics if none was provided
+    pub fn signal_tx(&mut self) -> &mut broadcast::Sender<Signal> {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { signal_tx, .. })
             | Self::Init(InitHostAccess { signal_tx, .. })
@@ -323,7 +338,7 @@ impl InvocationAuth {
     }
 }
 
-pub trait Invocation: Clone {
+pub trait Invocation: Clone + Send + Sync {
     /// Some invocations call into a single zome and some call into many or all zomes.
     /// An example of an invocation that calls across all zomes is init. Init must pass for every
     /// zome in order for the Dna overall to successfully init.
@@ -443,7 +458,8 @@ impl ZomeCallInvocation {
     /// - the nonce must not have already been seen
     /// - the grant must be valid
     /// - the provenance must not have any active blocks against them right now
-    /// the checks MUST be done in this order as witnessing the nonce is a write
+    ///
+    /// The checks MUST be done in this order as witnessing the nonce is a write operation,
     /// and so we MUST NOT write nonces until after we verify the signature.
     #[allow(clippy::extra_unused_lifetimes)]
     pub async fn is_authorized<'a>(
@@ -587,8 +603,9 @@ impl From<ZomeCallInvocation> for ZomeCall {
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
+    pub dpki: Option<DpkiImpl>,
     pub network: HolochainP2pDna,
-    pub signal_tx: SignalBroadcaster,
+    pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
 }
 
@@ -613,6 +630,7 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 /// Interface for a Ribosome. Currently used only for mocking, as our only
 /// real concrete type is [`RealRibosome`](crate::core::ribosome::real_ribosome::RealRibosome)
 #[automock]
+#[allow(async_fn_in_trait)]
 pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn dna_def(&self) -> &DnaDefHashed;
 
@@ -620,7 +638,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn dna_file(&self) -> &DnaFile;
 
-    fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
+    async fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo>;
 
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {
@@ -654,11 +672,11 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn get_integrity_zome(&self, zome_index: &ZomeIndex) -> Option<IntegrityZome>;
 
-    fn call_iterator<I: Invocation + 'static>(
+    fn call_stream<I: Invocation + 'static>(
         &self,
         host_context: HostContext,
         invocation: I,
-    ) -> CallIterator<Self, I>;
+    ) -> CallStream;
 
     fn maybe_call<I: Invocation + 'static>(
         &self,
@@ -666,7 +684,9 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         invocation: &I,
         zome: &Zome,
         to_call: &FunctionName,
-    ) -> Result<Option<ExternIO>, RibosomeError>;
+    ) -> MustBoxFuture<'static, Result<Option<ExternIO>, RibosomeError>>
+    where
+        Self: 'static;
 
     /// Get a value from a const wasm function.
     ///
@@ -676,7 +696,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     /// This allows getting values from wasm without the need for any translation.
     /// The same technique can be used with the wasmer cli to validate these
     /// values without needing to make holochain a dependency.
-    fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError>;
+    async fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError>;
 
     /// @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
@@ -692,31 +712,25 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
         // self.instance().exports().filter(|e| !e.is_callback())
     }
 
-    fn run_genesis_self_check(
+    async fn run_genesis_self_check(
         &self,
         access: GenesisSelfCheckHostAccess,
         invocation: GenesisSelfCheckInvocation,
     ) -> RibosomeResult<GenesisSelfCheckResult>;
 
-    fn run_init(
+    async fn run_init(
         &self,
         access: InitHostAccess,
         invocation: InitInvocation,
     ) -> RibosomeResult<InitResult>;
 
-    fn run_migrate_agent(
-        &self,
-        access: MigrateAgentHostAccess,
-        invocation: MigrateAgentInvocation,
-    ) -> RibosomeResult<MigrateAgentResult>;
-
-    fn run_entry_defs(
+    async fn run_entry_defs(
         &self,
         access: EntryDefsHostAccess,
         invocation: EntryDefsInvocation,
     ) -> RibosomeResult<EntryDefsResult>;
 
-    fn run_post_commit(
+    async fn run_post_commit(
         &self,
         access: PostCommitHostAccess,
         invocation: PostCommitInvocation,
@@ -724,7 +738,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     /// Helper function for running a validation callback. Calls
     /// private fn `do_callback!` under the hood.
-    fn run_validate(
+    async fn run_validate(
         &self,
         access: ValidateHostAccess,
         invocation: ValidateInvocation,
@@ -732,7 +746,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     /// Runs the specified zome fn. Returns the cursor used by HDK,
     /// so that it can be passed on to source chain manager for transactional writes
-    fn call_zome_function(
+    async fn call_zome_function(
         &self,
         access: ZomeCallHostAccess,
         invocation: ZomeCallInvocation,
@@ -750,7 +764,6 @@ pub fn weigh_placeholder() -> EntryRateWeight {
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
     use crate::core::ribosome::ZomeCall;
-    use crate::sweettest::SweetAgents;
     use crate::sweettest::SweetCell;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
@@ -772,7 +785,7 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn verify_zome_call_test() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -868,16 +881,8 @@ pub mod wasm_test {
             let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
 
             let mut conductor = SweetConductor::from_standard_config().await;
-            let (alice_pubkey, bob_pubkey) = SweetAgents::alice_and_bob();
 
-            let apps = conductor
-                .setup_app_for_agents(
-                    "app-",
-                    &[alice_pubkey.clone(), bob_pubkey.clone()],
-                    [&dna_file],
-                )
-                .await
-                .unwrap();
+            let apps = conductor.setup_apps("app-", 2, [&dna_file]).await.unwrap();
 
             let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
 
@@ -899,6 +904,9 @@ pub mod wasm_test {
 
             let alice = alice_cell.zome(test_wasm);
             let bob = bob_cell.zome(test_wasm);
+
+            let alice_pubkey = alice_cell.agent_pubkey().clone();
+            let bob_pubkey = bob_cell.agent_pubkey().clone();
 
             Self {
                 conductor,

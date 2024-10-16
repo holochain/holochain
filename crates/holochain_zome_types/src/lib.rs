@@ -22,6 +22,7 @@ pub mod capability;
 pub mod cell;
 #[allow(missing_docs)]
 pub mod chain;
+pub mod clone;
 pub mod countersigning;
 #[allow(missing_docs)]
 pub mod crdt;
@@ -40,8 +41,6 @@ pub mod judged;
 #[allow(missing_docs)]
 pub mod link;
 pub mod metadata;
-#[allow(missing_docs)]
-pub mod migrate_agent;
 #[allow(missing_docs)]
 pub mod op;
 pub mod prelude;

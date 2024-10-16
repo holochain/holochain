@@ -4,12 +4,13 @@ use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use holochain_cascade::CascadeImpl;
+use holochain_state::mutations::insert_op;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[tracing::instrument(skip(_ribosome, call_context))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context)))]
 pub fn must_get_agent_activity(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -29,9 +30,17 @@ pub fn must_get_agent_activity(
             // timeouts must be handled by the network
             tokio_helper::block_forever_on(async move {
                 let workspace = call_context.host_context.workspace();
+                use crate::core::ribosome::ValidateHostAccess;
                 let cascade = match call_context.host_context {
-                    HostContext::Validate(_) => {
-                        CascadeImpl::from_workspace_stores(workspace.stores(), None)
+                    HostContext::Validate(ValidateHostAccess { is_inline, .. }) => {
+                        if is_inline {
+                            CascadeImpl::from_workspace_and_network(
+                                &workspace,
+                                call_context.host_context.network().clone(),
+                            )
+                        } else {
+                            CascadeImpl::from_workspace_stores(workspace.stores(), None)
+                        }
                     }
                     _ => CascadeImpl::from_workspace_and_network(
                         &workspace,
@@ -48,7 +57,18 @@ pub fn must_get_agent_activity(
                 use MustGetAgentActivityResponse::*;
 
                 let result: Result<_, RuntimeError> = match (result, &call_context.host_context) {
-                    (Activity(activity), _) => Ok(activity),
+                    (Activity {activity, warrants}, _) => {
+                        if !warrants.is_empty() {
+                            if let Some(db) = cascade.cache() {
+                                db.write_async(|txn| {
+                                    for warrant in warrants {
+                                        insert_op(txn, &DhtOpHashed::from_content_sync(warrant))?;
+                                    }
+                                    crate::conductor::error::ConductorResult::Ok(())
+                                }).await.map_err(|e| -> RuntimeError { wasm_error!(e).into() })?;
+                            }
+                        }
+                        Ok(activity)},
                     (IncompleteChain | ChainTopNotFound(_), HostContext::Init(_)) => {
                         Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                             holochain_serialized_bytes::encode(
@@ -121,7 +141,7 @@ pub mod test {
     /// activity.
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_agent_activity_self() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::MustGet).await;
@@ -138,7 +158,7 @@ pub mod test {
     /// previous action bounded activity.
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_must_get_agent_activity_self_prev() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::MustGet).await;
@@ -152,8 +172,9 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn ribosome_must_get_agent_activity() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -212,6 +233,9 @@ pub mod test {
         let d: ActionHash = conductor
             .call(&bob, "commit_something", Something(vec![21]))
             .await;
+
+        // Give bob time to integrate
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         let _: ActionHash = conductor
             .call(

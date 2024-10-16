@@ -22,9 +22,12 @@ pub enum TestCoordinatorWasm {
 #[derive(EnumIter, Clone, Copy)]
 pub enum TestWasm {
     AgentInfo,
+    AgentKeyLineage,
     Anchor,
+    AppValidation,
     Bench,
     Capability,
+    Clone,
     CounterSigning,
     Create,
     Crd,
@@ -33,6 +36,7 @@ pub enum TestWasm {
     DnaProperties,
     EntryDefs,
     EmitSignal,
+    PostCommitSignal,
     HashEntry,
     Foo,
     GenesisSelfCheckValidLegacy,
@@ -43,10 +47,12 @@ pub enum TestWasm {
     HashPath,
     HdkExtern,
     InitFail,
+    InitInvalidReturn,
+    InitInvalidParams,
     InitPass,
     Link,
-    MigrateAgentFail,
-    MigrateAgentPass,
+    MigrateInitial,
+    MigrateNew,
     MultipleCalls,
     MustGet,
     MustGetAgentActivity,
@@ -68,6 +74,8 @@ pub enum TestWasm {
     ValidateValid,
     ValidateCreateLinkValid,
     ValidateRejectAppTypes,
+    ValidateInvalidReturn,
+    ValidateInvalidParams,
     WhoAmI,
     ZomeInfo,
 }
@@ -126,9 +134,12 @@ impl From<TestWasm> for ZomeName {
     fn from(test_wasm: TestWasm) -> ZomeName {
         ZomeName::from(match test_wasm {
             TestWasm::AgentInfo => "agent_info",
+            TestWasm::AgentKeyLineage => "agent_key_lineage",
             TestWasm::Anchor => "anchor",
+            TestWasm::AppValidation => "app_validation",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
+            TestWasm::Clone => "clone",
             TestWasm::CounterSigning => "countersigning",
             TestWasm::Create => "create_entry",
             TestWasm::Crd => "crd",
@@ -137,6 +148,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::DnaProperties => "dna_properties",
             TestWasm::EntryDefs => "entry_defs",
             TestWasm::EmitSignal => "emit_signal",
+            TestWasm::PostCommitSignal => "post_commit_signal",
             TestWasm::HashEntry => "hash_entry",
             TestWasm::Foo => "foo",
             TestWasm::GenesisSelfCheckValidLegacy => "genesis_self_check_legacy",
@@ -149,10 +161,12 @@ impl From<TestWasm> for ZomeName {
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
+            TestWasm::InitInvalidReturn => "init_invalid_return",
+            TestWasm::InitInvalidParams => "init_invalid_params",
             TestWasm::InitPass => "init_pass",
             TestWasm::Link => "link",
-            TestWasm::MigrateAgentFail => "migrate_agent_fail",
-            TestWasm::MigrateAgentPass => "migrate_agent_pass",
+            TestWasm::MigrateInitial => "migrate_initial",
+            TestWasm::MigrateNew => "migrate_new",
             TestWasm::MultipleCalls => "multiple_calls",
             TestWasm::MustGet => "must_get",
             TestWasm::MustGetAgentActivity => "must_get_agent_activity",
@@ -174,6 +188,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidateValid => "validate_valid",
             TestWasm::ValidateCreateLinkValid => "validate_link_add_valid",
             TestWasm::ValidateRejectAppTypes => "validate_reject_app_types",
+            TestWasm::ValidateInvalidReturn => "validate_invalid_return",
+            TestWasm::ValidateInvalidParams => "validate_invalid_params",
             TestWasm::WhoAmI => "whoami",
             TestWasm::ZomeInfo => "zome_info",
         })
@@ -195,9 +211,12 @@ impl From<TestWasm> for PathBuf {
     fn from(test_wasm: TestWasm) -> Self {
         PathBuf::from(match test_wasm {
             TestWasm::AgentInfo => "wasm32-unknown-unknown/release/test_wasm_agent_info.wasm",
+            TestWasm::AgentKeyLineage => "wasm32-unknown-unknown/release/test_wasm_agent_key_lineage.wasm",
             TestWasm::Anchor => "wasm32-unknown-unknown/release/test_wasm_anchor.wasm",
+            TestWasm::AppValidation => "wasm32-unknown-unknown/release/test_wasm_app_validation.wasm",
             TestWasm::Bench => "wasm32-unknown-unknown/release/test_wasm_bench.wasm",
             TestWasm::Capability => "wasm32-unknown-unknown/release/test_wasm_capability.wasm",
+            TestWasm::Clone => "wasm32-unknown-unknown/release/test_wasm_clone.wasm",
             TestWasm::CounterSigning => {
                 "wasm32-unknown-unknown/release/test_wasm_countersigning.wasm"
             }
@@ -210,6 +229,7 @@ impl From<TestWasm> for PathBuf {
             }
             TestWasm::EntryDefs => "wasm32-unknown-unknown/release/test_wasm_entry_defs.wasm",
             TestWasm::EmitSignal => "wasm32-unknown-unknown/release/test_wasm_emit_signal.wasm",
+            TestWasm::PostCommitSignal => "wasm32-unknown-unknown/release/test_wasm_post_commit_signal.wasm",
             TestWasm::HashEntry => "wasm32-unknown-unknown/release/test_wasm_hash_entry.wasm",
             TestWasm::Foo => "wasm32-unknown-unknown/release/test_wasm_foo.wasm",
             TestWasm::GenesisSelfCheckValidLegacy => {
@@ -230,14 +250,16 @@ impl From<TestWasm> for PathBuf {
             TestWasm::HashPath => "wasm32-unknown-unknown/release/test_wasm_hash_path.wasm",
             TestWasm::HdkExtern => "wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm",
             TestWasm::InitFail => "wasm32-unknown-unknown/release/test_wasm_init_fail.wasm",
+            TestWasm::InitInvalidReturn => "wasm32-unknown-unknown/release/test_wasm_init_invalid_return.wasm",
+            TestWasm::InitInvalidParams => "wasm32-unknown-unknown/release/test_wasm_init_invalid_params.wasm",
             TestWasm::InitPass => "wasm32-unknown-unknown/release/test_wasm_init_pass.wasm",
             TestWasm::Link => "wasm32-unknown-unknown/release/test_wasm_link.wasm",
-            TestWasm::MigrateAgentFail => {
-                "wasm32-unknown-unknown/release/test_wasm_migrate_agent_fail.wasm"
+            TestWasm::MigrateInitial => {
+                "wasm32-unknown-unknown/release/test_wasm_migrate_initial.wasm"
             }
-            TestWasm::MigrateAgentPass => {
-                "wasm32-unknown-unknown/release/test_wasm_migrate_agent_pass.wasm"
-            }
+            TestWasm::MigrateNew => {
+                "wasm32-unknown-unknown/release/test_wasm_migrate_new.wasm"
+            },
             TestWasm::MultipleCalls => {
                 "wasm32-unknown-unknown/release/test_wasm_multiple_calls.wasm"
             }
@@ -281,6 +303,8 @@ impl From<TestWasm> for PathBuf {
             TestWasm::ValidateRejectAppTypes => {
                 "wasm32-unknown-unknown/release/test_wasm_validate_reject_app_types.wasm"
             }
+            TestWasm::ValidateInvalidReturn => "wasm32-unknown-unknown/release/test_wasm_validate_invalid_return.wasm",
+            TestWasm::ValidateInvalidParams => "wasm32-unknown-unknown/release/test_wasm_validate_invalid_params.wasm",
             TestWasm::WhoAmI => "wasm32-unknown-unknown/release/test_wasm_whoami.wasm",
             TestWasm::ZomeInfo => "wasm32-unknown-unknown/release/test_wasm_zome_info.wasm",
         })

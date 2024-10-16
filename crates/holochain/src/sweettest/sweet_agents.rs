@@ -37,16 +37,6 @@ impl SweetAgents {
         (agents.pop().unwrap(), agents.pop().unwrap())
     }
 
-    /// Get the same two AgentPubKeys every time
-    pub fn alice_and_bob() -> (AgentPubKey, AgentPubKey) {
-        (fake_agent_pubkey_1(), fake_agent_pubkey_2())
-    }
-
-    /// Return only alice.
-    pub fn alice() -> AgentPubKey {
-        fake_agent_pubkey_1()
-    }
-
     /// Get three AgentPubKeys
     pub async fn three(keystore: MetaLairClient) -> (AgentPubKey, AgentPubKey, AgentPubKey) {
         let mut agents = Self::get(keystore, 3).await;
@@ -55,5 +45,15 @@ impl SweetAgents {
             agents.pop().unwrap(),
             agents.pop().unwrap(),
         )
+    }
+
+    /// Get the same two AgentPubKeys every time
+    pub fn alice_and_bob() -> (AgentPubKey, AgentPubKey) {
+        (fake_agent_pubkey_1(), fake_agent_pubkey_2())
+    }
+
+    /// Return only alice.
+    pub fn alice() -> AgentPubKey {
+        fake_agent_pubkey_1()
     }
 }

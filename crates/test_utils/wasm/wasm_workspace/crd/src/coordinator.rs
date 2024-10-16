@@ -16,7 +16,7 @@ fn create(_: ()) -> ExternResult<ActionHash> {
 /// `read` seems to be a reserved worked that causes SIGSEGV invalid memory reference when used as `#[hdk_extern]`
 #[hdk_extern]
 fn reed(action_hash: ActionHash) -> ExternResult<Option<Record>> {
-    get(action_hash, GetOptions::latest())
+    get(action_hash, GetOptions::network())
 }
 
 #[hdk_extern]
@@ -27,6 +27,13 @@ fn delete_via_hash(action_hash: ActionHash) -> ExternResult<ActionHash> {
 #[hdk_extern]
 fn delete_via_input(delete_input: DeleteInput) -> ExternResult<ActionHash> {
     delete_entry(delete_input)
+}
+
+#[hdk_extern]
+fn get_agent_activity(input: AgentPubKey) -> ExternResult<AgentActivity> {
+    let query = ChainQueryFilter::new().include_entries(true);
+    let options = ActivityRequest::Full;
+    hdk::prelude::get_agent_activity(input, query, options)
 }
 
 #[cfg(all(test, feature = "mock"))]
@@ -67,7 +74,7 @@ pub mod test {
             .expect_get()
             .with(hdk::prelude::mockall::predicate::eq(vec![GetInput::new(
                 input_action_hash.clone().into(),
-                GetOptions::latest(),
+                GetOptions::network(),
             )]))
             .times(1)
             .return_once(move |_| Ok(vec![None]));

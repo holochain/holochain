@@ -27,6 +27,7 @@ use holochain_zome_types::prelude::Timestamp;
 use kitsune_p2p::{
     agent_store::AgentInfoSigned,
     dependencies::kitsune_p2p_fetch::{OpHashSized, RoughSized, TransferMethod},
+    dht::arq::ArqSet,
     event::GetAgentInfoSignedEvt,
     KitsuneHost, KitsuneHostResult,
 };
@@ -122,6 +123,7 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn record_metrics(
         &self,
         space: std::sync::Arc<kitsune_p2p::KitsuneSpace>,
@@ -164,14 +166,14 @@ impl KitsuneHost for KitsuneHostImpl {
     fn query_region_set(
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
-        dht_arc_set: Arc<holochain_p2p::dht_arc::DhtArcSet>,
+        arq_set: ArqSet,
     ) -> KitsuneHostResult<holochain_p2p::dht::region_set::RegionSetLtcs> {
         let dna_hash = DnaHash::from_kitsune(&space);
         async move {
             let topology = self.get_topology(space.clone()).await?;
             let db = self.spaces.dht_db(&dna_hash)?;
             let region_set =
-                query_region_set(db, topology.clone(), &self.strat, dht_arc_set).await?;
+                query_region_set(db, topology.clone(), &self.strat, arq_set.into()).await?;
             Ok(region_set)
         }
         .boxed()
@@ -239,6 +241,7 @@ impl KitsuneHost for KitsuneHostImpl {
         .into()
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn check_op_data(
         &self,
         space: Arc<kitsune_p2p::KitsuneSpace>,
@@ -288,29 +291,17 @@ impl KitsuneHost for KitsuneHostImpl {
     fn handle_op_hash_received(
         &self,
         _space: &KitsuneSpace,
-        op_hash: &RoughSized<KOpHash>,
-        transfer_method: TransferMethod,
+        _op_hash: &RoughSized<KOpHash>,
+        _transfer_method: TransferMethod,
     ) {
-        let hash = DhtOpHash::from_kitsune(&op_hash.data());
-        aitia::trace!(&hc_sleuth::Event::ReceivedHash {
-            by: self.config.sleuth_id(),
-            op: hash,
-            method: transfer_method,
-        });
     }
 
     fn handle_op_hash_transmitted(
         &self,
         _space: &KitsuneSpace,
-        op_hash: &RoughSized<KOpHash>,
-        transfer_method: TransferMethod,
+        _op_hash: &RoughSized<KOpHash>,
+        _transfer_method: TransferMethod,
     ) {
-        let hash = DhtOpHash::from_kitsune(&op_hash.data());
-        aitia::trace!(&hc_sleuth::Event::SentHash {
-            by: self.config.sleuth_id(),
-            op: hash,
-            method: transfer_method,
-        });
     }
 
     fn lair_tag(&self) -> Option<Arc<str>> {

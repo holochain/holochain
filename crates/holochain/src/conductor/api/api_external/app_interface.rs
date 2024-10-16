@@ -1,6 +1,5 @@
-use super::InterfaceApi;
+use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
-use crate::conductor::api::error::ExternalApiWireError;
 use crate::conductor::api::error::SerializationError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
@@ -12,53 +11,70 @@ use holochain_types::prelude::*;
 
 pub use holochain_conductor_api::*;
 
-/// The interface that a Conductor exposes to the outside world.
-#[async_trait::async_trait]
-pub trait AppInterfaceApi: 'static + Send + Sync + Clone {
-    /// Call an admin function to modify this Conductor's behavior
-    async fn handle_app_request_inner(
-        &self,
-        request: AppRequest,
-    ) -> ConductorApiResult<AppResponse>;
-
-    // -- provided -- //
-
-    /// Deal with error cases produced by `handle_app_request_inner`
-    async fn handle_app_request(&self, request: AppRequest) -> AppResponse {
-        tracing::debug!("app request: {:?}", request);
-
-        let res = match self.handle_app_request_inner(request).await {
-            Ok(response) => response,
-            Err(e) => AppResponse::Error(e.into()),
-        };
-        tracing::debug!("app response: {:?}", res);
-        res
-    }
-}
-
 /// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
 /// other Api references
 #[derive(Clone)]
-pub struct RealAppInterfaceApi {
+pub struct AppInterfaceApi {
     conductor_handle: ConductorHandle,
 }
 
-impl RealAppInterfaceApi {
+impl AppInterfaceApi {
     /// Create a new instance from a shared Conductor reference
     pub fn new(conductor_handle: ConductorHandle) -> Self {
         Self { conductor_handle }
     }
-}
 
-#[async_trait::async_trait]
-impl AppInterfaceApi for RealAppInterfaceApi {
+    /// Check an authentication request and return the app that access has been granted
+    /// for on success.
+    pub async fn auth(&self, auth: AppAuthentication) -> InterfaceResult<InstalledAppId> {
+        self.conductor_handle
+            .authenticate_app_token(auth.token, auth.installed_app_id)
+            .map_err(Box::new)
+            .map_err(InterfaceError::RequestHandler)
+    }
+
+    /// Handle an [AppRequest] in the context of an [InstalledAppId], and return an [AppResponse].
+    pub async fn handle_request(
+        &self,
+        installed_app_id: InstalledAppId,
+        request: Result<AppRequest, SerializedBytesError>,
+    ) -> InterfaceResult<AppResponse> {
+        {
+            self.conductor_handle
+                .check_running()
+                .map_err(Box::new)
+                .map_err(InterfaceError::RequestHandler)?;
+        }
+        match request {
+            Ok(request) => Ok(self.handle_app_request(installed_app_id, request).await),
+            Err(e) => Ok(AppResponse::Error(SerializationError::from(e).into())),
+        }
+    }
+
+    /// Deal with error cases produced by `handle_app_request_inner`
+    async fn handle_app_request(
+        &self,
+        installed_app_id: InstalledAppId,
+        request: AppRequest,
+    ) -> AppResponse {
+        tracing::debug!("app request: {:?}", request);
+
+        let res = self
+            .handle_app_request_inner(installed_app_id, request)
+            .await
+            .unwrap_or_else(|e| AppResponse::Error(e.into()));
+        tracing::debug!("app response: {:?}", res);
+        res
+    }
+
     /// Routes the [AppRequest] to the [AppResponse]
     async fn handle_app_request_inner(
         &self,
+        installed_app_id: InstalledAppId,
         request: AppRequest,
     ) -> ConductorApiResult<AppResponse> {
         match request {
-            AppRequest::AppInfo { installed_app_id } => Ok(AppResponse::AppInfo(
+            AppRequest::AppInfo => Ok(AppResponse::AppInfo(
                 self.conductor_handle
                     .get_app_info(&installed_app_id)
                     .await?,
@@ -89,14 +105,14 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 let clone_cell = self
                     .conductor_handle
                     .clone()
-                    .create_clone_cell(*payload)
+                    .create_clone_cell(&installed_app_id, *payload)
                     .await?;
                 Ok(AppResponse::CloneCellCreated(clone_cell))
             }
             AppRequest::DisableCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
-                    .disable_clone_cell(&payload)
+                    .disable_clone_cell(&installed_app_id, &payload)
                     .await?;
                 Ok(AppResponse::CloneCellDisabled)
             }
@@ -104,38 +120,70 @@ impl AppInterfaceApi for RealAppInterfaceApi {
                 let enabled_cell = self
                     .conductor_handle
                     .clone()
-                    .enable_clone_cell(&payload)
+                    .enable_clone_cell(&installed_app_id, &payload)
                     .await?;
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
             AppRequest::NetworkInfo(payload) => {
-                let info = self.conductor_handle.network_info(&payload).await?;
+                let info = self
+                    .conductor_handle
+                    .network_info(&installed_app_id, &payload)
+                    .await?;
                 Ok(AppResponse::NetworkInfo(info))
             }
             AppRequest::ListWasmHostFunctions => Ok(AppResponse::ListWasmHostFunctions(
                 self.conductor_handle.list_wasm_host_functions().await?,
             )),
+            AppRequest::ProvideMemproofs(memproofs) => {
+                self.conductor_handle
+                    .clone()
+                    .provide_memproofs(&installed_app_id, memproofs)
+                    .await?;
+                Ok(AppResponse::Ok)
+            }
+            AppRequest::EnableApp => {
+                let status = self
+                    .conductor_handle
+                    .get_app_info(&installed_app_id)
+                    .await?
+                    .ok_or(ConductorApiError::other("app not found".to_string()))?
+                    .status;
+                match status {
+                    AppInfoStatus::Running
+                    | AppInfoStatus::Disabled {
+                        reason: DisabledAppReason::NotStartedAfterProvidingMemproofs,
+                    } => {
+                        self.conductor_handle
+                            .clone()
+                            .enable_app(installed_app_id.clone())
+                            .await?;
+                        Ok(AppResponse::Ok)
+                    }
+                    _ => Err(ConductorApiError::other(
+                        "app not in correct state to enable".to_string(),
+                    )),
+                }
+            } //
+              // TODO: implement after DPKI lands
+              // AppRequest::RotateAppAgentKey => {
+              //     let new_key = self
+              //         .conductor_handle
+              //         .rotate_app_agent_key(&installed_app_id)
+              //         .await?;
+              //     Ok(AppResponse::AppAgentKeyRotated(new_key))
+              // }
         }
     }
 }
 
-#[async_trait::async_trait]
-impl InterfaceApi for RealAppInterfaceApi {
-    type ApiRequest = AppRequest;
-    type ApiResponse = AppResponse;
-    async fn handle_request(
-        &self,
-        request: Result<Self::ApiRequest, SerializedBytesError>,
-    ) -> InterfaceResult<Self::ApiResponse> {
-        {
-            self.conductor_handle
-                .check_running()
-                .map_err(Box::new)
-                .map_err(InterfaceError::RequestHandler)?;
-        }
-        match request {
-            Ok(request) => Ok(AppInterfaceApi::handle_app_request(self, request).await),
-            Err(e) => Ok(AppResponse::Error(SerializationError::from(e).into())),
-        }
-    }
+/// The payload for authenticating an app interface connection
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+pub struct AppAuthentication {
+    /// The token received from the admin interface, demonstrating that the app is allowed
+    /// to connect.
+    pub token: Vec<u8>,
+
+    /// If the app interface is bound to an installed app, this is the ID of that app. This field
+    /// must be provided by Holochain and not the client.
+    pub installed_app_id: Option<InstalledAppId>,
 }

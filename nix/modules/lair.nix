@@ -5,15 +5,22 @@
     let
       rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        version = "1.71.1";
+        version = "1.77.2";
       };
 
-      craneLib = inputs.crane.lib.${system}.overrideToolchain rustToolchain;
+      craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
+
+      crateInfo = craneLib.crateNameFromCargoToml { cargoToml = flake.config.reconciledInputs.lair + "/crates/lair_keystore/Cargo.toml"; };
 
       commonArgs = {
 
         pname = "lair-keystore";
         src = flake.config.reconciledInputs.lair;
+
+        # We are asking Crane to build a binary from the workspace and that's the only way we can build it because
+        # the workspace defines the dependencies, so we can't just build the member crate. But then we need to tell
+        # Crate what the version is, so we look it up directly from the member's Cargo.toml.
+        version = crateInfo.version;
 
         CARGO_PROFILE = "release";
 

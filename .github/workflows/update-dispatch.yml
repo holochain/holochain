@@ -8,7 +8,7 @@ on:
   # push:
   #   branches: [pr-periodic-updates]
   schedule:
-    - cron: "0 */6 * * *" # run every 6 hours
+    - cron: "0 0 * * 1" # run once a week, at 12:00am on Monday
   workflow_dispatch:
     inputs:
       only-base-ref:
@@ -33,12 +33,6 @@ jobs:
           - name: ${{ github.ref_name }}
             skip: true
         update:
-          - source: "versions/0_1"
-            cmd: "nix run .#scripts-repo-flake-update 0_1"
-          - source: "versions/0_2"
-            cmd: "nix run .#scripts-repo-flake-update 0_2"
-          - source: "versions/0_2_rc"
-            cmd: "nix run .#scripts-repo-flake-update 0_2_rc"
           - source: "versions/weekly"
             cmd: "nix run .#scripts-repo-flake-update weekly"
           - source: "rust-overlay"

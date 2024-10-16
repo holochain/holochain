@@ -68,6 +68,14 @@
           }
         }
       }
+    },
+    "lineage": {
+      "type": "array",
+      "description": "List of DNA hashes of previous versions of this DNA which declares forward and backward compatibility between versions",
+      "items": {
+        "type": "string",
+        "description": "A DNA hash of a previous version"
+      }
     }
   },
   "definitions": {

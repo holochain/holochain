@@ -2,7 +2,7 @@ use super::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn exists() {
-    holochain_trace::test_run().ok();
+    holochain_trace::test_run();
     let mut scratch = Scratch::new();
     let mut conn = Connection::open_in_memory().unwrap();
     SCHEMA_CELL.initialize(&mut conn, None).unwrap();
@@ -18,7 +18,7 @@ async fn exists() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_op(&mut txn, &td.store_entry_op).unwrap();
+    insert_op(&mut txn, &td.store_entry_op.downcast()).unwrap();
     assert!(Txn::from(&txn)
         .contains_hash(&td.hash.clone().into())
         .unwrap());

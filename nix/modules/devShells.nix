@@ -1,13 +1,12 @@
 { self, lib, ... }: {
-  perSystem = { config, self', inputs', pkgs, ... }:
+  perSystem = { config, self', inputs', pkgs, system, ... }:
     let
       holonixPackages = { holochainOverrides ? { } }:
         with self'.packages; [
           (holochain.override holochainOverrides)
           lair-keystore
-          hc-launch
           hc-scaffold
-        ];
+        ] ++ (lib.optionals (system != "x86_64-darwin") [ hc-launch ]);
       versionsFileText = builtins.concatStringsSep "\n"
         (
           builtins.map
@@ -129,7 +128,6 @@
             )
             ;
 
-
             packages = with pkgs; [
               cargo-nextest
               graph-easy
@@ -175,6 +173,7 @@
             export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
             export NIX_PATH="nixpkgs=${pkgs.path}"
             export PS1='\n\[\033[1;34m\][rustDev:\w]\$\[\033[0m\] '
+            export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
             echo Rust development shell spawned. Type 'exit' to leave.
           ''
           + (lib.strings.optionalString pkgs.stdenv.isDarwin ''
@@ -194,7 +193,6 @@
               ];
 
               packages = [
-                (pkgs.callPackage self.inputs.crate2nix.outPath { })
                 pkgs.llvmPackages.bintools
               ];
             };

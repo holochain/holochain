@@ -3,7 +3,7 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::{
     db_cache::DhtDbQueryCache,
-    dht_op::{DhtOp, DhtOpHashed, DhtOpType},
+    dht_op::{ChainOpType, DhtOp, DhtOpHashed},
     prelude::*,
 };
 
@@ -16,12 +16,13 @@ use crate::{prelude::*, query::get_public_op_from_db};
 pub async fn authored_ops_to_dht_db(
     network: &(dyn HolochainP2pDnaT + Send + Sync),
     hashes: Vec<(DhtOpHash, AnyLinkableHash)>,
-    authored_db: &DbRead<DbKindAuthored>,
-    dht_db: &DbWrite<DbKindDht>,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
     // Check if any agents in this space are an authority for these hashes.
     let mut should_hold_hashes = Vec::new();
+
     for (op_hash, basis) in hashes {
         if network.authority_for_hash(basis).await? {
             should_hold_hashes.push(op_hash);
@@ -39,10 +40,11 @@ pub async fn authored_ops_to_dht_db(
 /// for these ops, which sort of makes sense to skip for the author, even though
 /// the author IS an authority, the network doesn't necessarily think so based
 /// on basis hash alone.
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn authored_ops_to_dht_db_without_check(
     hashes: Vec<DhtOpHash>,
-    authored_db: &DbRead<DbKindAuthored>,
-    dht_db: &DbWrite<DbKindDht>,
+    authored_db: DbRead<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
     dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
     // Get the ops from the authored database.
@@ -71,15 +73,21 @@ pub async fn authored_ops_to_dht_db_without_check(
         })
         .await?;
     for op in activity {
-        let dependency = op.sys_validation_dependency();
+        let deps = op.sys_validation_dependencies();
 
-        if dependency.is_none() {
+        if deps.is_empty() {
             let _ = dht_db_cache
-                .set_activity_to_integrated(op.action().author(), op.action().action_seq())
+                .set_activity_to_integrated(
+                    &op.author(),
+                    op.as_chain_op().map(|op| op.action().action_seq()),
+                )
                 .await;
         } else {
             dht_db_cache
-                .set_activity_ready_to_integrate(op.action().author(), op.action().action_seq())
+                .set_activity_ready_to_integrate(
+                    &op.author(),
+                    op.as_chain_op().map(|op| op.action().action_seq()),
+                )
                 .await?;
         }
     }
@@ -90,7 +98,7 @@ fn insert_locally_validated_op(
     txn: &mut Transaction,
     op: DhtOpHashed,
 ) -> StateMutationResult<Option<DhtOpHashed>> {
-    // These checks are redundant but cheap and future proof this function
+    // These checks are redundant but cheap and future-proof this function
     // against anyone using it with private entries.
     if is_private_store_entry(op.as_content()) {
         return Ok(None);
@@ -98,7 +106,7 @@ fn insert_locally_validated_op(
     let op = filter_private_entry(op)?;
     let hash = op.as_hash();
 
-    let dependency = op.sys_validation_dependency();
+    let deps = op.sys_validation_dependencies();
     let op_type = op.get_type();
 
     // Insert the op.
@@ -106,9 +114,8 @@ fn insert_locally_validated_op(
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 
-    // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
-    // Set the stage to awaiting integration.
-    if dependency.is_none() {
+    // If this op has no dependencies or is a warrant, we can mark it integrated immediately.
+    if deps.is_empty() || matches!(op_type, DhtOpType::Warrant(_)) {
         // This set the validation stage to pending which is correct when
         // it's integrated.
         set_validation_stage(txn, hash, ValidationStage::Pending)?;
@@ -118,35 +125,47 @@ fn insert_locally_validated_op(
     }
 
     // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
-    // Set the stage to awaiting integration.
-    if matches!(op_type, DhtOpType::RegisterAgentActivity) {
+    if matches!(
+        op_type,
+        DhtOpType::Chain(ChainOpType::RegisterAgentActivity)
+    ) {
         Ok(Some(op))
     } else {
         Ok(None)
     }
 }
 
-fn filter_private_entry(op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
-    let is_private_entry = op.action().entry_type().map_or(false, |et| {
-        matches!(et.visibility(), EntryVisibility::Private)
-    });
-
-    if is_private_entry && op.entry().into_option().is_some() {
-        let (op, hash) = op.into_inner();
-        let op_type = op.get_type();
-        let (signature, action) = (op.signature(), op.action());
-        Ok(DhtOpHashed::with_pre_hashed(
-            DhtOp::from_type(op_type, SignedAction(action, signature.clone()), None)?,
-            hash,
-        ))
+fn filter_private_entry(dht_op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
+    #[allow(irrefutable_let_patterns)]
+    if let DhtOp::ChainOp(op) = dht_op.as_content() {
+        let is_private = op.action().entry_type().map_or(false, |et| {
+            matches!(et.visibility(), EntryVisibility::Private)
+        });
+        let is_entry = op.entry().into_option().is_some();
+        if is_private && is_entry {
+            let op_type = op.get_type();
+            let (signature, action) = (op.signature(), op.action());
+            let hash = dht_op.as_hash().clone();
+            Ok(DhtOpHashed::with_pre_hashed(
+                ChainOp::from_type(op_type, SignedAction::new(action, signature.clone()), None)?
+                    .into(),
+                hash,
+            ))
+        } else {
+            Ok(dht_op)
+        }
     } else {
-        Ok(op)
+        Ok(dht_op)
     }
 }
 
 fn is_private_store_entry(op: &DhtOp) -> bool {
-    op.action()
-        .entry_type()
-        .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
-        && op.get_type() == DhtOpType::StoreEntry
+    if let DhtOp::ChainOp(op) = op {
+        op.action()
+            .entry_type()
+            .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
+            && op.get_type() == ChainOpType::StoreEntry
+    } else {
+        false
+    }
 }

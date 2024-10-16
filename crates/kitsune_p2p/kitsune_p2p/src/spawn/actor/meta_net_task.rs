@@ -22,6 +22,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::Instrument;
 
+struct DelegateBroadcastItem {
+    space: Arc<KitsuneSpace>,
+    basis: Arc<crate::KitsuneBasis>,
+    to_agent: Arc<KitsuneAgent>,
+    mod_idx: u32,
+    mod_cnt: u32,
+    data: BroadcastData,
+}
+
 pub struct MetaNetTask {
     host: HostApiLegacy,
     config: KitsuneP2pConfig,
@@ -30,6 +39,14 @@ pub struct MetaNetTask {
     ep_evt: Option<MetaNetEvtRecv>,
     i_s: GhostSender<Internal>,
     is_finished: Arc<AtomicBool>,
+    delegate_broadcast_send: tokio::sync::mpsc::Sender<DelegateBroadcastItem>,
+    delegate_broadcast_task: tokio::task::JoinHandle<()>,
+}
+
+impl Drop for MetaNetTask {
+    fn drop(&mut self) {
+        self.delegate_broadcast_task.abort();
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -63,6 +80,31 @@ impl MetaNetTask {
         ep_evt: MetaNetEvtRecv,
         i_s: GhostSender<Internal>,
     ) -> Self {
+        const MAX_DELEGATE_BROADCAST: usize = 512;
+
+        let (delegate_broadcast_send, mut db_recv) =
+            tokio::sync::mpsc::channel(MAX_DELEGATE_BROADCAST);
+
+        let i_s2 = i_s.clone();
+        let delegate_broadcast_task = tokio::task::spawn(async move {
+            while let Some(DelegateBroadcastItem {
+                space,
+                basis,
+                to_agent,
+                mod_idx,
+                mod_cnt,
+                data,
+            }) = db_recv.recv().await
+            {
+                if let Err(err) = i_s2
+                    .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
+                    .await
+                {
+                    tracing::warn!(?err, "failed to handle delegate broadcast");
+                }
+            }
+        });
+
         Self {
             host,
             config,
@@ -71,6 +113,8 @@ impl MetaNetTask {
             ep_evt: Some(ep_evt),
             i_s,
             is_finished: Arc::new(AtomicBool::new(false)),
+            delegate_broadcast_send,
+            delegate_broadcast_task,
         }
     }
 
@@ -82,8 +126,7 @@ impl MetaNetTask {
 
         tokio::task::spawn({
             let tuning_params = self.config.tuning_params.clone();
-            let span =
-                tracing::error_span!("MetaNetTask::spawn", scope = self.config.tracing_scope);
+            let span = tracing::info_span!("MetaNetTask::spawn", scope = self.config.tracing_scope);
             let span_outer = span.clone();
             async move {
                 let ep_evt = self
@@ -102,6 +145,9 @@ impl MetaNetTask {
                         let span = span.clone();
                         async move {
                             if let Err(MetaNetTaskError::RequiredChannelClosed) = match event {
+                                MetaNetEvt::NewAddress { local_url } => {
+                                    this.handle_new_address(local_url).await
+                                }
                                 MetaNetEvt::Connected { remote_url, con } => {
                                     this.handle_connect(remote_url, con).await
                                 }
@@ -145,6 +191,13 @@ impl MetaNetTask {
             }
             .instrument(span_outer)
         });
+    }
+
+    async fn handle_new_address(&self, local_url: String) -> MetaNetTaskResult<()> {
+        match self.i_s.new_address(local_url).await {
+            Err(e) => Err(e.into()),
+            Ok(_) => Ok(()),
+        }
     }
 
     async fn handle_connect(&self, remote_url: String, con: MetaNetCon) -> MetaNetTaskResult<()> {
@@ -339,15 +392,19 @@ impl MetaNetTask {
                     // the space incoming_delegate_broadcast
                     // handler.
                     if let Err(err) = self
-                        .i_s
-                        .incoming_delegate_broadcast(space, basis, to_agent, mod_idx, mod_cnt, data)
-                        .await
+                        .delegate_broadcast_send
+                        .try_send(DelegateBroadcastItem {
+                            space,
+                            basis,
+                            to_agent,
+                            mod_idx,
+                            mod_cnt,
+                            data,
+                        })
                     {
-                        tracing::warn!(?err, "failed to handle incoming delegate broadcast");
-                        Err(err.into())
-                    } else {
-                        Ok(())
+                        tracing::warn!(?err, "failed to enqueue incoming delegate broadcast");
                     }
+                    Ok(())
                 }
             },
             wire::Wire::Broadcast(wire::Broadcast {
@@ -372,7 +429,6 @@ impl MetaNetTask {
                         .host
                         .legacy
                         .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            space,
                             peer_data: vec![agent_info],
                         })
                         .await
@@ -545,27 +601,24 @@ impl MetaNetTask {
                 }
             }
             wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }) => {
-                for peer in peer_list {
-                    if let Err(err) = self
-                        .host
-                        .legacy
-                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            space: peer.space.clone(),
-                            peer_data: vec![peer.clone()],
-                        })
-                        .await
-                    {
-                        tracing::warn!(?err, "error processing incoming agent info unsolicited");
+                if let Err(err) = self
+                    .host
+                    .legacy
+                    .put_agent_info_signed(PutAgentInfoSignedEvt {
+                        peer_data: peer_list,
+                    })
+                    .await
+                {
+                    tracing::warn!(?err, "error processing incoming agent info unsolicited");
 
-                        match err {
-                            KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                return Err(MetaNetTaskError::RequiredChannelClosed)
-                            }
-                            e => {
-                                tracing::error!("Failed to put agent info: {:?}", e);
-                            }
-                        };
-                    }
+                    match err {
+                        KitsuneP2pError::GhostError(GhostError::Disconnected) => {
+                            return Err(MetaNetTaskError::RequiredChannelClosed)
+                        }
+                        e => {
+                            tracing::error!("Failed to put agent info: {:?}", e);
+                        }
+                    };
                 }
 
                 Ok(())
@@ -742,13 +795,13 @@ mod tests {
         ep_evt_send
             .send(MetaNetEvt::Request {
                 remote_url: "".to_string(),
-                con: con,
+                con,
                 data: wire::Wire::Call(wire::Call {
                     space: test_space(1),
                     to_agent: test_agent(2),
                     data: wire::WireData(vec![]),
                 }),
-                respond: Box::new(|_| async move { () }.boxed().into()),
+                respond: Box::new(|_| async move {}.boxed()),
             })
             .await
             .unwrap();
@@ -954,7 +1007,7 @@ mod tests {
                     to_agent: test_agent(1),
                     data: BroadcastData::User(test_agent(2).to_vec()),
                 }),
-                respond: Box::new(|_| async move { () }.boxed().into()),
+                respond: Box::new(|_| async move {}.boxed()),
             })
             .await
             .unwrap();
@@ -988,7 +1041,7 @@ mod tests {
         ep_evt_send
             .send(MetaNetEvt::Notify {
                 remote_url: "".to_string(),
-                con: con,
+                con,
                 data: wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
                     space: test_space(1),
                     basis: Arc::new(KitsuneBasis::new(vec![0; 36])),
@@ -1294,35 +1347,6 @@ mod tests {
             .is_empty());
 
         verify_task_live(ep_evt_send, meta_net_task_finished).await;
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn send_notify_delegate_broadcast_user_handles_shutdown() {
-        let (mut ep_evt_send, _, internal_sender, _, _, _, _, meta_net_task_finished) =
-            setup().await;
-
-        internal_sender
-            .ghost_actor_shutdown_immediate()
-            .await
-            .unwrap();
-
-        ep_evt_send
-            .send(MetaNetEvt::Notify {
-                remote_url: "".to_string(),
-                con: mk_test_con(),
-                data: wire::Wire::DelegateBroadcast(wire::DelegateBroadcast {
-                    space: test_space(1),
-                    basis: Arc::new(KitsuneBasis::new(vec![0; 36])),
-                    to_agent: test_agent(2),
-                    mod_idx: 0,
-                    mod_cnt: 0,
-                    data: BroadcastData::User(test_agent(5).to_vec()),
-                }),
-            })
-            .await
-            .unwrap();
-
-        wait_and_assert_shutdown(meta_net_task_finished).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1647,7 +1671,6 @@ mod tests {
                 .incoming_gossip_calls
                 .read()
                 .first()
-                .clone()
                 .unwrap()
                 .3
                 .to_vec()
@@ -1894,7 +1917,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn send_notify_push_op_data_fails_independently_on_receive_ops_error() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
 
         let (mut ep_evt_send, _, _, host_receiver_stub, _, _, fetch_pool, _) = setup().await;
 
@@ -2041,56 +2064,14 @@ mod tests {
             .await
             .unwrap();
 
-        // Wait for both agent infos to be received
-        for i in 1..3 {
-            assert_eq!(
-                mk_agent_info(i).await,
-                host_receiver_stub
-                    .next_event(Duration::from_secs(1))
-                    .await
-                    .peer_data
-                    .first()
-                    .unwrap()
-                    .clone()
-            );
-        }
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn send_notify_peer_unsolicited_fails_independently() {
-        let (mut ep_evt_send, _, _, mut host_receiver_stub, _, _, _, meta_net_task_finished) =
-            setup().await;
-
-        // Set up an error for the first call
-        host_receiver_stub
-            .respond_with_error
-            .store(true, Ordering::SeqCst);
-
-        ep_evt_send
-            .send(MetaNetEvt::Notify {
-                remote_url: "".to_string(),
-                con: mk_test_con(),
-                data: wire::Wire::PeerUnsolicited(wire::PeerUnsolicited {
-                    // Send two agent infos
-                    peer_list: vec![mk_agent_info(1).await, mk_agent_info(2).await],
-                }),
-            })
+        // Wait for the agent infos to be received
+        let peers = host_receiver_stub
+            .next_event(Duration::from_secs(1))
             .await
-            .unwrap();
+            .peer_data;
 
-        // Expect only the second agent info
-        assert_eq!(
-            mk_agent_info(2).await,
-            host_receiver_stub
-                .next_event(Duration::from_secs(1))
-                .await
-                .peer_data
-                .first()
-                .unwrap()
-                .clone()
-        );
-
-        verify_task_live(ep_evt_send, meta_net_task_finished).await;
+        assert_eq!(mk_agent_info(1).await, peers[0]);
+        assert_eq!(mk_agent_info(2).await, peers[1]);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -2224,10 +2205,8 @@ mod tests {
                 respond: Box::new(|r| {
                     async move {
                         send_res.send(r).unwrap();
-                        ()
                     }
                     .boxed()
-                    .into()
                 }),
             })
             .await

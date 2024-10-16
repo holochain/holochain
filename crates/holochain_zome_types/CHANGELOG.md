@@ -1,11 +1,81 @@
 ---
-default_semver_increment_mode: !pre_minor beta-dev
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## \[Unreleased\]
+
+## 0.5.0-dev.0
+
+## 0.4.0
+
+## 0.4.0-dev.18
+
+## 0.4.0-dev.17
+
+## 0.4.0-dev.16
+
+## 0.4.0-dev.15
+
+## 0.4.0-dev.14
+
+## 0.4.0-dev.13
+
+- **BREAKING**: `CloneCellId::CellId` has become `CloneCellId::DnaHash`. Now that it’s required that all cells in an app be installed under the same agent key, and because we don’t yet support sharing cells across apps, the DnaHash is sufficient to identify a clone cell within an app. If we allow cell sharing, this may change.
+
+## 0.4.0-dev.12
+
+## 0.4.0-dev.11
+
+## 0.4.0-dev.10
+
+## 0.4.0-dev.9
+
+## 0.4.0-dev.8
+
+## 0.4.0-dev.7
+
+## 0.4.0-dev.6
+
+## 0.4.0-dev.5
+
+## 0.4.0-dev.4
+
+## 0.4.0-dev.3
+
+## 0.4.0-dev.2
+
+## 0.4.0-dev.1
+
+## 0.4.0-dev.0
+
+## 0.3.0
+
+## 0.3.0-beta-dev.36
+
+## 0.3.0-beta-dev.35
+
+## 0.3.0-beta-dev.34
+
+## 0.3.0-beta-dev.33
+
+## 0.3.0-beta-dev.32
+
+## 0.3.0-beta-dev.31
+
+## 0.3.0-beta-dev.30
+
+## 0.3.0-beta-dev.29
+
+- **BREAKING**: Rename `GetOptions` variants. `Content` becomes `Local` and queries now consistently only locally available data. No network calls are made. This applies to `get` and `get_details`. `Latest` becomes `Network` and fetches from the network if the caller is not an authority of the requested Action or Entry.
+
+## 0.3.0-beta-dev.28
+
+## 0.3.0-beta-dev.27
+
+## 0.3.0-beta-dev.26
 
 ## 0.3.0-beta-dev.25
 

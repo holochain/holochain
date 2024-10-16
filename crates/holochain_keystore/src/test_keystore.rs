@@ -1,6 +1,8 @@
 //! DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
 
 use crate::*;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::prelude::*;
 use std::sync::Arc;
@@ -22,7 +24,7 @@ pub const TEST_AGENT_PK_4: &str = "uhCAkQHMlYam1PRiYJCzAwQ0AUxIMwOoOvxgXS67N_YPO
 const SEED_4: &str = "2o79pTXHaK1FTPZeBiJo2lCgXW_P0ULjX_5Div_2qxU";
 
 fn r(s: &str) -> Vec<u8> {
-    base64::decode_config(s, base64::URL_SAFE_NO_PAD).unwrap()
+    URL_SAFE_NO_PAD.decode(s).unwrap()
 }
 
 fn s(s: &str) -> [u8; 32] {
@@ -81,7 +83,7 @@ pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
 pub fn test_keystore() -> MetaLairClient {
     holochain_util::tokio_helper::block_on(
         async move { spawn_test_keystore().await.unwrap() },
-        std::time::Duration::from_secs(1),
+        std::time::Duration::from_secs(5),
     )
     .expect("timeout elapsed")
 }

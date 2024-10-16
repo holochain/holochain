@@ -1,6 +1,6 @@
 use crate::conductor::space::TestSpaces;
 use crate::conductor::Conductor;
-use crate::core::ribosome::real_ribosome::RealRibosome;
+use crate::core::ribosome::real_ribosome::{ModuleCacheLock, RealRibosome};
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
 use crate::test_utils::{fake_valid_dna_file, test_network};
 use holo_hash::HasHash;
@@ -8,8 +8,8 @@ use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_state::prelude::*;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
-use parking_lot::RwLock;
 use std::sync::Arc;
+use tokio::sync::broadcast;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_cell_handle_publish() {
@@ -21,8 +21,11 @@ async fn test_cell_handle_publish() {
     let dna = cell_id.dna_hash().clone();
     let agent = cell_id.agent_pubkey().clone();
 
-    let spaces = TestSpaces::new([dna.clone()]);
-    let db = spaces.test_spaces[&dna].space.authored_db.clone();
+    let spaces = TestSpaces::new([dna.clone()]).await;
+    let db = spaces.test_spaces[&dna]
+        .space
+        .get_or_create_authored_db(cell_id.agent_pubkey().clone())
+        .unwrap();
     let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
     let dht_db_cache = spaces.test_spaces[&dna].space.dht_query_cache.clone();
 
@@ -32,15 +35,24 @@ async fn test_cell_handle_publish() {
     let db_dir = test_db_dir().path().to_path_buf();
     let data_root_path: DataRootPath = db_dir.clone().into();
     let handle = Conductor::builder()
+        .config(
+            crate::sweettest::SweetConductorConfig::standard()
+                .no_dpki()
+                .into(),
+        )
         .with_keystore(keystore.clone())
         .with_data_root_path(data_root_path.clone())
         .test(&[])
         .await
         .unwrap();
     handle.register_dna(dna_file.clone()).await.unwrap();
-    let wasmer_module_cache = Arc::new(RwLock::new(ModuleCache::new(Some(db_dir))));
+    let wasmer_module_cache = Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(
+        db_dir.join("wasm-cache"),
+    ))));
 
-    let ribosome = RealRibosome::new(dna_file, wasmer_module_cache).unwrap();
+    let ribosome = RealRibosome::new(dna_file, wasmer_module_cache)
+        .await
+        .unwrap();
 
     super::Cell::genesis(
         cell_id.clone(),
@@ -60,23 +72,24 @@ async fn test_cell_handle_publish() {
         handle.clone(),
         spaces.test_spaces[&dna].space.clone(),
         holochain_p2p_cell,
+        broadcast::channel(10).0,
     )
     .await
     .unwrap();
 
     let action = action::Action::Dna(action::Dna {
         author: agent.clone(),
-        timestamp: Timestamp::now().into(),
+        timestamp: Timestamp::now(),
         hash: dna.clone(),
     });
     let hh = ActionHashed::from_content_sync(action.clone());
     let shh = SignedActionHashed::sign(&keystore, hh).await.unwrap();
-    let op = DhtOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
+    let op = ChainOp::StoreRecord(shh.signature().clone(), action.clone(), RecordEntry::NA);
     let op_hash = DhtOpHashed::from_content_sync(op.clone()).into_hash();
 
     spaces
         .spaces
-        .handle_publish(&dna, true, false, vec![op.clone()])
+        .handle_publish(&dna, true, false, vec![op.clone().into()])
         .await
         .unwrap();
 

@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 use crate::event::{
     FetchOpDataEvtQuery, KitsuneP2pEvent, KitsuneP2pEventHandlerResult, PutAgentInfoSignedEvt,
 };
@@ -65,7 +66,7 @@ impl LegacyHostStub {
 
                             respond
                                 .unwrap()
-                                .respond(Ok(async move { Ok(()) }.boxed().into()));
+                                .respond(Ok(async move { Ok(vec![]) }.boxed().into()));
                         }
                         KitsuneP2pEvent::Call {
                             payload, respond, ..

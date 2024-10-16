@@ -2,17 +2,20 @@
 
 use holochain_conductor_api::conductor::paths::ConfigFilePath;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 
 /// Create a new default [`ConductorConfig`] with data_root_path path,
 /// keystore, and database all in the same directory.
+/// DPKI is disabled.
 pub fn create_config(
     config_root_path: ConfigRootPath,
     con_url: Option<url2::Url2>,
 ) -> anyhow::Result<ConductorConfig> {
     let mut conductor_config = ConductorConfig {
         data_root_path: Some(config_root_path.is_also_data_root_path()),
+        dpki: DpkiConfig::testing(),
         ..Default::default()
     };
     match con_url {

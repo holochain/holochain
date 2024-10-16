@@ -199,13 +199,14 @@ mod slow_tests {
 
         let result = ribosome
             .run_entry_defs(EntryDefsHostAccess, entry_defs_invocation)
+            .await
             .unwrap();
         assert_eq!(result, EntryDefsResult::Defs(BTreeMap::new()),);
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_entry_defs_index_lookup() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::EntryDefs).await;
@@ -224,6 +225,7 @@ mod slow_tests {
 
         let result = ribosome
             .run_entry_defs(EntryDefsHostAccess, entry_defs_invocation)
+            .await
             .unwrap();
         assert_eq!(
             result,

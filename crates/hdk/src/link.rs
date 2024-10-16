@@ -105,6 +105,7 @@ where
 ///   either "there are N more/less creates than deletes" or "there is at least one delete", the
 ///   former leads to flakiness as above and the latter means it would be impossible to create a
 ///   link after any previous delete of any link.
+///
 /// All of this is bad so link creates point to entries (See [ `create_link` ]) and deletes point to
 /// creates.
 pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
@@ -114,13 +115,8 @@ pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
     })
 }
 
-/// Returns all links that reference a base hash, filtered by link type. Use a [ `GetLinksInputBuilder` ] to create the
-/// [ `GetLinksInput` ] and optionally filter links further.
-///
-/// Type can be filtered by providing a variant of the link types or the full range operator. Get links of
-/// all types like this: `get_links(base, .., None)`. Refer to the `get_links` function in
-/// [this coordinator zome](https://github.com/holochain/holochain/blob/develop/crates/test_utils/wasm/wasm_workspace/link/src/coordinator.rs)
-/// for examples.
+/// Returns all links that reference a base hash, filtered by link type and other criteria.
+/// Use a [ `GetLinksInputBuilder` ] to create the [ `GetLinksInput` ] and optionally filter links further.
 ///
 /// _Note this will only get links that are defined in dependent integrity zomes._
 ///
@@ -181,6 +177,7 @@ pub fn get_link_details(
     base: impl Into<AnyLinkableHash>,
     link_type: impl LinkTypeFilterExt,
     link_tag: Option<LinkTag>,
+    get_options: GetOptions,
 ) -> ExternResult<LinkDetails> {
     Ok(HDK
         .with(|h| {
@@ -188,6 +185,7 @@ pub fn get_link_details(
             if let Some(link_tag) = link_tag {
                 input = input.tag_prefix(link_tag);
             }
+            input = input.get_options(get_options.strategy);
             h.borrow().get_link_details(vec![input.build()])
         })?
         .into_iter()

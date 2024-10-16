@@ -1,6 +1,5 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
-#![deny(warnings)]
 //! Initialize holochain metrics.
 //! This crate should only be used in binaries to initialize the actual
 //! metrics collection. Libraries should just use the opentelemetry_api
@@ -88,6 +87,8 @@
 //! | ---------------- | ---- | --------------- | ----------- | ---------- |
 //! | `kitsune.peer.send.duration` | `f64_histogram` | `s` | When kitsune sends data to a remote peer. |- `remote_id`: the base64 remote peer id.<br />- `is_error`: if the send failed. |
 //! | `kitsune.peer.send.byte.count` | `u64_histogram` | `By` | When kitsune sends data to a remote peer. |- `remote_id`: the base64 remote peer id.<br />- `is_error`: if the send failed. |
+//! | `kitsune.gossip.generate_op_blooms.duration` | `f64_histogram` | `s` | The time taken to generate op blooms for gossip. | - `space`: The space (dna_hash representation) that gossip is being performed for.<br />- `batch_size`: The number of ops that were included in the bloom batch for this observation. |
+//! | `kitsune.gossip.generate_op_region_set.duration` | `f64_histogram` | `s` | The time taken to generate op region sets for gossip. | - `space`: The space (dna_hash representation) that gossip is being performed for. |
 //! | `tx5.conn.ice.send` | `u64_observable_counter` | `By` | Bytes sent on ice channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.ice.recv` | `u64_observable_counter` | `By` | Bytes received on ice channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.data.send` | `u64_observable_counter` | `By` | Bytes sent on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
@@ -100,6 +101,7 @@
 //! | `hc.cascade.duration` | `f64_histogram` | `s` | The time taken to execute a cascade query. | |
 //! | `hc.db.pool.utilization` | `f64_gauge` | | The utilisation of connections in the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
 //! | `hc.db.connections.use_time` | `f64_histogram` | `s` | The time between borrowing a connection and returning it to the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
+//! | `hc.ribosome.wasm.usage` | `u64_counter` | | The metered usage of a wasm ribosome. | - `dna`: The DNA hash that this wasm is metered for.<br />- `zome`: The zome that this wasm is metered for.<br />- `fn`: The function that this wasm is metered for.<br />- `agent`: The agent that this wasm is metered for (if there is one). |
 
 #[cfg(feature = "influxive")]
 const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json");

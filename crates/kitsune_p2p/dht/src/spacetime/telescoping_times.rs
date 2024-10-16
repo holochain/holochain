@@ -1,3 +1,5 @@
+// We can't fix this until Derivative updates their codegen
+#![allow(clippy::non_canonical_partial_ord_impl)]
 use super::*;
 
 /// A type which generates a sequence of exponentially expanding TimeSegments,
@@ -234,7 +236,7 @@ mod tests {
             let topo = Topology::unit_zero();
             let ts = TelescopingTimes::new(now.into()).segments();
             let total = ts.iter().fold(0u64, |len, t| {
-                assert_eq!(t.quantum_bounds(&topo).0.inner(), len as u32, "t = {:?}, len = {}", t, len);
+                assert_eq!(t.quantum_bounds(topo.time).0.inner(), len as u32, "t = {:?}, len = {}", t, len);
                 len + t.num_quanta()
             });
             assert_eq!(total, now as u64);

@@ -1,3 +1,4 @@
+use crate::db::key::DbKey;
 use crate::functions::add_custom_functions;
 use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
@@ -10,9 +11,6 @@ use std::{path::Path, sync::Arc, time::Duration};
 static CONNECTION_TIMEOUT_MS: AtomicU64 = AtomicU64::new(3_000);
 
 const SQLITE_BUSY_TIMEOUT: Duration = Duration::from_secs(30);
-
-#[cfg(feature = "sqlite-encrypted")]
-pub(super) const FAKE_KEY: &str = "x'98483C6EB40B6C31A448C22A66DED3B5E5E8D5119CAC8327B655C8B5C483648101010101010101010101010101010101'";
 
 static R2D2_THREADPOOL: Lazy<Arc<ScheduledThreadPool>> = Lazy::new(|| {
     let t = ScheduledThreadPool::new(1);
@@ -43,25 +41,32 @@ pub enum DbSyncStrategy {
     /// Allows databases that can be wiped and rebuilt to
     /// use the faster [`DbSyncLevel::Off`].
     /// This is the default.
-    #[default]
     Fast,
     /// Makes all databases use at least [`DbSyncLevel::Normal`].
     /// This is probably not needed unless you have an SSD and
     /// would prefer to lower the chances of databases needing to
     /// be rebuilt.
+    #[default]
     Resilient,
 }
 
-pub(super) fn new_connection_pool(
-    path: Option<&Path>,
-    synchronous_level: DbSyncLevel,
-) -> ConnectionPool {
+/// Configuration for holochain_sqlite ConnectionPool.
+#[derive(Default, Debug, Clone)]
+pub struct PoolConfig {
+    /// The sqlite synchronous level.
+    pub synchronous_level: DbSyncLevel,
+
+    /// The key with which to encrypt this database.
+    pub key: DbKey,
+}
+
+pub(super) fn new_connection_pool(path: Option<&Path>, config: PoolConfig) -> ConnectionPool {
     use r2d2_sqlite::SqliteConnectionManager;
     let manager = match path {
         Some(path) => SqliteConnectionManager::file(path),
         None => SqliteConnectionManager::memory(),
     };
-    let customizer = Box::new(ConnCustomizer { synchronous_level });
+    let customizer = Box::new(ConnCustomizer { config });
 
     /*
      * We want
@@ -89,37 +94,22 @@ pub(super) fn new_connection_pool(
 
 #[derive(Debug)]
 struct ConnCustomizer {
-    synchronous_level: DbSyncLevel,
+    config: PoolConfig,
 }
 
 impl r2d2::CustomizeConnection<Connection, rusqlite::Error> for ConnCustomizer {
     fn on_acquire(&self, conn: &mut Connection) -> Result<(), rusqlite::Error> {
-        initialize_connection(conn, self.synchronous_level)?;
+        initialize_connection(conn, &self.config)?;
         Ok(())
     }
 }
 
-pub(super) fn initialize_connection(
-    conn: &mut Connection,
-    synchronous_level: DbSyncLevel,
-) -> Result<()> {
+pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) -> Result<()> {
     // Tell SQLite to wait this long during write contention.
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
     #[cfg(feature = "sqlite-encrypted")]
-    {
-        use std::io::Write;
-        let key = get_encryption_key_shim();
-        let mut hex = *br#"0000000000000000000000000000000000000000000000000000000000000000"#;
-        let mut c = std::io::Cursor::new(&mut hex[..]);
-        for b in &key {
-            write!(c, "{:02X}", b)
-                .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-        }
-        let _keyval = std::str::from_utf8(&hex).unwrap();
-        // conn.pragma_update(None, "key", &keyval)?;
-        conn.pragma_update(None, "key", FAKE_KEY)?;
-    }
+    conn.execute_batch(&String::from_utf8_lossy(&config.key.unlocked.read_lock()))?;
 
     // this is recommended to always be off:
     // https://sqlite.org/pragma.html#pragma_trusted_schema
@@ -128,7 +118,7 @@ pub(super) fn initialize_connection(
     // enable foreign key support
     conn.pragma_update(None, "foreign_keys", "ON".to_string())?;
 
-    match synchronous_level {
+    match config.synchronous_level {
         DbSyncLevel::Full => conn.pragma_update(None, "synchronous", "2".to_string())?,
         DbSyncLevel::Normal => conn.pragma_update(None, "synchronous", "1".to_string())?,
         DbSyncLevel::Off => conn.pragma_update(None, "synchronous", "0".to_string())?,
@@ -143,15 +133,6 @@ pub fn num_read_threads() -> usize {
     let num_cpus = num_cpus::get();
     let num_threads = num_cpus.checked_div(2).unwrap_or(0);
     std::cmp::max(num_threads, 4)
-}
-
-#[cfg(feature = "sqlite-encrypted")]
-/// Simulate getting an encryption key from Lair.
-fn get_encryption_key_shim() -> [u8; 32] {
-    [
-        26, 111, 7, 31, 52, 204, 156, 103, 203, 171, 156, 89, 98, 51, 158, 143, 57, 134, 93, 56,
-        199, 225, 53, 141, 39, 77, 145, 130, 136, 108, 96, 201,
-    ]
 }
 
 #[cfg(feature = "test_utils")]

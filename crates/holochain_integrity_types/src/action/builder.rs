@@ -1,4 +1,5 @@
 use super::EntryType;
+use super::MigrationTarget;
 use super::Timestamp;
 use crate::action;
 use crate::link::LinkTag;
@@ -13,7 +14,6 @@ use action::Dna;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyLinkableHash;
-use holo_hash::DnaHash;
 use holo_hash::EntryHash;
 
 #[derive(Clone, Debug)]
@@ -47,10 +47,13 @@ impl ActionBuilderCommon {
 /// surrounding code to construct a proper Action outside of the context of
 /// the SourceChain.
 ///
-/// This builder does not build pre-genesis Actions, because prior to genesis
-/// there is no Agent associated with the source chain, and also the fact that
-/// the Dna action has no prev_entry causes a special case that need not be
-/// dealt with. SourceChain::genesis already handles genesis in one fell swoop.
+/// Genesis actions cannot be built with this method, because the way
+/// SourceChain is written, the agent key is not known until after genesis is
+/// performed, and the agent key is one of the values injected rather than
+/// provided by this builder. (There is also the problem that the Dna action
+/// is a special case as it has no `prev_action`, and generalizing
+/// `ActionBuilderCommon` just to make that optional is a bit inconvenient.)
+/// `SourceChain::genesis` already handles genesis in one fell swoop.
 pub trait ActionBuilder<U: ActionUnweighed>: Sized {
     fn build(self, common: ActionBuilderCommon) -> U;
 }
@@ -246,11 +249,12 @@ builder_variant!(DeleteLink {
 });
 
 builder_variant!(OpenChain {
-    prev_dna_hash: DnaHash,
+    prev_target: MigrationTarget,
+    close_hash: ActionHash,
 });
 
 builder_variant!(CloseChain {
-    new_dna_hash: DnaHash,
+    new_target: Option<MigrationTarget>,
 });
 
 builder_variant!(Create<EntryRateWeight> {
@@ -279,7 +283,7 @@ builder_variant!(AgentValidationPkg {
 /// `prev_action` field, so this helper is provided as a special case
 #[cfg(feature = "test_utils")]
 impl Dna {
-    pub fn from_builder(hash: DnaHash, builder: ActionBuilderCommon) -> Self {
+    pub fn from_builder(hash: holo_hash::DnaHash, builder: ActionBuilderCommon) -> Self {
         Self {
             author: builder.author,
             timestamp: builder.timestamp,

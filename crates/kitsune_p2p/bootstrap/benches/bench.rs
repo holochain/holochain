@@ -8,6 +8,7 @@ use criterion::Criterion;
 use ::fixt::prelude::*;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p::dependencies::url2::url2;
+use kitsune_p2p::dht::arq::ArqSize;
 use kitsune_p2p::fixt::*;
 use kitsune_p2p::KitsuneSpace;
 use kitsune_p2p_bootstrap::error::BootstrapClientError;
@@ -61,7 +62,7 @@ fn bootstrap(bench: &mut Criterion) {
                 let info = AgentInfoSigned::sign(
                     space.clone(),
                     Arc::new(fixt!(KitsuneAgent, Unpredictable)),
-                    u32::MAX / 4,
+                    ArqSize::from_half_len(u32::MAX / 4),
                     fixt!(UrlList, Empty),
                     0,
                     std::time::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64 + 60_000_000,

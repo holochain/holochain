@@ -12,12 +12,14 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
+use holochain_types::dht_op::ChainOpHashed;
+use holochain_types::dht_op::DhtOp;
 use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::dht_op::DhtOpLite;
 use holochain_types::dht_op::OpOrder;
 use holochain_types::prelude::DnaDefHashed;
 use holochain_types::prelude::DnaWasmHashed;
-use holochain_types::prelude::SysValDep;
+use holochain_types::prelude::SysValDeps;
 use holochain_types::prelude::{DhtOpError, SignedValidationReceipt};
 use holochain_types::sql::AsSql;
 use holochain_zome_types::block::Block;
@@ -65,11 +67,11 @@ macro_rules! dht_op_update {
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the [`Scratch`].
 pub fn insert_op_scratch(
     scratch: &mut Scratch,
-    op: DhtOpHashed,
+    op: ChainOpHashed,
     chain_top_ordering: ChainTopOrdering,
 ) -> StateMutationResult<()> {
     let (op, _) = op.into_inner();
-    let op_light = op.to_lite();
+    let op_lite = op.to_lite();
     let action = op.action();
     let signature = op.signature().clone();
     if let Some(entry) = op.entry().into_option() {
@@ -82,7 +84,7 @@ pub fn insert_op_scratch(
         );
         scratch.add_entry(entry_hashed, chain_top_ordering);
     }
-    let action_hashed = ActionHashed::with_pre_hashed(action, op_light.action_hash().to_owned());
+    let action_hashed = ActionHashed::with_pre_hashed(action, op_lite.action_hash().to_owned());
     let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
     scratch.add_action(action_hashed, chain_top_ordering);
     Ok(())
@@ -102,26 +104,51 @@ pub fn insert_record_scratch(
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
 pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
+    insert_op_when(txn, op, Timestamp::now())
+}
+
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
+pub fn insert_op_when(
+    txn: &mut Transaction,
+    op: &DhtOpHashed,
+    when_stored: Timestamp,
+) -> StateMutationResult<()> {
     let hash = op.as_hash();
     let op = op.as_content();
-    let op_light = op.to_lite();
-    let action = op.action();
-    let timestamp = action.timestamp();
+    let op_type = op.get_type();
+    let op_lite = op.to_lite();
+    let timestamp = op.timestamp();
     let signature = op.signature().clone();
-    if let Some(entry) = op.entry().into_option() {
-        let entry_hash = action
-            .entry_hash()
-            .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+    let op_order = OpOrder::new(op_type, op.timestamp());
+    let deps = op.sys_validation_dependencies();
 
-        insert_entry(txn, entry_hash, entry)?;
+    let mut create_op = true;
+
+    match op {
+        DhtOp::ChainOp(op) => {
+            let action = op.action();
+            if let Some(entry) = op.entry().into_option() {
+                let entry_hash = action
+                    .entry_hash()
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                insert_entry(txn, entry_hash, entry)?;
+            }
+            let action_hashed = ActionHashed::from_content_sync(action);
+            let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
+            insert_action(txn, &action_hashed)?;
+        }
+        DhtOp::WarrantOp(warrant_op) => {
+            let warrant = (***warrant_op).clone();
+            let inserted = insert_warrant(txn, warrant)?;
+            if inserted == 0 {
+                create_op = false;
+            }
+        }
     }
-    let dependency = op.sys_validation_dependency();
-    let action_hashed = ActionHashed::with_pre_hashed(action, op_light.action_hash().to_owned());
-    let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
-    let op_order = OpOrder::new(op_light.get_type(), action_hashed.action().timestamp());
-    insert_action(txn, &action_hashed)?;
-    insert_op_lite(txn, &op_light, hash, &op_order, &timestamp)?;
-    set_dependency(txn, hash, dependency)?;
+    if create_op {
+        insert_op_lite_when(txn, &op_lite, hash, &op_order, &timestamp, when_stored)?;
+        set_dependency(txn, hash, deps)?;
+    }
     Ok(())
 }
 
@@ -130,15 +157,15 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
 /// can be used in queries with other databases.
 /// Because we are sharing queries across databases
 /// we need the data in the same shape.
-#[tracing::instrument(skip(txn))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
 pub fn insert_op_lite_into_authored(
     txn: &mut Transaction,
     op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
-    timestamp: &Timestamp,
+    authored_timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    insert_op_lite(txn, op_lite, hash, order, timestamp)?;
+    insert_op_lite(txn, op_lite, hash, order, authored_timestamp)?;
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
@@ -150,20 +177,58 @@ pub fn insert_op_lite(
     op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
-    timestamp: &Timestamp,
+    authored_timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    let action_hash = op_lite.action_hash().clone();
-    let basis = op_lite.dht_basis().to_owned();
-    sql_insert!(txn, DhtOp, {
-        "hash": hash,
-        "type": op_lite.get_type(),
-        "storage_center_loc": basis.get_loc(),
-        "authored_timestamp": timestamp,
-        "basis_hash": basis,
-        "action_hash": action_hash,
-        "require_receipt": 0,
-        "op_order": order,
-    })?;
+    insert_op_lite_when(
+        txn,
+        op_lite,
+        hash,
+        order,
+        authored_timestamp,
+        Timestamp::now(),
+    )
+}
+
+/// Insert a [`DhtOpLite`] into the database.
+pub fn insert_op_lite_when(
+    txn: &mut Transaction,
+    op_lite: &DhtOpLite,
+    hash: &DhtOpHash,
+    order: &OpOrder,
+    authored_timestamp: &Timestamp,
+    when_stored: Timestamp,
+) -> StateMutationResult<()> {
+    let basis = op_lite.dht_basis();
+    match op_lite {
+        DhtOpLite::Chain(op) => {
+            let action_hash = op.action_hash().clone();
+            sql_insert!(txn, DhtOp, {
+                "hash": hash,
+                "type": op_lite.get_type(),
+                "storage_center_loc": basis.get_loc(),
+                "authored_timestamp": authored_timestamp,
+                "when_stored": when_stored,
+                "basis_hash": basis,
+                "action_hash": action_hash,
+                "require_receipt": 0,
+                "op_order": order,
+            })?;
+        }
+        DhtOpLite::Warrant(op) => {
+            let warrant_hash = op.warrant().to_hash();
+            sql_insert!(txn, DhtOp, {
+                "hash": hash,
+                "type": op_lite.get_type(),
+                "storage_center_loc": basis.get_loc(),
+                "authored_timestamp": authored_timestamp,
+                "when_stored": when_stored,
+                "basis_hash": basis,
+                "action_hash": warrant_hash,
+                "require_receipt": 0,
+                "op_order": order,
+            })?;
+        }
+    };
     Ok(())
 }
 
@@ -171,6 +236,15 @@ pub fn insert_op_lite(
 pub fn insert_validation_receipt(
     txn: &mut Transaction,
     receipt: SignedValidationReceipt,
+) -> StateMutationResult<()> {
+    insert_validation_receipt_when(txn, receipt, Timestamp::now())
+}
+
+/// Insert a [`SignedValidationReceipt`] into the database.
+pub fn insert_validation_receipt_when(
+    txn: &mut Transaction,
+    receipt: SignedValidationReceipt,
+    timestamp: Timestamp,
 ) -> StateMutationResult<()> {
     let op_hash = receipt.receipt.dht_op_hash.clone();
     let bytes: UnsafeBytes = SerializedBytes::try_from(receipt)?.into();
@@ -180,6 +254,7 @@ pub fn insert_validation_receipt(
         "hash": hash,
         "op_hash": op_hash,
         "blob": bytes,
+        "when_received": timestamp,
     })?;
     Ok(())
 }
@@ -382,9 +457,12 @@ pub fn set_validation_status(
 pub fn set_dependency(
     txn: &mut Transaction,
     hash: &DhtOpHash,
-    dependency: SysValDep,
+    deps: SysValDeps,
 ) -> StateMutationResult<()> {
-    if let Some(dep) = dependency {
+    // NOTE: this is only the FIRST dependency. This was written at a time when sys validation
+    // only had a notion of one dependency. This db field is not used, so we're not putting too
+    // much effort into getting all deps into the database.
+    if let Some(dep) = deps.first() {
         dht_op_update!(txn, hash, {
             "dependency": dep,
         })?;
@@ -431,6 +509,30 @@ pub fn set_validation_stage(
             ":hash": hash,
         },
     )?;
+    Ok(())
+}
+
+/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was sys validated.
+pub fn set_when_sys_validated(
+    txn: &mut Transaction,
+    hash: &DhtOpHash,
+    time: Timestamp,
+) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "when_sys_validated": time,
+    })?;
+    Ok(())
+}
+
+/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was app validated.
+pub fn set_when_app_validated(
+    txn: &mut Transaction,
+    hash: &DhtOpHash,
+    time: Timestamp,
+) -> StateMutationResult<()> {
+    dht_op_update!(txn, hash, {
+        "when_app_validated": time,
+    })?;
     Ok(())
 }
 
@@ -492,8 +594,60 @@ pub fn set_receipts_complete(
     Ok(())
 }
 
+/// Insert a [`Warrant`] into the Action table.
+pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMutationResult<usize> {
+    let warrant_type = warrant.get_type();
+    let hash = warrant.to_hash();
+    let author = &warrant.author;
+
+    // Don't produce a warrant if one, of any kind, already exists
+    let basis = warrant.dht_basis();
+
+    // XXX: this is a terrible misuse of databases. When putting a Warrant in the Action table,
+    //      if it's an InvalidChainOp warrant, we store the action hash in the prev_hash field.
+    let (exists, action_hash) = match &warrant.proof {
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp { action, .. }) => {
+            let action_hash = Some(action.0.clone());
+            let exists = txn
+                .prepare_cached(
+                    "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash = :prev_hash",
+                )?
+                .exists(named_params! {
+                    ":type": WarrantType::ChainIntegrityWarrant,                    
+                    ":base_hash": basis,
+                    ":prev_hash": action_hash,
+                })?;
+            (exists, action_hash)
+        }
+        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. }) => {
+            let exists = txn
+                .prepare_cached(
+                    "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash IS NULL",
+                )?
+                .exists(named_params! {
+                    ":type": WarrantType::ChainIntegrityWarrant,
+                    ":base_hash": basis
+                })?;
+            (exists, None)
+        }
+    };
+
+    Ok(if !exists {
+        sql_insert!(txn, Action, {
+            "hash": hash,
+            "type": warrant_type,
+            "author": author,
+            "base_hash": basis,
+            "prev_hash": action_hash,
+            "blob": to_blob(&warrant)?,
+        })?
+    } else {
+        0
+    })
+}
+
 /// Insert a [`Action`] into the database.
-#[tracing::instrument(skip(txn))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
 pub fn insert_action(
     txn: &mut Transaction,
     action: &SignedActionHashed,
@@ -599,7 +753,7 @@ pub fn insert_action(
 }
 
 /// Insert an [`Entry`] into the database.
-#[tracing::instrument(skip(txn, entry))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, entry)))]
 pub fn insert_entry(
     txn: &mut Transaction,
     hash: &EntryHash,
@@ -652,25 +806,24 @@ pub fn insert_entry(
     Ok(())
 }
 
-/// Lock the chain with the given lock id until the given end time.
-/// During this time only the lock id will be unlocked according to `is_chain_locked`.
-/// The chain can be unlocked for all lock ids at any time by calling `unlock_chain`.
-/// In theory there can be multiple locks active at once.
-/// If there are multiple locks active at once effectively all locks are locked
-/// because the chain is locked if there are ANY locks that don't match the
-/// current id being queried.
-/// In practise this is useless so don't do that. One lock at a time please.
+/// Lock the author's chain until the given end time.
+///
+/// The lock must have a `subject` which may have some meaning to the creator of the lock.
+/// For example, it may be the hash for a countersigning session. Multiple subjects cannot be
+/// used to create multiple locks though. The chain is either locked or unlocked for the author.
+/// The `subject` just allows information to be stored with the lock.
+///
+/// Check whether the chain is locked using [crate::chain_lock::is_chain_locked]. Or check whether
+/// the lock has expired using [crate::chain_lock::is_chain_lock_expired].
 pub fn lock_chain(
     txn: &mut Transaction,
-    lock: &[u8],
     author: &AgentPubKey,
+    subject: &[u8],
     expires_at: &Timestamp,
 ) -> StateMutationResult<()> {
-    let mut lock = lock.to_vec();
-    lock.extend(author.get_raw_39());
     sql_insert!(txn, ChainLock, {
-        "lock": lock,
         "author": author,
+        "subject": subject,
         "expires_at_timestamp": expires_at,
     })?;
     Ok(())
@@ -815,4 +968,122 @@ pub fn schedule_fn(
         })?;
     }
     Ok(())
+}
+
+/// Force remove a countersigning session from the source chain.
+///
+/// This is a dangerous operation and should only be used:
+/// - If the countersigning workflow has determined to a reasonable level of confidence that other
+///   peers abandoned the session.
+/// - If the user decides to force remove the session from their source chain when the
+///   countersigning session is unable to make a decision.
+///
+/// Note that this mutation is defensive about sessions that have any of their ops published to the
+/// network. If any of the ops have been published, the session cannot be removed.
+pub fn remove_countersigning_session(
+    txn: &mut Transaction,
+    cs_action: Action,
+    cs_entry_hash: EntryHash,
+) -> StateMutationResult<()> {
+    // Check, just for paranoia's sake that the countersigning session is not fully published.
+    // It is acceptable to delete a countersigning session that has been written to the source chain,
+    // with signatures published. As soon as the session's ops have been published to the network,
+    // it is unacceptable to remove the session from the database.
+    let count = txn.query_row(
+        "SELECT count(*) FROM DhtOp WHERE withhold_publish IS NULL AND action_hash = ?",
+        [cs_action.to_hash()],
+        |row| row.get::<_, usize>(0),
+    )?;
+    if count != 0 {
+        tracing::error!(
+            "Cannot remove countersigning session that has been published to the network: {:?}",
+            cs_action
+        );
+        return Err(StateMutationError::CannotRemoveFullyPublished);
+    }
+
+    tracing::info!("Cleaning up authored data for action {:?}", cs_action);
+
+    let count = txn.execute(
+        "DELETE FROM DhtOp WHERE withhold_publish = 1 AND action_hash = ?",
+        [cs_action.to_hash()],
+    )?;
+    tracing::debug!("Removed {} ops from the authored DHT", count);
+    let count = txn.execute("DELETE FROM Entry WHERE hash = ?", [cs_entry_hash])?;
+    tracing::debug!("Removed {} entries", count);
+    let count = txn.execute("DELETE FROM Action WHERE hash = ?", [cs_action.to_hash()])?;
+    tracing::debug!("Removed {} actions", count);
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use ::fixt::fixt;
+    use std::sync::Arc;
+
+    use holochain_types::prelude::*;
+
+    use crate::prelude::{Store, Txn};
+
+    use super::insert_op;
+
+    #[test]
+    fn can_write_and_read_warrants() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let cell_id = Arc::new(fixt!(CellId));
+
+        let pair = (fixt!(ActionHash), fixt!(Signature));
+
+        let make_op = |warrant| {
+            let op = SignedWarrant::new(warrant, fixt!(Signature));
+            let op: DhtOp = op.into();
+            op.into_hashed()
+        };
+
+        let action_author = fixt!(AgentPubKey);
+
+        let warrant1 = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                action_author: action_author.clone(),
+                action: pair.clone(),
+                validation_type: ValidationType::App,
+            }),
+            fixt!(AgentPubKey),
+            fixt!(Timestamp),
+        );
+
+        let warrant2 = Warrant::new(
+            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
+                chain_author: action_author.clone(),
+                action_pair: (pair.clone(), pair.clone()),
+            }),
+            fixt!(AgentPubKey),
+            fixt!(Timestamp),
+        );
+
+        let op1 = make_op(warrant1.clone());
+        let op2 = make_op(warrant2.clone());
+
+        let db = DbWrite::<DbKindAuthored>::test(dir.as_ref(), DbKindAuthored(cell_id)).unwrap();
+        db.test_write({
+            let op1 = op1.clone();
+            let op2 = op2.clone();
+            move |txn| {
+                insert_op(txn, &op1).unwrap();
+                insert_op(txn, &op2).unwrap();
+            }
+        });
+
+        db.test_read(move |txn| {
+            let warrants: Vec<DhtOp> = Txn::from(&txn)
+                .get_warrants_for_basis(&action_author.into(), false)
+                .unwrap()
+                .into_iter()
+                .map(Into::into)
+                .collect();
+            assert_eq!(warrants, vec![op1.into_content(), op2.into_content()]);
+        });
+    }
 }

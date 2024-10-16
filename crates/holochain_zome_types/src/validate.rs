@@ -11,6 +11,7 @@ pub use holochain_integrity_types::validate::*;
 #[derive(
     Clone, Copy, Hash, serde::Serialize, serde::Deserialize, PartialOrd, Ord, Debug, Eq, PartialEq,
 )]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "full", derive(num_enum::TryFromPrimitive))]
 #[cfg_attr(feature = "full", repr(i32))]
 pub enum ValidationStatus {
@@ -60,4 +61,54 @@ impl rusqlite::types::FromSql for ValidationStatus {
             Self::try_from(int).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
         })
     }
+}
+
+/// Input for the get_validation_receipts host function.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GetValidationReceiptsInput {
+    pub action_hash: ActionHash,
+}
+
+impl GetValidationReceiptsInput {
+    /// Create a new input to get validation receipts for an action.
+    pub fn new(action_hash: ActionHash) -> Self {
+        Self { action_hash }
+    }
+}
+
+/// A set of validation receipts, grouped by op.
+///
+/// This is intended to be returned as the result of a query for validation receipts by action.
+///
+/// It would also be valid to return this for a query that uniquely identified an op but those are
+/// generally not available to hApp developers.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ValidationReceiptSet {
+    /// The op hash that this receipt is for.
+    pub op_hash: DhtOpHash,
+
+    /// The type of the op that was validated.
+    ///
+    /// Note that the original type is discarded here because DhtOpType is part of `holochain_types`
+    /// and moving it would be a breaking change. For now this is just informational.
+    pub op_type: String,
+
+    /// Whether this op has received the required number of receipts.
+    pub receipts_complete: bool,
+
+    /// The validation receipts for this op.
+    pub receipts: Vec<ValidationReceiptInfo>,
+}
+
+/// Summary information for a validation receipt.
+///
+/// Currently, this is ignoring `dht_op_hash` because it's already on the parent type and
+/// `when_integrated` because that's not relevant to the validation receipt itself.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ValidationReceiptInfo {
+    /// the result of the validation.
+    pub validation_status: ValidationStatus,
+
+    /// the remote validators who signed the receipt.
+    pub validators: Vec<AgentPubKey>,
 }

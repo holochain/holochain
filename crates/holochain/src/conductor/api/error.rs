@@ -5,6 +5,7 @@ use crate::conductor::CellError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::workflow::WorkflowError;
 use holo_hash::DnaHash;
+use holochain_chc::ChcError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_state::workspace::WorkspaceError;
@@ -138,7 +139,7 @@ pub enum SerializationError {
 
     /// Denotes inability to parse a UUID
     #[error(transparent)]
-    Uuid(#[from] uuid::parser::ParseError),
+    Uuid(#[from] uuid::Error),
 }
 
 /// Type alias

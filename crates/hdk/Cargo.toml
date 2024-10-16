@@ -1,23 +1,24 @@
 [package]
 name = "hdk"
-version = "0.3.0-beta-dev.29"
+version = "0.5.0-dev.0"
 description = "The Holochain HDK"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain/tree/develop/crates/hdk"
 documentation = "https://docs.rs/hdk"
-authors = [ "Holochain Core Dev Team <devcore@holochain.org>" ]
-keywords = [ "holochain", "holo", "hdk" ]
-categories = [ "cryptography" ]
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "hdk"]
+categories = ["cryptography"]
 edition = "2021"
 
+# reminder - do not use workspace deps
 [dependencies]
-hdi = { version = "=0.4.0-beta-dev.25", path = "../hdi", features = ["trace"] }
-hdk_derive = { version = "^0.3.0-beta-dev.24", path = "../hdk_derive" }
-holo_hash = { version = "^0.3.0-beta-dev.20", path = "../holo_hash" }
-holochain_wasmer_guest = { workspace = true }
+hdi = { version = "=0.6.0-dev.0", path = "../hdi", features = ["trace"] }
+hdk_derive = { version = "^0.5.0-dev.0", path = "../hdk_derive" }
+holo_hash = { version = "^0.5.0-dev.0", path = "../holo_hash" }
+holochain_wasmer_guest = "=0.0.96"
 # it's important that we depend on holochain_zome_types with no default
 # features, both here AND in hdk_derive, to reduce code bloat
-holochain_zome_types = { version = "^0.3.0-beta-dev.25", path = "../holochain_zome_types", default-features = false }
+holochain_zome_types = { version = "^0.5.0-dev.0", path = "../holochain_zome_types", default-features = false }
 paste = "1.0"
 serde = "1.0"
 serde_bytes = "0.11"
@@ -36,14 +37,14 @@ getrandom = { version = "0.2", features = ["custom"] }
 fixt = { path = "../fixt" }
 trybuild = "1.0"
 
+[lints]
+workspace = true
+
 [features]
 default = []
 mock = ["hdk_derive/mock", "mockall"]
 encoding = ["holo_hash/encoding"]
 fixturators = ["holochain_zome_types/fixturators", "holo_hash/fixturators"]
-test_utils = [
-    "fixturators",
-    "hdi/test_utils",
-    "holo_hash/test_utils",
-]
+fuzzing = ["holochain_zome_types/fuzzing", "holo_hash/fuzzing"]
+test_utils = ["fixturators", "hdi/test_utils", "holo_hash/test_utils"]
 properties = ["holochain_zome_types/properties"]

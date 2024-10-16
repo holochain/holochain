@@ -41,6 +41,8 @@ pub trait HdkT: HdiT {
         &self,
         preflight_request: PreflightRequest,
     ) -> ExternResult<PreflightRequestAcceptance>;
+    // DPKI
+    fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
     fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
@@ -87,6 +89,23 @@ pub trait HdkT: HdiT {
         &self,
         x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
     ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    fn ed_25519_x_salsa20_poly1305_encrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_encrypt: Ed25519XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+    // Cloning
+    fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell>;
+    fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
+    fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell>;
+    fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
+    // Migrate DNA
+    fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
+    fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
+    // Validation receipts
+    fn get_validation_receipts(
+        &self,
+        input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>>;
 }
 
 #[cfg(feature = "mock")]
@@ -160,7 +179,18 @@ mockall::mock! {
             &self,
             x_25519_x_salsa20_poly1305_encrypt: X25519XSalsa20Poly1305Encrypt,
         ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
-
+        fn ed_25519_x_salsa20_poly1305_encrypt(
+            &self,
+            ed_25519_x_salsa20_poly1305_encrypt: Ed25519XSalsa20Poly1305Encrypt,
+        ) -> ExternResult<XSalsa20Poly1305EncryptedData>;
+        fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell>;
+        fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()>;
+        fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell>;
+        fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()>;
+        fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
+        fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
+        fn get_validation_receipts(&self, input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>>;
+        fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>>;
     }
 
     impl HdiT for HdkT {
@@ -193,6 +223,11 @@ mockall::mock! {
             &self,
             x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
         ) -> ExternResult<Option<XSalsa20Poly1305Data>>;
+        fn ed_25519_x_salsa20_poly1305_decrypt(
+            &self,
+            ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+        ) -> ExternResult<XSalsa20Poly1305Data>;
+        fn is_same_agent(&self, key1: AgentPubKey, key2: AgentPubKey) -> ExternResult<bool>;
     }
 
 }
@@ -247,6 +282,10 @@ impl HdiT for ErrHdk {
         Self::err()
     }
 
+    fn is_same_agent(&self, _: AgentPubKey, _: AgentPubKey) -> ExternResult<bool> {
+        Self::err()
+    }
+
     fn dna_info(&self, _dna_info_input: ()) -> ExternResult<DnaInfo> {
         Self::err()
     }
@@ -270,6 +309,13 @@ impl HdiT for ErrHdk {
         &self,
         _x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
+        Self::err()
+    }
+
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        _ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data> {
         Self::err()
     }
 }
@@ -314,6 +360,10 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
+        Self::err()
+    }
+    // DPKI
+    fn get_agent_key_lineage(&self, _: AgentPubKey) -> ExternResult<Vec<AgentPubKey>> {
         Self::err()
     }
     // Link
@@ -404,6 +454,47 @@ impl HdkT for ErrHdk {
     ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
         Self::err()
     }
+
+    fn ed_25519_x_salsa20_poly1305_encrypt(
+        &self,
+        _ed_25519_x_salsa20_poly1305_encrypt: Ed25519XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        Self::err()
+    }
+
+    // Cloning
+    fn create_clone_cell(&self, _input: CreateCloneCellInput) -> ExternResult<ClonedCell> {
+        Self::err()
+    }
+
+    fn disable_clone_cell(&self, _input: DisableCloneCellInput) -> ExternResult<()> {
+        Self::err()
+    }
+
+    fn enable_clone_cell(&self, _input: EnableCloneCellInput) -> ExternResult<ClonedCell> {
+        Self::err()
+    }
+
+    fn delete_clone_cell(&self, _input: DeleteCloneCellInput) -> ExternResult<()> {
+        Self::err()
+    }
+
+    // Migrate DNA
+    fn close_chain(&self, _input: CloseChainInput) -> ExternResult<ActionHash> {
+        Self::err()
+    }
+
+    fn open_chain(&self, _input: OpenChainInput) -> ExternResult<ActionHash> {
+        Self::err()
+    }
+
+    // Validation receipts
+    fn get_validation_receipts(
+        &self,
+        _input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>> {
+        Self::err()
+    }
 }
 
 /// The HDK implemented as externs provided by the host.
@@ -447,6 +538,9 @@ impl HdiT for HostHdk {
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         HostHdi::new().zome_info(())
     }
+    fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
+        HostHdi::new().is_same_agent(key_1, key_2)
+    }
     fn trace(&self, m: TraceMsg) -> ExternResult<()> {
         HostHdi::new().trace(m)
     }
@@ -461,6 +555,12 @@ impl HdiT for HostHdk {
         x_25519_x_salsa20_poly1305_decrypt: X25519XSalsa20Poly1305Decrypt,
     ) -> ExternResult<Option<XSalsa20Poly1305Data>> {
         HostHdi::new().x_25519_x_salsa20_poly1305_decrypt(x_25519_x_salsa20_poly1305_decrypt)
+    }
+    fn ed_25519_x_salsa20_poly1305_decrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_decrypt: Ed25519XSalsa20Poly1305Decrypt,
+    ) -> ExternResult<XSalsa20Poly1305Data> {
+        HostHdi::new().ed_25519_x_salsa20_poly1305_decrypt(ed_25519_x_salsa20_poly1305_decrypt)
     }
 }
 
@@ -512,6 +612,10 @@ impl HdkT for HostHdk {
             __hc__accept_countersigning_preflight_request_1,
             preflight_request,
         )
+    }
+    // DPKI
+    fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>> {
+        host_call::<AgentPubKey, Vec<AgentPubKey>>(__hc__get_agent_key_lineage_1, agent_key)
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         host_call::<(), AgentInfo>(__hc__agent_info_1, ())
@@ -618,14 +722,58 @@ impl HdkT for HostHdk {
             x_25519_x_salsa20_poly1305_encrypt,
         )
     }
+
+    fn ed_25519_x_salsa20_poly1305_encrypt(
+        &self,
+        ed_25519_x_salsa20_poly1305_encrypt: Ed25519XSalsa20Poly1305Encrypt,
+    ) -> ExternResult<XSalsa20Poly1305EncryptedData> {
+        host_call::<Ed25519XSalsa20Poly1305Encrypt, XSalsa20Poly1305EncryptedData>(
+            __hc__ed_25519_x_salsa20_poly1305_encrypt_1,
+            ed_25519_x_salsa20_poly1305_encrypt,
+        )
+    }
+
+    fn create_clone_cell(&self, input: CreateCloneCellInput) -> ExternResult<ClonedCell> {
+        host_call::<CreateCloneCellInput, ClonedCell>(__hc__create_clone_cell_1, input)
+    }
+
+    fn disable_clone_cell(&self, input: DisableCloneCellInput) -> ExternResult<()> {
+        host_call::<DisableCloneCellInput, ()>(__hc__disable_clone_cell_1, input)
+    }
+
+    fn enable_clone_cell(&self, input: EnableCloneCellInput) -> ExternResult<ClonedCell> {
+        host_call::<EnableCloneCellInput, ClonedCell>(__hc__enable_clone_cell_1, input)
+    }
+
+    fn delete_clone_cell(&self, input: DeleteCloneCellInput) -> ExternResult<()> {
+        host_call::<DeleteCloneCellInput, ()>(__hc__delete_clone_cell_1, input)
+    }
+
+    fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash> {
+        host_call::<CloseChainInput, ActionHash>(__hc__close_chain_1, input)
+    }
+
+    fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash> {
+        host_call::<OpenChainInput, ActionHash>(__hc__open_chain_1, input)
+    }
+
+    fn get_validation_receipts(
+        &self,
+        input: GetValidationReceiptsInput,
+    ) -> ExternResult<Vec<ValidationReceiptSet>> {
+        host_call::<GetValidationReceiptsInput, Vec<ValidationReceiptSet>>(
+            __hc__get_validation_receipts_1,
+            input,
+        )
+    }
 }
 
 /// At any time the global HDK can be set to a different hdk.
 /// Generally this is only useful during rust unit testing.
 /// When executing wasm without the `mock` feature, the host will be assumed.
-pub fn set_hdk<H: 'static>(hdk: H)
+pub fn set_hdk<H>(hdk: H)
 where
-    H: HdkT,
+    H: HdkT + 'static,
 {
     let hdk = Rc::new(hdk);
     let hdk2 = hdk.clone();

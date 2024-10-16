@@ -16,7 +16,7 @@ use crate::core::ribosome::guest_callback::genesis_self_check::{
 };
 use crate::{conductor::api::CellConductorApiT, core::ribosome::RibosomeT};
 use derive_more::Constructor;
-use holochain_p2p::ChcImpl;
+use holochain_chc::ChcImpl;
 use holochain_sqlite::prelude::*;
 use holochain_state::source_chain;
 use holochain_state::workspace::WorkspaceResult;
@@ -38,7 +38,7 @@ where
     chc: Option<ChcImpl>,
 }
 
-// #[instrument(skip(workspace, api, args))]
+// #[cfg_attr(feature = "instrument", tracing::instrument(skip(workspace, api, args)))]
 pub async fn genesis_workflow<'env, Api: CellConductorApiT, Ribosome>(
     mut workspace: GenesisWorkspace,
     api: Api,
@@ -85,42 +85,37 @@ where
         hash: dna_hash,
         properties: properties.clone(),
     };
-    let result = ribosome.run_genesis_self_check(
-        GenesisSelfCheckHostAccess {
-            host_access_1: GenesisSelfCheckHostAccessV1,
-            host_access_2: GenesisSelfCheckHostAccessV2,
-        },
-        GenesisSelfCheckInvocation {
-            invocation_1: GenesisSelfCheckInvocationV1 {
-                payload: Arc::new(GenesisSelfCheckDataV1 {
-                    dna_info,
-                    membrane_proof: membrane_proof.clone(),
-                    agent_key: agent_pubkey.clone(),
-                }),
+    let result = ribosome
+        .run_genesis_self_check(
+            GenesisSelfCheckHostAccess {
+                host_access_1: GenesisSelfCheckHostAccessV1,
+                host_access_2: GenesisSelfCheckHostAccessV2,
             },
-            invocation_2: GenesisSelfCheckInvocationV2 {
-                payload: Arc::new(GenesisSelfCheckDataV2 {
-                    membrane_proof: membrane_proof.clone(),
-                    agent_key: agent_pubkey.clone(),
-                }),
+            GenesisSelfCheckInvocation {
+                invocation_1: GenesisSelfCheckInvocationV1 {
+                    payload: Arc::new(GenesisSelfCheckDataV1 {
+                        dna_info,
+                        membrane_proof: membrane_proof.clone(),
+                        agent_key: agent_pubkey.clone(),
+                    }),
+                },
+                invocation_2: GenesisSelfCheckInvocationV2 {
+                    payload: Arc::new(GenesisSelfCheckDataV2 {
+                        membrane_proof: membrane_proof.clone(),
+                        agent_key: agent_pubkey.clone(),
+                    }),
+                },
             },
-        },
-    )?;
+        )
+        .await?;
 
     // If the self-check fails, fail genesis, and don't create the source chain.
     if let GenesisSelfCheckResult::Invalid(reason) = result {
         return Err(WorkflowError::GenesisFailure(reason));
     }
 
-    // NB: this is just a placeholder for a real DPKI request to show intent
-    if !api
-        .conductor_services()
-        .dpki
-        .is_key_valid(agent_pubkey.clone(), Timestamp::now())
-        .await?
-    {
-        return Err(WorkflowError::AgentInvalid(agent_pubkey.clone()));
-    }
+    // NOTE: we could check the key against DPKI state here, but the key hasn't even been
+    //       registered at this point, so we can't.
 
     source_chain::genesis(
         workspace.vault.clone(),
@@ -180,12 +175,15 @@ mod tests {
     use super::*;
 
     use crate::conductor::api::MockCellConductorApiT;
-    use crate::conductor::conductor::{mock_app_store, mock_dpki, ConductorServices};
+    use crate::conductor::conductor::{mock_app_store, ConductorServices};
     use crate::core::ribosome::MockRibosomeT;
+    use futures::FutureExt;
+    use holochain_conductor_services::{DpkiService, KeyState, MockDpkiState};
     use holochain_keystore::test_keystore;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
     use holochain_trace;
+    use holochain_types::deepkey_roundtrip_backward;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Action;
@@ -193,7 +191,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn genesis_initializes_source_chain() {
-        holochain_trace::test_run().unwrap();
+        holochain_trace::test_run();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
@@ -202,14 +200,24 @@ mod tests {
         let dna = fake_dna_file("a");
         let author = fake_agent_pubkey_1();
 
+        let mut mock_dpki = MockDpkiState::new();
+        let action =
+            deepkey_roundtrip_backward!(SignedActionHashed, &::fixt::fixt!(SignedActionHashed));
+        mock_dpki.expect_key_state().returning(move |_, _| {
+            let action = action.clone();
+            async move { Ok(KeyState::Valid(action)) }.boxed()
+        });
+
+        let dpki = DpkiService::new(::fixt::fixt!(CellId), mock_dpki);
+
         {
-            let workspace = GenesisWorkspace::new(vault.clone().into(), dht_db.to_db()).unwrap();
+            let workspace = GenesisWorkspace::new(vault.clone(), dht_db.to_db()).unwrap();
 
             let mut api = MockCellConductorApiT::new();
             api.expect_conductor_services()
                 .return_const(ConductorServices {
-                    dpki: Arc::new(mock_dpki()),
-                    app_store: Arc::new(mock_app_store()),
+                    dpki: Some(Arc::new(dpki)),
+                    app_store: Some(Arc::new(mock_app_store())),
                 });
             api.expect_keystore().return_const(keystore.clone());
             let mut ribosome = MockRibosomeT::new();

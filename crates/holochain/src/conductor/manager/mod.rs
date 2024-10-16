@@ -53,11 +53,12 @@ pub enum TaskOutcome {
 
 /// Spawn a task which performs some action after each task has completed,
 /// as recieved by the outcome channel produced by the task manager.
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub fn spawn_task_outcome_handler(
     conductor: ConductorHandle,
     mut outcomes: OutcomeReceiver,
 ) -> JoinHandle<TaskManagerResult> {
-    let span = tracing::error_span!(
+    let span = tracing::info_span!(
         "spawn_task_outcome_handler",
         scope = conductor.get_config().tracing_scope()
     );
@@ -206,7 +207,7 @@ pub fn spawn_task_outcome_handler(
     }.instrument(span))
 }
 
-#[tracing::instrument(skip(kind))]
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(kind)))]
 fn produce_task_outcome(kind: &TaskKind, result: ManagedTaskResult, name: String) -> TaskOutcome {
     use TaskOutcome::*;
     match kind {
@@ -231,12 +232,11 @@ fn produce_task_outcome(kind: &TaskKind, result: ManagedTaskResult, name: String
 
 /// Handle the result of shutting down the main thread.
 pub fn handle_shutdown(result: Result<TaskManagerResult, tokio::task::JoinError>) {
-    let result = result.map_err(|e| {
+    let result = result.inspect_err(|e| {
         error!(
-            error = &e as &dyn std::error::Error,
+            error = e as &dyn std::error::Error,
             "Failed to join the main task"
         );
-        e
     });
     match result {
         Ok(result) => result.expect("Conductor shutdown error"),
@@ -276,7 +276,7 @@ pub struct TaskManagerClient {
 impl TaskManagerClient {
     /// Construct the TaskManager and the outcome channel receiver
     pub fn new(tx: OutcomeSender, scope: String) -> Self {
-        let span = tracing::error_span!("managed task", scope = scope);
+        let span = tracing::info_span!("managed task", scope = scope);
         let tm = task_motel::TaskManager::new_instrumented(span, tx, |g| match g {
             TaskGroup::Conductor => None,
             TaskGroup::Dna(_) => Some(TaskGroup::Conductor),
@@ -298,9 +298,10 @@ impl TaskManagerClient {
     }
 
     /// Stop all tasks for a Cell and await their completion.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub fn stop_cell_tasks(&self, cell_id: CellId) -> ShutdownHandle {
         if let Some(tm) = self.tm.lock().as_mut() {
-            tokio::spawn(tm.stop_group(&TaskGroup::Cell(cell_id)))
+            tokio::spawn(tm.stop_group(&TaskGroup::Cell(cell_id)).in_current_span())
         } else {
             tracing::warn!("Tried to shutdown cell's tasks while they're already shutting down");
             tokio::spawn(async move {})
@@ -322,9 +323,15 @@ impl TaskManagerClient {
     pub fn add_conductor_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
-        f: impl FnOnce(StopListener) -> Fut + Send + 'static,
+        f: impl FnOnce() -> Fut + Send + 'static,
     ) {
-        self.add_conductor_task(name, TaskKind::Ignore, f)
+        self.add_conductor_task(name, TaskKind::Ignore, move |stop| async move {
+            tokio::select! {
+                _ = stop => (),
+                _ = f() => (),
+            }
+            Ok(())
+        })
     }
 
     /// Add a conductor-level task which will cause the conductor to shut down if it fails
@@ -429,7 +436,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn unrecoverable_error() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.path().to_path_buf().into())
@@ -462,7 +469,7 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "panics in tokio break other tests, this test is here to confirm behavior but cannot be run on ci"]
     async fn unrecoverable_panic() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let db_dir = test_db_dir();
         let handle = Conductor::builder()
             .with_data_root_path(db_dir.as_ref().to_path_buf().into())

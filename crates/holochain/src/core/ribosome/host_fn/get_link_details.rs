@@ -10,8 +10,7 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-#[allow(clippy::extra_unused_lifetimes)]
-pub fn get_link_details<'a>(
+pub fn get_link_details(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
@@ -26,6 +25,7 @@ pub fn get_link_details<'a>(
                     join_all(inputs.into_iter().map(|input| async {
                         let GetLinksInput {
                             base_address,
+                            get_options,
                             link_type,
                             tag_prefix,
                             ..
@@ -43,7 +43,13 @@ pub fn get_link_details<'a>(
                             &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         )
-                        .get_link_details(key, GetLinksOptions::default())
+                        .get_link_details(
+                            key,
+                            GetLinksOptions {
+                                get_options,
+                                ..Default::default()
+                            },
+                        )
                         .await?)
                     }))
                     .await
@@ -75,13 +81,16 @@ pub fn get_link_details<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
+    use holo_hash::ActionHash;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::link::LinkDetails;
     use holochain_zome_types::record::SignedActionHashed;
     use holochain_zome_types::Action;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_entry_hash_path_children_details() {
-        holochain_trace::test_run().ok();
+        holochain_trace::test_run();
         let RibosomeTestFixture {
             conductor, alice, ..
         } = RibosomeTestFixture::new(TestWasm::HashPath).await;
@@ -102,7 +111,7 @@ pub mod slow_tests {
 
         let exists_output: bool = conductor.call(&alice, "exists", "foo".to_string()).await;
 
-        assert_eq!(true, exists_output,);
+        assert!(exists_output);
 
         let _foo_bar: holo_hash::EntryHash = conductor
             .call(&alice, "path_entry_hash", "foo.bar".to_string())
@@ -135,7 +144,7 @@ pub mod slow_tests {
 
         let mut remove_happened = false;
         for (_, removes) in children_details_output_2_vec {
-            if removes.len() > 0 {
+            if !removes.is_empty() {
                 remove_happened = true;
 
                 let link_add_address = unwrap_to
@@ -146,5 +155,36 @@ pub mod slow_tests {
             }
         }
         assert!(remove_happened);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn get_link_details_local_only() {
+        holochain_trace::test_run();
+        // agents should not pass around data
+        let config = SweetConductorConfig::rendezvous(false)
+            .no_dpki()
+            .tune(|config| {
+                config.disable_historical_gossip = true;
+                config.disable_recent_gossip = true;
+                config.disable_publish = true;
+            });
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
+        let apps = conductors.setup_app("test", &[dna_file]).await.unwrap();
+
+        // alice creates a link
+        let zome_alice = apps[0].cells()[0].zome(TestWasm::Link.coordinator_zome_name());
+        let _: ActionHash = conductors[0].call(&zome_alice, "create_link", ()).await;
+
+        // now make both agents aware of each other
+        conductors.exchange_peer_info().await;
+
+        // bob gets link details locally only
+        let zome_bob = apps[1].cells()[0].zome(TestWasm::Link.coordinator_zome_name());
+        let local_link_details: LinkDetails = conductors[1]
+            .call(&zome_bob, "get_link_details_local_only", ())
+            .await;
+        // link details should be empty
+        assert_eq!(local_link_details.into_inner().len(), 0);
     }
 }

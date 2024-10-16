@@ -5,9 +5,6 @@ use holochain_integrity_types::link::LinkTag;
 use holochain_wasmer_guest::*;
 use std::str::FromStr;
 
-#[cfg(all(test, feature = "mock"))]
-mod test;
-
 /// Root for all paths.
 pub const ROOT: &[u8; 2] = &[0x00, 0x01];
 

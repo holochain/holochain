@@ -24,23 +24,21 @@ pub enum Signal {
     System(SystemSignal),
 }
 
-/// A Signal which originates from within the Holochain system, as opposed to
-/// from within a Cell
-///
-/// TODO, decide what these will be. For instance, maybe there is a
-/// DataAvailable signal for doing async network requests
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
-pub enum SystemSignal {
-    /// Since we have no real system signals, we use a test signal for testing
-    /// TODO: replace instances of this with something real
-    Test(String),
-    /// A countersigning session has successfully completed.
-    SuccessfulCountersigning(holo_hash::EntryHash),
+impl Signal {
+    /// Parse from vec.
+    pub fn try_from_vec(v: Vec<u8>) -> Result<Self, SerializedBytesError> {
+        Self::try_from(SerializedBytes::from(UnsafeBytes::from(v)))
+    }
 }
 
-/// Create a test signal
-pub fn test_signal(s: &str) -> Signal {
-    SystemSignal::Test(s.to_string()).into()
+/// A Signal which originates from within the Holochain system, as opposed to
+/// from within a Cell
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Eq)]
+pub enum SystemSignal {
+    /// A countersigning session has successfully completed.
+    SuccessfulCountersigning(EntryHash),
+    /// A countersigning session has been abandoned.
+    AbandonedCountersigning(EntryHash),
 }
 
 impl_from! {

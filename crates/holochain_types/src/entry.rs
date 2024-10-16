@@ -11,8 +11,8 @@ use holochain_zome_types::prelude::*;
 use crate::action::WireDelete;
 use crate::action::WireNewEntryAction;
 use crate::action::WireUpdateRelationship;
+use crate::dht_op::ChainOpType;
 use crate::dht_op::DhtOpResult;
-use crate::dht_op::DhtOpType;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
 
@@ -69,15 +69,16 @@ impl WireEntryOps {
                 let entry_hashed = EntryHashed::from_content_sync(entry);
                 for op in creates {
                     let status = op.validation_status();
-                    let SignedAction(action, signature) = op
+                    let (action, signature) = op
                         .data
-                        .into_signed_action(entry_type.clone(), entry_hashed.as_hash().clone());
+                        .into_signed_action(entry_type.clone(), entry_hashed.as_hash().clone())
+                        .into();
 
                     ops.push(RenderedOp::new(
                         action,
                         signature,
                         status,
-                        DhtOpType::StoreEntry,
+                        ChainOpType::StoreEntry,
                     )?);
                 }
                 for op in deletes {
@@ -90,24 +91,27 @@ impl WireEntryOps {
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterDeletedEntryAction,
+                        ChainOpType::RegisterDeletedEntryAction,
                     )?);
                 }
                 for op in updates {
                     let status = op.validation_status();
-                    let SignedAction(action, signature) =
-                        op.data.into_signed_action(entry_hashed.as_hash().clone());
+                    let (action, signature) = op
+                        .data
+                        .into_signed_action(entry_hashed.as_hash().clone())
+                        .into();
 
                     ops.push(RenderedOp::new(
                         action,
                         signature,
                         status,
-                        DhtOpType::RegisterUpdatedContent,
+                        ChainOpType::RegisterUpdatedContent,
                     )?);
                 }
                 Ok(RenderedOps {
                     entry: Some(entry_hashed),
                     ops,
+                    warrant: None,
                 })
             }
             None => Ok(Default::default()),

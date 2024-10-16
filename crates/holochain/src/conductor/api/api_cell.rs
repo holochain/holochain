@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
+use super::DpkiApi;
 use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
-use crate::conductor::interface::SignalBroadcaster;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
 use crate::core::ribosome::real_ribosome::RealRibosome;
@@ -76,16 +76,12 @@ impl CellConductorApiT for CellConductorApi {
 
     fn conductor_services(&self) -> ConductorServices {
         self.conductor_handle
-            .services
-            .share_ref(|s| s.clone().expect("Conductor services not yet initialized"))
+            .running_services
+            .share_ref(|s| s.clone())
     }
 
     fn keystore(&self) -> &MetaLairClient {
         self.conductor_handle.keystore()
-    }
-
-    fn signal_broadcaster(&self) -> SignalBroadcaster {
-        self.conductor_handle.signal_broadcaster()
     }
 
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
@@ -104,12 +100,12 @@ impl CellConductorApiT for CellConductorApi {
             .get_ribosome(self.cell_id.dna_hash())?)
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome> {
-        Ok(self
+        let dna = self
             .get_dna(dna_hash)
-            .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?
-            .dna_def()
-            .get_zome(zome_name)?)
+            .ok_or_else(|| ConductorApiError::DnaMissing(dna_hash.clone()))?;
+        Ok(dna.dna_def().get_zome(zome_name)?)
     }
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
@@ -146,10 +142,6 @@ pub trait CellConductorApiT: Send + Sync {
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &MetaLairClient;
 
-    /// Access the broadcast Sender which will send a Signal across every
-    /// attached app interface
-    fn signal_broadcaster(&self) -> SignalBroadcaster;
-
     /// Get a [`Dna`](holochain_types::prelude::Dna) from the [`RibosomeStore`](crate::conductor::ribosome_store::RibosomeStore)
     fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile>;
 
@@ -162,7 +154,7 @@ pub trait CellConductorApiT: Send + Sync {
     /// Get a [`Zome`](holochain_types::prelude::Zome) from this cell's Dna
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
-    /// Get a [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
+    /// Get a [`EntryDef`] from the [`EntryDefBufferKey`]
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
     /// Turn this into a call zome handle
@@ -190,8 +182,11 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Get a zome from this cell's Dna
     fn get_zome(&self, dna_hash: &DnaHash, zome_name: &ZomeName) -> ConductorApiResult<Zome>;
 
-    /// Get a [`EntryDef`](holochain_zome_types::EntryDef) from the [`EntryDefBufferKey`](holochain_types::dna::EntryDefBufferKey)
+    /// Get a [`EntryDef`] from the [`EntryDefBufferKey`]
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
+
+    /// Call into DPKI
+    fn get_dpki(&self) -> DpkiApi;
 
     /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
     async fn witness_nonce_from_calling_agent(
@@ -217,6 +212,43 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
     /// Expose is_blocked functionality to zomes.
     async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool>;
+
+    /// Find an installed app by one of its [CellId]s.
+    async fn find_app_containing_cell(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Option<InstalledApp>>;
+
+    /// Expose create_clone_cell functionality to zomes.
+    async fn create_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorResult<ClonedCell>;
+
+    /// Expose disable_clone_cell functionality to zomes.
+    async fn disable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: DisableCloneCellPayload,
+    ) -> ConductorResult<()>;
+
+    /// Expose enable_clone_cell functionality to zomes.
+    async fn enable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: EnableCloneCellPayload,
+    ) -> ConductorResult<ClonedCell>;
+
+    /// Expose delete_clone_cell functionality to zomes.
+    async fn delete_clone_cell(&self, payload: DeleteCloneCellPayload) -> ConductorResult<()>;
+
+    /// Accept a countersigning session.
+    async fn accept_countersigning_session(
+        &self,
+        cell_id: CellId,
+        request: PreflightRequest,
+    ) -> ConductorResult<PreflightRequestAcceptance>;
 }
 
 #[async_trait]
@@ -245,6 +277,10 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         CellConductorApiT::get_entry_def(self, key)
+    }
+
+    fn get_dpki(&self) -> DpkiApi {
+        CellConductorApiT::conductor_services(self).dpki
     }
 
     async fn witness_nonce_from_calling_agent(
@@ -279,5 +315,64 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool> {
         self.conductor_handle.is_blocked(input, timestamp).await
+    }
+
+    async fn find_app_containing_cell(
+        &self,
+        cell_id: &CellId,
+    ) -> ConductorResult<Option<InstalledApp>> {
+        self.conductor_handle
+            .find_app_containing_cell(cell_id)
+            .await
+    }
+
+    async fn create_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: CreateCloneCellPayload,
+    ) -> ConductorResult<ClonedCell> {
+        self.conductor_handle
+            .clone()
+            .create_clone_cell(installed_app_id, payload)
+            .await
+    }
+
+    async fn disable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: DisableCloneCellPayload,
+    ) -> ConductorResult<()> {
+        self.conductor_handle
+            .clone()
+            .disable_clone_cell(installed_app_id, &payload)
+            .await
+    }
+
+    async fn enable_clone_cell(
+        &self,
+        installed_app_id: &InstalledAppId,
+        payload: EnableCloneCellPayload,
+    ) -> ConductorResult<ClonedCell> {
+        self.conductor_handle
+            .clone()
+            .enable_clone_cell(installed_app_id, &payload)
+            .await
+    }
+
+    async fn delete_clone_cell(&self, payload: DeleteCloneCellPayload) -> ConductorResult<()> {
+        self.conductor_handle
+            .clone()
+            .delete_clone_cell(&payload)
+            .await
+    }
+
+    async fn accept_countersigning_session(
+        &self,
+        cell_id: CellId,
+        request: PreflightRequest,
+    ) -> ConductorResult<PreflightRequestAcceptance> {
+        self.conductor_handle
+            .accept_countersigning_session(cell_id, request)
+            .await
     }
 }

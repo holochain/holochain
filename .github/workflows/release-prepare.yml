@@ -89,9 +89,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install nix
-        uses: cachix/install-nix-action@v20
+        uses: cachix/install-nix-action@v26
       - name: Setup cachix
-        uses: cachix/cachix-action@v12
+        uses: cachix/cachix-action@v14
         with:
           name: holochain-ci
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
@@ -151,23 +151,21 @@ jobs:
           fi
           git merge --ff-only "${HOLOCHAIN_SOURCE_BRANCH}"
 
-      - name: Restore holochain cargo related state and build files
+      - name: Restore Cargo cache
         if: ${{ inputs.skip_prepare_logic != 'true' }}
-        uses: steveeJ-forks/actions-cache/restore@retry
-        id: restore-build-files
+        uses:  actions/cache@v4
         with:
+          # See https://doc.rust-lang.org/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci
+          # See https://github.com/actions/cache/blob/main/examples.md#rust---cargo
           path: |
-            /var/tmp/holochain_repo/.cargo/bin/
-            /var/tmp/holochain_repo/.cargo/registry/index/
-            /var/tmp/holochain_repo/.cargo/registry/cache/
-            /var/tmp/holochain_repo/.cargo/git/db/
-            /var/tmp/holochain_repo/target/
-          key: ${{ runner.os }}-prepare-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-prepare
-            ${{ runner.os }}-test-release-cargo-test-standard
-            ${{ runner.os }}
-          required: false
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ${{ inputs.HOLOCHAIN_REPO }}/target/
+          key: "${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}"
 
       - name: Generate READMEs and bump the crate versions
         id: bump-versions
@@ -182,6 +180,12 @@ jobs:
 
           nix run .#cargo-sweep -- sweep -s
           nix run .#scripts-release-automation-check-and-bump -- $PWD
+          
+          ./scripts/format-toml.sh
+          ./scripts/ci-git-config.sh
+          git add **/*.toml
+          git commit -m "Format toml files"
+          
           nix run .#scripts-ci-generate-readmes
           nix run .#cargo-sweep -- sweep -f
 
@@ -194,18 +198,6 @@ jobs:
       - name: Run dmesg on error
         if: ${{ failure() }}
         run: sudo dmesg
-
-      - name: Cache cargo related build files
-        uses: steveeJ-forks/actions-cache/save@main
-        if: ${{ inputs.skip_prepare_logic != 'true' }}
-        with:
-          path: |
-            /var/tmp/holochain_repo/.cargo/bin/
-            /var/tmp/holochain_repo/.cargo/registry/index/
-            /var/tmp/holochain_repo/.cargo/registry/cache/
-            /var/tmp/holochain_repo/.cargo/git/db/
-            /var/tmp/holochain_repo/target/
-          key: ${{ runner.os }}-prepare-${{ github.run_id }}-${{ github.run_number }}
 
       - name: cache the repo and set outputs
         id: write-env-and-tag
@@ -223,9 +215,9 @@ jobs:
           export LATEST_HOLOCHAIN_RELEASE_TAG=$(git tag --sort=-taggerdate --merged "${RELEASE_BRANCH}" | grep holochain- | head -n1)
           export LATEST_HOLOCHAIN_RELEASE_VERSION=${LATEST_HOLOCHAIN_RELEASE_TAG/holochain-/}
 
-          # clean the repo before adding it to the store
+          # clean the repo before adding it to the store. Adding the directory to the store will cause the content to be pushed to cachix.
           git clean -ffdx
-          export STORE_PATH=$(nix store add-path --name holochain_repo .)
+          export STORE_PATH=$(nix store add --name holochain_repo .)
 
           echo "latest_holochain_release_tag=${LATEST_HOLOCHAIN_RELEASE_TAG}" >> $GITHUB_OUTPUT
           echo "latest_holochain_release_version=${LATEST_HOLOCHAIN_RELEASE_VERSION}" >> $GITHUB_OUTPUT
@@ -241,4 +233,4 @@ jobs:
           ## limits ssh access and adds the ssh public key for the user which triggered the workflow
           limit-access-to-actor: true
           ## limits ssh access and adds the ssh public keys of the listed GitHub users
-          limit-access-to-users: steveeJ,jost-s,freesig,neonphog,thedavidmeister,maackle
+          limit-access-to-users: steveeJ,jost-s,neonphog,maackle,ThetaSinner,cdunster

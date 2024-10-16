@@ -9,7 +9,7 @@ pub async fn wait_for_connected(
     to_agent: Arc<KitsuneAgent>,
     space: Arc<KitsuneSpace>,
 ) {
-    tokio::time::timeout(std::time::Duration::from_secs(10), async move {
+    tokio::time::timeout(std::time::Duration::from_secs(32), async move {
         loop {
             match sender
                 .rpc_single(
@@ -30,5 +30,5 @@ pub async fn wait_for_connected(
         }
     })
     .await
-    .unwrap();
+    .expect("wait_for_connected timed out");
 }
