@@ -16,7 +16,7 @@ futures = "0.3"
 getrandom = "0.2.7"
 holochain_keystore = { version = "^0.5.0-dev.1", path = "../holochain_keystore", default-features = false }
 holochain_nonce = { version = "^0.5.0-dev.0", path = "../holochain_nonce" }
-holochain_types = { path = "../holochain_types", version = "^0.5.0-dev.1"}
+holochain_types = { path = "../holochain_types", version = "^0.5.0-dev.1" }
 one_err = "0.0.8"
 must_future = "0.1.1"
 parking_lot = "0.12"

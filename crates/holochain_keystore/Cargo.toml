@@ -18,7 +18,7 @@ holo_hash = { version = "^0.5.0-dev.1", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_serialized_bytes = "=0.0.55"
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.0-dev.1"}
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.0-dev.1" }
 kitsune_p2p_types = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/types" }
 holochain_secure_primitive = { version = "^0.5.0-dev.0", path = "../holochain_secure_primitive" }
 holochain_util = { version = "^0.5.0-dev.0", path = "../holochain_util" }
