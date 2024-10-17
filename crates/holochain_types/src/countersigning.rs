@@ -196,7 +196,7 @@ pub enum SessionCompletionDecision {
 #[derive(Debug, Error)]
 pub enum CountersigningError {
     /// Countersigning workspace does not exist for cell.
-    #[error("Countersigning workspace does not exist for cell id {0:?}")]
+    #[error("Countersigning workspace does not exist for cell id {0:?}. Probably an invalid cell id was provided.")]
     WorkspaceDoesNotExist(CellId),
     /// No countersigning session found for the cell.
     #[error("No countersigning session found for cell id {0:?}")]

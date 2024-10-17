@@ -3314,7 +3314,9 @@ mod countersigning_impls {
             let maybe_countersigning_workspace =
                 space.countersigning_workspaces.lock().get(cell_id).cloned();
             match maybe_countersigning_workspace {
-                None => Ok(None),
+                None => Err(ConductorError::CountersigningError(
+                    CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                )),
                 Some(workspace) => Ok(workspace.get_countersigning_session_state()),
             }
         }

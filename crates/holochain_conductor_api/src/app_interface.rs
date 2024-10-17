@@ -38,6 +38,11 @@ pub enum AppRequest {
     /// # Returns
     ///
     /// [`AppResponse::CountersigningSessionState`]
+    ///
+    /// # Errors
+    ///
+    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
+    /// passed in to the call.
     GetCountersigningSessionState(Box<CellId>),
 
     /// Abandon an unresolved countersigning session.
@@ -66,8 +71,11 @@ pub enum AppRequest {
     ///
     /// # Errors
     ///
-    /// [`CountersigningError::WorkspaceDoesNotExist`] or [`CountersigningError::SessionNotFound`]
-    /// when no ongoing session could be found for the provided cell id.
+    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
+    /// passed in to the call.
+    ///
+    /// [`CountersigningError::SessionNotFound`] when no ongoing session could be found for the provided
+    /// cell id.
     ///
     /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
     /// automatically has not been made.
@@ -99,8 +107,11 @@ pub enum AppRequest {
     ///
     /// # Errors
     ///
-    /// [`CountersigningError::WorkspaceDoesNotExist`] or [`CountersigningError::SessionNotFound`]
-    /// when no ongoing session could be found for the provided cell id.
+    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
+    /// passed in to the call.
+    ///
+    /// [`CountersigningError::SessionNotFound`] when no ongoing session could be found for the provided
+    /// cell id.
     ///
     /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
     /// automatically has not been made.
