@@ -22,7 +22,6 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
 use holochain_zome_types::cell::CloneId;
 use holochain_zome_types::prelude::*;
-use itertools::Itertools;
 use std::{collections::HashMap, path::PathBuf};
 
 /// The unique identifier for an installed app in this conductor
@@ -829,6 +828,8 @@ impl InstalledAppCommon {
         installed_app_id: S,
         installed_cells: I,
     ) -> AppResult<Self> {
+        use itertools::Itertools;
+
         let installed_app_id = installed_app_id.to_string();
         let installed_cells: Vec<_> = installed_cells.into_iter().collect();
 

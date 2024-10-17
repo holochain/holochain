@@ -3278,7 +3278,7 @@ mod authenticate_token_impls {
 /// Methods for bridging from host calls to workflows for countersigning
 mod countersigning_impls {
     use super::*;
-    use crate::core::workflow;
+    use crate::core::workflow::{self, countersigning_workflow::CountersigningWorkspace};
 
     impl Conductor {
         /// Accept a countersigning session
@@ -3287,7 +3287,12 @@ mod countersigning_impls {
             cell_id: CellId,
             request: PreflightRequest,
         ) -> ConductorResult<PreflightRequestAcceptance> {
-            let countersigning_trigger = self.cell_by_id(&cell_id).await?.countersigning_trigger();
+            let countersigning_trigger = self
+                .cell_by_id(&cell_id)
+                .await?
+                .triggers()
+                .countersigning
+                .clone();
 
             Ok(
                 workflow::countersigning_workflow::accept_countersigning_request(
@@ -3299,6 +3304,89 @@ mod countersigning_impls {
                 )
                 .await?,
             )
+        }
+
+        /// Get in-memory state of an ongoing countersigning session.
+        pub async fn get_countersigning_session_state(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<CountersigningSessionState>> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let maybe_countersigning_workspace =
+                space.countersigning_workspaces.lock().get(cell_id).cloned();
+            match maybe_countersigning_workspace {
+                None => Err(ConductorError::CountersigningError(
+                    CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                )),
+                Some(workspace) => Ok(workspace.get_countersigning_session_state()),
+            }
+        }
+
+        /// Abandon an ongoing countersigning session when it can not be automatically resolved.
+        pub async fn abandon_countersigning_session(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let countersigning_workspace = self
+                .get_workspace_of_unresolved_session(&space, cell_id)
+                .await?;
+            let cell = self.cell_by_id(cell_id).await?;
+            countersigning_workspace.mark_countersigning_session_for_force_abandon(cell_id)?;
+            cell.triggers()
+                .countersigning
+                .trigger(&"force_abandon_session");
+            Ok(())
+        }
+
+        /// Publish an ongoing countersigning session when it has not be automatically resolved.
+        pub async fn publish_countersigning_session(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let countersigning_workspace = self
+                .get_workspace_of_unresolved_session(&space, cell_id)
+                .await?;
+            let cell = self.cell_by_id(cell_id).await?;
+            countersigning_workspace.mark_countersigning_session_for_force_publish(cell_id)?;
+            cell.triggers()
+                .countersigning
+                .trigger(&"force_publish_session");
+            Ok(())
+        }
+
+        async fn get_workspace_of_unresolved_session(
+            &self,
+            space: &Space,
+            cell_id: &CellId,
+        ) -> ConductorResult<Arc<CountersigningWorkspace>> {
+            let maybe_countersigning_workspace =
+                space.countersigning_workspaces.lock().get(cell_id).cloned();
+            match maybe_countersigning_workspace {
+                None => Err(ConductorError::CountersigningError(
+                    CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                )),
+                Some(countersigning_workspace) => {
+                    match countersigning_workspace.get_countersigning_session_state() {
+                        None => Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotFound(cell_id.clone()),
+                        )),
+                        Some(CountersigningSessionState::Unknown { resolution, .. }) => {
+                            if resolution.attempts >= 1 {
+                                Ok(countersigning_workspace)
+                            } else {
+                                Err(ConductorError::CountersigningError(
+                                    CountersigningError::SessionNotUnresolved(cell_id.clone()),
+                                ))
+                            }
+                        }
+                        _ => Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotUnresolved(cell_id.clone()),
+                        )),
+                    }
+                }
+            }
         }
     }
 }
@@ -3879,7 +3967,7 @@ pub fn app_manifest_from_dnas(
             let dna = dr.dna();
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let mut modifiers = DnaModifiersOpt::none();
-            modifiers.network_seed = network_seed.clone();
+            modifiers.network_seed.clone_from(&network_seed);
             AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {

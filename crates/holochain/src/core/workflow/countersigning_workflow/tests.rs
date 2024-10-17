@@ -693,7 +693,7 @@ async fn recover_from_commit_when_other_agent_abandons() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn recover_after_restart_from_commit_when_other_agent_abandons() {
+async fn recover_from_commit_after_restart_when_other_agent_abandons() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
@@ -790,7 +790,7 @@ async fn recover_after_restart_from_commit_when_other_agent_abandons() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn recover_after_restart_from_commit_when_other_agent_completes() {
+async fn recover_from_commit_after_restart_when_other_agent_completes() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
