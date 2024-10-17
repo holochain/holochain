@@ -18,6 +18,7 @@ use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
 use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
+use tracing::Instrument;
 use url2::Url2;
 
 /// How often to record historical metrics
@@ -1154,27 +1155,41 @@ impl KitsuneP2pHandler for Space {
         .into())
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn handle_targeted_broadcast(
         &mut self,
+        span: tracing::Span,
         space: Arc<KitsuneSpace>,
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
         payload: Vec<u8>,
         drop_at_limit: bool,
     ) -> KitsuneP2pHandlerResult<()> {
+        let span = span.or_current();
+
         let evt_sender = self.host_api.legacy.clone();
         let ro_inner = self.ro_inner.clone();
         Ok(async move {
             for agent in agents {
+                let agent_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&agent.0);
+                let span = span
+                    .in_scope(|| {
+                        tracing::trace_span!(
+                            "kitsune::tgt_bcast",
+                            agent = %agent_b64,
+                        )
+                    })
+                    .or_current();
+
                 let task_permit = if drop_at_limit {
                     match ro_inner.parallel_notify_permit.clone().try_acquire_owned() {
                         Ok(p) => Some(p),
                         Err(_) => {
-                            tracing::debug!(
-                                "Too many outstanding notifies, dropping notify to {:?}",
-                                agent
-                            );
+                            span.in_scope(|| {
+                                tracing::debug!(
+                                    "Too many outstanding notifies, dropping notify to {:?}",
+                                    agent
+                                )
+                            });
                             continue;
                         }
                     }
@@ -1201,14 +1216,19 @@ impl KitsuneP2pHandler for Space {
                     match discover_result {
                         discover::PeerDiscoverResult::OkShortcut => {
                             // reflect this request locally
+                            span.in_scope(|| {
+                                tracing::trace!("Reflecting targeted broadcast to local agent")
+                            });
                             evt_sender
                                 .notify(space, agent, payload)
                                 .map(|r| {
-                                    if let Err(e) = r {
-                                        tracing::error!(
-                                            "Failed to broadcast to local agent because: {:?}",
-                                            e
-                                        )
+                                    if let Err(err) = r {
+                                        span.in_scope(|| {
+                                            tracing::error!(
+                                                ?err,
+                                                "Failed to broadcast to local agent",
+                                            )
+                                        });
                                     }
                                 })
                                 .await;
@@ -1218,23 +1238,28 @@ impl KitsuneP2pHandler for Space {
                                 wire::Wire::broadcast(space, agent, BroadcastData::User(payload));
                             con_hnd
                                 .notify(&payload, timeout)
+                                .instrument(span.clone())
                                 .map(|r| {
                                     if let Err(e) = r {
-                                        tracing::info!(
-                                            "Failed to broadcast to remote agent because: {:?}",
-                                            e
-                                        )
+                                        span.in_scope(|| {
+                                            tracing::info!(
+                                                "Failed to broadcast to remote agent because: {:?}",
+                                                e
+                                            )
+                                        });
                                     }
                                 })
                                 .await;
                         }
                         discover::PeerDiscoverResult::Err(e) => {
                             async move {
-                                tracing::info!(
-                                    "Failed to discover connection for {:?} because: {:?}",
-                                    agent,
-                                    e
-                                );
+                                span.in_scope(|| {
+                                    tracing::info!(
+                                        "Failed to discover connection for {:?} because: {:?}",
+                                        agent,
+                                        e
+                                    )
+                                });
                             }
                             .await
                         }

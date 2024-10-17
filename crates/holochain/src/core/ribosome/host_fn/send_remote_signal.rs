@@ -81,6 +81,7 @@ pub fn send_remote_signal(
 
                     if let Err(e) = network
                         .send_remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal, nonce, expires_at)
+                        .in_current_span()
                         .await
                     {
                         tracing::info!("Failed to send remote signals because of {:?}", e);
@@ -157,12 +158,13 @@ mod tests {
     #[cfg(feature = "test_utils")]
     async fn remote_signal_test() -> anyhow::Result<()> {
         holochain_trace::test_run();
+
         const NUM_CONDUCTORS: usize = 5;
 
         let num_signals = Arc::new(AtomicUsize::new(0));
 
-        let config = SweetConductorConfig::standard().no_dpki();
-        let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
+        let config = SweetConductorConfig::rendezvous(false).no_dpki();
+        let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
         let agents =
             future::join_all(conductors.iter().map(|c| SweetAgents::one(c.keystore()))).await;

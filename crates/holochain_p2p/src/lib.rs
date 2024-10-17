@@ -259,6 +259,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     ) -> actor::HolochainP2pResult<()> {
         self.sender
             .send_remote_signal(
+                tracing::Span::current(),
                 (*self.dna_hash).clone(),
                 from_agent,
                 to_agent_list,

@@ -295,7 +295,10 @@ impl ghost_actor::GhostControlHandler for KitsuneP2pActor {
             let _ = &self;
             // this is a courtesy, ok if fails
             let _ = self.host_api.legacy.close().await;
-            self.ep_hnd.close(500, "").await;
+            tracing::warn!("Kitsune Acton Shutdown. If the system is shutting down, this is expected. Otherwise, it is likely networking will no longer function");
+            tracing::error_span!("kitsune", "Actor Shutdown")
+                .or_current()
+                .in_scope(|| self.ep_hnd.close(500, "")).await;
             for (_, space) in self.spaces.into_iter() {
                 let (space, _) = space.get().await;
                 let _ = space.ghost_actor_shutdown_immediate().await;
@@ -560,7 +563,10 @@ impl KitsuneP2pEventHandler for KitsuneP2pActor {
 
             for removed_url in puts.iter().flat_map(|r| r.removed_urls.clone()) {
                 tracing::debug!(?removed_url, "peer URL changed, closing connection");
-                if let Err(e) = ep_hnd.close_peer_con(removed_url.clone()) {
+                if let Err(e) = tracing::debug_span!("kitsune", "url changed connection close")
+                    .or_current()
+                    .in_scope(|| ep_hnd.close_peer_con(removed_url.clone()))
+                {
                     tracing::debug!(?e, ?removed_url, "could not close peer connection");
                 }
             }
@@ -767,6 +773,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
 
     fn handle_targeted_broadcast(
         &mut self,
+        span: tracing::Span,
         space: Arc<KitsuneSpace>,
         agents: Vec<Arc<KitsuneAgent>>,
         timeout: KitsuneTimeout,
@@ -780,7 +787,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .targeted_broadcast(space, agents, timeout, payload, drop_at_limit)
+                .targeted_broadcast(span, space, agents, timeout, payload, drop_at_limit)
                 .await
         }
         .boxed()

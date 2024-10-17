@@ -51,6 +51,7 @@ impl HolochainP2pHandler for StubNetwork {
 
     fn handle_send_remote_signal(
         &mut self,
+        span: tracing::Span,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
         to_agent_list: Vec<(Signature, AgentPubKey)>,
