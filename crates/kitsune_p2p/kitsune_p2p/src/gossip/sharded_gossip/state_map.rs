@@ -100,7 +100,6 @@ mod tests {
     use crate::NOISE;
     use arbitrary::{Arbitrary, Unstructured};
     use kitsune_p2p_types::dht::arq::ArqSet;
-    use kitsune_p2p_types::Tx2Cert;
     use std::collections::HashSet;
     use std::sync::Arc;
     use std::time::Duration;
@@ -316,8 +315,7 @@ mod tests {
     }
 
     fn insert_new_state(state_map: &mut RoundStateMap, u: &mut Unstructured) -> NodeCert {
-        let cert = Tx2Cert::arbitrary(u).unwrap();
-        let key: NodeCert = cert.into();
+        let key = NodeCert::arbitrary(u).unwrap();
         state_map.insert(key.clone(), test_round_state());
 
         key

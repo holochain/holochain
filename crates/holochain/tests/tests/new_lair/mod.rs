@@ -5,6 +5,7 @@ use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AdminResponse};
 use holochain_types::websocket::AllowedOrigins;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::dependencies::*;
 use lair_keystore_api::ipc_keystore::*;
@@ -43,6 +44,8 @@ async fn test_new_lair_conductor_integration() {
     let keystore_config = keystore.get_config();
     println!("\n## keystore config ##\n{}", keystore_config);
 
+    todo!("this config, and similar ones, just don't work, because they don't have valid network transport config");
+
     // set up conductor config to use the started keystore
     let conductor_config = ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -55,7 +58,7 @@ async fn test_new_lair_conductor_integration() {
         keystore: KeystoreConfig::LairServer {
             connection_url: keystore_config.connection_url.clone().into(),
         },
-        ..ConductorConfig::default()
+        ..ConductorConfig::empty()
     };
 
     // write the conductor config

@@ -24,7 +24,10 @@ async fn migrate_dna_with_second_app_install() {
         amount: u32,
     }
 
-    let config = SweetConductorConfig::standard().no_dpki_mustfix();
+    let config = SweetConductorConfig::rendezvous(false)
+        .apply_shared_rendezvous()
+        .await
+        .no_dpki_mustfix();
     let mut conductor = SweetConductor::from_config(config).await;
 
     let alice = SweetAgents::one(conductor.keystore()).await;

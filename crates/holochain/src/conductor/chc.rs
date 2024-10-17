@@ -131,7 +131,7 @@ mod tests {
 
         let config = ConductorConfig {
             chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
-            ..Default::default()
+            ..ConductorConfig::empty()
         };
         let mut conductor = SweetConductor::from_config(config).await;
 
@@ -200,7 +200,7 @@ mod tests {
         let config = ConductorConfig {
             chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
             dpki: DpkiConfig::disabled(),
-            ..Default::default()
+            ..ConductorConfig::empty()
         };
         let mut conductor = SweetConductor::from_config(config).await;
 
@@ -259,7 +259,10 @@ mod tests {
     async fn multi_conductor_chc_sync() {
         holochain_trace::test_run();
 
-        let mut config = SweetConductorConfig::standard().no_dpki();
+        let mut config = SweetConductorConfig::rendezvous(false)
+            .apply_shared_rendezvous()
+            .await
+            .no_dpki();
         // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/"));
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
         let mut conductors = SweetConductorBatch::from_config(4, config).await;

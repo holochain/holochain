@@ -12,8 +12,13 @@ use std::sync::Arc;
 #[tokio::test(flavor = "multi_thread")]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
-    let mut conductor =
-        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
+    let mut conductor = SweetConductor::from_config(
+        SweetConductorConfig::rendezvous(false)
+            .apply_shared_rendezvous()
+            .await
+            .no_dpki(),
+    )
+    .await;
 
     let mut cache_dir = conductor.db_path().to_owned();
     cache_dir.push(WASM_CACHE);
@@ -49,7 +54,7 @@ async fn wasm_disk_cache() {
 async fn zome_with_no_entry_types_does_not_prevent_deletes() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::shared_rendezvous().await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::ValidateRejectAppTypes, TestWasm::Crd])
@@ -83,7 +88,7 @@ async fn zome_with_no_entry_types_does_not_prevent_deletes() {
 async fn zome_with_no_link_types_does_not_prevent_delete_links() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor = SweetConductor::shared_rendezvous().await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
         TestWasm::ValidateRejectAppTypes,
@@ -121,20 +126,14 @@ async fn zero_arc_can_link_to_uncached_base() {
 
     holochain_trace::test_run();
 
-    let mut empty_arc_conductor_config = ConductorConfig::default();
+    let mut empty_arc_conductor_config = SweetConductorConfig::rendezvous(false)
+        .no_dpki_mustfix()
+        .tune(|t| {
+            t.gossip_arc_clamping = String::from("empty");
+        });
 
-    let mut network_config = KitsuneP2pConfig::default();
-
-    let mut tuning_params = KitsuneP2pTuningParams::default();
-
-    tuning_params.gossip_arc_clamping = String::from("empty");
-    network_config.tuning_params = Arc::new(tuning_params);
-
-    empty_arc_conductor_config.network = network_config;
-    empty_arc_conductor_config.dpki = DpkiConfig::disabled();
-
-    let mut conductors = SweetConductorBatch::from_configs(vec![
-        ConductorConfig::default(),
+    let mut conductors = SweetConductorBatch::from_configs_rendezvous(vec![
+        SweetConductorConfig::rendezvous(false).no_dpki_mustfix(),
         empty_arc_conductor_config,
     ])
     .await;

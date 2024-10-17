@@ -52,7 +52,10 @@ impl NetworkTopologyConductor {
     pub async fn lock(&self) -> &RwLock<SweetConductor> {
         self.0
             .get_or_init(async {
-                let mut config = SweetConductorConfig::standard().no_dpki_mustfix();
+                let mut config = SweetConductorConfig::rendezvous(false)
+                    .apply_shared_rendezvous()
+                    .await
+                    .no_dpki_mustfix();
                 config.keystore = KeystoreConfig::DangerTestKeystore;
                 RwLock::new(SweetConductor::from_config(config).await)
             })
