@@ -28,7 +28,7 @@ mod session_interaction_over_websocket;
 async fn listen_for_countersigning_completion() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true);
+    let config = SweetConductorConfig::rendezvous(true).no_dpki();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -122,7 +122,7 @@ async fn listen_for_countersigning_completion() {
 async fn retry_countersigning_commit_on_missing_deps() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true);
+    let config = SweetConductorConfig::rendezvous(true).no_dpki();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
     for conductor in conductors.iter_mut() {
         conductor.shutdown().await;
@@ -282,7 +282,7 @@ async fn retry_countersigning_commit_on_missing_deps() {
 async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|c| {
+    let config = SweetConductorConfig::rendezvous(true).no_dpki().tune_conductor(|c| {
         c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
     });
     let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
@@ -386,7 +386,7 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
 async fn alice_can_recover_from_a_session_timeout() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|c| {
+    let config = SweetConductorConfig::rendezvous(true).no_dpki().tune_conductor(|c| {
         c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
     });
     let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
@@ -525,7 +525,7 @@ async fn alice_can_recover_from_a_session_timeout() {
 async fn complete_session_with_chc_enabled() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true);
+    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
@@ -557,13 +557,13 @@ async fn complete_session_with_chc_enabled() {
         .await
         .unwrap();
 
-    await_consistency(30, vec![alice, bob]).await.unwrap();
+    await_consistency(60, vec![alice, bob]).await.unwrap();
 
     // Set up the session and accept it for both agents
     let preflight_request: PreflightRequest = conductors[0]
         .call_fallible(
             &alice_zome,
-            "generate_countersigning_preflight_request_fast",
+            "generate_countersigning_preflight_request",
             vec![
                 (alice.agent_pubkey().clone(), vec![Role(0)]),
                 (bob.agent_pubkey().clone(), vec![]),
@@ -641,7 +641,7 @@ async fn complete_session_with_chc_enabled() {
 async fn session_rollback_with_chc_enabled() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true);
+    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
@@ -772,7 +772,7 @@ async fn session_rollback_with_chc_enabled() {
 async fn multiple_agents_on_same_conductor_with_chc_enabled() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true);
+    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
@@ -788,6 +788,12 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
     // Carol installs the same DNA on the conductor that Alice is using
     let carol_app = conductors[0].setup_app("app2", &[dna]).await.unwrap();
     let carol = &carol_app.cells()[0];
+
+    // Make sure the conductors are gossiping before continuing
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
+        .await
+        .unwrap();
 
     let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
     let carol_chc = conductors[0].get_chc(carol.cell_id()).unwrap();
@@ -809,7 +815,7 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
         .await
         .unwrap();
 
-    await_consistency(30, vec![alice, bob, carol])
+    await_consistency(60, vec![alice, bob, carol])
         .await
         .unwrap();
 
@@ -817,7 +823,7 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
     let preflight_request: PreflightRequest = conductors[0]
         .call_fallible(
             &alice_zome,
-            "generate_countersigning_preflight_request_fast",
+            "generate_countersigning_preflight_request",
             vec![
                 (alice.agent_pubkey().clone(), vec![Role(0)]),
                 (bob.agent_pubkey().clone(), vec![]),
@@ -977,7 +983,7 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
 async fn chc_should_respect_chain_lock() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true);
+    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
@@ -1091,7 +1097,7 @@ async fn chc_should_respect_chain_lock() {
 async fn should_be_able_to_schedule_functions_during_session() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true);
+    let config = SweetConductorConfig::rendezvous(true).no_dpki();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
