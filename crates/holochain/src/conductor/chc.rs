@@ -91,6 +91,8 @@ mod tests {
     /// A CHC implementation that can be set up to error
     struct FlakyChc {
         chc: chc_local::ChcLocal,
+        agent: AgentPubKey,
+        keystore: MetaLairClient,
         pub fail: AtomicBool,
     }
 
@@ -121,7 +123,7 @@ mod tests {
 
     impl ChainHeadCoordinatorExt for FlakyChc {
         fn signing_info(&self) -> (MetaLairClient, AgentPubKey) {
-            unimplemented!()
+            (self.keystore.clone(), self.agent.clone())
         }
     }
 
@@ -129,10 +131,7 @@ mod tests {
     async fn simple_chc_sync() {
         use holochain::test_utils::inline_zomes::simple_crud_zome;
 
-        let config = ConductorConfig {
-            chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
-            ..Default::default()
-        };
+        let config = SweetConductorConfig::standard().local_chc();
         let mut conductor = SweetConductor::from_config(config).await;
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
@@ -195,6 +194,7 @@ mod tests {
     /// Test that general CHC failures prevent chain writes
     #[tokio::test(flavor = "multi_thread")]
     async fn simple_chc_error_prevents_write() {
+        holochain_trace::test_run();
         use holochain::test_utils::inline_zomes::simple_crud_zome;
 
         let config = ConductorConfig {
@@ -210,6 +210,8 @@ mod tests {
 
         let flaky_chc = Arc::new(FlakyChc {
             chc: chc_local::ChcLocal::new(conductor.keystore(), agent.clone()),
+            keystore: conductor.keystore().clone(),
+            agent: agent.clone(),
             fail: true.into(),
         });
 
@@ -217,6 +219,10 @@ mod tests {
         CHC_LOCAL_MAP
             .lock()
             .insert(cell_id.clone(), flaky_chc.clone());
+
+        // Assert that the installed CHC is now bad
+        let chc = conductor.get_chc(&cell_id).unwrap();
+        chc.get_record_data(None).await.unwrap_err();
 
         // The app can't be installed, because of a CHC error during genesis
         let err = conductor
@@ -250,13 +256,13 @@ mod tests {
         matches::assert_matches!(
             err,
             ConductorApiError::CellError(CellError::WorkflowError(we))
-            if matches!(*we, WorkflowError::SourceChainError(SourceChainError::Other(_)))
+            if matches!(*we, WorkflowError::SourceChainError(SourceChainError::ChcError(ChcError::Other(_))))
         );
     }
 
-    // TODO: run this remotely too
+    // TODO: run this against a remote CHC too
     #[tokio::test(flavor = "multi_thread")]
-    async fn multi_conductor_chc_sync() {
+    async fn multi_conductor_chc_sync_with_genesis() {
         holochain_trace::test_run();
 
         let mut config = SweetConductorConfig::standard().no_dpki();
@@ -307,20 +313,35 @@ mod tests {
             .install_app_bundle(mk_payload(false).await)
             .await;
 
-        // It's not ideal to match on a string, but it seems like the only option:
-        // - The pattern involves Boxes which are impossible to match on
+        // It's not ideal to match on a string, but it seems like the only sane option:
+        // - The pattern involves Boxes which require multiple steps for matching
+        // - The error actually contains a Vec of errors
+        // - The innermost error is actually a SourceChainError::Other, which is a boxed trait object, not matchable
         // - The error types are not PartialEq, so cannot be constructed and tested for equality
+        // Here's the closest attempt, which does not work (Needs to use SourceChainError::Other), and perhaps a downcast:
+        /*
+                if let Err(ConductorError::GenesisFailed { errors }) = &install_result_1 {
+                    assert_eq!(errors.len(), 1);
+                    if let CellError::ConductorApiError(b) = &errors[0].1 {
+                        assert_matches!(
+                            &**b,
+                            ConductorApiError::WorkflowError(WorkflowError::SourceChainError(SourceChainError::ChcError(
+                                ChcError::InvalidChain(seq, _)
+                            )))
+                            if *seq == 2
+                        );
+                    }
+                }
+        */
 
-        dbg!(&install_result_1);
-        dbg!(&install_result_2);
-        dbg!(&install_result_3);
+        println!("install_result_1 = {:?}", install_result_1);
+        println!("install_result_2 = {:?}", install_result_2);
+        println!("install_result_3 = {:?}", install_result_3);
 
-        regex::Regex::new(
-            r#".*ChcHeadMoved\("genesis", InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\)\)\).*"#,
-        )
-        .unwrap()
-        .captures(&format!("{:?}", install_result_1))
-        .unwrap();
+        regex::Regex::new(r#".*ChcError\(InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\)\)\).*"#)
+            .unwrap()
+            .captures(&format!("{:?}", install_result_1))
+            .unwrap();
         // TODO: check sequence and hash
 
         assert_eq!(
@@ -361,14 +382,12 @@ mod tests {
             .await
             .unwrap();
 
-        // Sync is not possible since the installation was rolled back and the cell was removed
-        assert!(matches!(
-            conductors[3]
-                .raw_handle()
-                .chc_sync(cell_id.clone(), None)
-                .await,
-            Err(ConductorApiError::ConductorError(ConductorError::CellMissing(id))) if id == *cell_id
-        ));
+        // Sync is possible even though installation was rolled back and the cell was removed
+        conductors[3]
+            .raw_handle()
+            .chc_sync(cell_id.clone(), None)
+            .await
+            .unwrap();
 
         let dump1 = conductors[1]
             .dump_full_cell_state(cell_id, None)
@@ -394,9 +413,10 @@ mod tests {
 
         dbg!(&hash1);
 
-        regex::Regex::new(
-            r#".*ChcHeadMoved\("SourceChain::flush", InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\).*"#
-        ).unwrap().captures(&format!("{:?}", hash1)).unwrap();
+        regex::Regex::new(r#".*ChcError\(InvalidChain\((\d+), ActionHash\([a-zA-Z0-9-_]+\).*"#)
+            .unwrap()
+            .captures(&format!("{:?}", hash1))
+            .unwrap();
         // TODO: check sequence and hash
 
         // This should trigger a CHC sync

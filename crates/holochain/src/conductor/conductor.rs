@@ -133,8 +133,6 @@ mod builder;
 
 mod chc;
 
-mod graft_records_onto_source_chain;
-
 mod app_auth_token_store;
 
 /// Operations to manipulate agent keys.
@@ -2163,6 +2161,37 @@ mod cell_impls {
                 })
                 .collect())
         }
+
+        /// Instantiate a SourceChain for the given agent and DNA hash.
+        ///
+        /// If `allow_empty` is false, this will produce an error if the source chain is empty
+        /// (via [`SourceChain::new`]).
+        pub async fn get_agent_source_chain(
+            &self,
+            CellId(dna_hash, agent_key): &CellId,
+            allow_empty: bool,
+        ) -> ConductorApiResult<SourceChain> {
+            if allow_empty {
+                SourceChain::raw_empty(
+                    self.get_or_create_authored_db(dna_hash, agent_key.clone())?,
+                    self.get_dht_db(dna_hash)?,
+                    self.get_dht_db_cache(dna_hash)?,
+                    self.keystore().clone(),
+                    agent_key.clone(),
+                )
+                .await
+            } else {
+                SourceChain::new(
+                    self.get_or_create_authored_db(dna_hash, agent_key.clone())?,
+                    self.get_dht_db(dna_hash)?,
+                    self.get_dht_db_cache(dna_hash)?,
+                    self.keystore().clone(),
+                    agent_key.clone(),
+                )
+                .await
+            }
+            .map_err(Into::into)
+        }
     }
 }
 
@@ -3050,16 +3079,98 @@ mod misc_impls {
         /// Inject records into a source chain for a cell.
         /// If the records form a chain segment that can be "grafted" onto the existing chain, it will be.
         /// Otherwise, a new chain will be formed using the specified records.
+        //
+        // TODO: could integrate this better with [`SourceChain::flush`] when we re-visit our workflows:
+        //       this function is called automatically during a [`SourceChain::flush`] when the CHC head is beyond
+        //       the local head. In [`ChainHeadOrdering::Relaxed`] mode, we have the opportunity to rebase the current
+        //       scratch records onto the incoming grafted records from the CHC. We can also make use of the validation
+        //       and integration that already runs for flushed records, rather than re-implementing those here.
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn graft_records_onto_source_chain(
             self: Arc<Self>,
             cell_id: CellId,
             validate: bool,
             records: Vec<Record>,
         ) -> ConductorApiResult<()> {
-            graft_records_onto_source_chain::graft_records_onto_source_chain(
-                self, cell_id, validate, records,
-            )
-            .await
+            let CellId(dna_hash, agent_key) = cell_id.clone();
+            let space = self.get_or_create_space(&dna_hash)?;
+            let workspace = space
+                .source_chain_workspace(self.keystore().clone(), agent_key.clone())
+                .await?;
+            let network = self
+                .holochain_p2p()
+                .clone()
+                .into_dna(dna_hash.clone(), self.get_chc(&cell_id));
+            let ribosome = self.get_ribosome(&dna_hash)?;
+
+            let sc = workspace.source_chain();
+
+            let authored = self.get_or_create_authored_db(&dna_hash, agent_key.clone())?;
+            let dht = self.get_dht_db(&dna_hash)?;
+            let cache = self.get_dht_db_cache(&dna_hash)?;
+
+            let has_genesis =
+                crate::core::workflow::GenesisWorkspace::new(authored.clone(), dht.clone())
+                    .has_genesis(agent_key.clone())
+                    .await
+                    .unwrap_or(false);
+
+            // Add the records to the source chain so we can validate them.
+            sc.scratch()
+                .apply(|scratch| {
+                    for r in records.iter() {
+                        holochain_state::prelude::insert_record_scratch(
+                            scratch,
+                            r.clone(),
+                            Default::default(),
+                        );
+                    }
+                })
+                .map_err(SourceChainError::from)?;
+
+            // Validate
+            if validate {
+                // Run the individual record validations.
+                crate::core::workflow::inline_validation(
+                    workspace.clone(),
+                    network.clone(),
+                    self.clone(),
+                    ribosome,
+                )
+                .await?;
+            }
+
+            let op_hashes = authored
+                .write_async(|txn| {
+                    SourceChain::graft_records_onto_source_chain_txn(txn, records, cell_id)
+                })
+                .await?;
+
+            if has_genesis {
+                holochain_state::integrate::authored_ops_to_dht_db(
+                    &network,
+                    op_hashes,
+                    authored.into(),
+                    dht,
+                    &cache,
+                )
+                .await?;
+            } else {
+                // Integrate the ops.
+                // XXX: this is not checking for authorityship and just integrating everything we author,
+                //      which is wasteful of disk space in a sharded network, but not dangerous.
+                //      The reason for doing this is that when doing a CHC sync during genesis, we have not
+                //      yet joined the network, so we can't actually check authorityship at that time.
+                holochain_state::integrate::authored_ops_to_dht_db_without_check(
+                    op_hashes.into_iter().map(|(hash, _basis)| hash).collect(),
+                    authored.into(),
+                    dht,
+                    &cache,
+                )
+                .await?;
+            }
+
+            Ok(())
         }
 
         /// Update coordinator zomes on an existing dna.
@@ -3179,7 +3290,6 @@ mod accessor_impls {
                 .expect("failed to get p2p_batch_sender")
         }
 
-        #[cfg(feature = "test_utils")]
         pub(crate) fn p2p_metrics_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
             self.spaces
                 .p2p_metrics_db(hash)
@@ -3724,28 +3834,15 @@ impl Conductor {
     }
 }
 
-/// Methods only available with feature "test_utils"
-#[cfg(any(test, feature = "test_utils"))]
 #[allow(missing_docs)]
-mod test_utils_impls {
+mod direct_db_access_impls {
     use super::*;
-    use tokio::sync::broadcast;
 
     impl Conductor {
-        pub async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
-            self.get_state().await
-        }
-
-        pub fn subscribe_to_app_signals(
-            &self,
-            installed_app_id: InstalledAppId,
-        ) -> broadcast::Receiver<Signal> {
-            self.app_broadcast.subscribe(installed_app_id)
-        }
-
         pub fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
             Ok(self.get_or_create_dht_db(dna_hash)?)
         }
+
         pub fn get_dht_db_cache(
             &self,
             dna_hash: &DnaHash,
@@ -3771,6 +3868,27 @@ mod test_utils_impls {
 
         pub fn get_spaces(&self) -> Spaces {
             self.spaces.clone()
+        }
+    }
+}
+
+/// Methods only available with feature "test_utils"
+#[cfg(any(test, feature = "test_utils"))]
+#[allow(missing_docs)]
+mod test_utils_impls {
+    use super::*;
+    use tokio::sync::broadcast;
+
+    impl Conductor {
+        pub async fn get_state_from_handle(&self) -> ConductorResult<ConductorState> {
+            self.get_state().await
+        }
+
+        pub fn subscribe_to_app_signals(
+            &self,
+            installed_app_id: InstalledAppId,
+        ) -> broadcast::Receiver<Signal> {
+            self.app_broadcast.subscribe(installed_app_id)
         }
 
         pub async fn get_cell_triggers(
@@ -3848,6 +3966,7 @@ pub(crate) async fn genesis_cells(
 
     // If there were errors, cleanup and return the errors
     if !errors.is_empty() {
+        tracing::error!(?errors, "Genesis failed for some cells");
         Err(ConductorError::GenesisFailed { errors })
     } else {
         Ok(())

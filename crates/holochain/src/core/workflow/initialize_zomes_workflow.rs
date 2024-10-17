@@ -137,8 +137,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::*;
     use crate::conductor::Conductor;
     use crate::core::ribosome::guest_callback::validate::ValidateResult;
@@ -193,7 +191,6 @@ mod tests {
             test_cache.to_db(),
             keystore,
             author.clone(),
-            Arc::new(dna_def),
         )
         .await
         .unwrap();

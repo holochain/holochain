@@ -7,7 +7,7 @@ use holochain_zome_types::prelude::{CellId, SignedAction};
 /// An incoming countersigning session success.
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(space, signed_actions, countersigning_trigger))
+    tracing::instrument(skip(space, signature_bundle, countersigning_trigger))
 )]
 pub(crate) async fn countersigning_success(
     space: Space,
