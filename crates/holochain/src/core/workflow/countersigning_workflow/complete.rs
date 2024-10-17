@@ -296,7 +296,7 @@ fn get_countersigning_op_hashes(
         .collect::<Result<Vec<_>, _>>()?)
 }
 
-/// When it has been attempted to resolve a countersigning session unsuccessfully by querying peer state,
+/// When the workflow has attempted to resolve a countersigning session but wasn't able to find a deterministic answer by querying peer state,
 /// the session becomes unresolved and can be forcefully completed and published anyway.
 pub(super) async fn force_publish_countersigning_session(
     space: Space,
