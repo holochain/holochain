@@ -23,7 +23,7 @@ mod tests {
     use holochain_sqlite::error::DatabaseResult;
     use holochain_sqlite::rusqlite::Transaction;
 
-    fn _dbg_db_schema(db_name: &str, conn: Transaction) {
+    fn _dbg_db_schema(db_name: &str, conn: &Transaction) {
         #[allow(dead_code)]
         #[derive(Debug)]
         pub struct Schema {

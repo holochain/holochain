@@ -217,7 +217,7 @@ mod tests {
             fixt!(Action),
         ));
         let test_op_hash = op.as_hash().clone();
-        env.write_async(move |txn| mutations::insert_op(txn, &op))
+        env.write_async(move |txn| mutations::insert_op_authored(txn, &op))
             .await
             .unwrap();
 
@@ -243,10 +243,10 @@ mod tests {
         })
         .await?;
 
-        env.read_async(move |reader| -> DatabaseResult<()> {
-            assert_eq!(2, count_valid(&reader, &test_op_hash).unwrap());
+        env.read_async(move |txn| -> DatabaseResult<()> {
+            assert_eq!(2, count_valid(txn, &test_op_hash).unwrap());
 
-            let mut list = list_receipts(&reader, &test_op_hash).unwrap();
+            let mut list = list_receipts(txn, &test_op_hash).unwrap();
             list.sort_by(|a, b| {
                 a.receipt.validators[0]
                     .partial_cmp(&b.receipt.validators[0])
@@ -277,7 +277,7 @@ mod tests {
 
         // With no validators
         let pending = env
-            .read_async(|txn| get_pending_validation_receipts(&txn, vec![]))
+            .read_async(|txn| get_pending_validation_receipts(txn, vec![]))
             .await
             .unwrap();
 
@@ -285,7 +285,7 @@ mod tests {
 
         // Same result with validators
         let pending = env
-            .read_async(|txn| get_pending_validation_receipts(&txn, vec![fixt!(AgentPubKey)]))
+            .read_async(|txn| get_pending_validation_receipts(txn, vec![fixt!(AgentPubKey)]))
             .await
             .unwrap();
 
@@ -294,7 +294,10 @@ mod tests {
 
     async fn create_modified_op(
         vault: DbWrite<DbKindDht>,
-        modifier: fn(txn: &mut Transaction, op_hash: HoloHashOf<DhtOp>) -> StateMutationResult<()>,
+        modifier: fn(
+            txn: &mut Txn<DbKindDht>,
+            op_hash: HoloHashOf<DhtOp>,
+        ) -> StateMutationResult<()>,
     ) -> StateMutationResult<DhtOpHash> {
         // The actual op does not matter, just some of the status fields
         let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
@@ -307,7 +310,7 @@ mod tests {
             .write_async({
                 let test_op_hash = test_op_hash.clone();
                 move |txn| -> StateMutationResult<()> {
-                    mutations::insert_op(txn, &op)?;
+                    mutations::insert_op_dht(txn, &op, None)?;
                     modifier(txn, test_op_hash)?;
 
                     Ok(())
@@ -395,7 +398,7 @@ mod tests {
         let pending = env
             .read_async(
                 move |txn| -> StateQueryResult<Vec<(ValidationReceipt, AgentPubKey)>> {
-                    get_pending_validation_receipts(&txn, vec![])
+                    get_pending_validation_receipts(txn, vec![])
                 },
             )
             .await
@@ -425,7 +428,7 @@ mod tests {
             action,
         ));
         let test_op_hash = op.as_hash().clone();
-        env.write_async(move |txn| insert_op(txn, &op))
+        env.write_async(move |txn| insert_op_dht(txn, &op, None))
             .await
             .unwrap();
 
@@ -446,7 +449,7 @@ mod tests {
         .unwrap();
 
         let receipt_sets = env
-            .read_async(move |txn| validation_receipts_for_action(&txn, action_hash))
+            .read_async(move |txn| validation_receipts_for_action(txn, action_hash))
             .await
             .unwrap();
 

@@ -379,6 +379,7 @@ pub type KSpace = Arc<bin_types::KitsuneSpace>;
 /// KitsuneOpData in an Arc
 pub type KOpData = Arc<bin_types::KitsuneOpData>;
 
+pub use fetch_pool::GossipType;
 use metrics::metric_task;
 
 #[cfg(test)]

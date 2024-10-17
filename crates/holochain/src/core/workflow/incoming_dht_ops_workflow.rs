@@ -69,7 +69,7 @@ impl Drop for OpsClaim {
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
 fn batch_process_entry(
-    txn: &mut rusqlite::Transaction<'_>,
+    txn: &mut Txn<DbKindDht>,
     request_validation_receipt: bool,
     ops: Vec<DhtOpHashed>,
 ) -> WorkflowResult<()> {
@@ -224,12 +224,12 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
 }
 
 fn add_to_pending(
-    txn: &mut rusqlite::Transaction<'_>,
+    txn: &mut Txn<DbKindDht>,
     ops: &[DhtOpHashed],
     request_validation_receipt: bool,
 ) -> StateMutationResult<()> {
     for op in ops {
-        insert_op(txn, op)?;
+        insert_op_dht(txn, op, todo_no_cache_transfer_data())?;
         set_require_receipt(txn, op.as_hash(), request_validation_receipt)?;
     }
 
@@ -256,7 +256,7 @@ fn op_exists_inner(txn: &rusqlite::Transaction<'_>, hash: &DhtOpHash) -> Databas
 
 pub async fn op_exists(vault: &DbWrite<DbKindDht>, hash: DhtOpHash) -> DatabaseResult<bool> {
     vault
-        .read_async(move |txn| op_exists_inner(&txn, &hash))
+        .read_async(move |txn| op_exists_inner(txn, &hash))
         .await
 }
 
@@ -266,7 +266,7 @@ pub async fn filter_existing_ops(
 ) -> DatabaseResult<Vec<DhtOpHashed>> {
     vault
         .read_async(move |txn| {
-            ops.retain(|op| !op_exists_inner(&txn, &op.hash).unwrap_or(true));
+            ops.retain(|op| !op_exists_inner(txn, &op.hash).unwrap_or(true));
             Ok(ops)
         })
         .await
