@@ -24,5 +24,7 @@
       };
     };
 
-  outputs = { ... }: { };
+  outputs = { ... }: {
+    rustVersion = "1.78.0";
+  };
 }
