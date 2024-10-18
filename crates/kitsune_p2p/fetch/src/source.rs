@@ -18,6 +18,7 @@ pub enum FetchSource {
 
 /// Fetch item within the fetch queue state.
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(test, derive(Clone))]
 pub(crate) struct Sources {
     inner: IndexSet<FetchSource>,
     index: usize,

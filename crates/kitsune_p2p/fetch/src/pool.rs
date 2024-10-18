@@ -410,6 +410,7 @@ impl State {
 
 /// An item in the queue, corresponding to a single op or region to fetch
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(test, derive(Clone))]
 pub struct FetchPoolItem {
     /// Known sources from whom we can fetch this item.
     /// Sources will always be tried in order.
@@ -431,6 +432,7 @@ pub struct FetchPoolItem {
 /// Tracks the source and when a request was made for a [`FetchPoolItem`]. This is used to track timeouts
 /// for sources that don't respond before the configured timeout.
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(test, derive(Clone))]
 pub struct PendingItemResponse {
     when: Instant,
     source: FetchSource,
@@ -535,13 +537,29 @@ mod tests {
         let mut q = State::default();
         let cfg = Arc::new(TestFetchConfig(1, 1));
 
+        let ts = Timestamp::now();
+
         // note: new sources get added to the back of the list
         q.push(&*cfg, test_req_op(1, test_ctx(0), test_source(0)));
         q.push(&*cfg, test_req_op(1, test_ctx(1), test_source(1)));
 
         q.push(&*cfg, test_req_op(2, test_ctx(0), test_source(0)));
 
-        let expected_ready = [
+        fn update_timestamp(
+            ts: Timestamp,
+            q: &MapQueue<FetchKey, FetchPoolItem>,
+        ) -> Vec<(FetchKey, FetchPoolItem)> {
+            (**q)
+                .clone()
+                .into_iter()
+                .map(|(key, mut item)| {
+                    item.first_transfer_info.1 = ts;
+                    (key, item)
+                })
+                .collect()
+        }
+
+        let expected_ready: MapQueue<FetchKey, FetchPoolItem> = [
             (
                 test_key_op(1),
                 item(cfg.clone(), test_sources(0..=1), test_ctx(1)),
@@ -549,9 +567,18 @@ mod tests {
             (test_key_op(2), item(cfg, test_sources([0]), test_ctx(0))),
         ]
         .into_iter()
+        .map(|(key, mut item)| {
+            // set the timestamp to match
+            item.first_transfer_info.1 = ts;
+            (key, item)
+        })
         .collect();
 
-        assert_eq!(q.queue, expected_ready);
+        // Need to set timestamps equal for equality check
+        assert_eq!(
+            update_timestamp(ts, &q.queue),
+            update_timestamp(ts, &expected_ready)
+        )
     }
 
     #[tokio::test(start_paused = true)]
