@@ -25,6 +25,7 @@ use tokio::sync::broadcast::Sender;
 ///    is still in the workspace.
 /// 3. The countersigning entry has been committed and the chain is still locked, but the conductor
 ///    has restarted, so the session is not in the workspace.
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn refresh_workspace_state(
     space: &Space,
     workspace: Arc<CountersigningWorkspace>,

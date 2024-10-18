@@ -100,7 +100,10 @@ impl ConductorBuilder {
     #[cfg(any(test, feature = "test_utils"))]
     async fn setup_test_device_seed(mut self, keystore: MetaLairClient) -> ConductorResult<Self> {
         // Set up device seed if specified
-        if self.generate_test_device_seed && self.config.device_seed_lair_tag.is_none() {
+        if cfg!(any(test, feature = "test_utils"))
+            && self.generate_test_device_seed
+            && self.config.device_seed_lair_tag.is_none()
+        {
             let tag = format!("_hc_test_device_seed_{}", nanoid::nanoid!());
             keystore
                 .lair_client()
