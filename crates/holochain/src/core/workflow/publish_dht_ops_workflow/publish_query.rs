@@ -175,7 +175,7 @@ mod tests {
 
         let num_to_publish = db
             .to_db()
-            .read_async(|txn| num_still_needing_publish(&txn, agent))
+            .read_async(|txn| num_still_needing_publish(txn, agent))
             .await
             .unwrap();
 
@@ -241,7 +241,7 @@ mod tests {
 
             move |txn| -> DatabaseResult<()> {
                 let hash = query_state.as_hash().clone();
-                insert_op(txn, &query_state).unwrap();
+                insert_op_authored(txn, &query_state).unwrap();
                 set_last_publish_time(txn, &hash, last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
                 if facts.withold_publish {
