@@ -19,10 +19,12 @@
 
       # holochain_scaffolding_cli
       scaffolding = {
-        url = "github:holochain/scaffolding/8a6d1dab0f1668c2781a46d93a5ad638fcf25598";
+        url = "github:holochain/scaffolding/holochain-weekly";
         flake = false;
       };
     };
 
-  outputs = { ... }: { };
+  outputs = { ... }: {
+    rustVersion = "1.81.0";
+  };
 }

@@ -13,7 +13,10 @@ use holochain_state::mutations;
 use holochain_state::prelude::{
     current_countersigning_session, SourceChainError, SourceChainResult, Store,
 };
-use holochain_types::dht_op::ChainOp;
+use holochain_types::{
+    dht_op::ChainOp,
+    prelude::{CellId, PreflightRequest, Record},
+};
 use holochain_zome_types::prelude::SignedAction;
 use kitsune_p2p_types::dht::prelude::Timestamp;
 use rusqlite::{named_params, Transaction};
@@ -144,6 +147,58 @@ pub(crate) async fn inner_countersigning_session_complete(
         return Ok(None);
     }
 
+    reveal_countersigning_session(
+        space,
+        network.clone(),
+        keystore,
+        session_record,
+        &author,
+        this_cells_action_hash,
+        integration_trigger,
+        publish_trigger,
+    )
+    .await?;
+
+    // TODO This should be in the publish workflow
+    // Publish other signers agent activity ops to their agent activity authorities.
+    for sa in signed_actions {
+        let (action, signature) = sa.into();
+        if *action.author() == author {
+            continue;
+        }
+        let op = ChainOp::RegisterAgentActivity(signature, action);
+        let basis = op.dht_basis();
+        // TODO this is what flag is for, whether to witness or store - document and rename me
+        if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
+            tracing::error!(
+                "Failed to publish to other counter-signers agent authorities because of: {:?}",
+                e
+            );
+        }
+    }
+
+    tracing::info!(
+        "Countersigning session complete for agent {:?} in approximately {}ms",
+        author,
+        (Timestamp::now() - session_data.preflight_request.session_times.start)
+            .unwrap_or_default()
+            .num_milliseconds()
+    );
+
+    Ok(Some(session_data.preflight_request.app_entry_hash))
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn reveal_countersigning_session(
+    space: Space,
+    network: Arc<impl HolochainP2pDnaT>,
+    keystore: MetaLairClient,
+    session_record: Record,
+    author: &AgentPubKey,
+    this_cells_action_hash: ActionHash,
+    integration_trigger: TriggerSender,
+    publish_trigger: TriggerSender,
+) -> WorkflowResult<()> {
     if let Some(chc) = network.chc() {
         tracing::info!(
             "Adding countersigning session record to the CHC: {:?}",
@@ -167,38 +222,11 @@ pub(crate) async fn inner_countersigning_session_complete(
         }
     }
 
-    apply_success_state_changes(space, &author, this_cells_action_hash, integration_trigger)
-        .await?;
-
-    // TODO This should be in the publish workflow
-    // Publish other signers agent activity ops to their agent activity authorities.
-    for sa in signed_actions {
-        let (action, signature) = sa.into();
-        if *action.author() == author {
-            continue;
-        }
-        let op = ChainOp::RegisterAgentActivity(signature, action);
-        let basis = op.dht_basis();
-        // TODO this is what flag is for, whether to witness or store - document and rename me
-        if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
-            tracing::error!(
-                "Failed to publish to other counter-signers agent authorities because of: {:?}",
-                e
-            );
-        }
-    }
+    apply_success_state_changes(space, author, this_cells_action_hash, integration_trigger).await?;
 
     publish_trigger.trigger(&"publish countersigning_success");
 
-    tracing::info!(
-        "Countersigning session complete for agent {:?} in approximately {}ms",
-        author,
-        (Timestamp::now() - session_data.preflight_request.session_times.start)
-            .unwrap_or_default()
-            .num_milliseconds()
-    );
-
-    Ok(Some(session_data.preflight_request.app_entry_hash))
+    Ok(())
 }
 
 async fn apply_success_state_changes(
@@ -266,4 +294,71 @@ fn get_countersigning_op_hashes(
             },
         )?
         .collect::<Result<Vec<_>, _>>()?)
+}
+
+/// When the workflow has attempted to resolve a countersigning session but wasn't able to find a deterministic answer by querying peer state,
+/// the session becomes unresolved and can be forcefully completed and published anyway.
+pub(super) async fn force_publish_countersigning_session(
+    space: Space,
+    network: Arc<impl HolochainP2pDnaT>,
+    keystore: MetaLairClient,
+    integration_trigger: TriggerSender,
+    publish_trigger: TriggerSender,
+    cell_id: CellId,
+    preflight_request: PreflightRequest,
+) -> WorkflowResult<bool> {
+    // Query database for current countersigning session.
+    let reader_closure = {
+        let author = cell_id.agent_pubkey().clone();
+        let preflight_request = preflight_request.clone();
+        move |txn: Transaction| {
+            // This chain lock isn't necessarily for the current session, we can't check that until later.
+            if let Some((session_record, _, session_data)) =
+                current_countersigning_session(&txn, Arc::new(author.clone()))?
+            {
+                let lock_subject = session_data.preflight_request.fingerprint()?;
+                if lock_subject != preflight_request.fingerprint()? {
+                    return SourceChainResult::Ok(None);
+                }
+
+                let chain_lock = holochain_state::chain_lock::get_chain_lock(&txn, &author)?;
+                if let Some(chain_lock) = chain_lock {
+                    // This is the case where we have already locked the chain for another session and are
+                    // receiving another signature bundle from a different session. We don't need this, so
+                    // it's safe to short circuit.
+                    if chain_lock.subject() != lock_subject {
+                        return SourceChainResult::Ok(None);
+                    }
+
+                    return Ok(Some(session_record));
+                }
+            }
+            SourceChainResult::Ok(None)
+        }
+    };
+    let authored_db = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
+    let session_record = match authored_db.read_async(reader_closure).await? {
+        Some(cs) => cs,
+        None => {
+            // If there is no active session then we can short circuit.
+            tracing::info!("Received a signature bundle for a session that exists in state but is missing from the database");
+            return Ok(false);
+        }
+    };
+
+    let this_cells_action_hash = session_record.action_hashed().hash.clone();
+
+    reveal_countersigning_session(
+        space,
+        network,
+        keystore,
+        session_record,
+        cell_id.agent_pubkey(),
+        this_cells_action_hash,
+        integration_trigger,
+        publish_trigger,
+    )
+    .await?;
+
+    Ok(true)
 }
