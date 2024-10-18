@@ -10,6 +10,7 @@ pub async fn mk_agent_info(u: u8) -> AgentInfoSigned {
         vec![],
         0,
         0,
+        true,
         |_| async move { Ok(Arc::new(KitsuneSignature(vec![0; 64]))) },
     )
     .await
