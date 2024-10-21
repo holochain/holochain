@@ -853,7 +853,6 @@ impl Space {
         &self,
         keystore: MetaLairClient,
         author: AgentPubKey,
-        dna_def: Arc<DnaDef>,
     ) -> ConductorResult<SourceChainWorkspace> {
         Ok(SourceChainWorkspace::new(
             self.get_or_create_authored_db(author.clone())?.clone(),
@@ -862,7 +861,6 @@ impl Space {
             self.cache_db.clone(),
             keystore,
             author,
-            dna_def,
         )
         .await?)
     }

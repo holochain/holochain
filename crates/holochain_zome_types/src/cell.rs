@@ -23,7 +23,7 @@ use std::fmt;
     PartialOrd,
 )]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub struct CellId(DnaHash, AgentPubKey);
+pub struct CellId(pub DnaHash, pub AgentPubKey);
 
 /// Delimiter in a clone id that separates the base cell's role name from the
 /// clone index.

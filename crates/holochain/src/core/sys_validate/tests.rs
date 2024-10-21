@@ -882,11 +882,7 @@ async fn test_dpki_agent_update() {
         .unwrap();
 
     let workspace = space
-        .source_chain_workspace(
-            conductor.keystore(),
-            initial_agent.clone(),
-            Arc::new(dna.dna_def().clone()),
-        )
+        .source_chain_workspace(conductor.keystore(), initial_agent.clone())
         .await
         .unwrap();
     let chain = workspace.source_chain().clone();

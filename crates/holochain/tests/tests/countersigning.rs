@@ -529,11 +529,7 @@ async fn alice_can_recover_from_a_session_timeout() {
 async fn complete_session_with_chc_enabled() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
-    config.chc_url = Some(url2::Url2::parse(
-        holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
-    ));
-
+    let config = SweetConductorConfig::rendezvous(true).local_chc().no_dpki();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -645,11 +641,7 @@ async fn complete_session_with_chc_enabled() {
 async fn session_rollback_with_chc_enabled() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
-    config.chc_url = Some(url2::Url2::parse(
-        holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
-    ));
-
+    let config = SweetConductorConfig::rendezvous(true).local_chc().no_dpki();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -776,11 +768,7 @@ async fn session_rollback_with_chc_enabled() {
 async fn multiple_agents_on_same_conductor_with_chc_enabled() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
-    config.chc_url = Some(url2::Url2::parse(
-        holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
-    ));
-
+    let config = SweetConductorConfig::rendezvous(true).local_chc().no_dpki();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -987,10 +975,7 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
 async fn chc_should_respect_chain_lock() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
-    config.chc_url = Some(url2::Url2::parse(
-        holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
-    ));
+    let config = SweetConductorConfig::rendezvous(true).local_chc().no_dpki();
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
