@@ -71,8 +71,8 @@
       },
       "original": {
         "owner": "holochain",
+        "ref": "holochain-weekly",
         "repo": "scaffolding",
-        "rev": "8a6d1dab0f1668c2781a46d93a5ad638fcf25598",
         "type": "github"
       }
     }
