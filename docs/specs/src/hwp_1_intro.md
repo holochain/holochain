@@ -94,15 +94,21 @@ Building a distributed coordination framework starting from these axioms results
 
 ## From Global Consensus to Scaled Consent
 
-*Normally one uses AXIOMS to reaason upon and create some conclusions they intend to demonstrate or prove... should that be what happens in this section?*  **Two levels enabling evolution ??**
+We start from the understanding that networks, social spaces, and decentralized activities are inherently uncertain. Thus, coordination/collaboration is never about absolute certainty, rather it is about the capacity to remove sufficient uncertainty to provide confidence for action, which is always contextual. In distributed systems, it is absolutely fundamental to understand that every action taken by an agent happens because that agent has crossed a confidence threshold of some sort -- from its own point of view, the action is appropriate to take.
 
-demand the property of anti-fragility, that is, they must perform better under perturbation[^antifragile]. 
+### Fault Tolerance and Reducing Uncertainty
 
-[^antifragile]: Antifragile: Things that Gain from Disorder. Nassim Nicholas Taleb
+Like blockchain and other cryptographic systems, Holochain starts the path of extablishing confidence by leveraging cryptography to reduce uncertainties by removing most of the sources of Byzantine faults:
 
-We also start from the understanding that social spaces are inherently uncertain. Thus, coordination/collaboration is never about deterministic certainty but simply about the capacity to remove sufficient uncertainty to provide confidence for action, which is always contextual. Such confidence indicates **social coherence**. This notion of social coherence is the single most important design goal of Holochain: to create the tooling that in contextually appropriate ways leads to increasing social coherence.
+- **Corrupt Messages:** Data is retrieved by cryptographic hash which makes records self-validting, ensuring they are as requested and remain uncorrupted by checking data received against requested hash. Also, network messages are cryptographically signed.
+- **Misordered Messages:** Each agent writes their actions to a local append-only cryptographic hashchain, and must make explicit references to the hashes of any other agent's actions which one of their actions logically relies on, this establishes indisputable ordering of data.
+- **Lost Messages:** If any later actions rely on prior data, there will be either missing hash references or chain links which can be explicitly retrieved or have validation paused until available.
+- **Forged Messages or Actions:** Each action is signed in sequence to its author's local hashchain. The public signing key is the same as the agent's address on the network. Hence all actions or messages are self-validating with respect to identity of author.
+- **Malicious Actors/Actions:** Actions are validated based on local state established by the sequence of actions in an agent's hashchain, plus any actions included by reference. This enables each and every peer who is respnsible for performing such validation to reach the same deterministic conclusion regarding validity.
 
-In distributed systems, it is absolutely fundamental to understand that every action taken by an agent in any social context happens because that agent has crossed a confidence threshold of some sort. From its own point of view, that the given action is appropriate to take. Stated another way: agentic assessment of the social context and its coherence allows agents to act. This is always true, whether through centralized coordination or a Byzantine Generals' Problem approach or by blockchain consensus algorithms.
+These strategies help reduce sources of uncertainty; however, when it comes to concerns related to "consensus," still allow for actions which pass validation, but may differ in substance or perspective. 
+
+### Increasing Gradients of Certainty
 
 Given the above, we propose a very simple approach to creating tooling capacity for building increasing certainty: **enable validated global visibility, on demand, of local state**. In this approach, we distinguish between *authorship*, which is about local state changes initiated by agents, and *responsibility*, which is about distributing the workload of validating and serving records of local state changes across the participants in the network. This approach requires that we:
 
