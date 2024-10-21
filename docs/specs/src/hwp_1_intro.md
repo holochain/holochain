@@ -98,13 +98,13 @@ We start from the understanding that networks, social spaces, and decentralized 
 
 ### Fault Tolerance and Reducing Uncertainty
 
-Like blockchain and other cryptographic systems, Holochain starts the path of extablishing confidence by leveraging cryptography to reduce uncertainties by removing most of the sources of Byzantine faults:
+Like blockchain and other cryptographic systems, Holochain starts the path of establishing confidence by leveraging cryptography to reduce uncertainties to remove most of the sources of Byzantine faults:
 
-- **Corrupt Messages:** Data is retrieved by cryptographic hash which makes records self-validting, ensuring they are as requested and remain uncorrupted by checking data received against requested hash. Also, network messages are cryptographically signed.
+- **Corrupt Messages:** Data is retrieved by cryptographic hash which makes records self-validating, ensuring they are as requested and remain uncorrupted by checking data received against requested hash. Also, network messages are cryptographically signed.
 - **Misordered Messages:** Each agent writes their actions to a local append-only cryptographic hashchain, and must make explicit references to the hashes of any other agent's actions which one of their actions logically relies on, this establishes indisputable ordering of data.
 - **Lost Messages:** If any later actions rely on prior data, there will be either missing hash references or chain links which can be explicitly retrieved or have validation paused until available.
 - **Forged Messages or Actions:** Each action is signed in sequence to its author's local hashchain. The public signing key is the same as the agent's address on the network. Hence all actions or messages are self-validating with respect to identity of author.
-- **Malicious Actors/Actions:** Actions are validated based on local state established by the sequence of actions in an agent's hashchain, plus any actions included by reference. This enables each and every peer who is respnsible for performing such validation to reach the same deterministic conclusion regarding validity.
+- **Malicious Actors/Actions:** Actions are validated based on local state established by the sequence of actions in an agent's hashchain, plus any actions included by reference. This enables each and every peer who is responsible for performing such validation to reach the same deterministic conclusion regarding validity.
 
 These strategies help reduce sources of uncertainty; however, when it comes to concerns related to "consensus," still allow for actions which pass validation, but may differ in substance or perspective. 
 
@@ -140,3 +140,16 @@ Building upon this floor, we deliver the second point through the ability to com
 [^content-structure]: While Per Martin-Löf [demonstrated](https://en.wikipedia.org/wiki/Intuitionistic_type_theory) that values can be unified with classical types into a single [dependent type theory](https://en.wikipedia.org/wiki/Dependent_type), thus showing that content and structure can be equivalent and share a single calculus, here we distinguish the two in order to speak a language that is more familiar to programmers.
 
 The two domains of Intrinsic Data Integrity and Validation Rules, and their component dimensionality, amounts to what we might call a "Geometry of Certainty". Inside the clarity of such a geometry, the gradients of certainty become both much more visible, and much easier to build appropriately for. Thus it provides a context of agents being able to scale up their consent to play together in ways that meet their safety requirements. This is why we call our approach "Scaling Consent." It is what enables coherent collaborative action without first achieving global consensus.
+
+### Establishing Coherence
+
+Such confidence indicates **social coherence**. This notion of social coherence is the single most important design goal of Holochain: to create the tooling that in contextually appropriate ways leads to increasing social coherence.  Stated another way: agentic assessment of the social context and its coherence allows agents to act. This is always true, whether through centralized coordiation or a Byzantine Generals' Problem approach or by blockchain consensus algorithms.
+
+<more wanted here?>
+
+### Anti-Fragility and Evolvability
+
+**Two levels enabling evolution ??**
+demand the property of anti-fragility, that is, they must perform better under perturbation[^antifragile]. 
+
+[^antifragile]: Antifragile: Things that Gain from Disorder. Nassim Nicholas Taleb
