@@ -10,13 +10,8 @@ use holochain_sqlite::db::ReadAccess;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::mutations;
-use holochain_state::prelude::{
-    current_countersigning_session, SourceChainError, SourceChainResult, Store,
-};
-use holochain_types::{
-    dht_op::ChainOp,
-    prelude::{CellId, PreflightRequest, Record},
-};
+use holochain_state::prelude::*;
+use holochain_types::dht_op::ChainOp;
 use holochain_zome_types::prelude::SignedAction;
 use kitsune_p2p_types::dht::prelude::Timestamp;
 use rusqlite::{named_params, Transaction};
@@ -51,14 +46,14 @@ pub(crate) async fn inner_countersigning_session_complete(
     let reader_closure = {
         let entry_hash = entry_hash.clone();
         let author = author.clone();
-        move |txn: Transaction| {
+        move |txn: &Txn<DbKindAuthored>| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
             if let Some((session_record, cs_entry_hash, session_data)) =
-                current_countersigning_session(&txn, Arc::new(author.clone()))?
+                current_countersigning_session(txn, Arc::new(author.clone()))?
             {
                 let lock_subject = session_data.preflight_request.fingerprint()?;
 
-                let chain_lock = holochain_state::chain_lock::get_chain_lock(&txn, &author)?;
+                let chain_lock = holochain_state::chain_lock::get_chain_lock(txn, &author)?;
                 if let Some(chain_lock) = chain_lock {
                     // This is the case where we have already locked the chain for another session and are
                     // receiving another signature bundle from a different session. We don't need this, so
@@ -67,7 +62,8 @@ pub(crate) async fn inner_countersigning_session_complete(
                         return SourceChainResult::Ok(None);
                     }
 
-                    let transaction: holochain_state::prelude::Txn = (&txn).into();
+                    let transaction: holochain_state::prelude::CascadeTxnWrapper = txn.into();
+
                     // Ensure that the entry is present in the database.
                     // We've looked up the session as a Record, but that permits the entry to be
                     // missing. The cs_entry_hash is stored on the action rather than being a
@@ -311,17 +307,17 @@ pub(super) async fn force_publish_countersigning_session(
     let reader_closure = {
         let author = cell_id.agent_pubkey().clone();
         let preflight_request = preflight_request.clone();
-        move |txn: Transaction| {
+        move |txn: &Txn<DbKindAuthored>| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
             if let Some((session_record, _, session_data)) =
-                current_countersigning_session(&txn, Arc::new(author.clone()))?
+                current_countersigning_session(txn, Arc::new(author.clone()))?
             {
                 let lock_subject = session_data.preflight_request.fingerprint()?;
                 if lock_subject != preflight_request.fingerprint()? {
                     return SourceChainResult::Ok(None);
                 }
 
-                let chain_lock = holochain_state::chain_lock::get_chain_lock(&txn, &author)?;
+                let chain_lock = holochain_state::chain_lock::get_chain_lock(txn, &author)?;
                 if let Some(chain_lock) = chain_lock {
                     // This is the case where we have already locked the chain for another session and are
                     // receiving another signature bundle from a different session. We don't need this, so

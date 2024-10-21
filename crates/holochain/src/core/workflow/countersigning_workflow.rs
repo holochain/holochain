@@ -589,7 +589,7 @@ async fn apply_timeout(
     let current_session = authored
         .read_async({
             let author = cell_id.agent_pubkey().clone();
-            move |txn| current_countersigning_session(&txn, Arc::new(author))
+            move |txn| current_countersigning_session(txn, Arc::new(author))
         })
         .await?;
 
@@ -703,7 +703,7 @@ async fn force_abandon_session(
     let maybe_session_data = authored_db
         .read_async({
             let author = author.clone();
-            move |txn| current_countersigning_session(&txn, Arc::new(author.clone()))
+            move |txn| current_countersigning_session(txn, Arc::new(author.clone()))
         })
         .await?;
 

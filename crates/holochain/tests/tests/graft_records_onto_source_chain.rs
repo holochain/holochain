@@ -13,9 +13,8 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DnaHashExt;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
-use holochain_state::prelude::{StateMutationError, Store, Txn};
+use holochain_state::prelude::{CascadeTxnWrapper, StateMutationError, Store};
 use holochain_types::record::SignedActionHashedExt;
-use rusqlite::Transaction;
 
 /// Test that records can be manually grafted onto a source chain.
 #[tokio::test(flavor = "multi_thread")]
@@ -63,12 +62,15 @@ async fn grafting() {
         .authored_db()
         .read_async({
             let query_chain = chain.clone();
-
-            move |txn: Transaction| -> DatabaseResult<Vec<_>> {
-                let txn: Txn = (&txn).into();
+            move |txn| -> DatabaseResult<Vec<_>> {
                 Ok(query_chain
                     .iter()
-                    .map(|h| txn.get_record(&h.0.clone().into()).unwrap().unwrap())
+                    .map(|h| {
+                        CascadeTxnWrapper::from(txn)
+                            .get_record(&h.0.clone().into())
+                            .unwrap()
+                            .unwrap()
+                    })
                     .collect())
             }
         })

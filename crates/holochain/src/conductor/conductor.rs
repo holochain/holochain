@@ -641,7 +641,7 @@ mod dna_impls {
             let (wasms, defs) = db
                 .read_async(move |txn| {
                     // Get all the dna defs.
-                    let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
+                    let dna_defs: Vec<_> = holochain_state::dna_def::get_all(txn)?
                         .into_iter()
                         .collect();
 
@@ -659,13 +659,13 @@ mod dna_impls {
                     let wasms = unique_wasms
                         .into_iter()
                         .map(|wasm_hash| {
-                            holochain_state::wasm::get(&txn, &wasm_hash)?
+                            holochain_state::wasm::get(txn, &wasm_hash)?
                                 .map(|hashed| hashed.into_content())
                                 .ok_or(ConductorError::WasmMissing)
                                 .map(|wasm| (wasm_hash, wasm))
                         })
                         .collect::<ConductorResult<HashMap<_, _>>>()?;
-                    let wasms = holochain_state::dna_def::get_all(&txn)?
+                    let wasms = holochain_state::dna_def::get_all(txn)?
                         .into_iter()
                         .map(|dna_def| {
                             // Load all wasms for each dna_def from the wasm db into memory
@@ -679,7 +679,7 @@ mod dna_impls {
                         })
                         // This needs to happen due to the environment not being Send
                         .collect::<Vec<_>>();
-                    let defs = holochain_state::entry_def::get_all(&txn)?;
+                    let defs = holochain_state::entry_def::get_all(txn)?;
                     ConductorResult::Ok((wasms, defs))
                 })
                 .await?;
@@ -2841,7 +2841,8 @@ mod scheduler_impls {
                     let all_dbs = space.get_all_authored_dbs();
 
                     all_dbs.into_iter().map(|db| async move {
-                        db.write_async(delete_all_ephemeral_scheduled_fns).await
+                        db.write_async(|txn| delete_all_ephemeral_scheduled_fns(txn))
+                            .await
                     })
                 })
                 .into_iter()
@@ -3641,7 +3642,7 @@ impl Conductor {
             let mut path = db.path().clone();
             if let Err(err) = ffs::remove_file(&path).await {
                 tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
-                db.write_async(purge_data).await?;
+                db.write_async(|txn| purge_data(txn)).await?;
             }
             path.set_extension("");
             let stem = path.to_string_lossy();
@@ -3662,12 +3663,12 @@ impl Conductor {
                     self.spaces
                         .dht_db(dna_hash)
                         .unwrap()
-                        .write_async(purge_data)
+                        .write_async(|txn| purge_data(txn))
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
                         .unwrap()
-                        .write_async(purge_data)
+                        .write_async(|txn| purge_data(txn))
                         .boxed(),
                     // TODO: also delete stale Wasms
                 ]
@@ -4153,16 +4154,16 @@ pub async fn full_integration_dump(
     vault
         .read_async(move |txn| {
             let integrated =
-                query_dht_ops_from_statement(&txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
+                query_dht_ops_from_statement(txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
 
             let validation_limbo = query_dht_ops_from_statement(
-                &txn,
+                txn,
                 state_dump::DHT_OPS_IN_VALIDATION_LIMBO,
                 dht_ops_cursor,
             )?;
 
             let integration_limbo = query_dht_ops_from_statement(
-                &txn,
+                txn,
                 state_dump::DHT_OPS_IN_INTEGRATION_LIMBO,
                 dht_ops_cursor,
             )?;

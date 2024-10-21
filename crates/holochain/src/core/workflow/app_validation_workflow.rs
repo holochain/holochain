@@ -126,7 +126,6 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
 
 use parking_lot::Mutex;
-use rusqlite::Transaction;
 use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -292,7 +291,7 @@ async fn app_validation_workflow_inner(
                         .authored_db
                         .write_async(move |txn| {
                             warn!("Inserting warrant op");
-                            insert_op(txn, &warrant_op)
+                            insert_op_authored(txn, &warrant_op)
                         })
                         .await?;
 
@@ -898,7 +897,7 @@ impl AppValidationWorkspace {
 }
 
 pub fn put_validation_limbo(
-    txn: &mut Transaction<'_>,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     status: ValidationStage,
 ) -> WorkflowResult<()> {
@@ -907,7 +906,7 @@ pub fn put_validation_limbo(
 }
 
 pub fn put_integration_limbo(
-    txn: &mut Transaction<'_>,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
@@ -917,7 +916,7 @@ pub fn put_integration_limbo(
 }
 
 pub fn put_integrated(
-    txn: &mut Transaction<'_>,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     status: ValidationStatus,
 ) -> WorkflowResult<()> {

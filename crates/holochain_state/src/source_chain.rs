@@ -296,7 +296,7 @@ impl SourceChain {
                     .read_async({
                         let author = author.clone();
                         move |txn| {
-                            let chain_lock = get_chain_lock(&txn, author.as_ref())?;
+                            let chain_lock = get_chain_lock(txn, author.as_ref())?;
                             match chain_lock {
                                 Some(chain_lock) => {
                                     // If the chain is locked, the lock must be for this entry.
@@ -357,7 +357,7 @@ impl SourceChain {
 
         let chain_flush_result = self
             .vault
-            .write_async_with_permit(write_permit, move |txn: &mut Transaction| {
+            .write_async_with_permit(write_permit, move |txn| {
                 for scheduled_fn in scheduled_fns {
                     schedule_fn(txn, author.as_ref(), scheduled_fn, None, now)?;
                 }
@@ -533,7 +533,7 @@ where
             vault
                 .read_async({
                     let author = author.clone();
-                    move |txn| chain_head_db_nonempty(&txn, author)
+                    move |txn| chain_head_db_nonempty(txn, author)
                 })
                 .await?,
         );
@@ -566,7 +566,7 @@ where
         let head_info = vault
             .read_async({
                 let author = author.clone();
-                move |txn| chain_head_db(&txn, author)
+                move |txn| chain_head_db(txn, author)
             })
             .await?;
         Ok(Self {
@@ -778,9 +778,7 @@ where
         let author = self.author.clone();
         let public_only = self.public_only;
         self.vault
-            .read_async(move |txn| {
-                Self::query_txn(&txn, query, Some(scratch), &author, public_only)
-            })
+            .read_async(move |txn| Self::query_txn(txn, query, Some(scratch), &author, public_only))
             .await
     }
 
@@ -1034,7 +1032,7 @@ where
         let author = self.author.clone();
         Ok(self
             .vault
-            .read_async(move |txn| get_chain_lock(&txn, author.as_ref()))
+            .read_async(move |txn| get_chain_lock(txn, author.as_ref()))
             .await?)
     }
 
@@ -1275,6 +1273,8 @@ pub async fn genesis(
     Ok(())
 }
 
+/// Should only be used to put items into the Authored DB.
+/// Hash transfer fields (source, transfer_method, transfer_time) are not set.
 pub fn put_raw(
     txn: &mut Transaction,
     shh: SignedActionHashed,
@@ -1305,7 +1305,7 @@ pub fn put_raw(
     }
     insert_action(txn, &shh)?;
     for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp)?;
+        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp, None)?;
     }
     Ok(ops_to_integrate)
 }
@@ -1316,7 +1316,7 @@ pub fn chain_head_db(
     author: Arc<AgentPubKey>,
 ) -> SourceChainResult<Option<HeadInfo>> {
     let chain_head = ChainHeadQuery::new(author);
-    Ok(chain_head.run(Txn::from(txn))?)
+    Ok(chain_head.run(CascadeTxnWrapper::from(txn))?)
 }
 
 /// Get the current chain head of the database.
@@ -1341,7 +1341,7 @@ pub fn current_countersigning_session(
         Err(e) => Err(e),
         Ok(None) => Ok(None),
         Ok(Some(HeadInfo { action: hash, .. })) => {
-            let txn: Txn = txn.into();
+            let txn: CascadeTxnWrapper = txn.into();
             // Get the session data from the database.
             let record = match txn.get_record(&hash.into())? {
                 Some(record) => record,
@@ -1374,7 +1374,7 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
         .read_async({
             let query_author = author.clone();
 
-            move |txn| chain_head_db_nonempty(&txn, query_author.clone())
+            move |txn| chain_head_db_nonempty(txn, query_author.clone())
         })
         .await?;
     let action_seq = last_action_seq + 1;
@@ -1394,29 +1394,27 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
     let entry = entry.into_option();
     let hash = action.as_hash().clone();
     vault
-        .write_async(
-            move |txn: &mut Transaction| -> SourceChainResult<Vec<DhtOpHash>> {
-                let head_info = chain_head_db_nonempty(txn, author.clone())?;
-                if head_info.action != prev_action {
-                    let entries = match (entry, action.action().entry_hash()) {
-                        (Some(e), Some(entry_hash)) => {
-                            vec![holochain_types::EntryHashed::with_pre_hashed(
-                                e,
-                                entry_hash.clone(),
-                            )]
-                        }
-                        _ => vec![],
-                    };
-                    return Err(SourceChainError::HeadMoved(
-                        vec![action],
-                        entries,
-                        Some(prev_action),
-                        Some(head_info),
-                    ));
-                }
-                Ok(put_raw(txn, action, ops, entry)?)
-            },
-        )
+        .write_async(move |txn| -> SourceChainResult<Vec<DhtOpHash>> {
+            let head_info = chain_head_db_nonempty(txn, author.clone())?;
+            if head_info.action != prev_action {
+                let entries = match (entry, action.action().entry_hash()) {
+                    (Some(e), Some(entry_hash)) => {
+                        vec![holochain_types::EntryHashed::with_pre_hashed(
+                            e,
+                            entry_hash.clone(),
+                        )]
+                    }
+                    _ => vec![],
+                };
+                return Err(SourceChainError::HeadMoved(
+                    vec![action],
+                    entries,
+                    Some(prev_action),
+                    Some(head_info),
+                ));
+            }
+            Ok(put_raw(txn, action, ops, entry)?)
+        })
         .await?;
     Ok(hash)
 }
@@ -1582,7 +1580,7 @@ mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_1))
+            .write_async(move |txn| chain_head_db_nonempty(txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1593,7 +1591,7 @@ mod tests {
         ));
         let author_2 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_2))
+            .write_async(move |txn| chain_head_db_nonempty(txn, author_2))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1601,7 +1599,7 @@ mod tests {
         chain_3.flush(&mock).await?;
         let author_3 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_3))
+            .write_async(move |txn| chain_head_db_nonempty(txn, author_3))
             .await?
             .seq;
         assert_eq!(seq, 4);
@@ -1701,7 +1699,7 @@ mod tests {
         chain_1.flush(&mock).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_1))
+            .write_async(move |txn| chain_head_db_nonempty(txn, author_1))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1714,7 +1712,7 @@ mod tests {
         chain_3.flush(&mock).await?;
         let author_2 = Arc::clone(&author);
         let head = db
-            .write_async(move |txn: &mut Transaction| chain_head_db_nonempty(txn, author_2.clone()))
+            .write_async(move |txn| chain_head_db_nonempty(txn, author_2.clone()))
             .await?;
 
         // not equal since action hash change due to rebasing
@@ -1723,7 +1721,7 @@ mod tests {
 
         db.read_async(move |txn| -> DatabaseResult<()> {
             // get the full record
-            let store = Txn::from(&txn);
+            let store = CascadeTxnWrapper::from(txn);
             let h1_record_entry_fetched = store
                 .get_record(&h1.clone().into())
                 .expect("error retrieving")
@@ -2305,7 +2303,7 @@ mod tests {
                 let query_author = author.clone();
 
                 move |txn| -> DatabaseResult<()> {
-                    assert_matches!(chain_head_db(&txn, query_author.clone()), Ok(None));
+                    assert_matches!(chain_head_db(txn, query_author.clone()), Ok(None));
 
                     Ok(())
                 }
@@ -2362,13 +2360,13 @@ mod tests {
 
                 move |txn| -> DatabaseResult<()> {
                     assert_eq!(
-                        chain_head_db_nonempty(&txn, check_author.clone())
+                        chain_head_db_nonempty(txn, check_author.clone())
                             .unwrap()
                             .action,
                         check_h2
                     );
                     // get the full record
-                    let store = Txn::from(&txn);
+                    let store = CascadeTxnWrapper::from(txn);
                     let h1_record_fetched = store
                         .get_record(&check_h1.clone().into())
                         .expect("error retrieving")
