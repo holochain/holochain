@@ -22,7 +22,7 @@ formal state model.
     Each agent is the sole authority for managing its local state (by virtue of controlling their private key required for signing new actions to their source chain).
 * **Accountability:** Holochain is also socio-centric. Each Holochain application defines its set of mutually enforced data integrity rules. Every local state change gets validated by other agents to ensure that it adheres to the rules of that application. Peers also enforce limits on publishing rates, protect against network integrity threats, and can ban rule-breakers by a process we call *warranting*.
 * **Data:** Unlike some other decentralized approaches, in Holochain, data does not have first-order, independent, ontological existence. Every record in the shared DHT network space MUST CARRY its provenance from a local source chain as described below.
-* **Provenance:** Each record created in a Holochain application starts as an action pair on someone's local source chain. As such, even when published to the shared DHT, records must carry the associated public key and signature of the agent who created it. This means every piece of data carries meta-information about where that data came from (who created it, and in what sequence on the their chain). Note: In other hash-chain based systems Holochain's "actions" are often called entry "headers," which link to the previous headers to create the chain.  In Holochain, while the action does establish temporal order, its core function is to record an act of agency, that of "speaking" data into existence.
+* **Provenance:** Each record created in a Holochain application starts as an action pair on someone's local source chain. As such, even when published to the shared DHT, records must carry the associated public key and signature of the agent who created it. This means every piece of data carries meta-information about where that data came from (who created it, and in what sequence on the their chain). Note: In other hash-chain based systems Holochain's "actions" are often called "headers," which link to the previous headers to create the chain. In Holochain, while the action does establish temporal order, its core function is to record an act of agency, that of "speaking" data into existence.
 * **State:** State changes in Holochain are local (signed to a local *Source Chain*) and then information about having created a local state change is shared publicly on the DHT. This allows global visibility of local state changes, without a need to manage consensus about a global state, because there is truly no such thing as global state in a system that allows massive, simultaneous, decentralized change.
 * **Time:** There is no global time nor global absolute sequence of events in Holochain either. No global time is needed for local state changes, and since each local change is stored in a hash chain, we get a clear, immutable, sequence of actions tagged with local timestamps. (Note: For apps that need some kind of time proof to interface with the outside world (e.g. token or certificate expiration timestamps) we plan to provide a time proof service that replaces the need for centrally trusted timeservers.)
 
@@ -71,7 +71,7 @@ Within the context of the Basic Assumptions and the System Architecture both des
 
 Data in a Holochain application is created by agents changing their local state. This state is stored as an append-only hash chain. Only state changes originated by that agent (or state changes that they are party to in a multi-agent action) are stored to their chain. Source Chains are NOT a representation of global state or changes that others are originating, but only a sequential history of local state changes authored by one agent.
 
-The structure of a Source Chain is that of a hash chain which uses headers to connect a series of entries. Each record in the chain is a two-element tuple, containing the action (header) and the entry (if applicable for the action type).
+The structure of a Source Chain is that of a hash chain which uses headers (called "actions" in Holochain terms) to connect a series of entries. Each record in the chain is a two-element tuple, containing the action and the entry (if applicable for the action type).
 
 Since the action contains the prior action hash and current entry hash (if applicable), each record is a tamper-proof atomic data element. Additionally, in practice a record is always transmitted along with a signature on the action's hash, signed by the private complement of the public key in the action. This means that anyone can hash the entry content to make sure it hasn't been tampered with, and they can hash the action data and compare the accompanying signature on that hash to ensure it matches the author's public key. The action's chain sequence and monotonic timestamp properties provide further immutable reinforcement of logical chain ordering.
 
@@ -114,8 +114,8 @@ The first record in each agent's source chain contains the DNA hash. This initia
 $$
 C _0 = WASM
 \begin{Bmatrix}
-h {_{DNA}} \\
-e _\text{DNA}
+a_{DNA} \\
+e_{DNA}
 \end{Bmatrix}
 $$
 
@@ -124,8 +124,8 @@ $$
 $$
 C _1 =
 \begin{Bmatrix}
-    h _\text{mp} \\
-    e _\text{mp}
+    a _{mp} \\
+    e _{mp}
 \end{Bmatrix}
 $$
 
@@ -134,8 +134,8 @@ $$
 $$
 C _2 =
 \begin{Bmatrix}
-    h _\text{K}  \\
-    e _\text{K}
+    a_{K}  \\
+    e_{K}
 \end{Bmatrix}
 $$
 
@@ -166,11 +166,11 @@ First, Holochain's "subconscious" security system confirms the $CapTokenSecret$ 
 If the Zome call is one which alters local state (distinct from a call that just reads from the chain or DHT state), we must construct a bundle of state changes that will attempt to be appended to the source chain in an atomic commit:
 
 $$ \Delta _C ( C _n, Z _c ) = \begin{Bmatrix}
-    h ^\prime & h ^{\prime\prime} & \dots & {h ^x}  \\
-    e ^\prime & e ^{\prime\prime} & \dots & {e ^x}
+    a_\prime & a_{\prime\prime} & \dots & {a_x}  \\
+    e_\prime & e_{\prime\prime} & \dots & {e_x}
 \end{Bmatrix} $$
 
-where a Chain is composed of paired actions, $h^x$, and entries, $e^x$ (actions were formerly called headers and we're still using this $h$ in our formal symbols).
+where a Chain is composed of paired actions, $a_x$, and entries, $e_x$.
 
 The next chain state is obtained by appending the changes produced by a zome call to the state of the chain at that point.
 
@@ -183,8 +183,8 @@ $$
 $$
 C _n =
 \begin{Bmatrix}
-    h ^\text{DNA} & \dots & h ^n  \\
-    e ^\text{DNA} & \dots & e ^n
+    a _{DNA} & \dots & a _n  \\
+    e _{DNA} & \dots & e _n
 \end{Bmatrix}
 $$
 
@@ -238,8 +238,8 @@ Here is a high-level summary of how a countersigning session flows:
 2. Alice builds a session data package that contains the preflight request along with the source chain states and signatures of all consenting parties, and sends it to them.
 3. Each party builds and commits an action that writes the countersigned entry (including the contents of the session data package and the entry data itself) to their source chains. At this point, unsigned actions are created for themselves and every other party and full record validation is run against each action, as though they were authoring as that agent.
 4. After everything validates, each agent signs and sends their action to the session completer -- either the enzyme (if one was elected) or the entry's DHT neighborhood.
-5. The session completer reveals all the signed headers as a complete set, sending it back to all parties.
-6. Each signer can check for themselves that the set is valid simply by comparing against the session entry and preflight info. They do not have to rerun validation; they only need to check signatures, integrity, and completeness of the header set data.
+5. The session completer reveals all the signed actions as a complete set, sending it back to all parties.
+6. Each signer can check for themselves that the set is valid simply by comparing against the session entry and preflight info. They do not have to rerun validation; they only need to check signatures, integrity, and completeness of the action set data.
 7. All counterparties now proceed to write the completed action to their source chain and publish its data to the DHT.
 8. The DHT authorities validate and store the action and entry data as normal.
 
@@ -262,11 +262,11 @@ Formally, the entire GDHT is represented as a set of 'basis hashes' $b_{c_x}$, o
 $$
 \begin{aligned}
 GDHT &= \{d_1, \dots, d_n \} \\
-d_{b_{c_x}} &= \(c_x, M \) \\
+d_{b_{c_x}} &= (c_x, M ) \\
 b_{c_x} &= hash(c_x) \\
-C &= E \bigsqcup H \\
+C &= E \bigsqcup A \\
 E &= \{e_1, \dots, e_n\} \\
-H &= \{h_1, \dots, h_n\} \\
+A &= \{a_1, \dots, a_n\} \\
 M &= \{m_1, \dots, m_n \} \\
 m_x &= \text{metadata}
 \end{aligned}
@@ -276,9 +276,9 @@ There may be arbitrary types of metadata. Some important ones are:
 
 $$
 \begin{aligned}
-\forall e \: M_{context} &= \{{h_1}_e, \dots, {h_n}_e \} \\
+\forall e \: M_{context} &= \{{a_1}_e, \dots, {a_n}_e \} \\
 \exists c : M_{link} &= \{ link_1, \dots, link_n \} \\
-link &= \( type, tag, b_{c_T} \) \\
+link &= ( type, tag, b_{c_T} ) \\
 \end{aligned}
 $$
 
@@ -302,9 +302,9 @@ The following table shows how each action (which gets stored on the author's sou
 
 For viable eventual consistency in a gossipped DHT, all actions must be idempotent (where a second application of an operation will not result in a changed state) and additive/monotonic:
 
-* The deletion of an entry creation action and its corresponding entry doesn't actually delete the entry; it _marks_ the action as deleted. At the entry basis hash, the delete action becomes part of a CRDT-style "tombstone set", and a set difference is taken between the entry creation actions $H_c$ and entry deletion actions $H_d$ that reference at the entry's basis hash to determine which creation actions are still 'live' ($H_{c_l} = H_c - H_d$). Eventually the entry itself is considered deleted when $H_c - H_d = \varnothing$.
-* The removal of a link adds the removal header to a tombstone set at the link's base address in a similar fashion, subtracting the link removal headers from the link creation headers they reference to determine the set of live links.
-* Updating an entry creation header and its corresponding entry doesn't change the content in place; it adds a link to the original header and entry pointing to their replacements. One entry creation action may validly have many updates, which may or may not be seen by the application's logic as a conflict in need of resolution.
+* The deletion of an entry creation action and its corresponding entry doesn't actually delete the entry; it _marks_ the action as deleted. At the entry basis hash, the delete action becomes part of a CRDT-style "tombstone set", and a set difference is taken between the entry creation actions $A_c$ and entry deletion actions $A_d$ that reference at the entry's basis hash to determine which creation actions are still 'live' ($A_{c_l} = A_c - A_d$). Eventually the entry itself is considered deleted when $A_c - A_d = \varnothing$.
+* The removal of a link adds the removal action to a tombstone set at the link's base address in a similar fashion, subtracting the link removal actions from the link creation actions they reference to determine the set of live links.
+* Updating an entry creation action and its corresponding entry doesn't change the content in place; it adds a link to the original action and entry pointing to their replacements. One entry creation action may validly have many updates, which may or may not be seen by the application's logic as a conflict in need of resolution.
 
 The transformation of an action is followed by sending the operation to specific DHT basis hashes, instructing the agents claiming authority for a range of address space covering those basis hashes, to validate and store (integrate) the operations into their respective portions of the DHT store. Because the DHT is a **graph** database, what is added is either a node or an edge. A node is a basis hash in the DHT, while an edge is part of the addressable content or metadata stored at a node.
 
@@ -312,23 +312,23 @@ Here is a legend of labels and symbols used in the diagrams:
 
 * The large, gray, rounded rectangle on the left of each row represents the agent $k$ currently making an action, and encompasses the data they produce.
 * A label styled as $\mathsf{do\_x}()$ is the function representing the action being taken by the agent $k$. It yields a record of the action, which is saved to the source chain.
-* $h_n$ is the header that records the action. It is represented by a square.
-* $h_{n-1}$ is the header immediately preceding the header currently being recorded.
+* $a_n$ is the action that records the action. It is represented by a square.
+* $a_{n-1}$ is the action immediately preceding the action currently being recorded.
 * $E$ is action-specific data which is contained in a separate _entry_ which has its own home in the DHT. It is represented by a circle.
-* $e: \{ \dots \}$ is action-specific data which performs an operation on prior content. Such data exists wholly within the header of the record of the action.
-* Overlapping shapes (primarily square headers and circular entries) represent data that travels together and can be seen as a single unit for the purpose of defining what exists at a given basis hash. In the case of an entry basis hash, where multiple headers authoring the same entry may exist, each entry/header pair can be seen as its own unit, or alternatively the content at that address can be seen as a superposition of multiple entry/header pairs.
+* $e: \{ \dots \}$ is action-specific data which performs an operation on prior content. Such data exists wholly within the action of the record of the action.
+* Overlapping shapes (primarily square actions and circular entries) represent data that travels together and can be seen as a single unit for the purpose of defining what exists at a given basis hash. In the case of an entry basis hash, where multiple actions authoring the same entry may exist, each entry/action pair can be seen as its own unit, or alternatively the content at that address can be seen as a superposition of multiple entry/action pairs.
 * $k$ is the public key of the agent taking an action.
 * $\rightarrow$ is a graph edge pointing to the hash of other content on the DHT.
 * $C_B$ and $C_T$ are a link base and target, the basis hashes of previously existing content. Any addressable content can be the base and target of a link. These are represented by blobs.
 * Blue arrows are graph edges.
-* $h_{p}$ and $E_{p}$ are the previously existing content which a graph edge $\rightarrow$ references, when the reference may _only_ pertain to a header or an entry, respectively.
+* $a_{p}$ and $E_{p}$ are the previously existing content which a graph edge $\rightarrow$ references, when the reference may _only_ pertain to a action or an entry, respectively.
 * A label styled as $\mathsf{RegisterX}$ is a DHT operation that adds metadata to a basis hash. A label styled as $\mathsf{StoreX}$ is a DHT transform that adds addressable content to a DHT basis hash. The payload of an operation is contained in a gray triangle.
 * Basis hashes are represented as $b_x$ in black circles, in which the subscript $x$ represents the kind of addressable content stored at that basis hash. For instance, $b_k$ is the basis hash of the author $k$'s agent ID entry; that is, their public key.
 * A stack of rounded rectangles represents the neighborhood of the basis hash being manipulated, in which multiple peers may be assuming authority for the same hash.
 * Gray arrows represent the transformation or movement of data.
 * Data attached to a basis hash by a line is metadata, while data overlapping a basis hash is primary content.
-* A green slash indicates existing data that has been replaced by an update. A green arrow leads from the update header to the data it replaces.
-* A red X indicates existing data that has been _tombstoned_; that is. it is marked as dead. A red arrow leads from the delete header to the data it tombstones.
+* A green slash indicates existing data that has been replaced by an update. A green arrow leads from the update action to the data it replaces.
+* A red X indicates existing data that has been _tombstoned_; that is. it is marked as dead. A red arrow leads from the delete action to the data it tombstones.
 
 ![Operations and state changes produced by `create` action](create_ops.svg){#fig:create_ops width=60%}
 
@@ -364,7 +364,7 @@ rrDHT is designed with a few performance requirements/characteristics in mind.
 
 $$
 \begin{aligned}
-L &: \{l_0,\dots,l_{2^{32}-1}\} \\
+L &: \{l_0,\dots, l_{2^{32}-1}\} \\
 l_{2^{32}-1} &< l_0
 \end{aligned}
 $$
@@ -388,7 +388,7 @@ $$
 ARC_{l_k} : \{l_k,\dots,l_k + s_{arc}\}
 $$
 
-This guarantees that a node can rapidly resolve any basis hash $b$ to the most likely candidate for an authority $k_{best}$ by comparing the basis hash's network location $l_b$ to all the authorities they know about in the set $L_K$ using the following algorithm, in pseudocode:
+This guarantees that a node can rapidly resolve any basis hash $b$ to the most likely candidate for an authority $k_{best}$ by comparing the basis hash's network location $l_b$ to all the authorities they know about (the set $L_K$) using the following algorithm, in pseudocode:
 
 ```
 k_best = L_K
@@ -399,14 +399,13 @@ k_best = L_K
 
 #### Network Location Quantization
 
-Additionally, arcs are be subjected to **quantization** which splits the network location space $L$ into disjoint subsets of a given size $s_q$, and to which the starting arc boundary $k$ and arc size $s_{arc}$ are also snapped. The quantized arc is then fully represented by three numbers: the quantized chunk size $s_q$, the number of chunks until the start boundary $k_q$, and the number of chunks from start to end $n_q$.
-
+Additionally, arcs are subjected to **quantization** which splits the network location space $L$ into disjoint subsets of a given size $s_q$, and to which the starting arc boundary $k$ and arc size $s_{arc}$ are also snapped. The quantized arc is then fully represented by three numbers: the quantized chunk size $s_q$, the number of chunks until the start boundary $k_q$, and the number of chunks from start to end $n_q$.
 
 Peers also quantize the time dimension such that the size of chunks of time increase quadratically as the dimension extends into the past.
 
 The spaces of network locations and time form two dimensions of a coordinate space, and each operation can be mapped to a point in this space using the network location of its basis hash as the $x$ coordinate and its authoring time as the $y$ coordinate.
 
-When the coordinate space is quantized, it forms a grid. Each agent holds a finite region of this grid, bounded by their quantized arc, and the total set of held operations within each cell is fingerprinted using a lossy algorithm (such as the XOR of the hashes of all the operations whose coordinates fall within the cell).
+When the coordinate space is quantized, it forms a grid. Each agent holds a finite region of this grid, bounded by their quantized arc, and the total set of held operations within each grid cell is fingerprinted using a lossy algorithm (such as the XOR of the hashes of all the operations whose coordinates fall within the cell).
 
 When two peers attempt to synchronize the held sets of operations for the intersection of their two address spaces $ARC_{l_{k_a}} \cap ARC_{l_{k_b}}$, they can then simply compare their respective fingerprints of each cell within that intersection. If the fingerprints do not match, they exchange and compare the entire list of operation hashes they each hold. This allows peers to more quickly compare and synchronize regions of shared authority, and the quadratic nature of quantum sizes in the time dimension allows them to prioritize syncing of newer, more rapidly changing data, by comparing more fingerprints from smaller time regions for newer data, and fewer fingerprints over larger time regions for older data.
 
@@ -455,12 +454,12 @@ The following Holochain-specific message types are implemented using the precedi
 * **GetMeta** requests all metadata stored at the given basis hash.
 * **GetLinks** requests only link metadata of a certain type at the given basis hash, optionally with a filter predicate.
 * **CountLinks** is similar to GetLinks, but only requests the count of all links matching the type and filter predicate.
-* **GetAgentActivity** requests all or a portion of the 'agent activity' metadata for the given agent ID, which includes source chain headers, chain status (whether it has been forked), and any outstanding [warrants](#warrants) collected for that agent (see the following section for a description of warrants).
-* **MustGetAgentActivity** requests only the portion of the agent activity metadata that can be guaranteed to be unchanging (if it exists) regardless of the current state at the agent's basis hash --- that is, a contiguous sequence of source chain headers, notwithstanding any contiguous sequence that may exist in a fork of that agent's chain.
+* **GetAgentActivity** requests all or a portion of the 'agent activity' metadata for the given agent ID, which includes source chain actions, chain status (whether it has been forked), and any outstanding [warrants](#warrants) collected for that agent (see the following section for a description of warrants).
+* **MustGetAgentActivity** requests only the portion of the agent activity metadata that can be guaranteed to be unchanging (if it exists) regardless of the current state at the agent's basis hash --- that is, a contiguous sequence of source chain actions, notwithstanding any contiguous sequence that may exist in a fork of that agent's chain.
 * There are three message types used in negotiating a countersigning session, all of which use the **User** broadcast message:
-    * Counterparties use **CountersigningSessionNegotiation**, with a subtype of **EnzymePush**, to send their signed **Create** or **Update** header to the designated facilitator of the session (the Enzyme) when such an agent has been elected.
-    * When an Enzyme has not been elected, counterparties instead use **PublishCountersign** to send their header to the neighborhood of the basis hash of the **StoreEntry** DHT operation that they will eventually produce if countersigning succeeds.
-    * When authorities have received a PublishCountersign message from all expected counterparties, they then send the complete list of signed headers to all parties using **CountersigningSessionNegotiation** with a subtype of **AuthorityResponse**.
+    * Counterparties use **CountersigningSessionNegotiation**, with a subtype of **EnzymePush**, to send their signed **Create** or **Update** action to the designated facilitator of the session (the Enzyme) when such an agent has been elected.
+    * When an Enzyme has not been elected, counterparties instead use **PublishCountersign** to send their action to the neighborhood of the basis hash of the **StoreEntry** DHT operation that they will eventually produce if countersigning succeeds.
+    * When authorities have received a PublishCountersign message from all expected counterparties, they then send the complete list of signed actions to all parties using **CountersigningSessionNegotiation** with a subtype of **AuthorityResponse**.
 
 ##### Fast Push vs. Slow Heal
 
