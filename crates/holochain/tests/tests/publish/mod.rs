@@ -49,7 +49,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
                     // If this returns 0 then the publish workflow is expected to suspend. So the test isn't directly
                     // observing that behaviour but it's close enough given that there are unit tests for the actual
                     // behavior.
-                    move |txn| num_still_needing_publish(&txn, alice_pub_key)
+                    move |txn| num_still_needing_publish(txn, alice_pub_key)
                 })
                 .await
                 .unwrap();

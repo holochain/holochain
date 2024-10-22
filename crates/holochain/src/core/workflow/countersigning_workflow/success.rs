@@ -7,7 +7,7 @@ use holochain_zome_types::prelude::{CellId, SignedAction};
 /// An incoming countersigning session success.
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(space, signed_actions, countersigning_trigger))
+    tracing::instrument(skip(space, signature_bundle, countersigning_trigger))
 )]
 pub(crate) async fn countersigning_success(
     space: Space,
@@ -63,7 +63,7 @@ pub(crate) async fn countersigning_success(
                     // This could happen but is relatively unlikely. If we've restarted and gone
                     // into the unknown state, then receive valid signatures, we may as well
                     // use them. So we'll switch to the signatures collected state.
-                    CountersigningSessionState::Unknown { preflight_request, resolution } => {
+                    CountersigningSessionState::Unknown { preflight_request, resolution , ..} => {
                         tracing::trace!("Received countersigning signature bundle in the unknown state for agent: {:?}", author);
                         *state = CountersigningSessionState::SignaturesCollected {
                             preflight_request: preflight_request.clone(),

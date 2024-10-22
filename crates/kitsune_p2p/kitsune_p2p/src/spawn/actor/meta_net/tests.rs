@@ -234,6 +234,7 @@ write_test_struct! {
             _space: KSpace,
             _to_agent: KAgent,
             _source: KAgent,
+            _transfer_method: kitsune_p2p_fetch::TransferMethod,
             _op_hash_list: OpHashList,
             _context: kitsune_p2p_fetch::FetchContext,
             _maybe_delegate: MaybeDelegate,
