@@ -251,7 +251,7 @@ Holochain performs a topological transform on the set of the various agents' sou
 
 **Structure of GDHT data:** The DHT is a content-addressable space where each piece of content is found at the address which is the hash of its content. In addition, any address in the DHT can have metadata attached to it. This metadata is not part of the content being hashed.
 
-*Note about hashing: Holochain uses 256-bit Blake2b hashes with the exception of one entry type, AgentPubKey, which is a 256-bit Ed25519 public key and uses `equal()` as its hash function. In other words, **the content of the AgentPubKey is identical to its hash**. This preserves content-addressability but also enables agent keys to function as self-proving identifiers for network transport and cryptographic functions like signing or encryption.*
+*Note about hashing: Holochain uses 256-bit Blake2b hashes with the exception of one entry type, AgentPubKey, which is a 256-bit Ed25519 public key and its hash function is simply the identity function. In other words, **the content of the AgentPubKey is identical to its hash**. This preserves content-addressability but also enables agent keys to function as self-proving identifiers for network transport and cryptographic functions like signing or encryption.*
 
 **DHT Addresses:** Both Actions and Entries from source chains can be retrieved from the DHT by either the ActionHash or EntryHash. The DHT `get()` function call returns a Record, a tuple containing the most relevant action/entry pair. Structurally, Actions "contain" their referenced entries so that pairing is obvious when a Record is retrieved by ActionHash. However, Actions are also attached as metadata at an EntryHash, and there could be many Actions which have created the same Entry content. A `get()` function called by EntryHash returns the oldest undeleted Action in the pair, while a `get_details()` function call on an EntryHash returns all of the Actions.
 
@@ -262,7 +262,7 @@ Formally, the entire GDHT is represented as a set of 'basis hashes' $b_{c_x}$, o
 $$
 \begin{aligned}
 GDHT &= \{d_1, \dots, d_n \} \\
-d_{b_{c_x}} &= \{c_x, M \} \\
+d_{b_{c_x}} &= \(c_x, M \) \\
 b_{c_x} &= hash(c_x) \\
 C &= E \bigsqcup H \\
 E &= \{e_1, \dots, e_n\} \\
@@ -278,7 +278,7 @@ $$
 \begin{aligned}
 \forall e \: M_{context} &= \{{h_1}_e, \dots, {h_n}_e \} \\
 \exists c : M_{link} &= \{ link_1, \dots, link_n \} \\
-link &= \{ type, tag, b_{c_T} \} \\
+link &= \( type, tag, b_{c_T} \) \\
 \end{aligned}
 $$
 
@@ -302,7 +302,7 @@ The following table shows how each action (which gets stored on the author's sou
 
 For viable eventual consistency in a gossipped DHT, all actions must be idempotent (where a second application of an operation will not result in a changed state) and additive/monotonic:
 
-* The deletion of an entry creation header and its corresponding entry doesn't actually delete the entry; it _marks_ the header as deleted. At the entry basis hash, the delete header becomes part of a CRDT-style "tombstone set", and a set difference is taken between the entry creation headers $H_c$ and entry deletion headers $H_d$ that reference at the entry's basis hash to determine which creation headers are still 'live' ($H_{c_l} = H_c - H_d$). Eventually the entry itself is considered deleted when $H_c - H_d = \varnothing$.
+* The deletion of an entry creation action and its corresponding entry doesn't actually delete the entry; it _marks_ the action as deleted. At the entry basis hash, the delete action becomes part of a CRDT-style "tombstone set", and a set difference is taken between the entry creation actions $H_c$ and entry deletion actions $H_d$ that reference at the entry's basis hash to determine which creation actions are still 'live' ($H_{c_l} = H_c - H_d$). Eventually the entry itself is considered deleted when $H_c - H_d = \varnothing$.
 * The removal of a link adds the removal header to a tombstone set at the link's base address in a similar fashion, subtracting the link removal headers from the link creation headers they reference to determine the set of live links.
 * Updating an entry creation header and its corresponding entry doesn't change the content in place; it adds a link to the original header and entry pointing to their replacements. One entry creation action may validly have many updates, which may or may not be seen by the application's logic as a conflict in need of resolution.
 
@@ -360,7 +360,7 @@ rrDHT is designed with a few performance requirements/characteristics in mind.
 2. It must have **lookup speeds** at least as fast as Kademlia's binary trees ( $\mathcal{O}(n \log n)$ ). Current testing shows an average of 3 hops/queries to reach an authority with the data.
 3. It must be **adjustable** to be both resilient and performant across many DHT compositional make-ups (reliability of nodes, different network topologies, high/low usage volumes, etc.)
 
-**World Model:** The network location space is a circle comprising of the range of unsigned 32-bit numbers, in which the location $0$ is adjacent to the location ${2^{32}}-1$.
+**World Model:** The network location space is a circle comprising the range of unsigned 32-bit numbers, in which the location $0$ is adjacent to the location ${2^{32}}-1$.
 
 $$
 \begin{aligned}
@@ -399,13 +399,16 @@ k_best = L_K
 
 #### Network Location Quantization
 
-Additionally, arcs can be subjected to **quantization** which splits the network location space $L$ into disjoint subsets of a given quantum size $s_q$, and to which the starting arc boundary $k$ and arc size $s_{arc}$ are also snapped. The quantized arc size is then represented as an 8-bit integers containing the current size of quantum chunks of the address space and the number of chunks in the arc. Peers can also quantize their held operations in the time dimension using a quantum size that exponentially increases as the dimension extends into the past.
+Additionally, arcs are be subjected to **quantization** which splits the network location space $L$ into disjoint subsets of a given size $s_q$, and to which the starting arc boundary $k$ and arc size $s_{arc}$ are also snapped. The quantized arc is then fully represented by three numbers: the quantized chunk size $s_q$, the number of chunks until the start boundary $k_q$, and the number of chunks from start to end $n_q$.
+
+
+Peers also quantize the time dimension such that the size of chunks of time increase quadratically as the dimension extends into the past.
 
 The spaces of network locations and time form two dimensions of a coordinate space, and each operation can be mapped to a point in this space using the network location of its basis hash as the $x$ coordinate and its authoring time as the $y$ coordinate.
 
 When the coordinate space is quantized, it forms a grid. Each agent holds a finite region of this grid, bounded by their quantized arc, and the total set of held operations within each cell is fingerprinted using a lossy algorithm (such as the XOR of the hashes of all the operations whose coordinates fall within the cell).
 
-When two peers attempt to synchronize the held sets of operations for the intersection of their two address spaces $ARC_{l_{k_a}} \cap ARC_{l_{k_b}}$, they can then simply compare their respective fingerprints of each cell within that intersection. If the fingerprints do not match, they exchange and compare the entire list of operation hashes they each hold. This allows peers to more quickly compare and synchronize regions of shared authority, and the exponential nature of quantum sizes in the time dimension allows them to prioritize syncing of newer, more rapidly changing data.
+When two peers attempt to synchronize the held sets of operations for the intersection of their two address spaces $ARC_{l_{k_a}} \cap ARC_{l_{k_b}}$, they can then simply compare their respective fingerprints of each cell within that intersection. If the fingerprints do not match, they exchange and compare the entire list of operation hashes they each hold. This allows peers to more quickly compare and synchronize regions of shared authority, and the quadratic nature of quantum sizes in the time dimension allows them to prioritize syncing of newer, more rapidly changing data, by comparing more fingerprints from smaller time regions for newer data, and fewer fingerprints over larger time regions for older data.
 
 #### DHT Communication Protocols
 
