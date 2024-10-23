@@ -59,7 +59,7 @@ harness = false
 workspace = true
 
 [features]
-default = ["tx2"]
+default = ["tx2", "tx5"]
 
 fuzzing = [
   "arbitrary",
