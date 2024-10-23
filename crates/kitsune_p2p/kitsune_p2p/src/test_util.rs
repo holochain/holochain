@@ -90,9 +90,4 @@ pub(crate) use harness_actor::*;
 
 pub(crate) mod scenario_def_local;
 
-// TODO: learn from this work, and either remove it, or rewrite it.
-//       it was built on tx2 so we can't use it as is
-// #[cfg(feature = "mock_network")]
-// pub mod mock_network;
-
 pub mod data;
