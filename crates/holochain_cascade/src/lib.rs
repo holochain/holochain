@@ -32,7 +32,6 @@ use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
 use holochain_p2p::GenericNetwork;
-use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::insert_action;
@@ -369,7 +368,7 @@ impl Cascade for CascadeImpl {
 
 impl CascadeImpl {
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
-    fn insert_rendered_op(txn: &mut Transaction, op: &RenderedOp) -> CascadeResult<()> {
+    fn insert_rendered_op(txn: &mut Txn<DbKindCache>, op: &RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
             op_light,
             op_hash,
@@ -379,7 +378,14 @@ impl CascadeImpl {
         let op_order = OpOrder::new(op_light.get_type(), action.action().timestamp());
         let timestamp = action.action().timestamp();
         insert_action(txn, action)?;
-        insert_op_lite(txn, op_light, op_hash, &op_order, &timestamp)?;
+        insert_op_lite(
+            txn,
+            op_light,
+            op_hash,
+            &op_order,
+            &timestamp,
+            todo_no_cache_transfer_data(),
+        )?;
         if let Some(status) = validation_status {
             set_validation_status(txn, op_hash, *status)?;
         }
@@ -390,7 +396,7 @@ impl CascadeImpl {
     }
 
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
-    fn insert_rendered_ops(txn: &mut Transaction, ops: &RenderedOps) -> CascadeResult<()> {
+    fn insert_rendered_ops(txn: &mut Txn<DbKindCache>, ops: &RenderedOps) -> CascadeResult<()> {
         let RenderedOps {
             ops,
             entry,
@@ -399,7 +405,7 @@ impl CascadeImpl {
 
         if let Some(warrant) = warrant {
             let op = DhtOpHashed::from_content_sync(warrant.clone());
-            insert_op(txn, &op)?;
+            insert_op_cache(txn, &op)?;
         }
         if let Some(entry) = entry {
             insert_entry(txn, entry.as_hash(), entry.as_content())?;
@@ -413,7 +419,7 @@ impl CascadeImpl {
     /// Insert a set of agent activity into the Cache.
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_activity(
-        txn: &mut Transaction,
+        txn: &mut Txn<DbKindCache>,
         ops: Vec<RegisterAgentActivity>,
     ) -> CascadeResult<()> {
         for op in ops {
@@ -427,7 +433,7 @@ impl CascadeImpl {
             } = op;
             let op =
                 DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(signature, content));
-            insert_op(txn, &op)?;
+            insert_op_cache(txn, &op)?;
             // We set the integrated to for the cache so it can match the
             // same query as the vault. This can also be used for garbage collection.
             set_when_integrated(txn, op.as_hash(), Timestamp::now())?;
@@ -512,7 +518,7 @@ impl CascadeImpl {
                             Self::insert_activity(txn, activity)?;
                             for warrant in warrants {
                                 let op = DhtOpHashed::from_content_sync(warrant);
-                                insert_op(txn, &op)?;
+                                insert_op_cache(txn, &op)?;
                             }
 
                             CascadeResult::Ok(())
@@ -645,7 +651,7 @@ impl CascadeImpl {
             let r = cache
                 .read_async({
                     let mut f = f.clone();
-                    move |raw_txn| f(&Txn::from(&raw_txn))
+                    move |raw_txn| f(&CascadeTxnWrapper::from(raw_txn))
                 })
                 .await?;
 
@@ -658,7 +664,7 @@ impl CascadeImpl {
             let r = dht
                 .read_async({
                     let mut f = f.clone();
-                    move |raw_txn| f(&Txn::from(&raw_txn))
+                    move |raw_txn| f(&CascadeTxnWrapper::from(raw_txn))
                 })
                 .await?;
 
@@ -671,7 +677,7 @@ impl CascadeImpl {
             let r = authored
                 .read_async({
                     let mut f = f.clone();
-                    move |raw_txn| f(&Txn::from(&raw_txn))
+                    move |raw_txn| f(&CascadeTxnWrapper::from(raw_txn))
                 })
                 .await?;
 

@@ -143,6 +143,7 @@ async fn two_nodes_publish_and_fetch() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agent_a.clone(),
+                transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                 op_hash_list: vec![test_data.into()],
                 context: FetchContext::default(),
             },
@@ -256,6 +257,7 @@ async fn two_nodes_publish_and_fetch_large_number_of_ops() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agent_a.clone(),
+                transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                 op_hash_list,
                 context: FetchContext::default(),
             },
@@ -809,6 +811,7 @@ async fn publish_only_fetches_ops_once() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agent_a.clone(),
+                transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                 op_hash_list: vec![test_data.clone().into()],
                 context: FetchContext::default(),
             },
@@ -854,6 +857,7 @@ async fn publish_only_fetches_ops_once() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agent_a.clone(),
+                transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                 op_hash_list: vec![test_data.into()],
                 context: FetchContext::default(),
             },
@@ -1005,6 +1009,7 @@ async fn delegate_publish() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agent_a.clone(),
+                transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                 op_hash_list: vec![test_data.clone().into()],
                 context: FetchContext::default(),
             },

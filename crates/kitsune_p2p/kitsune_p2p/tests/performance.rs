@@ -102,6 +102,7 @@ async fn minimise_p2p_agent_store_host_calls() {
                         KitsuneTimeout::from_millis(5_000),
                         BroadcastData::Publish {
                             source: agent_a.clone(),
+                            transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                             op_hash_list: vec![test_data.into()],
                             context: FetchContext::default(),
                         },
@@ -121,6 +122,7 @@ async fn minimise_p2p_agent_store_host_calls() {
                         KitsuneTimeout::from_millis(5_000),
                         BroadcastData::Publish {
                             source: agent_b.clone(),
+                            transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                             op_hash_list: vec![test_data.into()],
                             context: FetchContext::default(),
                         },

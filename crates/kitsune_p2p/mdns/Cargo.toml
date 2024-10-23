@@ -20,7 +20,7 @@ path = "examples/discover.rs"
 
 # reminder - do not use workspace deps
 [dependencies]
-libmdns = "=0.7.4"
+libmdns = "=0.9.1"
 mdns = "=3.0.0"
 base64 = "0.22"
 err-derive = "0.3.1"

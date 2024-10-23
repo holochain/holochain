@@ -21,6 +21,7 @@ use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time;
+use std::time::Duration;
 use tracing::*;
 
 mod publish_query;
@@ -32,23 +33,21 @@ mod unit_tests;
 /// Default redundancy factor for validation receipts
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 
-/// Don't publish a DhtOp more than once during this interval.
-/// This allows us to trigger the publish workflow as often as we like, without
-/// flooding the network with spurious publishes.
-pub const MIN_PUBLISH_INTERVAL: time::Duration = time::Duration::from_secs(60 * 5);
-
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(db, network, trigger_self))
+    tracing::instrument(skip(db, network, trigger_self, min_publish_interval))
 )]
 pub async fn publish_dht_ops_workflow(
     db: DbWrite<DbKindAuthored>,
     network: Arc<impl HolochainP2pDnaT>,
     trigger_self: TriggerSender,
     agent: AgentPubKey,
+    min_publish_interval: Duration,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
-    let to_publish = publish_dht_ops_workflow_inner(db.clone().into(), agent.clone()).await?;
+    let to_publish =
+        publish_dht_ops_workflow_inner(db.clone().into(), agent.clone(), min_publish_interval)
+            .await?;
     let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
 
     if to_publish_count > 0 {
@@ -119,11 +118,12 @@ pub async fn publish_dht_ops_workflow(
 pub async fn publish_dht_ops_workflow_inner(
     db: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
+    min_publish_interval: Duration,
 ) -> WorkflowResult<HashMap<OpBasis, Vec<(OpHashSized, crate::prelude::DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (basis, op_hash, op) in get_ops_to_publish(agent, &db).await? {
+    for (basis, op_hash, op) in get_ops_to_publish(agent, &db, min_publish_interval).await? {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
@@ -145,6 +145,7 @@ mod tests {
     use crate::test_utils::TestNetwork;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
+    use holochain_conductor_api::conductor::ConductorTuningParams;
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
     use holochain_p2p::HolochainP2pRef;
@@ -152,6 +153,7 @@ mod tests {
     use holochain_trace;
     use holochain_types::db_cache::DhtDbQueryCache;
     use std::collections::HashMap;
+    use std::ops::Deref;
     use std::sync::atomic::AtomicU32;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
@@ -193,7 +195,7 @@ mod tests {
                     let op = ChainOp::RegisterAddLink(sig.clone(), link_add.clone());
                     // Get the hash from the op
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                    mutations::insert_op(txn, &op_hashed)?;
+                    mutations::insert_op_authored(txn, &op_hashed)?;
                 }
                 Ok(())
             }
@@ -260,9 +262,15 @@ mod tests {
         author: AgentPubKey,
     ) {
         let (trigger_sender, _) = TriggerSender::new();
-        publish_dht_ops_workflow(db.clone(), Arc::new(dna_network), trigger_sender, author)
-            .await
-            .unwrap();
+        publish_dht_ops_workflow(
+            db.clone(),
+            Arc::new(dna_network),
+            trigger_sender,
+            author,
+            ConductorTuningParams::default().min_publish_interval(),
+        )
+        .await
+        .unwrap();
     }
 
     /// There is a test that shows that network messages would be sent to all agents via broadcast.
@@ -427,7 +435,7 @@ mod tests {
 
                 source_chain.flush(&dna_network).await.unwrap();
                 let (entry_create_action, entry_update_action) = db.write_async(move |writer| -> StateQueryResult<(SignedActionHashed, SignedActionHashed)> {
-                        let store = Txn::from(writer);
+                        let store = CascadeTxnWrapper::from(writer.deref());
                         let ech = store.get_action(&original_action_address).unwrap().unwrap();
                         let euh = store.get_action(&entry_update_hash).unwrap().unwrap();
                         Ok((ech, euh))

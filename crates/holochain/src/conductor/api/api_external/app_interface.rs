@@ -101,6 +101,30 @@ impl AppInterfaceApi {
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
+            AppRequest::GetCountersigningSessionState(payload) => {
+                let countersigning_session_state = self
+                    .conductor_handle
+                    .clone()
+                    .get_countersigning_session_state(&payload)
+                    .await?;
+                Ok(AppResponse::CountersigningSessionState(Box::new(
+                    countersigning_session_state,
+                )))
+            }
+            AppRequest::AbandonCountersigningSession(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .abandon_countersigning_session(&payload)
+                    .await?;
+                Ok(AppResponse::CountersigningSessionAbandoned)
+            }
+            AppRequest::PublishCountersigningSession(payload) => {
+                self.conductor_handle
+                    .clone()
+                    .publish_countersigning_session(&payload)
+                    .await?;
+                Ok(AppResponse::PublishCountersigningSessionTriggered)
+            }
             AppRequest::CreateCloneCell(payload) => {
                 let clone_cell = self
                     .conductor_handle

@@ -94,6 +94,7 @@ async fn publish_to_basis_from_inside() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agents[sender_idx].3.clone(),
+                transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                 op_hash_list: vec![test_op.into()],
                 context: FetchContext::default(),
             },
@@ -192,6 +193,7 @@ async fn publish_to_basis_from_outside() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agents[sender_idx].3.clone(),
+                transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                 op_hash_list: vec![test_op.into()],
                 context: FetchContext::default(),
             },

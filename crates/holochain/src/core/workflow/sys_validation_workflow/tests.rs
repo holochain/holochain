@@ -79,7 +79,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
     let op = DhtOpHashed::from_content_sync(op);
     let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op(txn, &op).unwrap();
+        insert_op_dht(txn, &op, None).unwrap();
     });
 
     //- Trigger sys validation
@@ -99,7 +99,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
                 .get_all_authored_dbs(dna.dna_hash())
                 .unwrap()[0]
                 .test_read(move |txn| {
-                    let store = Txn::from(&txn);
+                    let store = CascadeTxnWrapper::from(txn);
 
                     let warrants = store.get_warrants_for_basis(&basis, false).unwrap();
                     warrants.len()
@@ -173,7 +173,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let forked_op = DhtOpHashed::from_content_sync(forked_op);
     let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op(txn, &forked_op).unwrap();
+        insert_op_dht(txn, &forked_op, None).unwrap();
     });
 
     //- Check that bob authored a chain fork warrant
@@ -193,7 +193,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
                 .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
                 .unwrap()
                 .test_read(move |txn| {
-                    let store = Txn::from(&txn);
+                    let store = CascadeTxnWrapper::from(txn);
                     store.get_warrants_for_basis(&basis, false).unwrap()
                 })
         },
@@ -250,8 +250,8 @@ async fn run_test(
     // holochain_state::prelude::dump_tmp(&alice_dht_db);
     // Validation should be empty
     alice_dht_db.read_async(move |txn| -> DatabaseResult<()> {
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+        let limbo = show_limbo(txn);
+        assert!(limbo_is_empty(txn), "{:?}", limbo);
 
         let num_valid_ops: usize = txn
             .query_row("SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
@@ -278,7 +278,7 @@ async fn run_test(
         .unwrap();
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
-    let num_valid_ops = move |txn: Transaction| -> DatabaseResult<usize> {
+    let num_valid_ops = move |txn: &Transaction| -> DatabaseResult<usize> {
         let valid_ops: usize = txn
                 .query_row(
                     "
@@ -323,8 +323,8 @@ async fn run_test(
     let (limbo, empty) = alice_db
         .read_async(move |txn| {
             // Validation should be empty
-            let limbo = show_limbo(&txn);
-            let empty = limbo_is_empty(&txn);
+            let limbo = show_limbo(txn);
+            let empty = limbo_is_empty(txn);
             DatabaseResult::Ok((limbo, empty))
         })
         .await
@@ -332,7 +332,10 @@ async fn run_test(
 
     assert!(empty, "{:?}", limbo);
 
-    let valid_ops = alice_db.read_async(num_valid_ops.clone()).await.unwrap();
+    let valid_ops = alice_db
+        .read_async(move |txn| num_valid_ops(txn))
+        .await
+        .unwrap();
     assert_eq!(valid_ops, expected_count);
 }
 

@@ -42,7 +42,7 @@ pub fn test_req_op(n: u8, context: Option<FetchContext>, source: FetchSource) ->
         space: test_space(0),
         source,
         size: None,
-        transfer_method: TransferMethod::Gossip,
+        transfer_method: TransferMethod::Publish,
     }
 }
 

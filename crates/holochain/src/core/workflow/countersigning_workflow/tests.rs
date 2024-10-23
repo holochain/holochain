@@ -25,11 +25,11 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::{HolochainP2pError, MockHolochainP2pDnaT};
 use holochain_state::chain_lock::get_chain_lock;
 use holochain_state::prelude::{
-    chain_head_db, current_countersigning_session, remove_countersigning_session,
-    set_withhold_publish, AppEntryBytesFixturator, HeadInfo,
+    chain_head_db, current_countersigning_session, insert_op_authored,
+    remove_countersigning_session, set_withhold_publish, AppEntryBytesFixturator, HeadInfo,
 };
 use holochain_state::prelude::{
-    insert_action, insert_entry, insert_op, unlock_chain, CounterSigningSessionData,
+    insert_action, insert_entry, unlock_chain, CounterSigningSessionData,
 };
 use holochain_state::prelude::{StateMutationError, StateMutationResult};
 use holochain_state::query::from_blob;
@@ -693,7 +693,7 @@ async fn recover_from_commit_when_other_agent_abandons() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn recover_after_restart_from_commit_when_other_agent_abandons() {
+async fn recover_from_commit_after_restart_when_other_agent_abandons() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
@@ -790,7 +790,7 @@ async fn recover_after_restart_from_commit_when_other_agent_abandons() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn recover_after_restart_from_commit_when_other_agent_completes() {
+async fn recover_from_commit_after_restart_when_other_agent_completes() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
@@ -1979,7 +1979,7 @@ impl TestHarness {
             .write_async(move |txn| -> StateMutationResult<()> {
                 insert_action(txn, &sah)?;
                 insert_entry(txn, &entry_hash, &entry)?;
-                insert_op(txn, &dht_op)?;
+                insert_op_authored(txn, &dht_op)?;
                 set_withhold_publish(txn, &dht_op.hash)?;
 
                 Ok(())
@@ -1999,7 +1999,7 @@ impl TestHarness {
         let chain_head = authored
             .read_async({
                 let author = self.author.clone();
-                move |txn| chain_head_db(&txn, Arc::new(author))
+                move |txn| chain_head_db(txn, Arc::new(author))
             })
             .await
             .unwrap();
@@ -2110,7 +2110,7 @@ impl TestHarness {
         let lock = authored
             .read_async({
                 let author = self.author.clone();
-                move |txn| get_chain_lock(&txn, &author)
+                move |txn| get_chain_lock(txn, &author)
             })
             .await
             .unwrap();
@@ -2127,7 +2127,7 @@ impl TestHarness {
         let lock = authored
             .read_async({
                 let author = self.author.clone();
-                move |txn| get_chain_lock(&txn, &author)
+                move |txn| get_chain_lock(txn, &author)
             })
             .await
             .unwrap();
@@ -2145,7 +2145,7 @@ impl TestHarness {
         let session = authored
             .read_async({
                 let author = self.author.clone();
-                move |txn| current_countersigning_session(&txn, Arc::new(author))
+                move |txn| current_countersigning_session(txn, Arc::new(author))
             })
             .await
             .unwrap();

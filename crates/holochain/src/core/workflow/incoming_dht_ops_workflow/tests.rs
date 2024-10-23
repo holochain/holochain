@@ -208,9 +208,9 @@ async fn get_pending_op_hashes(env: DbWrite<DbKindDht>) -> Vec<DhtOpHash> {
 }
 
 async fn clear_requires_receipt(env: DbWrite<DbKindDht>, op_hashes: Vec<DhtOpHash>) {
-    env.read_async(move |mut txn| -> StateMutationResult<()> {
+    env.write_async(move |txn| -> StateMutationResult<()> {
         for hash in &op_hashes {
-            set_require_receipt(&mut txn, hash, false)?;
+            set_require_receipt(txn, hash, false)?;
         }
 
         Ok(())
