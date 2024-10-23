@@ -255,28 +255,56 @@ Holochain performs a topological transform on the set of the various agents' sou
 
 **DHT Addresses:** Both Actions and Entries from source chains can be retrieved from the DHT by either the ActionHash or EntryHash. The DHT `get()` function call returns a Record, a tuple containing the most relevant action/entry pair. Structurally, Actions "contain" their referenced entries so that pairing is obvious when a Record is retrieved by ActionHash. However, Actions are also attached as metadata at an EntryHash, and there could be many Actions which have created the same Entry content. A `get()` function called by EntryHash returns the oldest undeleted Action in the pair, while a `get_details()` function call on an EntryHash returns all of the Actions.
 
-**Agent Addresses & Agent Activity:** Technically an AgentPubKey functions as both a content address (which is never really used because performing a `get()` on the key just returns the key you used to get it) and a network address to send communications to that agents. But in addition to the content of the key stored on the DHT is metadata about that agent's chain activity. In other words, a `get_agent_activity()` request retrieves metadata about their chain records and chain status.
+**Agent Addresses & Agent Activity:** Technically an AgentPubKey functions as both a content address (which is never really used because performing a `get()` on the key just returns the key itself) and a network address to send communications to that agents. But in addition to the content of the key stored on the DHT is metadata about that agent's chain activity. In other words, a `get_agent_activity()` request retrieves metadata about their chain records and chain status.
 
 Formally, the entire GDHT is represented as a set of 'basis hashes' $b_{c_x}$, or addresses where both content $c$ and metadata $m$ may be stored:
 
 $$
+GDHT = \{d_1, \dots, d_n \}
+$$
+
+The data at a basis hash can consist of content and/or metadata:
+
+$$
+d_{b_{c_x}} = (c_x, M )
+$$
+
+A basis hash is the hash of the content stored at the address:
+
+$$
+b_{c_x} = hash(c_x)
+$$
+
+The total set of content represented by the GDHT consists of entries $E$, actions $A$, and external content $T$ (where the addresses can still store metadata and be used as references, but the content is not stored in the DHT):
+
+$$
 \begin{aligned}
-GDHT &= \{d_1, \dots, d_n \} \\
-d_{b_{c_x}} &= (c_x, M ) \\
-b_{c_x} &= hash(c_x) \\
-C &= E \bigsqcup A \\
 E &= \{e_1, \dots, e_n\} \\
 A &= \{a_1, \dots, a_n\} \\
+T &= \{t_1, \dots, t_n\} \\
+C &= E \bigsqcup A \bigsqcup T \\
+\end{aligned}
+$$
+
+An address can hold a set of metadata:
+
+$$
+\begin{aligned}
 M &= \{m_1, \dots, m_n \} \\
 m_x &= \text{metadata}
 \end{aligned}
 $$
 
-There may be arbitrary types of metadata. Some important ones are:
+There may be arbitrary types of metadata. For instance, every instance of entry content $e$ has a set of creation actions $A_e$ associated with it:
+
+$$
+\forall e \: M_{context} = \{{a_1}_e, \dots, {a_n}_e \}
+$$
+
+And any address may have a set of links pointing to other addresses, each of which is a tuple of its type, an arbitrary tag, and a reference to the target address $b_{c_T}$:
 
 $$
 \begin{aligned}
-\forall e \: M_{context} &= \{{a_1}_e, \dots, {a_n}_e \} \\
 \exists c : M_{link} &= \{ link_1, \dots, link_n \} \\
 link &= ( type, tag, b_{c_T} ) \\
 \end{aligned}
@@ -350,7 +378,7 @@ Most existing DHT frameworks simply have nodes volunteer to hold specific conten
 
 As such, Holochain doesn't rely on nodes to volunteer to hold specific entries, but rather to volunteer aggregate capacity (e.g., holding 100MB of data rather than arbitrarily chosen entries). Authoring nodes are responsible for publishing entries from their local DHT instance to other nodes on the network (**authorities**) who will become responsible for serving that data.
 
-Like most DHT architectures, Holochain uses a "nearness" algorithm to compute the "distance" distance between the 256-bit Blake2b basis hash of the data or metadata to be stored and the 256-bit Ed25519 public key (network address) of nodes. Basically, it is the responsibility of the nodes *nearest* a basis hash to store data and metadata for it.
+Like most DHT architectures, Holochain uses a "nearness" algorithm to compute the "distance" between the key of a piece of data and the key of a peer holding the data; in our case, between the 256-bit Blake2b basis hash of the data or metadata to be stored and the 256-bit Ed25519 public key (network address) of nodes. Basically, it is the responsibility of the nodes *nearest* a basis hash to store data and metadata for it, within an "arc" of authority of their choosing.
 
 Holochain's validating, graphing, gossiping DHT implementation is called **rrDHT**.
 
@@ -360,42 +388,53 @@ rrDHT is designed with a few performance requirements/characteristics in mind.
 2. It must have **lookup speeds** at least as fast as Kademlia's binary trees ( $\mathcal{O}(n \log n)$ ). Current testing shows an average of 3 hops/queries to reach an authority with the data.
 3. It must be **adjustable** to be both resilient and performant across many DHT compositional make-ups (reliability of nodes, different network topologies, high/low usage volumes, etc.)
 
-**World Model:** The network location space is a circle comprising the range of unsigned 32-bit numbers, in which the location $0$ is adjacent to the location ${2^{32}}-1$.
+**World Model:** The network location space is a circle comprising the range of unsigned 32-bit numbers, in which the location $0$ is adjacent to the location ${2^{32}}-1$. It can be more precisely defined as:
+
+$$
+L : \mathbb{Z} \mod 2^{32}
+$$
+
+Defining this in terms of modulo arithmetic has an important consequence for routing a publish or query request to the correct agent, which we will explain later.
+
+The larger 256-bit address space of the DHT, consisting of 256-bit "basis hashes" $B$ (Blake2b-256 hashes of addressable content $C$, which as previously defined includes Ed25519 public keys of agents $K$), is mapped to the smaller network location space via a function:
+
+$$
+\mathsf{map\_to\_loc} : B \rightarrow L
+$$
+
+which is the XOR of 8 × 32-bit segments of the hashes. At the storage level, the original address is still used for addressing content and metadata, so collisions in the smaller space are not a concern.
+
+Using the sets $B$ and $L$ to denote all basis addresses and network locations in the DHT, respectively:
 
 $$
 \begin{aligned}
-L &: \{l_0,\dots, l_{2^{32}-1}\} \\
-l_{2^{32}-1} &< l_0
+|L| &= 2^{32} \\
+|B| &= 2^{256} \\
+\therefore |B| &= |L| \cdot 2^{256 - 32} \\
 \end{aligned}
 $$
 
-The larger 256-bit address space of the DHT, consisting of 256-bit "basis hashes" $B$ (Blake2b-256 hashes of addressable content $C$, and Ed25519 public keys of agents $K$), is mapped to the smaller network location space via a function $\mathsf{map\_to\_loc}(b)$, which is the XOR of 8 × 32-bit segments of the hashes. The original address is still kept with the data or metadata, so collisions in the smaller space are not a concern.
-
-$$
-\begin{aligned}
-E &: \{e_0,\dots,e_{2^{256}-1}\} \\
-K &: \{k_0,\dots,k_{2^{256}-1}\} \\
-C &: E \cup K \\
-\mathsf{hash} &: C \rightarrow B \\
-\mathsf{map\_to\_loc} &: B \rightarrow L \\
-|L| &\approx |B| \cdot 2^8
-\end{aligned}
-$$
-
-Each agent has a network location $l_k$ in this 32-bit space as well as an arc size $s_{arc}$ indicating how large an 'arc' of the location circle they are claiming authority for. The storage arc $ARC_{l_k}$ defines the range of basis hashes for which a node claims authority. The arc spreads clockwise from $l_k$.
+Each agent has a network location $l_k$ in this 32-bit space as well as an arc size $s_{arc}$ indicating how large an arc of the location circle they are claiming authority for. The storage arc $ARC_{l_k}$ defines the range of basis hashes for which a node claims authority. The arc spreads clockwise from $l_k$.
 
 $$
 ARC_{l_k} : \{l_k,\dots,l_k + s_{arc}\}
 $$
 
-This guarantees that a node can rapidly resolve any basis hash $b$ to the most likely candidate for an authority $k_{best}$ by comparing the basis hash's network location $l_b$ to all the authorities they know about (the set $L_K$) using the following algorithm, in pseudocode:
+As a consequence of modulo arithmetic, agents close to $2^{32}$ may end up claiming authority for data at and beyond $0$; for example, if the network location for an agent's public key $k$ is $2^{32} - 2$ and their arc of authority is $20$, the arc extends to network location $18$:
+
+$$
+(2^{32} - 2 + 20) \mod 2^{32} = 18
+$$
+
+A node can rapidly resolve any basis hash $b$ to the most likely candidate for an authority $p_{best}$ by comparing the basis hash's network location $l_b$ to all the peers they know about (the set $L_P$, or their "peer table") using the following algorithm (expressed in pseudocode):
 
 ```
-k_best = L_K
-    .sort_ascending()
-    .filter(l_k -> l_k <= l_b)
-    .last()
+p_best = L_P
+    .sort_ascending_by(l_p -> (l_b - l_p) mod 2^32)
+    .first()
 ```
+
+It is then determined whether the peer is indeed an authority for $l_b$, either by relying on locally cached knowledge of their arc or asking them directly. At this point, if the peer is determined to not claim authority, the next less likely candidate may be chosen, on the hope that their arc is larger, or the most likely candidate is asked if they know of a _more_ likely candidate. They are in an advantageous place to do so, as agents' peer tables are naturally biased toward peers that are near to them in the network location space.
 
 #### Network Location Quantization
 
