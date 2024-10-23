@@ -2191,7 +2191,7 @@ mod tests {
 
         let meta_net_task = MetaNetTask::new(
             host_stub.clone().legacy(host_sender),
-            KitsuneP2pConfig::empty(),
+            KitsuneP2pConfig::mem(),
             fetch_pool.clone(),
             fetch_response_queue.clone(),
             ep_evt_rcv,

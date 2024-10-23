@@ -40,7 +40,7 @@ impl KitsuneTestHarness {
         let legacy_host_api = TestLegacyHost::new(keystore);
 
         Ok(Self {
-            config: KitsuneP2pConfig::empty(),
+            config: KitsuneP2pConfig::mem(),
             name: name.to_string(),
             tls_config: TlsConfig::new_ephemeral().await?,
             host_api,

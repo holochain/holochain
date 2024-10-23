@@ -230,7 +230,7 @@ mod tests {
         .legacy(dummy_sender);
 
         let task = FetchTask::spawn(
-            KitsuneP2pConfig::empty(),
+            KitsuneP2pConfig::mem(),
             fetch_pool.clone(),
             host_stub,
             internal_sender,

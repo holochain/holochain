@@ -393,7 +393,7 @@ async fn create_test_data(
 
     // This is gonna get dropped at the end of this fn.
     let tmpdir = tempfile::TempDir::new().unwrap();
-    let mut network = KitsuneP2pConfig::empty();
+    let mut network = KitsuneP2pConfig::mem();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
         network,

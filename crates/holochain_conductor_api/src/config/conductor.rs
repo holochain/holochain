@@ -160,7 +160,7 @@ where
 }
 
 impl ConductorConfig {
-    /// The most minimal config, which will not work
+    /// The most minimal config, with in-memory networking
     pub fn empty() -> Self {
         Self {
             tracing_override: None,
@@ -168,7 +168,7 @@ impl ConductorConfig {
             keystore: KeystoreConfig::default(),
             dpki: DpkiConfig::testing(),
             admin_interfaces: None,
-            network: KitsuneP2pConfig::empty(),
+            network: KitsuneP2pConfig::mem(),
             db_sync_strategy: DbSyncStrategy::default(),
             tuning_params: None,
             device_seed_lair_tag: None,
@@ -360,7 +360,7 @@ mod tests {
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
-                network: KitsuneP2pConfig::empty(),
+                network: KitsuneP2pConfig::mem(),
                 dpki: DpkiConfig::testing(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
@@ -423,7 +423,7 @@ mod tests {
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let mut network_config = KitsuneP2pConfig::empty();
+        let mut network_config = KitsuneP2pConfig::mem();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::WebRTC {
             signal_url: "wss://sbd-0.main.infra.holo.host".into(),
@@ -490,7 +490,7 @@ mod tests {
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
-                network: KitsuneP2pConfig::empty(),
+                network: KitsuneP2pConfig::mem(),
                 dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),

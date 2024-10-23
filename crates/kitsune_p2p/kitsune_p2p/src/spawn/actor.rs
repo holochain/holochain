@@ -215,6 +215,8 @@ pub(super) async fn create_meta_net(
 
     if ep_hnd.is_none() && config.is_tx5() {
         tracing::trace!("tx5");
+        let mut tune: kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams =
+            (*config.tuning_params).clone();
         let (signal_url, webrtc_config) = match config.transport_pool.first().unwrap() {
             TransportConfig::WebRTC {
                 signal_url,
@@ -226,10 +228,13 @@ pub(super) async fn create_meta_net(
                     .unwrap_or_else(|| DEFAULT_WEBRTC_CONFIG.to_string());
                 (signal_url.clone(), webrtc_config)
             }
-            _ => unreachable!(),
+            TransportConfig::Mem {} => {
+                tune.tx5_backend_module = "mem".to_string();
+                ("wss://fake.fake".to_string(), "{}".to_string())
+            }
         };
         let (h, e, p) = MetaNet::new_tx5(
-            config.tuning_params.clone(),
+            Arc::new(tune),
             host.clone(),
             internal_sender.clone(),
             signal_url,
