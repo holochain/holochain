@@ -298,15 +298,15 @@ $$
 There may be arbitrary types of metadata. For instance, every instance of entry content $e$ has a set of creation actions $A_e$ associated with it:
 
 $$
-\forall e \: M_{context} = \{{a_1}_e, \dots, {a_n}_e \}
+\forall e \: M_{context} = \{{a_e}_1, \dots, {a_e}_n \}
 $$
 
 And any address may have a set of links pointing to other addresses, each of which is a tuple of its type, an arbitrary tag, and a reference to the target address $b_{c_T}$:
 
 $$
 \begin{aligned}
-\exists c : M_{link} &= \{ link_1, \dots, link_n \} \\
-link &= ( type, tag, b_{c_T} ) \\
+M_{link} &= \{ link_1, \dots, link_n \} \\
+\exists c_T \: link &= ( type, tag, b_{c_T} ) \\
 \end{aligned}
 $$
 
