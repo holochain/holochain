@@ -7,9 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Add App API calls to interact with an unresolvable countersigning session. State of countersigning can be queried with
-`AppRequest::GetCountersigningSessionState`, an unresolvable session can be abandoned using `AppRequest::AbandonCountersigningSession`
-or force-published by making `AppRequest::PublishCountersigningSession`. Abandoning and publishing is only possible for sessions that have been through automatic resolution at least once where Holochain has not been able to make a decision. #4253
+## 0.5.0-dev.2
+
+- Add App API calls to interact with an unresolvable countersigning session. State of countersigning can be queried with `AppRequest::GetCountersigningSessionState`, an unresolvable session can be abandoned using `AppRequest::AbandonCountersigningSession` or force-published by making `AppRequest::PublishCountersigningSession`. Abandoning and publishing is only possible for sessions that have been through automatic resolution at least once where Holochain has not been able to make a decision. \#4253
 
 ## 0.5.0-dev.1
 
