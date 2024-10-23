@@ -12,21 +12,9 @@ use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
-use holochain_types::dht_op::ChainOpHashed;
-use holochain_types::dht_op::DhtOp;
-use holochain_types::dht_op::DhtOpHashed;
-use holochain_types::dht_op::DhtOpLite;
-use holochain_types::dht_op::OpOrder;
-use holochain_types::prelude::DnaDefHashed;
-use holochain_types::prelude::DnaWasmHashed;
-use holochain_types::prelude::SysValDeps;
-use holochain_types::prelude::{DhtOpError, SignedValidationReceipt};
+use holochain_types::prelude::*;
 use holochain_types::sql::AsSql;
-use holochain_zome_types::block::Block;
-use holochain_zome_types::block::BlockTargetId;
-use holochain_zome_types::block::BlockTargetReason;
-use holochain_zome_types::entry::EntryHashed;
-use holochain_zome_types::prelude::*;
+use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 use std::str::FromStr;
 
 pub use error::*;
@@ -102,15 +90,57 @@ pub fn insert_record_scratch(
     }
 }
 
-/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
-pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
-    insert_op_when(txn, op, Timestamp::now())
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Authored database.
+pub fn insert_op_authored(
+    txn: &mut Txn<DbKindAuthored>,
+    op: &DhtOpHashed,
+) -> StateMutationResult<()> {
+    insert_op_when(txn, op, None, Timestamp::now())
+}
+
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the DHT database.
+///
+/// If `transfer_data` is None, that means that the Op was locally validated
+/// and is being included in the DHT by self-authority
+pub fn insert_op_dht(
+    txn: &mut Txn<DbKindDht>,
+    op: &DhtOpHashed,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
+) -> StateMutationResult<()> {
+    insert_op_when(txn, op, transfer_data, Timestamp::now())
+}
+
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Cache database.
+///
+/// TODO: no transfer data is hooked up for now, but ideally in the future we want:
+/// - an AgentPubKey from the remote node should be included
+/// - perhaps a TransferMethod could include the method used to get the data, e.g. `get` vs `get_links`
+/// - timestamp is probably unnecessary since `when_stored` will suffice
+pub fn insert_op_cache(txn: &mut Txn<DbKindCache>, op: &DhtOpHashed) -> StateMutationResult<()> {
+    insert_op_when(txn, op, None, Timestamp::now())
+}
+
+/// Marker for the cases where we could include some transfer data, but this is currently
+/// not hooked up. Ideally:
+/// - an AgentPubKey from the remote node should be included
+/// - perhaps a TransferMethod could include the method used to get the data, e.g. `get` vs `get_links`
+/// - timestamp is probably unnecessary since `when_stored` will suffice
+pub fn todo_no_cache_transfer_data() -> Option<(AgentPubKey, TransferMethod, Timestamp)> {
+    None
+}
+
+/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into any Op database.
+/// The type is not checked, and transfer data is not set.
+#[cfg(feature = "test_utils")]
+pub fn insert_op_untyped(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
+    insert_op_when(txn, op, None, Timestamp::now())
 }
 
 /// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
 pub fn insert_op_when(
     txn: &mut Transaction,
     op: &DhtOpHashed,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
     when_stored: Timestamp,
 ) -> StateMutationResult<()> {
     let hash = op.as_hash();
@@ -146,7 +176,15 @@ pub fn insert_op_when(
         }
     }
     if create_op {
-        insert_op_lite_when(txn, &op_lite, hash, &op_order, &timestamp, when_stored)?;
+        insert_op_lite_when(
+            txn,
+            &op_lite,
+            hash,
+            &op_order,
+            &timestamp,
+            transfer_data,
+            when_stored,
+        )?;
         set_dependency(txn, hash, deps)?;
     }
     Ok(())
@@ -159,14 +197,16 @@ pub fn insert_op_when(
 /// we need the data in the same shape.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn)))]
 pub fn insert_op_lite_into_authored(
-    txn: &mut Transaction,
+    txn: &mut Txn<DbKindAuthored>,
     op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
     authored_timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    insert_op_lite(txn, op_lite, hash, order, authored_timestamp)?;
+    insert_op_lite(txn, op_lite, hash, order, authored_timestamp, None)?;
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
+    set_when_sys_validated(txn, hash, Timestamp::now())?;
+    set_when_app_validated(txn, hash, Timestamp::now())?;
     set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }
@@ -178,6 +218,7 @@ pub fn insert_op_lite(
     hash: &DhtOpHash,
     order: &OpOrder,
     authored_timestamp: &Timestamp,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
     insert_op_lite_when(
         txn,
@@ -185,6 +226,7 @@ pub fn insert_op_lite(
         hash,
         order,
         authored_timestamp,
+        transfer_data,
         Timestamp::now(),
     )
 }
@@ -196,9 +238,13 @@ pub fn insert_op_lite_when(
     hash: &DhtOpHash,
     order: &OpOrder,
     authored_timestamp: &Timestamp,
+    transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
     when_stored: Timestamp,
 ) -> StateMutationResult<()> {
     let basis = op_lite.dht_basis();
+    let (transfer_source, transfer_method, transfer_time) = transfer_data
+        .map(|(s, m, t)| (Some(s), Some(m), Some(t)))
+        .unwrap_or((None, None, None));
     match op_lite {
         DhtOpLite::Chain(op) => {
             let action_hash = op.action_hash().clone();
@@ -210,6 +256,9 @@ pub fn insert_op_lite_when(
                 "when_stored": when_stored,
                 "basis_hash": basis,
                 "action_hash": action_hash,
+                "transfer_source": transfer_source,
+                "transfer_method": transfer_method,
+                "transfer_time": transfer_time,
                 "require_receipt": 0,
                 "op_order": order,
             })?;
@@ -224,6 +273,9 @@ pub fn insert_op_lite_when(
                 "when_stored": when_stored,
                 "basis_hash": basis,
                 "action_hash": warrant_hash,
+                "transfer_source": transfer_source,
+                "transfer_method": transfer_method,
+                "transfer_time": transfer_time,
                 "require_receipt": 0,
                 "op_order": order,
             })?;
@@ -296,7 +348,7 @@ pub fn insert_entry_def(
 /// Insert [`ConductorState`](https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html)
 /// into the database.
 pub fn insert_conductor_state(
-    txn: &mut Transaction,
+    txn: &mut Txn<DbKindConductor>,
     bytes: SerializedBytes,
 ) -> StateMutationResult<()> {
     let bytes: Vec<u8> = UnsafeBytes::from(bytes).into();
@@ -354,7 +406,7 @@ fn pluck_overlapping_block_bounds(
     Ok(maybe_min_maybe_max)
 }
 
-fn insert_block_inner(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
+fn insert_block_inner(txn: &mut Txn<DbKindConductor>, block: Block) -> DatabaseResult<()> {
     sql_insert!(txn, BlockSpan, {
         "target_id": BlockTargetId::from(block.target().clone()),
         "target_reason": BlockTargetReason::from(block.target().clone()),
@@ -364,7 +416,7 @@ fn insert_block_inner(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()>
     Ok(())
 }
 
-pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
+pub fn insert_block(txn: &mut Txn<DbKindConductor>, block: Block) -> DatabaseResult<()> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, block.clone())?;
 
     // Build one new block from the extremums.
@@ -386,7 +438,7 @@ pub fn insert_block(txn: &Transaction<'_>, block: Block) -> DatabaseResult<()> {
     )
 }
 
-pub fn insert_unblock(txn: &Transaction<'_>, unblock: Block) -> DatabaseResult<()> {
+pub fn insert_unblock(txn: &mut Txn<DbKindConductor>, unblock: Block) -> DatabaseResult<()> {
     let maybe_min_maybe_max = pluck_overlapping_block_bounds(txn, unblock.clone())?;
 
     // Reinstate anything outside the unblock bounds.
@@ -472,7 +524,7 @@ pub fn set_dependency(
 
 /// Set the whether or not a receipt is required of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
 pub fn set_require_receipt(
-    txn: &mut Transaction,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     require_receipt: bool,
 ) -> StateMutationResult<()> {
@@ -550,7 +602,7 @@ pub fn set_when_integrated(
 
 /// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was last publish time
 pub fn set_last_publish_time(
-    txn: &mut Transaction,
+    txn: &mut Txn<DbKindAuthored>,
     hash: &DhtOpHash,
     unix_epoch: std::time::Duration,
 ) -> StateMutationResult<()> {
@@ -561,7 +613,10 @@ pub fn set_last_publish_time(
 }
 
 /// Set withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
-pub fn set_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
+pub fn set_withhold_publish(
+    txn: &mut Txn<DbKindAuthored>,
+    hash: &DhtOpHash,
+) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "withhold_publish": true,
     })?;
@@ -569,7 +624,10 @@ pub fn set_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMut
 }
 
 /// Unset withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
-pub fn unset_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateMutationResult<()> {
+pub fn unset_withhold_publish(
+    txn: &mut Txn<DbKindAuthored>,
+    hash: &DhtOpHash,
+) -> StateMutationResult<()> {
     dht_op_update!(txn, hash, {
         "withhold_publish": Null,
     })?;
@@ -578,6 +636,15 @@ pub fn unset_withhold_publish(txn: &mut Transaction, hash: &DhtOpHash) -> StateM
 
 /// Set the receipt count for a [`DhtOp`](holochain_types::dht_op::DhtOp).
 pub fn set_receipts_complete(
+    txn: &mut Txn<DbKindAuthored>,
+    hash: &DhtOpHash,
+    complete: bool,
+) -> StateMutationResult<()> {
+    set_receipts_complete_redundantly_in_dht_db(txn, hash, complete)
+}
+
+/// Set the receipt count for a [`DhtOp`](holochain_types::dht_op::DhtOp).
+pub fn set_receipts_complete_redundantly_in_dht_db(
     txn: &mut Transaction,
     hash: &DhtOpHash,
     complete: bool,
@@ -1024,9 +1091,9 @@ mod tests {
 
     use holochain_types::prelude::*;
 
-    use crate::prelude::{Store, Txn};
+    use crate::prelude::{CascadeTxnWrapper, Store};
 
-    use super::insert_op;
+    use super::insert_op_authored;
 
     #[test]
     fn can_write_and_read_warrants() {
@@ -1071,13 +1138,13 @@ mod tests {
             let op1 = op1.clone();
             let op2 = op2.clone();
             move |txn| {
-                insert_op(txn, &op1).unwrap();
-                insert_op(txn, &op2).unwrap();
+                insert_op_authored(txn, &op1).unwrap();
+                insert_op_authored(txn, &op2).unwrap();
             }
         });
 
         db.test_read(move |txn| {
-            let warrants: Vec<DhtOp> = Txn::from(&txn)
+            let warrants: Vec<DhtOp> = CascadeTxnWrapper::from(txn)
                 .get_warrants_for_basis(&action_author.into(), false)
                 .unwrap()
                 .into_iter()

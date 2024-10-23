@@ -32,11 +32,22 @@ pub fn spawn_publish_dht_ops_consumer(
             let env = env.clone();
             let agent = cell_id.agent_pubkey().clone();
             let network = network.clone();
+            let min_publish_interval = conductor
+                .get_config()
+                .conductor_tuning_params()
+                .min_publish_interval();
             async move {
                 if conductor.get_config().network.tuning_params.disable_publish {
                     Ok(WorkComplete::Complete)
                 } else {
-                    publish_dht_ops_workflow(env, Arc::new(network), tx, agent).await
+                    publish_dht_ops_workflow(
+                        env,
+                        Arc::new(network),
+                        tx,
+                        agent,
+                        min_publish_interval,
+                    )
+                    .await
                 }
             }
         },

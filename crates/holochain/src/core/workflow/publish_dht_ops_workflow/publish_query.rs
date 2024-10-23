@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
@@ -14,8 +15,6 @@ use rusqlite::Transaction;
 
 use crate::core::workflow::WorkflowResult;
 
-use super::MIN_PUBLISH_INTERVAL;
-
 /// Get all dht ops on an agents chain that need to be published.
 /// - Don't publish private entries.
 /// - Only get ops that haven't been published within the minimum publish interval
@@ -24,6 +23,7 @@ use super::MIN_PUBLISH_INTERVAL;
 pub async fn get_ops_to_publish<AuthorDb>(
     agent: AgentPubKey,
     db: &AuthorDb,
+    min_publish_interval: Duration,
 ) -> WorkflowResult<Vec<(OpBasis, OpHashSized, DhtOp)>>
 where
     AuthorDb: ReadAccess<DbKindAuthored>,
@@ -31,7 +31,7 @@ where
     let recency_threshold = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .ok()
-        .and_then(|epoch| epoch.checked_sub(MIN_PUBLISH_INTERVAL))
+        .and_then(|epoch| epoch.checked_sub(min_publish_interval))
         .map(|t| t.as_secs())
         .unwrap_or(0);
 
@@ -121,6 +121,7 @@ mod tests {
     use ::fixt::prelude::*;
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
+    use holochain_conductor_api::conductor::ConductorTuningParams;
     use holochain_sqlite::db::DbWrite;
     use holochain_sqlite::prelude::DatabaseResult;
     use holochain_state::prelude::*;
@@ -153,9 +154,13 @@ mod tests {
         let agent = fixt!(AgentPubKey);
         let db = test_authored_db();
         let expected = test_data(&db.to_db(), agent.clone()).await;
-        let r = get_ops_to_publish(expected.agent.clone(), &db.to_db())
-            .await
-            .unwrap();
+        let r = get_ops_to_publish(
+            expected.agent.clone(),
+            &db.to_db(),
+            ConductorTuningParams::default().min_publish_interval(),
+        )
+        .await
+        .unwrap();
         assert_eq!(
             r.into_iter()
                 .map(|t| t.1.into_inner().0)
@@ -170,7 +175,7 @@ mod tests {
 
         let num_to_publish = db
             .to_db()
-            .read_async(|txn| num_still_needing_publish(&txn, agent))
+            .read_async(|txn| num_still_needing_publish(txn, agent))
             .await
             .unwrap();
 
@@ -214,7 +219,7 @@ mod tests {
             now
         } else {
             // - WithinMinPeriod: false.
-            now - MIN_PUBLISH_INTERVAL
+            now - ConductorTuningParams::default().min_publish_interval()
         };
 
         let state = if facts.store_entry {
@@ -236,7 +241,7 @@ mod tests {
 
             move |txn| -> DatabaseResult<()> {
                 let hash = query_state.as_hash().clone();
-                insert_op(txn, &query_state).unwrap();
+                insert_op_authored(txn, &query_state).unwrap();
                 set_last_publish_time(txn, &hash, last_publish).unwrap();
                 set_receipts_complete(txn, &hash, facts.has_required_receipts).unwrap();
                 if facts.withold_publish {

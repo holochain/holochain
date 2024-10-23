@@ -1,6 +1,5 @@
 use holo_hash::{AnyLinkableHash, DhtOpHash, HasHash};
 use holochain_p2p::HolochainP2pDnaT;
-use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{ChainOpType, DhtOp, DhtOpHashed},
@@ -54,7 +53,7 @@ pub async fn authored_ops_to_dht_db_without_check(
             for hash in hashes {
                 // This function filters out any private entries from ops
                 // or store entry ops with private entries.
-                if let Some(op) = get_public_op_from_db(&txn, &hash)? {
+                if let Some(op) = get_public_op_from_db(txn, &hash)? {
                     ops.push(op);
                 }
             }
@@ -95,7 +94,7 @@ pub async fn authored_ops_to_dht_db_without_check(
 }
 
 fn insert_locally_validated_op(
-    txn: &mut Transaction,
+    txn: &mut Txn<DbKindDht>,
     op: DhtOpHashed,
 ) -> StateMutationResult<Option<DhtOpHashed>> {
     // These checks are redundant but cheap and future-proof this function
@@ -110,7 +109,7 @@ fn insert_locally_validated_op(
     let op_type = op.get_type();
 
     // Insert the op.
-    insert_op(txn, &op)?;
+    insert_op_dht(txn, &op, None)?;
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 

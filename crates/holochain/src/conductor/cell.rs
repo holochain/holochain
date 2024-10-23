@@ -11,7 +11,6 @@ use std::sync::Arc;
 use futures::future::FutureExt;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
-use rusqlite::Transaction;
 use tokio::sync::broadcast;
 use tracing::*;
 use tracing_futures::Instrument;
@@ -32,9 +31,9 @@ use holochain_types::db_cache::DhtDbQueryCache;
 
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::cell::error::CellResult;
+use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
-use crate::core::queue_consumer::{spawn_queue_consumer_tasks, TriggerSender};
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
@@ -255,7 +254,7 @@ impl Cell {
 
         let author = self.id.agent_pubkey().clone();
         let live_fns = authored_db
-            .write_async(move |txn: &mut Transaction| {
+            .write_async(move |txn| {
                 // Rescheduling should not fail as the data in the database
                 // should be valid schedules only.
                 reschedule_expired(txn, now, &author)?;
@@ -335,7 +334,7 @@ impl Cell {
                 let author = self.id.agent_pubkey().clone();
                 // We don't do anything with errors in here.
                 let _ = authored_db
-                    .write_async(move |txn: &mut Transaction| {
+                    .write_async(move |txn| {
                         for ((scheduled_fn, _), result) in live_fns.iter().zip(results.iter()) {
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
@@ -831,7 +830,12 @@ impl Cell {
                             // Don't fail here if this doesn't work, it's only informational. Getting
                             // the same flag set in the authored db is what will stop the publish
                             // workflow from republishing this op.
-                            set_receipts_complete(txn, &receipt_op_hash, true).ok();
+                            set_receipts_complete_redundantly_in_dht_db(
+                                txn,
+                                &receipt_op_hash,
+                                true,
+                            )
+                            .ok();
                         }
 
                         Ok(receipt_count)
@@ -1083,14 +1087,6 @@ impl Cell {
             .trigger(&"publish_authored_ops");
     }
 
-    pub(crate) fn countersigning_trigger(&self) -> TriggerSender {
-        self.queue_triggers.countersigning.clone()
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    /// Get the triggers for the cell
-    /// Useful for testing when you want to
-    /// Cause workflows to trigger
     pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
     }

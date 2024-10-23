@@ -18,11 +18,11 @@ async fn exists() {
         ChainTopOrdering::default(),
     )
     .unwrap();
-    insert_op(&mut txn, &td.store_entry_op.downcast()).unwrap();
-    assert!(Txn::from(&txn)
+    insert_op_untyped(&mut txn, &td.store_entry_op.downcast()).unwrap();
+    assert!(CascadeTxnWrapper::from(&txn)
         .contains_hash(&td.hash.clone().into())
         .unwrap());
-    assert!(Txn::from(&txn)
+    assert!(CascadeTxnWrapper::from(&txn)
         .contains_hash(&td.action.as_hash().clone().into())
         .unwrap());
     assert!(scratch.contains_hash(&td.hash.clone().into()).unwrap());
