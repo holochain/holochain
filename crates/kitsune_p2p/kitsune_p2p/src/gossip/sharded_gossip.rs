@@ -8,6 +8,7 @@ use crate::types::event::*;
 use crate::types::gossip::*;
 use crate::types::*;
 use crate::{meta_net::*, HostApiLegacy};
+use fetch_pool::GossipType;
 use ghost_actor::dependencies::tracing;
 use governor::clock::DefaultClock;
 use governor::state::{InMemoryState, NotKeyed};

@@ -216,7 +216,7 @@ impl Network {
             Some(n) => (*n).clone(),
         };
 
-        let mut kit = KitsuneP2pConfig::empty();
+        let mut kit = KitsuneP2pConfig::mem();
         kit.bootstrap_service = bootstrap;
 
         match transport {

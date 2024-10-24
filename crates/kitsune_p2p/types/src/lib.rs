@@ -220,6 +220,8 @@ pub mod tx_utils;
 #[cfg(feature = "fixt")]
 pub mod fixt;
 
+pub use fetch_pool::GossipType;
+
 pub use kitsune_p2p_dht as dht;
 pub use kitsune_p2p_dht_arc as dht_arc;
 

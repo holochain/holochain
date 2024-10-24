@@ -448,7 +448,7 @@ pub async fn setup_app_inner(
                 allowed_origins: AllowedOrigins::Any,
             },
         }]),
-        network: network.unwrap_or_else(KitsuneP2pConfig::empty),
+        network: network.unwrap_or_else(KitsuneP2pConfig::mem),
         ..ConductorConfig::empty()
     };
     let conductor_handle = ConductorBuilder::new()

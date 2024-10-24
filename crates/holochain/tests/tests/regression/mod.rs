@@ -1,12 +1,7 @@
 use holo_hash::ActionHash;
 use holochain::conductor::conductor::WASM_CACHE;
-use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::*;
-use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
-use std::sync::Arc;
 
 // make sure the wasm cache at least creates files
 #[tokio::test(flavor = "multi_thread")]
@@ -126,7 +121,7 @@ async fn zero_arc_can_link_to_uncached_base() {
 
     holochain_trace::test_run();
 
-    let mut empty_arc_conductor_config = SweetConductorConfig::rendezvous(false)
+    let empty_arc_conductor_config = SweetConductorConfig::rendezvous(false)
         .no_dpki_mustfix()
         .tune(|t| {
             t.gossip_arc_clamping = String::from("empty");
