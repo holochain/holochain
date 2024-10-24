@@ -200,8 +200,10 @@ default = [
   "tx2",
   "tx5",
   "metrics_influxive",
-  "wasmer_sys",
+  "wasmer_sys_dev",
 ]
+
+prod = ["sqlite-encrypted", "tx2", "tx5", "wasmer_sys_prod"]
 
 tx2 = ["kitsune_p2p/tx2"]
 tx5 = ["kitsune_p2p/tx5", "tx5-go-pion-turn"]
@@ -301,11 +303,17 @@ wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
 wasmer_sys = [
   "dep:wasmer",
   "dep:wasmer-middlewares",
-  "wasmer/default",
   "holochain_wasmer_host/wasmer_sys",
 ]
 
-wasmer_compiler_production = ["wasmer_sys", "wasmer/llvm"]
+wasmer_sys_dev = [
+  "wasmer_sys",
+  "holochain_wasmer_host/wasmer_sys_dev",
+]
+wasmer_sys_prod = [
+  "wasmer_sys",
+  "holochain_wasmer_host/wasmer_sys_prod",
+]
 
 # Enable wasm interpreter (experimental)
 # Incompatible with "wasmer_sys"
