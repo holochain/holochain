@@ -17,7 +17,7 @@ use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
@@ -404,6 +404,18 @@ async fn get_launch_info(mut child: tokio::process::Child) -> LaunchInfo {
             return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();
         }
     }
+
+    let mut buf = String::new();
+    if let Some(stderr) = child.stderr.take() {
+        BufReader::new(stderr)
+            .read_to_string(&mut buf)
+            .await
+            .unwrap();
+        eprintln!("{buf}");
+    } else {
+        panic!("No stderr! Was the process handle dropped?");
+    }
+
     panic!("Unable to find launch info in sandbox output. See stderr above.")
 }
 

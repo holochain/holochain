@@ -596,7 +596,7 @@ impl Agent {
         let environment_path = path.clone();
         let mut config = create_config(admin_port, environment_path.into());
         config.network = KitsuneP2pConfig::default().tune(|mut kc| {
-            kc.tx2_implicit_timeout_ms = 3_000;
+            kc.tx5_implicit_timeout_ms = 3_000;
             kc
         });
         config.keystore = KeystoreConfig::LairServerInProc { lair_root: None };

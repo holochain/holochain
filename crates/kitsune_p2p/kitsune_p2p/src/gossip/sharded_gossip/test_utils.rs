@@ -3,7 +3,7 @@ use std::sync::Arc;
 use kitsune_p2p_types::{
     agent_info::AgentInfoSigned,
     bin_types::{KitsuneAgent, KitsuneBinType, KitsuneOpHash},
-    tx2::tx2_utils::PoolBuf,
+    tx_utils::PoolBuf,
 };
 
 use crate::gossip::{decode_bloom_filter, encode_bloom_filter, MetaOpKey};

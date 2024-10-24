@@ -1,8 +1,8 @@
 use super::*;
 
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::tx2::tx2_adapter::test_utils::*;
 use kitsune_p2p_types::tx2::tx2_adapter::*;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use once_cell::sync::Lazy;
 
@@ -110,7 +110,7 @@ async fn test_rpc_multi_logic_mocked() {
     let evt_sender = build_event_handler(m).await;
     let host_api = HostStub::new();
 
-    let config = Arc::new(KitsuneP2pConfig::default());
+    let config = Arc::new(KitsuneP2pConfig::empty());
 
     // mock out our bind adapter
     let mut m = MockBindAdapt::new();

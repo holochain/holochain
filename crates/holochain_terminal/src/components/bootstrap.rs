@@ -119,8 +119,8 @@ impl Widget for BootstrapWidget {
                 .expect("Should have been able to read network type");
 
             let new_net = match *network_type {
-                BootstrapNet::Tx2 => BootstrapNet::Tx5,
-                BootstrapNet::Tx5 => BootstrapNet::Tx2,
+                // Does nothing, but can accommodate future network types
+                BootstrapNet::Tx5 => BootstrapNet::Tx5,
             };
 
             *network_type = new_net;

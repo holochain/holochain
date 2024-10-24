@@ -1,144 +1,148 @@
-#![allow(irrefutable_let_patterns)]
-use criterion::{/*black_box,*/ criterion_group, criterion_main, Criterion};
-
-use futures::stream::StreamExt;
-use kitsune_p2p_types::tx2::tx2_api::*;
-use kitsune_p2p_types::tx2::tx2_pool_promote::*;
-use kitsune_p2p_types::tx2::tx2_utils::*;
-use kitsune_p2p_types::tx2::*;
-use kitsune_p2p_types::*;
-
-const SIZE: usize = 2048;
-
-kitsune_p2p_types::write_codec_enum! {
-    codec TestData {
-        One(0x01) {
-            data.0: PoolBuf,
-        },
-    }
+fn main() {
+    todo!("rewrite for tx5")
 }
 
-const REQ: &[u8] = &[0xda; SIZE];
-const RES: &[u8] = &[0xdb; SIZE];
+// #![allow(irrefutable_let_patterns)]
+// use criterion::{/*black_box,*/ criterion_group, criterion_main, Criterion};
 
-#[allow(dead_code)]
-struct Test {
-    dst_ep: Tx2EpHnd<TestData>,
-    dst_url: TxUrl,
-    src_ep: Tx2EpHnd<TestData>,
-}
+// use futures::stream::StreamExt;
+// use kitsune_p2p_types::tx2::tx2_api::*;
+// use kitsune_p2p_types::tx2::tx2_pool_promote::*;
+// use kitsune_p2p_types::tx2::*;
+// use kitsune_p2p_types::tx_utils::*;
+// use kitsune_p2p_types::*;
 
-impl Test {
-    pub async fn new() -> Self {
-        let (dst_url, dst_ep) = mk_dst().await;
-        let src_ep = mk_src().await;
+// const SIZE: usize = 2048;
 
-        Self {
-            dst_ep,
-            dst_url,
-            src_ep,
-        }
-    }
+// kitsune_p2p_types::write_codec_enum! {
+//     codec TestData {
+//         One(0x01) {
+//             data.0: PoolBuf,
+//         },
+//     }
+// }
 
-    pub async fn test(&mut self) {
-        let t = KitsuneTimeout::from_millis(5000);
+// const REQ: &[u8] = &[0xda; SIZE];
+// const RES: &[u8] = &[0xdb; SIZE];
 
-        let mut data = PoolBuf::new();
-        data.extend_from_slice(REQ);
-        let data = TestData::one(data);
+// #[allow(dead_code)]
+// struct Test {
+//     dst_ep: Tx2EpHnd<TestData>,
+//     dst_url: TxUrl,
+//     src_ep: Tx2EpHnd<TestData>,
+// }
 
-        let con = self
-            .src_ep
-            .get_connection(self.dst_url.as_str(), t)
-            .await
-            .unwrap();
+// impl Test {
+//     pub async fn new() -> Self {
+//         let (dst_url, dst_ep) = mk_dst().await;
+//         let src_ep = mk_src().await;
 
-        let res = con
-            .request(&data, KitsuneTimeout::from_millis(5000))
-            .await
-            .unwrap();
+//         Self {
+//             dst_ep,
+//             dst_url,
+//             src_ep,
+//         }
+//     }
 
-        if let TestData::One(One { data }) = res {
-            assert_eq!(data.as_ref(), RES);
-        } else {
-            panic!("invalid data");
-        }
-    }
-}
+//     pub async fn test(&mut self) {
+//         let t = KitsuneTimeout::from_millis(5000);
 
-async fn mk_core() -> (TxUrl, Tx2Ep<TestData>, Tx2EpHnd<TestData>) {
-    let t = KitsuneTimeout::from_millis(5000);
+//         let mut data = PoolBuf::new();
+//         data.extend_from_slice(REQ);
+//         let data = TestData::one(data);
 
-    let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
-    let f = tx2_pool_promote(f, Default::default());
-    let f = tx2_api(f, Default::default());
+//         let con = self
+//             .src_ep
+//             .get_connection(self.dst_url.as_str(), t)
+//             .await
+//             .unwrap();
 
-    let ep = f.bind(TxUrl::from_str_panicking("none:"), t).await.unwrap();
-    let ep_hnd = ep.handle().clone();
-    let addr = ep_hnd.local_addr().unwrap();
+//         let res = con
+//             .request(&data, KitsuneTimeout::from_millis(5000))
+//             .await
+//             .unwrap();
 
-    (addr, ep, ep_hnd)
-}
+//         if let TestData::One(One { data }) = res {
+//             assert_eq!(data.as_ref(), RES);
+//         } else {
+//             panic!("invalid data");
+//         }
+//     }
+// }
 
-async fn mk_dst() -> (TxUrl, Tx2EpHnd<TestData>) {
-    let (url, mut ep, ep_hnd) = mk_core().await;
+// async fn mk_core() -> (TxUrl, Tx2Ep<TestData>, Tx2EpHnd<TestData>) {
+//     let t = KitsuneTimeout::from_millis(5000);
 
-    tokio::task::spawn(async move {
-        while let Some(evt) = ep.next().await {
-            if let Tx2EpEvent::IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) = evt {
-                if let TestData::One(One { data }) = data {
-                    assert_eq!(data.as_ref(), REQ);
-                } else {
-                    panic!("invalid data");
-                }
-                let mut data = PoolBuf::new();
-                data.extend_from_slice(RES);
-                let data = TestData::one(data);
-                respond
-                    .respond(data, KitsuneTimeout::from_millis(5000))
-                    .await
-                    .unwrap();
-            }
-        }
-    });
+//     let f = tx2_mem_adapter(MemConfig::default()).await.unwrap();
+//     let f = tx2_pool_promote(f, Default::default());
+//     let f = tx2_api(f, Default::default());
 
-    (url, ep_hnd)
-}
+//     let ep = f.bind(TxUrl::from_str_panicking("none:"), t).await.unwrap();
+//     let ep_hnd = ep.handle().clone();
+//     let addr = ep_hnd.local_addr().unwrap();
 
-async fn mk_src() -> Tx2EpHnd<TestData> {
-    let (_url, mut ep, ep_hnd) = mk_core().await;
+//     (addr, ep, ep_hnd)
+// }
 
-    tokio::task::spawn(async move { while let Some(_evt) = ep.next().await {} });
+// async fn mk_dst() -> (TxUrl, Tx2EpHnd<TestData>) {
+//     let (url, mut ep, ep_hnd) = mk_core().await;
 
-    ep_hnd
-}
+//     tokio::task::spawn(async move {
+//         while let Some(evt) = ep.next().await {
+//             if let Tx2EpEvent::IncomingRequest(Tx2EpIncomingRequest { data, respond, .. }) = evt {
+//                 if let TestData::One(One { data }) = data {
+//                     assert_eq!(data.as_ref(), REQ);
+//                 } else {
+//                     panic!("invalid data");
+//                 }
+//                 let mut data = PoolBuf::new();
+//                 data.extend_from_slice(RES);
+//                 let data = TestData::one(data);
+//                 respond
+//                     .respond(data, KitsuneTimeout::from_millis(5000))
+//                     .await
+//                     .unwrap();
+//             }
+//         }
+//     });
 
-async fn test(this: &Share<Option<Test>>) {
-    let mut t = this.share_mut(|i, _| Ok(i.take().unwrap())).unwrap();
-    t.test().await;
-    this.share_mut(move |i, _| {
-        *i = Some(t);
-        Ok(())
-    })
-    .unwrap();
-}
+//     (url, ep_hnd)
+// }
 
-fn api_thru(rt: &tokio::runtime::Runtime, t: &Share<Option<Test>>) {
-    rt.block_on(async {
-        test(t).await;
-    });
-}
+// async fn mk_src() -> Tx2EpHnd<TestData> {
+//     let (_url, mut ep, ep_hnd) = mk_core().await;
 
-fn criterion_benchmark(c: &mut Criterion) {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
+//     tokio::task::spawn(async move { while let Some(_evt) = ep.next().await {} });
 
-    let t = rt.block_on(async { Share::new(Some(Test::new().await)) });
+//     ep_hnd
+// }
 
-    c.bench_function("api-thru-mem", |b| b.iter(|| api_thru(&rt, &t)));
-}
+// async fn test(this: &Share<Option<Test>>) {
+//     let mut t = this.share_mut(|i, _| Ok(i.take().unwrap())).unwrap();
+//     t.test().await;
+//     this.share_mut(move |i, _| {
+//         *i = Some(t);
+//         Ok(())
+//     })
+//     .unwrap();
+// }
 
-criterion_group!(benches, criterion_benchmark);
-criterion_main!(benches);
+// fn api_thru(rt: &tokio::runtime::Runtime, t: &Share<Option<Test>>) {
+//     rt.block_on(async {
+//         test(t).await;
+//     });
+// }
+
+// fn criterion_benchmark(c: &mut Criterion) {
+//     let rt = tokio::runtime::Builder::new_multi_thread()
+//         .enable_all()
+//         .build()
+//         .unwrap();
+
+//     let t = rt.block_on(async { Share::new(Some(Test::new().await)) });
+
+//     c.bench_function("api-thru-mem", |b| b.iter(|| api_thru(&rt, &t)));
+// }
+
+// criterion_group!(benches, criterion_benchmark);
+// criterion_main!(benches);

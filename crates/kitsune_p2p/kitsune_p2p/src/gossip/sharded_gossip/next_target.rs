@@ -55,12 +55,19 @@ impl ShardedGossipLocal {
                 .url_list
                 .iter()
                 .filter_map(|url| {
-                    kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str())
+                    kitsune_p2p_types::tx_utils::ProxyUrl::from_full(url.as_str())
                         .map_err(|e| tracing::error!("Failed to parse url {:?}", e))
                         .ok()
-                        .map(|purl| (info.clone(), purl.digest().0.into(), url.to_string()))
+                        .map(|purl| {
+                            KitsuneResult::Ok((
+                                info.clone(),
+                                purl.digest()?.0.into(),
+                                url.to_string(),
+                            ))
+                        })
                 })
-                .next();
+                .next()
+                .transpose()?;
 
             // If we found a remote address add this agent to the node
             // or create the node if it doesn't exist.
@@ -217,10 +224,10 @@ mod tests {
             .map(|_| {
                 let info = random_agent_info(&mut rng);
                 let url = info.url_list.first().unwrap().clone();
-                let purl = kitsune_p2p_proxy::ProxyUrl::from_full(url.as_str()).unwrap();
+                let purl = kitsune_p2p_types::tx_utils::ProxyUrl::from_full(url.as_str()).unwrap();
                 Node {
                     agent_info_list: vec![info],
-                    cert: NodeCert::from(purl.digest().0),
+                    cert: NodeCert::from(purl.digest().unwrap().0),
                     url,
                 }
             })

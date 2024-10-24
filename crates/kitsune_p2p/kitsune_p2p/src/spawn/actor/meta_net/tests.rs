@@ -1,4 +1,9 @@
 #![allow(clippy::field_reassign_with_default)] // just easier to read/wriet
+use self::{
+    spawn::actor::{InternalHandler, InternalHandlerResult},
+    test_util::start_signal_srv,
+};
+
 use super::*;
 
 use kitsune_p2p_fetch::OpHashSized;
@@ -31,7 +36,7 @@ use crate::spawn::BroadcastData;
 use crate::event::GetAgentInfoSignedEvt;
 use crate::event::*;
 
-use crate::spawn::{Internal, InternalHandler, InternalHandlerResult};
+use crate::spawn::Internal;
 
 macro_rules! write_test_struct {
     ($(
@@ -400,18 +405,6 @@ impl Test {
     }
 }
 
-async fn start_signal_srv() -> (std::net::SocketAddr, sbd_server::SbdServer) {
-    let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
-        bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
-        limit_clients: 100,
-        ..Default::default()
-    }))
-    .await
-    .unwrap();
-
-    (*server.bind_addrs().first().unwrap(), server)
-}
-
 struct Setup2Nodes {
     tuning_params: KitsuneP2pTuningParams,
     _sig_hnd: sbd_server::SbdServer,
@@ -437,7 +430,6 @@ impl Setup2Nodes {
         user_data_b: PreflightUserData,
     ) -> Self {
         let mut tuning_params = config::tuning_params_struct::KitsuneP2pTuningParams::default();
-        tuning_params.tx2_implicit_timeout_ms = 500;
         tuning_params.tx5_timeout_s = 4;
         let tuning_params = Arc::new(tuning_params);
 

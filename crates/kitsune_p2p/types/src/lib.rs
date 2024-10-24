@@ -21,6 +21,8 @@ pub mod dependencies {
     pub use ::proptest_derive;
 }
 
+use std::sync::Arc;
+
 /// Typedef for result of `proc_count_now()`.
 /// This value is on the scale of microseconds.
 pub type ProcCountMicros = i64;
@@ -88,152 +90,6 @@ impl CertDigestExt for CertDigest {
         out.into()
     }
 }
-
-/// Wrapper around CertDigest that provides some additional debugging helpers.
-#[derive(Clone)]
-pub struct Tx2Cert(pub Arc<(CertDigest, String, String)>);
-
-impl From<Tx2Cert> for bin_types::NodeCert {
-    fn from(f: Tx2Cert) -> Self {
-        f.0 .0 .0.clone().into()
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for Tx2Cert {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self::from(u.bytes(32)?.to_vec()))
-    }
-}
-
-impl Tx2Cert {
-    /// get the tls cert digest
-    pub fn as_digest(&self) -> &CertDigest {
-        self.as_ref()
-    }
-
-    /// get the cert bytes
-    pub fn as_bytes(&self) -> &[u8] {
-        self.as_ref()
-    }
-
-    /// get the base64 representation
-    pub fn as_str(&self) -> &str {
-        self.as_ref()
-    }
-
-    /// get the base64 nickname
-    pub fn as_nick(&self) -> &str {
-        &self.0 .2
-    }
-}
-
-impl std::fmt::Debug for Tx2Cert {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Cert(")?;
-        f.write_str(self.as_nick())?;
-        f.write_str(")")?;
-        Ok(())
-    }
-}
-
-impl PartialEq for Tx2Cert {
-    fn eq(&self, oth: &Self) -> bool {
-        self.0 .0.eq(&oth.0 .0)
-    }
-}
-
-impl Eq for Tx2Cert {}
-
-impl PartialOrd for Tx2Cert {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Tx2Cert {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0 .0.cmp(&other.0 .0)
-    }
-}
-
-impl std::hash::Hash for Tx2Cert {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0 .0.hash(state);
-    }
-}
-
-impl std::ops::Deref for Tx2Cert {
-    type Target = CertDigest;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0 .0
-    }
-}
-
-impl std::convert::AsRef<CertDigest> for Tx2Cert {
-    fn as_ref(&self) -> &CertDigest {
-        std::ops::Deref::deref(self)
-    }
-}
-
-impl std::convert::AsRef<[u8]> for Tx2Cert {
-    fn as_ref(&self) -> &[u8] {
-        &*self.0 .0
-    }
-}
-
-impl std::convert::AsRef<str> for Tx2Cert {
-    fn as_ref(&self) -> &str {
-        &self.0 .1
-    }
-}
-
-impl From<Vec<u8>> for Tx2Cert {
-    fn from(v: Vec<u8>) -> Self {
-        Arc::new(v).into()
-    }
-}
-
-impl From<Arc<Vec<u8>>> for Tx2Cert {
-    fn from(v: Arc<Vec<u8>>) -> Self {
-        CertDigest::from_slice(&v).into()
-    }
-}
-
-impl From<CertDigest> for Tx2Cert {
-    fn from(c: CertDigest) -> Self {
-        let b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(*c);
-        let nick = {
-            let (start, _) = b64.split_at(6);
-            let (_, end) = b64.split_at(b64.len() - 6);
-            format!("{}..{}", start, end)
-        };
-        Self(Arc::new((c, b64, nick)))
-    }
-}
-
-impl From<&CertDigest> for Tx2Cert {
-    fn from(c: &CertDigest) -> Self {
-        c.clone().into()
-    }
-}
-
-impl From<Tx2Cert> for CertDigest {
-    fn from(d: Tx2Cert) -> Self {
-        d.0 .0.clone()
-    }
-}
-
-impl From<&Tx2Cert> for CertDigest {
-    fn from(d: &Tx2Cert) -> Self {
-        d.0 .0.clone()
-    }
-}
-
-use base64::Engine;
-use config::KitsuneP2pTuningParams;
-use std::sync::Arc;
 
 /// Error related to remote communication.
 #[derive(Debug, thiserror::Error)]
@@ -359,11 +215,12 @@ pub mod metrics;
 pub mod task_agg;
 pub mod tls;
 pub use kitsune_p2p_bin_data as bin_types;
+pub mod tx_utils;
+
 #[cfg(feature = "fixt")]
 pub mod fixt;
 
-#[cfg(feature = "tx2")]
-pub mod tx2;
+pub use fetch_pool::GossipType;
 
 pub use kitsune_p2p_dht as dht;
 pub use kitsune_p2p_dht_arc as dht_arc;
@@ -378,22 +235,3 @@ pub type KOpHash = Arc<bin_types::KitsuneOpHash>;
 pub type KSpace = Arc<bin_types::KitsuneSpace>;
 /// KitsuneOpData in an Arc
 pub type KOpData = Arc<bin_types::KitsuneOpData>;
-
-pub use fetch_pool::GossipType;
-use metrics::metric_task;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "tx2")]
-    async fn test_tx2_digest() {
-        let d: Tx2Cert = vec![0xdb; 32].into();
-        println!("raw_debug: {:?}", d);
-        println!("as_digest: {:?}", d.as_digest());
-        println!("as_bytes: {:?}", d.as_bytes());
-        println!("as_str: {:?}", d.as_str());
-        println!("as_nick: {:?}", d.as_nick());
-    }
-}

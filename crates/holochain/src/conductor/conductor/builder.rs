@@ -9,7 +9,6 @@ use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_p2p::NetworkCompatParams;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
-#[derive(Default)]
 pub struct ConductorBuilder {
     /// The configuration
     pub config: ConductorConfig,
@@ -51,7 +50,26 @@ pub struct ConductorBuilder {
 impl ConductorBuilder {
     /// Default ConductorBuilder.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            config: ConductorConfig::empty(),
+            ribosome_store: Default::default(),
+            passphrase: None,
+            keystore: None,
+            no_print_setup: false,
+            danger_print_db_secrets: false,
+            #[cfg(any(test, feature = "test_utils"))]
+            state: None,
+            #[cfg(any(test, feature = "test_utils"))]
+            dpki: None,
+            #[cfg(any(test, feature = "test_utils"))]
+            generate_test_device_seed: false,
+        }
+    }
+}
+
+impl Default for ConductorBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

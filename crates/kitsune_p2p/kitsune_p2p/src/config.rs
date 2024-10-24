@@ -1,6 +1,6 @@
 use kitsune_p2p_types::config::{tuning_params_struct, KitsuneP2pTuningParams};
 use kitsune_p2p_types::tx2::tx2_adapter::AdapterFactory;
-use kitsune_p2p_types::tx2::tx2_utils::*;
+use kitsune_p2p_types::tx_utils::*;
 use kitsune_p2p_types::*;
 use url2::Url2;
 
