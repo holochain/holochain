@@ -1,5 +1,6 @@
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::{CallContext, RibosomeT};
+use holochain_sqlite::db::DbKindDht;
 use holochain_sqlite::prelude::DbRead;
 use holochain_state::prelude::validation_receipts_for_action;
 use holochain_types::access::{HostFnAccess, Permission};
@@ -8,7 +9,6 @@ use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner, Wasm
 use holochain_zome_types::prelude::{GetValidationReceiptsInput, ValidationReceiptSet};
 use std::sync::Arc;
 use wasmer::RuntimeError;
-use holochain_sqlite::db::DbKindDht;
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context), fields(?call_context.zome, function = ?call_context.function_name)))]
 pub fn get_validation_receipts(
@@ -26,10 +26,7 @@ pub fn get_validation_receipts(
 
                 dht_db
                     .read_async(move |txn| {
-                        validation_receipts_for_action(
-                            &txn,
-                            input.action_hash.clone(),
-                        )
+                        validation_receipts_for_action(txn, input.action_hash.clone())
                     })
                     .await
             })

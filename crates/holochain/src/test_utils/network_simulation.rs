@@ -426,7 +426,7 @@ async fn create_test_data(
             .read_async({
                 let agent_pk = cell.agent_pubkey().clone();
                 move |txn| -> DatabaseResult<HashMap<Arc<DhtOpHash>, ChainOpHashed>> {
-                    Ok(get_authored_chain_ops(&txn, &agent_pk))
+                    Ok(get_authored_chain_ops(txn, &agent_pk))
                 }
             })
             .await

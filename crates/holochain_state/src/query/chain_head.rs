@@ -161,6 +161,7 @@ mod tests {
                 &fixt!(DhtOpHash),
                 &op_order,
                 &action.action().timestamp(),
+                None,
             )
             .unwrap();
         }
@@ -176,7 +177,6 @@ mod tests {
         let query = ChainHeadQuery::new(Arc::new(author));
 
         let head = query.run(DbScratch::new(&[&mut txn], &scratch)).unwrap();
-        // let head = query.run(Txn::from(&txn)).unwrap();
         assert_eq!(
             head.unwrap(),
             HeadInfo {
