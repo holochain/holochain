@@ -3,184 +3,186 @@ use holochain_types::prelude::ChainItem;
 
 use super::*;
 
-#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-pub(crate) async fn graft_records_onto_source_chain(
-    conductor: ConductorHandle,
-    cell_id: CellId,
-    validate: bool,
-    records: Vec<Record>,
-) -> ConductorApiResult<()> {
-    // Require that the cell is installed.
-    if let err @ Err(ConductorError::CellMissing(_)) = conductor.cell_by_id(&cell_id).await {
-        let _ = err?;
+impl Conductor {
+    /// Inject records into a source chain for a cell.
+    /// If the records form a chain segment that can be "grafted" onto the existing chain, it will be.
+    /// Otherwise, a new chain will be formed using the specified records.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    pub(crate) async fn graft_records_onto_source_chain(
+        self: Arc<Self>,
+        cell_id: CellId,
+        validate: bool,
+        records: Vec<Record>,
+    ) -> ConductorApiResult<()> {
+        // Require that the cell is installed.
+        if let err @ Err(ConductorError::CellMissing(_)) = self.cell_by_id(&cell_id).await {
+            let _ = err?;
+        }
+
+        // Get or create the space for this cell.
+        let space = self.get_or_create_space(cell_id.dna_hash())?;
+
+        let chc = None;
+        let network = self.holochain_p2p().to_dna(cell_id.dna_hash().clone(), chc);
+
+        let source_chain: SourceChain = space
+            .source_chain(self.keystore().clone(), cell_id.agent_pubkey().clone())
+            .await?;
+
+        let existing = source_chain
+            .query(ChainQueryFilter::new().descending())
+            .await?
+            .into_iter()
+            .map(|r| r.signed_action)
+            .collect::<Vec<SignedActionHashed>>();
+
+        let graft = ChainGraft::new(existing, records).rebalance();
+        let chain_top = graft.existing_chain_top();
+
+        if validate {
+            self.clone()
+                .validate_records(&cell_id, &chain_top, graft.incoming())
+                .await?;
+        }
+
+        // Produce the op lites for each record.
+        let data = graft
+            .incoming
+            .into_iter()
+            .map(|el| {
+                let ops = produce_op_lites_from_records(vec![&el])?;
+                // Check have the same author as cell.
+                let (sah, entry) = el.into_inner();
+                if sah.action().author() != cell_id.agent_pubkey() {
+                    return Err(StateMutationError::AuthorsMustMatch);
+                }
+                Ok((sah, ops, entry.into_option()))
+            })
+            .collect::<StateMutationResult<Vec<_>>>()?;
+
+        // Commit the records to the source chain.
+        let ops_to_integrate = space
+            .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
+            .write_async({
+                let cell_id = cell_id.clone();
+                move |txn| {
+                    if let Some((_, seq)) = chain_top {
+                        // Remove records above the grafting position.
+                        //
+                        // NOTES:
+                        // - the chain top may have moved since the grafting call began,
+                        //   but it doesn't really matter, since we explicitly want to
+                        //   clobber anything beyond the grafting point anyway.
+                        // - if there is an existing fork, there may still be a fork after the
+                        //   grafting. A more rigorous approach would thin out the existing
+                        //   actions until a single fork is obtained.
+                        txn.execute(
+                            holochain_sqlite::sql::sql_cell::DELETE_ACTIONS_AFTER_SEQ,
+                            rusqlite::named_params! {
+                                ":author": cell_id.agent_pubkey(),
+                                ":seq": seq
+                            },
+                        )
+                        .map_err(StateMutationError::from)?;
+                    }
+
+                    let mut ops_to_integrate = Vec::new();
+
+                    // Commit the records and ops to the authored db.
+                    for (sah, ops, entry) in data {
+                        // Clippy is wrong :(
+                        #[allow(clippy::needless_collect)]
+                        let basis = ops
+                            .iter()
+                            .map(|op| op.dht_basis().clone())
+                            .collect::<Vec<_>>();
+                        ops_to_integrate.extend(
+                            source_chain::put_raw(txn, sah, ops, entry)?
+                                .into_iter()
+                                .zip(basis.into_iter()),
+                        );
+                    }
+                    SourceChainResult::Ok(ops_to_integrate)
+                }
+            })
+            .await?;
+
+        // Check which ops need to be integrated.
+        // Only integrated if a cell is installed.
+        if self.running_cell_ids().contains(&cell_id) {
+            holochain_state::integrate::authored_ops_to_dht_db(
+                &network,
+                ops_to_integrate,
+                space
+                    .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
+                    .into(),
+                space.dht_db.clone(),
+                &space.dht_query_cache,
+            )
+            .await?;
+
+            // Any ops that were moved to the dht_db but had dependencies will need to be integrated.
+            self.cell_by_id(&cell_id)
+                .await?
+                .notify_authored_ops_moved_to_limbo();
+        }
+        Ok(())
     }
 
-    // Get or create the space for this cell.
-    let space = conductor.get_or_create_space(cell_id.dna_hash())?;
+    async fn validate_records(
+        self: Arc<Self>,
+        cell_id: &CellId,
+        chain_top: &Option<(ActionHash, u32)>,
+        records: &[Record],
+    ) -> ConductorApiResult<()> {
+        let space = self.get_or_create_space(cell_id.dna_hash())?;
+        let ribosome = self.get_ribosome(cell_id.dna_hash())?;
+        let chc = None;
+        let network = self.holochain_p2p().to_dna(cell_id.dna_hash().clone(), chc);
 
-    let chc = None;
-    let network = conductor
-        .holochain_p2p()
-        .to_dna(cell_id.dna_hash().clone(), chc);
-
-    let source_chain: SourceChain = space
-        .source_chain(conductor.keystore().clone(), cell_id.agent_pubkey().clone())
-        .await?;
-
-    let existing = source_chain
-        .query(ChainQueryFilter::new().descending())
-        .await?
-        .into_iter()
-        .map(|r| r.signed_action)
-        .collect::<Vec<SignedActionHashed>>();
-
-    let graft = ChainGraft::new(existing, records).rebalance();
-    let chain_top = graft.existing_chain_top();
-
-    if validate {
-        validate_records(conductor.clone(), &cell_id, &chain_top, graft.incoming()).await?;
-    }
-
-    // Produce the op lites for each record.
-    let data = graft
-        .incoming
-        .into_iter()
-        .map(|el| {
-            let ops = produce_op_lites_from_records(vec![&el])?;
-            // Check have the same author as cell.
-            let (sah, entry) = el.into_inner();
-            if sah.action().author() != cell_id.agent_pubkey() {
-                return Err(StateMutationError::AuthorsMustMatch);
-            }
-            Ok((sah, ops, entry.into_option()))
-        })
-        .collect::<StateMutationResult<Vec<_>>>()?;
-
-    // Commit the records to the source chain.
-    let ops_to_integrate = space
-        .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
-        .write_async({
-            let cell_id = cell_id.clone();
-            move |txn| {
-                if let Some((_, seq)) = chain_top {
-                    // Remove records above the grafting position.
-                    //
-                    // NOTES:
-                    // - the chain top may have moved since the grafting call began,
-                    //   but it doesn't really matter, since we explicitly want to
-                    //   clobber anything beyond the grafting point anyway.
-                    // - if there is an existing fork, there may still be a fork after the
-                    //   grafting. A more rigorous approach would thin out the existing
-                    //   actions until a single fork is obtained.
-                    txn.execute(
-                        holochain_sqlite::sql::sql_cell::DELETE_ACTIONS_AFTER_SEQ,
-                        rusqlite::named_params! {
-                            ":author": cell_id.agent_pubkey(),
-                            ":seq": seq
-                        },
-                    )
-                    .map_err(StateMutationError::from)?;
-                }
-
-                let mut ops_to_integrate = Vec::new();
-
-                // Commit the records and ops to the authored db.
-                for (sah, ops, entry) in data {
-                    // Clippy is wrong :(
-                    #[allow(clippy::needless_collect)]
-                    let basis = ops
-                        .iter()
-                        .map(|op| op.dht_basis().clone())
-                        .collect::<Vec<_>>();
-                    ops_to_integrate.extend(
-                        source_chain::put_raw(txn, sah, ops, entry)?
-                            .into_iter()
-                            .zip(basis.into_iter()),
-                    );
-                }
-                SourceChainResult::Ok(ops_to_integrate)
-            }
-        })
-        .await?;
-
-    // Check which ops need to be integrated.
-    // Only integrated if a cell is installed.
-    if conductor.running_cell_ids().contains(&cell_id) {
-        holochain_state::integrate::authored_ops_to_dht_db(
-            &network,
-            ops_to_integrate,
-            space
-                .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
-                .into(),
+        // Create a raw source chain to validate against because
+        // genesis may not have been run yet.
+        let workspace = SourceChainWorkspace::raw_empty(
+            space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?,
             space.dht_db.clone(),
-            &space.dht_query_cache,
+            space.dht_query_cache.clone(),
+            space.cache_db.clone(),
+            self.keystore().clone(),
+            cell_id.agent_pubkey().clone(),
+            Arc::new(ribosome.dna_def().as_content().clone()),
         )
         .await?;
 
-        // Any ops that were moved to the dht_db but had dependencies will need to be integrated.
-        conductor
-            .cell_by_id(&cell_id)
-            .await?
-            .notify_authored_ops_moved_to_limbo();
+        let sc = workspace.source_chain();
+
+        // Validate the chain.
+        validate_chain(records.iter().map(|e| e.signed_action()), chain_top)
+            .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
+
+        // Add the records to the source chain so we can validate them.
+        sc.scratch()
+            .apply(|scratch| {
+                for r in records {
+                    holochain_state::prelude::insert_record_scratch(
+                        scratch,
+                        r.clone(),
+                        Default::default(),
+                    );
+                }
+            })
+            .map_err(SourceChainError::from)?;
+
+        // Run the individual record validations.
+        crate::core::workflow::inline_validation(
+            workspace.clone(),
+            network.clone(),
+            self.clone(),
+            ribosome,
+        )
+        .await?;
+
+        Ok(())
     }
-    Ok(())
-}
-
-async fn validate_records(
-    handle: ConductorHandle,
-    cell_id: &CellId,
-    chain_top: &Option<(ActionHash, u32)>,
-    records: &[Record],
-) -> ConductorApiResult<()> {
-    let space = handle.get_or_create_space(cell_id.dna_hash())?;
-    let ribosome = handle.get_ribosome(cell_id.dna_hash())?;
-    let chc = None;
-    let network = handle
-        .holochain_p2p()
-        .to_dna(cell_id.dna_hash().clone(), chc);
-
-    // Create a raw source chain to validate against because
-    // genesis may not have been run yet.
-    let workspace = SourceChainWorkspace::raw_empty(
-        space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?,
-        space.dht_db.clone(),
-        space.dht_query_cache.clone(),
-        space.cache_db.clone(),
-        handle.keystore().clone(),
-        cell_id.agent_pubkey().clone(),
-        Arc::new(ribosome.dna_def().as_content().clone()),
-    )
-    .await?;
-
-    let sc = workspace.source_chain();
-
-    // Validate the chain.
-    validate_chain(records.iter().map(|e| e.signed_action()), chain_top)
-        .map_err(|e| SourceChainError::InvalidCommit(e.to_string()))?;
-
-    // Add the records to the source chain so we can validate them.
-    sc.scratch()
-        .apply(|scratch| {
-            for r in records {
-                holochain_state::prelude::insert_record_scratch(
-                    scratch,
-                    r.clone(),
-                    Default::default(),
-                );
-            }
-        })
-        .map_err(SourceChainError::from)?;
-
-    // Run the individual record validations.
-    crate::core::workflow::inline_validation(
-        workspace.clone(),
-        network.clone(),
-        handle.clone(),
-        ribosome,
-    )
-    .await?;
-
-    Ok(())
 }
 
 /// Specifies a set of existing actions forming a chain, and a set of incoming actions
