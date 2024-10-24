@@ -767,6 +767,13 @@ async fn session_rollback_with_chc_enabled() {
     await_consistency(60, [alice, bob]).await.unwrap();
 }
 
+// This test is flaky on macos (locally?).
+// The problem only occurs when DPKI is enabled. The app is slow to react on the websocket, and therefore
+// the ws is closed and kept closed for 5 mins before it's re-connected.
+// As this is exclusive to DPKI, it's got something to do with DPKI execution, perhaps init or wasm
+// compilation, and is unrelated to websockets or kitsune.
+// When work on DPKI is resumed and this test is still flaky, this could serve as starting point for further
+// investigation.
 #[cfg(feature = "chc")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
