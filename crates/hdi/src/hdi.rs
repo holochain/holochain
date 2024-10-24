@@ -189,6 +189,7 @@ impl HdiT for HostHdi {
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         host_call::<(), ZomeInfo>(__hc__zome_info_1, ())
     }
+    #[cfg(feature = "unstable-hdk-functions")]
     fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
         host_call::<(AgentPubKey, AgentPubKey), bool>(__hc__is_same_agent_1, (key_1, key_2))
     }
