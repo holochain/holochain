@@ -163,12 +163,12 @@ where
 fn default_network_config() -> KitsuneP2pConfig {
     cfg_if::cfg_if! {
         if #[cfg(feature = "network-sharding")] {
-            KitsuneP2pConfig::default()
-        } else {
             KitsuneP2pConfig::default().tune(|mut tune| {
                 tune.gossip_arc_clamping = "full".to_string();
                 tune
             })
+        } else {
+            KitsuneP2pConfig::default()
         }
     }
 }
@@ -338,7 +338,7 @@ mod tests {
       type: danger_test_keystore
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             result,
             ConductorConfig {
                 tracing_override: None,
@@ -467,7 +467,7 @@ mod tests {
       connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
