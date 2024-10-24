@@ -48,6 +48,7 @@ impl Query for GetAgentActivityRecordsQuery {
                 -- is an action authored by this agent
                 Action.author = :author
                 AND DhtOp.type = :chain_op_type
+                AND DhtOp.withhold_publish IS NULL
             )
             OR
             (
