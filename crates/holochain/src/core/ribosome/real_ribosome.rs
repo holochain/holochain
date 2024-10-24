@@ -7,7 +7,6 @@ use super::host_fn::delete_clone_cell::delete_clone_cell;
 use super::host_fn::disable_clone_cell::disable_clone_cell;
 use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
-use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
 use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
@@ -27,9 +26,7 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::CallStream;
-use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
-use crate::core::ribosome::host_fn::block_agent::block_agent;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::call_info::call_info;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
@@ -51,21 +48,17 @@ use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash::hash;
-use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
 use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
 use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::send_remote_signal::send_remote_signal;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
-use crate::core::ribosome::host_fn::sleep::sleep;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::trace::trace;
-use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
 use crate::core::ribosome::host_fn::version::version;
@@ -103,6 +96,19 @@ use wasmer::Module;
 use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
+
+#[cfg(feature = "unstable-hdk-functions")]
+use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
+#[cfg(feature = "unstable-hdk-functions")]
+use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
+#[cfg(feature = "unstable-hdk-functions")]
+use crate::core::ribosome::host_fn::block_agent::block_agent;
+#[cfg(feature = "unstable-hdk-functions")]
+use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
+#[cfg(feature = "unstable-hdk-functions")]
+use crate::core::ribosome::host_fn::schedule::schedule;
+#[cfg(feature = "unstable-hdk-functions")]
+use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
 
 use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
@@ -532,20 +538,7 @@ impl RealRibosome {
         };
 
         host_fn_builder
-            .with_host_function(
-                &mut ns,
-                "__hc__accept_countersigning_preflight_request_1",
-                accept_countersigning_preflight_request,
-            )
-            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
-            .with_host_function(
-                &mut ns,
-                "__hc__get_agent_key_lineage_1",
-                get_agent_key_lineage,
-            )
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
-            .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             .with_host_function(&mut ns, "__hc__trace_1", trace)
             .with_host_function(&mut ns, "__hc__hash_1", hash)
             .with_host_function(&mut ns, "__hc__version_1", version)
@@ -608,7 +601,6 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__call_info_1", call_info)
             .with_host_function(&mut ns, "__hc__random_bytes_1", random_bytes)
             .with_host_function(&mut ns, "__hc__sys_time_1", sys_time)
-            .with_host_function(&mut ns, "__hc__sleep_1", sleep)
             .with_host_function(&mut ns, "__hc__capability_claims_1", capability_claims)
             .with_host_function(&mut ns, "__hc__capability_grants_1", capability_grants)
             .with_host_function(&mut ns, "__hc__capability_info_1", capability_info)
@@ -639,8 +631,6 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__delete_link_1", delete_link)
             .with_host_function(&mut ns, "__hc__update_1", update)
             .with_host_function(&mut ns, "__hc__delete_1", delete)
-            .with_host_function(&mut ns, "__hc__schedule_1", schedule)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
             .with_host_function(&mut ns, "__hc__disable_clone_cell_1", disable_clone_cell)
             .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
@@ -652,6 +642,25 @@ impl RealRibosome {
                 "__hc__get_validation_receipts_1",
                 get_validation_receipts,
             );
+
+        #[cfg(feature = "unstable-hdk-functions")]
+        {
+            let host_fn_builder = host_fn_builder
+                .with_host_function(
+                    &mut ns,
+                    "__hc__accept_countersigning_preflight_request_1",
+                    accept_countersigning_preflight_request,
+                )
+                .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
+                .with_host_function(
+                    &mut ns,
+                    "__hc__get_agent_key_lineage_1",
+                    get_agent_key_lineage,
+                )
+                .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
+                .with_host_function(&mut ns, "__hc__schedule_1", schedule)
+                .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent);
+        }
 
         imports.register_namespace("env", ns);
 
