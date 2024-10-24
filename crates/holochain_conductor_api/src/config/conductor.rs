@@ -126,7 +126,7 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Optional config for the network module.
-    #[serde(default)]
+    #[serde(default = "default_network_config")]
     pub network: KitsuneP2pConfig,
 
     /// Optional specification of Chain Head Coordination service URL.
@@ -158,6 +158,19 @@ where
     T: DeserializeOwned,
 {
     serde_yaml::from_str(yaml).map_err(ConductorConfigError::SerializationError)
+}
+
+fn default_network_config() -> KitsuneP2pConfig {
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "network-sharding")] {
+            KitsuneP2pConfig::default().tune(|mut tune| {
+                tune.gossip_arc_clamping = "full".to_string();
+                tune
+            })
+        } else {
+            KitsuneP2pConfig::default()
+        }
+    }
 }
 
 impl ConductorConfig {
@@ -325,7 +338,7 @@ mod tests {
       type: danger_test_keystore
     "#;
         let result: ConductorConfig = config_from_yaml(yaml).unwrap();
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             result,
             ConductorConfig {
                 tracing_override: None,
@@ -454,7 +467,7 @@ mod tests {
       connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             result.unwrap(),
             ConductorConfig {
                 tracing_override: None,
@@ -473,5 +486,22 @@ mod tests {
                 tuning_params: None,
             }
         );
+    }
+
+    #[test]
+    #[cfg(not(feature = "network-sharding"))]
+    fn test_config_default_network_config_no_sharding() {
+        let config = ConductorConfig::default();
+        assert_eq!(
+            config.network.tuning_params.arc_clamping(),
+            Some(kitsune_p2p::dht::arq::ArqClamping::Full)
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "network-sharding")]
+    fn test_config_default_network_config_sharding() {
+        let config = ConductorConfig::default();
+        assert_eq!(config.network.tuning_params.arc_clamping(), None);
     }
 }
