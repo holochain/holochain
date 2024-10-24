@@ -8,7 +8,7 @@ impl Conductor {
     /// If the records form a chain segment that can be "grafted" onto the existing chain, it will be.
     /// Otherwise, a new chain will be formed using the specified records.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    pub(crate) async fn graft_records_onto_source_chain(
+    pub async fn graft_records_onto_source_chain(
         self: Arc<Self>,
         cell_id: CellId,
         validate: bool,
