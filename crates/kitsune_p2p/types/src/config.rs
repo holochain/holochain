@@ -276,6 +276,18 @@ pub mod tuning_params_struct {
         /// Set this to `true` to enable verbose webrtc backend tracing.
         tx5_backend_tracing_enabled: bool = false,
 
+        /// The backend tx5 module to be used. This defaults to "go_pion"
+        /// which is also the default if unspecified or invalid.
+        /// Options currently inclued:
+        /// - "go_pion" - based off the golang pion webrtc library
+        /// - "mem" - a stub memory backend for performance/validation testing
+        tx5_backend_module: String = "go_pion".to_string(),
+
+        /// The additional tx5 backend module config. This should be
+        /// a json object with backend module specific configuration
+        /// as specified by tx5. Defaults to an empty object ("{}").
+        tx5_backend_module_config: String = "{}".to_string(),
+
         /// if you would like to be able to use an external tool
         /// to debug the QUIC messages sent and received by kitsune
         /// you'll need the decryption keys.
@@ -421,7 +433,7 @@ impl KitsuneP2pConfig {
             #[cfg(feature = "tx5")]
             {
                 if let Some(t) = self.transport_pool.first() {
-                    !matches!(t, TransportConfig::WebRTC { .. })
+                    !matches!(t, TransportConfig::Mem {} | TransportConfig::WebRTC { .. })
                 } else {
                     true
                 }
@@ -443,7 +455,7 @@ impl KitsuneP2pConfig {
         #[cfg(feature = "tx5")]
         {
             if let Some(t) = self.transport_pool.first() {
-                return matches!(t, TransportConfig::WebRTC { .. });
+                return matches!(t, TransportConfig::Mem {} | TransportConfig::WebRTC { .. });
             }
         }
         false
@@ -490,10 +502,6 @@ impl KitsuneP2pConfig {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TransportConfig {
-    /// A transport that uses the local memory transport protocol
-    /// (this is mainly for testing)
-    #[cfg(feature = "tx2")]
-    Mem {},
     /// A mock network for testing
     #[cfg(feature = "tx2")]
     #[serde(skip)]
@@ -511,6 +519,10 @@ pub enum TransportConfig {
         /// Webrtc peer connection config.
         webrtc_config: Option<serde_json::Value>,
     },
+    /// A transport that uses the local memory transport protocol
+    /// (this is mainly for testing)
+    #[cfg(feature = "tx5")]
+    Mem {},
 }
 
 pub enum KitsuneP2pTx2Backend {

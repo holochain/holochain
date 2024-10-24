@@ -50,6 +50,9 @@ pub enum ConductorError {
     #[error("Configuration consistency error: {0}")]
     ConfigError(String),
 
+    #[error(transparent)]
+    CountersigningError(#[from] CountersigningError),
+
     #[error("DPKI service error: {0}")]
     DpkiError(#[from] DpkiServiceError),
 

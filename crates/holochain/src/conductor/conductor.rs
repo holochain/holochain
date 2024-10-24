@@ -643,7 +643,7 @@ mod dna_impls {
             let (wasms, defs) = db
                 .read_async(move |txn| {
                     // Get all the dna defs.
-                    let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
+                    let dna_defs: Vec<_> = holochain_state::dna_def::get_all(txn)?
                         .into_iter()
                         .collect();
 
@@ -661,13 +661,13 @@ mod dna_impls {
                     let wasms = unique_wasms
                         .into_iter()
                         .map(|wasm_hash| {
-                            holochain_state::wasm::get(&txn, &wasm_hash)?
+                            holochain_state::wasm::get(txn, &wasm_hash)?
                                 .map(|hashed| hashed.into_content())
                                 .ok_or(ConductorError::WasmMissing)
                                 .map(|wasm| (wasm_hash, wasm))
                         })
                         .collect::<ConductorResult<HashMap<_, _>>>()?;
-                    let wasms = holochain_state::dna_def::get_all(&txn)?
+                    let wasms = holochain_state::dna_def::get_all(txn)?
                         .into_iter()
                         .map(|dna_def| {
                             // Load all wasms for each dna_def from the wasm db into memory
@@ -681,7 +681,7 @@ mod dna_impls {
                         })
                         // This needs to happen due to the environment not being Send
                         .collect::<Vec<_>>();
-                    let defs = holochain_state::entry_def::get_all(&txn)?;
+                    let defs = holochain_state::entry_def::get_all(txn)?;
                     ConductorResult::Ok((wasms, defs))
                 })
                 .await?;
@@ -2812,7 +2812,8 @@ mod scheduler_impls {
                     let all_dbs = space.get_all_authored_dbs();
 
                     all_dbs.into_iter().map(|db| async move {
-                        db.write_async(delete_all_ephemeral_scheduled_fns).await
+                        db.write_async(|txn| delete_all_ephemeral_scheduled_fns(txn))
+                            .await
                     })
                 })
                 .into_iter()
@@ -3277,7 +3278,7 @@ mod authenticate_token_impls {
 /// Methods for bridging from host calls to workflows for countersigning
 mod countersigning_impls {
     use super::*;
-    use crate::core::workflow;
+    use crate::core::workflow::{self, countersigning_workflow::CountersigningWorkspace};
 
     impl Conductor {
         /// Accept a countersigning session
@@ -3286,7 +3287,12 @@ mod countersigning_impls {
             cell_id: CellId,
             request: PreflightRequest,
         ) -> ConductorResult<PreflightRequestAcceptance> {
-            let countersigning_trigger = self.cell_by_id(&cell_id).await?.countersigning_trigger();
+            let countersigning_trigger = self
+                .cell_by_id(&cell_id)
+                .await?
+                .triggers()
+                .countersigning
+                .clone();
 
             Ok(
                 workflow::countersigning_workflow::accept_countersigning_request(
@@ -3298,6 +3304,89 @@ mod countersigning_impls {
                 )
                 .await?,
             )
+        }
+
+        /// Get in-memory state of an ongoing countersigning session.
+        pub async fn get_countersigning_session_state(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<CountersigningSessionState>> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let maybe_countersigning_workspace =
+                space.countersigning_workspaces.lock().get(cell_id).cloned();
+            match maybe_countersigning_workspace {
+                None => Err(ConductorError::CountersigningError(
+                    CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                )),
+                Some(workspace) => Ok(workspace.get_countersigning_session_state()),
+            }
+        }
+
+        /// Abandon an ongoing countersigning session when it can not be automatically resolved.
+        pub async fn abandon_countersigning_session(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let countersigning_workspace = self
+                .get_workspace_of_unresolved_session(&space, cell_id)
+                .await?;
+            let cell = self.cell_by_id(cell_id).await?;
+            countersigning_workspace.mark_countersigning_session_for_force_abandon(cell_id)?;
+            cell.triggers()
+                .countersigning
+                .trigger(&"force_abandon_session");
+            Ok(())
+        }
+
+        /// Publish an ongoing countersigning session when it has not be automatically resolved.
+        pub async fn publish_countersigning_session(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let countersigning_workspace = self
+                .get_workspace_of_unresolved_session(&space, cell_id)
+                .await?;
+            let cell = self.cell_by_id(cell_id).await?;
+            countersigning_workspace.mark_countersigning_session_for_force_publish(cell_id)?;
+            cell.triggers()
+                .countersigning
+                .trigger(&"force_publish_session");
+            Ok(())
+        }
+
+        async fn get_workspace_of_unresolved_session(
+            &self,
+            space: &Space,
+            cell_id: &CellId,
+        ) -> ConductorResult<Arc<CountersigningWorkspace>> {
+            let maybe_countersigning_workspace =
+                space.countersigning_workspaces.lock().get(cell_id).cloned();
+            match maybe_countersigning_workspace {
+                None => Err(ConductorError::CountersigningError(
+                    CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                )),
+                Some(countersigning_workspace) => {
+                    match countersigning_workspace.get_countersigning_session_state() {
+                        None => Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotFound(cell_id.clone()),
+                        )),
+                        Some(CountersigningSessionState::Unknown { resolution, .. }) => {
+                            if resolution.attempts >= 1 {
+                                Ok(countersigning_workspace)
+                            } else {
+                                Err(ConductorError::CountersigningError(
+                                    CountersigningError::SessionNotUnresolved(cell_id.clone()),
+                                ))
+                            }
+                        }
+                        _ => Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotUnresolved(cell_id.clone()),
+                        )),
+                    }
+                }
+            }
         }
     }
 }
@@ -3443,7 +3532,7 @@ impl Conductor {
             let mut path = db.path().clone();
             if let Err(err) = ffs::remove_file(&path).await {
                 tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
-                db.write_async(purge_data).await?;
+                db.write_async(|txn| purge_data(txn)).await?;
             }
             path.set_extension("");
             let stem = path.to_string_lossy();
@@ -3464,12 +3553,12 @@ impl Conductor {
                     self.spaces
                         .dht_db(dna_hash)
                         .unwrap()
-                        .write_async(purge_data)
+                        .write_async(|txn| purge_data(txn))
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
                         .unwrap()
-                        .write_async(purge_data)
+                        .write_async(|txn| purge_data(txn))
                         .boxed(),
                     // TODO: also delete stale Wasms
                 ]
@@ -3878,7 +3967,7 @@ pub fn app_manifest_from_dnas(
             let dna = dr.dna();
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let mut modifiers = DnaModifiersOpt::none();
-            modifiers.network_seed = network_seed.clone();
+            modifiers.network_seed.clone_from(&network_seed);
             AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {
@@ -3946,16 +4035,16 @@ pub async fn full_integration_dump(
     vault
         .read_async(move |txn| {
             let integrated =
-                query_dht_ops_from_statement(&txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
+                query_dht_ops_from_statement(txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
 
             let validation_limbo = query_dht_ops_from_statement(
-                &txn,
+                txn,
                 state_dump::DHT_OPS_IN_VALIDATION_LIMBO,
                 dht_ops_cursor,
             )?;
 
             let integration_limbo = query_dht_ops_from_statement(
-                &txn,
+                txn,
                 state_dump::DHT_OPS_IN_INTEGRATION_LIMBO,
                 dht_ops_cursor,
             )?;
