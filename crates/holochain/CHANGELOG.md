@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- The following HDK functions have been temporarily removed as "unstable". They can be re-enabled by building Holochain with the "unstable-hdk-functions" feature flag:
+  - `accept_countersigning_preflight_request`
+  - `block_agent`
+  - `unblock_agent`
+  - `get_agent_key_lineage`
+  - `is_same_agent`
+  - `schedule`
+
 ## 0.5.0-dev.2
 
 - Add App API calls to interact with an unresolvable countersigning session. State of countersigning can be queried with `AppRequest::GetCountersigningSessionState`, an unresolvable session can be abandoned using `AppRequest::AbandonCountersigningSession` or force-published by making `AppRequest::PublishCountersigningSession`. Abandoning and publishing is only possible for sessions that have been through automatic resolution at least once where Holochain has not been able to make a decision. \#4253
