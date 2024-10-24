@@ -159,6 +159,8 @@
               export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
               mkdir -p $HC_WASM_CACHE_PATH
 
+              export LLVM_SYS_150_PREFIX="$(which llvm-config | xargs dirname | xargs dirname)"
+
               # Enables the pre-commit hooks
               ${config.pre-commit.installationScript}
             '';

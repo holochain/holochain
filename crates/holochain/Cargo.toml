@@ -191,7 +191,9 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = ["sqlite-encrypted", "tx5", "metrics_influxive", "wasmer_sys"]
+default = ["sqlite-encrypted", "tx5", "metrics_influxive", "wasmer_sys_dev"]
+
+prod = ["sqlite-encrypted", "tx5", "wasmer_sys_prod"]
 
 tx5 = ["tx5-go-pion-turn"]
 
@@ -294,7 +296,14 @@ wasmer_sys = [
   "holochain_wasmer_host/wasmer_sys_dev",
 ]
 
-wasmer_compiler_production = ["wasmer_sys", "wasmer/llvm"]
+wasmer_sys_dev = [
+  "wasmer_sys",
+  "holochain_wasmer_host/wasmer_sys_dev",
+]
+wasmer_sys_prod = [
+  "wasmer_sys",
+  "holochain_wasmer_host/wasmer_sys_prod",
+]
 
 # Enable wasm interpreter (experimental)
 # Incompatible with "wasmer_sys"
