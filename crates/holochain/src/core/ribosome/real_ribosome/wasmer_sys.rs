@@ -6,9 +6,9 @@ use crate::{
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_zome_types::prelude::WasmZome;
 use std::sync::Arc;
+use tracing::warn;
 use wasmer::{AsStoreMut, Module};
 use wasmer_middlewares::metering::{get_remaining_points, set_remaining_points, MeteringPoints};
-use tracing::warn;
 
 pub fn reset_metering_points(instance_with_store: Arc<InstanceWithStore>) {
     let mut store_lock = instance_with_store.store.lock();
