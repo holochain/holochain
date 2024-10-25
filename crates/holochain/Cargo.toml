@@ -193,7 +193,6 @@ workspace = true
 
 [features]
 default = [
-  "chc",
   "sqlite-encrypted",
   "tx2",
   "tx5",
