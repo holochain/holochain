@@ -44,6 +44,7 @@ workspace = true
 
 [features]
 chc = []
+unstable-dpki = []
 sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
   "holochain_types/sqlite-encrypted",

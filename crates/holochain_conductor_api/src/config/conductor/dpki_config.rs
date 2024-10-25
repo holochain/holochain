@@ -10,6 +10,7 @@ use serde::Serialize;
 /// The network seed used in the main "production" DPKI network.
 const DPKI_NETWORK_SEED_MAIN: &str = "deepkey-main";
 
+#[cfg(feature = "unstable-dpki")]
 /// A network seed used for testing.
 const DPKI_NETWORK_SEED_TESTING: &str = "deepkey-testing";
 
@@ -44,7 +45,7 @@ pub struct DpkiConfig {
     pub allow_throwaway_random_dpki_agent_key: bool,
 
     /// For testing only, we can turn off DPKI if needed.
-    /// TODO: this can be removed once DPKI is truly optional again.
+    // TODO: this can be removed once DPKI is truly optional again.
     #[serde(default)]
     pub no_dpki: bool,
 }
@@ -60,11 +61,16 @@ impl DpkiConfig {
     }
 
     pub fn testing() -> Self {
-        Self {
-            dna_path: None,
-            network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
-            allow_throwaway_random_dpki_agent_key: true,
-            no_dpki: false,
+        cfg_if! {
+            if #[cfg(feature = "unstable-dpki")] {
+                Self {
+                    dna_path: None,
+                    network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
+                    allow_throwaway_random_dpki_agent_key: true,
+                    no_dpki: false,
+            } } else {
+                Self::disabled()
+            }
         }
     }
 
@@ -81,16 +87,44 @@ impl DpkiConfig {
 impl Default for DpkiConfig {
     fn default() -> Self {
         cfg_if! {
-            if #[cfg(feature = "dpki")] {
-                Self {
-                    dna_path: None,
-                    network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
-                    allow_throwaway_random_dpki_agent_key: false,
-                    no_dpki: false,
-                }
+            if #[cfg(feature = "unstable-dpki")] {
+                Self::testing()
             } else {
                 Self::disabled()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DpkiConfig;
+
+    #[cfg(not(feature = "unstable-dpki"))]
+    #[test]
+    fn default_config() {
+        let config = DpkiConfig::default();
+        assert_eq!(config, DpkiConfig::disabled());
+    }
+
+    #[cfg(not(feature = "unstable-dpki"))]
+    #[test]
+    fn enable_dpki_without_feature_enabled() {
+        let config = DpkiConfig::testing();
+        assert_eq!(config, DpkiConfig::disabled());
+    }
+
+    #[cfg(feature = "unstable-dpki")]
+    #[test]
+    fn default_config_with_feature_enabled() {
+        let config = DpkiConfig::default();
+        assert_eq!(config, DpkiConfig::testing());
+    }
+
+    #[cfg(feature = "unstable-dpki")]
+    #[test]
+    fn enable_dpki_with_feature_enabled() {
+        let config = DpkiConfig::testing();
+        assert_eq!(config, DpkiConfig::testing());
     }
 }
