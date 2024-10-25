@@ -1,5 +1,5 @@
 use hdk::prelude::{
-    PreflightRequest, PreflightRequestAcceptance, Signature, SignedActionHashed, Timestamp,
+    PreflightRequest, PreflightRequestAcceptance
 };
 use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
@@ -9,7 +9,6 @@ use holochain::prelude::CountersigningSessionState;
 use holochain::sweettest::{
     await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
 };
-use holochain_nonce::fresh_nonce;
 use holochain_state::prelude::{IncompleteCommitReason, SourceChainError};
 use holochain_types::app::DisabledAppReason;
 use holochain_types::prelude::Signal;
@@ -17,7 +16,6 @@ use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::countersigning::Role;
 use matches::assert_matches;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
@@ -991,6 +989,7 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
+#[cfg(feature = "chc")]
 async fn chc_should_respect_chain_lock() {
     holochain_trace::test_run();
 
@@ -1560,8 +1559,8 @@ async fn get_all_records(
     chc: &holochain_chc::ChcImpl,
 ) -> holochain_chc::ChcResult<
     Vec<(
-        SignedActionHashed,
-        Option<(Arc<holochain_chc::EncryptedEntry>, Signature)>,
+        hdk::prelude::SignedActionHashed,
+        Option<(std::sync::Arc<holochain_chc::EncryptedEntry>, hdk::prelude::Signature)>,
     )>,
 > {
     use holochain_types::fixt::SignatureFixturator;
@@ -1569,7 +1568,7 @@ async fn get_all_records(
     chc.get_record_data_request(holochain_chc::GetRecordsRequest {
         payload: holochain_chc::GetRecordsPayload {
             since_hash: None,
-            nonce: fresh_nonce(Timestamp::now()).unwrap().0,
+            nonce: holochain_nonce::fresh_nonce(hdk::prelude::Timestamp::now()).unwrap().0,
         },
         signature: fixt::fixt!(Signature),
     })
