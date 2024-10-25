@@ -1,6 +1,4 @@
-use hdk::prelude::{
-    PreflightRequest, PreflightRequestAcceptance
-};
+use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance};
 use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use holochain::conductor::CellError;
@@ -1560,7 +1558,10 @@ async fn get_all_records(
 ) -> holochain_chc::ChcResult<
     Vec<(
         hdk::prelude::SignedActionHashed,
-        Option<(std::sync::Arc<holochain_chc::EncryptedEntry>, hdk::prelude::Signature)>,
+        Option<(
+            std::sync::Arc<holochain_chc::EncryptedEntry>,
+            hdk::prelude::Signature,
+        )>,
     )>,
 > {
     use holochain_types::fixt::SignatureFixturator;
@@ -1568,7 +1569,9 @@ async fn get_all_records(
     chc.get_record_data_request(holochain_chc::GetRecordsRequest {
         payload: holochain_chc::GetRecordsPayload {
             since_hash: None,
-            nonce: holochain_nonce::fresh_nonce(hdk::prelude::Timestamp::now()).unwrap().0,
+            nonce: holochain_nonce::fresh_nonce(hdk::prelude::Timestamp::now())
+                .unwrap()
+                .0,
         },
         signature: fixt::fixt!(Signature),
     })
