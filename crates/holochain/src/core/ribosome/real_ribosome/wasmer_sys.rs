@@ -30,6 +30,7 @@ pub fn get_used_metering_points(instance_with_store: Arc<InstanceWithStore>) -> 
     }
 }
 
+/// DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
 pub fn get_prebuilt_module(wasm_zome: &WasmZome) -> RibosomeResult<Option<Arc<Module>>> {
     match &wasm_zome.preserialized_path {
         Some(path) => {
