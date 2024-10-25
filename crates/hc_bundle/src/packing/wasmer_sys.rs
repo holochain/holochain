@@ -7,7 +7,7 @@ use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use tracing::info;
 
-#[deprecated(since="0.4.0", note="Bundling precompiled & serialized wasm for iOS is deprecated. Please use the wasm interpreter instead.")]
+/// DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
 pub(super) async fn build_preserialized_wasm<M: Manifest>(
     target_path: &Path,
     bundle: &Bundle<M>,

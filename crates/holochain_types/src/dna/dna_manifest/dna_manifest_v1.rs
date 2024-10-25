@@ -177,10 +177,10 @@ pub struct ZomeManifest {
     /// are used in the zome.
     pub dependencies: Option<Vec<ZomeDependency>>,
 
-    /// **Deprecated** Bundling precompiled & serialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
+    /// DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
+    ///
     /// The location of the wasm dylib for this zome
     /// Useful for iOS.
-    #[deprecated(since="0.4.0", note="Bundling precompiled & serialized wasm for iOS is deprecated. Please use the wasm interpreter instead.")]
     #[serde(default)]
     pub dylib: Option<PathBuf>,
 }

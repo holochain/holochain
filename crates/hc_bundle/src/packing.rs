@@ -104,7 +104,7 @@ pub async fn pack<M: Manifest>(
     };
     bundle.write_to_file(&target_path).await?;
     if serialize_wasm {
-        warn!("Bundling precompiled & serialized wasm for iOS is deprecated. Please use the wasm interpreter instead.");
+        warn!("DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.");
         build_preserialized_wasm(&target_path, &bundle).await?;
     }
 
