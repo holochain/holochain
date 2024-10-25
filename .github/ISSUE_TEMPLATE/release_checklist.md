@@ -1,17 +1,18 @@
 ---
 name: Release Checklist
-about: Create a release checklist
+about: Release preparation checklist
 title: "[RELEASE]"
 labels: ''
 assignees: ''
 
 ---
 
-- [ ] confirm works reasonably in the field someplace: @
+- [ ] check for regressions or unexpected behavior by testing with an app that's in active use, in the field: @
 - [ ] confirm launcher build: @
-- [ ] confirm with manual runs of a stress test app: @
+- [ ] confirm with manual runs of a test app: @
 - [ ] confirm scaffolding works: @
 - [ ] confirm holonix branch `main-0.x`: @
+- [ ] migration guide written to help users move to the new release: @
 - [ ] confirm any docs/updates ready to publish after release lands: @ 
 
 **Assignment**
