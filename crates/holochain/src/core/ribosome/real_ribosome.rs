@@ -48,6 +48,7 @@ use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash::hash;
+use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
 use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
@@ -641,7 +642,10 @@ impl RealRibosome {
                 &mut ns,
                 "__hc__get_validation_receipts_1",
                 get_validation_receipts,
-            );
+            )
+            // This HDI function can't be easily removed, even though it's considered an
+            // unstable function.
+            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent);
 
         #[cfg(feature = "unstable-hdk-functions")]
         {
@@ -651,7 +655,6 @@ impl RealRibosome {
                     "__hc__accept_countersigning_preflight_request_1",
                     accept_countersigning_preflight_request,
                 )
-                .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
                 .with_host_function(
                     &mut ns,
                     "__hc__get_agent_key_lineage_1",
