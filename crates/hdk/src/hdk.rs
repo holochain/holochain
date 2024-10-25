@@ -37,11 +37,13 @@ pub trait HdkT: HdiT {
     fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>>;
     fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
     // CounterSigning
+    #[cfg(feature = "unstable-hdk-functions")]
     fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
     ) -> ExternResult<PreflightRequestAcceptance>;
     // DPKI
+    #[cfg(feature = "unstable-hdk-functions")]
     fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
@@ -56,7 +58,9 @@ pub trait HdkT: HdiT {
     ) -> ExternResult<Vec<LinkDetails>>;
     fn count_links(&self, query: LinkQuery) -> ExternResult<usize>;
     // P2P
+    #[cfg(feature = "unstable-hdk-functions")]
     fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()>;
+    #[cfg(feature = "unstable-hdk-functions")]
     fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()>;
     fn call(&self, call: Vec<Call>) -> ExternResult<Vec<ZomeCallResponse>>;
     fn emit_signal(&self, app_signal: AppSignal) -> ExternResult<()>;
@@ -65,8 +69,8 @@ pub trait HdkT: HdiT {
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
     // Time
     fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
+    #[cfg(feature = "unstable-hdk-functions")]
     fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
-    fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
     // XSalsa20Poly1305
     fn x_salsa20_poly1305_shared_secret_create_random(
         &self,
@@ -350,6 +354,7 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // CounterSigning
+    #[cfg(feature = "unstable-hdk-functions")]
     fn accept_countersigning_preflight_request(
         &self,
         _: PreflightRequest,
@@ -363,6 +368,7 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // DPKI
+    #[cfg(feature = "unstable-hdk-functions")]
     fn get_agent_key_lineage(&self, _: AgentPubKey) -> ExternResult<Vec<AgentPubKey>> {
         Self::err()
     }
@@ -383,9 +389,11 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // P2P
+    #[cfg(feature = "unstable-hdk-functions")]
     fn block_agent(&self, _: BlockAgentInput) -> ExternResult<()> {
         Self::err()
     }
+    #[cfg(feature = "unstable-hdk-functions")]
     fn unblock_agent(&self, _: BlockAgentInput) -> ExternResult<()> {
         Self::err()
     }
@@ -406,12 +414,11 @@ impl HdkT for ErrHdk {
     fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
         Self::err()
     }
+    #[cfg(feature = "unstable-hdk-functions")]
     fn schedule(&self, _: String) -> ExternResult<()> {
         Self::err()
     }
-    fn sleep(&self, _: std::time::Duration) -> ExternResult<()> {
-        Self::err()
-    }
+
     // XSalsa20Poly1305
     fn x_salsa20_poly1305_shared_secret_create_random(
         &self,
@@ -604,6 +611,7 @@ impl HdkT for HostHdk {
         host_call::<Vec<GetInput>, Vec<Option<Details>>>(__hc__get_details_1, get_inputs)
     }
     // CounterSigning
+    #[cfg(feature = "unstable-hdk-functions")]
     fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
@@ -614,6 +622,7 @@ impl HdkT for HostHdk {
         )
     }
     // DPKI
+    #[cfg(feature = "unstable-hdk-functions")]
     fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>> {
         host_call::<AgentPubKey, Vec<AgentPubKey>>(__hc__get_agent_key_lineage_1, agent_key)
     }
@@ -641,9 +650,11 @@ impl HdkT for HostHdk {
     fn count_links(&self, query: LinkQuery) -> ExternResult<usize> {
         host_call::<LinkQuery, usize>(__hc__count_links_1, query)
     }
+    #[cfg(feature = "unstable-hdk-functions")]
     fn block_agent(&self, block_agent_input: BlockAgentInput) -> ExternResult<()> {
         host_call::<BlockAgentInput, ()>(__hc__block_agent_1, block_agent_input)
     }
+    #[cfg(feature = "unstable-hdk-functions")]
     fn unblock_agent(&self, unblock_agent_input: BlockAgentInput) -> ExternResult<()> {
         host_call::<BlockAgentInput, ()>(__hc__unblock_agent_1, unblock_agent_input)
     }
@@ -662,11 +673,9 @@ impl HdkT for HostHdk {
     fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
         host_call::<(), Timestamp>(__hc__sys_time_1, ())
     }
+    #[cfg(feature = "unstable-hdk-functions")]
     fn schedule(&self, scheduled_fn: String) -> ExternResult<()> {
         host_call::<String, ()>(__hc__schedule_1, scheduled_fn)
-    }
-    fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()> {
-        host_call::<std::time::Duration, ()>(__hc__sleep_1, wake_after)
     }
 
     fn x_salsa20_poly1305_shared_secret_create_random(
