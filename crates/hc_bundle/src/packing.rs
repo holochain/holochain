@@ -8,7 +8,6 @@ use mr_bundle::RawBundle;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
-use tracing::warn;
 
 #[cfg(feature = "wasmer_sys")]
 mod wasmer_sys;
@@ -104,7 +103,7 @@ pub async fn pack<M: Manifest>(
     };
     bundle.write_to_file(&target_path).await?;
     if serialize_wasm {
-        warn!("DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.");
+        eprintln!("DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.");
         build_preserialized_wasm(&target_path, &bundle).await?;
     }
 

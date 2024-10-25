@@ -6,7 +6,6 @@ use crate::{
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_zome_types::prelude::WasmZome;
 use std::sync::Arc;
-use tracing::warn;
 use wasmer::{AsStoreMut, Module};
 use wasmer_middlewares::metering::{get_remaining_points, set_remaining_points, MeteringPoints};
 
@@ -34,7 +33,7 @@ pub fn get_used_metering_points(instance_with_store: Arc<InstanceWithStore>) -> 
 pub fn get_prebuilt_module(wasm_zome: &WasmZome) -> RibosomeResult<Option<Arc<Module>>> {
     match &wasm_zome.preserialized_path {
         Some(path) => {
-            warn!("DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.");
+            eprintln!("DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.");
             let module = holochain_wasmer_host::module::get_ios_module_from_file(path.as_path())?;
             Ok(Some(Arc::new(module)))
         }
