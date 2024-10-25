@@ -155,8 +155,10 @@ pub struct WasmZome {
     /// The zome dependencies
     pub dependencies: Vec<ZomeName>,
 
+    /// **Deprecated** Bundling precompiled & serialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
     /// The path to a preserialized wasmer module used as a "dynamic library" (dylib).
     /// Useful for iOS and other targets.
+    #[deprecated(since="0.4.0", note="Bundling precompiled & serialized wasm for iOS is deprecated. Please use the wasm interpreter instead.")]
     #[serde(default)]
     pub preserialized_path: Option<PathBuf>,
 }

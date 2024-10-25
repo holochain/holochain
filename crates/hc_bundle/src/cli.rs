@@ -59,8 +59,10 @@ pub enum HcDnaBundleSubcommand {
         #[arg(short = 'o', long)]
         output: Option<PathBuf>,
 
+        /// **Deprecated** Bundling precompiled & serialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
         /// Output shared object "dylib" files
         /// that can be used to run this happ on iOS
+        #[deprecated(since="0.4.0", note="Bundling precompiled & serialized wasm for iOS is deprecated. Please use the wasm interpreter instead.")]
         #[arg(long)]
         dylib_ios: bool,
     },
