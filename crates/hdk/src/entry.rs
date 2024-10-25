@@ -11,6 +11,38 @@ pub use hdi::entry::*;
 ///
 /// Usually you don't need to use this function directly; it is the most general way to create an
 /// entry and standardizes the internals of higher level create functions.
+///
+/// ```
+/// use hdk::prelude::*;
+///
+/// #[hdk_entry_helper]
+/// pub struct Foo;
+///
+/// #[hdk_entry_types]
+/// #[unit_enum(UnitEntryTypes)]
+/// pub enum EntryTypes {
+///     Foo(Foo),
+/// }
+///
+/// fn main() {
+///     let mut mock = hdk::hdk::MockHdkT::new();
+///     mock.expect_zome_info().returning(|_| {
+///         Ok(ZomeInfo {
+///             name: "Foo".into(),
+///             id: 1.into(),
+///             properties: ().try_into().unwrap(),
+///             entry_defs: EntryDefs(vec![]),
+///             extern_fns: vec![],
+///             zome_types: ScopedZomeTypesSet {
+///                 entries: ScopedZomeTypes(vec![]),
+///                 links: ScopedZomeTypes(vec![]),
+///             },
+///         })
+///     });
+///     hdk::hdk::set_hdk(mock);
+///     create_entry(EntryTypes::Foo(Foo)).unwrap();
+/// }
+/// ```
 pub fn create(create_input: CreateInput) -> ExternResult<ActionHash> {
     HDK.with(|h| h.borrow().create(create_input))
 }

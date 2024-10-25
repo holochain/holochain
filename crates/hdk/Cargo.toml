@@ -34,6 +34,7 @@ mockall = { version = "0.11.3", optional = true }
 getrandom = { version = "0.2", features = ["custom"] }
 
 [dev-dependencies]
+hdk = { path = ".", features = [ "mock" ] }
 fixt = { path = "../fixt" }
 trybuild = "1.0"
 

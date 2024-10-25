@@ -2788,6 +2788,7 @@ dependencies = [
  "fixt",
  "getrandom 0.2.15",
  "hdi",
+ "hdk",
  "hdk_derive",
  "holo_hash",
  "holochain_wasmer_guest",
