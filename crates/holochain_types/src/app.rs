@@ -23,6 +23,7 @@ use holochain_util::ffs;
 use holochain_zome_types::cell::CloneId;
 use holochain_zome_types::prelude::*;
 use std::{collections::HashMap, path::PathBuf};
+use indexmap::IndexMap;
 
 /// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;
@@ -455,7 +456,7 @@ pub struct InstalledAppCommon {
     pub agent_key: AgentPubKey,
 
     /// Assignments of DNA roles to cells and their clones, as specified in the AppManifest
-    pub role_assignments: HashMap<RoleName, AppRoleAssignment>,
+    pub role_assignments: IndexMap<RoleName, AppRoleAssignment>,
 
     /// The manifest used to install the app.
     pub manifest: AppManifest,
@@ -473,7 +474,7 @@ impl InstalledAppCommon {
         manifest: AppManifest,
         installed_at: Timestamp,
     ) -> AppResult<Self> {
-        let role_assignments: HashMap<_, _> = role_assignments.into_iter().collect();
+        let role_assignments: IndexMap<_, _> = role_assignments.into_iter().collect();
         // ensure no role name contains a clone id delimiter
         if let Some((illegal_role_name, _)) = role_assignments
             .iter()
@@ -639,7 +640,7 @@ impl InstalledAppCommon {
     }
 
     /// Accessor
-    pub fn roles(&self) -> &HashMap<RoleName, AppRoleAssignment> {
+    pub fn roles(&self) -> &IndexMap<RoleName, AppRoleAssignment> {
         &self.role_assignments
     }
 
@@ -899,7 +900,7 @@ impl InstalledAppCommon {
     }
 
     /// Return the list of role assignments
-    pub fn role_assignments(&self) -> &HashMap<RoleName, AppRoleAssignment> {
+    pub fn role_assignments(&self) -> &IndexMap<RoleName, AppRoleAssignment> {
         &self.role_assignments
     }
 

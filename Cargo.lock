@@ -3553,6 +3553,7 @@ dependencies = [
  "holochain_types",
  "holochain_util",
  "holochain_zome_types",
+ "indexmap 2.6.0",
  "isotest",
  "itertools 0.12.1",
  "kitsune_p2p_dht",
