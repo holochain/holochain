@@ -25,7 +25,7 @@
 
 use kitsune_p2p_dht_arc::DhtLocation;
 
-use crate::error::{HoloHashResult, HoloHashError};
+use crate::error::{HoloHashError, HoloHashResult};
 use crate::has_hash::HasHash;
 use crate::HashType;
 use crate::PrimitiveHashType;
@@ -367,7 +367,6 @@ mod tests {
         DnaHash::from_raw_39(vec![0xdb; 39]);
     }
 
-
     #[test]
     fn test_try_from_raw_36_and_type_errors_with_bad_size() {
         let res = HoloHash::try_from_raw_36_and_type(vec![0xdb; 35], hash_type::Dna);
@@ -407,5 +406,4 @@ mod tests {
 
         DnaHash::from_raw_39(raw);
     }
-
 }
