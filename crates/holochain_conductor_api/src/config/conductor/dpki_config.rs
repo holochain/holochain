@@ -13,22 +13,18 @@ const DPKI_NETWORK_SEED_TESTING: &str = "deepkey-testing";
 
 /// Configure which app instance ID to treat as the DPKI application handler
 /// as well as what parameters to pass it on its initialization.
-/// Note that these settings have an effect on network compatibility,
-/// see [`holochain_p2p::spawn::NetworkCompatParams`].
+/// Note that the Deepkey DNA path and the network seed settings determine network compatibility.
+/// They have to match for all conductors on a network, for them to be able to communicate.
+/// Also see [`holochain_p2p::spawn::NetworkCompatParams`].
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub struct DpkiConfig {
     /// Path to a DNA which implements the DPKI service, i.e. Deepkey.
     /// Defaults to the built-in Deepkey DNA from the holochain_deepkey_dna crate.
     pub dna_path: Option<PathBuf>,
 
-    /// **IMPORTANT!**
-    ///
-    /// For the main DPKI network, this seed must be set to "deepkey-main".
-    /// For hApp unit and integration tests, a random seed should be used.
-    ///
     /// DPKI is always installed with a network seed.
-    /// Also, any two conductors not using the exact same DPKI service cannot communicate with each other.
-    /// This means that this network seed must match across all conductors in a network!
+    /// Only conductors using the exact same DPKI service can communicate with each other.
+    /// This means that this network seed must match across all conductors in a network.
     //
     // TODO: consider emitting a warning if this is not set to the production value
     //       in release builds.
