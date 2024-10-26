@@ -7,9 +7,6 @@ use cfg_if::cfg_if;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// The network seed used in the main "production" DPKI network.
-const DPKI_NETWORK_SEED_MAIN: &str = "deepkey-main";
-
 #[cfg(feature = "unstable-dpki")]
 /// A network seed used for testing.
 const DPKI_NETWORK_SEED_TESTING: &str = "deepkey-testing";
@@ -51,15 +48,6 @@ pub struct DpkiConfig {
 }
 
 impl DpkiConfig {
-    pub fn production(dna_path: Option<PathBuf>) -> Self {
-        Self {
-            dna_path,
-            network_seed: DPKI_NETWORK_SEED_MAIN.to_string(),
-            allow_throwaway_random_dpki_agent_key: false,
-            no_dpki: false,
-        }
-    }
-
     pub fn testing() -> Self {
         cfg_if! {
             if #[cfg(feature = "unstable-dpki")] {
