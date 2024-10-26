@@ -99,7 +99,7 @@ where
         use proptest::strategy::Strategy;
 
         let strat = T::arbitrary().prop_flat_map(move |hash_type| {
-            let gen_strat = proptest::string::bytes_regex(r".[39]").unwrap();
+            let gen_strat = proptest::string::bytes_regex(r"(?-u:.{39})").unwrap();
             gen_strat.prop_map(move |mut buf| {
                 assert_eq!(buf.len(), 39);
                 buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(hash_type.get_prefix());
@@ -323,5 +323,14 @@ mod tests {
     #[should_panic]
     fn test_fails_with_bad_size() {
         DnaHash::from_raw_36(vec![0xdb; 35]);
+    }
+
+    #[test]
+    #[cfg(feature = "fuzzing")]
+    fn proptest_arbitrary_smoke_test() {
+        use proptest::prelude::*;
+        proptest!(|(h: DnaHash)| {
+            assert_eq!(*h.hash_type(), hash_type::Dna);
+        });
     }
 }
