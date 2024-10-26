@@ -52,7 +52,9 @@ impl DpkiConfig {
                     network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
                     allow_throwaway_random_dpki_agent_key: true,
                     no_dpki: false,
-            } } else {
+                }
+            } else {
+                tracing::error!("Enabling DPKI on conductor without specifying cargo feature 'unstable-dpki' at compile time.");
                 Self::disabled()
             }
         }
