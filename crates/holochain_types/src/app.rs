@@ -22,8 +22,8 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_util::ffs;
 use holochain_zome_types::cell::CloneId;
 use holochain_zome_types::prelude::*;
-use std::{collections::HashMap, path::PathBuf};
 use indexmap::IndexMap;
+use std::{collections::HashMap, path::PathBuf};
 
 /// The unique identifier for an installed app in this conductor
 pub type InstalledAppId = String;
