@@ -68,7 +68,7 @@ tempfile = "3"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = ["rt"] }
 tracing = "0.1.26"
-indexmap = "2.6.0"
+indexmap = { version = "2.6.0", features = ["serde"] }
 
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
 isotest = { version = "0", optional = true }
