@@ -344,6 +344,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(feature = "unstable-dpki"))]
     #[test]
     fn test_config_complete_config() {
         holochain_trace::test_run();
