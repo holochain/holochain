@@ -61,7 +61,7 @@ build-workspace-wasmer_wamr:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
 
-# execute tests on all creates
+# execute tests on all crates with wasmer compiler
 test-workspace-wasmer_sys:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
@@ -70,6 +70,16 @@ test-workspace-wasmer_sys:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
+# executes tests on all crates with wasmer compiler and unstable dpki feature
+test-workspace-wasmer_sys-unstable-dpki:
+	cargo install cargo-nextest
+	$(F) RUST_BACKTRACE=1 cargo nextest run \
+		--workspace \
+		--locked \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES),wasmer_sys,unstable-dpki
+
+# execute tests on all crates with wasmer interpreter
 test-workspace-wasmer_wamr:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
