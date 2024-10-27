@@ -50,6 +50,7 @@ jobs:
         include:
           - os: ubuntu-latest
             wasmer-feature: wasmer_sys
+            dpki-feature: unstable-dpki
           - os: macos-latest
             wasmer-feature: wasmer_sys
           - os: macos-13
@@ -98,6 +99,10 @@ jobs:
       - name: test
         if: matrix.os != 'windows-latest'
         run: make test-workspace-${{ matrix.wasmer-feature }}
+
+      - name: test-dpki
+        if: ${{ matrix.dpki-feature }}
+        run: make test-workspace${{ matrix.wasmer-feature }}-${{ matrix.dpki-feature }}
 
       - name: 'Common Test Teardown Actions'
         uses: ./.github/actions/common-post
