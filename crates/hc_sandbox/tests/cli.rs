@@ -269,9 +269,10 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
     assert!(exit_code.success());
 }
 
-/// Create a new default sandbox which should have DPKI enabled in the conductor config.
+/// Create a new default sandbox which should have DPKI disabled in the conductor config.
+#[cfg(not(feature = "unstable-dpki"))]
 #[tokio::test(flavor = "multi_thread")]
-async fn default_sandbox_has_dpki_enabled() {
+async fn default_sandbox_has_dpki_disabled() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
@@ -288,7 +289,7 @@ async fn default_sandbox_has_dpki_enabled() {
 
     let mut sandbox_process = input_piped_password(&mut cmd).await;
     let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
-    assert!(!conductor_config.dpki.no_dpki);
+    assert!(conductor_config.dpki.no_dpki);
 }
 
 /// Create a new sandbox with DPKI disabled in the conductor config.
