@@ -102,7 +102,7 @@ jobs:
 
       - name: test-dpki
         if: ${{ matrix.dpki-feature }}
-        run: make test-workspace${{ matrix.wasmer-feature }}-${{ matrix.dpki-feature }}
+        run: make test-workspace-${{ matrix.wasmer-feature }}-${{ matrix.dpki-feature }}
 
       - name: 'Common Test Teardown Actions'
         uses: ./.github/actions/common-post
