@@ -30,7 +30,7 @@ jobs:
           # ensure functionality on multiple platforms
           - pkgs:
               - build-holonix-tests-integration
-            # TODO switch to `0_4` when that it is released
+            # TODO switch to `0_4` when that is released
             extra_arg: "--override-input versions 'github:holochain/holochain?dir=versions/0_4_rc' --override-input holochain ${{ inputs.repo_path }}"
         platform:
           - system: aarch64-darwin
