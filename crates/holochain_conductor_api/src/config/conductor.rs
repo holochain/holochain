@@ -359,9 +359,9 @@ mod tests {
       type: lair_server_in_proc
 
     dpki:
-      dna_path: path/to/dna.dna
-      network_seed: "deepkey-main"
-      device_seed_lair_tag: "device-seed"
+      dna_path: ~
+      network_seed: ""
+      no_dpki: true
 
     admin_interfaces:
       - driver:
