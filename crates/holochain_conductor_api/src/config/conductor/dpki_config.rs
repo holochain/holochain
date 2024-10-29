@@ -15,8 +15,8 @@ const DPKI_NETWORK_SEED_MAIN: &str = "deepkey-main";
 /// A network seed used for testing.
 const DPKI_NETWORK_SEED_TESTING: &str = "deepkey-testing";
 
-/// Configure which app instance ID to treat as the DPKI application handler
-/// as well as what parameters to pass it on its initialization.
+/// Configure DPKI properties.
+///
 /// Note that the Deepkey DNA path and the network seed settings determine network compatibility.
 /// They have to match for all conductors on a network, for them to be able to communicate.
 /// Also see [`holochain_p2p::spawn::NetworkCompatParams`].
