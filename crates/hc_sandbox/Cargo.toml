@@ -63,7 +63,7 @@ matches = "0.1"
 workspace = true
 
 [features]
-default = ["chc"]
+default = []
 
 chc = ["holochain_chc", "holochain_conductor_api/chc"]
 
