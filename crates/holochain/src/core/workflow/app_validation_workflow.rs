@@ -219,6 +219,7 @@ async fn app_validation_workflow_inner(
     let warranted_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity = vec![];
+    #[cfg(feature = "unstable-warrants")]
     let mut warrant_op_hashes = vec![];
 
     // Validate ops sequentially
@@ -275,6 +276,7 @@ async fn app_validation_workflow_inner(
                 let awaiting_ops = awaiting_ops.clone();
                 let rejected_ops = rejected_ops.clone();
 
+                #[cfg(feature = "unstable-warrants")]
                 if let Outcome::Rejected(_) = &outcome {
                     let warrant_op =
                         crate::core::workflow::sys_validation_workflow::make_warrant_op(
@@ -349,6 +351,7 @@ async fn app_validation_workflow_inner(
     }
 
     // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
+    #[cfg(feature = "unstable-warrants")]
     holochain_state::integrate::authored_ops_to_dht_db(
         network,
         warrant_op_hashes,

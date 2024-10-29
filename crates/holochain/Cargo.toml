@@ -311,6 +311,12 @@ chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_chc/http"]
 # Enable unstable DPKI feature.
 unstable-dpki = ["holochain_conductor_api/unstable-dpki"]
 
+# Enables unstable warrants feature.
+unstable-warrants = [
+  "holochain_state/unstable-warrants",
+  "holochain_cascade/unstable-warrants",
+]
+
 sweettest = ["test_utils", "sqlite"]
 
 deepkey-wasm-cache = []

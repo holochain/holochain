@@ -188,6 +188,7 @@ async fn get_links() {
     assert_eq!(result, expected);
 }
 
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity() {
     use ::fixt::fixt;

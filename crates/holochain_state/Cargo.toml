@@ -113,3 +113,5 @@ sqlite = [
   "holochain_zome_types/sqlite",
   "kitsune_p2p/sqlite",
 ]
+
+unstable-warrants = []
