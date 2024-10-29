@@ -19,6 +19,7 @@ fn msg() -> Msg {
 }
 
 #[hdk_extern]
+#[cfg(feature = "unstable-hdk-functions")]
 pub fn block_agent(target: AgentPubKey) -> ExternResult<()> {
     HDK.with(|h| {
         h.borrow()
@@ -32,6 +33,7 @@ pub fn block_agent(target: AgentPubKey) -> ExternResult<()> {
 }
 
 #[hdk_extern]
+#[cfg(feature = "unstable-hdk-functions")]
 pub fn unblock_agent(target: AgentPubKey) -> ExternResult<()> {
     HDK.with(|h| {
         h.borrow()
@@ -228,6 +230,8 @@ fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<ActionH
 }
 
 #[hdk_extern]
-fn get_validation_receipts(input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>> {
+fn get_validation_receipts(
+    input: GetValidationReceiptsInput,
+) -> ExternResult<Vec<ValidationReceiptSet>> {
     hdk::prelude::get_validation_receipts(input)
 }

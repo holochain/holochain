@@ -48,7 +48,6 @@ use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash::hash;
-use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
 use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
@@ -642,28 +641,24 @@ impl RealRibosome {
                 &mut ns,
                 "__hc__get_validation_receipts_1",
                 get_validation_receipts,
-            )
-            // This HDI function can't be easily removed, even though it's considered an
-            // unstable function.
-            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent);
+            );
 
         #[cfg(feature = "unstable-hdk-functions")]
-        {
-            let host_fn_builder = host_fn_builder
-                .with_host_function(
-                    &mut ns,
-                    "__hc__accept_countersigning_preflight_request_1",
-                    accept_countersigning_preflight_request,
-                )
-                .with_host_function(
-                    &mut ns,
-                    "__hc__get_agent_key_lineage_1",
-                    get_agent_key_lineage,
-                )
-                .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
-                .with_host_function(&mut ns, "__hc__schedule_1", schedule)
-                .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent);
-        }
+        let host_fn_builder = host_fn_builder
+            .with_host_function(
+                &mut ns,
+                "__hc__accept_countersigning_preflight_request_1",
+                accept_countersigning_preflight_request,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__get_agent_key_lineage_1",
+                get_agent_key_lineage,
+            )
+            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
+            .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
+            .with_host_function(&mut ns, "__hc__schedule_1", schedule)
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent);
 
         imports.register_namespace("env", ns);
 
@@ -1344,9 +1339,11 @@ pub mod wasm_test {
 
         assert_eq!(
             vec![
-                // "__hc__accept_countersigning_preflight_request_1",
+                #[cfg(feature = "unstable-hdk-functions")]
+                "__hc__accept_countersigning_preflight_request_1",
                 "__hc__agent_info_1",
-                // "__hc__block_agent_1",
+                #[cfg(feature = "unstable-hdk-functions")]
+                "__hc__block_agent_1",
                 "__hc__call_1",
                 "__hc__call_info_1",
                 "__hc__capability_claims_1",
@@ -1370,13 +1367,15 @@ pub mod wasm_test {
                 "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
-                // "__hc__get_agent_key_lineage_1",
+                #[cfg(feature = "unstable-hdk-functions")]
+                "__hc__get_agent_key_lineage_1",
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",
                 "__hc__get_validation_receipts_1",
                 "__hc__hash_1",
-                // "__hc__is_same_agent_1",
+                #[cfg(feature = "unstable-hdk-functions")]
+                "__hc__is_same_agent_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
                 "__hc__must_get_entry_1",
@@ -1384,13 +1383,15 @@ pub mod wasm_test {
                 "__hc__open_chain_1",
                 "__hc__query_1",
                 "__hc__random_bytes_1",
-                // "__hc__schedule_1",
+                #[cfg(feature = "unstable-hdk-functions")]
+                "__hc__schedule_1",
                 "__hc__send_remote_signal_1",
                 "__hc__sign_1",
                 "__hc__sign_ephemeral_1",
                 "__hc__sys_time_1",
                 "__hc__trace_1",
-                // "__hc__unblock_agent_1",
+                #[cfg(feature = "unstable-hdk-functions")]
+                "__hc__unblock_agent_1",
                 "__hc__update_1",
                 "__hc__verify_signature_1",
                 "__hc__version_1",
