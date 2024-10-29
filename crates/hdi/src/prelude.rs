@@ -87,7 +87,7 @@ macro_rules! holochain_externs {
             zome_info:1,
             dna_info:1,
             dna_info:2,
-            // TODO: re-enable this when implementing unstable-hdk-functions
+            // TODO: re-enable this when implementing unstable-functions
             // is_same_agent:1,
             must_get_entry:1,
             must_get_valid_record:1,

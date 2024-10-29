@@ -131,7 +131,7 @@ pub fn sys_time() -> ExternResult<Timestamp> {
 ///
 /// The only argument to `schedule` is the name of the schedulable function in the
 /// current zome to be scheduled.
-#[cfg(feature = "unstable-hdk-functions")]
+#[cfg(feature = "unstable-functions")]
 pub fn schedule(scheduled_fn: &str) -> ExternResult<()> {
     HDK.with(|h| h.borrow().schedule(String::from(scheduled_fn)))
 }

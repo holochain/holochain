@@ -37,14 +37,14 @@ wasm_io_types! {
     // when updated
 
     // Attempt to accept a preflight request.
-    #[cfg(feature = "unstable-hdk-functions")]
+    #[cfg(feature = "unstable-functions")]
     fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
 
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
 
     // Block some agent on the same DNA.
-    #[cfg(feature = "unstable-hdk-functions")]
+    #[cfg(feature = "unstable-functions")]
     fn block_agent (zt::block::BlockAgentInput) -> ();
 
     // Info about the current DNA.
@@ -133,7 +133,7 @@ wasm_io_types! {
     fn send_remote_signal (zt::signal::RemoteSignal) -> ();
 
     // Schedule a schedulable function if it is not already.
-    #[cfg(feature = "unstable-hdk-functions")]
+    #[cfg(feature = "unstable-functions")]
     fn schedule (String) -> ();
 
     // @todo
@@ -152,7 +152,7 @@ wasm_io_types! {
     fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
 
     // Unblock some previously blocked agent.
-    #[cfg(feature = "unstable-hdk-functions")]
+    #[cfg(feature = "unstable-functions")]
     fn unblock_agent(zt::block::BlockAgentInput) -> ();
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;

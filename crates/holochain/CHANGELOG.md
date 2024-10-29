@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- The following HDK functions have been temporarily removed as "unstable". They can be re-enabled by building Holochain with the "unstable-hdk-functions" feature flag:
+- The following HDK functions have been temporarily removed as "unstable". They can be re-enabled by building Holochain with the "unstable-functions" feature flag:
   - `accept_countersigning_preflight_request`
   - `block_agent`
   - `unblock_agent`

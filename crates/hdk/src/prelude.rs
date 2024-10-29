@@ -107,10 +107,10 @@ pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
 
-#[cfg(feature = "unstable-hdk-functions")]
+#[cfg(feature = "unstable-functions")]
 pub use crate::countersigning::accept_countersigning_preflight_request;
 
-#[cfg(feature = "unstable-hdk-functions")]
+#[cfg(feature = "unstable-functions")]
 pub use crate::time::schedule;
 
 #[cfg(feature = "mock")]
@@ -180,7 +180,7 @@ macro_rules! holochain_externs {
             get_validation_receipts:1
         );
 
-        #[cfg(feature = "unstable-hdk-functions")]
+        #[cfg(feature = "unstable-functions")]
         holochain_wasmer_guest::host_externs!(
             accept_countersigning_preflight_request:1,
             schedule:1
