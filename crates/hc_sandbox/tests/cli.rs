@@ -85,7 +85,9 @@ async fn check_timeout<T>(response: impl Future<Output = WebsocketResult<T>>) ->
 }
 
 async fn package_fixture_if_not_packaged() {
-    if PathBuf::from("tests/fixtures/my-app/my-fixture-app.happ").exists() {
+    if PathBuf::from("tests/fixtures/my-app/my-fixture-app.happ").exists()
+        && PathBuf::from("tests/fixtures/my-app-deferred/my-fixture-app-deferred.happ").exists()
+    {
         return;
     }
 
