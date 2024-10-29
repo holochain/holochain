@@ -148,8 +148,6 @@ macro_rules! holochain_externs {
             must_get_entry:1,
             must_get_valid_record:1,
             must_get_action:1,
-            #[cfg(feature = "unstable-hdk-functions")]
-            accept_countersigning_preflight_request:1,
             get_agent_key_lineage:1,
             query:1,
             call_remote:1,
@@ -163,8 +161,6 @@ macro_rules! holochain_externs {
             delete_link:1,
             update:1,
             delete:1,
-            #[cfg(feature = "unstable-hdk-functions")]
-            schedule:1,
             x_salsa20_poly1305_shared_secret_create_random:1,
             x_salsa20_poly1305_shared_secret_export:1,
             x_salsa20_poly1305_shared_secret_ingest:1,
@@ -182,6 +178,12 @@ macro_rules! holochain_externs {
             close_chain:1,
             open_chain:1,
             get_validation_receipts:1
+        );
+
+        #[cfg(feature = "unstable-hdk-functions")]
+        holochain_wasmer_guest::host_externs!(
+            accept_countersigning_preflight_request:1,
+            schedule:1
         );
     };
 }

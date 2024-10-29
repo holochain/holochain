@@ -64,6 +64,7 @@ fn cron_scheduled_fn_init(_: Option<Schedule>) -> Option<Schedule> {
 }
 
 #[hdk_extern]
+#[cfg(feature = "unstable-hdk-functions")]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     hdk::prelude::schedule("scheduled_fn_init")?;
     hdk::prelude::schedule("cron_scheduled_fn_init")?;
@@ -71,6 +72,7 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 }
 
 #[hdk_extern]
+#[cfg(feature = "unstable-hdk-functions")]
 fn schedule(_: ()) -> ExternResult<()> {
     hdk::prelude::schedule("scheduled_fn")?;
     hdk::prelude::schedule("cron_scheduled_fn")?;
@@ -79,7 +81,7 @@ fn schedule(_: ()) -> ExternResult<()> {
 
 fn _query(entry_types_unit: EntryTypesUnit) -> ExternResult<Vec<Record>> {
     hdk::prelude::query(
-        ChainQueryFilter::default().entry_type(entry_types_unit.try_into().unwrap())
+        ChainQueryFilter::default().entry_type(entry_types_unit.try_into().unwrap()),
     )
 }
 

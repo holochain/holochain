@@ -14,6 +14,7 @@ fn create_an_invalid_thing(_: ()) -> ExternResult<ActionHash> {
     create_entry(&EntryTypes::Thing(Thing::Invalid))
 }
 
+#[cfg(feature = "unstable-hdk-functions")]
 fn create_countersigned(
     responses: Vec<PreflightResponse>,
     thing: Thing,
@@ -53,6 +54,7 @@ fn create_countersigned(
 }
 
 #[hdk_extern]
+#[cfg(feature = "unstable-hdk-functions")]
 fn create_an_invalid_countersigned_thing(
     responses: Vec<PreflightResponse>,
 ) -> ExternResult<ActionHash> {
@@ -60,11 +62,13 @@ fn create_an_invalid_countersigned_thing(
 }
 
 #[hdk_extern]
+#[cfg(feature = "unstable-hdk-functions")]
 fn create_a_countersigned_thing(responses: Vec<PreflightResponse>) -> ExternResult<ActionHash> {
     Ok(create_countersigned(responses, Thing::Valid)?.0)
 }
 
 #[hdk_extern]
+#[cfg(feature = "unstable-hdk-functions")]
 fn create_a_countersigned_thing_with_entry_hash(
     responses: Vec<PreflightResponse>,
 ) -> ExternResult<(ActionHash, EntryHash)> {
@@ -129,6 +133,7 @@ fn generate_invalid_countersigning_preflight_request_enzymatic(
 }
 
 #[hdk_extern]
+#[cfg(feature = "unstable-hdk-functions")]
 fn accept_countersigning_preflight_request(
     preflight_request: PreflightRequest,
 ) -> ExternResult<PreflightRequestAcceptance> {
@@ -156,11 +161,13 @@ fn get_agent_activity(input: GetAgentActivityInput) -> ExternResult<AgentActivit
 }
 
 #[hdk_extern]
+#[cfg(feature = "unstable-hdk-functions")]
 fn schedule_signal() -> ExternResult<()> {
     HDK.with(|h| h.borrow().schedule("scheduled_fn".to_string()))
 }
 
 #[hdk_extern(infallible)]
+#[cfg(feature = "unstable-hdk-functions")]
 fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {
     emit_signal("scheduled hello");
     Some(Schedule::from("*/1 * * * * *".to_string()))
