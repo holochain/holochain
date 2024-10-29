@@ -7,7 +7,6 @@ pub use crate::chain::get_agent_activity;
 pub use crate::chain::must_get_agent_activity;
 pub use crate::chain::query;
 pub use crate::clone::*;
-pub use crate::countersigning::accept_countersigning_preflight_request;
 pub use crate::countersigning::session_times_from_millis;
 pub use crate::ed25519::sign;
 pub use crate::ed25519::sign_ephemeral;
@@ -55,8 +54,6 @@ pub use crate::p2p::call_remote;
 pub use crate::p2p::emit_signal;
 pub use crate::p2p::send_remote_signal;
 pub use crate::random::*;
-pub use crate::time::schedule;
-pub use crate::time::sleep;
 pub use crate::time::sys_time;
 pub use crate::validation_receipt::get_validation_receipts;
 pub use crate::x_salsa20_poly1305::create_x25519_keypair;
@@ -110,6 +107,12 @@ pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
 
+#[cfg(feature = "unstable-hdk-functions")]
+pub use crate::countersigning::accept_countersigning_preflight_request;
+
+#[cfg(feature = "unstable-hdk-functions")]
+pub use crate::time::schedule;
+
 #[cfg(feature = "mock")]
 pub use mockall;
 
@@ -145,6 +148,7 @@ macro_rules! holochain_externs {
             must_get_entry:1,
             must_get_valid_record:1,
             must_get_action:1,
+            #[cfg(feature = "unstable-hdk-functions")]
             accept_countersigning_preflight_request:1,
             get_agent_key_lineage:1,
             query:1,
@@ -159,8 +163,8 @@ macro_rules! holochain_externs {
             delete_link:1,
             update:1,
             delete:1,
+            #[cfg(feature = "unstable-hdk-functions")]
             schedule:1,
-            sleep:1,
             x_salsa20_poly1305_shared_secret_create_random:1,
             x_salsa20_poly1305_shared_secret_export:1,
             x_salsa20_poly1305_shared_secret_ingest:1,
