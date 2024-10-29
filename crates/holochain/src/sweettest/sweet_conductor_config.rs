@@ -101,6 +101,7 @@ impl SweetConductorConfig {
     }
 
     /// Use the local in-memory CHC
+    #[cfg(feature = "chc")]
     pub fn local_chc(mut self) -> Self {
         self.chc_url = Some(url2::Url2::parse(
             crate::conductor::chc::CHC_LOCAL_MAGIC_URL,

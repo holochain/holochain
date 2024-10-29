@@ -18,6 +18,7 @@ use holochain_types::record::SignedActionHashedExt;
 
 /// Test that records can be manually grafted onto a source chain.
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "chc")]
 async fn grafting() {
     holochain_trace::test_run();
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
