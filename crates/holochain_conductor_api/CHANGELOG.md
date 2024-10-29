@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- AppInfo field `cell_info` is now an `IndexMap` to ensure consistent ordering.
+
+## 0.5.0-dev.2
+
 ## 0.5.0-dev.1
 
 - AppInfo now includes a field `installed_at` with the timestamp that the app was installed

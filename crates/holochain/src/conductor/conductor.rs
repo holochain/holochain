@@ -49,6 +49,7 @@ use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holochain_wasmer_host::module::ModuleCache;
+use indexmap::IndexMap;
 use itertools::Itertools;
 use rusqlite::Transaction;
 use tokio::sync::mpsc::error::SendError;
@@ -590,8 +591,8 @@ mod dna_impls {
         pub fn get_dna_definitions(
             &self,
             app: &InstalledApp,
-        ) -> ConductorResult<HashMap<CellId, DnaDefHashed>> {
-            let mut dna_defs = HashMap::new();
+        ) -> ConductorResult<IndexMap<CellId, DnaDefHashed>> {
+            let mut dna_defs = IndexMap::new();
             for cell_id in app.all_cells() {
                 let ribosome = self.get_ribosome(cell_id.dna_hash())?;
                 let dna_def = ribosome.dna_def();
