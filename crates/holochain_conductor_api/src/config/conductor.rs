@@ -292,11 +292,12 @@ impl Default for ConductorTuningParams {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use holochain_types::websocket::AllowedOrigins;
-    use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;
     use std::path::Path;
     use std::path::PathBuf;
+
+    #[cfg(not(feature = "unstable-dpki"))]
+    use {holochain_types::websocket::AllowedOrigins, kitsune_p2p_types::config::TransportConfig};
 
     #[test]
     fn test_config_load_yaml() {
