@@ -2915,7 +2915,7 @@ dependencies = [
  "futures",
  "holochain_serialized_bytes",
  "holochain_util",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.96 (registry+https://github.com/rust-lang/crates.io-index)",
  "kitsune_p2p_dht_arc",
  "must_future",
  "proptest",
@@ -3626,13 +3626,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "holochain_wasmer_guest"
+name = "holochain_wasmer_common"
 version = "0.0.96"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa3d0105471c4f0fa2d9644c7113e4f7ed5385ed5dbb980eab14eb7c6efaff8a"
+source = "git+https://github.com/holochain/holochain-wasmer.git?rev=122b097#122b09750021109762955370f58e4d95096d783f"
 dependencies = [
  "holochain_serialized_bytes",
- "holochain_wasmer_common",
+ "serde",
+ "serde_bytes",
+ "test-fuzz",
+ "thiserror",
+]
+
+[[package]]
+name = "holochain_wasmer_guest"
+version = "0.0.96"
+source = "git+https://github.com/holochain/holochain-wasmer.git?rev=122b097#122b09750021109762955370f58e4d95096d783f"
+dependencies = [
+ "holochain_serialized_bytes",
+ "holochain_wasmer_common 0.0.96 (git+https://github.com/holochain/holochain-wasmer.git?rev=122b097)",
  "parking_lot 0.12.3",
  "paste",
  "serde",
@@ -3650,7 +3661,7 @@ dependencies = [
  "hc-wasmer",
  "hex",
  "holochain_serialized_bytes",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.96 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.12.3",
  "rand 0.8.5",
  "serde",
@@ -3691,7 +3702,7 @@ dependencies = [
  "holochain_integrity_types",
  "holochain_nonce",
  "holochain_serialized_bytes",
- "holochain_wasmer_common",
+ "holochain_wasmer_common 0.0.96 (registry+https://github.com/rust-lang/crates.io-index)",
  "holochain_zome_types",
  "kitsune_p2p_block",
  "kitsune_p2p_dht",
