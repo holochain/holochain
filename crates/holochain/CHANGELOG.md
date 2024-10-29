@@ -6,6 +6,9 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Use of WasmZome preserialized_path has been **deprecated**. Please use the wasm interpreter instead.
+
+- Conductor::get_dna_definitions now returns an `IndexMap` to ensure consistent ordering.
 
 - The following HDK functions have been temporarily removed as "unstable". They can be re-enabled by building Holochain with the "unstable-functions" feature flag:
   - `accept_countersigning_preflight_request`
