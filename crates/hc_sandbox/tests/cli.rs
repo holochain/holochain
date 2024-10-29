@@ -292,6 +292,29 @@ async fn default_sandbox_has_dpki_disabled() {
     assert!(conductor_config.dpki.no_dpki);
 }
 
+/// Create a new default sandbox which should have DPKI enabled in the conductor config.
+#[cfg(feature = "unstable-dpki")]
+#[tokio::test(flavor = "multi_thread")]
+async fn default_sandbox_has_dpki_enabled() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("create")
+        .arg("--in-process-lair")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut sandbox_process = input_piped_password(&mut cmd).await;
+    let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
+    assert!(!conductor_config.dpki.no_dpki);
+}
+
 /// Create a new sandbox with DPKI disabled in the conductor config.
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_without_dpki() {
