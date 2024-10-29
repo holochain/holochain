@@ -97,17 +97,17 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
-#[cfg(feature = "unstable-hdk-functions")]
+#[cfg(feature = "unstable-functions")]
 use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
-#[cfg(feature = "unstable-hdk-functions")]
+#[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
-#[cfg(feature = "unstable-hdk-functions")]
+#[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::block_agent::block_agent;
-#[cfg(feature = "unstable-hdk-functions")]
+#[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
-#[cfg(feature = "unstable-hdk-functions")]
+#[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::schedule::schedule;
-#[cfg(feature = "unstable-hdk-functions")]
+#[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
 
 use crate::core::ribosome::host_fn::close_chain::close_chain;
@@ -643,7 +643,7 @@ impl RealRibosome {
                 get_validation_receipts,
             );
 
-        #[cfg(feature = "unstable-hdk-functions")]
+        #[cfg(feature = "unstable-functions")]
         let host_fn_builder = host_fn_builder
             .with_host_function(
                 &mut ns,
@@ -1339,10 +1339,10 @@ pub mod wasm_test {
 
         assert_eq!(
             vec![
-                #[cfg(feature = "unstable-hdk-functions")]
+                #[cfg(feature = "unstable-functions")]
                 "__hc__accept_countersigning_preflight_request_1",
                 "__hc__agent_info_1",
-                #[cfg(feature = "unstable-hdk-functions")]
+                #[cfg(feature = "unstable-functions")]
                 "__hc__block_agent_1",
                 "__hc__call_1",
                 "__hc__call_info_1",
@@ -1367,14 +1367,14 @@ pub mod wasm_test {
                 "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
-                #[cfg(feature = "unstable-hdk-functions")]
+                #[cfg(feature = "unstable-functions")]
                 "__hc__get_agent_key_lineage_1",
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",
                 "__hc__get_validation_receipts_1",
                 "__hc__hash_1",
-                #[cfg(feature = "unstable-hdk-functions")]
+                #[cfg(feature = "unstable-functions")]
                 "__hc__is_same_agent_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
@@ -1383,14 +1383,14 @@ pub mod wasm_test {
                 "__hc__open_chain_1",
                 "__hc__query_1",
                 "__hc__random_bytes_1",
-                #[cfg(feature = "unstable-hdk-functions")]
+                #[cfg(feature = "unstable-functions")]
                 "__hc__schedule_1",
                 "__hc__send_remote_signal_1",
                 "__hc__sign_1",
                 "__hc__sign_ephemeral_1",
                 "__hc__sys_time_1",
                 "__hc__trace_1",
-                #[cfg(feature = "unstable-hdk-functions")]
+                #[cfg(feature = "unstable-functions")]
                 "__hc__unblock_agent_1",
                 "__hc__update_1",
                 "__hc__verify_signature_1",

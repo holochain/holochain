@@ -66,14 +66,14 @@ host_fn_api_impls! {
     // MAYBE: is there a way to unhygienically import this code in both places?
 
     // Attempt to accept a preflight request.
-    #[cfg(feature = "unstable-hdk-functions")]
+    #[cfg(feature = "unstable-functions")]
     fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
 
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
 
     // Block some agent on the same DNA.
-    #[cfg(feature = "unstable-hdk-functions")]
+    #[cfg(feature = "unstable-functions")]
     fn block_agent (zt::block::BlockAgentInput) -> ();
 
     // Info about the current DNA.
@@ -197,7 +197,7 @@ host_fn_api_impls! {
     fn send_remote_signal (zt::signal::RemoteSignal) -> ();
 
     // @todo
-    #[cfg(feature = "unstable-hdk-functions")]
+    #[cfg(feature = "unstable-functions")]
     fn schedule (String) -> ();
 
     // @todo
@@ -214,7 +214,7 @@ host_fn_api_impls! {
     fn sys_time (()) -> zt::timestamp::Timestamp;
 
     // Unblock some previously blocked agent.
-    #[cfg(feature = "unstable-hdk-functions")]
+    #[cfg(feature = "unstable-functions")]
     fn unblock_agent (zt::block::BlockAgentInput) -> ();
 
     // Same as  but also takes the ActionHash of the updated record.
