@@ -116,7 +116,7 @@ impl TestData {
 
                 move |txn| -> DatabaseResult<bool> {
                     Ok(query
-                        .run(DbScratch::new(&[&txn], &scratch))
+                        .run(DbScratch::new(&[txn], &scratch))
                         .unwrap()
                         .is_empty())
                 }
@@ -134,7 +134,7 @@ impl TestData {
                 let scratch = self.scratch.clone();
 
                 move |txn| -> StateQueryResult<Vec<Link>> {
-                    query.run(DbScratch::new(&[&txn], &scratch))
+                    query.run(DbScratch::new(&[txn], &scratch))
                 }
             })
             .await
@@ -150,7 +150,7 @@ impl TestData {
                 let scratch = self.scratch.clone();
 
                 move |txn| -> StateQueryResult<Vec<Link>> {
-                    query.run(DbScratch::new(&[&txn], &scratch))
+                    query.run(DbScratch::new(&[txn], &scratch))
                 }
             })
             .await
@@ -171,7 +171,7 @@ impl TestData {
                 let scratch = self.scratch.clone();
 
                 move |txn| -> StateQueryResult<Vec<Link>> {
-                    query_no_tag.run(DbScratch::new(&[&txn], &scratch))
+                    query_no_tag.run(DbScratch::new(&[txn], &scratch))
                 }
             })
             .await
@@ -193,7 +193,7 @@ impl TestData {
                 let scratch = self.scratch.clone();
 
                 move |txn| -> StateQueryResult<Vec<Link>> {
-                    query.run(DbScratch::new(&[&txn], &scratch))
+                    query.run(DbScratch::new(&[txn], &scratch))
                 }
             })
             .await
@@ -220,7 +220,7 @@ impl TestData {
                 let scratch = self.scratch.clone();
 
                 move |txn| -> StateQueryResult<Vec<Link>> {
-                    query.run(DbScratch::new(&[&txn], &scratch))
+                    query.run(DbScratch::new(&[txn], &scratch))
                 }
             })
             .await
@@ -251,7 +251,7 @@ impl TestData {
                 let scratch = self.scratch.clone();
 
                 move |txn| -> StateQueryResult<Vec<Link>> {
-                    query.run(DbScratch::new(&[&txn], &scratch))
+                    query.run(DbScratch::new(&[txn], &scratch))
                 }
             })
             .await
@@ -277,7 +277,7 @@ impl TestData {
                 let scratch = self.scratch.clone();
 
                 move |txn| -> StateQueryResult<Vec<Link>> {
-                    query.run(DbScratch::new(&[&txn], &scratch))
+                    query.run(DbScratch::new(&[txn], &scratch))
                 }
             })
             .await
@@ -369,7 +369,7 @@ impl TestData {
 
                         move |txn| -> DatabaseResult<IntoIter<Link>> {
                             Ok(query
-                                .run(DbScratch::new(&[&txn], &scratch))
+                                .run(DbScratch::new(&[txn], &scratch))
                                 .unwrap()
                                 .into_iter())
                         }
@@ -411,7 +411,7 @@ impl TestData {
 
                 move |txn| -> DatabaseResult<IntoIter<Link>> {
                     Ok(query
-                        .run(DbScratch::new(&[&txn], &scratch))
+                        .run(DbScratch::new(&[txn], &scratch))
                         .unwrap()
                         .into_iter())
                 }
@@ -452,7 +452,7 @@ impl TestData {
 
                         move |txn| -> DatabaseResult<IntoIter<Link>> {
                             Ok(my_query
-                                .run(DbScratch::new(&[&txn], &scratch))
+                                .run(DbScratch::new(&[txn], &scratch))
                                 .unwrap()
                                 .into_iter())
                         }
@@ -497,7 +497,7 @@ impl TestData {
 
                         move |txn| -> DatabaseResult<IntoIter<Link>> {
                             Ok(my_query
-                                .run(DbScratch::new(&[&txn], &scratch))
+                                .run(DbScratch::new(&[txn], &scratch))
                                 .unwrap()
                                 .into_iter())
                         }
