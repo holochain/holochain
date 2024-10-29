@@ -92,6 +92,7 @@ url2 = "0.0.6"
 uuid = { version = "1.8", features = ["serde", "v4"] }
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
+indexmap = { version = "2.6.0", features = ["serde"] }
 
 # Temporarily include a fork of wasmer from the git branch 'wamr', until it is officially released in wasmer v5
 hc-wasmer = { version = "=4.3.6-hc.1", optional = true, default-features = false }
