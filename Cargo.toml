@@ -122,7 +122,7 @@ lto = true
 # isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_guest = { path = "../holochain-wasmer/crates/guest" }
 # holochain_wasmer_host = { path = "../holochain-wasmer/crates/host" }
-# holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
+holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "122b097" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
