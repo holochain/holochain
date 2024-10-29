@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- WasmZome preserialized_path has been **deprecated**. Please use the wasm interpreter instead.
+
 ## 0.4.0-rc.0
 
 ## 0.4.0-dev.18
