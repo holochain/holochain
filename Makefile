@@ -11,7 +11,8 @@ DEFAULT_FEATURES=chc,slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_d
 .PHONY: default \
 	static-all static-fmt static-toml static-clippy static-doc \
 	build-workspace-wasmer_sys build-workspace-wasmer_wamr \
-	test-workspace-wasmer_sys test-workspace-wasmer_wamr
+	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
+	test-workspace-wasmer_sys-unstable-dpki
 
 # default to running everything (first rule)
 default: build-workspace-wasmer_sys \
