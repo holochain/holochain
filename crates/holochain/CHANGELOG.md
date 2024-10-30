@@ -6,7 +6,12 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- Use of WasmZome preserialized_path has been **deprecated**. Please use the wasm interpreter instead.
+
+## 0.5.0-dev.3
+
+- Use of WasmZome preserialized\_path has been **deprecated**. Please use the wasm interpreter instead.
+
+- Conductor::get\_dna\_definitions now returns an `IndexMap` to ensure consistent ordering.
 
 ## 0.5.0-dev.2
 

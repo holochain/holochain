@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.5.0-dev.3
+
+- InstalledAppCommon field `role_assignments` is now an IndexMap to ensure consisent ordering.
 - ZomeManifest dylib has been **deprecated**. Please use the wasm interpreter instead.
 
 ## 0.5.0-dev.2
