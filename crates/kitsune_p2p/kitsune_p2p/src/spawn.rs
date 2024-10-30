@@ -24,7 +24,7 @@ pub async fn spawn_kitsune_p2p(
     KitsuneP2pEventReceiver,
 )> {
     #[cfg(not(feature = "unstable-sharding"))]
-    if config.tuning_params.arc_clamping() == None {
+    if config.tuning_params.arc_clamping().is_none() {
         tracing::warn!(
             "\
             gossip_arc_clamping network tuning parameter is not set. \
