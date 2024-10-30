@@ -70,7 +70,7 @@ build-workspace-wasmer_wamr:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
 
-# execute tests on all crate
+# execute tests on all crates
 test-workspace-unstable:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
