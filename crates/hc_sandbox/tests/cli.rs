@@ -368,6 +368,7 @@ async fn create_default_sandbox_with_dpki_test_network_seed() {
 }
 
 /// Create a new sandbox with a custom DPKI network seed.
+#[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_with_custom_dpki_network_seed() {
     clean_sandboxes().await;
