@@ -12,7 +12,8 @@ UNSTABLE_FEATURES=chc,unstable-sharding,$(DEFAULT_FEATURES)
 .PHONY: default \
 	static-all static-fmt static-toml static-clippy static-doc \
 	build-workspace-wasmer_sys build-workspace-wasmer_wamr \
-	test-workspace-wasmer_sys test-workspace-wasmer_wamr
+	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
+	test-workspace-unstable
 
 # default to running everything (first rule)
 default: build-workspace-wasmer_sys \
