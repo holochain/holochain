@@ -70,11 +70,14 @@ async fn publish_to_basis_from_inside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = if cfg!(feature = "unstable-sharding") {
-            "none".to_string()
-        } else {
-            "full".to_string()
-        };
+        #[cfg(feature = "unstable-sharding")]
+        {
+            params.gossip_arc_clamping = "none".to_string();
+        }
+        #[cfg(not(feature = "unstable-sharding"))]
+        {
+            params.gossip_arc_clamping = "full".to_string();
+        }
         #[cfg(feature = "unstable-sharding")]
         {
             // Don't update the arcs dynamically, use the initial value
@@ -175,11 +178,14 @@ async fn publish_to_basis_from_outside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = if cfg!(feature = "unstable-sharding") {
-            "none".to_string()
-        } else {
-            "full".to_string()
-        };
+        #[cfg(feature = "unstable-sharding")]
+        {
+            params.gossip_arc_clamping = "none".to_string();
+        }
+        #[cfg(not(feature = "unstable-sharding"))]
+        {
+            params.gossip_arc_clamping = "full".to_string();
+        }
         #[cfg(feature = "unstable-sharding")]
         {
             // Don't update the arcs dynamically, use the initial value
@@ -305,11 +311,14 @@ async fn gossip_to_basis_from_inside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = if cfg!(feature = "unstable-sharding") {
-            "none".to_string()
-        } else {
-            "full".to_string()
-        };
+        #[cfg(feature = "unstable-sharding")]
+        {
+            params.gossip_arc_clamping = "none".to_string();
+        }
+        #[cfg(not(feature = "unstable-sharding"))]
+        {
+            params.gossip_arc_clamping = "full".to_string();
+        }
         #[cfg(feature = "unstable-sharding")]
         {
             // Don't update the arcs dynamically, use the initial value
@@ -403,11 +412,14 @@ async fn no_gossip_to_basis_from_outside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = if cfg!(feature = "unstable-sharding") {
-            "none".to_string()
-        } else {
-            "full".to_string()
-        };
+        #[cfg(feature = "unstable-sharding")]
+        {
+            params.gossip_arc_clamping = "none".to_string();
+        }
+        #[cfg(not(feature = "unstable-sharding"))]
+        {
+            params.gossip_arc_clamping = "full".to_string();
+        }
         #[cfg(feature = "unstable-sharding")]
         {
             // Don't update the arcs dynamically, use the initial value
