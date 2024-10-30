@@ -44,9 +44,7 @@ workspace = true
 
 [features]
 chc = []
-unstable-sharding = [
-  "kitsune_p2p_types/unstable-sharding",
-]
+unstable-sharding = ["kitsune_p2p_types/unstable-sharding"]
 sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
   "holochain_types/sqlite-encrypted",
