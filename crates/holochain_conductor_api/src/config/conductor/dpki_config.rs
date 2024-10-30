@@ -118,7 +118,7 @@ mod tests {
     #[cfg(feature = "unstable-dpki")]
     #[test]
     fn production_config_with_feature_enabled() {
-        let config = DpkiConfig::production();
-        assert_eq!(config, DpkiConfig::production());
+        let config = DpkiConfig::production(None);
+        assert_eq!(config, DpkiConfig::production(None));
     }
 }

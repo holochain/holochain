@@ -1,6 +1,8 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_cli_sandbox::config::read_config;
-use holochain_conductor_api::conductor::{ConductorConfig, DpkiConfig};
+use holochain_conductor_api::conductor::ConductorConfig;
+#[cfg(feature = "unstable-dpki")]
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
 use holochain_types::app::InstalledAppId;
@@ -339,6 +341,7 @@ async fn create_sandbox_without_dpki() {
 }
 
 /// Create a new default sandbox which should have a test network seed set for DPKI.
+#[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_default_sandbox_with_dpki_test_network_seed() {
     clean_sandboxes().await;
