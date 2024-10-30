@@ -99,6 +99,8 @@ where
         use proptest::strategy::Strategy;
 
         let strat = T::arbitrary().prop_flat_map(move |hash_type| {
+            // Generate 39 arbitrary bytes. `?-u:` specifies that the bytes need not be valid UTF-8 
+            // (any value from 0-255 is allowed).
             let gen_strat = proptest::string::bytes_regex(r"(?-u:.{39})").unwrap();
             gen_strat.prop_map(move |mut buf| {
                 assert_eq!(buf.len(), 39);
