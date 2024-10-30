@@ -148,11 +148,8 @@ macro_rules! holochain_externs {
             must_get_entry:1,
             must_get_valid_record:1,
             must_get_action:1,
-            get_agent_key_lineage:1,
             query:1,
             call_remote:1,
-            block_agent:1,
-            unblock_agent:1,
             call:1,
             create:1,
             emit_signal:1,
@@ -183,6 +180,9 @@ macro_rules! holochain_externs {
         #[cfg(feature = "unstable-functions")]
         holochain_wasmer_guest::host_externs!(
             accept_countersigning_preflight_request:1,
+            get_agent_key_lineage:1,
+            block_agent:1,
+            unblock_agent:1,
             schedule:1
         );
     };
