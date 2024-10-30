@@ -15,7 +15,7 @@ impl<P: PrimitiveHashType> TryFrom<&str> for HoloHash<P> {
     type Error = HoloHashError;
     fn try_from(s: &str) -> Result<Self, HoloHashError> {
         let hash_type = P::new();
-        HoloHash::from_raw_39(holo_hash_decode(hash_type.get_prefix(), s)?)
+        HoloHash::try_from_raw_39(holo_hash_decode(hash_type.get_prefix(), s)?)
     }
 }
 
