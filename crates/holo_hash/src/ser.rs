@@ -42,7 +42,7 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
                 "HoloHash serialized representation must be exactly 39 bytes",
             ))
         } else {
-            HoloHash::from_raw_39(h.to_vec())
+            HoloHash::try_from_raw_39(h.to_vec())
                 .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))
         }
     }
@@ -72,7 +72,7 @@ impl<'de, T: HashType> serde::de::Visitor<'de> for HoloHashVisitor<T> {
                 "HoloHash serialized representation must be exactly 39 bytes",
             ))
         } else {
-            HoloHash::from_raw_39(h.to_vec())
+            HoloHash::try_from_raw_39(h.to_vec())
                 .map_err(|e| serde::de::Error::custom(format!("HoloHash error: {:?}", e)))
         }
     }
