@@ -58,19 +58,13 @@ impl DpkiConfig {
         }
     }
 
+    #[cfg(feature = "unstable-dpki")]
     pub fn testing() -> Self {
-        cfg_if! {
-            if #[cfg(feature = "unstable-dpki")] {
-                Self {
-                    dna_path: None,
-                    network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
-                    allow_throwaway_random_dpki_agent_key: true,
-                    no_dpki: false,
-                }
-            } else {
-                tracing::error!("Enabling DPKI on conductor without specifying cargo feature 'unstable-dpki' at compile time.");
-                Self::disabled()
-            }
+        Self {
+            dna_path: None,
+            network_seed: DPKI_NETWORK_SEED_TESTING.to_string(),
+            allow_throwaway_random_dpki_agent_key: true,
+            no_dpki: false,
         }
     }
 
@@ -107,13 +101,6 @@ mod tests {
         assert_eq!(config, DpkiConfig::disabled());
     }
 
-    #[cfg(not(feature = "unstable-dpki"))]
-    #[test]
-    fn enable_dpki_without_feature_enabled() {
-        let config = DpkiConfig::testing();
-        assert_eq!(config, DpkiConfig::disabled());
-    }
-
     #[cfg(feature = "unstable-dpki")]
     #[test]
     fn default_config_with_feature_enabled() {
@@ -123,8 +110,15 @@ mod tests {
 
     #[cfg(feature = "unstable-dpki")]
     #[test]
-    fn enable_dpki_with_feature_enabled() {
+    fn testing_config_with_feature_enabled() {
         let config = DpkiConfig::testing();
         assert_eq!(config, DpkiConfig::testing());
+    }
+
+    #[cfg(feature = "unstable-dpki")]
+    #[test]
+    fn production_config_with_feature_enabled() {
+        let config = DpkiConfig::production();
+        assert_eq!(config, DpkiConfig::production());
     }
 }
