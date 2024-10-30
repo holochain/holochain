@@ -3,8 +3,8 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
+use indexmap::IndexMap;
 use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
-use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -413,7 +413,7 @@ pub struct AppInfo {
     /// Info about the cells installed in this app. Lists of cells are ordered
     /// and contain first the provisioned cell, then enabled clone cells and
     /// finally disabled clone cells.
-    pub cell_info: HashMap<RoleName, Vec<CellInfo>>,
+    pub cell_info: IndexMap<RoleName, Vec<CellInfo>>,
     /// The app's current status, in an API-friendly format
     pub status: AppInfoStatus,
     /// The app's agent pub key.
@@ -428,7 +428,7 @@ pub struct AppInfo {
 impl AppInfo {
     pub fn from_installed_app(
         app: &InstalledApp,
-        dna_definitions: &HashMap<CellId, DnaDefHashed>,
+        dna_definitions: &IndexMap<CellId, DnaDefHashed>,
     ) -> Self {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
@@ -436,7 +436,7 @@ impl AppInfo {
         let mut manifest = app.manifest().clone();
         let installed_at = *app.installed_at();
 
-        let mut cell_info: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
+        let mut cell_info: IndexMap<RoleName, Vec<CellInfo>> = IndexMap::new();
         app.roles().iter().for_each(|(role_name, role_assignment)| {
             // create a vector with info of all cells for this role
             let mut cell_info_for_role: Vec<CellInfo> = Vec::new();
