@@ -126,7 +126,7 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Optional config for the network module.
-    #[serde(default = "default_network_config")]
+    #[serde(default)]
     pub network: KitsuneP2pConfig,
 
     /// Optional specification of Chain Head Coordination service URL.
@@ -158,19 +158,6 @@ where
     T: DeserializeOwned,
 {
     serde_yaml::from_str(yaml).map_err(ConductorConfigError::SerializationError)
-}
-
-fn default_network_config() -> KitsuneP2pConfig {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "network-sharding")] {
-            KitsuneP2pConfig::default().tune(|mut tune| {
-                tune.gossip_arc_clamping = "full".to_string();
-                tune
-            })
-        } else {
-            KitsuneP2pConfig::default()
-        }
-    }
 }
 
 impl ConductorConfig {
@@ -489,7 +476,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(feature = "network-sharding"))]
+    #[cfg(not(feature = "unstable-sharding"))]
     fn test_config_default_network_config_no_sharding() {
         let config = ConductorConfig::default();
         assert_eq!(
@@ -499,7 +486,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "network-sharding")]
+    #[cfg(feature = "unstable-sharding")]
     fn test_config_default_network_config_sharding() {
         let config = ConductorConfig::default();
         assert_eq!(config.network.tuning_params.arc_clamping(), None);

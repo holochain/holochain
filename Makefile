@@ -5,7 +5,8 @@
 F=RUSTFLAGS="-Dwarnings"
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
-DEFAULT_FEATURES=chc,slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
+DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
+UNSTABLE_FEATURES=chc,unstable-sharding,slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
@@ -45,6 +46,14 @@ static-doc:
 # but also ensures targets like benchmarks remain buildable.
 # NOTE: excludes must match test-workspace nextest params,
 #       otherwise some rebuilding will occur due to resolver = "2"
+build-workspace-unstable:
+	$(F) cargo build \
+		--workspace \
+		--locked \
+		--all-targets \
+		--no-default-features \
+		--features $(UNSTABLE_FEATURES),wasmer_sys
+
 build-workspace-wasmer_sys:
 	$(F) cargo build \
 		--workspace \
@@ -61,7 +70,15 @@ build-workspace-wasmer_wamr:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
 
-# execute tests on all creates
+# execute tests on all crate
+test-workspace-unstable:
+	cargo install cargo-nextest
+	$(F) RUST_BACKTRACE=1 cargo nextest run \
+		--workspace \
+		--locked \
+		--no-default-features \
+		--features $(UNSTABLE_FEATURES),wasmer_sys
+
 test-workspace-wasmer_sys:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \

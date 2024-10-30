@@ -22,6 +22,35 @@ mod common;
 
 type AgentCtx = Vec<(KitsuneTestHarness, GhostSender<KitsuneP2p>, Arq, KAgent)>;
 
+#[cfg(not(feature = "unstable-sharding"))]
+#[tokio::test(flavor = "multi_thread")]
+async fn gossip_arc_clamping_required() {
+    let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    // Try to set up a network with gossip_arc_clamping set to None
+    let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
+        params.gossip_arc_clamping = "none".to_string();
+        params
+    };
+
+    let mut harness = KitsuneTestHarness::try_new("")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(tuner);
+
+    let result = harness.spawn().await;
+    match result {
+        Ok(_) => panic!("Should not have been able to spawn node"),
+        Err(kitsune_p2p::KitsuneP2pError::Other(e)) => {
+            assert_eq!("gossip_arc_clamping must be set".to_string(), e.to_string(),);
+        }
+        Err(e) => panic!("Unexpected error type: {e:?}"),
+    }
+}
+
 /// Test scenario steps:
 ///   1. Set up 5 nodes, each with one agent.
 ///   2. Assign a DHT arc to each agent such that their start location is inside the previous agent's arc.
@@ -41,8 +70,16 @@ async fn publish_to_basis_from_inside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = "none".to_string();
-        params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        params.gossip_arc_clamping = if cfg!(feature = "unstable-sharding") {
+            "none".to_string()
+        } else {
+            "full".to_string()
+        };
+        #[cfg(feature = "unstable-sharding")]
+        {
+            // Don't update the arcs dynamically, use the initial value
+            params.gossip_dynamic_arcs = false;
+        }
         params.disable_recent_gossip = true;
         params.disable_historical_gossip = true;
         params
@@ -138,8 +175,16 @@ async fn publish_to_basis_from_outside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = "none".to_string();
-        params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        params.gossip_arc_clamping = if cfg!(feature = "unstable-sharding") {
+            "none".to_string()
+        } else {
+            "full".to_string()
+        };
+        #[cfg(feature = "unstable-sharding")]
+        {
+            // Don't update the arcs dynamically, use the initial value
+            params.gossip_dynamic_arcs = false;
+        }
         params.disable_recent_gossip = true;
         params.disable_historical_gossip = true;
         params
@@ -260,8 +305,16 @@ async fn gossip_to_basis_from_inside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = "none".to_string();
-        params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        params.gossip_arc_clamping = if cfg!(feature = "unstable-sharding") {
+            "none".to_string()
+        } else {
+            "full".to_string()
+        };
+        #[cfg(feature = "unstable-sharding")]
+        {
+            // Don't update the arcs dynamically, use the initial value
+            params.gossip_dynamic_arcs = false;
+        }
         params.disable_historical_gossip = true;
         params.disable_publish = true;
         params.gossip_loop_iteration_delay_ms = 100;
@@ -350,8 +403,16 @@ async fn no_gossip_to_basis_from_outside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = "none".to_string();
-        params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        params.gossip_arc_clamping = if cfg!(feature = "unstable-sharding") {
+            "none".to_string()
+        } else {
+            "full".to_string()
+        };
+        #[cfg(feature = "unstable-sharding")]
+        {
+            // Don't update the arcs dynamically, use the initial value
+            params.gossip_dynamic_arcs = false;
+        }
         params.disable_historical_gossip = true;
         params.disable_publish = true;
         params.gossip_loop_iteration_delay_ms = 100;

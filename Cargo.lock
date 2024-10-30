@@ -3194,7 +3194,6 @@ dependencies = [
 name = "holochain_conductor_api"
 version = "0.5.0-dev.2"
 dependencies = [
- "cfg-if 1.0.0",
  "derive_more",
  "holo_hash",
  "holochain_keystore",

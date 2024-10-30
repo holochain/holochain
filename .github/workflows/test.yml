@@ -49,20 +49,22 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            wasmer-feature: wasmer_sys
+            target: wasmer_sys
           - os: macos-latest
-            wasmer-feature: wasmer_sys
+            target: wasmer_sys
           - os: macos-13
-            wasmer-feature: wasmer_sys
+            target: wasmer_sys
           - os: windows-latest
-            wasmer-feature: wasmer_sys
+            target: wasmer_sys
+          - os: ubuntu-latest
+            target: unstable
 
           # Our intended target for wasmer_wamr feature is iOS and Android.
           # For now, wasmer_wamr tests are only run on macos-latest.
           # Additionally, building with wasmer_wamr feature flag on windows is not currently working.
           # See https://github.com/holochain/holochain-wasmer/issues/117
           - os: macos-latest
-            wasmer-feature: wasmer_wamr
+            target: wasmer_wamr
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -71,7 +73,7 @@ jobs:
         uses: ./.github/actions/common-pre
 
       - name: install build dependencies (macos-latest, wasmer_wamr)
-        if: matrix.os == 'macos-latest' && matrix.wasmer-feature == 'wasmer_wamr'
+        if: matrix.os == 'macos-latest' && matrix.target == 'wasmer_wamr'
         shell: bash
         run: brew install cmake
 
@@ -81,11 +83,11 @@ jobs:
           $env:OPENSSL_NO_VENDOR="1"
           $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
-          make build-workspace-${{ matrix.wasmer-feature }}
+          make build-workspace-${{ matrix.target }}
 
       - name: build
         if: matrix.os != 'windows-latest'
-        run: make build-workspace-${{ matrix.wasmer-feature }}
+        run: make build-workspace-${{ matrix.target }}
 
       - name: test (windows-latest)
         if: matrix.os == 'windows-latest'
@@ -93,11 +95,11 @@ jobs:
           $env:OPENSSL_NO_VENDOR="1"
           $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
-          make test-workspace-${{ matrix.wasmer-feature }}
+          make test-workspace-${{ matrix.target }}
 
       - name: test
         if: matrix.os != 'windows-latest'
-        run: make test-workspace-${{ matrix.wasmer-feature }}
+        run: make test-workspace-${{ matrix.target }}
 
       - name: 'Common Test Teardown Actions'
         uses: ./.github/actions/common-post
