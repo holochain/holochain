@@ -532,20 +532,7 @@ impl RealRibosome {
         };
 
         host_fn_builder
-            .with_host_function(
-                &mut ns,
-                "__hc__accept_countersigning_preflight_request_1",
-                accept_countersigning_preflight_request,
-            )
-            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
-            .with_host_function(
-                &mut ns,
-                "__hc__get_agent_key_lineage_1",
-                get_agent_key_lineage,
-            )
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
-            .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             .with_host_function(&mut ns, "__hc__trace_1", trace)
             .with_host_function(&mut ns, "__hc__hash_1", hash)
             .with_host_function(&mut ns, "__hc__version_1", version)
@@ -639,8 +626,6 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__delete_link_1", delete_link)
             .with_host_function(&mut ns, "__hc__update_1", update)
             .with_host_function(&mut ns, "__hc__delete_1", delete)
-            .with_host_function(&mut ns, "__hc__schedule_1", schedule)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
             .with_host_function(&mut ns, "__hc__disable_clone_cell_1", disable_clone_cell)
             .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
@@ -652,6 +637,23 @@ impl RealRibosome {
                 "__hc__get_validation_receipts_1",
                 get_validation_receipts,
             );
+
+        #[cfg(feature = "unstable-functions")]
+        let host_fn_builder = host_fn_builder
+            .with_host_function(
+                &mut ns,
+                "__hc__accept_countersigning_preflight_request_1",
+                accept_countersigning_preflight_request,
+            )
+            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
+            .with_host_function(
+                &mut ns,
+                "__hc__get_agent_key_lineage_1",
+                get_agent_key_lineage,
+            )
+            .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
+            .with_host_function(&mut ns, "__hc__schedule_1", schedule);
 
         imports.register_namespace("env", ns);
 
