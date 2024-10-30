@@ -103,7 +103,7 @@ fn hash_from_content<T: HashType, C: HashableContent<HashType = T>>(content: &C)
             assert_length!(HOLO_HASH_CORE_LEN, &hash);
             HoloHash::<T>::from_raw_32_and_type(hash, content.hash_type())
         }
-        HashableContentBytes::Prehashed39(bytes) => HoloHash::from_raw_39_panicky(bytes),
+        HashableContentBytes::Prehashed39(bytes) => HoloHash::from_raw_39(bytes),
     }
 }
 

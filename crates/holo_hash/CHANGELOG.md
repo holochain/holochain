@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- **BREAKING** Renamed `from_raw_39_panicky` to `from_raw_39`.
+- Added function `try_from_raw_39` which returns an Err instead of panicking.
+- Added function `try_from_raw_36_and_type` which returns an Err instead of panicking.
+
 ## 0.5.0-dev.1
 
 ## 0.5.0-dev.0
