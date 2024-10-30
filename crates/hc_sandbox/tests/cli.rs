@@ -318,6 +318,7 @@ async fn default_sandbox_has_dpki_enabled() {
 }
 
 /// Create a new sandbox with DPKI disabled in the conductor config.
+#[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_without_dpki() {
     clean_sandboxes().await;
