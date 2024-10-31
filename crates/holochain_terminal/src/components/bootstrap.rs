@@ -119,7 +119,7 @@ impl Widget for BootstrapWidget {
                 .expect("Should have been able to read network type");
 
             let new_net = match *network_type {
-                // Does nothing, but can accommodate future network types
+                // Places this peer info in the `tx5` bucket. There are currently no other buckets.
                 BootstrapNet::Tx5 => BootstrapNet::Tx5,
             };
 
