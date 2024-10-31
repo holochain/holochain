@@ -6,6 +6,8 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- **BREAKING**: As the DPKI feature is unstable and incomplete, it is disabled with default cargo features and put behind a feature called `unstable-dpki`. If this feature is specified at compile time, DPKI is enabled by default.
+- **BREAKING**: Conductor::get_dna_definitions now returns an `IndexMap` to ensure consistent ordering.
 
 - Added a new feature "unstable-sharding" which puts the network sharding behind a feature flag. It will not be possible
   to configure network sharding unless Holochain is built with this feature enabled. By default, the network tuning 

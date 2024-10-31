@@ -6,14 +6,14 @@ F=RUSTFLAGS="-Dwarnings"
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
 DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
-UNSTABLE_FEATURES=chc,unstable-sharding,$(DEFAULT_FEATURES)
+UNSTABLE_FEATURES=chc,unstable-dpki,unstable-sharding,$(DEFAULT_FEATURES)
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
 	static-all static-fmt static-toml static-clippy static-doc \
 	build-workspace-wasmer_sys build-workspace-wasmer_wamr \
 	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
-	test-workspace-unstable
+	test-workspace-wasmer_sys-unstable
 
 # default to running everything (first rule)
 default: build-workspace-wasmer_sys \
@@ -47,14 +47,6 @@ static-doc:
 # but also ensures targets like benchmarks remain buildable.
 # NOTE: excludes must match test-workspace nextest params,
 #       otherwise some rebuilding will occur due to resolver = "2"
-build-workspace-unstable:
-	$(F) cargo build \
-		--workspace \
-		--locked \
-		--all-targets \
-		--no-default-features \
-		--features $(UNSTABLE_FEATURES),wasmer_sys
-
 build-workspace-wasmer_sys:
 	$(F) cargo build \
 		--workspace \
@@ -71,15 +63,7 @@ build-workspace-wasmer_wamr:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
 
-# execute tests on all crates
-test-workspace-unstable:
-	cargo install cargo-nextest
-	$(F) RUST_BACKTRACE=1 cargo nextest run \
-		--workspace \
-		--locked \
-		--no-default-features \
-		--features $(UNSTABLE_FEATURES),wasmer_sys
-
+# execute tests on all crates with wasmer compiler
 test-workspace-wasmer_sys:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
@@ -88,6 +72,16 @@ test-workspace-wasmer_sys:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
+# executes tests on all crates with wasmer compiler and unstable dpki feature
+test-workspace-wasmer_sys-unstable:
+	cargo install cargo-nextest
+	$(F) RUST_BACKTRACE=1 cargo nextest run \
+		--workspace \
+		--locked \
+		--no-default-features \
+		--features $(UNSTABLE_FEATURES),wasmer_sys
+
+# execute tests on all crates with wasmer interpreter
 test-workspace-wasmer_wamr:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \

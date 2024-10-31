@@ -10,6 +10,7 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
+cfg-if = "1.0"
 derive_more = "0.99"
 kitsune_p2p_types = { version = "^0.5.0-dev.3", path = "../kitsune_p2p/types" }
 kitsune_p2p_bin_data = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/bin_data" }
@@ -44,6 +45,7 @@ workspace = true
 
 [features]
 chc = []
+unstable-dpki = []
 unstable-sharding = ["kitsune_p2p_types/unstable-sharding"]
 sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
