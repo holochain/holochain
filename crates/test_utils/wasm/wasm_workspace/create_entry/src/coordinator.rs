@@ -19,7 +19,6 @@ fn msg() -> Msg {
 }
 
 #[hdk_extern]
-#[cfg(feature = "unstable-functions")]
 pub fn block_agent(target: AgentPubKey) -> ExternResult<()> {
     HDK.with(|h| {
         h.borrow()
@@ -33,7 +32,6 @@ pub fn block_agent(target: AgentPubKey) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-#[cfg(feature = "unstable-functions")]
 pub fn unblock_agent(target: AgentPubKey) -> ExternResult<()> {
     HDK.with(|h| {
         h.borrow()

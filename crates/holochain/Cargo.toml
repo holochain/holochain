@@ -240,8 +240,8 @@ slow_tests = []
 glacial_tests = []
 
 # Includes the wasm build script, which we don't need when not building wasms
-build_wasms = ['holochain_wasm_test_utils/build']
-only_check_wasms = ['holochain_wasm_test_utils/only_check']
+build_wasms = ["holochain_wasm_test_utils/build", "unstable-functions"]
+only_check_wasms = ["holochain_wasm_test_utils/only_check"]
 
 # Enables at-rest encryption of the SQLite database.
 # Incompatible with "sqlite".
