@@ -302,130 +302,79 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    #[cfg(not(feature = "unstable-warrants"))]
-    {
-        let summary = workspace
-            .dht_db
-            .write_async(move |txn| {
-                let mut summary = OutcomeSummary::default();
+    // Allow unused mutable, because it's mutated when feature unstable-warrants is enabled.
+    #[allow(unused_mut)]
+    let (mut summary, _invalid_ops, _forked_pairs) = workspace
+        .dht_db
+        .write_async(move |txn| {
+            let mut summary = OutcomeSummary::default();
+            let mut invalid_ops = vec![];
+            let mut forked_pairs: Vec<(
+                AgentPubKey,
+                ((ActionHash, Signature), (ActionHash, Signature)),
+            )> = vec![];
 
-                for (hashed_op, outcome) in validation_outcomes {
-                    let (op, op_hash) = hashed_op.into_inner();
-                    let op_type = op.get_type();
+            for (hashed_op, outcome) in validation_outcomes {
+                let (op, op_hash) = hashed_op.into_inner();
+                let op_type = op.get_type();
 
-                    // This is an optimization to skip app validation and integration for ops that are
-                    // rejected and don't have dependencies.
-                    let deps = op.sys_validation_dependencies();
+                #[cfg(feature = "unstable-warrants")]
+                if let DhtOp::ChainOp(chain_op) = &op {
+                    // Author a ChainFork warrant if fork is detected
+                    let action = chain_op.action();
+                    if let Some(forked_action) = detect_fork(txn, &action)? {
+                        let signature = chain_op.signature().clone();
+                        let action_hash = action.to_hash();
+                        forked_pairs.push((
+                            action.author().clone(),
+                            ((action_hash, signature), forked_action),
+                        ));
+                    }
+                }
 
-                    match outcome {
-                        Outcome::Accepted => {
-                            summary.accepted += 1;
-                            match op_type {
-                                DhtOpType::Chain(_) => put_validation_limbo(
-                                    txn,
-                                    &op_hash,
-                                    ValidationStage::SysValidated,
-                                )?,
-                                DhtOpType::Warrant(_) => {}
-                            };
-                        }
-                        Outcome::MissingDhtDep => {
-                            summary.missing += 1;
-                            let status = ValidationStage::AwaitingSysDeps;
-                            put_validation_limbo(txn, &op_hash, status)?;
-                        }
-                        Outcome::Rejected(_) => {
-                            summary.rejected += 1;
-                            if deps.is_empty() {
-                                put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
-                            } else {
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
+                // This is an optimization to skip app validation and integration for ops that are
+                // rejected and don't have dependencies.
+                let deps = op.sys_validation_dependencies();
+
+                match outcome {
+                    Outcome::Accepted => {
+                        summary.accepted += 1;
+                        match op_type {
+                            DhtOpType::Chain(_) => {
+                                put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
                             }
+                            DhtOpType::Warrant(_) => {
+                                // XXX: integrate accepted warrants immediately, because we don't
+                                //      want them to go to app validation.
+                                #[cfg(feature = "unstable-warrants")]
+                                put_integrated(txn, &op_hash, ValidationStatus::Valid)?
+                            }
+                        };
+                    }
+                    Outcome::MissingDhtDep => {
+                        summary.missing += 1;
+                        let status = ValidationStage::AwaitingSysDeps;
+                        put_validation_limbo(txn, &op_hash, status)?;
+                    }
+                    Outcome::Rejected(_) => {
+                        invalid_ops.push((op_hash.clone(), op.clone()));
+
+                        summary.rejected += 1;
+                        if deps.is_empty() {
+                            put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
+                        } else {
+                            put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                         }
                     }
                 }
-                WorkflowResult::Ok(summary)
-            })
-            .await?;
-
-        tracing::debug!(
-            ?summary,
-            ?num_ops_to_validate,
-            "Finished sys validation workflow"
-        );
-
-        Ok(summary)
-    }
+            }
+            WorkflowResult::Ok((summary, invalid_ops, forked_pairs))
+        })
+        .await?;
 
     #[cfg(feature = "unstable-warrants")]
     {
-        let mut warrants: Vec<DhtOpHashed> = vec![];
-
-        let (mut summary, _invalid_ops, _forked_pairs) = workspace
-            .dht_db
-            .write_async(move |txn| {
-                let mut summary = OutcomeSummary::default();
-                let mut invalid_ops = vec![];
-                let mut forked_pairs = vec![];
-
-                for (hashed_op, outcome) in validation_outcomes {
-                    let (op, op_hash) = hashed_op.into_inner();
-                    let op_type = op.get_type();
-
-                    if let DhtOp::ChainOp(chain_op) = &op {
-                        // Author a ChainFork warrant if fork is detected
-                        let action = chain_op.action();
-                        if let Some(forked_action) = detect_fork(txn, &action)? {
-                            let signature = chain_op.signature().clone();
-                            let action_hash = action.to_hash();
-                            forked_pairs.push((
-                                action.author().clone(),
-                                ((action_hash, signature), forked_action),
-                            ));
-                        }
-                    }
-
-                    // This is an optimization to skip app validation and integration for ops that are
-                    // rejected and don't have dependencies.
-                    let deps = op.sys_validation_dependencies();
-
-                    match outcome {
-                        Outcome::Accepted => {
-                            summary.accepted += 1;
-                            match op_type {
-                                DhtOpType::Chain(_) => put_validation_limbo(
-                                    txn,
-                                    &op_hash,
-                                    ValidationStage::SysValidated,
-                                )?,
-                                DhtOpType::Warrant(_) => {
-                                    // XXX: integrate accepted warrants immediately, because we don't
-                                    //      want them to go to app validation.
-                                    put_integrated(txn, &op_hash, ValidationStatus::Valid)?
-                                }
-                            };
-                        }
-                        Outcome::MissingDhtDep => {
-                            summary.missing += 1;
-                            let status = ValidationStage::AwaitingSysDeps;
-                            put_validation_limbo(txn, &op_hash, status)?;
-                        }
-                        Outcome::Rejected(_) => {
-                            invalid_ops.push((op_hash.clone(), op.clone()));
-
-                            summary.rejected += 1;
-                            if deps.is_empty() {
-                                put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
-                            } else {
-                                put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
-                            }
-                        }
-                    }
-                }
-                WorkflowResult::Ok((summary, invalid_ops, forked_pairs))
-            })
-            .await?;
-
+        let mut warrants = vec![];
         for (_, op) in _invalid_ops {
             if let Some(chain_op) = op.as_chain_op() {
                 let warrant_op = crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op_inner(
@@ -473,15 +422,15 @@ async fn sys_validation_workflow_inner(
             )
             .await?;
         }
-
-        tracing::debug!(
-            ?summary,
-            ?num_ops_to_validate,
-            "Finished sys validation workflow"
-        );
-
-        Ok(summary)
     }
+
+    tracing::debug!(
+        ?summary,
+        ?num_ops_to_validate,
+        "Finished sys validation workflow"
+    );
+
+    Ok(summary)
 }
 
 async fn retrieve_actions(
