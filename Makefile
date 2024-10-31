@@ -13,6 +13,7 @@ UNSTABLE_FEATURES=chc,unstable-dpki,unstable-sharding,$(DEFAULT_FEATURES)
 	static-all static-fmt static-toml static-clippy static-doc \
 	build-workspace-wasmer_sys build-workspace-wasmer_wamr \
 	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
+	build-workspace-wasmer_sys-unstable \
 	test-workspace-wasmer_sys-unstable
 
 # default to running everything (first rule)
@@ -54,6 +55,14 @@ build-workspace-wasmer_sys:
 		--all-targets \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
+
+build-workspace-wasmer_sys-unstable:
+	$(F) cargo build \
+		--workspace \
+		--locked \
+		--all-targets \
+		--no-default-features \
+		--features $(UNSTABLE_FEATURES),wasmer_sys
 
 build-workspace-wasmer_wamr:
 	$(F) cargo build \
