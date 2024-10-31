@@ -44,7 +44,7 @@ thiserror = "1.0.22"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
 tokio-stream = "0.1"
-tx5 = { version = "=0.1.4-beta", optional = true }
+tx5 = { version = "=0.1.4-beta" }
 url2 = "0.0.6"
 
 # fuzzing
@@ -84,7 +84,7 @@ workspace = true
 
 [features]
 
-default = ["tx5"]
+default = []
 
 fuzzing = [
   "arbitrary",
