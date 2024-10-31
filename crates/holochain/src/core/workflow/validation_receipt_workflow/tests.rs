@@ -126,6 +126,7 @@ macro_rules! wait_until {
     };
 }
 
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]

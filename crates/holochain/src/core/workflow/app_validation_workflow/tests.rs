@@ -932,6 +932,7 @@ async fn check_app_entry_def_test() {
 /// Alice and Bob join the network, and Alice commits an invalid action.
 /// Bob blocks Alice and authors a Warrant.
 /// Carol joins the network, and receives Bob's warrant via gossip.
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn app_validation_produces_warrants() {
     holochain_trace::test_run();
