@@ -644,7 +644,7 @@ impl RealRibosome {
             );
 
         #[cfg(feature = "unstable-functions")]
-        let host_fn_builder = host_fn_builder
+        host_fn_builder
             .with_host_function(
                 &mut ns,
                 "__hc__accept_countersigning_preflight_request_1",
