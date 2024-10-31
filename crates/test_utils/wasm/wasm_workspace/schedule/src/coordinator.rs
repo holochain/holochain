@@ -64,7 +64,6 @@ fn cron_scheduled_fn_init(_: Option<Schedule>) -> Option<Schedule> {
 }
 
 #[hdk_extern]
-#[cfg(feature = "unstable-functions")]
 fn init(_: ()) -> ExternResult<InitCallbackResult> {
     hdk::prelude::schedule("scheduled_fn_init")?;
     hdk::prelude::schedule("cron_scheduled_fn_init")?;
@@ -72,7 +71,6 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 }
 
 #[hdk_extern]
-#[cfg(feature = "unstable-functions")]
 fn schedule(_: ()) -> ExternResult<()> {
     hdk::prelude::schedule("scheduled_fn")?;
     hdk::prelude::schedule("cron_scheduled_fn")?;
