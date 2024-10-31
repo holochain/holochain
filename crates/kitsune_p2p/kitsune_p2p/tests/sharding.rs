@@ -51,6 +51,51 @@ async fn gossip_arc_clamping_required() {
     }
 }
 
+#[cfg(not(feature = "unstable-sharding"))]
+#[tokio::test(flavor = "multi_thread")]
+async fn gossip_arc_clamping_permits_empty() {
+    let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    // Try to set up a network with gossip_arc_clamping set to "empty"
+    let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
+        params.gossip_arc_clamping = "empty".to_string();
+        params
+    };
+
+    let mut harness = KitsuneTestHarness::try_new("")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(tuner);
+
+    harness.spawn().await.unwrap();
+}
+
+#[cfg(not(feature = "unstable-sharding"))]
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic]
+async fn gossip_arc_clamping_required_when_junk_config_provided() {
+    let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    // Try to set up a network with gossip_arc_clamping set to a junk value
+    let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
+        params.gossip_arc_clamping = "winkle".to_string();
+        params
+    };
+
+    let mut harness = KitsuneTestHarness::try_new("")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(tuner);
+
+    harness.spawn().await.unwrap();
+}
+
 /// Test scenario steps:
 ///   1. Set up 5 nodes, each with one agent.
 ///   2. Assign a DHT arc to each agent such that their start location is inside the previous agent's arc.
