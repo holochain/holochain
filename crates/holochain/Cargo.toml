@@ -104,7 +104,7 @@ fixt = { version = "^0.5.0-dev.0", path = "../fixt", optional = true }
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 diff = { version = "0.1", optional = true }
-hdk = { version = "^0.5.0-dev.3", path = "../hdk", optional = true }
+hdk = { version = "^0.5.0-dev.3", path = "../hdk", optional = true, default-features = false }
 matches = { version = "0.1.8", optional = true }
 holochain_wasm_test_utils = { version = "^0.5.0-dev.3", path = "../test_utils/wasm", optional = true }
 holochain_test_wasm_common = { version = "^0.5.0-dev.3", path = "../test_utils/wasm_common", optional = true }
@@ -163,7 +163,7 @@ predicates = "3.1"
 assert2 = "0.3.15"
 
 [build-dependencies]
-hdk = { version = "^0.5.0-dev.3", path = "../hdk" }
+hdk = { version = "^0.5.0-dev.3", path = "../hdk", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0.51" }
 toml = "0.8"
@@ -242,8 +242,11 @@ slow_tests = []
 glacial_tests = []
 
 # Includes the wasm build script, which we don't need when not building wasms
-build_wasms = ['holochain_wasm_test_utils/build']
-only_check_wasms = ['holochain_wasm_test_utils/only_check']
+build_wasms = ["holochain_wasm_test_utils/build", "unstable-functions"]
+only_check_wasms = [
+  "holochain_wasm_test_utils/only_check",
+  "unstable-functions",
+]
 
 # Enables at-rest encryption of the SQLite database.
 # Incompatible with "sqlite".
@@ -327,4 +330,9 @@ instrument = [
   "holochain_types/instrument",
   "holochain_zome_types/instrument",
   "kitsune_p2p/instrument",
+]
+
+unstable-functions = [
+  "holochain_zome_types/unstable-functions",
+  "hdk/unstable-functions",
 ]

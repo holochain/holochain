@@ -41,10 +41,16 @@ trybuild = "1.0"
 workspace = true
 
 [features]
-default = []
+default = ["unstable-functions"]
+
 mock = ["hdk_derive/mock", "mockall"]
 encoding = ["holo_hash/encoding"]
 fixturators = ["holochain_zome_types/fixturators", "holo_hash/fixturators"]
 fuzzing = ["holochain_zome_types/fuzzing", "holo_hash/fuzzing"]
 test_utils = ["fixturators", "hdi/test_utils", "holo_hash/test_utils"]
 properties = ["holochain_zome_types/properties"]
+
+unstable-functions = [
+  "holochain_zome_types/unstable-functions",
+  "hdi/unstable-functions",
+]

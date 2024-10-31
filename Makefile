@@ -5,7 +5,7 @@
 F=RUSTFLAGS="-Dwarnings"
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
-DEFAULT_FEATURES=chc,slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
+DEFAULT_FEATURES=chc,slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo,unstable-functions
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
@@ -35,7 +35,7 @@ static-toml:
 
 # ensure our chosen style lints are followed
 static-clippy:
-	$(F) CHK_SQL_FMT=1 cargo clippy --all-targets
+	$(F) CHK_SQL_FMT=1 cargo clippy --all-targets --features $(DEFAULT_FEATURES)
 
 # ensure we can build the docs
 static-doc:
