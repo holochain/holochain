@@ -228,6 +228,8 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     }
 }
 
+type ForkedPair = ((ActionHash, Signature), (ActionHash, Signature));
+
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: SysValDeps,
@@ -309,10 +311,7 @@ async fn sys_validation_workflow_inner(
         .write_async(move |txn| {
             let mut summary = OutcomeSummary::default();
             let mut invalid_ops = vec![];
-            let mut forked_pairs: Vec<(
-                AgentPubKey,
-                ((ActionHash, Signature), (ActionHash, Signature)),
-            )> = vec![];
+            let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = vec![];
 
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
