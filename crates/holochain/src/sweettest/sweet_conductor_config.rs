@@ -85,7 +85,7 @@ impl SweetConductorConfig {
     }
 
     /// Standard config for SweetConductors
-    fn standard() -> Self {
+    pub fn mem() -> Self {
         let mut c = SweetConductorConfig::from(KitsuneP2pConfig::mem())
             .tune(|tune| {
                 tune.gossip_loop_iteration_delay_ms = 500;
@@ -123,7 +123,7 @@ impl SweetConductorConfig {
 
     /// Rendezvous config for SweetConductors
     pub fn rendezvous(bootstrap: bool) -> Self {
-        let mut config = Self::standard();
+        let mut config = Self::mem();
 
         if bootstrap {
             config.network.bootstrap_service = Some(url2::url2!("rendezvous:"));
