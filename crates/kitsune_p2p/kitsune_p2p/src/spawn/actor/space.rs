@@ -1531,10 +1531,6 @@ impl Space {
             // Push to the network as well
 
             {
-                // TODO: "mdns" stuff
-            }
-
-            {
                 match kitsune_p2p_bootstrap_client::put(
                     bootstrap_service.clone(),
                     agent_info_signed,
