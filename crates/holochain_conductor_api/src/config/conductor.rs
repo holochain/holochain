@@ -367,7 +367,8 @@ mod tests {
         let yaml = r#"---
     data_root_path: /path/to/env
     network:
-      transport_pool: []
+      transport_pool:
+        - type: mem
     keystore:
       type: danger_test_keystore
     "#;
@@ -444,7 +445,7 @@ mod tests {
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let mut network_config = KitsuneP2pConfig::default();
+        let mut network_config = KitsuneP2pConfig::mem();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
         network_config.transport_pool.push(TransportConfig::WebRTC {
             signal_url: "wss://sbd-0.main.infra.holo.host".into(),
@@ -598,7 +599,8 @@ mod tests {
     data_root_path: /path/to/env
     keystore_path: /path/to/keystore
     network:
-      transport_pool: []
+      transport_pool:
+        - type: mem    
     keystore:
       type: lair_server
       connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
