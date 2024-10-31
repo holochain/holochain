@@ -99,7 +99,7 @@ macro_rules! holochain_externs {
 
         #[cfg(feature = "unstable-functions")]
         holochain_wasmer_guest::host_externs!(
-            is_same_agent:1,
+            is_same_agent:1
         );
     };
 }
