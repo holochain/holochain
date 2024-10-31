@@ -439,7 +439,7 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
         dpki: DpkiConfig::disabled(),
-        network: holochain_conductor_api::conductor::test_network_config(),
+        network: KitsuneP2pConfig::mem(),
         ..ConductorConfig::empty()
     }
 }
