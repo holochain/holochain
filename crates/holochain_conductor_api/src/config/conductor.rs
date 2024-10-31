@@ -447,7 +447,7 @@ mod tests {
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         let mut network_config = KitsuneP2pConfig::mem();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-        network_config.transport_pool.push(TransportConfig::WebRTC {
+        network_config.transport_pool = vec![TransportConfig::WebRTC {
             signal_url: "wss://sbd-0.main.infra.holo.host".into(),
             webrtc_config: Some(serde_json::json!({
               "iceServers": [
@@ -455,7 +455,7 @@ mod tests {
                 { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
               ]
             })),
-        });
+        }];
         let mut tuning_params =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.gossip_loop_iteration_delay_ms = 42;
