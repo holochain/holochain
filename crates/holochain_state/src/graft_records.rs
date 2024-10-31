@@ -52,7 +52,7 @@ impl SourceChain {
         let cell_id = (*self.cell_id()).clone();
         self.author_db()
             .write_async_with_permit(permit, move |txn| {
-                Self::graft_records_onto_source_chain_txn(txn, records, cell_id)
+                Self::graft_records_onto_source_chain_txn(txn, records, &cell_id)
             })
             .await
     }
@@ -61,7 +61,7 @@ impl SourceChain {
     pub fn graft_records_onto_source_chain_txn(
         txn: &mut Transaction<'_>,
         records: Vec<Record>,
-        cell_id: CellId,
+        cell_id: &CellId,
     ) -> SourceChainResult<Vec<(DhtOpHash, AnyLinkableHash)>> {
         let existing = Self::query_txn(
             txn,

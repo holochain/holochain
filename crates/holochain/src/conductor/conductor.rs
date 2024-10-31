@@ -3094,6 +3094,11 @@ mod misc_impls {
             validate: bool,
             records: Vec<Record>,
         ) -> ConductorApiResult<()> {
+            // Require that the cell is installed.
+            if let err @ Err(ConductorError::CellMissing(_)) = self.cell_by_id(&cell_id).await {
+                let _ = err?;
+            }
+
             let CellId(dna_hash, agent_key) = cell_id.clone();
             let space = self.get_or_create_space(&dna_hash)?;
             let workspace = space
@@ -3142,9 +3147,10 @@ mod misc_impls {
                 .await?;
             }
 
+            let cell_id_clone = cell_id.clone();
             let op_hashes = authored
-                .write_async(|txn| {
-                    SourceChain::graft_records_onto_source_chain_txn(txn, records, cell_id)
+                .write_async(move |txn| {
+                    SourceChain::graft_records_onto_source_chain_txn(txn, records, &cell_id_clone)
                 })
                 .await?;
 
@@ -3170,6 +3176,15 @@ mod misc_impls {
                     &cache,
                 )
                 .await?;
+            }
+
+            // Check which ops need to be integrated.
+            // Only integrated if a cell is installed.
+            if self.running_cell_ids().contains(&cell_id) {
+                // Any ops that were moved to the dht_db but had dependencies will need to be integrated.
+                self.cell_by_id(&cell_id)
+                    .await?
+                    .notify_authored_ops_moved_to_limbo();
             }
 
             Ok(())

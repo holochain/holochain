@@ -99,7 +99,9 @@ where
         use proptest::strategy::Strategy;
 
         let strat = T::arbitrary().prop_flat_map(move |hash_type| {
-            let gen_strat = proptest::string::bytes_regex(r".[39]").unwrap();
+            // Generate 39 arbitrary bytes. `?-u:` specifies that the bytes need not be valid UTF-8
+            // (any value from 0-255 is allowed).
+            let gen_strat = proptest::string::bytes_regex(r"(?-u:.{39})").unwrap();
             gen_strat.prop_map(move |mut buf| {
                 assert_eq!(buf.len(), 39);
                 buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(hash_type.get_prefix());
@@ -405,5 +407,14 @@ mod tests {
         raw.extend(vec![0xdb; 36]);
 
         DnaHash::from_raw_39(raw);
+    }
+
+    #[test]
+    #[cfg(feature = "fuzzing")]
+    fn proptest_arbitrary_smoke_test() {
+        use proptest::prelude::*;
+        proptest!(|(h: DnaHash)| {
+            assert_eq!(*h.hash_type(), hash_type::Dna);
+        });
     }
 }
