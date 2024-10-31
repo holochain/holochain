@@ -160,7 +160,6 @@ mockall::mock! {
         // Time
         fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
         fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
-        fn sleep(&self, wake_after: std::time::Duration) -> ExternResult<()>;
         // XSalsa20Poly1305
         fn x_salsa20_poly1305_shared_secret_create_random(
             &self,
