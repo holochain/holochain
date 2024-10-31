@@ -128,7 +128,7 @@ impl Cell {
         // check if genesis has been run
         let has_genesis = {
             // check if genesis ran.
-            GenesisWorkspace::new(authored_db.clone(), space.dht_db.clone())?
+            GenesisWorkspace::new(authored_db.clone(), space.dht_db.clone())
                 .has_genesis(id.agent_pubkey().clone())
                 .await?
         };
@@ -186,9 +186,7 @@ impl Cell {
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
-        let workspace = GenesisWorkspace::new(authored_db, dht_db)
-            .map_err(ConductorApiError::from)
-            .map_err(Box::new)?;
+        let workspace = GenesisWorkspace::new(authored_db, dht_db);
 
         // exit early if genesis has already run
         if workspace
@@ -240,6 +238,7 @@ impl Cell {
         &self.holochain_p2p_cell
     }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub(super) async fn dispatch_scheduled_fns(self: Arc<Self>, now: Timestamp) {
         let authored_db = match self.get_or_create_authored_db() {
             Ok(db) => db,
@@ -916,7 +915,7 @@ impl Cell {
             .map_or(true, |w| !w.called_from_init())
         {
             // Check if init has run if not run it
-            self.check_or_run_zome_init().await?;
+            self.check_or_run_zome_init().await?
         }
 
         let keystore = self.conductor_api.keystore().clone();
@@ -926,7 +925,6 @@ impl Cell {
         let invocation =
             ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
 
-        let dna_def = ribosome.dna_def().as_content().clone();
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
@@ -939,7 +937,6 @@ impl Cell {
                     self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
-                    Arc::new(dna_def),
                 )
                 .await?
             }
@@ -984,8 +981,6 @@ impl Cell {
         // get the dna
         let ribosome = self.get_ribosome()?;
 
-        let dna_def = ribosome.dna_def().clone();
-
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
             self.get_or_create_authored_db()?,
@@ -994,7 +989,6 @@ impl Cell {
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
-            Arc::new(dna_def.into_content()),
         )
         .await?;
 
@@ -1021,6 +1015,7 @@ impl Cell {
             InitResult::Pass => {}
             r => return Err(CellError::InitFailed(r)),
         }
+
         Ok(())
     }
 

@@ -4,11 +4,13 @@
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holochain::conductor::api::error::ConductorApiError;
+use holochain::core::SourceChainError;
 use holochain::sweettest::{
     DynSweetRendezvous, SweetConductor, SweetConductorConfig, SweetDnaFile, SweetInlineZomes,
 };
 use holochain::test_utils::inline_zomes::simple_crud_zome;
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::DnaHashExt;
 use holochain_sqlite::db::{DbKindAuthored, DbWrite};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::prelude::{CascadeTxnWrapper, StateMutationError, Store};
@@ -16,17 +18,18 @@ use holochain_types::record::SignedActionHashedExt;
 
 /// Test that records can be manually grafted onto a source chain.
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "chc")]
 async fn grafting() {
+    holochain_trace::test_run();
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let mut config = SweetConductorConfig::standard().no_dpki();
-    config.chc_url = Some(url2::Url2::parse(
-        holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
-    ));
-    let mut conductor = SweetConductor::from_config(config.clone()).await;
+    let config = SweetConductorConfig::standard().no_dpki().local_chc();
+    let mut conductor = SweetConductor::from_config(config).await;
     let keystore = conductor.keystore();
 
     let apps = conductor.setup_app("app", [&dna_file]).await.unwrap();
     let (alice,) = apps.into_tuple();
+    dbg!(&alice.dna_hash());
+    dbg!(&alice.dna_hash().to_kitsune());
     let zome = alice.zome(SweetInlineZomes::COORDINATOR);
 
     // Trigger init.
@@ -106,8 +109,8 @@ async fn grafting() {
     // This gets rejected.
     assert!(matches!(
         result,
-        Err(ConductorApiError::StateMutationError(
-            StateMutationError::AuthorsMustMatch
+        Err(ConductorApiError::SourceChainError(
+            SourceChainError::StateMutationError(StateMutationError::AuthorsMustMatch)
         ))
     ));
 
@@ -203,6 +206,7 @@ async fn grafting() {
     drop(conductor);
 
     // Start a second conductor.
+    let config = SweetConductorConfig::standard().no_dpki().local_chc();
     let conductor =
         SweetConductor::create_with_defaults(config, Some(keystore), None::<DynSweetRendezvous>)
             .await;

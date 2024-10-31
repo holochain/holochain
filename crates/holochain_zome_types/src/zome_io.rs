@@ -7,9 +7,10 @@ use holochain_nonce::Nonce256Bits;
 /// All wasm shared I/O types need to share the same basic behaviours to cross the host/guest
 /// boundary in a predictable way.
 macro_rules! wasm_io_types {
-    ( $( fn $f:ident ( $in_arg:ty ) -> $out_arg:ty; )* ) => {
+    ( $( $(#[cfg(feature = $feat:literal)])? fn $f:ident ( $in_arg:ty ) -> $out_arg:ty; )* ) => {
         pub trait HostFnApiT {
             $(
+                $(#[cfg(feature = $feat)])?
                 fn $f(&self, _: $in_arg) -> Result<$out_arg, HostFnApiError>;
             )*
         }
@@ -36,12 +37,14 @@ wasm_io_types! {
     // when updated
 
     // Attempt to accept a preflight request.
+    #[cfg(feature = "unstable-functions")]
     fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
 
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
 
     // Block some agent on the same DNA.
+    #[cfg(feature = "unstable-functions")]
     fn block_agent (zt::block::BlockAgentInput) -> ();
 
     // Info about the current DNA.
@@ -105,6 +108,8 @@ wasm_io_types! {
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
     // Check if agent key 2 is of the same lineage as agent key 2.
+    // TODO: This HDI function can't be easily removed, even though it's considered an
+    // unstable function.
     fn is_same_agent ((AgentPubKey, AgentPubKey)) -> bool;
 
     // Retreive a record from the DHT or short circuit.
@@ -127,14 +132,9 @@ wasm_io_types! {
     // Remotely signal many agents without waiting for responses
     fn send_remote_signal (zt::signal::RemoteSignal) -> ();
 
-    // // @todo
-    // fn send (()) -> ();
-
     // Schedule a schedulable function if it is not already.
+    #[cfg(feature = "unstable-functions")]
     fn schedule (String) -> ();
-
-    // @todo
-    fn sleep (core::time::Duration) -> ();
 
     // @todo
     fn version (()) -> zt::version::ZomeApiVersion;
@@ -152,6 +152,7 @@ wasm_io_types! {
     fn update (zt::entry::UpdateInput) -> holo_hash::ActionHash;
 
     // Unblock some previously blocked agent.
+    #[cfg(feature = "unstable-functions")]
     fn unblock_agent(zt::block::BlockAgentInput) -> ();
 
     fn verify_signature (zt::signature::VerifySignature) -> bool;

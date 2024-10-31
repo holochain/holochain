@@ -87,7 +87,6 @@ macro_rules! holochain_externs {
             zome_info:1,
             dna_info:1,
             dna_info:2,
-            is_same_agent:1,
             must_get_entry:1,
             must_get_valid_record:1,
             must_get_action:1,
@@ -95,6 +94,12 @@ macro_rules! holochain_externs {
             x_salsa20_poly1305_decrypt:1,
             x_25519_x_salsa20_poly1305_decrypt:1,
             ed_25519_x_salsa20_poly1305_decrypt:1
+        );
+
+
+        #[cfg(feature = "unstable-functions")]
+        holochain_wasmer_guest::host_externs!(
+            is_same_agent:1
         );
     };
 }

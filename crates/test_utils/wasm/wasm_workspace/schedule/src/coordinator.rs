@@ -79,7 +79,7 @@ fn schedule(_: ()) -> ExternResult<()> {
 
 fn _query(entry_types_unit: EntryTypesUnit) -> ExternResult<Vec<Record>> {
     hdk::prelude::query(
-        ChainQueryFilter::default().entry_type(entry_types_unit.try_into().unwrap())
+        ChainQueryFilter::default().entry_type(entry_types_unit.try_into().unwrap()),
     )
 }
 
