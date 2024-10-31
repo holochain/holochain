@@ -1,11 +1,13 @@
-use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::prelude::InlineZomeSet;
 use crate::sweettest::*;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::prelude::*;
+#[cfg(feature = "unstable-warrants")]
+use {
+    crate::core::ribosome::guest_callback::validate::ValidateResult, crate::prelude::InlineZomeSet,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky, doesn't take into account timing or retries"]
@@ -111,6 +113,7 @@ async fn test_validation_receipt() {
     );
 }
 
+#[cfg(feature = "unstable-warrants")]
 macro_rules! wait_until {
     ($expression:expr; $interval_ms:literal; $timeout_ms:literal; $wait_msg:literal; $timeout_msg:literal;) => {
         let timeout = (Timestamp::now() + std::time::Duration::from_millis($timeout_ms)).unwrap();
