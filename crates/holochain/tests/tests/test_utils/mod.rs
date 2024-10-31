@@ -31,6 +31,7 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use matches::assert_matches;
 use serde::Serialize;
 use std::time::Duration;
