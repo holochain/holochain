@@ -1,6 +1,8 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_cli_sandbox::config::read_config;
-use holochain_conductor_api::conductor::{ConductorConfig, DpkiConfig};
+use holochain_conductor_api::conductor::ConductorConfig;
+#[cfg(feature = "unstable-dpki")]
+use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
 use holochain_types::app::InstalledAppId;
@@ -271,7 +273,31 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
     assert!(exit_code.success());
 }
 
+/// Create a new default sandbox which should have DPKI disabled in the conductor config.
+#[cfg(not(feature = "unstable-dpki"))]
+#[tokio::test(flavor = "multi_thread")]
+async fn default_sandbox_has_dpki_disabled() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("create")
+        .arg("--in-process-lair")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut sandbox_process = input_piped_password(&mut cmd).await;
+    let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
+    assert!(conductor_config.dpki.no_dpki);
+}
+
 /// Create a new default sandbox which should have DPKI enabled in the conductor config.
+#[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn default_sandbox_has_dpki_enabled() {
     clean_sandboxes().await;
@@ -294,6 +320,7 @@ async fn default_sandbox_has_dpki_enabled() {
 }
 
 /// Create a new sandbox with DPKI disabled in the conductor config.
+#[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_without_dpki() {
     clean_sandboxes().await;
@@ -317,6 +344,7 @@ async fn create_sandbox_without_dpki() {
 }
 
 /// Create a new default sandbox which should have a test network seed set for DPKI.
+#[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_default_sandbox_with_dpki_test_network_seed() {
     clean_sandboxes().await;
@@ -342,6 +370,7 @@ async fn create_default_sandbox_with_dpki_test_network_seed() {
 }
 
 /// Create a new sandbox with a custom DPKI network seed.
+#[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_with_custom_dpki_network_seed() {
     clean_sandboxes().await;

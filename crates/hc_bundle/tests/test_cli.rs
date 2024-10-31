@@ -178,11 +178,11 @@ async fn test_multi_integrity() {
     let (dna, _) = pack_dna("tests/fixtures/my-app/dnas/dna5").await;
 
     // The actual wasm hashes of the fake zomes.
-    let wasm_hash = WasmHash::from_raw_39_panicky(vec![
+    let wasm_hash = WasmHash::from_raw_39(vec![
         132, 42, 36, 217, 5, 131, 6, 203, 162, 51, 6, 34, 63, 247, 21, 77, 60, 106, 98, 53, 59, 98,
         172, 222, 143, 105, 210, 10, 5, 56, 152, 102, 178, 159, 162, 69, 249, 162, 67,
     ]);
-    let wasm_hash2 = WasmHash::from_raw_39_panicky(vec![
+    let wasm_hash2 = WasmHash::from_raw_39(vec![
         132, 42, 36, 235, 225, 55, 255, 141, 140, 72, 148, 154, 141, 124, 248, 185, 142, 62, 218,
         220, 85, 73, 201, 54, 10, 30, 191, 206, 93, 108, 142, 140, 201, 164, 225, 20, 241, 98, 16,
     ]);
@@ -191,12 +191,12 @@ async fn test_multi_integrity() {
     let s = "2022-02-11T23:05:19.470323Z";
     let origin_time = Timestamp::from_str(s).unwrap();
     let lineage = vec![
-        DnaHash::from_raw_39(
+        DnaHash::try_from_raw_39(
             holo_hash_decode_unchecked("uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm")
                 .unwrap(),
         )
         .unwrap(),
-        DnaHash::from_raw_39(
+        DnaHash::try_from_raw_39(
             holo_hash_decode_unchecked("uhC0k39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH")
                 .unwrap(),
         )
