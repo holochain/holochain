@@ -308,8 +308,8 @@ wasmer_wamr = [
 # Enable chain head coordination
 chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_chc/http"]
 
-# Transitional feature flag for code that is only ready when DPKI integration lands.
-dpki = []
+# Enable unstable DPKI feature.
+unstable-dpki = ["holochain_conductor_api/unstable-dpki"]
 
 sweettest = ["test_utils", "sqlite"]
 
