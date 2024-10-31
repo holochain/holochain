@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_types"
-version = "0.5.0-dev.2"
+version = "0.5.0-dev.3"
 description = "types subcrate for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -59,7 +59,7 @@ harness = false
 workspace = true
 
 [features]
-default = ["tx2"]
+default = ["tx2", "tx5"]
 
 fuzzing = [
   "arbitrary",
