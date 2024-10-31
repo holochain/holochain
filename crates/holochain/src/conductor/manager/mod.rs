@@ -15,13 +15,13 @@
 //!
 //! For instance, the tasks which run the workflows for a cell are critical
 //! to the cell's functioning, so if any of these tasks fail, then the cell
-//! is no longer able to function. The task failure is a signal that the cell
+//! is no longer able to function. Task failure is a signal that the cell
 //! needs to be shut down, so the task manager takes the steps necessary to
 //! accomplish that:
 //!
 //! 1. Stop all other tasks related to the cell, so they don't continue in the background.
 //! 2. Pause or disable any apps which depend on the cell, because the app cannot
-//!     function without the proper functioning of that cell
+//!     function without the proper functioning of that cell.
 //!
 //! See [`crate::conductor::Conductor::reconcile_app_status_with_cell_status`] for more details
 //! on how app status is related to cell status.
