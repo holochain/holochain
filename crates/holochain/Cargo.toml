@@ -193,7 +193,7 @@ workspace = true
 [features]
 default = ["sqlite-encrypted", "tx5", "metrics_influxive", "wasmer_sys"]
 
-tx5 = ["kitsune_p2p/tx5", "tx5-go-pion-turn"]
+tx5 = ["tx5-go-pion-turn"]
 
 # Use the "Influxive" opentelemetry metrics binding to write metrics
 # to an InfluxDB time series database.
