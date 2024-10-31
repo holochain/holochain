@@ -18,7 +18,7 @@ pub fn create_config(
         #[cfg(not(feature = "unstable-dpki"))]
         dpki: DpkiConfig::disabled(),
         #[cfg(feature = "unstable-dpki")]
-        dpki: DpkiConfig::testing(),
+        dpki: DpkiConfig::default(),
         ..ConductorConfig::testing()
     };
     match con_url {

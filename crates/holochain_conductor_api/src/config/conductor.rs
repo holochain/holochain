@@ -166,7 +166,7 @@ impl ConductorConfig {
             tracing_override: None,
             data_root_path: None,
             keystore: KeystoreConfig::default(),
-            dpki: DpkiConfig::testing(),
+            dpki: DpkiConfig::default(),
             admin_interfaces: None,
             network: KitsuneP2pConfig::mem(),
             db_sync_strategy: DbSyncStrategy::default(),
@@ -183,7 +183,7 @@ impl ConductorConfig {
     pub fn testing() -> Self {
         Self {
             network: test_network_config(),
-            dpki: DpkiConfig::testing(),
+            dpki: DpkiConfig::default(),
             ..ConductorConfig::empty()
         }
     }
@@ -234,6 +234,12 @@ impl ConductorConfig {
     /// Check if the config is set to use a rendezvous bootstrap server
     pub fn has_rendezvous_bootstrap(&self) -> bool {
         self.network.bootstrap_service == Some(url2::url2!("rendezvous:"))
+    }
+}
+
+impl Default for ConductorConfig {
+    fn default() -> Self {
+        Self::empty()
     }
 }
 
@@ -374,7 +380,7 @@ mod tests {
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
                 network: KitsuneP2pConfig::mem(),
-                dpki: DpkiConfig::testing(),
+                dpki: DpkiConfig::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
@@ -387,6 +393,7 @@ mod tests {
 
     #[cfg(not(feature = "unstable-dpki"))]
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_config_complete_config() {
         holochain_trace::test_run();
 

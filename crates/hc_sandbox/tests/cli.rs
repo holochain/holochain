@@ -363,7 +363,7 @@ async fn create_default_sandbox_with_dpki_test_network_seed() {
     let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
     assert_eq!(
         conductor_config.dpki.network_seed,
-        DpkiConfig::testing().network_seed
+        DpkiConfig::default().network_seed
     );
 }
 

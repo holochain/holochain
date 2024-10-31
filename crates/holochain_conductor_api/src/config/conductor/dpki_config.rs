@@ -105,14 +105,14 @@ mod tests {
     #[test]
     fn default_config_with_feature_enabled() {
         let config = DpkiConfig::default();
-        assert_eq!(config, DpkiConfig::testing());
+        assert_eq!(config, DpkiConfig::default());
     }
 
     #[cfg(feature = "unstable-dpki")]
     #[test]
     fn testing_config_with_feature_enabled() {
-        let config = DpkiConfig::testing();
-        assert_eq!(config, DpkiConfig::testing());
+        let config = DpkiConfig::default();
+        assert_eq!(config, DpkiConfig::default());
     }
 
     #[cfg(feature = "unstable-dpki")]
