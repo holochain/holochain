@@ -11,7 +11,8 @@ DEFAULT_FEATURES=chc,slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_d
 .PHONY: default \
 	static-all static-fmt static-toml static-clippy static-doc \
 	build-workspace-wasmer_sys build-workspace-wasmer_wamr \
-	test-workspace-wasmer_sys test-workspace-wasmer_wamr
+	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
+	test-workspace-wasmer_sys-unstable-dpki
 
 # default to running everything (first rule)
 default: build-workspace-wasmer_sys \
@@ -61,7 +62,7 @@ build-workspace-wasmer_wamr:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
 
-# execute tests on all creates
+# execute tests on all crates with wasmer compiler
 test-workspace-wasmer_sys:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
@@ -70,6 +71,16 @@ test-workspace-wasmer_sys:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
+# executes tests on all crates with wasmer compiler and unstable dpki feature
+test-workspace-wasmer_sys-unstable-dpki:
+	cargo install cargo-nextest
+	$(F) RUST_BACKTRACE=1 cargo nextest run \
+		--workspace \
+		--locked \
+		--no-default-features \
+		--features $(DEFAULT_FEATURES),wasmer_sys,unstable-dpki
+
+# execute tests on all crates with wasmer interpreter
 test-workspace-wasmer_wamr:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \

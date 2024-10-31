@@ -15,6 +15,9 @@ pub fn create_config(
 ) -> anyhow::Result<ConductorConfig> {
     let mut conductor_config = ConductorConfig {
         data_root_path: Some(config_root_path.is_also_data_root_path()),
+        #[cfg(not(feature = "unstable-dpki"))]
+        dpki: DpkiConfig::disabled(),
+        #[cfg(feature = "unstable-dpki")]
         dpki: DpkiConfig::testing(),
         ..Default::default()
     };

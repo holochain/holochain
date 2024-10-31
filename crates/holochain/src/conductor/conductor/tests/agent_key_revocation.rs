@@ -1,25 +1,33 @@
 use holo_hash::{ActionHash, AgentPubKey, DnaHash, EntryHash};
-use holochain_conductor_services::{DpkiServiceError, KeyRevocation, KeyState, RevokeKeyInput};
-use holochain_keystore::AgentPubKeyExt;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_state::source_chain::{SourceChain, SourceChainError};
 use holochain_types::app::{AppError, CreateCloneCellPayload};
-use holochain_types::deepkey_roundtrip_backward;
 use holochain_types::dna::DnaFile;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::action::ActionType;
 use holochain_zome_types::cell::CellId;
-use holochain_zome_types::dependencies::holochain_integrity_types::{DnaModifiersOpt, Signature};
+use holochain_zome_types::dependencies::holochain_integrity_types::DnaModifiersOpt;
 use holochain_zome_types::record::Record;
-use holochain_zome_types::timestamp::Timestamp;
-use holochain_zome_types::validate::ValidationStatus;
+
 use matches::assert_matches;
-use rusqlite::{named_params, Row};
+use rusqlite::Row;
+
+#[cfg(feature = "unstable-dpki")]
+use {
+    crate::core::SysValidationError,
+    holochain_conductor_services::{DpkiServiceError, KeyRevocation, KeyState, RevokeKeyInput},
+    holochain_keystore::AgentPubKeyExt,
+    holochain_types::deepkey_roundtrip_backward,
+    holochain_zome_types::dependencies::holochain_integrity_types::Signature,
+    holochain_zome_types::timestamp::Timestamp,
+    holochain_zome_types::validate::ValidationStatus,
+    rusqlite::named_params,
+};
 
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::{conductor::ConductorError, CellError};
 use crate::core::workflow::WorkflowError;
-use crate::core::{SysValidationError, ValidationOutcome};
+use crate::core::ValidationOutcome;
 use crate::sweettest::{
     await_consistency, SweetConductor, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
     SweetZome,
@@ -31,6 +39,7 @@ mod single_conductor {
 
     use super::*;
 
+    #[cfg(feature = "unstable-dpki")]
     #[tokio::test(flavor = "multi_thread")]
     async fn revoke_agent_key_with_dpki() {
         holochain_trace::test_run();
@@ -258,6 +267,7 @@ mod single_conductor {
         assert_matches!(result, ConductorError::SourceChainError(SourceChainError::InvalidAgentKey(invalid_key, cell_id)) if invalid_key == agent_key && cell_id == cell_id_2);
     }
 
+    #[cfg(feature = "unstable-dpki")]
     #[tokio::test(flavor = "multi_thread")]
     async fn recover_from_partial_revocation_with_dpki() {
         let TestCase {
@@ -490,6 +500,7 @@ mod multi_conductor {
         await_consistency(20, &cells).await.unwrap();
     }
 
+    #[cfg(feature = "unstable-dpki")]
     #[tokio::test(flavor = "multi_thread")]
     async fn revoke_agent_key_with_dpki() {
         holochain_trace::test_run();
@@ -613,6 +624,7 @@ mod multi_conductor {
         assert_delete_agent_key_accepted_by_validation(&alice, &conductors[1], dna_file.dna_hash());
     }
 
+    #[cfg(feature = "unstable-dpki")]
     #[tokio::test(flavor = "multi_thread")]
     async fn recover_from_partial_revocation_with_dpki() {
         holochain_trace::test_run();
@@ -799,6 +811,7 @@ impl TestCase {
         }
     }
 
+    #[cfg(feature = "unstable-dpki")]
     async fn dpki() -> TestCase {
         TestCase::new(true).await
     }
@@ -835,6 +848,7 @@ fn assert_delete_agent_key_present_in_source_chain(
         .test_read(move |txn| txn.query_row(sql, [], row_fn).unwrap());
 }
 
+#[cfg(feature = "unstable-dpki")]
 fn assert_delete_agent_key_accepted_by_validation(
     agent_key: &AgentPubKey,
     conductor: &SweetConductor,
@@ -872,6 +886,7 @@ fn assert_delete_agent_key_accepted_by_validation(
     });
 }
 
+#[cfg(feature = "unstable-dpki")]
 async fn assert_key_valid_in_dpki(conductor: &SweetConductor, agent_key: AgentPubKey) {
     let dpki = conductor.running_services().dpki.unwrap();
     let dpki_state = dpki.state().await;
@@ -882,6 +897,7 @@ async fn assert_key_valid_in_dpki(conductor: &SweetConductor, agent_key: AgentPu
     assert_matches!(key_state, KeyState::Valid(_));
 }
 
+#[cfg(feature = "unstable-dpki")]
 fn assert_error_due_to_invalid_dpki_agent_key(error: ConductorApiError, agent_key: AgentPubKey) {
     if let ConductorApiError::CellError(CellError::WorkflowError(workflow_error)) = error {
         assert_matches!(
@@ -909,6 +925,7 @@ fn assert_error_due_to_invalid_agent_key_in_source_chain(
     }
 }
 
+#[cfg(feature = "unstable-dpki")]
 async fn revoke_agent_key_in_dpki(conductor: &SweetConductor, agent_key: AgentPubKey) {
     let dpki_service = conductor
         .running_services()
@@ -950,6 +967,7 @@ async fn revoke_agent_key_in_dpki(conductor: &SweetConductor, agent_key: AgentPu
     }
 }
 
+#[cfg(feature = "unstable-dpki")]
 async fn delete_agent_key_from_source_chain(
     conductor: &SweetConductor,
     source_chain: &mut SourceChain,

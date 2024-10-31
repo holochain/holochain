@@ -65,6 +65,7 @@ async fn is_same_agent_without_dpki() {
     }
 }
 
+#[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn is_same_agent() {
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -139,6 +140,7 @@ async fn get_agent_key_lineage_during_init_without_dpki() {
     let _: () = conductor.call(&zome, "no_op_init", ()).await;
 }
 
+#[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_key_lineage_during_init() {
     let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
@@ -174,6 +176,7 @@ async fn get_agent_key_lineage_without_dpki() {
     assert_eq!(response, vec![agent_key.clone()]);
 }
 
+#[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_key_lineage() {
     let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
