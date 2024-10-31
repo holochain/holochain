@@ -262,7 +262,7 @@ pub fn check_agent_validation_pkg_predecessor(
             }),
         ) => None,
         (Action::AgentValidationPkg(AgentValidationPkg { .. }), _) => Some(
-            "**Every AgentValidationPkg must be followed b**y a Create or Update for an AgentPubKey",
+            "Every AgentValidationPkg must be followed by a Create or Update for an AgentPubKey",
         ),
         (
             _,

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::conductor::paths::KeystorePath;
+use holochain_conductor_api::conductor::test_network_config;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
@@ -31,7 +32,7 @@ pub fn generate(
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url)?;
-    config.network = network.unwrap_or_else(KitsuneP2pConfig::testing);
+    config.network = network.unwrap_or_else(test_network_config);
     #[cfg(feature = "chc")]
     {
         config.chc_url = chc_url;

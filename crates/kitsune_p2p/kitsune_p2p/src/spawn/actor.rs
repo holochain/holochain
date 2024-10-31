@@ -250,10 +250,7 @@ pub(super) async fn create_meta_net(
 
     match (ep_hnd, ep_evt, bootstrap_net) {
         (Some(h), Some(e), Some(n)) => Ok((h, e, n, maybe_peer_url)),
-        _ => todo!(
-            "need a sensible way to run a conductor without networking for tests, 
-            so we don't have to create rendezvous for our many single-conductor tests"
-        ),
+        _ => Err("Network config has no valid transport".into()),
     }
 }
 

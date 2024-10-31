@@ -360,7 +360,6 @@ pub mod tuning_params_struct {
 pub type KitsuneP2pTuningParams = std::sync::Arc<tuning_params_struct::KitsuneP2pTuningParams>;
 
 /// Configure the kitsune actor.
-#[non_exhaustive]
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct KitsuneP2pConfig {
     /// List of sub-transports to be included in this pool
@@ -396,18 +395,6 @@ impl KitsuneP2pConfig {
         Self {
             transport_pool: vec![TransportConfig::Mem {}],
             bootstrap_service: None,
-            tuning_params: KitsuneP2pTuningParams::default(),
-            tracing_scope: None,
-        }
-    }
-
-    pub fn testing() -> Self {
-        Self {
-            transport_pool: vec![TransportConfig::WebRTC {
-                signal_url: "wss://signal.holo.host".to_string(),
-                webrtc_config: None,
-            }],
-            bootstrap_service: Some(Url2::parse("https://bootstrap.holo.host")),
             tuning_params: KitsuneP2pTuningParams::default(),
             tracing_scope: None,
         }
