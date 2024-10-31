@@ -51,7 +51,7 @@ pub use error::*;
 
 use self::app_manifest_validated::AppManifestValidated;
 
-use super::InstalledCell;
+use super::{InstalledCell, ModifiersMap};
 
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
@@ -104,6 +104,13 @@ impl AppManifest {
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         match self {
             Self::V1(manifest) => manifest.set_network_seed(network_seed),
+        }
+    }
+
+    /// Update the modifiers for the specified roles.
+    pub fn set_modifiers(&mut self, modifiers: ModifiersMap) -> AppManifestResult<()> {
+        match self {
+            Self::V1(manifest) => manifest.set_modifiers(modifiers),
         }
     }
 

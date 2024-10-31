@@ -175,11 +175,19 @@ pub struct InstallAppPayload {
     #[serde(default)]
     pub existing_cells: ExistingCellsMap,
 
-    /// Optional: overwrites all network seeds for all DNAs of Cells created by this app.
+    /// Optional: Overwrites all network seeds for all DNAs of Cells created by this app.
+    /// If a role-specific network seed is also profided in the modifiers field of the
+    /// `InstallAppPayload`, this latter, role-specific network seed will take precedence.
+    ///
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
     #[serde(default)]
     pub network_seed: Option<NetworkSeed>,
+
+    /// Optional: Overwrites the dna modifiers of the specified roles. Only modifier fields
+    /// for which `Some(T)` is provided will be overwritten.
+    #[serde(default)]
+    pub modifiers: Option<ModifiersMap>,
 
     /// Optional: If app installation fails due to genesis failure, normally the app will be
     /// immediately uninstalled. When this flag is set, the app is left installed with empty cells intact.
@@ -199,6 +207,8 @@ pub struct InstallAppPayload {
 
 /// Alias
 pub type MemproofMap = HashMap<RoleName, MembraneProof>;
+/// Alias
+pub type ModifiersMap = HashMap<RoleName, DnaModifiersOpt<YamlProperties>>;
 /// Alias
 pub type ExistingCellsMap = HashMap<RoleName, CellId>;
 

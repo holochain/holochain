@@ -194,6 +194,46 @@ impl AppManifestV1 {
         }
     }
 
+    /// Update the network seed for all DNAs used in Create-provisioned Cells.
+    /// Cells with other provisioning strategies are not affected.
+    pub fn set_modifiers(
+        &mut self,
+        modifiers: HashMap<RoleName, DnaModifiersOpt<YamlProperties>>,
+    ) -> AppManifestResult<()> {
+        let existing_role_names = self
+            .roles
+            .iter()
+            .map(|manifest| &manifest.name)
+            .collect::<Vec<&String>>();
+        for role_name in modifiers.keys() {
+            if !existing_role_names.contains(&role_name) {
+                return Err(AppManifestError::InvalidRoleName(format!(
+                    "Tried to set modifiers for a role name that does not exist in the dna manifest: {role_name}"
+                )));
+            }
+        }
+        for role in self.roles.iter_mut() {
+            match modifiers.get(&role.name) {
+                Some(modifier_opts) => {
+                    if let Some(network_seed) = modifier_opts.network_seed.clone() {
+                        role.dna.modifiers.network_seed = Some(network_seed);
+                    }
+                    if let Some(origin_time) = modifier_opts.origin_time {
+                        role.dna.modifiers.origin_time = Some(origin_time);
+                    }
+                    if let Some(props) = modifier_opts.properties.clone() {
+                        role.dna.modifiers.properties = Some(props);
+                    }
+                    if let Some(quantum_time) = modifier_opts.quantum_time {
+                        role.dna.modifiers.quantum_time = Some(quantum_time);
+                    }
+                }
+                None => (),
+            }
+        }
+        Ok(())
+    }
+
     /// Convert this human-focused manifest into a validated, concise representation
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
         let AppManifestV1 {

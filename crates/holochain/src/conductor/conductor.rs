@@ -1674,20 +1674,23 @@ mod app_impls {
                 membrane_proofs,
                 existing_cells,
                 network_seed,
+                modifiers,
                 ignore_genesis_failure,
                 allow_throwaway_random_agent_key,
             } = payload;
 
             let bundle = {
                 let original_bundle = source.resolve().await?;
+                let mut manifest = original_bundle.manifest().to_owned();
                 if let Some(network_seed) = network_seed {
-                    let mut manifest = original_bundle.manifest().to_owned();
                     manifest.set_network_seed(network_seed);
-                    AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
-                } else {
-                    original_bundle
                 }
+                if let Some(modifiers) = modifiers {
+                    manifest.set_modifiers(modifiers);
+                }
+                AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
             };
+
             let manifest = bundle.manifest().clone();
 
             // Use deferred memproofs only if no memproofs are provided.
@@ -2688,11 +2691,11 @@ mod service_impls {
                 self.keystore().new_sign_keypair_random().await?
             } else {
                 return Err(ConductorError::other(
-"DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config. 
+"DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config.
 If using DPKI, a device seed must be created in lair, and the tag specified in the conductor config.
 
 (If this is a throwaway test environment, you can also set the config `dpki.allow_throwaway_random_dpki_agent_key`
-to `true` instead of instead of setting up a `device_seed_lair_tag`, but then you will lose the ability to recover 
+to `true` instead of instead of setting up a `device_seed_lair_tag`, but then you will lose the ability to recover
 your agent keys if you lose access to your device. This is not recommended!!)
 "));
             };
