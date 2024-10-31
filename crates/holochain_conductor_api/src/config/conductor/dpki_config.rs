@@ -3,31 +3,32 @@
 
 use std::path::PathBuf;
 
+use cfg_if::cfg_if;
 use serde::Deserialize;
 use serde::Serialize;
 
+#[cfg(feature = "unstable-dpki")]
 /// The network seed used in the main "production" DPKI network.
 const DPKI_NETWORK_SEED_MAIN: &str = "deepkey-main";
 
+#[cfg(feature = "unstable-dpki")]
 /// A network seed used for testing.
 const DPKI_NETWORK_SEED_TESTING: &str = "deepkey-testing";
 
-/// Configure which app instance ID to treat as the DPKI application handler
-/// as well as what parameters to pass it on its initialization.
+/// Configure DPKI properties.
+///
+/// Note that the Deepkey DNA path and the network seed settings determine network compatibility.
+/// They have to match for all conductors on a network, for them to be able to communicate.
+/// Also see [`holochain_p2p::spawn::NetworkCompatParams`].
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub struct DpkiConfig {
     /// Path to a DNA which implements the DPKI service, i.e. Deepkey.
     /// Defaults to the built-in Deepkey DNA from the holochain_deepkey_dna crate.
     pub dna_path: Option<PathBuf>,
 
-    /// **IMPORTANT!**
-    ///
-    /// For the main DPKI network, this seed must be set to "deepkey-main".
-    /// For hApp unit and integration tests, a random seed should be used.
-    ///
     /// DPKI is always installed with a network seed.
-    /// Also, any two conductors not using the exact same DPKI service cannot communicate with each other.
-    /// This means that this network seed must match across all conductors in a network!
+    /// Only conductors using the exact same DPKI service can communicate with each other.
+    /// This means that this network seed must match across all conductors in a network.
     //
     // TODO: consider emitting a warning if this is not set to the production value
     //       in release builds.
@@ -41,12 +42,13 @@ pub struct DpkiConfig {
     pub allow_throwaway_random_dpki_agent_key: bool,
 
     /// For testing only, we can turn off DPKI if needed.
-    /// TODO: this can be removed once DPKI is truly optional again.
+    // TODO: this can be removed once DPKI is truly optional again.
     #[serde(default)]
     pub no_dpki: bool,
 }
 
 impl DpkiConfig {
+    #[cfg(feature = "unstable-dpki")]
     pub fn production(dna_path: Option<PathBuf>) -> Self {
         Self {
             dna_path,
@@ -56,6 +58,7 @@ impl DpkiConfig {
         }
     }
 
+    #[cfg(feature = "unstable-dpki")]
     pub fn testing() -> Self {
         Self {
             dna_path: None,
@@ -77,6 +80,45 @@ impl DpkiConfig {
 
 impl Default for DpkiConfig {
     fn default() -> Self {
-        Self::testing()
+        cfg_if! {
+            if #[cfg(feature = "unstable-dpki")] {
+                Self::testing()
+            } else {
+                Self::disabled()
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DpkiConfig;
+
+    #[cfg(not(feature = "unstable-dpki"))]
+    #[test]
+    fn default_config() {
+        let config = DpkiConfig::default();
+        assert_eq!(config, DpkiConfig::disabled());
+    }
+
+    #[cfg(feature = "unstable-dpki")]
+    #[test]
+    fn default_config_with_feature_enabled() {
+        let config = DpkiConfig::default();
+        assert_eq!(config, DpkiConfig::testing());
+    }
+
+    #[cfg(feature = "unstable-dpki")]
+    #[test]
+    fn testing_config_with_feature_enabled() {
+        let config = DpkiConfig::testing();
+        assert_eq!(config, DpkiConfig::testing());
+    }
+
+    #[cfg(feature = "unstable-dpki")]
+    #[test]
+    fn production_config_with_feature_enabled() {
+        let config = DpkiConfig::production(None);
+        assert_eq!(config, DpkiConfig::production(None));
     }
 }

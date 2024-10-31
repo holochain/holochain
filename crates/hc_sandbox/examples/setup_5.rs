@@ -40,7 +40,9 @@ async fn main() -> anyhow::Result<()> {
             None,
             None,
             false,
+            #[cfg(feature = "unstable-dpki")]
             false,
+            #[cfg(feature = "unstable-dpki")]
             None,
             #[cfg(feature = "chc")]
             None,
