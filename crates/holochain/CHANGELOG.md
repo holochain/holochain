@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 - **BREAKING**: As the DPKI feature is unstable and incomplete, it is disabled with default cargo features and put behind a feature called `unstable-dpki`. If this feature is specified at compile time, DPKI is enabled by default.
-- **BREAKING**: Issuing and persisting warrants is behind a feature `unstable-warrants` now. Warrants have not been tested extensively and there is no way to recover from a warrant. Hence the feature is considered unstable and must be explicitly enabled. 
+- **BREAKING**: Issuing and persisting warrants is behind a feature `unstable-warrants` now. Warrants have not been tested extensively and there is no way to recover from a warrant. Hence the feature is considered unstable and must be explicitly enabled. Note that once warrants are issued some functions or calls may not work correctly.
 
 ## 0.5.0-dev.3
 
