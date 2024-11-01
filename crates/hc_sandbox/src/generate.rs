@@ -32,11 +32,7 @@ pub fn generate(
     let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url)?;
-    // TODO: this network config targets production signal and bootstrap servers,
-    // which does not constitute a true "sandbox". `hc_run_local_services` should
-    // be used instead.
-    config.network =
-        network.unwrap_or_else(holochain_conductor_api::conductor::test_network_config);
+    config.network = network.unwrap_or_else(KitsuneP2pConfig::mem);
     #[cfg(feature = "chc")]
     {
         config.chc_url = chc_url;

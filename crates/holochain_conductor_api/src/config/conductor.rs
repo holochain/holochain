@@ -178,16 +178,6 @@ impl ConductorConfig {
         }
     }
 
-    /// Create a config using the testing network config,
-    /// testing DPKI, and default values for everything else.
-    pub fn testing() -> Self {
-        Self {
-            network: test_network_config(),
-            dpki: DpkiConfig::default(),
-            ..ConductorConfig::empty()
-        }
-    }
-
     /// Create a conductor config from a YAML file path.
     pub fn load_yaml(path: &Path) -> ConductorConfigResult<ConductorConfig> {
         let config_yaml = std::fs::read_to_string(path).map_err(|err| match err {
@@ -319,19 +309,6 @@ impl Default for ConductorTuningParams {
             countersigning_resolution_retry_limit: None,
             min_publish_interval: None,
         }
-    }
-}
-
-/// Network config for testing with real infrastructure.
-pub fn test_network_config() -> KitsuneP2pConfig {
-    KitsuneP2pConfig {
-        transport_pool: vec![kitsune_p2p_types::config::TransportConfig::WebRTC {
-            signal_url: "wss://signal.holo.host".to_string(),
-            webrtc_config: None,
-        }],
-        bootstrap_service: Some(url2::Url2::parse("https://bootstrap.holo.host")),
-        tuning_params: KitsuneP2pTuningParams::default(),
-        tracing_scope: None,
     }
 }
 
