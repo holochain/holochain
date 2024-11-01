@@ -7,13 +7,8 @@ use holochain_wasm_test_utils::TestWasm;
 #[tokio::test(flavor = "multi_thread")]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
-    let mut conductor = SweetConductor::from_config(
-        SweetConductorConfig::rendezvous(false)
-            .apply_shared_rendezvous()
-            .await
-            .no_dpki(),
-    )
-    .await;
+    let mut conductor =
+        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
 
     let mut cache_dir = conductor.db_path().to_owned();
     cache_dir.push(WASM_CACHE);
@@ -49,7 +44,7 @@ async fn wasm_disk_cache() {
 async fn zome_with_no_entry_types_does_not_prevent_deletes() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::shared_rendezvous().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let (dna_file, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::ValidateRejectAppTypes, TestWasm::Crd])
@@ -83,7 +78,7 @@ async fn zome_with_no_entry_types_does_not_prevent_deletes() {
 async fn zome_with_no_link_types_does_not_prevent_delete_links() {
     holochain_trace::test_run();
 
-    let mut conductor = SweetConductor::shared_rendezvous().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![
         TestWasm::ValidateRejectAppTypes,

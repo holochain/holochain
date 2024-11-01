@@ -13,13 +13,8 @@ use crate::{
 
 #[tokio::test(flavor = "multi_thread")]
 async fn is_same_agent_without_dpki() {
-    let mut conductor = SweetConductor::from_config(
-        SweetConductorConfig::rendezvous(false)
-            .apply_shared_rendezvous()
-            .await
-            .no_dpki(),
-    )
-    .await;
+    let mut conductor =
+        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
         .await
         .0;
@@ -73,7 +68,7 @@ async fn is_same_agent_without_dpki() {
 #[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn is_same_agent() {
-    let mut conductor = SweetConductor::shared_rendezvous().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
         .await
         .0;
@@ -132,13 +127,8 @@ async fn is_same_agent() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_key_lineage_during_init_without_dpki() {
-    let mut conductor = SweetConductor::from_config(
-        SweetConductorConfig::rendezvous(false)
-            .apply_shared_rendezvous()
-            .await
-            .no_dpki(),
-    )
-    .await;
+    let mut conductor =
+        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
         .await
         .0;
@@ -153,12 +143,7 @@ async fn get_agent_key_lineage_during_init_without_dpki() {
 #[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_key_lineage_during_init() {
-    let mut conductor = SweetConductor::from_config(
-        SweetConductorConfig::rendezvous(false)
-            .apply_shared_rendezvous()
-            .await,
-    )
-    .await;
+    let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
         .await
         .0;
@@ -175,13 +160,8 @@ async fn get_agent_key_lineage_during_init() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_key_lineage_without_dpki() {
-    let mut conductor = SweetConductor::from_config(
-        SweetConductorConfig::rendezvous(false)
-            .apply_shared_rendezvous()
-            .await
-            .no_dpki(),
-    )
-    .await;
+    let mut conductor =
+        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
         .await
         .0;
@@ -199,12 +179,7 @@ async fn get_agent_key_lineage_without_dpki() {
 #[cfg(feature = "unstable-dpki")]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_key_lineage() {
-    let mut conductor = SweetConductor::from_config(
-        SweetConductorConfig::rendezvous(false)
-            .apply_shared_rendezvous()
-            .await,
-    )
-    .await;
+    let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentKeyLineage])
         .await
         .0;

@@ -292,13 +292,10 @@ async fn test_zero_arc_get_links() {
     // Standard config with arc clamped to zero
     let mut tuning = make_tuning(true, true, true, None);
     tuning.gossip_arc_clamping = "empty".into();
-    let config = SweetConductorConfig::rendezvous(false)
-        .apply_shared_rendezvous()
-        .await
-        .set_tuning_params(tuning);
+    let config = SweetConductorConfig::standard().set_tuning_params(tuning);
 
     let mut conductor0 = SweetConductor::from_config(config).await;
-    let mut conductor1 = SweetConductor::shared_rendezvous().await;
+    let mut conductor1 = SweetConductor::from_standard_config().await;
 
     let tw = holochain_wasm_test_utils::TestWasm::Link;
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![tw]).await;
@@ -593,13 +590,10 @@ async fn test_gossip_shutdown() {
 async fn test_gossip_startup() {
     holochain_trace::test_run();
     let config = || async move {
-        SweetConductorConfig::rendezvous(false)
-            .apply_shared_rendezvous()
-            .await
-            .tune(|t| {
-                t.danger_gossip_recent_threshold_secs = 1;
-                t.default_rpc_single_timeout_ms = 3_000;
-            })
+        SweetConductorConfig::standard().tune(|t| {
+            t.danger_gossip_recent_threshold_secs = 1;
+            t.default_rpc_single_timeout_ms = 3_000;
+        })
     };
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;

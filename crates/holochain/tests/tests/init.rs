@@ -92,10 +92,7 @@ async fn call_init_across_cells_passes() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_from_init_across_cells() {
-    let config = SweetConductorConfig::rendezvous(false)
-        .apply_shared_rendezvous()
-        .await
-        .no_dpki();
+    let config = SweetConductorConfig::standard().no_dpki();
     let mut conductor = SweetConductor::from_config(config).await;
     let agent = SweetAgents::one(conductor.keystore()).await;
     let inits = Arc::new(AtomicU8::new(0));

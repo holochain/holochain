@@ -245,14 +245,9 @@ impl SweetConductor {
             .unwrap()
     }
 
-    /// Create a SweetConductor with a new set of TestEnvs, using the "empty" config
-    /// with a singleton rendezvous. Can only be used in single-conductor tests.
-    pub async fn shared_rendezvous() -> SweetConductor {
-        Self::from_config_rendezvous(
-            SweetConductorConfig::rendezvous(false),
-            shared_rendezvous().await,
-        )
-        .await
+    /// Create a SweetConductor with a new set of TestEnvs from the given config
+    pub async fn from_standard_config() -> SweetConductor {
+        Self::from_config(SweetConductorConfig::standard()).await
     }
 
     /// Get the rendezvous config that this conductor is using, if any

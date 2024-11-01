@@ -766,14 +766,9 @@ struct TestCase {
 impl TestCase {
     async fn new(dpki: bool) -> TestCase {
         let conductor_config = if dpki {
-            SweetConductorConfig::rendezvous(false)
-                .apply_shared_rendezvous()
-                .await
+            SweetConductorConfig::standard()
         } else {
-            SweetConductorConfig::rendezvous(false)
-                .apply_shared_rendezvous()
-                .await
-                .no_dpki()
+            SweetConductorConfig::standard().no_dpki()
         };
         let mut conductor = SweetConductor::from_config(conductor_config).await;
         let (dna_file_1, _, coordinator_zomes_1) =

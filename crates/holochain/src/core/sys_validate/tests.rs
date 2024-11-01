@@ -866,7 +866,7 @@ fn valid_chain_test() {
 #[ignore = "flaky"]
 async fn valid_chain_fact_test() {
     let n = 100;
-    let keystore = SweetConductor::shared_rendezvous().await.keystore();
+    let keystore = SweetConductor::from_standard_config().await.keystore();
     let author = SweetAgents::one(keystore.clone()).await;
     let mut g = random_generator();
 
