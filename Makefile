@@ -5,14 +5,16 @@
 F=RUSTFLAGS="-Dwarnings"
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
-DEFAULT_FEATURES=chc,slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
+DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
+UNSTABLE_FEATURES=chc,unstable-dpki,unstable-sharding,$(DEFAULT_FEATURES)
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
 	static-all static-fmt static-toml static-clippy static-doc \
 	build-workspace-wasmer_sys build-workspace-wasmer_wamr \
 	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
-	test-workspace-wasmer_sys-unstable-dpki
+	build-workspace-wasmer_sys-unstable \
+	test-workspace-wasmer_sys-unstable
 
 # default to running everything (first rule)
 default: build-workspace-wasmer_sys \
@@ -54,6 +56,14 @@ build-workspace-wasmer_sys:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
+build-workspace-wasmer_sys-unstable:
+	$(F) cargo build \
+		--workspace \
+		--locked \
+		--all-targets \
+		--no-default-features \
+		--features $(UNSTABLE_FEATURES),wasmer_sys
+
 build-workspace-wasmer_wamr:
 	$(F) cargo build \
 		--workspace \
@@ -72,13 +82,13 @@ test-workspace-wasmer_sys:
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
 # executes tests on all crates with wasmer compiler and unstable dpki feature
-test-workspace-wasmer_sys-unstable-dpki:
+test-workspace-wasmer_sys-unstable:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_sys,unstable-dpki
+		--features $(UNSTABLE_FEATURES),wasmer_sys
 
 # execute tests on all crates with wasmer interpreter
 test-workspace-wasmer_wamr:

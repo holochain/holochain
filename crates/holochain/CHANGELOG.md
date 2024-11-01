@@ -9,6 +9,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING**: As the DPKI feature is unstable and incomplete, it is disabled with default cargo features and put behind a feature called `unstable-dpki`. If this feature is specified at compile time, DPKI is enabled by default.
 - **BREAKING**: Conductor::get_dna_definitions now returns an `IndexMap` to ensure consistent ordering.
 
+- Added a new feature "unstable-sharding" which puts the network sharding behind a feature flag. It will not be possible
+  to configure network sharding unless Holochain is built with this feature enabled. By default, the network tuning 
+  parameter `gossip_dynamic_arcs` is ignored, and the parameter `gossip_arc_clamping` must be set to either `"full"`
+  or `"empty"`, the previous default value of `"none"` will prevent the conductor from starting. We intend to stabilise
+  this feature in the future, and it will return to being available without a feature flag. #4344
+
 ## 0.5.0-dev.3
 
 - Use of WasmZome preserialized\_path has been **deprecated**. Please use the wasm interpreter instead.
