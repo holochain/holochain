@@ -1267,7 +1267,10 @@ async fn mock_network_sharded_gossip() {
     // Setup the network.
     let mut tuning = KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
-    tuning.gossip_dynamic_arcs = true;
+    #[cfg(feature = "unstable-sharding")]
+    {
+        tuning.gossip_dynamic_arcs = true;
+    }
 
     let mut network = KitsuneP2pConfig::default();
     network.transport_pool = vec![TransportConfig::Mock {
@@ -1779,7 +1782,10 @@ async fn mock_network_sharding() {
     // Setup the network.
     let mut tuning = KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "sharded-gossip".to_string();
-    tuning.gossip_dynamic_arcs = true;
+    #[cfg(feature = "unstable-sharding")]
+    {
+        tuning.gossip_dynamic_arcs = true;
+    }
 
     let mut network = KitsuneP2pConfig::default();
     network.bootstrap_service = Some(bootstrap);
