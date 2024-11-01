@@ -1,16 +1,18 @@
 use super::*;
-use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::*;
-use crate::test_utils::inline_zomes::simple_crud_zome;
 use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use holochain_wasm_test_utils::TestWasm;
 use rusqlite::named_params;
 use rusqlite::Transaction;
 use std::convert::TryFrom;
-use std::convert::TryInto;
 use std::time::Duration;
+#[cfg(feature = "unstable-warrants")]
+use {
+    crate::core::workflow::sys_validation_workflow::types::Outcome,
+    crate::test_utils::inline_zomes::simple_crud_zome, std::convert::TryInto,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
@@ -31,6 +33,7 @@ async fn sys_validation_workflow_test() {
     run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
 }
 
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_produces_invalid_chain_warrant() {
     holochain_trace::test_run();
@@ -106,6 +109,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
     );
 }
 
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_produces_forked_chain_warrant() {
     holochain_trace::test_run();
@@ -266,8 +270,11 @@ async fn run_test(
     let (bad_update_action, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
-    // Integration should have 14 chain ops in it + 1 warrant op + the running tally
+    // Integration should have 14 chain ops in it + 1 warrant op (if unstable-warrants enabled) + the running tally
+    #[cfg(feature = "unstable-warrants")]
     let expected_count = 14 + 1 + expected_count;
+    #[cfg(not(feature = "unstable-warrants"))]
+    let expected_count = 14 + expected_count;
 
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
