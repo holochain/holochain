@@ -113,6 +113,10 @@ tx5 = ["dep:tx5", "kitsune_p2p_types/tx5"]
 
 instrument = []
 
+unstable-sharding = [
+  "kitsune_p2p_types/unstable-sharding",
+]
+
 sqlite-encrypted = [
   "kitsune_p2p_fetch/sqlite-encrypted",
   "kitsune_p2p_proxy/sqlite-encrypted",
