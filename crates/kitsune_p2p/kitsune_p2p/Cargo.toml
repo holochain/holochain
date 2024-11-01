@@ -114,6 +114,10 @@ mock_network = ["kitsune_p2p_types/test_utils", "mockall"]
 
 instrument = []
 
+unstable-sharding = [
+  "kitsune_p2p_types/unstable-sharding",
+]
+
 sqlite-encrypted = [
   "kitsune_p2p_fetch/sqlite-encrypted",
   "kitsune_p2p_timestamp/sqlite-encrypted",

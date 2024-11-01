@@ -81,6 +81,8 @@ test_utils = [
 
 fixt = ["dep:fixt", "kitsune_p2p_bin_data/fixt"]
 
+unstable-sharding = []
+
 sqlite-encrypted = [
   "kitsune_p2p_dht/sqlite-encrypted",
   "kitsune_p2p_dht_arc/sqlite-encrypted",

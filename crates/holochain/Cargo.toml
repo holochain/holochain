@@ -309,6 +309,14 @@ chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_chc/http"]
 # Enable unstable DPKI feature.
 unstable-dpki = ["holochain_conductor_api/unstable-dpki"]
 
+# Enable sharding for networks. This is currently considered an unstable feature
+# and with the feature disabled you will only be able to configure nodes that have
+# a full or empty arc.
+unstable-sharding = [
+  "kitsune_p2p/unstable-sharding",
+  "kitsune_p2p_types/unstable-sharding",
+]
+
 sweettest = ["test_utils", "sqlite"]
 
 deepkey-wasm-cache = []
