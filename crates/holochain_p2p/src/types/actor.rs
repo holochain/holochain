@@ -268,6 +268,7 @@ ghost_actor::ghost_chan! {
         fn call_remote(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
+            zome_call_payload: ExternIO,
             signature: Signature,
             to_agent: AgentPubKey,
             zome_name: ZomeName,
@@ -285,7 +286,7 @@ ghost_actor::ghost_chan! {
         fn send_remote_signal(
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
-            to_agent_list: Vec<(Signature, AgentPubKey)>,
+            to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap: Option<CapSecret>,

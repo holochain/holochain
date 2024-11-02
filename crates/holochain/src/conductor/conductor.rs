@@ -3381,6 +3381,7 @@ mod countersigning_impls {
 impl holochain_conductor_services::CellRunner for Conductor {
     async fn call_zome(
         &self,
+        zome_call_payload: ExternIO,
         provenance: &AgentPubKey,
         cap_secret: Option<CapSecret>,
         cell_id: CellId,

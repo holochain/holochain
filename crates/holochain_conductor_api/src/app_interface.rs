@@ -259,6 +259,8 @@ pub enum AppResponse {
 pub struct ZomeCall {
     /// The ID of the cell containing the zome to be called
     pub cell_id: CellId,
+    /// The zome call payload
+    pub zome_call_payload: ExternIO,
     /// The zome containing the function to be called
     pub zome_name: ZomeName,
     /// The name of the zome function to call
@@ -279,37 +281,37 @@ pub struct ZomeCall {
     pub expires_at: Timestamp,
 }
 
-impl From<ZomeCall> for ZomeCallUnsigned {
-    fn from(zome_call: ZomeCall) -> Self {
-        Self {
-            cell_id: zome_call.cell_id,
-            zome_name: zome_call.zome_name,
-            fn_name: zome_call.fn_name,
-            payload: zome_call.payload,
-            cap_secret: zome_call.cap_secret,
-            provenance: zome_call.provenance,
-            nonce: zome_call.nonce,
-            expires_at: zome_call.expires_at,
-        }
-    }
-}
+// impl From<ZomeCall> for ZomeCallUnsigned {
+//     fn from(zome_call: ZomeCall) -> Self {
+//         Self {
+//             zome_call_payload: zome_call.zome_call_payload,
+//             cell_id: zome_call.cell_id,
+//             zome_name: zome_call.zome_name,
+//             fn_name: zome_call.fn_name,
+//             payload: zome_call.payload,
+//             cap_secret: zome_call.cap_secret,
+//             provenance: zome_call.provenance,
+//             nonce: zome_call.nonce,
+//             expires_at: zome_call.expires_at,
+//         }
+//     }
+// }
 
 impl ZomeCall {
     pub async fn try_from_unsigned_zome_call(
         keystore: &MetaLairClient,
         unsigned_zome_call: ZomeCallUnsigned,
     ) -> LairResult<Self> {
+        let zome_call_payload = unsigned_zome_call
+            .data_to_sign()
+            .map_err(|e| e.to_string())?;
         let signature = unsigned_zome_call
             .provenance
-            .sign_raw(
-                keystore,
-                unsigned_zome_call
-                    .data_to_sign()
-                    .map_err(|e| e.to_string())?,
-            )
+            .sign_raw(keystore, zome_call_payload.clone())
             .await?;
         Ok(Self {
             cell_id: unsigned_zome_call.cell_id,
+            zome_call_payload: ExternIO(zome_call_payload.to_vec()),
             zome_name: unsigned_zome_call.zome_name,
             fn_name: unsigned_zome_call.fn_name,
             payload: unsigned_zome_call.payload,

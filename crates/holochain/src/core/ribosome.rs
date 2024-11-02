@@ -373,10 +373,7 @@ impl ZomeCallInvocation {
         Ok(
             if self
                 .provenance
-                .verify_signature_raw(
-                    &self.signature,
-                    ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?,
-                )
+                .verify_signature_raw(&self.signature, self.zome_call_payload.as_bytes().into())
                 .await?
             {
                 ZomeCallAuthorization::Authorized
@@ -500,6 +497,8 @@ mockall::mock! {
 pub struct ZomeCallInvocation {
     /// The Id of the `Cell` in which this Zome-call would be invoked
     pub cell_id: CellId,
+    /// Zome call payload
+    pub zome_call_payload: ExternIO,
     /// The Zome containing the function that would be invoked
     pub zome: Zome,
     /// The capability request authorization.
@@ -546,6 +545,7 @@ impl ZomeCallInvocation {
     ) -> RibosomeResult<Self> {
         let ZomeCall {
             cell_id,
+            zome_call_payload,
             zome_name,
             fn_name,
             cap_secret,
@@ -560,6 +560,7 @@ impl ZomeCallInvocation {
             .map_err(|conductor_api_error| RibosomeError::from(Box::new(conductor_api_error)))?;
         Ok(Self {
             cell_id,
+            zome_call_payload,
             zome,
             cap_secret,
             fn_name,
@@ -576,6 +577,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
     fn from(inv: ZomeCallInvocation) -> Self {
         let ZomeCallInvocation {
             cell_id,
+            zome_call_payload,
             zome,
             fn_name,
             cap_secret,
@@ -587,6 +589,7 @@ impl From<ZomeCallInvocation> for ZomeCall {
         } = inv;
         Self {
             cell_id,
+            zome_call_payload,
             zome_name: zome.zome_name().clone(),
             fn_name,
             cap_secret,
@@ -797,6 +800,7 @@ pub mod wasm_test {
         let now = Timestamp::now();
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
         let alice_unsigned_zome_call = ZomeCallUnsigned {
+            zome_call_payload: ExternIO::encode(()).unwrap(),
             provenance: alice_pubkey.clone(),
             cell_id: alice.cell_id().clone(),
             zome_name: "foo".into(),

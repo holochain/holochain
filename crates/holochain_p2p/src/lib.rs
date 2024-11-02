@@ -53,6 +53,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     async fn call_remote(
         &self,
         from_agent: AgentPubKey,
+        zome_call_payload: ExternIO,
         from_signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
@@ -70,7 +71,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     async fn send_remote_signal(
         &self,
         from_agent: AgentPubKey,
-        to_agent_list: Vec<(Signature, AgentPubKey)>,
+        to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
@@ -217,6 +218,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn call_remote(
         &self,
         from_agent: AgentPubKey,
+        zome_call_payload: ExternIO,
         from_signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
@@ -230,6 +232,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .call_remote(
                 (*self.dna_hash).clone(),
                 from_agent,
+                zome_call_payload,
                 from_signature,
                 to_agent,
                 zome_name,
@@ -249,7 +252,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn send_remote_signal(
         &self,
         from_agent: AgentPubKey,
-        to_agent_list: Vec<(Signature, AgentPubKey)>,
+        to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,

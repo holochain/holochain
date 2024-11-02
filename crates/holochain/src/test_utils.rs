@@ -949,6 +949,7 @@ where
 {
     let ZomeCall {
         cell_id,
+        zome_call_payload,
         cap_secret,
         fn_name,
         payload,
@@ -960,6 +961,7 @@ where
     } = new_zome_call(keystore, cell_id, func, payload, zome.clone().into()).await?;
     Ok(ZomeCallInvocation {
         cell_id,
+        zome_call_payload,
         zome: zome.into(),
         cap_secret,
         fn_name,

@@ -514,6 +514,7 @@ fixturator!(
     ZomeCallInvocation;
     curve Empty ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
+        zome_call_payload: ExternIoFixturator::new(Empty).next().unwrap(),
         zome: ZomeFixturator::new(Empty).next().unwrap(),
         cap_secret: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
@@ -525,6 +526,7 @@ fixturator!(
     };
     curve Unpredictable ZomeCallInvocation {
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
+        zome_call_payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
@@ -539,6 +541,7 @@ fixturator!(
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
+        zome_call_payload: ExternIoFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
         zome: ZomeFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),

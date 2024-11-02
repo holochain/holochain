@@ -2,6 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
+use hdk::prelude::ExternIO;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_nonce::fresh_nonce;
 use holochain_types::access::Permission;
@@ -17,7 +18,10 @@ use std::sync::Arc;
 use tracing::Instrument;
 use wasmer::RuntimeError;
 
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(_ribosome, call_context, input)))]
+#[cfg_attr(
+    feature = "instrument",
+    tracing::instrument(skip(_ribosome, call_context, input))
+)]
 pub fn send_remote_signal(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
@@ -41,7 +45,7 @@ pub fn send_remote_signal(
 
             tokio::task::spawn(
                 async move {
-                    let mut to_agent_list: Vec<(Signature, AgentPubKey)> = Vec::new();
+                    let mut to_agent_list = Vec::new();
 
                     let (nonce, expires_at) = match fresh_nonce(Timestamp::now()) {
                         Ok(nonce) => nonce,
@@ -62,25 +66,50 @@ pub fn send_remote_signal(
                             nonce,
                             expires_at,
                         };
-                        let potentially_signature = zome_call_unsigned.provenance.sign_raw(call_context.host_context.keystore(), match zome_call_unsigned.data_to_sign() {
+                        let zome_call_payload = match zome_call_unsigned.data_to_sign() {
                             Ok(to_sign) => to_sign,
                             Err(e) => {
-                                tracing::info!("Failed to serialize zome call for signal because of {:?}", e);
+                                tracing::info!(
+                                    "Failed to serialize zome call for signal because of {:?}",
+                                    e
+                                );
                                 return;
                             }
-                        }).await;
+                        };
 
-                        match potentially_signature {
-                            Ok(signature) => to_agent_list.push((signature, agent)),
+                        match from_agent
+                            .sign_raw(
+                                call_context.host_context.keystore(),
+                                zome_call_payload.clone(),
+                            )
+                            .await
+                        {
+                            Ok(signature) => to_agent_list.push((
+                                agent,
+                                ExternIO(zome_call_payload.to_vec()),
+                                signature,
+                            )),
                             Err(e) => {
-                                tracing::info!("Failed to sign and send remote signals because of {:?}", e);
+                                tracing::info!(
+                                    "Failed to sign and send remote signals because of {:?}",
+                                    e
+                                );
                                 return;
                             }
-                        }
+                        };
                     }
 
                     if let Err(e) = network
-                        .send_remote_signal(from_agent, to_agent_list, zome_name, fn_name, None, signal, nonce, expires_at)
+                        .send_remote_signal(
+                            from_agent,
+                            to_agent_list,
+                            zome_name,
+                            fn_name,
+                            None,
+                            signal,
+                            nonce,
+                            expires_at,
+                        )
                         .await
                     {
                         tracing::info!("Failed to send remote signals because of {:?}", e);

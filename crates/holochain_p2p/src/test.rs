@@ -35,6 +35,7 @@ impl HolochainP2pHandler for StubNetwork {
 
     fn handle_call_remote(
         &mut self,
+        zome_call_payload: ExternIO,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
         signature: Signature,
@@ -51,6 +52,7 @@ impl HolochainP2pHandler for StubNetwork {
 
     fn handle_send_remote_signal(
         &mut self,
+        zome_call_payload: ExternIO,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
         to_agent_list: Vec<(Signature, AgentPubKey)>,
@@ -315,28 +317,36 @@ mod tests {
         let payload = ExternIO::encode(b"yippo").unwrap();
         let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
 
+        let zome_call_payload = ZomeCallUnsigned {
+            provenance: a1.clone(),
+            cell_id: CellId::new(dna.clone(), a2.clone()),
+            zome_name: zome_name.clone(),
+            fn_name: fn_name.clone(),
+            cap_secret,
+            payload: payload.clone(),
+            nonce,
+            expires_at,
+        }
+        .data_to_sign()
+        .unwrap();
         let signature = a1
-            .sign_raw(
-                &keystore,
-                ZomeCallUnsigned {
-                    provenance: a1.clone(),
-                    cell_id: CellId::new(dna.clone(), a2.clone()),
-                    zome_name: zome_name.clone(),
-                    fn_name: fn_name.clone(),
-                    cap_secret,
-                    payload: payload.clone(),
-                    nonce,
-                    expires_at,
-                }
-                .data_to_sign()
-                .unwrap(),
-            )
+            .sign_raw(&keystore, zome_call_payload.clone())
             .await
             .unwrap();
 
         let res = p2p
             .call_remote(
-                dna, a1, signature, a2, zome_name, fn_name, None, payload, nonce, expires_at,
+                ExternIO(zome_call_payload.to_vec()),
+                dna,
+                a1,
+                signature,
+                a2,
+                zome_name,
+                fn_name,
+                None,
+                payload,
+                nonce,
+                expires_at,
             )
             .await
             .unwrap();

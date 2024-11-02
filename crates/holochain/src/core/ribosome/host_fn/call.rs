@@ -74,20 +74,22 @@ pub fn call(
                                     nonce,
                                     expires_at,
                                 };
+                                let zome_call_payload = ZomeCall::try_from_unsigned_zome_call(
+                                    call_context.host_context.keystore(),
+                                    zome_call_unsigned,
+                                )
+                                .await?;
                                 match call_context
                                     .host_context()
                                     .network()
                                     .call_remote(
+                                        zome_call_payload,
                                         provenance.clone(),
                                         zome_call_unsigned
                                             .provenance
                                             .sign_raw(
                                                 call_context.host_context.keystore(),
-                                                zome_call_unsigned.data_to_sign().map_err(
-                                                    |e| -> RuntimeError {
-                                                        wasm_error!(e.to_string()).into()
-                                                    },
-                                                )?,
+                                                ,
                                             )
                                             .await
                                             .map_err(|e| -> RuntimeError {
@@ -149,6 +151,7 @@ pub fn call(
                                 match cell_id_result {
                                     Ok(cell_id) => {
                                         let zome_call_unsigned = ZomeCallUnsigned {
+                                            zome_call_payload: ExternIO::encode(()).unwrap(),
                                             cell_id,
                                             zome_name,
                                             fn_name,

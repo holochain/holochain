@@ -175,6 +175,7 @@ ghost_actor::ghost_chan! {
 
         /// A remote node is attempting to make a remote call on us.
         fn call_remote(
+            zome_call_payload: ExternIO,
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
             signature: Signature,
