@@ -19,7 +19,7 @@ pub type ResourceMap = BTreeMap<PathBuf, ResourceBytes>;
 /// by the receiver.
 ///
 /// The manifest may describe locations of resources not included in the Bundle.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Bundle<M>
 where

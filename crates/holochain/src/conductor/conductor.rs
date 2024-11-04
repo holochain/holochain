@@ -1671,13 +1671,15 @@ mod app_impls {
                 source,
                 agent_key,
                 installed_app_id,
-                membrane_proofs,
-                existing_cells,
                 network_seed,
-                modifiers,
+                role_settings,
                 ignore_genesis_failure,
                 allow_throwaway_random_agent_key,
             } = payload;
+
+            let modifiers = get_modifiers_map_from_role_settings(&role_settings);
+            let membrane_proofs = get_memproof_map_from_role_settings(&role_settings);
+            let existing_cells = get_existing_cells_map_from_role_settings(&role_settings);
 
             let bundle = {
                 let original_bundle = source.resolve().await?;
@@ -1685,9 +1687,7 @@ mod app_impls {
                 if let Some(network_seed) = network_seed {
                     manifest.set_network_seed(network_seed);
                 }
-                if let Some(modifiers) = modifiers {
-                    manifest.set_modifiers(modifiers);
-                }
+                manifest.set_modifiers(modifiers)?;
                 AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
             };
 
@@ -1697,7 +1697,7 @@ mod app_impls {
             // If a memproof map is provided, it will override the allow_deferred_memproofs setting,
             // and the provided memproofs will be used immediately.
             let defer_memproofs = match &manifest {
-                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_none(),
+                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.len() == 0,
             };
 
             let flags = InstallAppCommonFlags {
@@ -1705,8 +1705,6 @@ mod app_impls {
                 ignore_genesis_failure,
                 allow_throwaway_random_agent_key,
             };
-
-            let membrane_proofs = membrane_proofs.unwrap_or_default();
 
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
@@ -4148,4 +4146,57 @@ async fn p2p_event_task(
         .await;
 
     tracing::info!("p2p_event_task has ended");
+}
+
+/// Extract the modifiers from the RoleSettingsMap into their own HashMap
+fn get_modifiers_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) -> ModifiersMap {
+    match role_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .map(
+                |(role_name, role_settings)| match role_settings.modifiers.clone() {
+                    Some(m) => Some((role_name.clone(), m.clone())),
+                    None => None,
+                },
+            )
+            .filter_map(|r| r)
+            .collect(),
+        None => HashMap::new(),
+    }
+}
+
+/// Extract the memproofs from the RoleSettingsMap into their own HashMap
+fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) -> MemproofMap {
+    match role_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .map(
+                |(role_name, role_settings)| match role_settings.membrane_proof.clone() {
+                    Some(m) => Some((role_name.clone(), m.clone())),
+                    None => None,
+                },
+            )
+            .filter_map(|r| r)
+            .collect(),
+        None => HashMap::new(),
+    }
+}
+
+/// Extract the existing cells ids from the RoleSettingsMap into their own HashMap
+fn get_existing_cells_map_from_role_settings(
+    role_settings: &Option<RoleSettingsMap>,
+) -> ExistingCellsMap {
+    match role_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .map(
+                |(role_name, role_settings)| match role_settings.existing_cell.clone() {
+                    Some(c) => Some((role_name.clone(), c.clone())),
+                    None => None,
+                },
+            )
+            .filter_map(|r| r)
+            .collect(),
+        None => HashMap::new(),
+    }
 }
