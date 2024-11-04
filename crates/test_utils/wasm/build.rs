@@ -4,6 +4,7 @@ use std::process::Stdio;
 fn main() {
     let should_build = std::env::var_os("CARGO_FEATURE_BUILD").is_some();
     let only_check = std::env::var_os("CARGO_FEATURE_ONLY_CHECK").is_some();
+    let enable_unstable_functions = std::env::var_os("CARGO_FEATURE_UNSTABLE_FUNCTIONS").is_some();
 
     if !(should_build || only_check) {
         return;
@@ -43,8 +44,8 @@ fn main() {
     let cargo_command = std::env::var_os("CARGO");
     let cargo_command = cargo_command.as_deref().unwrap_or_else(|| "cargo".as_ref());
 
-    build_test_wasms(&wasm_out, cargo_command, should_build, false, &wasms_path);
-    build_test_wasms(&wasm_out, cargo_command, should_build, true, &wasms_path);
+    build_test_wasms(&wasm_out, cargo_command, should_build, false, enable_unstable_functions, &wasms_path);
+    build_test_wasms(&wasm_out, cargo_command, should_build, true, enable_unstable_functions, &wasms_path);
 }
 
 fn build_test_wasms(
@@ -52,6 +53,7 @@ fn build_test_wasms(
     cargo_command: &std::ffi::OsStr,
     should_build: bool,
     build_integrity_zomes: bool,
+    enable_unstable_functions: bool,
     wasms_path: &str,
 ) {
     let mut cmd = std::process::Command::new(cargo_command);
@@ -69,16 +71,25 @@ fn build_test_wasms(
             .arg("--workspace")
             .arg("--target")
             .arg("wasm32-unknown-unknown");
+
+        if enable_unstable_functions {
+            cmd.arg("--features").arg("unstable-functions");
+        }
     } else {
         cmd.arg("check")
             .arg("--manifest-path")
             .arg("wasm_workspace/Cargo.toml");
     }
     if build_integrity_zomes {
+        let mut features = "integrity".to_string();
+        if enable_unstable_functions {
+            features.push_str(",unstable-functions");
+        }
+
         cmd.arg("--examples");
         cmd.arg("--no-default-features");
         cmd.arg("--features");
-        cmd.arg("integrity");
+        cmd.arg(features);
     }
     match wasm_out {
         Some(wasm_out) => {
