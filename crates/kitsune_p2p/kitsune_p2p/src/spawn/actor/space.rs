@@ -225,7 +225,10 @@ impl SpaceInternalHandler for Space {
         let evt_sender = self.host_api.legacy.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        #[cfg(feature = "unstable-sharding")]
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
+        #[cfg(not(feature = "unstable-sharding"))]
+        let dynamic_arcs = false;
         let internal_sender = self.i_s.clone();
         Ok(async move {
             let urls = vec![TxUrl::try_from(local_url)?];
@@ -272,7 +275,10 @@ impl SpaceInternalHandler for Space {
         let internal_sender = self.i_s.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
+        #[cfg(feature = "unstable-sharding")]
         let dynamic_arcs = self.config.tuning_params.gossip_dynamic_arcs;
+        #[cfg(not(feature = "unstable-sharding"))]
+        let dynamic_arcs = false;
         let arc = self.get_agent_arq(&agent);
 
         Ok(async move {

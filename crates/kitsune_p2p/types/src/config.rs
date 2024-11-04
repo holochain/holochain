@@ -21,7 +21,7 @@ pub mod tuning_params_struct {
     use std::collections::HashMap;
 
     macro_rules! mk_tune {
-        ($($(#[doc = $doc:expr])* $i:ident: $t:ty = $d:expr,)*) => {
+        ($($(#[doc = $doc:expr])* $(#[cfg($cfg:meta)])? $i:ident: $t:ty = $d:expr, $(#[cfg_not($cfg_alt:meta)] $i_alt:ident: $t_alt:ty = $d_alt:expr,)?)*) => {
             /// Network tuning parameters.
             /// This is serialized carefully so all the values can be represented
             /// as strings in YAML - and we will be able to proceed with a printed
@@ -32,7 +32,11 @@ pub mod tuning_params_struct {
             pub struct KitsuneP2pTuningParams {
                 $(
                     $(#[doc = $doc])*
+                    $(#[cfg($cfg)])?
                     pub $i: $t,
+                    $(#[cfg(not($cfg_alt))]
+                        pub $i: $t,
+                    )?
                 )*
             }
 
@@ -40,7 +44,11 @@ pub mod tuning_params_struct {
                 fn default() -> Self {
                     Self {
                         $(
+                            $(#[cfg($cfg)])?
                             $i: $d,
+                            $(#[cfg(not($cfg_alt))]
+                                $i: $d_alt,
+                            )?
                         )*
                     }
                 }
@@ -54,10 +62,17 @@ pub mod tuning_params_struct {
                     use serde::ser::SerializeMap;
                     let mut m = serializer.serialize_map(None)?;
                     $(
+                        $(#[cfg($cfg)])?
                         m.serialize_entry(
                             stringify!($i),
                             &format!("{}", &self.$i),
                         )?;
+                        $(#[cfg(not($cfg_alt))]
+                            m.serialize_entry(
+                                stringify!($i),
+                                &format!("{}", &self.$i),
+                            )?;
+                        )?
                     )*
                     m.end()
                 }
@@ -73,10 +88,17 @@ pub mod tuning_params_struct {
                     for (k, v) in result.into_iter() {
                         match k.as_str() {
                             $(
+                                $(#[cfg($cfg)])?
                                 stringify!($i) => match v.parse::<$t>() {
                                     Ok(v) => out.$i = v,
                                     Err(e) => tracing::warn!("failed to parse {}: {}", k, e),
                                 },
+                                $(#[cfg(not($cfg_alt))]
+                                    stringify!($i) => match v.parse::<$t>() {
+                                        Ok(v) => out.$i = v,
+                                        Err(e) => tracing::warn!("failed to parse {}: {}", k, e),
+                                    },
+                                )?
                             )*
                             _ => tracing::warn!("INVALID TUNING PARAM: '{}'", k),
                         }
@@ -154,10 +176,24 @@ pub mod tuning_params_struct {
         gossip_max_batch_size: u32 = 1_000_000,
 
         /// Should gossip dynamically resize storage arcs?
+        ///
+        /// This is an unstable feature must be enabled with the "unstable-sharding" Cargo feature.
+        /// This setting is not available without the feature.
+        ///
+        /// [Default: true]
+        #[cfg(feature = "unstable-sharding")]
         gossip_dynamic_arcs: bool = true,
 
-        /// By default, Holochain adjusts the gossip_arc to match the
-        /// the current network conditions for the given DNA.
+        /// Override the configured arc management strategy?
+        ///
+        /// This is part of an unstable sharding feature and can only be set to "full" or "empty".
+        /// The default value is "full", where all nodes will be expected to hold all data.
+        /// If the "unstable-sharding" feature is enabled then this can also be set to "none" to
+        /// allow sharding to be managed by Kitsune.
+        ///
+        /// If [KitsuneP2pTuningParams::gossip_dynamic_arcs] is `true`, Kitsune adjusts the
+        /// gossip_arc to match the current network conditions for the given DNA.
+        ///
         /// If unsure, please keep this setting at the default "none",
         /// meaning no arc clamping. Setting options are:
         /// - "none" - Keep the default auto-adjust behavior.
@@ -166,10 +202,13 @@ pub mod tuning_params_struct {
         ///   a good reason, such as being on a bandwidth constrained
         ///   mobile device!
         /// - "full" - Indicates that you commit to serve and hold all
-        ///   all data from all agents, and be a potential target for all
+        ///   data from all agents, and be a potential target for all
         ///   get requests. This could be a significant investment of
         ///   bandwidth. Don't take this responsibility lightly.
+        #[cfg(feature = "unstable-sharding")]
         gossip_arc_clamping: String = "none".to_string(),
+        #[cfg_not(feature = "unstable-sharding")]
+        gossip_arc_clamping: String = "full".to_string(),
 
         /// Default timeout for rpc single. [Default: 60s]
         default_rpc_single_timeout_ms: u32 = 1000 * 60,
@@ -622,5 +661,28 @@ impl std::cmp::PartialEq for AdapterFactoryMock {
 impl From<AdapterFactory> for AdapterFactoryMock {
     fn from(adaptor_factory: AdapterFactory) -> Self {
         Self(adaptor_factory)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::KitsuneP2pConfig;
+
+    #[cfg(not(feature = "unstable-sharding"))]
+    #[test]
+    fn check_sharding_disabled_by_default() {
+        let config = KitsuneP2pConfig::default();
+        assert_eq!(
+            Some(kitsune_p2p_dht::arq::ArqClamping::Full),
+            config.tuning_params.arc_clamping()
+        );
+    }
+
+    #[cfg(feature = "unstable-sharding")]
+    #[test]
+    fn check_sharding_enabled_by_default() {
+        let config = KitsuneP2pConfig::default();
+        assert_eq!(None, config.tuning_params.arc_clamping());
+        assert!(config.tuning_params.gossip_dynamic_arcs);
     }
 }

@@ -193,7 +193,10 @@ async fn sharded_consistency() {
 
     let config = SweetConductorConfig::standard().tune(|tuning| {
         tuning.gossip_strategy = "sharded-gossip".to_string();
-        tuning.gossip_dynamic_arcs = true;
+        #[cfg(feature = "unstable-sharding")]
+        {
+            tuning.gossip_dynamic_arcs = true;
+        }
     });
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
