@@ -549,6 +549,7 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         membrane_proofs: Default::default(),
         existing_cells: Default::default(),
         network_seed,
+        modifiers: None,
         ignore_genesis_failure: false,
         allow_throwaway_random_agent_key: true,
     };

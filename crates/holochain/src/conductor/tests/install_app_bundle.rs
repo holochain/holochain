@@ -5,6 +5,7 @@ use crate::{conductor::error::ConductorError, sweettest::*};
 use holo_hash::DnaHash;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use kitsune_p2p_types::dependencies::proptest::prelude::Arbitrary;
 use maplit::btreeset;
 use matches::assert_matches;
 
@@ -51,6 +52,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             agent_key: None,
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
+            modifiers: None,
             network_seed: None,
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
@@ -173,6 +175,7 @@ async fn reject_duplicate_app_for_same_agent() {
             agent_key: None,
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
+            modifiers: None,
             network_seed: None,
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
@@ -200,6 +203,7 @@ async fn reject_duplicate_app_for_same_agent() {
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
             network_seed: None,
+            modifiers: None,
         })
         .await;
     assert_matches!(
@@ -225,6 +229,7 @@ async fn reject_duplicate_app_for_same_agent() {
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
             network_seed: None,
+            modifiers: None,
         })
         .await;
     assert_matches!(
@@ -247,6 +252,7 @@ async fn reject_duplicate_app_for_same_agent() {
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
             network_seed: Some("network".into()),
+            modifiers: None,
         })
         .await;
     assert!(valid_install_of_second_app.is_ok());
@@ -294,6 +300,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: Some("final seed".into()),
+            modifiers: None,
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
@@ -339,6 +346,228 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
+            modifiers: None,
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
+            ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
+        })
+        .await
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn can_install_app_with_custom_modifiers_correctly() {
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let path = PathBuf::from(format!("{}", dna.dna_hash()));
+
+    let manifest_network_seed = String::from("initial seed from the manifest");
+    let manifest_properties = YamlProperties::arbitrary();
+    let manifest_origin_time = Timestamp::now().saturating_sub(&Duration::from_secs(1));
+    let manifest_quantum_time = Duration::from_secs(1 * 60);
+
+    let modifiers = DnaModifiersOpt::default()
+        .with_network_seed(manifest_network_seed)
+        .with_properties(manifest_properties)
+        .with_origin_time(manifest_origin_time)
+        .with_quantum_time(manifest_quantum_time);
+
+    let role_name = String::from("name");
+
+    let roles = vec![AppRoleManifest {
+        name: role_name,
+        dna: AppRoleDnaManifest {
+            location: Some(DnaLocation::Bundled(path.clone())),
+            modifiers: modifiers.clone(),
+            // Note that there is no installed hash provided. We'll check that this changes later.
+            installed_hash: None,
+            clone_limit: 0,
+        },
+        provisioning: Some(CellProvisioning::Create { deferred: false }),
+    }];
+
+    let manifest = AppManifestCurrentBuilder::default()
+        .name("test_app".into())
+        .description(None)
+        .roles(roles)
+        .build()
+        .unwrap();
+
+    let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
+
+    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
+        .await
+        .unwrap();
+
+    // Test that installing with custom modifiers correctly overwrites the values
+    let custom_network_seed = String::from("modified seed");
+    let custom_properties = YamlProperties::arbitrary();
+    let custom_origin_time = Timestamp::now();
+    let custom_quantum_time = Duration::from_secs(5 * 60);
+
+    let custom_modifiers = DnaModifiersOpt::default()
+        .with_network_seed(custom_network_seed)
+        .with_origin_time(custom_origin_time)
+        .with_quantum_time(custom_quantum_time)
+        .with_properties(custom_properties);
+
+    let mut modifiers_map = HashMap::new();
+    modifiers_map.insert(role_name, custom_modifiers);
+
+    conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: None,
+            source: AppBundleSource::Bundle(bundle),
+            installed_app_id: Some("app_1".into()),
+            network_seed: Some("final seed".into()),
+            modifiers: Some(modifiers_map),
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
+            ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
+        })
+        .await
+        .unwrap();
+
+    let manifest = conductor
+        .get_app_info(&"app_1".to_string())
+        .await
+        .unwrap()
+        .unwrap()
+        .manifest;
+
+    // Check that the modifers have been set correctly
+    assert_eq!(
+        manifest.app_roles()[0].dna.modifiers.network_seed,
+        custom_network_seed
+    );
+    assert_eq!(
+        manifest.app_roles()[0].dna.modifiers.properties,
+        custom_properties
+    );
+    assert_eq!(
+        manifest.app_roles()[0].dna.modifiers.origin_time,
+        custom_origin_time
+    );
+    assert_eq!(
+        manifest.app_roles()[0].dna.modifiers.quantum_time,
+        custom_quantum_time
+    );
+
+    // Test that modifier fields that are None in the modifiers map do not overwrite existing
+    // modifiers from the manifest
+    let custom_network_seed = None;
+    let custom_properties = None;
+    let custom_origin_time = None;
+    let custom_quantum_time = None;
+
+    let custom_modifiers = DnaModifiersOpt::default()
+        .with_network_seed(custom_network_seed)
+        .with_origin_time(custom_origin_time)
+        .with_quantum_time(custom_quantum_time)
+        .with_properties(custom_properties);
+
+    let mut modifiers_map = HashMap::new();
+    modifiers_map.insert(role_name, custom_modifiers);
+
+    conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: None,
+            source: AppBundleSource::Bundle(bundle),
+            installed_app_id: Some("app_1".into()),
+            network_seed: Some("final seed".into()), // We set a network seed here
+            modifiers: Some(modifiers_map),
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
+            ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
+        })
+        .await
+        .unwrap();
+
+    let manifest = conductor
+        .get_app_info(&"app_1".to_string())
+        .await
+        .unwrap()
+        .unwrap()
+        .manifest;
+
+    // Check that the modifers have been set correctly
+    assert_eq!(
+        manifest.app_roles()[0].dna.modifiers.network_seed,
+        manifest_network_seed
+    );
+    assert_eq!(
+        manifest.app_roles()[0].dna.modifiers.properties,
+        manifest_properties
+    );
+    assert_eq!(
+        manifest.app_roles()[0].dna.modifiers.origin_time,
+        manifest_origin_time
+    );
+    assert_eq!(
+        manifest.app_roles()[0].dna.modifiers.quantum_time,
+        manifest_quantum_time
+    );
+
+    // Check that installing with modifiers for a non-existent role fails
+    let mut modifiers_map = HashMap::new();
+    modifiers_map.insert("unknown role name".into(), custom_modifiers);
+
+    let result = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: None,
+            source: AppBundleSource::Bundle(bundle),
+            installed_app_id: Some("app_1".into()),
+            network_seed: Some("final seed".into()),
+            modifiers: Some(modifiers_map),
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
+            ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
+        })
+        .await;
+
+    assert!(result.is_err());
+
+    // Check that installing with modifiers for a non-existent role fails
+    let mut modifiers_map = HashMap::new();
+    modifiers_map.insert("unknown role name".into(), custom_modifiers);
+
+    let result = conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: None,
+            source: AppBundleSource::Bundle(bundle),
+            installed_app_id: Some("app_1".into()),
+            network_seed: Some("final seed".into()),
+            modifiers: Some(modifiers_map),
+            membrane_proofs: Default::default(),
+            existing_cells: Default::default(),
+            ignore_genesis_failure: false,
+            allow_throwaway_random_agent_key: true,
+        })
+        .await;
+
+    assert!(result.is_err());
+
+    let bundle = AppBundle::new(manifest, vec![], PathBuf::from("."))
+        .await
+        .unwrap();
+
+    conductor
+        .clone()
+        .install_app_bundle(InstallAppPayload {
+            agent_key: None,
+            source: AppBundleSource::Bundle(bundle),
+            installed_app_id: Some("app_2".into()),
+            network_seed: None,
+            modifiers: None,
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
@@ -535,6 +764,7 @@ async fn use_existing_integration() {
             source: AppBundleSource::Bundle(bundle1),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
+            modifiers: None,
             membrane_proofs: Default::default(),
             existing_cells: Default::default(),
             ignore_genesis_failure: false,
@@ -552,6 +782,7 @@ async fn use_existing_integration() {
                 source: AppBundleSource::Bundle(bundle2(false).await),
                 installed_app_id: Some("app_2".into()),
                 network_seed: None,
+                modifiers: None,
                 membrane_proofs: Default::default(),
                 existing_cells: Default::default(),
                 ignore_genesis_failure: false,
@@ -574,6 +805,7 @@ async fn use_existing_integration() {
                 source: AppBundleSource::Bundle(bundle2(true).await),
                 installed_app_id: Some("app_2".into()),
                 network_seed: None,
+                modifiers: None,
                 membrane_proofs: Default::default(),
                 existing_cells: Default::default(),
                 ignore_genesis_failure: false,
@@ -606,6 +838,7 @@ async fn use_existing_integration() {
             source: AppBundleSource::Bundle(bundle2(true).await),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
+            modifiers: None,
             membrane_proofs: Default::default(),
             existing_cells: maplit::hashmap! {
                 "extant".to_string() => cell_id
