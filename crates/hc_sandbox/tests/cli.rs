@@ -19,7 +19,7 @@ use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
@@ -363,7 +363,7 @@ async fn create_default_sandbox_with_dpki_test_network_seed() {
     let conductor_config = get_created_conductor_config(&mut sandbox_process).await;
     assert_eq!(
         conductor_config.dpki.network_seed,
-        DpkiConfig::default().network_seed
+        DpkiConfig::testing().network_seed
     );
 }
 
@@ -433,18 +433,6 @@ async fn get_launch_info(mut child: tokio::process::Child) -> LaunchInfo {
             return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();
         }
     }
-
-    let mut buf = String::new();
-    if let Some(stderr) = child.stderr.take() {
-        BufReader::new(stderr)
-            .read_to_string(&mut buf)
-            .await
-            .unwrap();
-        eprintln!("{buf}");
-    } else {
-        panic!("No stderr! Was the process handle dropped?");
-    }
-
     panic!("Unable to find launch info in sandbox output. See stderr above.")
 }
 
