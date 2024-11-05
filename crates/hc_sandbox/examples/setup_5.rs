@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
             installed_app_id: Some(app_id),
             agent_key: None,
             source: AppBundleSource::Bundle(bundle),
-            role_settings: Default::default(),
+            roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,

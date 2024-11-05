@@ -4172,9 +4172,9 @@ fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) 
 
 /// Extract the existing cells ids from the RoleSettingsMap into their own HashMap
 fn get_existing_cells_map_from_role_settings(
-    role_settings: &Option<RoleSettingsMap>,
+    roles_settings: &Option<RoleSettingsMap>,
 ) -> ExistingCellsMap {
-    match role_settings {
+    match roles_settings {
         Some(role_settings_map) => role_settings_map
             .iter()
             .map(|(role_name, role_settings)| match role_settings {
