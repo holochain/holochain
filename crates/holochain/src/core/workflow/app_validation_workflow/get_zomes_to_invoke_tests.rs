@@ -30,8 +30,6 @@ use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::sync::Arc;
 
-// Deletes of deletes are not tested, as they are rejected by sys validation.
-
 #[tokio::test(flavor = "multi_thread")]
 async fn register_agent_activity() {
     let zomes = SweetInlineZomes::new(vec![], 0);
