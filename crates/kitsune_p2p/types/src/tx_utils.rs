@@ -1,5 +1,5 @@
 #![allow(clippy::never_loop)] // using for block breaking
-//! Utilities to help with developing / testing tx5.
+//! Utilities to help with developing / testing transport layer.
 
 mod active;
 pub use active::*;
