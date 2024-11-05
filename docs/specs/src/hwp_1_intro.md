@@ -168,6 +168,8 @@ But let us assume that users of this application demand unique usernames in the 
     * An auction.
 3. Similar to client/server or blockchain approaches, a set of one or more witnesses can be elected to approve all name registrations and ensure there are no conflicts. While this approach prevents conflicts from happening, it requires a majority of a known set of witnesses, and any partition which contains a minority will not be able to process registrations.
 
+[^roughtime]: [Roughtime IETF draft](https://datatracker.ietf.org/doc/draft-ietf-ntp-roughtime/), W Ladd, Akamai Technologies, M Dansarie, Netnod, 2024.
+
 Each one of these strategies achieves the same outcome while embodying very different patterns of social coherence; and in each case, there was no resolution overhead expended on all the non-rivalrous forms of data.
 
 Another commonly used example of the rivalrous data problem is a "double-spend" attempt in a cryptocurrency. This involves fooling two separate parties into receiving units from the same pool of currency, such that the same units are sent twice, thus artificially expanding one's outflow of currency beyond what should be possible. Each transaction is valid in isolation, but conflicts with the other.
