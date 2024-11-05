@@ -76,26 +76,20 @@ pub fn call(
                                 };
                                 let zome_call_payload = ZomeCall::try_from_unsigned_zome_call(
                                     call_context.host_context.keystore(),
-                                    zome_call_unsigned,
+                                    zome_call_unsigned.clone(),
                                 )
-                                .await?;
+                                .await
+                                .map_err(|e| -> RuntimeError {
+                                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                                })?;
                                 match call_context
                                     .host_context()
                                     .network()
                                     .call_remote(
                                         zome_call_payload,
                                         provenance.clone(),
-                                        zome_call_unsigned
-                                            .provenance
-                                            .sign_raw(
-                                                call_context.host_context.keystore(),
-                                                ,
-                                            )
-                                            .await
-                                            .map_err(|e| -> RuntimeError {
-                                                wasm_error!(WasmErrorInner::Host(e.to_string()))
-                                                    .into()
-                                            })?,
+                                        zome_call_payload.zome_call_payload,
+                                        zome_call_payload.signature,
                                         target_agent,
                                         zome_call_unsigned.zome_name,
                                         zome_call_unsigned.fn_name,

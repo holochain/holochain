@@ -38,6 +38,7 @@ impl HolochainP2pHandler for StubNetwork {
         zome_call_payload: ExternIO,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
+        zome_call_payload: ExternIO,
         signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,
@@ -55,7 +56,7 @@ impl HolochainP2pHandler for StubNetwork {
         zome_call_payload: ExternIO,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
-        to_agent_list: Vec<(Signature, AgentPubKey)>,
+        to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
         zome_name: ZomeName,
         fn_name: FunctionName,
         cap: Option<CapSecret>,
@@ -336,9 +337,9 @@ mod tests {
 
         let res = p2p
             .call_remote(
-                ExternIO(zome_call_payload.to_vec()),
                 dna,
                 a1,
+                ExternIO(zome_call_payload.to_vec()),
                 signature,
                 a2,
                 zome_name,

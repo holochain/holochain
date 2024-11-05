@@ -281,22 +281,6 @@ pub struct ZomeCall {
     pub expires_at: Timestamp,
 }
 
-// impl From<ZomeCall> for ZomeCallUnsigned {
-//     fn from(zome_call: ZomeCall) -> Self {
-//         Self {
-//             zome_call_payload: zome_call.zome_call_payload,
-//             cell_id: zome_call.cell_id,
-//             zome_name: zome_call.zome_name,
-//             fn_name: zome_call.fn_name,
-//             payload: zome_call.payload,
-//             cap_secret: zome_call.cap_secret,
-//             provenance: zome_call.provenance,
-//             nonce: zome_call.nonce,
-//             expires_at: zome_call.expires_at,
-//         }
-//     }
-// }
-
 impl ZomeCall {
     pub async fn try_from_unsigned_zome_call(
         keystore: &MetaLairClient,

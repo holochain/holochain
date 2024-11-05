@@ -400,6 +400,7 @@ impl Cell {
             CallRemote {
                 span_context: _,
                 from_agent,
+                zome_call_payload,
                 signature,
                 zome_name,
                 fn_name,
@@ -413,7 +414,14 @@ impl Cell {
                 async {
                     let res = self
                         .handle_call_remote(
-                            from_agent, signature, zome_name, fn_name, cap_secret, payload, nonce,
+                            from_agent,
+                            zome_call_payload,
+                            signature,
+                            zome_name,
+                            fn_name,
+                            cap_secret,
+                            payload,
+                            nonce,
                             expires_at,
                         )
                         .await
@@ -873,6 +881,7 @@ impl Cell {
     async fn handle_call_remote(
         &self,
         from_agent: AgentPubKey,
+        zome_call_payload: ExternIO,
         from_signature: Signature,
         zome_name: ZomeName,
         fn_name: FunctionName,
@@ -883,11 +892,12 @@ impl Cell {
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCall {
             cell_id: self.id.clone(),
-            zome_name,
+            zome_call_payload,
             cap_secret,
             payload,
             provenance: from_agent,
             signature: from_signature,
+            zome_name,
             fn_name,
             nonce,
             expires_at,

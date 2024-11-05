@@ -178,6 +178,7 @@ ghost_actor::ghost_chan! {
             zome_call_payload: ExternIO,
             dna_hash: DnaHash,
             from_agent: AgentPubKey,
+            zome_call_payload: ExternIO,
             signature: Signature,
             to_agent: AgentPubKey,
             zome_name: ZomeName,
