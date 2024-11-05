@@ -49,6 +49,7 @@ use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holochain_wasmer_host::module::ModuleCache;
+use indexmap::IndexMap;
 use itertools::Itertools;
 use rusqlite::Transaction;
 use tokio::sync::mpsc::error::SendError;
@@ -592,8 +593,8 @@ mod dna_impls {
         pub fn get_dna_definitions(
             &self,
             app: &InstalledApp,
-        ) -> ConductorResult<HashMap<CellId, DnaDefHashed>> {
-            let mut dna_defs = HashMap::new();
+        ) -> ConductorResult<IndexMap<CellId, DnaDefHashed>> {
+            let mut dna_defs = IndexMap::new();
             for cell_id in app.all_cells() {
                 let ribosome = self.get_ribosome(cell_id.dna_hash())?;
                 let dna_def = ribosome.dna_def();
@@ -3047,21 +3048,6 @@ mod misc_impls {
                 inject_agent_infos(db, agent_infos.iter()).await?;
             }
             Ok(())
-        }
-
-        /// Inject records into a source chain for a cell.
-        /// If the records form a chain segment that can be "grafted" onto the existing chain, it will be.
-        /// Otherwise, a new chain will be formed using the specified records.
-        pub async fn graft_records_onto_source_chain(
-            self: Arc<Self>,
-            cell_id: CellId,
-            validate: bool,
-            records: Vec<Record>,
-        ) -> ConductorApiResult<()> {
-            graft_records_onto_source_chain::graft_records_onto_source_chain(
-                self, cell_id, validate, records,
-            )
-            .await
         }
 
         /// Update coordinator zomes on an existing dna.

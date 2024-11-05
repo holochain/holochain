@@ -6,6 +6,20 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- **BREAKING**: As the DPKI feature is unstable and incomplete, it is disabled with default cargo features and put behind a feature called `unstable-dpki`. If this feature is specified at compile time, DPKI is enabled by default.
+- **BREAKING**: Issuing and persisting warrants is behind a feature `unstable-warrants` now. Warrants have not been tested extensively and there is no way to recover from a warrant. Hence the feature is considered unstable and must be explicitly enabled. Note that once warrants are issued some functions or calls may not work correctly.
+
+- Added a new feature "unstable-sharding" which puts the network sharding behind a feature flag. It will not be possible
+  to configure network sharding unless Holochain is built with this feature enabled. By default, the network tuning 
+  parameter `gossip_dynamic_arcs` is ignored, and the parameter `gossip_arc_clamping` must be set to either `"full"`
+  or `"empty"`, the previous default value of `"none"` will prevent the conductor from starting. We intend to stabilise
+  this feature in the future, and it will return to being available without a feature flag. #4344
+
+## 0.5.0-dev.3
+
+- Use of WasmZome preserialized\_path has been **deprecated**. Please use the wasm interpreter instead.
+
+- Conductor::get\_dna\_definitions now returns an `IndexMap` to ensure consistent ordering.
 
 ## 0.5.0-dev.2
 

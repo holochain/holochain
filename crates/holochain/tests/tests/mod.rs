@@ -3,6 +3,7 @@ mod agent_scaling;
 mod app_interface_security;
 mod authored_test;
 mod clone_cell;
+#[cfg(feature = "unstable-dpki")]
 mod conductor_services;
 mod countersigning;
 mod dht_arc;

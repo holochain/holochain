@@ -25,7 +25,7 @@
 
 use kitsune_p2p_dht_arc::DhtLocation;
 
-use crate::error::HoloHashResult;
+use crate::error::{HoloHashError, HoloHashResult};
 use crate::has_hash::HasHash;
 use crate::HashType;
 use crate::PrimitiveHashType;
@@ -99,7 +99,9 @@ where
         use proptest::strategy::Strategy;
 
         let strat = T::arbitrary().prop_flat_map(move |hash_type| {
-            let gen_strat = proptest::string::bytes_regex(r".[39]").unwrap();
+            // Generate 39 arbitrary bytes. `?-u:` specifies that the bytes need not be valid UTF-8
+            // (any value from 0-255 is allowed).
+            let gen_strat = proptest::string::bytes_regex(r"(?-u:.{39})").unwrap();
             gen_strat.prop_map(move |mut buf| {
                 assert_eq!(buf.len(), 39);
                 buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(hash_type.get_prefix());
@@ -116,25 +118,37 @@ where
 impl<T: HashType> HoloHash<T> {
     /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
     /// bytes to determine the hash_type
-    pub fn from_raw_39(hash: Vec<u8>) -> HoloHashResult<Self> {
-        assert_length!(HOLO_HASH_FULL_LEN, &hash);
+    pub fn try_from_raw_39(hash: Vec<u8>) -> HoloHashResult<Self> {
+        if hash.len() != HOLO_HASH_FULL_LEN {
+            return Err(HoloHashError::BadSize);
+        }
         let hash_type = T::try_from_prefix(&hash[0..3])?;
         Ok(Self { hash, hash_type })
     }
+
     /// Raw constructor: Create a HoloHash from 39 bytes, using the prefix
-    /// bytes to determine the hash_type. Panics if hash_type does not match.
-    pub fn from_raw_39_panicky(hash: Vec<u8>) -> Self {
-        Self::from_raw_39(hash).expect("the specified hash_type does not match the prefix bytes")
+    /// bytes to determine the hash_type.
+    /// Panics if hash_type does not match or hash is incorrect length.
+    pub fn from_raw_39(hash: Vec<u8>) -> Self {
+        Self::try_from_raw_39(hash).unwrap()
     }
 
     /// Use a precomputed hash + location byte array in vec form,
-    /// along with a type, to construct a hash. Used in this crate only, for testing.
-    pub fn from_raw_36_and_type(mut bytes: Vec<u8>, hash_type: T) -> Self {
-        assert_length!(HOLO_HASH_UNTYPED_LEN, &bytes);
+    /// along with a type, to construct a hash.
+    pub fn try_from_raw_36_and_type(mut bytes: Vec<u8>, hash_type: T) -> HoloHashResult<Self> {
+        if bytes.len() != HOLO_HASH_UNTYPED_LEN {
+            return Err(HoloHashError::BadSize);
+        }
         let mut hash = hash_type.get_prefix().to_vec();
         hash.append(&mut bytes);
-        assert_length!(HOLO_HASH_FULL_LEN, &hash);
-        Self { hash, hash_type }
+        Ok(Self { hash, hash_type })
+    }
+
+    /// Use a precomputed hash + location byte array in vec form,
+    /// along with a type, to construct a hash.
+    /// Panics hash is incorrect length.
+    pub fn from_raw_36_and_type(bytes: Vec<u8>, hash_type: T) -> Self {
+        Self::try_from_raw_36_and_type(bytes, hash_type).unwrap()
     }
 
     /// Change the type of this HoloHash, keeping the same bytes
@@ -237,7 +251,7 @@ impl<T: HashType> rusqlite::ToSql for HoloHash<T> {
 impl<T: HashType> rusqlite::types::FromSql for HoloHash<T> {
     fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
         Vec::<u8>::column_result(value).and_then(|bytes| {
-            Self::from_raw_39(bytes).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
+            Self::try_from_raw_39(bytes).map_err(|_| rusqlite::types::FromSqlError::InvalidType)
         })
     }
 }
@@ -321,7 +335,86 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_fails_with_bad_size() {
+    fn test_from_raw_36_panics_with_bad_size() {
         DnaHash::from_raw_36(vec![0xdb; 35]);
+    }
+
+    #[test]
+    fn test_try_from_raw_39_errors_with_bad_size() {
+        let mut raw = vec![132, 45, 36];
+        raw.extend(vec![0xdb; 35]);
+
+        let res = DnaHash::try_from_raw_39(raw);
+        assert_eq!(res, Err(HoloHashError::BadSize));
+    }
+
+    #[test]
+    fn test_try_from_raw_39_errors_with_bad_prefix() {
+        let res = DnaHash::try_from_raw_39(vec![0xdb; 39]);
+        assert!(matches!(res, Err(HoloHashError::BadPrefix { .. })));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_raw_39_panics_with_bad_size() {
+        let mut raw = vec![132, 45, 36];
+        raw.extend(vec![0xdb; 35]);
+
+        DnaHash::from_raw_39(raw);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_raw_39_panics_with_bad_prefix() {
+        DnaHash::from_raw_39(vec![0xdb; 39]);
+    }
+
+    #[test]
+    fn test_try_from_raw_36_and_type_errors_with_bad_size() {
+        let res = HoloHash::try_from_raw_36_and_type(vec![0xdb; 35], hash_type::Dna);
+        assert_eq!(res, Err(HoloHashError::BadSize));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_raw_36_and_type_panics_with_bad_size() {
+        HoloHash::from_raw_36_and_type(vec![0xdb; 35], hash_type::Dna);
+    }
+
+    #[test]
+    fn test_try_from_raw_36_and_type() {
+        let res = HoloHash::try_from_raw_36_and_type(vec![0xdb; 36], hash_type::Dna);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_from_raw_36_and_type() {
+        HoloHash::from_raw_36_and_type(vec![0xdb; 36], hash_type::Dna);
+    }
+
+    #[test]
+    fn test_try_from_raw_39() {
+        let mut raw = vec![132, 45, 36];
+        raw.extend(vec![0xdb; 36]);
+
+        let res = DnaHash::try_from_raw_39(raw);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_from_raw_39() {
+        let mut raw = vec![132, 45, 36];
+        raw.extend(vec![0xdb; 36]);
+
+        DnaHash::from_raw_39(raw);
+    }
+
+    #[test]
+    #[cfg(feature = "fuzzing")]
+    fn proptest_arbitrary_smoke_test() {
+        use proptest::prelude::*;
+        proptest!(|(h: DnaHash)| {
+            assert_eq!(*h.hash_type(), hash_type::Dna);
+        });
     }
 }
