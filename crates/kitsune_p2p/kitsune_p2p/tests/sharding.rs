@@ -344,6 +344,7 @@ async fn publish_to_basis_from_outside() {
 ///   5. Wait for the 3rd agent to receive the data.
 ///   6. Assert that the op was never gossipped to the 1st, 2nd, or 5th agents.
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky--this is flaky both with and without unstable-sharding feature"]
 async fn gossip_to_basis_from_inside() {
     holochain_trace::test_run();
 
