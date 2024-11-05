@@ -19,7 +19,7 @@ pub fn create_config(
         dpki: DpkiConfig::disabled(),
         #[cfg(feature = "unstable-dpki")]
         dpki: DpkiConfig::testing(),
-        ..ConductorConfig::empty()
+        ..Default::default()
     };
     match con_url {
         Some(url) => {

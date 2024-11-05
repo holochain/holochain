@@ -83,7 +83,7 @@ use crate::config::conductor::paths::DataRootPath;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -126,6 +126,7 @@ pub struct ConductorConfig {
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
 
     /// Optional config for the network module.
+    #[serde(default)]
     pub network: KitsuneP2pConfig,
 
     /// Optional specification of Chain Head Coordination service URL.
@@ -160,24 +161,6 @@ where
 }
 
 impl ConductorConfig {
-    /// The most minimal config, with in-memory networking
-    pub fn empty() -> Self {
-        Self {
-            tracing_override: None,
-            data_root_path: None,
-            keystore: KeystoreConfig::default(),
-            dpki: DpkiConfig::default(),
-            admin_interfaces: None,
-            network: KitsuneP2pConfig::mem(),
-            db_sync_strategy: DbSyncStrategy::default(),
-            tuning_params: None,
-            device_seed_lair_tag: None,
-            danger_generate_throwaway_device_seed: false,
-            #[cfg(feature = "chc")]
-            chc_url: None,
-        }
-    }
-
     /// Create a conductor config from a YAML file path.
     pub fn load_yaml(path: &Path) -> ConductorConfigResult<ConductorConfig> {
         let config_yaml = std::fs::read_to_string(path).map_err(|err| match err {
@@ -224,12 +207,6 @@ impl ConductorConfig {
     /// Check if the config is set to use a rendezvous bootstrap server
     pub fn has_rendezvous_bootstrap(&self) -> bool {
         self.network.bootstrap_service == Some(url2::url2!("rendezvous:"))
-    }
-}
-
-impl Default for ConductorConfig {
-    fn default() -> Self {
-        Self::empty()
     }
 }
 

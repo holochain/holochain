@@ -398,7 +398,7 @@ async fn create_test_data(
     let config = ConductorConfig {
         network,
         data_root_path: Some(tmpdir.path().to_path_buf().into()),
-        ..ConductorConfig::empty()
+        ..Default::default()
     };
     let mut conductor = SweetConductor::from_config(config).await;
 

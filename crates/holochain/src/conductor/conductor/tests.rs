@@ -41,7 +41,7 @@ async fn can_update_state() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..ConductorConfig::empty()
+        ..Default::default()
     };
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(
@@ -98,7 +98,7 @@ async fn app_ids_are_unique() {
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
-        ..ConductorConfig::empty()
+        ..Default::default()
     };
     let spaces = Spaces::new(
         config.clone().into(),
@@ -395,7 +395,7 @@ async fn test_signing_error_during_genesis() {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
         dpki: DpkiConfig::disabled(),
         device_seed_lair_tag: Some("nonexistent-tag".to_string()),
-        ..ConductorConfig::empty()
+        ..Default::default()
     };
     let mut conductor = SweetConductor::new(
         SweetConductor::handle_from_existing(bad_keystore, &config, &[]).await,

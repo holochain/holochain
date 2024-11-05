@@ -449,7 +449,7 @@ pub async fn setup_app_inner(
             },
         }]),
         network: network.unwrap_or_else(KitsuneP2pConfig::mem),
-        ..ConductorConfig::empty()
+        ..Default::default()
     };
     let conductor_handle = ConductorBuilder::new()
         .config(config)

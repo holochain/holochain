@@ -48,7 +48,7 @@ impl From<KitsuneP2pConfig> for SweetConductorConfig {
                 countersigning_resolution_retry_limit: None,
                 min_publish_interval: None,
             }),
-            ..ConductorConfig::empty()
+            ..Default::default()
         }
         .into()
     }

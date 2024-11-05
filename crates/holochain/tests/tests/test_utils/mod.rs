@@ -441,7 +441,7 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         keystore: KeystoreConfig::DangerTestKeystore,
         dpki: DpkiConfig::disabled(),
         network: KitsuneP2pConfig::mem(),
-        ..ConductorConfig::empty()
+        ..Default::default()
     }
 }
 

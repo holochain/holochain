@@ -39,7 +39,7 @@ async fn test_region_queries() {
     let spaces = Spaces::new(
         ConductorConfig {
             data_root_path: Some(data_root_path),
-            ..ConductorConfig::empty()
+            ..Default::default()
         }
         .into(),
         sodoken::BufRead::new_no_lock(b"passphrase"),

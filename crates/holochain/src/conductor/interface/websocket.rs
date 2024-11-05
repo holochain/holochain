@@ -908,7 +908,7 @@ pub mod test {
         let handle = ConductorBuilder::new()
             .config(ConductorConfig {
                 dpki: DpkiConfig::disabled(),
-                ..ConductorConfig::empty()
+                ..Default::default()
             })
             .with_data_root_path(db_dir.path().to_path_buf().into())
             .test(&[])

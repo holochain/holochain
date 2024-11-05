@@ -43,7 +43,7 @@ async fn signature_smoke_test() {
 
     let rendezvous = SweetLocalRendezvous::new().await;
 
-    let mut config = ConductorConfig::empty();
+    let mut config = ConductorConfig::default();
     config.network.transport_pool = vec![TransportConfig::Mem {}];
     // Hit a bootstrap service so it can blow up and return an error if we get our end of
     // things totally wrong.

@@ -131,7 +131,7 @@ mod tests {
 
         let config = ConductorConfig {
             chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
-            ..ConductorConfig::empty()
+            ..Default::default()
         };
         let mut conductor = SweetConductor::from_config(config).await;
 
@@ -200,7 +200,7 @@ mod tests {
         let config = ConductorConfig {
             chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
             dpki: DpkiConfig::disabled(),
-            ..ConductorConfig::empty()
+            ..Default::default()
         };
         let mut conductor = SweetConductor::from_config(config).await;
 

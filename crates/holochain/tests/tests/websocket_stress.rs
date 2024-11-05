@@ -45,7 +45,7 @@ pub async fn websocket_stress() {
         }]),
         data_root_path: Some(data_root_path.into()),
         keystore: KeystoreConfig::DangerTestKeystore,
-        ..ConductorConfig::empty()
+        ..Default::default()
     };
     let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = conductor_handle

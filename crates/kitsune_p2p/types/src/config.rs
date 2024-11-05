@@ -420,7 +420,6 @@ pub struct KitsuneP2pConfig {
     pub tracing_scope: Option<String>,
 }
 
-#[cfg(feature = "test_utils")]
 impl Default for KitsuneP2pConfig {
     fn default() -> Self {
         Self::mem()
@@ -428,8 +427,7 @@ impl Default for KitsuneP2pConfig {
 }
 
 impl KitsuneP2pConfig {
-    /// Minimal but non-functional config. Without a transport pool set,
-    /// nothing will work.
+    /// Testing-only memory backend.
     pub fn mem() -> Self {
         Self {
             transport_pool: vec![TransportConfig::Mem {}],

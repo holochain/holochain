@@ -71,7 +71,7 @@ async fn test_publish() -> anyhow::Result<()> {
             ..Default::default()
         }),
         dpki: DpkiConfig::disabled(),
-        ..ConductorConfig::empty()
+        ..Default::default()
     };
 
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;

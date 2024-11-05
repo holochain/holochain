@@ -939,7 +939,7 @@ impl TestSpaces {
         let spaces = Spaces::new(
             ConductorConfig {
                 data_root_path: Some(temp_dir.path().to_path_buf().into()),
-                ..ConductorConfig::empty()
+                ..Default::default()
             }
             .into(),
             sodoken::BufRead::new_no_lock(b"passphrase"),
