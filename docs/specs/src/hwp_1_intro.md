@@ -98,19 +98,19 @@ Building a distributed coordination framework starting from these axioms results
 
 ## From Global Consensus to Scaled Consent
 
-We start from the understanding that networks, social spaces, and decentralized activities are inherently uncertain. Thus, coordination/collaboration is never about absolute certainty, rather it is about the capacity to remove sufficient uncertainty to provide confidence for action, which is always contextual. In distributed systems, it is absolutely fundamental to understand that every action taken by an agent happens because that agent has crossed a confidence threshold of some sort -- from its own point of view, the action is appropriate to take.
+We start from the understanding that networks, social spaces, and decentralized activities are inherently uncertain. Thus, coordination is never about absolute certainty; rather, it is about the capacity to remove sufficient uncertainty to provide confidence for action, which is always contextual. In distributed systems, it is absolutely fundamental to understand that every action taken by an agent happens because that agent has crossed a confidence threshold of some sort -- from its own point of view, the action is appropriate to take.
 
 ### Fault Tolerance and Reducing Uncertainty
 
 Like blockchain and other cryptographic systems, Holochain starts the path of establishing confidence by leveraging cryptography to reduce uncertainties which remove most of the sources of Byzantine faults:
 
-- **Corrupt Messages:** Data is retrieved by cryptographic hash which makes records self-validating, ensuring they are as requested and remain uncorrupted by checking data received against requested hash. Also, network messages are cryptographically signed.
-- **Misordered Messages:** Each agent writes their actions to a local append-only cryptographic hashchain, and must make explicit references to the hashes of any other agent's actions which one of their actions logically relies on, this establishes indisputable ordering of data.
-- **Lost Messages:** If any later actions rely on prior data, there will be either missing hash references or chain links which can be explicitly retrieved or have validation paused until available.
-- **Forged Messages or Actions:** Each action is signed in sequence to its author's local hashchain. The public signing key is the same as the agent's address on the network. Hence all actions or messages are self-validating with respect to identity of author.
-- **Malicious Actors/Actions:** Actions are validated based on local state established by the sequence of actions in an agent's hashchain, plus any actions included by reference. This enables each and every peer who is responsible for performing such validation to reach the same deterministic conclusion regarding validity.
+* **Corrupt Messages:** Data is retrieved by cryptographic hash which makes records self-validating, ensuring they are as requested and remain uncorrupted by checking data received against requested hash. Network messages are also cryptographically signed.
+* **Misordered Messages:** Each agent writes their actions to a local append-only cryptographic hash chain, and must make explicit references to the hashes of any other agent's actions which one of their actions logically relies on, thus establishing indisputable ordering of data.
+* **Lost Messages:** If the validity of any action relies on prior data, there will be either missing hash references or chain links which can be explicitly retrieved or have validation paused until available.
+* **Forged Messages or Actions:** Each action is signed in sequence to its author's local hash chain. The public signing key is the same as the agent's address on the network. Hence all actions or messages are self-validating with respect to identity of author.
+* **Malicious Actors/Actions:** Actions are validated based on local state established by the sequence of actions in an agent's hash chain, plus any actions included by reference. This enables every peer who is responsible for performing such validation to reach the same deterministic conclusion regarding validity.
 
-These strategies help reduce sources of uncertainty; however, when it comes to concerns related to "consensus," still admit actions which pass validation, but may differ in content, substance, or perspective. 
+These strategies help reduce sources of uncertainty; however, when it comes to concerns related to "consensus," still admit actions which individually pass validation but conflict with each other in content, substance, or perspective.
 
 ### Increasing Gradients of Certainty
 
@@ -126,17 +126,17 @@ The first point we deliver through various types of **Intrinsic Data Integrity**
 
 * **Signatures**: Because provenance is a public key, it's also easy to create self-proving authenticity. All messages sent, and all data committed to chains, is signed by agents using their public key. Thus any agent can immediately, and with high confidence, verify the authenticity of messages and data.
 
-* **Hashes**: All data on our DHT is addressed by its hash. Thus, when retrieving data it's possible to have deterministic confidence that it hasn't been tampered with by whoever was storing or relaying it.
+* **Hashes**: All shared data in a Holochain application is addressed by its hash. Thus, when retrieving data it's possible to have deterministic confidence that it hasn't been tampered with by whoever was storing or relaying it.
 
-* **Monotonicity**: The system is both structurally and logically monotonic. Structurally, local state is append-only and shared state can only grow. Data can be marked as deleted, but it is never actually removed from the history of the agent who authored it. Logically, once any peer has identified that state change is invalid, no peers should identify it as valid.
+* **Monotonicity**: The system is both structurally and logically monotonic. Structurally, local state is append-only and shared state can only grow. Data can be marked as deleted, but it is never actually removed from the history of the agent who authored it. Logically, once any peer has identified that a state change is invalid, no peers should identify it as valid.
 
-* **Common Genesis**: The Validation Rules and joining criteria of an application are the first entry in every chain. This provides a mechanism for self-proving, shared ground rules. Any agent can examine the chain of any other agent all the way back to the source and thus have high confidence that they have actually committed to play by the same rules.
+* **Common genesis**: The validation rules and joining criteria of an application are the first entries in every agent's chain. This provides a mechanism for self-proving, shared ground rules. Any agent can examine the chain of any other agent all the way back to the source and thus have high confidence that they have actually committed to play by the same rules.
 
-Building upon this fundament, we deliver the second point through the ability to compose various types of **Validation Rules**. Validation rules create certainty in the following dimensions, with some examples:
+Building upon this fundament, we deliver the second point through the ability to compose various types of **Validation Rules**. Validation Rules create certainty in the following dimensions, with some examples:
 
 * **Content**: a string does not exceed a maximum length
 * **Structure**: an entry consists of a certain set of types of data[^content-structure]
-* **Sequence**: someone can not spend credits they have not already received
+* **Sequence**: someone cannot spend credits they have not already received
 * **Process**: a transaction must be approved and signed by a notary
 * **Behavior**: one does not take an action more frequently than a certain rate
 * **Dependency**: an editor can only make changes if another agent has given them prior authorization
