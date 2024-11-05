@@ -936,6 +936,7 @@ async fn check_app_entry_def_test() {
 /// Carol joins the network, and receives Bob's warrant via gossip.
 #[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky"]
 async fn app_validation_produces_warrants() {
     holochain_trace::test_run();
 

@@ -524,6 +524,7 @@ mod tests {
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
         let mut network_config = KitsuneP2pConfig::mem();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
+        network_config.transport_pool.clear();
         network_config.transport_pool.push(TransportConfig::WebRTC {
             signal_url: "wss://sbd-0.main.infra.holo.host".into(),
             webrtc_config: Some(serde_json::json!({
