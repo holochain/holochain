@@ -576,7 +576,7 @@ pub mod test {
             source: AppBundleSource::Bundle(app_bundle),
             agent_key: None,
             installed_app_id: None,
-            role_settings: Default::default(),
+            roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,

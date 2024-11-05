@@ -1673,14 +1673,14 @@ mod app_impls {
                 agent_key,
                 installed_app_id,
                 network_seed,
-                role_settings,
+                roles_settings,
                 ignore_genesis_failure,
                 allow_throwaway_random_agent_key,
             } = payload;
 
-            let modifiers = get_modifiers_map_from_role_settings(&role_settings);
-            let membrane_proofs = get_memproof_map_from_role_settings(&role_settings);
-            let existing_cells = get_existing_cells_map_from_role_settings(&role_settings);
+            let modifiers = get_modifiers_map_from_role_settings(&roles_settings);
+            let membrane_proofs = get_memproof_map_from_role_settings(&roles_settings);
+            let existing_cells = get_existing_cells_map_from_role_settings(&roles_settings);
 
             let bundle = {
                 let original_bundle = source.resolve().await?;
@@ -1694,9 +1694,9 @@ mod app_impls {
 
             let manifest = bundle.manifest().clone();
 
-            // Use deferred memproofs only if no memproofs are provided.
-            // If a memproof map is provided, it will override the allow_deferred_memproofs setting,
-            // and the provided memproofs will be used immediately.
+            // Use deferred memproofs only if no memproofs are provided for any of the roles.
+            // If a memproof is provided for any of the roles, it will override the app wide
+            // allow_deferred_memproofs setting and the provided memproofs will be used immediately.
             let defer_memproofs = match &manifest {
                 AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.len() == 0,
             };
@@ -4135,16 +4135,17 @@ async fn p2p_event_task(
 }
 
 /// Extract the modifiers from the RoleSettingsMap into their own HashMap
-fn get_modifiers_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) -> ModifiersMap {
-    match role_settings {
+fn get_modifiers_map_from_role_settings(roles_settings: &Option<RoleSettingsMap>) -> ModifiersMap {
+    match roles_settings {
         Some(role_settings_map) => role_settings_map
             .iter()
-            .map(
-                |(role_name, role_settings)| match role_settings.modifiers.clone() {
+            .map(|(role_name, role_settings)| match role_settings {
+                RoleSettings::UseExisting(_) => None,
+                RoleSettings::Provisioned { modifiers, .. } => match modifiers {
                     Some(m) => Some((role_name.clone(), m.clone())),
                     None => None,
                 },
-            )
+            })
             .filter_map(|r| r)
             .collect(),
         None => HashMap::new(),
@@ -4156,12 +4157,13 @@ fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) 
     match role_settings {
         Some(role_settings_map) => role_settings_map
             .iter()
-            .map(
-                |(role_name, role_settings)| match role_settings.membrane_proof.clone() {
+            .map(|(role_name, role_settings)| match role_settings {
+                RoleSettings::UseExisting(_) => None,
+                RoleSettings::Provisioned { membrane_proof, .. } => match membrane_proof {
                     Some(m) => Some((role_name.clone(), m.clone())),
                     None => None,
                 },
-            )
+            })
             .filter_map(|r| r)
             .collect(),
         None => HashMap::new(),
@@ -4175,12 +4177,10 @@ fn get_existing_cells_map_from_role_settings(
     match role_settings {
         Some(role_settings_map) => role_settings_map
             .iter()
-            .map(
-                |(role_name, role_settings)| match role_settings.existing_cell.clone() {
-                    Some(c) => Some((role_name.clone(), c.clone())),
-                    None => None,
-                },
-            )
+            .map(|(role_name, role_settings)| match role_settings {
+                RoleSettings::UseExisting(cell_id) => Some((role_name.clone(), cell_id.clone())),
+                _ => None,
+            })
             .filter_map(|r| r)
             .collect(),
         None => HashMap::new(),

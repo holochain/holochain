@@ -371,7 +371,7 @@ pub async fn register_and_install_dna_named(
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(name),
         network_seed: None,
-        role_settings: Default::default(),
+        roles_settings: Default::default(),
         ignore_genesis_failure: false,
         allow_throwaway_random_agent_key: true,
     };

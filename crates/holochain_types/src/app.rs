@@ -172,7 +172,7 @@ pub struct InstallAppPayload {
     /// Specify role specific settings or modifiers that will override any settings in
     /// the dna manifets.
     #[serde(default)]
-    pub role_settings: Option<RoleSettingsMap>,
+    pub roles_settings: Option<RoleSettingsMap>,
 
     /// Optional: If app installation fails due to genesis failure, normally the app will be
     /// immediately uninstalled. When this flag is set, the app is left installed with empty cells intact.
@@ -201,19 +201,32 @@ pub type RoleSettingsMap = HashMap<RoleName, RoleSettings>;
 
 /// Settings for a Role that may be passed on installation of an app
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct RoleSettings {
-    /// When the app being installed has the `allow_deferred_memproofs` manifest flag set,
-    /// passing `None` for this field will allow the app to enter the "deferred membrane proofs"
-    /// state, so that memproofs can be provided later via [`AppRequest::ProvideMemproofs`].
-    /// If `Some` is used here, whatever memproofs are provided will be used, and the app will
-    /// be installed as normal.
-    pub membrane_proof: Option<MembraneProof>,
-    /// Optional: Overwrites the dna modifiers from the dna manifets. Only
-    /// modifier fields for which `Some(T)` is provided will be overwritten.
-    pub modifiers: Option<DnaModifiersOpt<YamlProperties>>,
-    /// For each role in the app manifest which has UseExisting cell provisioning,
-    /// a CellId of a currently installed cell must be specified in this field.
-    pub existing_cell: Option<CellId>,
+#[serde(tag = "type")]
+pub enum RoleSettings {
+    /// If the role has the UseExisting strategy defined in the app manifest
+    /// the cell id to use needs to be specified here.
+    UseExisting(CellId),
+    /// Optional settings for a normally provisioned cell
+    Provisioned {
+        /// When the app being installed has the `allow_deferred_memproofs` manifest flag set,
+        /// passing `None` for this field for all roles in the app will allow the app to enter
+        /// the "deferred membrane proofs" state, so that memproofs can be provided later via
+        /// [`AppRequest::ProvideMemproofs`]. If `Some` is used here, whatever memproofs are
+        /// provided will be used, and the app will be installed as normal.
+        membrane_proof: Option<MembraneProof>,
+        /// Overwrites the dna modifiers from the dna manifest. Only
+        /// modifier fields for which `Some(T)` is provided will be overwritten.
+        modifiers: Option<DnaModifiersOpt<YamlProperties>>,
+    },
+}
+
+impl Default for RoleSettings {
+    fn default() -> Self {
+        Self::Provisioned {
+            membrane_proof: None,
+            modifiers: None,
+        }
+    }
 }
 
 /// The possible locations of an AppBundle

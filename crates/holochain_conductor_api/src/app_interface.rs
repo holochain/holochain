@@ -380,6 +380,27 @@ impl CellInfo {
             enabled,
         })
     }
+
+    pub fn into_provisioned_cell(self) -> Option<ProvisionedCell> {
+        match self {
+            CellInfo::Provisioned(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    pub fn into_cloned_cell(self) -> Option<ClonedCell> {
+        match self {
+            CellInfo::Cloned(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    pub fn into_stem_cell(self) -> Option<StemCell> {
+        match self {
+            CellInfo::Stem(c) => Some(c),
+            _ => None,
+        }
+    }
 }
 
 /// Cell whose instantiation has been deferred.

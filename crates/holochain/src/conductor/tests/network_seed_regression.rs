@@ -65,7 +65,7 @@ async fn network_seed_regression() {
             source: AppBundleSource::Bundle(bundle1),
             installed_app_id: Some("no-seed".into()),
             network_seed: None,
-            role_settings: Default::default(),
+            roles_settings: Default::default(),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
         })
@@ -79,7 +79,7 @@ async fn network_seed_regression() {
             source: AppBundleSource::Bundle(bundle2),
             installed_app_id: Some("yes-seed".into()),
             network_seed: Some("seed".into()),
-            role_settings: Default::default(),
+            roles_settings: Default::default(),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
         })
@@ -313,7 +313,7 @@ impl TestCase {
                 source,
                 installed_app_id: Some(case_str.clone()),
                 network_seed,
-                role_settings: Default::default(),
+                roles_settings: Default::default(),
                 ignore_genesis_failure: false,
                 allow_throwaway_random_agent_key: true,
             })
