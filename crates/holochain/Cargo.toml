@@ -309,6 +309,12 @@ chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_chc/http"]
 # Enable unstable DPKI feature.
 unstable-dpki = ["holochain_conductor_api/unstable-dpki"]
 
+# Enables unstable warrants feature.
+unstable-warrants = [
+  "holochain_state/unstable-warrants",
+  "holochain_cascade/unstable-warrants",
+]
+
 # Enable sharding for networks. This is currently considered an unstable feature
 # and with the feature disabled you will only be able to configure nodes that have
 # a full or empty arc.
