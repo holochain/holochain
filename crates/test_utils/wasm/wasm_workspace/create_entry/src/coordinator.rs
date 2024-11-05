@@ -18,6 +18,7 @@ fn msg() -> Msg {
     Msg("hello".into())
 }
 
+#[cfg(feature = "unstable-functions")]
 #[hdk_extern]
 pub fn block_agent(target: AgentPubKey) -> ExternResult<()> {
     HDK.with(|h| {
@@ -31,6 +32,7 @@ pub fn block_agent(target: AgentPubKey) -> ExternResult<()> {
     })
 }
 
+#[cfg(feature = "unstable-functions")]
 #[hdk_extern]
 pub fn unblock_agent(target: AgentPubKey) -> ExternResult<()> {
     HDK.with(|h| {

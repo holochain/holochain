@@ -431,6 +431,7 @@ impl RealRibosome {
         &self,
         module: Arc<Module>,
         context_key: u64,
+        name: &str,
     ) -> RibosomeResult<Arc<InstanceWithStore>> {
         let store = Arc::new(Mutex::new(Store::default()));
         let function_env = FunctionEnv::new(&mut store.lock().as_store_mut(), Env::default());
@@ -440,7 +441,7 @@ impl RealRibosome {
             let mut store = store.lock();
             let mut store_mut = store.as_store_mut();
             instance = Arc::new(Instance::new(&mut store_mut, &module, &imports).map_err(
-                |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
+                |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(format!("{}: {}", name, e.to_string()))).into() },
             )?);
         }
 
@@ -846,7 +847,7 @@ impl RealRibosome {
                     // there is a corresponding zome fn
                     let context_key = Self::next_context_key();
                     let instance_with_store =
-                        self.build_instance_with_store(module, context_key)?;
+                        self.build_instance_with_store(module, context_key, &zome.name.0)?;
                     // add call context to map for the following call
                     {
                         CONTEXT_MAP
@@ -1004,7 +1005,7 @@ impl RibosomeT for RealRibosome {
                     // create a new key for the context map.
                     let context_key = Self::next_context_key();
                     let instance_with_store =
-                        self.build_instance_with_store(module, context_key)?;
+                        self.build_instance_with_store(module, context_key, &zome.name.0)?;
 
                     // add call context to map for following call
                     {

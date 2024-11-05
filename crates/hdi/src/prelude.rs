@@ -96,7 +96,6 @@ macro_rules! holochain_externs {
             ed_25519_x_salsa20_poly1305_decrypt:1
         );
 
-
         #[cfg(feature = "unstable-functions")]
         holochain_wasmer_guest::host_externs!(
             is_same_agent:1
