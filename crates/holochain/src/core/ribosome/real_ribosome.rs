@@ -444,12 +444,7 @@ impl RealRibosome {
             let mut store_mut = store.as_store_mut();
             instance = Arc::new(Instance::new(&mut store_mut, &module, &imports).map_err(
                 |e| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::Compile(format!(
-                        "{}: {}",
-                        name,
-                        e
-                    )))
-                    .into()
+                    wasm_error!(WasmErrorInner::Compile(format!("{}: {}", name, e))).into()
                 },
             )?);
         }
