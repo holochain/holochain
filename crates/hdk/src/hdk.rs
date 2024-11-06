@@ -285,6 +285,7 @@ impl HdiT for ErrHdk {
         Self::err()
     }
 
+    #[cfg(feature = "unstable-functions")]
     fn is_same_agent(&self, _: AgentPubKey, _: AgentPubKey) -> ExternResult<bool> {
         Self::err()
     }
@@ -544,6 +545,7 @@ impl HdiT for HostHdk {
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         HostHdi::new().zome_info(())
     }
+    #[cfg(feature = "unstable-functions")]
     fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
         HostHdi::new().is_same_agent(key_1, key_2)
     }

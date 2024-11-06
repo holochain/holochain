@@ -28,6 +28,7 @@ use matches::assert_matches;
 mod agent_key_revocation;
 // Module with tests related to an agent's key lineage. Agents can update their key. Both old and new
 // key belong to the same key lineage, they belong to the same agent.
+#[cfg(feature = "unstable-functions")]
 pub mod agent_lineage;
 mod test_dpki;
 

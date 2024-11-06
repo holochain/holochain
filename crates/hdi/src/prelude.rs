@@ -1,4 +1,3 @@
-pub use crate::agent::is_same_agent;
 pub use crate::app_entry;
 pub use crate::chain::must_get_agent_activity;
 pub use crate::ed25519::verify_signature;
@@ -58,6 +57,8 @@ pub use std::convert::TryFrom;
 pub use tracing;
 #[cfg(feature = "trace")]
 pub use tracing::{debug, error, info, instrument, trace, warn};
+#[cfg(feature = "unstable-functions")]
+pub use crate::agent::is_same_agent;
 
 #[cfg(not(feature = "trace"))]
 /// Needed as a noop for map_extern! when trace is off.

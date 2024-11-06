@@ -201,6 +201,7 @@ host_fn_api_impls! {
     fn schedule (String) -> ();
 
     // TODO deprecated, remove me
+    #[cfg(feature = "unstable-functions")]
     fn sleep (core::time::Duration) -> ();
 
     // @todo

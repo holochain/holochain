@@ -35,6 +35,9 @@ jobs:
       - name: static-clippy
         run: make static-clippy
 
+      - name: static-clippy-unstable
+        run: make static-clippy-unstable
+
       - name: static-doc
         run: make static-doc
 

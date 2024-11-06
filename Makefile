@@ -23,7 +23,7 @@ default: build-workspace-wasmer_sys \
 	test-workspace-wasmer_wamr
 
 # execute all static code validation
-static-all: static-fmt static-toml static-clippy static-doc
+static-all: static-fmt static-toml static-clippy static-clippy-unstable static-doc
 
 # ensure committed code is formatted properly
 static-fmt:
@@ -38,6 +38,9 @@ static-toml:
 # ensure our chosen style lints are followed
 static-clippy:
 	$(F) CHK_SQL_FMT=1 cargo clippy --all-targets --features $(DEFAULT_FEATURES)
+
+static-clippy-unstable:
+	$(F) CHK_SQL_FMT=1 cargo clippy --all-targets --features $(UNSTABLE_FEATURES)
 
 # ensure we can build the docs
 static-doc:

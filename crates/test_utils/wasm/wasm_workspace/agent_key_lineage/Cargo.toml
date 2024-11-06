@@ -14,6 +14,6 @@ crate-type = ["cdylib", "rlib"]
 
 # reminder - do not use workspace deps
 [dependencies]
-hdk = { path = "../../../../hdk" }
+hdk = { path = "../../../../hdk", features = ["unstable-functions"] }
 serde = "1.0"
-hdi = { path = "../../../../hdi" }
+hdi = { path = "../../../../hdi", features = ["unstable-functions"] }

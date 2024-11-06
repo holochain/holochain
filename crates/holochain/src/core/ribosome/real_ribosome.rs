@@ -1342,7 +1342,7 @@ pub mod wasm_test {
     async fn wasm_tooling_test() {
         holochain_trace::test_run();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             vec![
                 #[cfg(feature = "unstable-functions")]
                 "__hc__accept_countersigning_preflight_request_1",
@@ -1393,9 +1393,9 @@ pub mod wasm_test {
                 "__hc__send_remote_signal_1",
                 "__hc__sign_1",
                 "__hc__sign_ephemeral_1",
-                "__hc__sys_time_1",
                 #[cfg(feature = "unstable-functions")]
                 "__hc__sleep_1",
+                "__hc__sys_time_1",
                 "__hc__trace_1",
                 #[cfg(feature = "unstable-functions")]
                 "__hc__unblock_agent_1",
