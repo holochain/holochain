@@ -104,7 +104,7 @@ fn build_test_wasms(
             }
             if enable_unstable_functions && defines_feature(&project, "unstable-functions") {
                 if !features.is_empty() {
-                    features.push_str(",");
+                    features.push(',');
                 }
                 features.push_str("unstable-functions");
             }
