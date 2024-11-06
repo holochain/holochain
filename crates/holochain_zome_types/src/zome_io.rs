@@ -136,6 +136,10 @@ wasm_io_types! {
     #[cfg(feature = "unstable-functions")]
     fn schedule (String) -> ();
 
+    // TODO deprecated, remove me
+    #[cfg(feature = "unstable-functions")]
+    fn sleep (core::time::Duration) -> ();
+
     // @todo
     fn version (()) -> zt::version::ZomeApiVersion;
 

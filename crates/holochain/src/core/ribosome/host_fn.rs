@@ -200,6 +200,9 @@ host_fn_api_impls! {
     #[cfg(feature = "unstable-functions")]
     fn schedule (String) -> ();
 
+    // TODO deprecated, remove me
+    fn sleep (core::time::Duration) -> ();
+
     // @todo
     fn version (()) -> zt::version::ZomeApiVersion;
 

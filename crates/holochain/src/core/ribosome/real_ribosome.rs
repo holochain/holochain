@@ -109,6 +109,8 @@ use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
 use crate::core::ribosome::host_fn::schedule::schedule;
 #[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::sleep::sleep;
 
 use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
@@ -659,7 +661,9 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent);
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
+            // TODO deprecated, remove me
+            .with_host_function(&mut ns, "__hc__sleep_1", sleep);
 
         imports.register_namespace("env", ns);
 
@@ -1390,6 +1394,8 @@ pub mod wasm_test {
                 "__hc__sign_1",
                 "__hc__sign_ephemeral_1",
                 "__hc__sys_time_1",
+                #[cfg(feature = "unstable-functions")]
+                "__hc__sleep_1",
                 "__hc__trace_1",
                 #[cfg(feature = "unstable-functions")]
                 "__hc__unblock_agent_1",
