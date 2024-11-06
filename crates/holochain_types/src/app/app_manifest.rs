@@ -107,10 +107,12 @@ impl AppManifest {
         }
     }
 
-    /// Update the modifiers for the specified roles.
-    pub fn set_modifiers(&mut self, modifiers: ModifiersMap) -> AppManifestResult<()> {
+    /// Selectively override the modifiers for the specified roles. Only modifier fields with
+    /// `Some(T)` will override existing values. If `None` is provided for a modifier field
+    /// the corresponding value in the manifest will remain untouched.
+    pub fn override_modifiers(&mut self, modifiers: ModifiersMap) -> AppManifestResult<()> {
         match self {
-            Self::V1(manifest) => manifest.set_modifiers(modifiers),
+            Self::V1(manifest) => manifest.override_modifiers(modifiers),
         }
     }
 

@@ -194,9 +194,10 @@ impl AppManifestV1 {
         }
     }
 
-    /// Update the network seed for all DNAs used in Create-provisioned Cells.
-    /// Cells with other provisioning strategies are not affected.
-    pub fn set_modifiers(
+    /// Selectively overrides the modifiers for the given roles. Only fields with value `Some(T)` will
+    /// override the corresponding value in the manifest. If `None` is provided for a modifier field
+    /// the corresponding value in the manifest will remain untouched.
+    pub fn override_modifiers(
         &mut self,
         modifiers: HashMap<RoleName, DnaModifiersOpt<YamlProperties>>,
     ) -> AppManifestResult<()> {
@@ -213,22 +214,19 @@ impl AppManifestV1 {
             }
         }
         for role in self.roles.iter_mut() {
-            match modifiers.get(&role.name) {
-                Some(modifier_opts) => {
-                    if let Some(network_seed) = modifier_opts.network_seed.clone() {
-                        role.dna.modifiers.network_seed = Some(network_seed);
-                    }
-                    if let Some(origin_time) = modifier_opts.origin_time {
-                        role.dna.modifiers.origin_time = Some(origin_time);
-                    }
-                    if let Some(props) = modifier_opts.properties.clone() {
-                        role.dna.modifiers.properties = Some(props);
-                    }
-                    if let Some(quantum_time) = modifier_opts.quantum_time {
-                        role.dna.modifiers.quantum_time = Some(quantum_time);
-                    }
+            if let Some(modifier_opts) = modifiers.get(&role.name) {
+                if let Some(network_seed) = modifier_opts.network_seed.clone() {
+                    role.dna.modifiers.network_seed = Some(network_seed);
                 }
-                None => (),
+                if let Some(origin_time) = modifier_opts.origin_time {
+                    role.dna.modifiers.origin_time = Some(origin_time);
+                }
+                if let Some(props) = modifier_opts.properties.clone() {
+                    role.dna.modifiers.properties = Some(props);
+                }
+                if let Some(quantum_time) = modifier_opts.quantum_time {
+                    role.dna.modifiers.quantum_time = Some(quantum_time);
+                }
             }
         }
         Ok(())

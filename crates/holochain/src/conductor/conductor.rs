@@ -1688,7 +1688,7 @@ mod app_impls {
                 if let Some(network_seed) = network_seed {
                     manifest.set_network_seed(network_seed);
                 }
-                manifest.set_modifiers(modifiers)?;
+                manifest.override_modifiers(modifiers)?;
                 AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
             };
 
