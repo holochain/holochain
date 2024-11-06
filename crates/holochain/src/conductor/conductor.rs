@@ -1698,7 +1698,7 @@ mod app_impls {
             // If a memproof is provided for any of the roles, it will override the app wide
             // allow_deferred_memproofs setting and the provided memproofs will be used immediately.
             let defer_memproofs = match &manifest {
-                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.len() == 0,
+                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_empty(),
             };
 
             let flags = InstallAppCommonFlags {
@@ -4141,12 +4141,11 @@ fn get_modifiers_map_from_role_settings(roles_settings: &Option<RoleSettingsMap>
             .iter()
             .map(|(role_name, role_settings)| match role_settings {
                 RoleSettings::UseExisting(_) => None,
-                RoleSettings::Provisioned { modifiers, .. } => match modifiers {
-                    Some(m) => Some((role_name.clone(), m.clone())),
-                    None => None,
-                },
+                RoleSettings::Provisioned { modifiers, .. } => {
+                    modifiers.as_ref().map(|m| (role_name.clone(), m.clone()))
+                }
             })
-            .filter_map(|r| r)
+            .flatten()
             .collect(),
         None => HashMap::new(),
     }
@@ -4159,12 +4158,11 @@ fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) 
             .iter()
             .map(|(role_name, role_settings)| match role_settings {
                 RoleSettings::UseExisting(_) => None,
-                RoleSettings::Provisioned { membrane_proof, .. } => match membrane_proof {
-                    Some(m) => Some((role_name.clone(), m.clone())),
-                    None => None,
-                },
+                RoleSettings::Provisioned { membrane_proof, .. } => membrane_proof
+                    .as_ref()
+                    .map(|m| (role_name.clone(), m.clone())),
             })
-            .filter_map(|r| r)
+            .flatten()
             .collect(),
         None => HashMap::new(),
     }
@@ -4181,7 +4179,7 @@ fn get_existing_cells_map_from_role_settings(
                 RoleSettings::UseExisting(cell_id) => Some((role_name.clone(), cell_id.clone())),
                 _ => None,
             })
-            .filter_map(|r| r)
+            .flatten()
             .collect(),
         None => HashMap::new(),
     }

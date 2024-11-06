@@ -380,36 +380,6 @@ impl CellInfo {
             enabled,
         })
     }
-
-    /// Get the cell id of the cell. The cell id will be `None` for stem cells.
-    pub fn cell_id(self) -> Option<CellId> {
-        match self {
-            CellInfo::Provisioned(c) => Some(c.cell_id),
-            CellInfo::Cloned(c) => Some(c.cell_id),
-            CellInfo::Stem(_) => None,
-        }
-    }
-
-    pub fn into_provisioned_cell(self) -> Option<ProvisionedCell> {
-        match self {
-            CellInfo::Provisioned(c) => Some(c),
-            _ => None,
-        }
-    }
-
-    pub fn into_cloned_cell(self) -> Option<ClonedCell> {
-        match self {
-            CellInfo::Cloned(c) => Some(c),
-            _ => None,
-        }
-    }
-
-    pub fn into_stem_cell(self) -> Option<StemCell> {
-        match self {
-            CellInfo::Stem(c) => Some(c),
-            _ => None,
-        }
-    }
 }
 
 /// Cell whose instantiation has been deferred.
@@ -555,14 +525,6 @@ impl AppInfo {
             manifest,
             installed_at,
         }
-    }
-
-    /// Returns all CellInfo for the given role if the role is present in the app
-    pub fn cells_for_role(self, role: &RoleName) -> Option<Vec<CellInfo>> {
-        self.cell_info
-            .into_iter()
-            .find(|(role_name, _)| role_name == role)
-            .map(|(_, cell_infos)| cell_infos)
     }
 }
 
