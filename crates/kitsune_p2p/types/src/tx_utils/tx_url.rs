@@ -1,9 +1,11 @@
+//! Defines the TxUrl type
+
 use std::sync::Arc;
 
 use crate::{KitsuneError, KitsuneErrorKind, KitsuneResult};
 
 /// New-type for sync ref-counted Urls
-/// to make passing around tx2 more efficient.
+/// to make passing around transport layer implementation more efficient.
 #[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TxUrl(Arc<url2::Url2>);
 

@@ -55,11 +55,13 @@ async fn test_publish() -> anyhow::Result<()> {
     holochain_trace::test_run();
     const NUM_CONDUCTORS: usize = 3;
 
+    let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv().await;
+
     let mut tuning =
         kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
     tuning.gossip_strategy = "none".to_string();
 
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::from_signal_addr(signal_url);
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
         network,
@@ -69,7 +71,7 @@ async fn test_publish() -> anyhow::Result<()> {
             ..Default::default()
         }),
         dpki: DpkiConfig::disabled(),
-        ..ConductorConfig::default()
+        ..Default::default()
     };
 
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;

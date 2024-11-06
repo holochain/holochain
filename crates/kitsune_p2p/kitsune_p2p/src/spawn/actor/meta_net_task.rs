@@ -676,6 +676,7 @@ mod tests {
     use kitsune_p2p_fetch::{FetchPool, FetchResponseQueue};
     use kitsune_p2p_timestamp::{InclusiveTimestampInterval, Timestamp};
     use kitsune_p2p_types::bin_types::NodeCert;
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
@@ -2190,7 +2191,7 @@ mod tests {
 
         let meta_net_task = MetaNetTask::new(
             host_stub.clone().legacy(host_sender),
-            Default::default(),
+            KitsuneP2pConfig::mem(),
             fetch_pool.clone(),
             fetch_response_queue.clone(),
             ep_evt_rcv,

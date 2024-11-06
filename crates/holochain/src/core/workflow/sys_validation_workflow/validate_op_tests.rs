@@ -2128,6 +2128,57 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn validate_delete_a_delete_is_rejected() {
+    holochain_trace::test_run();
+
+    let mut test_case = TestCase::new().await;
+
+    // Delete action to be deleted.
+    let mut delete = fixt!(Delete);
+    delete.author = test_case.agent.clone();
+    let delete_action_signed_hashed = test_case.sign_action(Action::Delete(delete)).await;
+
+    // Op to validate
+    let mut delete_delete_action = fixt!(Delete);
+    delete_delete_action.author = test_case.agent.clone();
+    delete_delete_action.timestamp = Timestamp::now();
+    delete_delete_action.deletes_address = delete_action_signed_hashed.as_hash().clone();
+
+    // Validate a deleted entry action.
+    let op =
+        ChainOp::RegisterDeletedEntryAction(fixt!(Signature), delete_delete_action.clone()).into();
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![delete_action_signed_hashed.clone()])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::NotNewEntry(delete_action_signed_hashed.action().clone())
+                .to_string()
+        ),
+        outcome
+    );
+
+    // Validate a deleted by.
+    let op = ChainOp::RegisterDeletedBy(fixt!(Signature), delete_delete_action).into();
+    let outcome = test_case
+        .expect_retrieve_records_from_cascade(vec![])
+        .with_op(op)
+        .run()
+        .await
+        .unwrap();
+    assert_eq!(
+        Outcome::Rejected(
+            ValidationOutcome::NotNewEntry(delete_action_signed_hashed.action().clone())
+                .to_string()
+        ),
+        outcome
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_add_link() {
     holochain_trace::test_run();
 

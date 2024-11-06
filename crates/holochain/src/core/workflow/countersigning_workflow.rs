@@ -7,7 +7,7 @@ use holo_hash::AgentPubKey;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::prelude::*;
-use kitsune_p2p_types::tx2::tx2_utils::Share;
+use kitsune_p2p_types::tx_utils::Share;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::Sender;

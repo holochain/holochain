@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.5.0-dev.3"
+version = "0.5.0-dev.4"
 description = "p2p / dht communication framework"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -20,16 +20,15 @@ derive_more = "0.99"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.6"
 governor = "0.3.2"
-kitsune_p2p_fetch = { version = "^0.5.0-dev.3", path = "../fetch" }
+kitsune_p2p_fetch = { version = "^0.5.0-dev.4", path = "../fetch" }
 kitsune_p2p_mdns = { version = "^0.5.0-dev.1", path = "../mdns" }
-kitsune_p2p_proxy = { version = "^0.5.0-dev.3", path = "../proxy" }
 kitsune_p2p_timestamp = { version = "^0.5.0-dev.0", path = "../timestamp", features = [
   "now",
 ] }
-kitsune_p2p_block = { version = "^0.5.0-dev.1", path = "../block" }
-kitsune_p2p_bootstrap_client = { version = "^0.5.0-dev.3", path = "../bootstrap_client" }
-kitsune_p2p_bin_data = { version = "^0.5.0-dev.1", path = "../bin_data" }
-kitsune_p2p_types = { version = "^0.5.0-dev.3", path = "../types", default-features = false }
+kitsune_p2p_block = { version = "^0.5.0-dev.2", path = "../block" }
+kitsune_p2p_bootstrap_client = { version = "^0.5.0-dev.4", path = "../bootstrap_client" }
+kitsune_p2p_bin_data = { version = "^0.5.0-dev.2", path = "../bin_data" }
+kitsune_p2p_types = { version = "^0.5.0-dev.4", path = "../types", default-features = false }
 must_future = "0.1.1"
 nanoid = "0.4"
 num-traits = "0.2"
@@ -45,7 +44,7 @@ thiserror = "1.0.22"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
 tokio-stream = "0.1"
-tx5 = { version = "=0.1.4-beta", optional = true }
+tx5 = { version = "=0.1.4-beta" }
 url2 = "0.0.6"
 
 # fuzzing
@@ -57,6 +56,8 @@ proptest-derive = { version = "0", optional = true }
 blake2b_simd = { version = "1.0", optional = true }
 maplit = { version = "1", optional = true }
 mockall = { version = "0.11.3", optional = true }
+sbd-server = { version = "=0.0.7-alpha", optional = true }
+tx5-signal-srv = { version = "=0.0.9-alpha", optional = true }
 fixt = { path = "../../fixt", version = "^0.5.0-dev.0", optional = true }
 
 [dev-dependencies]
@@ -82,7 +83,8 @@ itertools = "0.12"
 workspace = true
 
 [features]
-default = ["tx2", "tx5"]
+
+default = []
 
 fuzzing = [
   "arbitrary",
@@ -103,13 +105,12 @@ test_utils = [
   "kitsune_p2p_bin_data/fixt",
   "maplit",
   "mockall",
+  "sbd-server",
+  "tx5-signal-srv",
   "fixt",
 ]
 
 mock_network = ["kitsune_p2p_types/test_utils", "mockall"]
-
-tx2 = ["kitsune_p2p_types/tx2"]
-tx5 = ["dep:tx5", "kitsune_p2p_types/tx5"]
 
 instrument = []
 
@@ -119,14 +120,12 @@ unstable-sharding = [
 
 sqlite-encrypted = [
   "kitsune_p2p_fetch/sqlite-encrypted",
-  "kitsune_p2p_proxy/sqlite-encrypted",
   "kitsune_p2p_timestamp/sqlite-encrypted",
   "kitsune_p2p_block/sqlite-encrypted",
   "kitsune_p2p_types/sqlite-encrypted",
 ]
 sqlite = [
   "kitsune_p2p_fetch/sqlite",
-  "kitsune_p2p_proxy/sqlite",
   "kitsune_p2p_timestamp/sqlite",
   "kitsune_p2p_block/sqlite",
   "kitsune_p2p_types/sqlite",

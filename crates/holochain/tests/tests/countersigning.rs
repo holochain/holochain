@@ -1214,7 +1214,7 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
         })
         .tune(|params| {
             // Incredible, but true: set the timeout for a network
-            params.tx2_implicit_timeout_ms = 3_000;
+            params.tx5_implicit_timeout_ms = 3_000;
         });
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
@@ -1363,7 +1363,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         })
         .tune(|params| {
             // Incredible, but true: set the timeout for a network
-            params.tx2_implicit_timeout_ms = 3_000;
+            params.tx5_implicit_timeout_ms = 3_000;
         });
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 

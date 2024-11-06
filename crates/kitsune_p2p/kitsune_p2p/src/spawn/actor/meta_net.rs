@@ -13,21 +13,7 @@ use crate::*;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
 
-#[cfg(feature = "tx2")]
-use kitsune_p2p_proxy::tx2::*;
-#[cfg(feature = "tx2")]
-use kitsune_p2p_types::config::KitsuneP2pTx2Backend;
-#[cfg(feature = "tx2")]
-use kitsune_p2p_types::config::KitsuneP2pTx2ProxyConfig;
-#[cfg(feature = "tx2")]
-use kitsune_p2p_types::tx2::tx2_api::*;
-#[cfg(feature = "tx2")]
-use kitsune_p2p_types::tx2::tx2_pool_promote::*;
-#[cfg(feature = "tx2")]
-use kitsune_p2p_types::tx2::tx2_restart_adapter::*;
-use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
-#[cfg(feature = "tx2")]
-use kitsune_p2p_types::tx2::*;
+use kitsune_p2p_types::tx_utils::TxUrl;
 
 use crate::spawn::actor::InternalSender;
 use crate::spawn::KitsuneP2pEvent;
@@ -324,10 +310,6 @@ impl Drop for MetricSendGuard {
 
 #[derive(Debug, Clone)]
 pub enum MetaNetCon {
-    #[cfg(feature = "tx2")]
-    Tx2(Tx2ConHnd<wire::Wire>, HostApiLegacy),
-
-    #[cfg(feature = "tx5")]
     Tx5 {
         host: HostApiLegacy,
         ep: Arc<tx5::Endpoint>,
@@ -345,9 +327,6 @@ pub enum MetaNetCon {
 impl PartialEq for MetaNetCon {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            #[cfg(feature = "tx2")]
-            (MetaNetCon::Tx2(a, _), MetaNetCon::Tx2(b, _)) => a == b,
-            #[cfg(feature = "tx5")]
             (MetaNetCon::Tx5 { ep: a, .. }, MetaNetCon::Tx5 { ep: b, .. }) => Arc::ptr_eq(a, b),
             _ => false,
         }
@@ -366,15 +345,6 @@ impl MetaNetCon {
             }
         }
 
-        #[cfg(feature = "tx2")]
-        {
-            if let MetaNetCon::Tx2(con, _) = self {
-                con.close(code, reason).await;
-                return;
-            }
-        }
-
-        #[cfg(feature = "tx5")]
         {
             if let MetaNetCon::Tx5 {
                 ep, rem_url, tun, ..
@@ -394,26 +364,16 @@ impl MetaNetCon {
             }
         }
 
-        #[cfg(feature = "tx2")]
-        {
-            if let MetaNetCon::Tx2(con, _) = self {
-                return con.is_closed();
-            }
-        }
-
-        #[cfg(feature = "tx5")]
         {
             // NOTE - tx5 connections are never exactly "closed"
             //        since it's more of a message queue...
             return false;
         }
-
-        true
     }
 
     async fn wire_is_authorized(&self, payload: &wire::Wire, now: Timestamp) -> MetaNetAuth {
         match self {
-            MetaNetCon::Tx5 { host, .. } | MetaNetCon::Tx2(_, host) => {
+            MetaNetCon::Tx5 { host, .. } => {
                 nodespace_is_authorized(host, self.peer_id(), payload.maybe_space(), now).await
             }
             #[cfg(test)]
@@ -443,14 +403,6 @@ impl MetaNetCon {
                         }
                     }
 
-                    #[cfg(feature = "tx2")]
-                    {
-                        if let MetaNetCon::Tx2(con, _) = self {
-                            return con.notify(payload, timeout).await;
-                        }
-                    }
-
-                    #[cfg(feature = "tx5")]
                     {
                         if let MetaNetCon::Tx5 { ep, rem_url, .. } = self {
                             let wire = payload.encode_vec().map_err(KitsuneError::other)?;
@@ -505,14 +457,6 @@ impl MetaNetCon {
         let result = async move {
             match self.wire_is_authorized(payload, Timestamp::now()).await {
                 MetaNetAuth::Authorized => {
-                    #[cfg(feature = "tx2")]
-                    {
-                        if let MetaNetCon::Tx2(con, _) = self {
-                            return con.request(payload, timeout).await;
-                        }
-                    }
-
-                    #[cfg(feature = "tx5")]
                     {
                         if let MetaNetCon::Tx5 {
                             ep,
@@ -577,14 +521,6 @@ impl MetaNetCon {
             }
         }
 
-        #[cfg(feature = "tx2")]
-        {
-            if let MetaNetCon::Tx2(con, _) = self {
-                return con.peer_cert().into();
-            }
-        }
-
-        #[cfg(feature = "tx5")]
         {
             if let MetaNetCon::Tx5 { rem_url, .. } = self {
                 return rem_url.pub_key().0.clone().into();
@@ -634,12 +570,7 @@ impl MetaNetConTest {
 /// Networking abstraction to handle feature flipping.
 #[derive(Clone)]
 pub enum MetaNet {
-    /// Tx2 Abstraction
-    #[cfg(feature = "tx2")]
-    Tx2(Tx2EpHnd<wire::Wire>, HostApiLegacy),
-
     /// Tx5 Abstraction
-    #[cfg(feature = "tx5")]
     Tx5 {
         host: HostApiLegacy,
         ep: Arc<tx5::Endpoint>,
@@ -649,217 +580,7 @@ pub enum MetaNet {
 }
 
 impl MetaNet {
-    /// Construct abstraction with tx2 backend.
-    #[cfg(feature = "tx2")]
-    pub async fn new_tx2(
-        host: HostApiLegacy,
-        config: KitsuneP2pConfig,
-        tls_config: kitsune_p2p_types::tls::TlsConfig,
-        metrics: Tx2ApiMetrics,
-    ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv, Option<String>)> {
-        use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
-
-        let tuning_params = config.tuning_params.clone();
-        let (mut evt_send, evt_recv) =
-            futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
-
-        let tx2_conf = config.to_tx2().map_err(KitsuneP2pError::other)?;
-
-        let mut is_mock = false;
-
-        // set up our backend based on config
-        let (f, bind_to): (_, kitsune_p2p_types::tx2::tx2_utils::TxUrl) = match tx2_conf.backend {
-            KitsuneP2pTx2Backend::Mem => {
-                let mut conf = MemConfig::default();
-                conf.tls = Some(tls_config.clone());
-                conf.tuning_params = Some(config.tuning_params.clone());
-                (
-                    tx2_mem_adapter(conf)
-                        .await
-                        .map_err(KitsuneP2pError::other)?,
-                    TxUrl::from_str_panicking("none:"),
-                )
-            }
-            /*
-            KitsuneP2pTx2Backend::Quic { bind_to } => {
-                let mut conf = QuicConfig::default();
-                conf.tls = Some(tls_config.clone());
-                conf.tuning_params = Some(config.tuning_params.clone());
-                (
-                    tx2_quic_adapter(conf)
-                        .await
-                        .map_err(KitsuneP2pError::other)?,
-                    bind_to,
-                )
-            }
-            */
-            KitsuneP2pTx2Backend::Mock { mock_network } => {
-                is_mock = true;
-                (mock_network, TxUrl::from_str_panicking("none:"))
-            }
-        };
-
-        // wrap in restart logic
-        let f = tx2_restart_adapter(f);
-
-        // convert to frontend
-        let f = tx2_pool_promote(f, config.tuning_params.clone());
-
-        // wrap in proxy
-        let f = if !is_mock {
-            let mut conf = kitsune_p2p_proxy::tx2::ProxyConfig::default();
-            conf.tuning_params = Some(config.tuning_params.clone());
-            match tx2_conf.use_proxy {
-                KitsuneP2pTx2ProxyConfig::NoProxy => (),
-                KitsuneP2pTx2ProxyConfig::Specific(proxy_url) => {
-                    conf.client_of_remote_proxy = ProxyRemoteType::Specific(proxy_url);
-                }
-                KitsuneP2pTx2ProxyConfig::Bootstrap {
-                    bootstrap_url,
-                    fallback_proxy_url,
-                } => {
-                    conf.client_of_remote_proxy = ProxyRemoteType::Bootstrap {
-                        bootstrap_url,
-                        fallback_proxy_url,
-                    };
-                    conf.proxy_from_bootstrap_cb = Arc::new(|bootstrap_url| {
-                        Box::pin(async move {
-                            match kitsune_p2p_bootstrap_client::proxy_list(
-                                bootstrap_url.into(),
-                                kitsune_p2p_bootstrap_client::BootstrapNet::Tx2,
-                            )
-                            .await
-                            {
-                                Ok(mut proxy_list) => {
-                                    if proxy_list.is_empty() {
-                                        return None;
-                                    }
-                                    use rand::Rng;
-                                    Some(
-                                        proxy_list
-                                            .remove(
-                                                rand::thread_rng().gen_range(0..proxy_list.len()),
-                                            )
-                                            .into(),
-                                    )
-                                }
-                                _ => None,
-                            }
-                        })
-                    });
-                }
-            }
-
-            tx2_proxy(f, conf)?
-        } else {
-            f
-        };
-
-        // wrap in api
-        let f = tx2_api(f, metrics);
-
-        // bind local endpoint
-        let mut ep = f
-            .bind(bind_to, config.tuning_params.implicit_timeout())
-            .await
-            .map_err(KitsuneP2pError::other)?;
-
-        // capture endpoint handle
-        let ep_hnd = ep.handle().clone();
-
-        let return_host = host.clone();
-        tokio::task::spawn(async move {
-            let tuning_params = &tuning_params;
-            while let Some(evt) = ep.next().await {
-                match evt {
-                    Tx2EpEvent::OutgoingConnection(Tx2EpConnection { con, url }) => {
-                        if evt_send
-                            .send(MetaNetEvt::Connected {
-                                remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con, host.clone()),
-                            })
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    Tx2EpEvent::IncomingConnection(Tx2EpConnection { con, url }) => {
-                        if evt_send
-                            .send(MetaNetEvt::Connected {
-                                remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con, host.clone()),
-                            })
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    Tx2EpEvent::ConnectionClosed(Tx2EpConnectionClosed { con, url, .. }) => {
-                        if evt_send
-                            .send(MetaNetEvt::Disconnected {
-                                remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con, host.clone()),
-                            })
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    Tx2EpEvent::IncomingRequest(Tx2EpIncomingRequest {
-                        con,
-                        url,
-                        data,
-                        respond,
-                    }) => {
-                        let timeout = tuning_params.implicit_timeout();
-                        let send_result = evt_send
-                            .send(MetaNetEvt::Request {
-                                remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con, host.clone()),
-                                data,
-                                respond: Box::new(move |data| {
-                                    let out: RespondFut = Box::pin(async move {
-                                        let _ = respond.respond(data, timeout).await;
-                                    });
-                                    out
-                                }),
-                            })
-                            .await;
-                        if send_result.is_err() {
-                            break;
-                        }
-                    }
-                    Tx2EpEvent::IncomingNotify(Tx2EpIncomingNotify { con, url, data, .. }) => {
-                        if evt_send
-                            .send(MetaNetEvt::Notify {
-                                remote_url: url.to_string(),
-                                con: MetaNetCon::Tx2(con, host.clone()),
-                                data,
-                            })
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    Tx2EpEvent::Error(_) | Tx2EpEvent::Tick | Tx2EpEvent::EndpointClosed => (),
-                }
-            }
-        });
-
-        let url = match ep_hnd.local_addr() {
-            Ok(url) => Some(url.to_string()),
-            _ => None,
-        };
-
-        Ok((MetaNet::Tx2(ep_hnd, return_host), evt_recv, url))
-    }
-
     /// Construct abstraction with tx5 backend.
-    #[cfg(feature = "tx5")]
     pub async fn new_tx5(
         tuning_params: KitsuneP2pTuningParams,
         host: HostApiLegacy,
@@ -1186,15 +907,6 @@ impl MetaNet {
     ) -> KitsuneResult<()> {
         let msg_id = next_msg_id();
 
-        #[cfg(feature = "tx2")]
-        {
-            if matches!(self, MetaNet::Tx2 { .. }) {
-                tracing::debug!("broadcast on tx2");
-                return Ok(());
-            }
-        }
-
-        #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 { ep, .. } = self {
                 let wire = payload.encode_vec().map_err(KitsuneError::other)?;
@@ -1210,21 +922,11 @@ impl MetaNet {
     }
 
     pub async fn close(&self, code: u32, reason: &str) {
-        #[cfg(feature = "tx2")]
-        {
-            if let MetaNet::Tx2(ep, _) = self {
-                ep.close(code, reason).await;
-                return;
-            }
-        }
 
         // TODO - currently no way to shutdown tx5
     }
 
     pub fn close_peer_con(&self, peer_url: TxUrl) -> KitsuneResult<()> {
-        // Not supported for tx2
-
-        #[cfg(feature = "tx5")]
         {
             // Even if tx5 is enabled, check that the peer_url is a ws or wss url to the signal server
             if peer_url.scheme() == "ws" || peer_url.scheme() == "wss" {
@@ -1244,15 +946,6 @@ impl MetaNet {
         remote_url: String,
         timeout: KitsuneTimeout,
     ) -> KitsuneResult<MetaNetCon> {
-        #[cfg(feature = "tx2")]
-        {
-            if let MetaNet::Tx2(ep, host) = self {
-                let con = ep.get_connection(remote_url, timeout).await?;
-                return Ok(MetaNetCon::Tx2(con, host.clone()));
-            }
-        }
-
-        #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 {
                 host, ep, res, tun, ..
@@ -1276,18 +969,6 @@ impl MetaNet {
     ) -> impl std::future::Future<Output = KitsuneResult<serde_json::Value>> + 'static + Send {
         use futures::FutureExt;
 
-        #[cfg(feature = "tx2")]
-        {
-            if let MetaNet::Tx2(ep, _) = self {
-                let mut res = ep.debug();
-                if let Some(map) = res.as_object_mut() {
-                    map.insert("backend".into(), "tx2-quic".into());
-                }
-                return async move { Ok(res) }.boxed();
-            }
-        }
-
-        #[cfg(feature = "tx5")]
         {
             if let MetaNet::Tx5 { ep, .. } = self {
                 let ep = ep.clone();

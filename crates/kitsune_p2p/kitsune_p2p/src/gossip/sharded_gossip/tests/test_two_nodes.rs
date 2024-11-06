@@ -9,7 +9,7 @@ use itertools::Itertools;
 async fn sharded_sanity_test() {
     // - Setup players and data.
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let bob_cert = NodeCert::arbitrary(&mut u).unwrap();
 
     let agents = agents_with_infos(2).await;
     let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
@@ -53,11 +53,7 @@ async fn sharded_sanity_test() {
 
     // - Send initiate to alice.
     let alice_outgoing = alice
-        .process_incoming(
-            bob_cert.clone().into(),
-            bob_outgoing,
-            &mut agent_info_session,
-        )
+        .process_incoming(bob_cert.clone(), bob_outgoing, &mut agent_info_session)
         .await
         .unwrap();
 
@@ -98,7 +94,7 @@ async fn sharded_sanity_test() {
     // - Send the above to alice.
     for incoming in bob_outgoing {
         let outgoing = alice
-            .process_incoming(bob_cert.clone().into(), incoming, &mut agent_info_session)
+            .process_incoming(bob_cert.clone(), incoming, &mut agent_info_session)
             .await
             .unwrap();
         alice_outgoing.extend(outgoing);
@@ -147,14 +143,14 @@ async fn sharded_sanity_test() {
 /// marked as finished does not finish the round.
 async fn partial_missing_doesnt_finish() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::arbitrary(&mut u).unwrap();
 
     // - Set bob up with a current round that expects one
     // response to a sent bloom.
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone().into() => RoundState {
+                cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arq_set: Arc::new(ArqSet::full_std()),
                     num_expected_op_blooms: 1,
@@ -187,7 +183,7 @@ async fn partial_missing_doesnt_finish() {
         AgentInfoSession::new(bob.query_agents_by_local_agents().await.unwrap(), vec![]);
 
     let outgoing = bob
-        .process_incoming(cert.clone().into(), incoming, &mut agent_info_session)
+        .process_incoming(cert.clone(), incoming, &mut agent_info_session)
         .await
         .unwrap();
     assert_eq!(outgoing.len(), 0);
@@ -207,13 +203,13 @@ async fn partial_missing_doesnt_finish() {
 /// marked as finished does finish the round.
 async fn missing_ops_finishes() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::arbitrary(&mut u).unwrap();
 
     // - Set bob up the same as the test above.
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone().into() => RoundState {
+                cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arq_set: Arc::new(ArqSet::full_std()),
                     num_expected_op_blooms: 1,
@@ -246,7 +242,7 @@ async fn missing_ops_finishes() {
         AgentInfoSession::new(bob.query_agents_by_local_agents().await.unwrap(), vec![]);
 
     let outgoing = bob
-        .process_incoming(cert.clone().into(), incoming, &mut agent_info_session)
+        .process_incoming(cert.clone(), incoming, &mut agent_info_session)
         .await
         .unwrap();
     assert_eq!(outgoing.len(), 0);
@@ -267,13 +263,13 @@ async fn missing_ops_finishes() {
 /// the player is still awaiting incoming blooms.
 async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::arbitrary(&mut u).unwrap();
 
     // - Set bob up awaiting incoming blooms and one response.
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone().into() => RoundState {
+                cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arq_set: Arc::new(ArqSet::full_std()),
                     num_expected_op_blooms: 1,
@@ -306,7 +302,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
         AgentInfoSession::new(bob.query_agents_by_local_agents().await.unwrap(), vec![]);
 
     let outgoing = bob
-        .process_incoming(cert.clone().into(), incoming, &mut agent_info_session)
+        .process_incoming(cert.clone(), incoming, &mut agent_info_session)
         .await
         .unwrap();
     assert_eq!(outgoing.len(), 0);
@@ -326,14 +322,14 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
 /// finish the round when there are no outstanding response.
 async fn bloom_response_finishes() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::arbitrary(&mut u).unwrap();
 
     // - Set bob up with a current round that expects no responses
     // and has not received all blooms.
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone().into() => RoundState {
+                cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arq_set: Arc::new(ArqSet::full_std()),
                     num_expected_op_blooms: 0,
@@ -366,7 +362,7 @@ async fn bloom_response_finishes() {
         AgentInfoSession::new(bob.query_agents_by_local_agents().await.unwrap(), vec![]);
 
     let outgoing = bob
-        .process_incoming(cert.clone().into(), incoming, &mut agent_info_session)
+        .process_incoming(cert.clone(), incoming, &mut agent_info_session)
         .await
         .unwrap();
     assert_eq!(outgoing.len(), 1);
@@ -386,14 +382,14 @@ async fn bloom_response_finishes() {
 /// finish the round when their are outstanding responses.
 async fn bloom_response_doesnt_finish_outstanding_incoming() {
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::arbitrary(&mut u).unwrap();
 
     // - Set bob up with a current round that expects one response
     // and has not received all blooms.
     let bob = setup_standard_player(
         ShardedGossipLocalState {
             round_map: maplit::hashmap! {
-                cert.clone().into() => RoundState {
+                cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arq_set: Arc::new(ArqSet::full_std()),
                     num_expected_op_blooms: 1,
@@ -426,7 +422,7 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
         AgentInfoSession::new(bob.query_agents_by_local_agents().await.unwrap(), vec![]);
 
     let outgoing = bob
-        .process_incoming(cert.clone().into(), incoming, &mut agent_info_session)
+        .process_incoming(cert.clone(), incoming, &mut agent_info_session)
         .await
         .unwrap();
     assert_eq!(outgoing.len(), 1);
@@ -447,8 +443,8 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
 async fn no_data_still_finishes() {
     // - Set up two players with no data.
     let mut u = arbitrary::Unstructured::new(&NOISE);
-    let alice_cert = Tx2Cert::arbitrary(&mut u).unwrap();
-    let bob_cert = Tx2Cert::arbitrary(&mut u).unwrap();
+    let alice_cert = NodeCert::arbitrary(&mut u).unwrap();
+    let bob_cert = NodeCert::arbitrary(&mut u).unwrap();
 
     let agents = agents_with_infos(2).await;
     let all_agents = agents.iter().map(|(_, info)| info.clone()).collect_vec();
@@ -457,7 +453,7 @@ async fn no_data_still_finishes() {
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[0].0.clone()),
             round_map: maplit::hashmap! {
-                bob_cert.clone().into() => RoundState {
+                bob_cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arq_set: Arc::new(ArqSet::full_std()),
                     num_expected_op_blooms: 0,
@@ -485,7 +481,7 @@ async fn no_data_still_finishes() {
         ShardedGossipLocalState {
             local_agents: maplit::hashset!(agents[1].0.clone()),
             round_map: maplit::hashmap! {
-                alice_cert.clone().into() => RoundState {
+                alice_cert.clone() => RoundState {
                     remote_agent_list: vec![],
                     common_arq_set: Arc::new(ArqSet::full_std()),
                     num_expected_op_blooms: 1,
@@ -516,7 +512,7 @@ async fn no_data_still_finishes() {
 
     let outgoing = alice
         .process_incoming(
-            bob_cert.clone().into(),
+            bob_cert.clone(),
             incoming,
             &mut AgentInfoSession::new(
                 alice.query_agents_by_local_agents().await.unwrap(),
@@ -532,7 +528,7 @@ async fn no_data_still_finishes() {
     // - Send this to bob.
     let outgoing = bob
         .process_incoming(
-            alice_cert.clone().into(),
+            alice_cert.clone(),
             outgoing.into_iter().next().unwrap(),
             &mut AgentInfoSession::new(
                 bob.query_agents_by_local_agents().await.unwrap(),
@@ -797,7 +793,7 @@ async fn initiate_times_out() {
     // Process the initiate with Bob.
     let bob_outgoing = bob
         .process_incoming(
-            alice_cert.clone().into(),
+            alice_cert.clone(),
             alice_initiate,
             &mut AgentInfoSession::new(
                 bob.query_agents_by_local_agents().await.unwrap(),
