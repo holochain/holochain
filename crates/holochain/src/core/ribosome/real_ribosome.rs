@@ -108,9 +108,9 @@ use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
 #[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::schedule::schedule;
 #[cfg(feature = "unstable-functions")]
-use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
-#[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::sleep::sleep;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
 
 use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
@@ -443,7 +443,14 @@ impl RealRibosome {
             let mut store = store.lock();
             let mut store_mut = store.as_store_mut();
             instance = Arc::new(Instance::new(&mut store_mut, &module, &imports).map_err(
-                |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(format!("{}: {}", name, e.to_string()))).into() },
+                |e| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Compile(format!(
+                        "{}: {}",
+                        name,
+                        e.to_string()
+                    )))
+                    .into()
+                },
             )?);
         }
 

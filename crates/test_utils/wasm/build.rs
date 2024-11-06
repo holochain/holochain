@@ -93,9 +93,7 @@ fn build_test_wasms(
                 cmd.arg("--features").arg("unstable-functions");
             }
         } else {
-            cmd.arg("check")
-                .arg("--manifest-path")
-                .arg(&path);
+            cmd.arg("check").arg("--manifest-path").arg(&path);
         }
         if build_integrity_zomes {
             let mut features = "".to_string();
@@ -196,12 +194,9 @@ fn list_wasms(wasms_path: PathBuf) -> Vec<PathBuf> {
 }
 
 fn load_project_toml(cargo_toml: PathBuf) -> toml::value::Table {
-    let project = std::fs::read_to_string(cargo_toml)
-        .expect("Could not load Cargo.toml");
+    let project = std::fs::read_to_string(cargo_toml).expect("Could not load Cargo.toml");
 
-    toml_table(
-        toml::from_str::<toml::Value>(&project).expect("Could not parse Cargo.toml"),
-    )
+    toml_table(toml::from_str::<toml::Value>(&project).expect("Could not parse Cargo.toml"))
 }
 
 fn defines_feature(project: &toml::value::Table, feature: &str) -> bool {
