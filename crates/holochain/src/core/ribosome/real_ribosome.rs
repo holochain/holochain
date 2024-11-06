@@ -447,7 +447,7 @@ impl RealRibosome {
                     wasm_error!(WasmErrorInner::Compile(format!(
                         "{}: {}",
                         name,
-                        e.to_string()
+                        e
                     )))
                     .into()
                 },
