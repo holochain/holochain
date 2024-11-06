@@ -1,3 +1,8 @@
+// TODO: not sure how to fix these unused warnings, something to do with
+// the weird module structure and features
+
+#![allow(unused)]
+
 mod internal_stub;
 mod legacy_host_stub;
 mod space_internal_stub;

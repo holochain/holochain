@@ -320,7 +320,9 @@ mod tests {
     fn test_config_complete_minimal_config() {
         let yaml = r#"---
     data_root_path: /path/to/env
-
+    network:
+      transport_pool:
+        - type: mem
     keystore:
       type: danger_test_keystore
     "#;
@@ -332,8 +334,8 @@ mod tests {
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
-                network: Default::default(),
-                dpki: Default::default(),
+                network: KitsuneP2pConfig::mem(),
+                dpki: DpkiConfig::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
@@ -346,6 +348,7 @@ mod tests {
 
     #[cfg(not(feature = "unstable-dpki"))]
     #[test]
+    #[allow(clippy::field_reassign_with_default)]
     fn test_config_complete_config() {
         holochain_trace::test_run();
 
@@ -396,9 +399,9 @@ mod tests {
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let mut network_config = KitsuneP2pConfig::default();
+        let mut network_config = KitsuneP2pConfig::mem();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-        network_config.transport_pool.push(TransportConfig::WebRTC {
+        network_config.transport_pool = vec![TransportConfig::WebRTC {
             signal_url: "wss://sbd-0.main.infra.holo.host".into(),
             webrtc_config: Some(serde_json::json!({
               "iceServers": [
@@ -406,7 +409,7 @@ mod tests {
                 { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
               ]
             })),
-        });
+        }];
         let mut tuning_params =
             kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
         tuning_params.gossip_loop_iteration_delay_ms = 42;
@@ -496,8 +499,9 @@ mod tests {
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let mut network_config = KitsuneP2pConfig::default();
+        let mut network_config = KitsuneP2pConfig::mem();
         network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
+        network_config.transport_pool.clear();
         network_config.transport_pool.push(TransportConfig::WebRTC {
             signal_url: "wss://sbd-0.main.infra.holo.host".into(),
             webrtc_config: Some(serde_json::json!({
@@ -549,7 +553,9 @@ mod tests {
         let yaml = r#"---
     data_root_path: /path/to/env
     keystore_path: /path/to/keystore
-
+    network:
+      transport_pool:
+        - type: mem    
     keystore:
       type: lair_server
       connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
@@ -562,7 +568,7 @@ mod tests {
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
-                network: Default::default(),
+                network: KitsuneP2pConfig::mem(),
                 dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),

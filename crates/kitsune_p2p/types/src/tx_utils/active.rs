@@ -1,4 +1,4 @@
-use crate::tx2::tx2_utils::*;
+use crate::tx_utils::*;
 use crate::*;
 use futures::future::FutureExt;
 
@@ -127,6 +127,8 @@ impl Active {
 
 #[cfg(test)]
 mod tests {
+    use crate::metrics::metric_task;
+
     use super::*;
     use std::sync::atomic;
 

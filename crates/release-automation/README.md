@@ -141,7 +141,7 @@ Automated steps still require running the tool manually ;-).
     nix-shell --run '
       hc-ra \
         --workspace-path=$PWD \
-        --match-filter="^(holochain|holochain_cli|kitsune_p2p_proxy)$" \
+        --match-filter="^(holochain|holochain_cli)$" \
         --log-level=info \
         release \
           --dry-run \

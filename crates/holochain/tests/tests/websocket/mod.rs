@@ -748,7 +748,6 @@ async fn network_stats() {
         .admin_ws_client::<AdminResponse>()
         .await;
 
-    #[cfg(feature = "tx5")]
     const EXPECT: &str = "backendGoPion";
 
     let req = AdminRequest::DumpNetworkStats;

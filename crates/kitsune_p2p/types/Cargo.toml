@@ -59,7 +59,6 @@ harness = false
 workspace = true
 
 [features]
-default = ["tx2", "tx5"]
 
 fuzzing = [
   "arbitrary",
@@ -81,10 +80,6 @@ test_utils = [
 ]
 
 fixt = ["dep:fixt", "kitsune_p2p_bin_data/fixt"]
-
-tx2 = []
-
-tx5 = []
 
 unstable-sharding = []
 

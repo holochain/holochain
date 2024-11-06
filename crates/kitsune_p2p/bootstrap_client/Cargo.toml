@@ -24,7 +24,7 @@ url2 = "0.0.6"
 
 [dev-dependencies]
 arbitrary = { version = "1.0", features = ["derive"] }
-kitsune_p2p_bootstrap_client = { path = ".", features = ["tx2", "test_utils"] }
+kitsune_p2p_bootstrap_client = { path = ".", features = ["test_utils"] }
 kitsune_p2p_types = { version = "^0.5.0-dev.3", path = "../types", features = [
   "test_utils",
 ] }
@@ -37,9 +37,5 @@ rand = "0.8.5"
 workspace = true
 
 [features]
-default = ["tx5"]
-
-tx2 = ["kitsune_p2p_types/tx2"]
-tx5 = ["kitsune_p2p_types/tx5"]
 
 test_utils = ["kitsune_p2p_bin_data/fixt", "kitsune_p2p_types/fixt"]
