@@ -16,12 +16,8 @@ clap = { version = "4.2.2", features = [
 ], optional = true }
 flate2 = { version = "1.0.25", optional = true }
 hdi = { path = "../hdi", version = "^0.6.0-dev.2", optional = true }
-hdk = { path = "../hdk", version = "^0.5.0-dev.4", optional = true, features = [
-  "unstable-functions",
-] }
-holochain = { path = "../holochain", version = "^0.5.0-dev.4", optional = true, default-features = false, features = [
-  "unstable-functions",
-] }
+hdk = { path = "../hdk", version = "^0.5.0-dev.4", optional = true }
+holochain = { path = "../holochain", version = "^0.5.0-dev.4", optional = true, default-features = false }
 holochain_types = { path = "../holochain_types", version = "^0.5.0-dev.4", optional = true }
 holochain_keystore = { path = "../holochain_keystore", version = "^0.5.0-dev.4", optional = true }
 rand = { version = "0.8.5", optional = true }
