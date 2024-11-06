@@ -14,6 +14,90 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20241106.004411
+
+## [hc\_service\_check-0.2.0-dev.4](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.4)
+
+## [hcterm-0.5.0-dev.4](crates/hcterm/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_cli-0.5.0-dev.4](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain-0.5.0-dev.4](crates/holochain/CHANGELOG.md#0.5.0-dev.4)
+
+- **BREAKING**: As the DPKI feature is unstable and incomplete, it is disabled with default cargo features and put behind a feature called `unstable-dpki`. If this feature is specified at compile time, DPKI is enabled by default.
+- **BREAKING**: Issuing and persisting warrants is behind a feature `unstable-warrants` now. Warrants have not been tested extensively and there is no way to recover from a warrant. Hence the feature is considered unstable and must be explicitly enabled. Note that once warrants are issued some functions or calls may not work correctly.
+- **BREAKING**: Conductor::get\_dna\_definitions now returns an `IndexMap` to ensure consistent ordering.
+- Add test to make sure sys validation rejects deleting a delete. Unit tests to get zomes to invoke for app validation were removed for these cases of deleting a delete, because the code path cannot be reached by the system.
+- Added a new feature “unstable-sharding” which puts the network sharding behind a feature flag. It will not be possible to configure network sharding unless Holochain is built with this feature enabled. By default, the network tuning parameter `gossip_dynamic_arcs` is ignored, and the parameter `gossip_arc_clamping` must be set to either `"full"` or `"empty"`, the previous default value of `"none"` will prevent the conductor from starting. We intend to stabilise this feature in the future, and it will return to being available without a feature flag. \#4344
+
+## [holochain\_cli\_bundle-0.5.0-dev.4](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_cli\_run\_local\_services-0.5.0-dev.4](crates/holochain_cli_run_local_services/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.4](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_cascade-0.5.0-dev.4](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_conductor\_api-0.5.0-dev.4](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_conductor\_services-0.4.0-dev.4](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.4)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.4](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.4](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_websocket-0.5.0-dev.4](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.4)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.4](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.4)
+
+## [holochain\_state-0.5.0-dev.4](crates/holochain_state/CHANGELOG.md#0.5.0-dev.4)
+
+## [hc\_deepkey\_types-0.9.0-dev.2](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.2)
+
+## [hdk-0.5.0-dev.4](crates/hdk/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_p2p-0.5.0-dev.4](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_state\_types-0.5.0-dev.2](crates/holochain_state_types/CHANGELOG.md#0.5.0-dev.2)
+
+## [hdi-0.6.0-dev.2](crates/hdi/CHANGELOG.md#0.6.0-dev.2)
+
+## [holochain\_chc-0.2.0-dev.4](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.4)
+
+## [kitsune\_p2p-0.5.0-dev.4](crates/kitsune_p2p/CHANGELOG.md#0.5.0-dev.4)
+
+- Removed `network_type` from `KitsuneP2pConfig`
+
+## [hdk\_derive-0.5.0-dev.2](crates/hdk_derive/CHANGELOG.md#0.5.0-dev.2)
+
+## [holochain\_types-0.5.0-dev.4](crates/holochain_types/CHANGELOG.md#0.5.0-dev.4)
+
+## [kitsune\_p2p\_bootstrap\_client-0.5.0-dev.4](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.5.0-dev.4)
+
+## [kitsune\_p2p\_fetch-0.5.0-dev.4](crates/kitsune_p2p_fetch/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_keystore-0.5.0-dev.4](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_sqlite-0.5.0-dev.4](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.4)
+
+## [kitsune\_p2p\_bootstrap-0.4.0-dev.4](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.4.0-dev.4)
+
+## [holochain\_zome\_types-0.5.0-dev.4](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.4)
+
+## [kitsune\_p2p\_types-0.5.0-dev.4](crates/kitsune_p2p_types/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_integrity\_types-0.5.0-dev.2](crates/holochain_integrity_types/CHANGELOG.md#0.5.0-dev.2)
+
+## [kitsune\_p2p\_block-0.5.0-dev.2](crates/kitsune_p2p_block/CHANGELOG.md#0.5.0-dev.2)
+
+## [holo\_hash-0.5.0-dev.2](crates/holo_hash/CHANGELOG.md#0.5.0-dev.2)
+
+- **BREAKING** Renamed `from_raw_39_panicky` to `from_raw_39`.
+- Added function `try_from_raw_39` which returns an Err instead of panicking.
+- Added function `try_from_raw_36_and_type` which returns an Err instead of panicking.
+
+## [kitsune\_p2p\_bin\_data-0.5.0-dev.2](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.5.0-dev.2)
+
 # 20241030.004523
 
 ## [hc\_service\_check-0.2.0-dev.3](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.3)
