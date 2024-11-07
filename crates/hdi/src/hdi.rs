@@ -37,6 +37,7 @@ pub trait HdiT: Send + Sync {
         must_get_agent_activity_input: MustGetAgentActivityInput,
     ) -> ExternResult<Vec<RegisterAgentActivity>>;
     // DPKI
+    #[cfg(feature = "unstable-functions")]
     fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool>;
     // Info
     fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
@@ -93,6 +94,7 @@ impl HdiT for ErrHdi {
     ) -> ExternResult<Vec<RegisterAgentActivity>> {
         Self::err("must_get_agent_activity")
     }
+    #[cfg(feature = "unstable-functions")]
     fn is_same_agent(&self, _: AgentPubKey, _: AgentPubKey) -> ExternResult<bool> {
         Self::err("is_same_agent")
     }
@@ -189,8 +191,12 @@ impl HdiT for HostHdi {
     fn zome_info(&self, _: ()) -> ExternResult<ZomeInfo> {
         host_call::<(), ZomeInfo>(__hc__zome_info_1, ())
     }
+    #[cfg(feature = "unstable-functions")]
     fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
-        host_call::<(AgentPubKey, AgentPubKey), bool>(__hc__is_same_agent_1, (key_1, key_2))
+        return host_call::<(AgentPubKey, AgentPubKey), bool>(
+            __hc__is_same_agent_1,
+            (key_1, key_2),
+        );
     }
     fn trace(&self, trace_msg: TraceMsg) -> ExternResult<()> {
         if cfg!(feature = "trace") {
