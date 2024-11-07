@@ -4139,13 +4139,12 @@ fn get_modifiers_map_from_role_settings(roles_settings: &Option<RoleSettingsMap>
     match roles_settings {
         Some(role_settings_map) => role_settings_map
             .iter()
-            .map(|(role_name, role_settings)| match role_settings {
+            .filter_map(|(role_name, role_settings)| match role_settings {
                 RoleSettings::UseExisting(_) => None,
                 RoleSettings::Provisioned { modifiers, .. } => {
                     modifiers.as_ref().map(|m| (role_name.clone(), m.clone()))
                 }
             })
-            .flatten()
             .collect(),
         None => HashMap::new(),
     }
@@ -4156,13 +4155,12 @@ fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) 
     match role_settings {
         Some(role_settings_map) => role_settings_map
             .iter()
-            .map(|(role_name, role_settings)| match role_settings {
+            .filter_map(|(role_name, role_settings)| match role_settings {
                 RoleSettings::UseExisting(_) => None,
                 RoleSettings::Provisioned { membrane_proof, .. } => membrane_proof
                     .as_ref()
                     .map(|m| (role_name.clone(), m.clone())),
             })
-            .flatten()
             .collect(),
         None => HashMap::new(),
     }
@@ -4175,11 +4173,10 @@ fn get_existing_cells_map_from_role_settings(
     match roles_settings {
         Some(role_settings_map) => role_settings_map
             .iter()
-            .map(|(role_name, role_settings)| match role_settings {
+            .filter_map(|(role_name, role_settings)| match role_settings {
                 RoleSettings::UseExisting(cell_id) => Some((role_name.clone(), cell_id.clone())),
                 _ => None,
             })
-            .flatten()
             .collect(),
         None => HashMap::new(),
     }
