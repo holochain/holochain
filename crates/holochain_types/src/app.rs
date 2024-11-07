@@ -161,8 +161,7 @@ pub struct InstallAppPayload {
     pub installed_app_id: Option<InstalledAppId>,
 
     /// Optional: Overwrites all network seeds for all DNAs of Cells created by this app.
-    /// If a role-specific network seed is also provided in the `role_settings` field of the
-    /// `InstallAppPayload`, this latter, role-specific network seed will take precedence.
+    /// This has a lower precedence than role-specific network seeds provided in the  `role_settings` field of the `InstallAppPayload`.
     ///
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
