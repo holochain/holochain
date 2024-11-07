@@ -39,7 +39,7 @@ pub fn get_agent_key_lineage(
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "unstable-functions"))]
 pub mod test {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use hdk::prelude::*;

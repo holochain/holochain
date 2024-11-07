@@ -6,12 +6,12 @@ F=RUSTFLAGS="-Dwarnings"
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
 DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
-UNSTABLE_FEATURES=chc,unstable-dpki,unstable-sharding,unstable-warrants,$(DEFAULT_FEATURES)
+UNSTABLE_FEATURES=chc,unstable-dpki,unstable-sharding,unstable-warrants,unstable-functions,$(DEFAULT_FEATURES)
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
-	static-all static-fmt static-toml static-clippy static-doc \
-	build-workspace-wasmer_sys build-workspace-wasmer_wamr \
+	static-all static-fmt static-toml static-clippy static-clippy-unstable \
+	static-doc build-workspace-wasmer_sys build-workspace-wasmer_wamr \
 	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
 	build-workspace-wasmer_sys-unstable \
 	test-workspace-wasmer_sys-unstable
@@ -23,7 +23,7 @@ default: build-workspace-wasmer_sys \
 	test-workspace-wasmer_wamr
 
 # execute all static code validation
-static-all: static-fmt static-toml static-clippy static-doc
+static-all: static-fmt static-toml static-clippy static-clippy-unstable static-doc
 
 # ensure committed code is formatted properly
 static-fmt:
@@ -37,7 +37,10 @@ static-toml:
 
 # ensure our chosen style lints are followed
 static-clippy:
-	$(F) CHK_SQL_FMT=1 cargo clippy --all-targets
+	$(F) CHK_SQL_FMT=1 cargo clippy --all-targets --features $(DEFAULT_FEATURES)
+
+static-clippy-unstable:
+	$(F) CHK_SQL_FMT=1 cargo clippy --all-targets --features $(UNSTABLE_FEATURES)
 
 # ensure we can build the docs
 static-doc:
