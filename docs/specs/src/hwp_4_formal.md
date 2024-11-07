@@ -63,9 +63,11 @@ Within the context of the Basic Assumptions and the System Architecture both des
 4. **Termination of Execution:** No node can be coerced into infinite loops by non-terminating application code in either remote zome call or validation callbacks. Holochain uses WASM metering to guarantee a maximum execution budget to address the the Halting Problem.
 5. **Deterministic Validation:** Ensure that only deterministic behaviors (ones that will always get the same result no matter who calls them on what computer) are available in validation functions. An interim result of "missing dependency" is also acceptable, but final evaluation of valid/invalid status for each datum must be consistent across all nodes and all time spans.
 6. **Strong Eventual Consistency:** Despite network partitions, all nodes who are authorities for a given DHT address (or become one at any point) will eventually converge to the same state for data at that address. This is ensured by the DHT functioning as a conflict-free replicated data type (CRDT).
-8. **"0 of N" Trust Model:** Holochain is immune to "majority attacks" because any node can always validate data for themselves independent of what any other nodes say. See this [Levels of Trust Diagram](https://miro.medium.com/max/1248/0*k3o00pQovnOWRwtA)
+8. **"0 of N" Trust Model:** Holochain is immune to "majority attacks" because any node can always validate data for themselves independent of what any other nodes say.[^zero-of-n]
 9. **Data Model Scalability:** Because of the overlapping sharding scheme of DHT storage and validation, the total computing power and overall throughput for an application scales linearly as more users join the app.
 10. **Atomic Zome Calls:** Multiple writes in a single zome call will all be committed in a single SQL transaction or all fail together. If they fail the zome call, they will report an error to the caller and the writes will be rolled back.
+
+[^zero-of-n]:  See this Levels of Trust Diagram <https://miro.medium.com/max/1248/0*k3o00pQovnOWRwtA>.
 
 ## Source Chain: Formal State Model
 
@@ -508,7 +510,7 @@ When data is initially created with the intention of persisting it in the DHT, i
 
 After data has been created and has 'saturated' the neighborhood of the data's basis hashes, however, ongoing maintenance is required to keep the data alive as authorities leave and join the network. This is done using a **slow heal** strategy, in which authorities in the same neighborhood regularly initiate **gossip rounds**[^gossipnaming] to check each other's stores for new data.
 
-[^gossipnaming]: While we use the term 'gossip' exclusively for the slow-heal strategy, both fast-push and slow-heal can be considered a [gossip protocol](https://en.wikipedia.org/wiki/Gossip_protocol), as in both strategies a piece of data is initially communicated to a small number of peers who then communicate it to a larger number of their peers.
+[^gossipnaming]: While we use the term 'gossip' exclusively for the slow-heal strategy, both fast-push and slow-heal can be considered a gossip protocol (see <https://en.wikipedia.org/wiki/Gossip_protocol>), as in both strategies a piece of data is initially communicated to a small number of peers who then communicate it to a larger number of their peers.
 
 Additionally, gossip is split into **recent** and **historical** gossip, wherein peers attempt to sync data that is younger than a certain threshold (for instance, five minutes) using a diffing strategy (a Bloom filter) that results in fewer unnecessary deltas being transferred, while data that is older than this threshold can afford to use a strategy with more noisy diffs (time/space quantization).
 
@@ -527,7 +529,9 @@ Many factors contribute to a system's ability to live up to the varying safety a
 
 ### Cryptographic Object Capabilities
 
-To use a Holochain application, end-users must trigger zome calls that effect local state changes on their Source Chains.  Additionally, zome functions can make calls to other zome functions on remote nodes in the same application network, or to other cells running on the same conductor. All of these calls must happen in the context of some kind of permissioning system. Holochain's security model for calls is based on the [Object-capability](https://en.wikipedia.org/wiki/Object-capability_model) security model, but augmented for a distributed cryptographic context in which we use cryptographic signatures to further prove the necessary agency for taking action and create an additional defense against undesired capability leakage.
+To use a Holochain application, end-users must trigger zome calls that effect local state changes on their Source Chains.  Additionally, zome functions can make calls to other zome functions on remote nodes in the same application network, or to other cells running on the same conductor. All of these calls must happen in the context of some kind of permissioning system. Holochain's security model for calls is based on the Object-capability security model[^ocap], but augmented for a distributed cryptographic context in which we use cryptographic signatures to further prove the necessary agency for taking action and create an additional defense against undesired capability leakage.
+
+[^ocap]: See <https://en.wikipedia.org/wiki/Object-capability_model>.
 
 Access is thus mediated by Capability Grants of four types:
 

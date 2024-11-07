@@ -89,7 +89,7 @@ Many factors contribute to a system's ability to live up to the varying safety a
 
 To use a Holochain application, end-users must trigger Zome Calls that effect local state changes on their Source Chains. Additionally, Zome Functions can make calls to other Zome Functions on remote nodes in the same app, or to other DNAs running on the same Conductor. All of these calls must happen in the context of some kind of permissioning system. Holochain's security model for calls is based on the Object-capability[^object_capability] security model, but augmented for a distributed cryptographic context in which we use cryptographic signatures to prove the necessary agency for taking action.
 
-[^object_capability]: https://en.wikipedia.org/wiki/Object-capability\_model
+[^object_capability]: See <https://en.wikipedia.org/wiki/Object-capability\_model>
 
 Access is thus mediated by Capability Grants of four types:
 
@@ -149,7 +149,7 @@ Application developers can take steps to further protect their users by providin
 
 There are some aspects of security, especially those of human error, that all systems are subject to. People​ ​will​ ​still​ ​lose​ ​their​ ​keys,​ ​use​ ​weak​ ​passwords,​ ​get​ ​computer​ ​viruses, etc. But, crucially, in the realm of "System Correctness" and "confidence,"​ the question that needs addressing is how the system interfaces with mechanisms to mitigate against human error. Holochain provides significant tooling to support key management in the form of its ​core​ ​Distributed​ ​Public Key​ ​Infrastructure (DPKI) and DeepKey app built on that infrastructure. Among other things, this tooling ​provides​ ​assistance​ ​in​ ​managing​ ​keys,​ ​managing​ ​revocation​ ​methods,​ ​and reclaiming​ ​control​ ​of​ ​applications​ ​when​ ​keys​ ​or​ ​devices​ ​have​ ​become​ ​compromised.
 
-A definition and specification of a DPKI system is outside of the scope of this paper; see the [DeepKey design specification](https://github.com/holochain/deepkey/blob/main/docs/2023/README.md) for a more thorough exploration.
+A definition and specification of a DPKI system is outside of the scope of this paper; see the DeepKey design specification (<https://github.com/holochain/deepkey/blob/main/docs/2023/README.md>) for a more thorough exploration.
 
 ## Evolvability
 
@@ -165,4 +165,4 @@ For large-scale systems to work well over time, we contend that specific archite
 
 2. **Grammatic composability:** Highly evolvable systems are built of grammatic elements that compose well with each other both "horizontally", which is the building of a vocabulary that fills out a given grammar, and "vertically" which is the creation of new grammars out of expressions of a lower level grammar. There is much more that can be said about grammatics and evolvability, but that is out of scope for this paper. However, we contend that the system as described above lives up to these criteria of having powerful grammatical elements that compose well as described. DNAs are essentially API definitions that can be used to create a large array of micro-services that can be assembled into small applications. Applications themselves can be assembled at the User Interface level. A number of frameworks in the Holochain ecosystem are already building off of this deep capacity for evolvability that is built into the system's architecture[^evolvability].
 
-[^evolvability]: A number of projects in the Holochain ecosystem are already exhibiting this characteristic of evolvability, such as [The Weave / Moss](https://theweave.social), [Ad4m](https://ad4m.dev/), [Memetic Activation Platform]().
+[^evolvability]: A number of projects in the Holochain ecosystem are already exhibiting this characteristic of evolvability, such as The Weave / Moss (see <https://theweave.social>), Ad4m (<https://ad4m.dev/>), Memetic Activation Platform (see <https://github.com/evomimic/we-all-map/wiki/MAP-Overview>).

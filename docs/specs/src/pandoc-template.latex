@@ -223,13 +223,21 @@ $endif$
   hidelinks,
   pdfcreator={LaTeX via pandoc}
 }
+
 % Style links the way we want
+
 \usepackage{soul}
+% This makes it so we don't have to escape every underscore in every URL
+% (which indeed we can't from Markdown)
+% but leaves underscores in math intact as subscript modifiers.
+\usepackage{underscore}
 \NewCommandCopy\styledhyperlink\hyperlink
 \renewcommand{\hyperlink}[2]{\styledhyperlink{#1}{\color{blue}\setulcolor{blue}\ul{#2}}}
-\renewcommand{\url}[1]{\href{#1}{\color{blue}\setulcolor{blue}\ul{#1}}}
-
+\NewCommandCopy\styledhref\href
+\renewcommand{\href}[2]{\styledhref{#1}{\color{blue}\setulcolor{blue}\ul{#2}}}
 \urlstyle{same} % disable monospaced font for URLs
+\renewcommand{\url}[1]{\styledhref{#1}{\color{blue}\setulcolor{blue}\ul{#1}}}
+
 $if(verbatim-in-note)$
 \VerbatimFootnotes % allow verbatim text in footnotes
 $endif$

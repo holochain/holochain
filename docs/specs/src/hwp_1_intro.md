@@ -19,7 +19,7 @@ documentclass: 'revtex4-1'
 
 ## Preamble -- A Focus on Practice, Not Just Theory
 
-The original/alpha version of the [Holochain white paper](https://github.com/holochain/holochain-proto/blob/whitepaper/holochain.pdf) took a formal approach to modeling generalized distributed computation schemes and contrasted Holochain's approach with blockchain-based systems. It also provided formal reasoning for the scaling and performance benefits of Holochain's agent-centric approach.
+The original/alpha version of the Holochain white paper (<https://github.com/holochain/holochain-proto/blob/whitepaper/holochain.pdf>) took a formal approach to modeling generalized distributed computation schemes and contrasted Holochain's approach with blockchain-based systems. It also provided formal reasoning for the scaling and performance benefits of Holochain's agent-centric approach.
 
 When dealing with distributed systems, however, the application of logical models and formal proofs are often deceiving. This stems from how easy it is to define sets and conditions which are logically solid in theory but fundamentally impossible and unintelligible in practice. Since our primary intent with Holochain is to provide a highly functional and scalable framework for sophisticated decentralized coordination, our focus must be on what is practicable, and resist the pull of the purely conceptual which frequently steers builders into unwieldy architectures.
 
@@ -27,7 +27,7 @@ Note how easy it is to reference a theoretical set like "all living persons" or 
 
 The initial example should be a comparatively easy data set to work with, since it changes relatively slowly. Typically each person undergoes a state change only twice in their life (when they become a living person, and when they cease to be one). However, to power the next web, tools need to handle much more rapid and complex changes. A more apt logical construct might be "all people with just one foot on the ground". Membership in this set changes quite rapidly -- around 1/2 billion times per second[^steps].
 
-[^steps]:Global smartphone data indicates an average of 5,000 steps per day per person. [https://www.aicr.org/news/globally-the-average-person-walks-about-5000-steps-per-day/)]
+[^steps]: *Globally, The Average Person Walks About 5,000 Steps Per Day*, American Institute of Cancer Research, 2017 <https://www.aicr.org/news/globally-the-average-person-walks-about-5000-steps-per-day/>.
 
 It should be obvious there is no practical way to work with that data set without requiring actions that either break reality (like freezing time) or asserting a god-like, omniscient being, who not only has instantaneous access to all knowledge (requiring information propagation faster than the speed of light), but also has infinite attention to all states (likely requiring infinite energy). However, since current computing architectures are bound by laws of physics, we should avoid the temptation of injecting such impossible constructs into our theoretical models. A proof that involves simple logical concepts which cannot be reliably worked with in practice is not much of a proof at all.
 
@@ -35,13 +35,13 @@ It should be obvious there is no practical way to work with that data set withou
 
 "State" within the local computing context is likely rooted in the concept of the Turing Tape[^turing] or Von Neumann linear memory address architecture[^memory] which assume a single tape head or system bus for making changes to the single local memory space where changes are stored. With the introduction of multi-core processors, programmers encountered the myriad problems of having multiple agents (CPUs) operating on just one shared local state. They developed various strategies to enforce memory safety for concurrent local operations. So, in distributed computing, people extrapolated these local strategies and starting inventing some new ones, **still in the attempt to manage one single state across many physical machines.** The assumption of the need to sustain this simple logical concept of managing one global state persisted, even when that concept was mapped onto a physical topology which made it fundamentally unknowable in practice.
 
-[^turing]: See [https://en.wikipedia.org/wiki/Turing_machine].
+[^turing]: See <https://en.wikipedia.org/wiki/Turing_machine>.
 
-[^memory]: See [https://en.wikipedia.org/wiki/Von_Neumann_architecture].
+[^memory]: See <https://en.wikipedia.org/wiki/Von_Neumann_architecture>.
 
 Early influential works in decentralized computing (such as the Byzantine Generals' Problem[^byzantine]) may have also set such expectations. Those papers were written in the context of reaching consensus in finite control systems where there was a known number of sensors and states, and the goal was to reach a unified decision (like nine generals deciding a time for all to attack). Therefore, to be Byzantine Fault Tolerant, seems simply that a system is tolerant of the kinds of faults introduced by the generals problem (messages that are corrupted, misordered, or lost and generals/nodes that are malicious), but most distributed systems have assumed that global consensus must be constructed and maintained in order to reach a unified outcome. In this paper, we will detail some more efficient paths to enable agents to act without a construct of global consensus at all, yet still have strong guarantees that even when nodes act in partitioned groups or individually, they will reach a unified outcome.
 
-[^byzantine]: Some readers may come to the problems of distributed coordination from the framework laid out by the literature on Byzantine Fault Tolerance such as *The Byzantine Generals Problem*: Leslie Lamport, Robert Shostak, and Marshall Pease [https://lamport.azurewebsites.net/pubs/byz.pdf] and *Reaching Agreement in the Presence of Faults*: Marshall Pease, Robert Shostak, and Leslie Lamport [https://dl.acm.org/doi/pdf/10.1145/322186.322188](https://dl.acm.org/doi/pdf/10.1145/322186.322188). These axioms and a discussion of why to start with them are explained in our paper [The Players of Ludos: Beyond Byzantium](https://holochain.org/papers/holochain-players-of-ludos.pdf).
+[^byzantine]: Some readers may come to the problems of distributed coordination from the framework laid out by the literature on Byzantine Fault Tolerance such as *The Byzantine Generals Problem*, Leslie Lamport, Robert Shostak, and Marshall Pease <https://lamport.azurewebsites.net/pubs/byz.pdf>, and *Reaching Agreement in the Presence of Faults*, Marshall Pease, Robert Shostak, and Leslie Lamport <https://dl.acm.org/doi/pdf/10.1145/322186.322188>. These axioms and a discussion of why to start with them are explained in our paper *The Players of Ludos: Beyond Byzantium* <https://holochain.org/papers/holochain-players-of-ludos.pdf>.
 
 So, while the formalizations from the original Holochain white paper are still valid in theory, this white paper is more concerned with addressing what works in practice. We will start by stating our underlying assumptions as axioms -- each of which correlates to architectural properties of Holochain. And we will take special care not to make grand, categorical statements which cannot be implemented inside the constraints of computational systems bounded by the laws of physics.
 
@@ -80,7 +80,7 @@ The aforementioned axioms have affected the design of Holochain in the following
 
 **It is hard to maintain a unified, dynamic, shared state across a network, because of the constraints of physics:** In a distributed and open system, which enables autonomous agents to make valid changes to their state and freely associate with other agents in order to communicate those state changes to them, one cannot expect any one agent to know the state of all other agents across whatever partitions they may be in and whatever realtime changes they may be making. Such an assumption requires either centralization or omniscience. However, it is feasible to ensure strong eventual consistency[^strong-eventual-consistency], so that when any agents interact with and integrate the same data, all will converge to matching conclusions about the validity of any state change it represents.
 
-[^strong-eventual-consistency]: [Conflict-free Replicated Data Types](https://pages.lip6.fr/Marc.Shapiro/papers/RR-7687.pdf), Marc Shapiro, Nuno Preguiça, Carlos Baquero, Marek Zawirski.
+[^strong-eventual-consistency]: *Conflict-free Replicated Data Types*, Marc Shapiro, Nuno Preguiça, Carlos Baquero, Marek Zawirski <https://pages.lip6.fr/Marc.Shapiro/papers/RR-7687.pdf>.
 
 **Since only local time is knowable, non-local ordering is constructed by explicit reference:** In the physical universe, entities experience time only as a local phenomenon; any awareness of other entities' experience of time comes from direct interaction with them. Thus, "global time" as a total ordering of causal events does not exist and entities' interactions form only partial orderings.
 
@@ -141,7 +141,7 @@ Building upon this fundament, we deliver the second point through the ability to
 * **Behavior**: one does not take an action more frequently than a certain rate
 * **Dependency**: an editor can only make changes if another agent has given them prior authorization
 
-[^content-structure]: While Per Martin-Löf [demonstrated](https://en.wikipedia.org/wiki/Intuitionistic_type_theory) that values can be unified with classical types into a single [dependent type theory](https://en.wikipedia.org/wiki/Dependent_type), thus showing that content and structure can be equivalent and share a single calculus, here we distinguish the two in order to speak a language that is more familiar to programmers.
+[^content-structure]: While Per Martin-Löf demonstrated (see <https://en.wikipedia.org/wiki/Intuitionistic_type_theory>) that values can be unified with classical types into a single dependent type theory (see <https://en.wikipedia.org/wiki/Dependent_type>), thus showing that content and structure can be equivalent and share a single calculus, here we distinguish the two in order to speak a language that is more familiar to programmers.
 
 The two domains of Intrinsic Data Integrity and Validation Rules, and their component dimensionality, amounts to what we might call a "Geometry of Certainty". Inside the clarity of such a geometry, the gradients of certainty become both much more visible, and much easier to build for appropriately. Thus it provides a context of agents being able to scale up their consent to play together in ways that meet their safety requirements. This is why we call our approach "Scaling Consent." It is what enables coherent collaborative action without first achieving global consensus.
 
@@ -155,9 +155,9 @@ If this application, unaware of total global ordering, ran at the scale of X (fo
 
 [^latency-as-partition]: It should be noted that communication latency induces conditions equivalent to a network partition, differing only in scope; therefore, there is still a risk of conflicting username registrations even in an unpartitioned network.
 
-Now, a given group's rules for social coherence may not require username registrations to be unique across all participants. Systems that refer to participants by a random unique key, allowing participants to identify themselves and others by assigning non-unique "petnames"[^petnames] (personally meaningful identifiers) to those keys, are proven to be usable in cases such as [Signal Messenger](https://signal.org) and [Secure Scuttlebutt](https://scuttlebutt.nz).
+Now, a given group's rules for social coherence may not require username registrations to be unique across all participants. Systems that refer to participants by a random unique key, allowing participants to identify themselves and others by assigning non-unique "petnames"[^petnames] (personally meaningful identifiers) to those keys, are proven to be usable in cases such as Signal Messenger (<https://signal.org>) and Secure Scuttlebutt (<https://scuttlebutt.nz>).
 
-[^petnames]: [An Introduction to Petname Systems](http://www.skyhunter.com/marcs/petnames/IntroPetNames.html), Marc Stiegler, 2005.
+[^petnames]: *An Introduction to Petname Systems*, Marc Stiegler, 2005 <http://www.skyhunter.com/marcs/petnames/IntroPetNames.html>.
 
 But let us assume that users of this application demand unique usernames in the manner of X. It could employ one of a number of strategies for resolving or preventing conflicts:
 
@@ -168,7 +168,7 @@ But let us assume that users of this application demand unique usernames in the 
     * An auction.
 3. Similar to client/server or blockchain approaches, a set of one or more witnesses can be elected to approve all name registrations and ensure there are no conflicts. While this approach prevents conflicts from happening, it requires a majority of a known set of witnesses, and any partition which contains a minority will not be able to process registrations.
 
-[^roughtime]: [Roughtime IETF draft](https://datatracker.ietf.org/doc/draft-ietf-ntp-roughtime/), W Ladd, Akamai Technologies, M Dansarie, Netnod, 2024.
+[^roughtime]: Roughtime IETF draft, W Ladd, Akamai Technologies, M Dansarie, Netnod, 2024 <https://datatracker.ietf.org/doc/draft-ietf-ntp-roughtime/>.
 
 Each one of these strategies achieves the same outcome while embodying very different patterns of social coherence; and in each case, there was no resolution overhead expended on all the non-rivalrous forms of data.
 
@@ -192,4 +192,4 @@ While our axioms may seem obvious to those familiar with distributed and agent-b
 
 As we have also argued, and as other authors formally prove[^byzantine-eventual-consistency], such freedom need not compromise the technical or social integrity needed to take confident action. There is a broad space of design possibilities that allow groups to embody non-coercive, highly coherent, contextually appropriate patterns of coordination even in the presence of malicious actors. In the remainder of this paper, we will explore how Holochain's design realizes the expressivity necessary to build these patterns.
 
-[^byzantine-eventual-consistency]: [Byzantine Eventual Consistency and the Fundamental Limits of Peer-to-Peer Databases](https://arxiv.org/pdf/2012.00472), Martin Kleppmann and Heidi Howard, 2020.
+[^byzantine-eventual-consistency]: *Byzantine Eventual Consistency and the Fundamental Limits of Peer-to-Peer Databases*, Martin Kleppmann and Heidi Howard, 2020 <https://arxiv.org/pdf/2012.00472>.

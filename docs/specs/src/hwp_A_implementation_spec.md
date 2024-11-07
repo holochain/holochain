@@ -18,13 +18,21 @@ Given the formal description from that document of our local state model (Source
 
 ## Ribosome: The Application "Virtual Machine"
 
-We use the term **Ribosome** to the name of part of the Holochain system that runs the DNA's application code. Abstractly, a Ribosome could be built for any programming language as long as it's possible to deterministically hash and run the code of the DNA's Integrity Zome such that all agents who possess the same hash can rely on the validation routines and structure described by that Integrity Zome operating identically for all. (In our implementation we use WebAssembly (WASM) for DNA code, and [Wasmer](https://wasmer.io/) as the runtime that executes it.)
+We use the term **Ribosome** to the name of part of the Holochain system that runs the DNA's application code. Abstractly, a Ribosome could be built for any programming language as long as it's possible to deterministically hash and run the code of the DNA's Integrity Zome such that all agents who possess the same hash can rely on the validation routines and structure described by that Integrity Zome operating identically for all. (In our implementation we use WebAssembly (WASM) for DNA code, and Wasmer[^wasmer] as the runtime that executes it.)
+
+[^wasmer]: See <https://wasmer.io/>.
 
 The Ribosome, as an application host, must expose a minimal set of functions to guest applications to allow them to access Holochain functionality, and it should expect that guest applications implement a minimal set of callbacks that allow the guest to define its entry types, link types, validation functions, and lifecycle hooks for both Integrity and Coordinator Zomes. We will call this set of provisions and expectations the Ribosome Host API.
 
 Additionally, it is advantageous to provide software development kits (SDKs) to facilitate the rapid development of Integrity and Coordinator Zomes that consume the Ribosome's host functions and provide the callbacks it expects.
 
-In our implementation we provide SDKs for Integrity and Coordinator Zomes written in the [Rust programming language](https://rust-lang.org) as Rust crates: the [Holochain Deterministic Integrity (HDI) crate](https://docs.rs/hdi/) facilitates the development of Integrity Zomes, while the [Holochain Development Kit (HDK) crate](https://docs.rs/hdk/) facilitates the development of Coordinator Zomes.
+In our implementation we provide SDKs for Integrity and Coordinator Zomes written in the Rust programming language[^rust] as Rust crates: the Holochain Deterministic Integrity (HDI) crate[^hdi] facilitates the development of Integrity Zomes, while the Holochain Development Kit (HDK) crate[^hdk] facilitates the development of Coordinator Zomes.
+
+[^rust]: See <https://rust-lang.org>.
+
+[^hdi]: See <https://docs.rs/hdi/>.
+
+[^hdk]: See <https://docs.rs/hdk/>.
 
 ### Ribosome/Zome Interop ABI
 
@@ -1199,7 +1207,7 @@ The HDK MUST provide mechanisms for agents to sign and check the signatures of d
 
 * `verify_signature<I>(AgentPubKey, Signature, I) -> ExternResult<bool> where I: Serialize`: (see HDI)
 
-* `x_salsa20_poly1305_shared_secret_create_random(Option<XSalsa20Poly1305KeyRef>) -> ExternResult<XSalsa20Poly1305KeyRef>`: Generate a secure random shared secret suitable for encrypting and decrypting messages using NaCl's [secretbox](https://nacl.cr.yp.to/secretbox.html) encryption algorithm, and store it in the key-management system. An optional key reference ID may be given; if this ID already exists in the key-management system, an error will be returned. If no ID is given, one will be generated and returned. The key reference is defined as:
+* `x_salsa20_poly1305_shared_secret_create_random(Option<XSalsa20Poly1305KeyRef>) -> ExternResult<XSalsa20Poly1305KeyRef>`: Generate a secure random shared secret suitable for encrypting and decrypting messages using NaCl's secretbox[^secretbox] encryption algorithm, and store it in the key-management system. An optional key reference ID may be given; if this ID already exists in the key-management system, an error will be returned. If no ID is given, one will be generated and returned. The key reference is defined as:
 
     ```rust
     struct XSalsa20Poly1305KeyRef(u8);
@@ -1214,21 +1222,27 @@ The HDK MUST provide mechanisms for agents to sign and check the signatures of d
     }
     ```
 
+[^secretbox]: See <https://nacl.cr.yp.to/secretbox.html>.
+
 * `x_salsa20_poly1305_decrypt(XSalsa20Poly1305KeyRef, XSalsa20Poly1305EncryptedData) -> ExternResult<Option<Vec<u8>>`: Given a reference to a symmetric encryption key, request the decryption of the given bytes with the key.
 
-* `create_x25519_keypair() -> ExternResult<X25519PubKey>`: Create an X25519 key pair suitable for encrypting and decrypting messages using NaCl's [box](https://nacl.cr.yp.to/box.html) algorithm, and store it in the key-management service. The return value is defined as:
+* `create_x25519_keypair() -> ExternResult<X25519PubKey>`: Create an X25519 key pair suitable for encrypting and decrypting messages using NaCl's box[^box] algorithm, and store it in the key-management service. The return value is defined as:
 
     ```rust
     struct X25519PubKey([u8; 32]);
     ```
 
+[^box]: See <https://nacl.cr.yp.to/box.html>.
+
 * `x_25519_x_salsa20_poly1305_encrypt(X25519PubKey, X25519PubKey, Vec<u8>) -> ExternResult<XSalsa20Poly1305EncryptedData>`: Given X25519 public keys for the sender and recipient, attempt to encrypt the given bytes via the box algorithm using the sender's private key stored in the key-management service and the receiver's public key.
 
 * `x_25519_x_salsa20_poly1305_decrypt(X25519PubKey, X25519PubKey, Vec<u8>) -> ExternResult<XSalsa20Poly1305EncryptedData>`: Given X25519 public keys for the recipient and sender, attempt to decrypt the given bytes via the box algorithm using the sender's public key and the receiver's private key stored in the key-management service.
 
-* `ed_25519_x_salsa20_poly1305_encrypt(AgentPubKey, AgentPubKey, XSalsa20Poly1305Data) -> ExternResult<XSalsa20Poly1305EncryptedData>`: Attempt to encrypt a message using the box algorithm, converting the Ed25519 signing keys of the sender and recipient agents into X25519 encryption keys. This procedure is [not recommended](https://doc.libsodium.org/quickstart#how-can-i-sign-and-encrypt-using-the-same-key-pair) by the developers of libsodium, the NaCl implementation used by Holochain.
+* `ed_25519_x_salsa20_poly1305_encrypt(AgentPubKey, AgentPubKey, XSalsa20Poly1305Data) -> ExternResult<XSalsa20Poly1305EncryptedData>`: Attempt to encrypt a message using the box algorithm, converting the Ed25519 signing keys of the sender and recipient agents into X25519 encryption keys. This procedure is not recommended[^ed-x-25519-signing] by the developers of libsodium, the NaCl implementation used by Holochain.
 
-* `ed_25519_x_salsa20_poly1305_decrypt(AgentHash, AgentHash, XSalsa20Poly1305EncryptedData) -> ExternResult<XSalsa20Poly1305Data>`: Attempt to decrypt a message using the box algorithm, converting the Ed25519 signing keys of the recipient and sender agents into X22519 encryption keys. This procedure is [not recommended](https://doc.libsodium.org/quickstart#how-can-i-sign-and-encrypt-using-the-same-key-pair) by the developers of libsodium, the NaCl implementation used by Holochain.
+[^ed-x-25519-signing]: See <https://doc.libsodium.org/quickstart#how-can-i-sign-and-encrypt-using-the-same-key-pair>.
+
+* `ed_25519_x_salsa20_poly1305_decrypt(AgentHash, AgentHash, XSalsa20Poly1305EncryptedData) -> ExternResult<XSalsa20Poly1305Data>`: Attempt to decrypt a message using the box algorithm, converting the Ed25519 signing keys of the recipient and sender agents into X22519 encryption keys. This procedure is not recommended by the developers of libsodium, the NaCl implementation used by Holochain.
 
 #### User Notification
 
@@ -1541,7 +1555,7 @@ impl HashableContent for Warrant {
 
 As a simple accumulation of data (DHT operations) attached to their respective basis addresses, a Holochain DHT exhibits a logical monotonicity[^calm-theorem]. The natural consequence of this property is that any two peers who receive the same set of DHT operations will arrive at the same database state without need of a coordination protocol.
 
-[^calm-theorem]: [Keeping CALM: When Distributed Consistency is Easy](https://arxiv.org/abs/1901.01930), Joseph M Hellerstein and Peter Alvaro.
+[^calm-theorem]: *Keeping CALM: When Distributed Consistency is Easy*, Joseph M Hellerstein and Peter Alvaro <https://arxiv.org/abs/1901.01930>.
 
 While the monotonic accumulation of operations is the most fundamental truth about the nature of DHT data, it is nevertheless important for the goal of ensuring Holochain's fitness for application development that we give the operations further meaning. This happens at two levels:
 
@@ -1557,7 +1571,7 @@ While the monotonic accumulation of operations is the most fundamental truth abo
     * The set difference between all record creates/updates and deletes that refer to them can be accessed as a "tombstone" set that yields the list of non-deleted records, the liveness of an entry or record, or the earliest live non-deleted record for an entry (see `get` in the DHT Data Retrieval section).
     * The set difference between all link creates and link deletes that refer to them can be accessed as a tombstone set that yields the list of non-deleted links (see `get_links` in the DHT Data Retrieval section).
 
-[^crdt-like]: While this interpretation indicates that the set of metadata can be validly seen as operations in a simple operation-based [conflict-free replicated data type (CRDT)](https://crdt.tech), we have chosen not to use this term in order to avoid overlaying of preconceptions formed by more capable CRDTs.
+[^crdt-like]: While this interpretation indicates that the set of metadata can be validly seen as operations in a simple operation-based conflict-free replicated data type (CRDT) (see <https://crdt.tech>), we have chosen not to use this term in order to avoid overlaying of preconceptions formed by more capable CRDTs.
 
 #### Validation and Liveness on the DHT
 
@@ -2517,7 +2531,9 @@ A Holochain Conductor manages running Holochain applications, which consist of l
 
 ### Bundle Formats
 
-Holochain implementations must be able to load Holochain applications that have been serialized, either to disk or for transmission over a network. Holochain uses a bundling format that allows for specification of properties along with other resources in a manifest that can include recursively bundled elements of the same general bundling format but adapted for different component types. The bundling format can also store the resources themselves within the same file; any of the sub-bundles can be specified by "location", which may be specified to be in the same bundle, in a separate file, or at a network address. Thus we have Zomes, DNAs, Apps, UIs, and WebApps that can all be wrapped up in a single bundle, or can reference components stored elsewhere. The "meta bundle" format can be seen here: https://github.com/holochain/holochain/tree/develop/crates/mr_bundle. The manifests for each of the type of bundles that MUST be implemented are specified as follows:
+Holochain implementations must be able to load Holochain applications that have been serialized, either to disk or for transmission over a network. Holochain uses a bundling format that allows for specification of properties along with other resources in a manifest that can include recursively bundled elements of the same general bundling format but adapted for different component types. The bundling format can also store the resources themselves within the same file; any of the sub-bundles can be specified by "location", which may be specified to be in the same bundle, in a separate file, or at a network address. Thus we have Zomes, DNAs, Apps, UIs, and WebApps that can all be wrapped up in a single bundle, or can reference components stored elsewhere.[^metabundle] The manifests for each of the type of bundles that MUST be implemented are specified as follows:
+
+[^metabundle]: The "meta bundle" format can be seen here: <https://github.com/holochain/holochain/tree/develop/crates/mr_bundle>.
 
 #### DNA Bundle Manifest
 
