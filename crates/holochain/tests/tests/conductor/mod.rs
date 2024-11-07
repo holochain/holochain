@@ -19,13 +19,13 @@ async fn can_install_app_with_custom_modifiers_correctly() {
         "some properties in the manifest",
     )));
     let manifest_origin_time = Timestamp::now().saturating_sub(&std::time::Duration::from_secs(1));
-    let manifest_quantum_time = std::time::Duration::from_secs(1 * 60);
+    let manifest_quantum_time = std::time::Duration::from_secs(60);
 
     let modifiers = DnaModifiersOpt::default()
         .with_network_seed(manifest_network_seed.clone())
         .with_properties(manifest_properties.clone())
-        .with_origin_time(manifest_origin_time.clone())
-        .with_quantum_time(manifest_quantum_time.clone());
+        .with_origin_time(manifest_origin_time)
+        .with_quantum_time(manifest_quantum_time);
 
     let role_name_1 = String::from("role1");
     let role_name_2 = String::from("role2");
@@ -168,13 +168,13 @@ async fn can_install_app_with_custom_modifiers_correctly() {
     let installed_app_role_1 = manifest
         .app_roles()
         .into_iter()
-        .find(|r| &r.name == &role_name_1)
+        .find(|r| r.name == role_name_1)
         .unwrap();
 
     let installed_app_role_2 = manifest
         .app_roles()
         .into_iter()
-        .find(|r| &r.name == &role_name_2)
+        .find(|r| r.name == role_name_2)
         .unwrap();
 
     assert_eq!(
@@ -204,11 +204,11 @@ async fn can_install_app_with_custom_modifiers_correctly() {
     );
     assert_eq!(
         installed_app_role_2.dna.modifiers.origin_time,
-        Some(manifest_origin_time.clone())
+        Some(manifest_origin_time)
     );
     assert_eq!(
         installed_app_role_2.dna.modifiers.quantum_time,
-        Some(manifest_quantum_time.clone())
+        Some(manifest_quantum_time)
     );
 
     //- Test that modifier fields that are None in the modifiers map do not overwrite existing
@@ -247,7 +247,7 @@ async fn can_install_app_with_custom_modifiers_correctly() {
     let installed_app_role_1 = manifest
         .app_roles()
         .into_iter()
-        .find(|r| &r.name == &role_name_1)
+        .find(|r| r.name == role_name_1)
         .unwrap();
 
     // Check that the modifers have been set correctly
