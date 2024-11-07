@@ -10,8 +10,8 @@ UNSTABLE_FEATURES=chc,unstable-dpki,unstable-sharding,unstable-warrants,unstable
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
-	static-all static-fmt static-toml static-clippy static-doc \
-	build-workspace-wasmer_sys build-workspace-wasmer_wamr \
+	static-all static-fmt static-toml static-clippy static-clippy-unstable \
+	static-doc build-workspace-wasmer_sys build-workspace-wasmer_wamr \
 	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
 	build-workspace-wasmer_sys-unstable \
 	test-workspace-wasmer_sys-unstable
