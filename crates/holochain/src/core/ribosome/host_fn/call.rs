@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use crate::core::ribosome::ZomeCall;
+use crate::core::ribosome::SignedZomeCall;
 use futures::future::join_all;
 use holochain_conductor_api::ZomeCallDeserialized;
 use holochain_nonce::fresh_nonce;
@@ -75,20 +75,23 @@ pub fn call(
                                     nonce,
                                     expires_at,
                                 };
-                                let zome_call_payload = ZomeCall::try_from_unsigned_zome_call(
-                                    call_context.host_context.keystore(),
-                                    zome_call_unsigned.clone(),
-                                )
-                                .await
-                                .map_err(|e| -> RuntimeError {
-                                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                                })?;
+                                let zome_call_payload =
+                                    SignedZomeCall::try_from_unsigned_zome_call(
+                                        call_context.host_context.keystore(),
+                                        zome_call_unsigned.clone(),
+                                    )
+                                    .await
+                                    .map_err(
+                                        |e| -> RuntimeError {
+                                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                                        },
+                                    )?;
                                 match call_context
                                     .host_context()
                                     .network()
                                     .call_remote(
                                         provenance.clone(),
-                                        zome_call_payload.zome_call_payload,
+                                        zome_call_payload.bytes,
                                         zome_call_payload.signature,
                                         target_agent,
                                         zome_call_unsigned.zome_name,
@@ -232,7 +235,7 @@ pub mod wasm_test {
 
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::test_utils::new_zome_call_unsigned;
-    use holochain_conductor_api::ZomeCall;
+    use holochain_conductor_api::SignedZomeCall;
     use holochain_sqlite::prelude::DatabaseResult;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -302,10 +305,12 @@ pub mod wasm_test {
         let zome_call_unsigned =
             new_zome_call_unsigned(alice.cell_id(), "call_create_entry", (), TestWasm::Create)
                 .unwrap();
-        let zome_call =
-            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), zome_call_unsigned.clone())
-                .await
-                .unwrap();
+        let zome_call = SignedZomeCall::try_from_unsigned_zome_call(
+            handle.keystore(),
+            zome_call_unsigned.clone(),
+        )
+        .await
+        .unwrap();
         let call = ZomeCallDeserialized {
             signed_zome_call: zome_call,
             unsigned_zome_call: zome_call_unsigned,

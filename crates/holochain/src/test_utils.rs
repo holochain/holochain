@@ -17,7 +17,7 @@ use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
-use holochain_conductor_api::ZomeCall;
+use holochain_conductor_api::SignedZomeCall;
 use holochain_conductor_api::ZomeCallDeserialized;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
@@ -949,10 +949,11 @@ where
     P: serde::Serialize + std::fmt::Debug,
 {
     let ZomeCallDeserialized {
-        signed_zome_call: ZomeCall {
-            zome_call_payload,
-            signature,
-        },
+        signed_zome_call:
+            SignedZomeCall {
+                bytes: zome_call_payload,
+                signature,
+            },
         unsigned_zome_call:
             ZomeCallUnsigned {
                 cell_id,

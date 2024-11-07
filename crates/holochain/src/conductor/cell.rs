@@ -9,7 +9,7 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use futures::future::FutureExt;
-use holochain_conductor_api::ZomeCall;
+use holochain_conductor_api::SignedZomeCall;
 use holochain_conductor_api::ZomeCallDeserialized;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
@@ -892,8 +892,8 @@ impl Cell {
         expires_at: Timestamp,
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCallDeserialized {
-            signed_zome_call: ZomeCall {
-                zome_call_payload,
+            signed_zome_call: SignedZomeCall {
+                bytes: zome_call_payload,
                 signature: from_signature,
             },
             unsigned_zome_call: ZomeCallUnsigned {

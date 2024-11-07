@@ -635,7 +635,7 @@ pub mod test {
         // Call Zome
         let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
         let request = AppRequest::CallZome(Box::new(
-            ZomeCall::try_from_unsigned_zome_call(
+            SignedZomeCall::try_from_unsigned_zome_call(
                 conductor_handle.keystore(),
                 ZomeCallUnsigned {
                     provenance: agent_key.clone(),

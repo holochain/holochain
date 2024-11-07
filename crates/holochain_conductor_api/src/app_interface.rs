@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{AppAuthenticationToken, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
@@ -31,7 +33,7 @@ pub enum AppRequest {
     /// # Returns
     ///
     /// [`AppResponse::ZomeCalled`]
-    CallZome(Box<ZomeCall>),
+    CallZome(Box<SignedZomeCall>),
 
     /// Get the state of a countersigning session.
     ///
@@ -256,30 +258,34 @@ pub enum AppResponse {
 
 /// The data provided over an app interface in order to make a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ZomeCall {
-    /// The serialized zome call payload that includes all fields of a
-    /// [`ZomeCallDeserialized`].
-    pub zome_call_payload: ExternIO,
+pub struct SignedZomeCall {
+    /// Bytes of the serialized zome call payload that consists all fields of a
+    /// [`ZomeCallUnsigned`].
+    pub bytes: ExternIO,
     /// Signature by the provenance of the call, signing the bytes of the zome call payload.
     pub signature: Signature,
 }
 
-impl ZomeCall {
+impl SignedZomeCall {
+    pub fn new(bytes: Arc<[u8]>, signature: Signature) -> Self {
+        Self {
+            bytes: ExternIO::from(bytes.to_vec()),
+            signature,
+        }
+    }
+
     pub async fn try_from_unsigned_zome_call(
         keystore: &MetaLairClient,
         unsigned_zome_call: ZomeCallUnsigned,
     ) -> LairResult<Self> {
-        let zome_call_payload = unsigned_zome_call
+        let bytes = unsigned_zome_call
             .data_to_sign()
             .map_err(|e| e.to_string())?;
         let signature = unsigned_zome_call
             .provenance
-            .sign_raw(keystore, zome_call_payload.clone())
+            .sign_raw(keystore, bytes.clone())
             .await?;
-        Ok(Self {
-            zome_call_payload: ExternIO(zome_call_payload.to_vec()),
-            signature,
-        })
+        Ok(Self::new(bytes, signature))
     }
 
     pub async fn resign_zome_call(
@@ -288,18 +294,18 @@ impl ZomeCall {
         agent_key: AgentPubKey,
     ) -> LairResult<Self> {
         let mut zome_call_unsigned = self
-            .zome_call_payload
+            .bytes
             .decode::<ZomeCallUnsigned>()
             .map_err(|e| e.to_string())?;
         zome_call_unsigned.provenance = agent_key;
-        ZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned).await
+        SignedZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned).await
     }
 }
 
 ///
 #[derive(Clone, Debug)]
 pub struct ZomeCallDeserialized {
-    pub signed_zome_call: ZomeCall,
+    pub signed_zome_call: SignedZomeCall,
     pub unsigned_zome_call: ZomeCallUnsigned,
     // /// The zome call payload
     // pub zome_call_payload: ExternIO,
@@ -331,7 +337,8 @@ impl ZomeCallDeserialized {
         unsigned_zome_call: ZomeCallUnsigned,
     ) -> LairResult<Self> {
         let signed_zome_call =
-            ZomeCall::try_from_unsigned_zome_call(keystore, unsigned_zome_call.clone()).await?;
+            SignedZomeCall::try_from_unsigned_zome_call(keystore, unsigned_zome_call.clone())
+                .await?;
         // let zome_call_payload = unsigned_zome_call
         //     .data_to_sign()
         //     .map_err(|e| e.to_string())?;

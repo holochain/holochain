@@ -59,7 +59,7 @@ mod check_clone_access;
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::DpkiApi;
-use crate::conductor::api::ZomeCall;
+use crate::conductor::api::SignedZomeCall;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
@@ -562,7 +562,7 @@ impl ZomeCallInvocation {
             .get_zome(cell_id.dna_hash(), &zome_name)
             .map_err(|conductor_api_error| RibosomeError::from(Box::new(conductor_api_error)))?;
         Ok(Self {
-            zome_call_payload: signed_zome_call.zome_call_payload,
+            zome_call_payload: signed_zome_call.bytes,
             signature: signed_zome_call.signature,
             cell_id,
             zome,
@@ -591,8 +591,8 @@ impl From<ZomeCallInvocation> for ZomeCallDeserialized {
             expires_at,
         } = inv;
         Self {
-            signed_zome_call: ZomeCall {
-                zome_call_payload,
+            signed_zome_call: SignedZomeCall {
+                bytes: zome_call_payload,
                 signature,
             },
             unsigned_zome_call: ZomeCallUnsigned {

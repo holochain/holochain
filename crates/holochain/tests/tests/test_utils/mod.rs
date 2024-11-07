@@ -43,7 +43,7 @@ use tokio::process::Command;
 
 use hdk::prelude::*;
 use holochain::{
-    conductor::api::ZomeCall,
+    conductor::api::SignedZomeCall,
     conductor::api::{AdminRequest, AdminResponse, AppRequest},
 };
 use holochain_conductor_api::AppResponse;
@@ -206,19 +206,12 @@ where
         nonce,
         expires_at,
     };
-    let signature = signing_keypair.sign(&zome_call_unsigned.data_to_sign().unwrap());
-    let call = ZomeCall {
-        cell_id: zome_call_unsigned.cell_id,
-        zome_name: zome_call_unsigned.zome_name,
-        fn_name: zome_call_unsigned.fn_name,
-        payload: zome_call_unsigned.payload,
-        cap_secret: zome_call_unsigned.cap_secret,
-        provenance: zome_call_unsigned.provenance,
-        nonce: zome_call_unsigned.nonce,
-        expires_at: zome_call_unsigned.expires_at,
-        signature: Signature::from(signature.to_bytes()),
-    };
-    let request = AppRequest::CallZome(Box::new(call));
+    let bytes = zome_call_unsigned.data_to_sign().unwrap();
+    let signature = signing_keypair.sign(&bytes);
+    let request = AppRequest::CallZome(Box::new(SignedZomeCall::new(
+        bytes,
+        Signature::from(signature.to_bytes()),
+    )));
     let response = app_tx.request(request);
     check_timeout(response, 6000).await.unwrap()
 }

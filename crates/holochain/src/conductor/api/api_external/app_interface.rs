@@ -81,7 +81,7 @@ impl AppInterfaceApi {
             )),
             AppRequest::CallZome(call) => {
                 let zome_call_unsigned = call
-                    .zome_call_payload
+                    .bytes
                     .clone()
                     .decode::<ZomeCallUnsigned>()
                     .map_err(|e| ConductorApiError::SerializationError(e.into()))?;

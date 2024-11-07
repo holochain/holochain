@@ -1,7 +1,10 @@
+use holochain_conductor_api::ZomeCallDeserialized;
+use holochain_nonce::fresh_nonce;
 use holochain_nonce::Nonce256Bits;
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::*;
+use matches::assert_matches;
 use std::collections::BTreeSet;
 
 use crate::fixt::AgentPubKeyFixturator;
@@ -12,10 +15,6 @@ use arbitrary::Arbitrary;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn signed_zome_call() {
-    use holochain_conductor_api::{ZomeCall, ZomeCallDeserialized};
-    use holochain_nonce::fresh_nonce;
-    use matches::assert_matches;
-
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -165,11 +164,6 @@ async fn signed_zome_call() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn signed_zome_call_wildcard() {
-    use holochain_conductor_api::{ZomeCall, ZomeCallDeserialized};
-    use holochain_nonce::fresh_nonce;
-    use holochain_zome_types::prelude::*;
-    use matches::assert_matches;
-
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
