@@ -60,12 +60,12 @@ pub use agent_key_operations::RevokeAgentKeyForAppResult;
 pub use builder::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::{DpkiConfig, KeystoreConfig};
-use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
+use holochain_conductor_api::{AppInfo, ZomeCallDeserialized};
 pub use holochain_conductor_services::*;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
@@ -108,7 +108,6 @@ use crate::{
 };
 
 use super::api::AppInterfaceApi;
-use super::api::ZomeCall;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
 use super::entry_def_store::get_entry_defs;
@@ -835,6 +834,7 @@ mod network_impls {
     use std::time::Duration;
 
     use futures::future::join_all;
+    use holochain_conductor_api::ZomeCallDeserialized;
     use rusqlite::params;
 
     use holochain_conductor_api::{
@@ -1368,18 +1368,21 @@ mod network_impls {
         }
 
         /// Invoke a zome function on a Cell
-        pub async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
-            let cell = self.cell_by_id(&call.cell_id).await?;
+        pub async fn call_zome(
+            &self,
+            call: ZomeCallDeserialized,
+        ) -> ConductorApiResult<ZomeCallResult> {
+            let cell = self.cell_by_id(&call.unsigned_zome_call.cell_id).await?;
             Ok(cell.call_zome(call, None).await?)
         }
 
         pub(crate) async fn call_zome_with_workspace(
             &self,
-            call: ZomeCall,
+            call: ZomeCallDeserialized,
             workspace_lock: SourceChainWorkspace,
         ) -> ConductorApiResult<ZomeCallResult> {
-            debug!(cell_id = ?call.cell_id);
-            let cell = self.cell_by_id(&call.cell_id).await?;
+            debug!(cell_id = ?call.unsigned_zome_call.cell_id);
+            let cell = self.cell_by_id(&call.unsigned_zome_call.cell_id).await?;
             Ok(cell.call_zome(call, Some(workspace_lock)).await?)
         }
 
@@ -1413,7 +1416,8 @@ mod network_impls {
                 expires_at,
             };
             let call =
-                ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
+                ZomeCallDeserialized::try_from_unsigned_zome_call(self.keystore(), call_unsigned)
+                    .await?;
             let response = self.call_zome(call).await;
             match response {
                 Ok(Ok(response)) => Ok(zome_call_response_to_conductor_api_result(response)?),
@@ -3381,7 +3385,6 @@ mod countersigning_impls {
 impl holochain_conductor_services::CellRunner for Conductor {
     async fn call_zome(
         &self,
-        zome_call_payload: ExternIO,
         provenance: &AgentPubKey,
         cap_secret: Option<CapSecret>,
         cell_id: CellId,
@@ -3402,7 +3405,9 @@ impl holochain_conductor_services::CellRunner for Conductor {
             nonce,
             expires_at,
         };
-        let call = ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
+        let call =
+            ZomeCallDeserialized::try_from_unsigned_zome_call(self.keystore(), call_unsigned)
+                .await?;
         let response = self.call_zome(call).await;
         match response {
             Ok(Ok(ZomeCallResponse::Ok(bytes))) => Ok(bytes),

@@ -18,6 +18,7 @@ use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCall;
+use holochain_conductor_api::ZomeCallDeserialized;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::actor::HolochainP2pRefToDna;
@@ -901,13 +902,13 @@ pub async fn new_zome_call<P, Z: Into<ZomeName>>(
     func: &str,
     payload: P,
     zome: Z,
-) -> Result<ZomeCall, SerializedBytesError>
+) -> Result<ZomeCallDeserialized, SerializedBytesError>
 where
     P: serde::Serialize + std::fmt::Debug,
 {
     let zome_call_unsigned = new_zome_call_unsigned(cell_id, func, payload, zome)?;
     Ok(
-        ZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned)
+        ZomeCallDeserialized::try_from_unsigned_zome_call(keystore, zome_call_unsigned)
             .await
             .unwrap(),
     )
@@ -947,17 +948,22 @@ pub async fn new_invocation<P, Z: Into<Zome> + Clone>(
 where
     P: serde::Serialize + std::fmt::Debug,
 {
-    let ZomeCall {
-        cell_id,
-        zome_call_payload,
-        cap_secret,
-        fn_name,
-        payload,
-        provenance,
-        signature,
-        nonce,
-        expires_at,
-        ..
+    let ZomeCallDeserialized {
+        signed_zome_call: ZomeCall {
+            zome_call_payload,
+            signature,
+        },
+        unsigned_zome_call:
+            ZomeCallUnsigned {
+                cell_id,
+                cap_secret,
+                fn_name,
+                payload,
+                provenance,
+                nonce,
+                expires_at,
+                ..
+            },
     } = new_zome_call(keystore, cell_id, func, payload, zome.clone().into()).await?;
     Ok(ZomeCallInvocation {
         cell_id,

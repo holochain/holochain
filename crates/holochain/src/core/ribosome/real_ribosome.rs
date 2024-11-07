@@ -1155,7 +1155,7 @@ impl RibosomeT for RealRibosome {
 pub mod wasm_test {
     use crate::core::ribosome::real_ribosome::CONTEXT_MAP;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::core::ribosome::ZomeCall;
+    use crate::core::ribosome::ZomeCallDeserialized;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
@@ -1299,7 +1299,7 @@ pub mod wasm_test {
         let infallible_result = conductor
             .raw_handle()
             .call_zome(
-                ZomeCall::try_from_unsigned_zome_call(
+                ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
                     ZomeCallUnsigned {
                         cell_id: alice.cell_id().clone(),

@@ -190,7 +190,6 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn send_remote_signal(
         &self,
-        _zome_call_payload: ExternIO,
         _from_agent: AgentPubKey,
         _to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
         _zome_name: ZomeName,
@@ -260,7 +259,6 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn call_remote(
         &self,
-        _zome_call_payload: ExternIO,
         _from_agent: AgentPubKey,
         _zome_call_payload: ExternIO,
         _from_signature: Signature,

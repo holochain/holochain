@@ -41,7 +41,6 @@ impl DeepkeyState {
         let payload = ExternIO::encode(input)?;
         self.runner
             .call_zome(
-                ExternIO::encode(())?,
                 &provenance,
                 cap_secret,
                 cell_id,

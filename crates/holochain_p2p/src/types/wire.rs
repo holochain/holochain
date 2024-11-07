@@ -26,7 +26,6 @@ impl WireDhtOpData {
 #[allow(missing_docs)]
 pub enum WireMessage {
     CallRemote {
-        zome_call_payload: ExternIO,
         zome_name: ZomeName,
         fn_name: FunctionName,
         from_agent: holo_hash::AgentPubKey,
@@ -40,7 +39,6 @@ pub enum WireMessage {
         expires_at: Timestamp,
     },
     CallRemoteMulti {
-        zome_call_payload: ExternIO,
         zome_name: ZomeName,
         fn_name: FunctionName,
         from_agent: holo_hash::AgentPubKey,
@@ -104,7 +102,6 @@ impl WireMessage {
     /// For an outgoing remote call.
     #[allow(clippy::too_many_arguments)]
     pub fn call_remote(
-        zome_call_payload: ExternIO,
         zome_name: ZomeName,
         fn_name: FunctionName,
         from_agent: holo_hash::AgentPubKey,
@@ -117,7 +114,6 @@ impl WireMessage {
         expires_at: Timestamp,
     ) -> WireMessage {
         Self::CallRemote {
-            zome_call_payload,
             zome_name,
             fn_name,
             from_agent,
@@ -133,7 +129,6 @@ impl WireMessage {
 
     #[allow(clippy::too_many_arguments)]
     pub fn call_remote_multi(
-        zome_call_payload: ExternIO,
         zome_name: ZomeName,
         fn_name: FunctionName,
         from_agent: holo_hash::AgentPubKey,
@@ -144,7 +139,6 @@ impl WireMessage {
         expires_at: Timestamp,
     ) -> WireMessage {
         Self::CallRemoteMulti {
-            zome_call_payload,
             zome_name,
             fn_name,
             from_agent,

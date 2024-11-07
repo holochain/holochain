@@ -35,7 +35,6 @@ impl HolochainP2pHandler for StubNetwork {
 
     fn handle_call_remote(
         &mut self,
-        zome_call_payload: ExternIO,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
         zome_call_payload: ExternIO,
@@ -53,7 +52,6 @@ impl HolochainP2pHandler for StubNetwork {
 
     fn handle_send_remote_signal(
         &mut self,
-        zome_call_payload: ExternIO,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
         to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,

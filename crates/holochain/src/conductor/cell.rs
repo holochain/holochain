@@ -9,6 +9,8 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use futures::future::FutureExt;
+use holochain_conductor_api::ZomeCall;
+use holochain_conductor_api::ZomeCallDeserialized;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
 use tokio::sync::broadcast;
@@ -19,7 +21,6 @@ use error::CellError;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_chc::ChcImpl;
-use holochain_conductor_api::ZomeCall;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDna;
@@ -312,7 +313,7 @@ impl Cell {
 
                     tasks.push(
                         self.call_zome(
-                            match ZomeCall::try_from_unsigned_zome_call(
+                            match ZomeCallDeserialized::try_from_unsigned_zome_call(
                                 self.conductor_handle.keystore(),
                                 unsigned_zome_call,
                             )
@@ -890,17 +891,21 @@ impl Cell {
         nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> CellResult<SerializedBytes> {
-        let invocation = ZomeCall {
-            cell_id: self.id.clone(),
-            zome_call_payload,
-            cap_secret,
-            payload,
-            provenance: from_agent,
-            signature: from_signature,
-            zome_name,
-            fn_name,
-            nonce,
-            expires_at,
+        let invocation = ZomeCallDeserialized {
+            signed_zome_call: ZomeCall {
+                zome_call_payload,
+                signature: from_signature,
+            },
+            unsigned_zome_call: ZomeCallUnsigned {
+                cell_id: self.id.clone(),
+                cap_secret,
+                payload,
+                provenance: from_agent,
+                zome_name,
+                fn_name,
+                nonce,
+                expires_at,
+            },
         };
         // double ? because
         // - ConductorApiResult
@@ -916,7 +921,7 @@ impl Cell {
     // to access the Cell itself, as it was previously done.
     pub async fn call_zome(
         &self,
-        call: ZomeCall,
+        call: ZomeCallDeserialized,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
         // Only check if init has run if this call is not coming from

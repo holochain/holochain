@@ -4,6 +4,7 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCall;
 use futures::future::join_all;
+use holochain_conductor_api::ZomeCallDeserialized;
 use holochain_nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -86,7 +87,6 @@ pub fn call(
                                     .host_context()
                                     .network()
                                     .call_remote(
-                                        zome_call_payload,
                                         provenance.clone(),
                                         zome_call_payload.zome_call_payload,
                                         zome_call_payload.signature,
@@ -145,7 +145,6 @@ pub fn call(
                                 match cell_id_result {
                                     Ok(cell_id) => {
                                         let zome_call_unsigned = ZomeCallUnsigned {
-                                            zome_call_payload: ExternIO::encode(()).unwrap(),
                                             cell_id,
                                             zome_name,
                                             fn_name,
@@ -155,14 +154,18 @@ pub fn call(
                                             nonce,
                                             expires_at,
                                         };
-                                        let call = ZomeCall::try_from_unsigned_zome_call(
-                                            call_context.host_context.keystore(),
-                                            zome_call_unsigned,
-                                        )
-                                        .await
-                                        .map_err(|e| -> RuntimeError {
-                                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                                        })?;
+                                        let call =
+                                            ZomeCallDeserialized::try_from_unsigned_zome_call(
+                                                call_context.host_context.keystore(),
+                                                zome_call_unsigned,
+                                            )
+                                            .await
+                                            .map_err(
+                                                |e| -> RuntimeError {
+                                                    wasm_error!(WasmErrorInner::Host(e.to_string()))
+                                                        .into()
+                                                },
+                                            )?;
                                         match call_context
                                             .host_context()
                                             .call_zome_handle()
@@ -221,6 +224,7 @@ pub mod wasm_test {
     use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
     use holo_hash::ActionHash;
+    use holochain_conductor_api::ZomeCallDeserialized;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
@@ -299,10 +303,14 @@ pub mod wasm_test {
             new_zome_call_unsigned(alice.cell_id(), "call_create_entry", (), TestWasm::Create)
                 .unwrap();
         let zome_call =
-            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), zome_call_unsigned)
+            ZomeCall::try_from_unsigned_zome_call(handle.keystore(), zome_call_unsigned.clone())
                 .await
                 .unwrap();
-        let result = handle.call_zome(zome_call).await;
+        let call = ZomeCallDeserialized {
+            signed_zome_call: zome_call,
+            unsigned_zome_call: zome_call_unsigned,
+        };
+        let result = handle.call_zome(call).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
 
         // Get the action hash of that entry

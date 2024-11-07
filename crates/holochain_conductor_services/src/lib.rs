@@ -18,7 +18,6 @@ use holochain_types::prelude::*;
 pub trait CellRunner: Send + Sync + 'static {
     async fn call_zome(
         &self,
-        zome_call_payload: ExternIO,
         provenance: &AgentPubKey,
         cap_secret: Option<CapSecret>,
         cell_id: CellId,

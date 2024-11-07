@@ -80,12 +80,21 @@ impl AppInterfaceApi {
                     .await?,
             )),
             AppRequest::CallZome(call) => {
-                match self.conductor_handle.call_zome(*call.clone()).await? {
+                let zome_call_unsigned = call
+                    .zome_call_payload
+                    .clone()
+                    .decode::<ZomeCallUnsigned>()
+                    .map_err(|e| ConductorApiError::SerializationError(e.into()))?;
+                let zome_call = ZomeCallDeserialized {
+                    signed_zome_call: *call,
+                    unsigned_zome_call: zome_call_unsigned,
+                };
+                match self.conductor_handle.call_zome(zome_call.clone()).await? {
                     Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),
                     Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, _, zome_name, fn_name, _)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
                             "Call was not authorized with reason {:?}, cap secret {:?} to call the function {} in zome {}",
-                            zome_call_authorization, call.cap_secret, fn_name, zome_name
+                            zome_call_authorization, zome_call.unsigned_zome_call.cap_secret, fn_name, zome_name
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(

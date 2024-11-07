@@ -735,7 +735,7 @@ pub mod test {
         respond: R,
     ) {
         // Now make sure we can call a zome once again
-        let mut request: ZomeCall =
+        let mut zome_call: ZomeCallDeserialized =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 cell_id.clone(),
                 wasm,
@@ -745,13 +745,14 @@ pub mod test {
             .next()
             .unwrap()
             .into();
-        request.cell_id = cell_id;
-        request = request
+        zome_call.unsigned_zome_call.cell_id = cell_id;
+        zome_call.signed_zome_call = zome_call
+            .signed_zome_call
             .resign_zome_call(&test_keystore(), fixt!(AgentPubKey, Predictable, 0))
             .await
             .unwrap();
 
-        let msg = AppRequest::CallZome(Box::new(request));
+        let msg = AppRequest::CallZome(Box::new(zome_call.signed_zome_call));
         test_handle_incoming_app_message(
             "".to_string(),
             msg,
