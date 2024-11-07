@@ -186,12 +186,10 @@ However, if this currency were designed to work in regions with unreliable netwo
 
 The above examples illustrate how the demand for appropriate social coherence drives an application's approach to selecting from affordances that Holochain provides to resolve conflicts and reach unified outcomes. They also demonstrate how coordination overhead becomes unnecessarily high if all non-rivalrous data is treated as rivalrous, and how forcing conflict resolution into a single costly pattern should not apply to all data nor in all social contexts. Agentic assessment of the social context, and mutual enforcement of only the necessary rules for coherence, enables agents to act as soon as their certainty threshold is reached. This is always true, whether it is reached through centralized coordination, a Byzantine Generals' Problem approach, or blockchain consensus algorithms.
 
-### Evolving Beyond Fault Tolerance to Anti-Fragility
+## Conclusion
 
-Finally, for coordination to function at scale as well as maintain its usefulness across time, a framework must do more than be resilient to Byzantine Faults, but actually evolve toward greater resilience by adapting future behaviors in response to past failures. Resilient coordination must be anti-fragile, that is, disruptions and perturbations should improve the system's performance[^antifragile]. 
+While our axioms may seem obvious to those familiar with distributed and agent-based systems, they yield surprising and often-overlooked consequences when taken to their logical conclusions in the design of a practical distributed system. As we have seen, such a system is likely to be more efficient than a consensus-based system of equivalent functionality in terms of computation, communication, and storage. It is also likely to be more respectful of the agency of individuals and the group than either consensus or centralized systems: there is an underlying theme in these axioms, that of full agency constrained by the obligation to respect the agency of others (and indeed the inability to override their agency).
 
-[^antifragile]: Antifragile: Things that Gain from Disorder. Nassim Nicholas Taleb
+As we have also argued, and as other authors formally prove[^byzantine-eventual-consistency], such freedom need not compromise the technical or social integrity needed to take confident action. There is a broad space of design possibilities that allow groups to embody non-coercive, highly coherent, contextually appropriate patterns of coordination even in the presence of malicious actors. In the remainder of this paper, we will explore how Holochain's design realizes the expressivity necessary to build these patterns.
 
-Holochain updates... but also apps evolving code in response to changing social coherence requirements... attack factory?
-
-**If we write this section, can we remove axiom #8 about two levels enabling evolution?**
+[^byzantine-eventual-consistency]: [Byzantine Eventual Consistency and the Fundamental Limits of Peer-to-Peer Databases](https://arxiv.org/pdf/2012.00472), Martin Kleppmann and Heidi Howard, 2020.
