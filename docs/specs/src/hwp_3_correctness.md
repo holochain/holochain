@@ -16,7 +16,7 @@ Our claim is that if all of these dimensions are sufficiently addressed, then th
 
 In distributed systems much has been written about Fault Tolerance especially to those faults known as "Byzantine" faults. These faults might be caused by either random chance or by malicious action. For aspects of failures in system confidence that arise purely from malicious action, see the [Security] section.
 
-1. **Faults from unknown data provenance:** Because all data transmitted in the system is generated and cryptographically signed by Agents, and those signatures are also included in the hash-chains, it is always possible to verify any datum's provenance. Thus, faults from intentional or accidental impostors is not possible. The system cannot prevent malicious or incautious actors from stealing or revealing private keys, however, although it does include affordances to deal with these eventualities. These are discussed under Human Error in the [Security] section.
+1. **Faults from unknown data provenance:** Because all data transmitted in the system is generated and cryptographically signed by Agents, and those signatures are also included in the hash-chains, it is always possible to verify any datum's provenance. Thus, faults from intentional or accidental impostors is not possible. The system cannot prevent malicious or incautious actors from stealing or revealing private keys, however, although it does include affordances to deal with these eventualities. These are discussed under [Human Error].
 
 2. **Faults from data corruptibility in transmission and storage:** Because all state data is stored along with a cryptographic hash of that data, and because all data is addressed and retrieved by that hash and can be compared against the hash, the only possible fault is that the corruption resulted in data that has the same hash. For Blake2b-256 hashing (which is what we use), this is known to be a vanishingly small possibility for both intentional and unintentional data corruption.[^corruption] Furthermore, because all data is stored as hash-chains, it is not possible for portions of data to be retroactively changed. Agents' Source Chains thus become immutable append-only event logs.
 
@@ -145,7 +145,7 @@ Holochain apps bypass the risk of an Eclipse Attacks by providing an address for
 
 Application developers can take steps to further protect their users by providing in-app methods of exchanging signed pings with known nodes (such as a progenitor, migrator, notary, witness, or initial admin node) so a node can ensure it is not partitioned from the real network.
 
-### Human​ ​Error
+#### Human Error
 
 There are some aspects of security, especially those of human error, that all systems are subject to. People​ ​will​ ​still​ ​lose​ ​their​ ​keys,​ ​use​ ​weak​ ​passwords,​ ​get​ ​computer​ ​viruses, etc. But, crucially, in the realm of "System Correctness" and "confidence,"​ the question that needs addressing is how the system interfaces with mechanisms to mitigate against human error. Holochain provides significant tooling to support key management in the form of its ​core​ ​Distributed​ ​Public Key​ ​Infrastructure (DPKI) and DeepKey app built on that infrastructure. Among other things, this tooling ​provides​ ​assistance​ ​in​ ​managing​ ​keys,​ ​managing​ ​revocation​ ​methods,​ ​and reclaiming​ ​control​ ​of​ ​applications​ ​when​ ​keys​ ​or​ ​devices​ ​have​ ​become​ ​compromised.
 
