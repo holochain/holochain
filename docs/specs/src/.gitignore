@@ -12,4 +12,5 @@ media/*
 *.blg
 *.out
 hwp.*
-!hwp_alpha.tex
+holochain-white-paper*
+!holochain-white-paper-alpha.tex
