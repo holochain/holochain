@@ -9,8 +9,8 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use futures::future::FutureExt;
-use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_conductor_api::ZomeCall;
+use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
 use tokio::sync::broadcast;
@@ -300,7 +300,7 @@ impl Cell {
                             continue;
                         }
                     };
-                    let unsigned_zome_call = ZomeCallParams {
+                    let zome_call_params = ZomeCallParams {
                         provenance,
                         cell_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
@@ -315,7 +315,7 @@ impl Cell {
                         self.call_zome(
                             match ZomeCall::try_from_params(
                                 self.conductor_handle.keystore(),
-                                unsigned_zome_call,
+                                zome_call_params,
                             )
                                 .await
                             {
