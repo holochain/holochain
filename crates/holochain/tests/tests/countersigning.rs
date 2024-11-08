@@ -390,6 +390,7 @@ async fn alice_can_recover_from_a_session_timeout() {
     let config = SweetConductorConfig::rendezvous(true)
         .no_dpki()
         .tune_conductor(|c| {
+            c.countersigning_resolution_retry_limit = Some(3);
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         });
     let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
@@ -1214,6 +1215,7 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
 
     let config = SweetConductorConfig::rendezvous(true)
         .tune_conductor(|c| {
+            c.countersigning_resolution_retry_limit = Some(3);
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
         .tune(|params| {
@@ -1363,6 +1365,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
 
     let config = SweetConductorConfig::rendezvous(true)
         .tune_conductor(|c| {
+            c.countersigning_resolution_retry_limit = Some(3);
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
         .tune(|params| {

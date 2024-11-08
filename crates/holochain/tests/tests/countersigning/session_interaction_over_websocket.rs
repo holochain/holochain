@@ -601,6 +601,7 @@ impl Agent {
         });
         config.keystore = KeystoreConfig::LairServerInProc { lair_root: None };
         config.tuning_params = Some(ConductorTuningParams {
+            countersigning_resolution_retry_limit: Some(3),
             countersigning_resolution_retry_delay: Some(Duration::from_secs(5)),
             min_publish_interval: Some(Duration::from_secs(5)),
             ..Default::default()
