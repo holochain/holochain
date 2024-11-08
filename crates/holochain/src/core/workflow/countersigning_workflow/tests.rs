@@ -697,7 +697,7 @@ async fn recover_from_commit_after_restart_when_other_agent_abandons() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash, None).await;
+    let mut test_harness = TestHarness::new(dna_hash, Some(3)).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -794,7 +794,7 @@ async fn recover_from_commit_after_restart_when_other_agent_completes() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash, None).await;
+    let mut test_harness = TestHarness::new(dna_hash, Some(3)).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -844,8 +844,6 @@ async fn recover_from_commit_after_restart_when_other_agent_completes() {
 
     test_harness.expect_session_in_unknown_state();
 
-    test_harness.expect_session_in_unknown_state();
-
     // Now Bob's completed session shows up with an AAA
     let activity_response = bob
         .complete_session_activity_response(
@@ -889,11 +887,11 @@ async fn recover_from_commit_after_restart_when_other_agent_completes() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn stay_in_unknown_state_when_activity_authorities_do_not_agree() {
+async fn retry_in_unknown_state_when_activity_authorities_do_not_agree() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash, None).await;
+    let mut test_harness = TestHarness::new(dna_hash, Some(3)).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -953,12 +951,12 @@ async fn stay_in_unknown_state_when_activity_authorities_do_not_agree() {
         }
     });
 
-    for i in 1..5 {
-        test_harness
-            .respond_to_countersigning_workflow_signal()
-            .await;
-        test_harness.countersigning_tx.trigger(&"test");
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+    test_harness.countersigning_tx.trigger(&"test");
 
+    for i in 1..3 {
         let resolution = test_harness.expect_session_in_unknown_state();
 
         assert_eq!(i, resolution.attempts);
@@ -981,15 +979,23 @@ async fn stay_in_unknown_state_when_activity_authorities_do_not_agree() {
                 .any(|d| matches!(d, SessionCompletionDecision::Indeterminate))
         });
         assert!(!some_indeterminate);
+
+        test_harness
+            .respond_to_countersigning_workflow_signal()
+            .await;
+        test_harness.countersigning_tx.trigger(&"test");
     }
+
+    test_harness.expect_abandoned_signal().await;
+    test_harness.expect_empty_workspace();
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn stay_in_unknown_state_when_activity_authorities_are_missing_data() {
+async fn retry_when_activity_authorities_are_missing_data() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
-    let mut test_harness = TestHarness::new(dna_hash, None).await;
+    let mut test_harness = TestHarness::new(dna_hash, Some(3)).await;
 
     let bob = test_harness.new_remote_agent().await;
 
@@ -1049,12 +1055,12 @@ async fn stay_in_unknown_state_when_activity_authorities_are_missing_data() {
         }
     });
 
-    for i in 1..5 {
-        test_harness
-            .respond_to_countersigning_workflow_signal()
-            .await;
-        test_harness.countersigning_tx.trigger(&"test");
+    test_harness
+        .respond_to_countersigning_workflow_signal()
+        .await;
+    test_harness.countersigning_tx.trigger(&"test");
 
+    for i in 1..3 {
         let resolution = test_harness.expect_session_in_unknown_state();
 
         assert_eq!(i, resolution.attempts);
@@ -1077,7 +1083,15 @@ async fn stay_in_unknown_state_when_activity_authorities_are_missing_data() {
                 .any(|d| matches!(d, SessionCompletionDecision::Indeterminate))
         });
         assert!(some_indeterminate);
+
+        test_harness
+            .respond_to_countersigning_workflow_signal()
+            .await;
+        test_harness.countersigning_tx.trigger(&"test");
     }
+
+    test_harness.expect_abandoned_signal().await;
+    test_harness.expect_empty_workspace();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -1395,7 +1409,7 @@ async fn respect_unlimited_retries_on_timeout_with_no_signatures_received() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn retry_limit_does_not_apply_after_a_restart() {
+async fn retry_limit_applies_after_a_restart() {
     holochain_trace::test_run();
 
     let dna_hash = fixt!(DnaHash);
@@ -1450,16 +1464,18 @@ async fn retry_limit_does_not_apply_after_a_restart() {
         .respond_to_countersigning_workflow_signal()
         .await;
 
-    for _ in 0..10 {
+    // Run twice more to reach the retry limit
+    for _ in 0..2 {
+        test_harness.expect_session_in_unknown_state();
+
         test_harness
             .respond_to_countersigning_workflow_signal()
             .await;
-
-        test_harness.expect_session_in_unknown_state();
     }
 
-    // And on and on and on...
-    test_harness.expect_session_in_unknown_state();
+    // Then the retry limit should be reached and the session should be abandoned
+    test_harness.expect_abandoned_signal().await;
+    test_harness.expect_empty_workspace();
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -2069,7 +2085,10 @@ impl TestHarness {
             .share_ref(|w| Ok(w.session.clone()))
             .unwrap();
 
-        assert!(maybe_found.is_some());
+        assert!(
+            maybe_found.is_some(),
+            "No session found when looking for unknown state"
+        );
 
         match maybe_found {
             Some(CountersigningSessionState::Unknown { resolution, .. }) => resolution,
