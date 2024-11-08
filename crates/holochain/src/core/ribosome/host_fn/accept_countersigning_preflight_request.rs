@@ -1,3 +1,4 @@
+use crate::conductor::api::ZomeCall;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -354,7 +355,6 @@ pub mod wasm_test {
     #[cfg(feature = "slow_tests")]
     #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_invalid_session() {
-        use holochain_conductor_api::ZomeCall;
         use holochain_nonce::fresh_nonce;
 
         holochain_trace::test_run();
@@ -478,7 +478,6 @@ pub mod wasm_test {
     #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     #[cfg_attr(target_os = "windows", ignore = "stack overflow on windows")]
     async fn lock_chain() {
-        use holochain_conductor_api::ZomeCall;
         use holochain_nonce::fresh_nonce;
         holochain_trace::test_run();
         let RibosomeTestFixture {
