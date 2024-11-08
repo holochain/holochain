@@ -547,7 +547,7 @@ impl ZomeCallInvocation {
         let ZomeCallDeserialized {
             signed_zome_call,
             unsigned_zome_call:
-                ZomeCallUnsigned {
+                ZomeCallParams {
                     cap_secret,
                     cell_id,
                     expires_at,
@@ -595,7 +595,7 @@ impl From<ZomeCallInvocation> for ZomeCallDeserialized {
                 bytes: zome_call_payload,
                 signature,
             },
-            unsigned_zome_call: ZomeCallUnsigned {
+            unsigned_zome_call: ZomeCallParams {
                 cell_id,
                 provenance,
                 zome_name: zome.zome_name().clone(),
@@ -785,7 +785,7 @@ pub mod wasm_test {
     use holochain_keystore::AgentPubKeyExt;
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use holochain_zome_types::zome_io::ZomeCallParams;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -806,7 +806,7 @@ pub mod wasm_test {
 
         let now = Timestamp::now();
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
-        let alice_unsigned_zome_call = ZomeCallUnsigned {
+        let alice_unsigned_zome_call = ZomeCallParams {
             provenance: alice_pubkey.clone(),
             cell_id: alice.cell_id().clone(),
             zome_name: "foo".into(),

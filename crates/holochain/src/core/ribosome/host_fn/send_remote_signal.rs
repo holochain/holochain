@@ -11,7 +11,7 @@ use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::prelude::Timestamp;
 use holochain_zome_types::signal::RemoteSignal;
 use holochain_zome_types::zome::FunctionName;
-use holochain_zome_types::zome_io::ZomeCallUnsigned;
+use holochain_zome_types::zome_io::ZomeCallParams;
 use std::sync::Arc;
 use tracing::Instrument;
 use wasmer::RuntimeError;
@@ -54,7 +54,7 @@ pub fn send_remote_signal(
                     };
 
                     for agent in agents {
-                        let zome_call_unsigned = ZomeCallUnsigned {
+                        let zome_call_unsigned = ZomeCallParams {
                             provenance: from_agent.clone(),
                             cell_id: CellId::new(network.dna_hash(), agent.clone()),
                             zome_name: zome_name.clone(),

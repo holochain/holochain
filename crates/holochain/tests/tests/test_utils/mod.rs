@@ -196,7 +196,7 @@ where
 {
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
-    let zome_call_unsigned = ZomeCallUnsigned {
+    let zome_call_unsigned = ZomeCallParams {
         cap_secret: Some(cap_secret),
         cell_id: cell_id.clone(),
         zome_name: zome_name.clone(),

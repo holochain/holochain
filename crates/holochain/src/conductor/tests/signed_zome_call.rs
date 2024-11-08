@@ -116,7 +116,7 @@ async fn signed_zome_call() {
         .call_zome(
             ZomeCallDeserialized::try_from_unsigned_zome_call(
                 &conductor.keystore(),
-                ZomeCallUnsigned {
+                ZomeCallParams {
                     provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
                     cell_id: cell_id.clone(),
                     zome_name: zome.coordinator_zome_name(),
@@ -141,7 +141,7 @@ async fn signed_zome_call() {
         .call_zome(
             ZomeCallDeserialized::try_from_unsigned_zome_call(
                 &conductor.keystore(),
-                ZomeCallUnsigned {
+                ZomeCallParams {
                     provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
                     cell_id: cell_id.clone(),
                     zome_name: zome.coordinator_zome_name(),
@@ -243,7 +243,7 @@ async fn signed_zome_call_wildcard() {
         .call_zome(
             ZomeCallDeserialized::try_from_unsigned_zome_call(
                 &conductor.keystore(),
-                ZomeCallUnsigned {
+                ZomeCallParams {
                     provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
                     cell_id: cell_id.clone(),
                     zome_name: zome.coordinator_zome_name(),

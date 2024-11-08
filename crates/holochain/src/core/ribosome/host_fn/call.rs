@@ -62,7 +62,7 @@ pub fn call(
 
                         let result: Result<ZomeCallResponse, RuntimeError> = match target {
                             CallTarget::NetworkAgent(target_agent) => {
-                                let zome_call_unsigned = ZomeCallUnsigned {
+                                let zome_call_unsigned = ZomeCallParams {
                                     provenance: provenance.clone(),
                                     cell_id: CellId::new(
                                         ribosome.dna_def().as_hash().clone(),
@@ -147,7 +147,7 @@ pub fn call(
                                 };
                                 match cell_id_result {
                                     Ok(cell_id) => {
-                                        let zome_call_unsigned = ZomeCallUnsigned {
+                                        let zome_call_unsigned = ZomeCallParams {
                                             cell_id,
                                             zome_name,
                                             fn_name,

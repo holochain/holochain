@@ -637,7 +637,7 @@ pub mod test {
         let request = AppRequest::CallZome(Box::new(
             SignedZomeCall::try_from_unsigned_zome_call(
                 conductor_handle.keystore(),
-                ZomeCallUnsigned {
+                ZomeCallParams {
                     provenance: agent_key.clone(),
                     cell_id: cell_id.clone(),
                     zome_name: TestWasm::EmitSignal.coordinator_zome_name(),

@@ -276,7 +276,7 @@ impl SignedZomeCall {
 
     pub async fn try_from_unsigned_zome_call(
         keystore: &MetaLairClient,
-        unsigned_zome_call: ZomeCallUnsigned,
+        unsigned_zome_call: ZomeCallParams,
     ) -> LairResult<Self> {
         let bytes = unsigned_zome_call
             .data_to_sign()
@@ -295,7 +295,7 @@ impl SignedZomeCall {
     ) -> LairResult<Self> {
         let mut zome_call_unsigned = self
             .bytes
-            .decode::<ZomeCallUnsigned>()
+            .decode::<ZomeCallParams>()
             .map_err(|e| e.to_string())?;
         zome_call_unsigned.provenance = agent_key;
         SignedZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned).await
@@ -306,7 +306,7 @@ impl SignedZomeCall {
 #[derive(Clone, Debug)]
 pub struct ZomeCallDeserialized {
     pub signed_zome_call: SignedZomeCall,
-    pub unsigned_zome_call: ZomeCallUnsigned,
+    pub unsigned_zome_call: ZomeCallParams,
     // /// The zome call payload
     // pub zome_call_payload: ExternIO,
     // /// The ID of the cell containing the zome to be called
@@ -334,7 +334,7 @@ pub struct ZomeCallDeserialized {
 impl ZomeCallDeserialized {
     pub async fn try_from_unsigned_zome_call(
         keystore: &MetaLairClient,
-        unsigned_zome_call: ZomeCallUnsigned,
+        unsigned_zome_call: ZomeCallParams,
     ) -> LairResult<Self> {
         let signed_zome_call =
             SignedZomeCall::try_from_unsigned_zome_call(keystore, unsigned_zome_call.clone())

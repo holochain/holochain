@@ -1405,7 +1405,7 @@ mod network_impls {
             let now = Timestamp::now();
             let (nonce, expires_at) =
                 holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
-            let call_unsigned = ZomeCallUnsigned {
+            let call_unsigned = ZomeCallParams {
                 cell_id,
                 zome_name: zome_name.into(),
                 fn_name: fn_name.into(),
@@ -3395,7 +3395,7 @@ impl holochain_conductor_services::CellRunner for Conductor {
         let now = Timestamp::now();
         let (nonce, expires_at) =
             holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
-        let call_unsigned = ZomeCallUnsigned {
+        let call_unsigned = ZomeCallParams {
             cell_id,
             zome_name,
             fn_name,

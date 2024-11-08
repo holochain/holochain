@@ -284,7 +284,7 @@ impl ZomeCallResponse {
 /// Zome calls need to be signed regardless of how they are called.
 /// This defines exactly what needs to be signed.
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ZomeCallUnsigned {
+pub struct ZomeCallParams {
     /// Provenance to sign.
     pub provenance: AgentPubKey,
     /// Cell ID to sign.
@@ -303,7 +303,7 @@ pub struct ZomeCallUnsigned {
     pub expires_at: Timestamp,
 }
 
-impl ZomeCallUnsigned {
+impl ZomeCallParams {
     /// Prepare the canonical bytes for an unsigned zome call so that it is
     /// always signed and verified in the same way.
     pub fn data_to_sign(&self) -> Result<std::sync::Arc<[u8]>, SerializedBytesError> {

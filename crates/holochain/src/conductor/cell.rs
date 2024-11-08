@@ -300,7 +300,7 @@ impl Cell {
                             continue;
                         }
                     };
-                    let unsigned_zome_call = ZomeCallUnsigned {
+                    let unsigned_zome_call = ZomeCallParams {
                         provenance,
                         cell_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
@@ -896,7 +896,7 @@ impl Cell {
                 bytes: zome_call_payload,
                 signature: from_signature,
             },
-            unsigned_zome_call: ZomeCallUnsigned {
+            unsigned_zome_call: ZomeCallParams {
                 cell_id: self.id.clone(),
                 cap_secret,
                 payload,

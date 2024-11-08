@@ -251,7 +251,7 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
                 let cell_id = cell.cell_id().clone();
                 let call = SignedZomeCall::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: cell_id.clone(),
                         zome_name: TestWasm::MultipleCalls.into(),
                         fn_name: "create_entry_multiple".into(),

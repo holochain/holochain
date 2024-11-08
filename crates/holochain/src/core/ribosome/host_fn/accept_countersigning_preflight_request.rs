@@ -72,7 +72,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use holochain_zome_types::zome_io::ZomeCallParams;
     use matches::assert_matches;
     use wasmer::RuntimeError;
 
@@ -423,7 +423,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
                         zome_name: alice.name().clone(),
                         fn_name: "create_a_thing".into(),
@@ -450,7 +450,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
                         zome_name: alice.name().clone(),
                         fn_name: "create_an_invalid_countersigned_thing".into(),
@@ -545,7 +545,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
                         zome_name: alice.name().clone(),
                         fn_name: "accept_countersigning_preflight_request".into(),
@@ -588,7 +588,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
                         zome_name: alice.name().clone(),
                         fn_name: "create_a_thing".into(),
@@ -612,7 +612,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: bob.cell_id().clone(),
                         zome_name: bob.name().clone(),
                         fn_name: "create_a_thing".into(),
@@ -646,7 +646,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
                         zome_name: alice.name().clone(),
                         fn_name: "create_a_thing".into(),
@@ -688,7 +688,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: bob.cell_id().clone(),
                         zome_name: bob.name().clone(),
                         fn_name: "create_a_thing".into(),
@@ -856,7 +856,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
                         zome_name: alice.name().clone(),
                         fn_name: "accept_countersigning_preflight_request".into(),
@@ -899,7 +899,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
                         zome_name: alice.name().clone(),
                         fn_name: "create_a_thing".into(),
@@ -923,7 +923,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: bob.cell_id().clone(),
                         zome_name: bob.name().clone(),
                         fn_name: "create_a_thing".into(),
@@ -957,7 +957,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
                         zome_name: alice.name().clone(),
                         fn_name: "create_a_thing".into(),
@@ -999,7 +999,7 @@ pub mod wasm_test {
             .call_zome(
                 ZomeCallDeserialized::try_from_unsigned_zome_call(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: bob.cell_id().clone(),
                         zome_name: bob.name().clone(),
                         fn_name: "create_a_thing".into(),

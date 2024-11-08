@@ -316,7 +316,7 @@ mod tests {
         let payload = ExternIO::encode(b"yippo").unwrap();
         let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
 
-        let zome_call_payload = ZomeCallUnsigned {
+        let zome_call_payload = ZomeCallParams {
             provenance: a1.clone(),
             cell_id: CellId::new(dna.clone(), a2.clone()),
             zome_name: zome_name.clone(),

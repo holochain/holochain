@@ -920,12 +920,12 @@ pub fn new_zome_call_unsigned<P, Z: Into<ZomeName>>(
     func: &str,
     payload: P,
     zome: Z,
-) -> Result<ZomeCallUnsigned, SerializedBytesError>
+) -> Result<ZomeCallParams, SerializedBytesError>
 where
     P: serde::Serialize + std::fmt::Debug,
 {
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    Ok(ZomeCallUnsigned {
+    Ok(ZomeCallParams {
         cell_id: cell_id.clone(),
         zome_name: zome.into(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
@@ -955,7 +955,7 @@ where
                 signature,
             },
         unsigned_zome_call:
-            ZomeCallUnsigned {
+            ZomeCallParams {
                 cell_id,
                 cap_secret,
                 fn_name,
