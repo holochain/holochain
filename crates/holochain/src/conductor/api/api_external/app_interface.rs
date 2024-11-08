@@ -246,15 +246,4 @@ impl ZomeCall {
             params: zome_call_params,
         })
     }
-
-    ///
-    pub async fn resign_zome_call(
-        self,
-        keystore: &MetaLairClient,
-        agent_key: AgentPubKey,
-    ) -> LairResult<Self> {
-        let mut zome_call_params = self.params.clone();
-        zome_call_params.provenance = agent_key;
-        Self::try_from_params(keystore, zome_call_params).await
-    }
 }
