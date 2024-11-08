@@ -6,14 +6,28 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.5.0-dev.4
+
 - **BREAKING**: As the DPKI feature is unstable and incomplete, it is disabled with default cargo features and put behind a feature called `unstable-dpki`. If this feature is specified at compile time, DPKI is enabled by default.
 - **BREAKING**: Issuing and persisting warrants is behind a feature `unstable-warrants` now. Warrants have not been tested extensively and there is no way to recover from a warrant. Hence the feature is considered unstable and must be explicitly enabled. Note that once warrants are issued some functions or calls may not work correctly.
+- **BREAKING**: Conductor::get\_dna\_definitions now returns an `IndexMap` to ensure consistent ordering.
+- Add test to make sure sys validation rejects deleting a delete. Unit tests to get zomes to invoke for app validation were removed for these cases of deleting a delete, because the code path cannot be reached by the system.
+- Added a new feature “unstable-sharding” which puts the network sharding behind a feature flag. It will not be possible to configure network sharding unless Holochain is built with this feature enabled. By default, the network tuning parameter `gossip_dynamic_arcs` is ignored, and the parameter `gossip_arc_clamping` must be set to either `"full"` or `"empty"`, the previous default value of `"none"` will prevent the conductor from starting. We intend to stabilise this feature in the future, and it will return to being available without a feature flag. \#4344
 
-- Added a new feature "unstable-sharding" which puts the network sharding behind a feature flag. It will not be possible
-  to configure network sharding unless Holochain is built with this feature enabled. By default, the network tuning 
-  parameter `gossip_dynamic_arcs` is ignored, and the parameter `gossip_arc_clamping` must be set to either `"full"`
-  or `"empty"`, the previous default value of `"none"` will prevent the conductor from starting. We intend to stabilise
-  this feature in the future, and it will return to being available without a feature flag. #4344
+- **BREAKING** The following HDK functions have been temporarily removed as "unstable". They can be re-enabled by building Holochain with the "unstable-functions" feature flag:
+  - `accept_countersigning_preflight_request`
+  - `block_agent`
+  - `unblock_agent`
+  - `get_agent_key_lineage`
+  - `is_same_agent`
+  - `schedule`
+  - the function `sleep` has been removed entirely because it wasn't implemented
+  - and the HDI function `is_same_agent`
+  Note that installing apps that have been built with an HDK from before this change will not be possible to install on
+  a conductor that has been built without the `unstable-functions` feature. You will get import errors when Holochain tries
+  to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto
+  a conductor which has been compiled with `unstable-functions` but the reverse is not true. #4371
 
 ## 0.5.0-dev.3
 

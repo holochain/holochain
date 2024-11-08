@@ -1,10 +1,12 @@
 #![allow(clippy::type_complexity)]
+
 use crate::actor::BroadcastData;
+use crate::actor::*;
 use crate::spawn::actor::{
-    EvtRcv, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,
+    EvtRcv, InternalHandler, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,
 };
 use crate::spawn::meta_net::MetaNetCon;
-use crate::spawn::{Internal, InternalHandler};
+use crate::spawn::Internal;
 use crate::{GossipModuleType, KitsuneP2pError};
 use futures::FutureExt;
 use ghost_actor::GhostError;
@@ -18,6 +20,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub struct InternalStub {
     fetch_calls: Vec<(FetchKey, KSpace, FetchSource)>,
     pub incoming_publish_calls: Arc<

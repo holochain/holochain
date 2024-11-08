@@ -6,7 +6,6 @@ pub trait SweetRendezvous: 'static + Send + Sync {
     /// Get the bootstrap address.
     fn bootstrap_addr(&self) -> &str;
 
-    #[cfg(feature = "tx5")]
     /// Get the signal server address.
     fn sig_addr(&self) -> &str;
 }
@@ -19,15 +18,10 @@ pub struct SweetLocalRendezvous {
     bs_addr: String,
     bs_shutdown: Option<kitsune_p2p_bootstrap::BootstrapShutdown>,
 
-    #[cfg(feature = "tx5")]
     turn_srv: Option<tx5_go_pion_turn::Tx5TurnServer>,
-    #[cfg(feature = "tx5")]
     sig_addr: String,
-    #[cfg(feature = "tx5")]
     sig_hnd: Mutex<Option<sbd_server::SbdServer>>,
-    #[cfg(feature = "tx5")]
     sig_ip: std::net::IpAddr,
-    #[cfg(feature = "tx5")]
     sig_port: u16,
 }
 
@@ -36,7 +30,6 @@ impl Drop for SweetLocalRendezvous {
         if let Some(s) = self.bs_shutdown.take() {
             s();
         }
-        #[cfg(feature = "tx5")]
         if let Some(s) = self.turn_srv.take() {
             tokio::task::spawn(async move {
                 let _ = s.stop().await;
@@ -45,7 +38,6 @@ impl Drop for SweetLocalRendezvous {
     }
 }
 
-#[cfg(feature = "tx5")]
 async fn spawn_sig(ip: std::net::IpAddr, port: u16) -> (String, u16, sbd_server::SbdServer) {
     let sig_hnd = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
         bind: vec![format!("{ip}:{port}")],
@@ -92,15 +84,6 @@ impl SweetLocalRendezvous {
         let bs_addr = format!("http://{bs_addr}");
         tracing::info!("RUNNING BOOTSTRAP: {bs_addr:?}");
 
-        #[cfg(not(feature = "tx5"))]
-        {
-            Arc::new(Self {
-                bs_addr,
-                bs_shutdown: Some(bs_shutdown),
-            })
-        }
-
-        #[cfg(feature = "tx5")]
         {
             let (turn_addr, turn_srv) = tx5_go_pion_turn::test_turn_server().await.unwrap();
             tracing::info!("RUNNING TURN: {turn_addr:?}");
@@ -122,7 +105,6 @@ impl SweetLocalRendezvous {
     }
 
     /// Drop (shutdown) the signal server.
-    #[cfg(feature = "tx5")]
     pub async fn drop_sig(&self) {
         self.sig_hnd.lock().unwrap().take();
 
@@ -138,7 +120,6 @@ impl SweetLocalRendezvous {
     }
 
     /// Start (or restart) the signal server.
-    #[cfg(feature = "tx5")]
     pub async fn start_sig(&self) {
         self.drop_sig().await;
 
@@ -154,7 +135,6 @@ impl SweetRendezvous for SweetLocalRendezvous {
         self.bs_addr.as_str()
     }
 
-    #[cfg(feature = "tx5")]
     /// Get the signal server address.
     fn sig_addr(&self) -> &str {
         self.sig_addr.as_str()

@@ -21,6 +21,7 @@ use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
+use kitsune_p2p_types::config::TransportConfig;
 use nanoid::nanoid;
 use rand::Rng;
 use std::net::ToSocketAddrs;
@@ -68,11 +69,6 @@ impl PartialEq for SweetConductor {
 
 impl Eq for SweetConductor {}
 
-/// Standard config for SweetConductors
-pub fn standard_config() -> SweetConductorConfig {
-    SweetConductorConfig::standard()
-}
-
 impl SweetConductor {
     /// Get the ID of this conductor for manual equality checks.
     pub fn id(&self) -> String {
@@ -116,7 +112,9 @@ impl SweetConductor {
     where
         C: Into<SweetConductorConfig>,
     {
-        Self::create_with_defaults(config, None, None::<DynSweetRendezvous>).await
+        let config: SweetConductorConfig = config.into();
+        let vous = config.get_rendezvous();
+        Self::create_with_defaults(config, None, vous).await
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
@@ -169,10 +167,22 @@ impl SweetConductor {
                 .await;
         }
 
+        let config: SweetConductorConfig = config.into();
         let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
-            config.into().into_conductor_config(&*r).await
+            config.apply_rendezvous(&r).into()
         } else {
-            config.into().into()
+            if let Some(b) = config.network.bootstrap_service.as_ref() {
+                if b.to_string().starts_with("rendezvous:") {
+                    panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.bootstrap_service");
+                }
+            }
+            if config.network.transport_pool.iter().any(|p| match p {
+                TransportConfig::WebRTC { signal_url, .. } => signal_url.starts_with("rendezvous:"),
+                _ => false,
+            }) {
+                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.transport_pool[].signal_url");
+            }
+            config.into()
         };
 
         if config.tracing_scope().is_none() {
@@ -237,7 +247,7 @@ impl SweetConductor {
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
     pub async fn from_standard_config() -> SweetConductor {
-        Self::from_config(standard_config()).await
+        Self::from_config(SweetConductorConfig::standard()).await
     }
 
     /// Get the rendezvous config that this conductor is using, if any

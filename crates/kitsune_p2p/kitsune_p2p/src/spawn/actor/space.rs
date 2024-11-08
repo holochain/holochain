@@ -1,21 +1,15 @@
 use super::*;
 use crate::metrics::*;
 use crate::types::gossip::GossipModule;
-use base64::Engine;
 use ghost_actor::dependencies::tracing;
 use kitsune_p2p_bootstrap_client::BootstrapNet;
 use kitsune_p2p_fetch::FetchPool;
-use kitsune_p2p_mdns::*;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
-use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
 use kitsune_p2p_types::config::KitsuneP2pConfig;
-use kitsune_p2p_types::config::NetworkType;
 use kitsune_p2p_types::dht::arq::ArqSize;
-use kitsune_p2p_types::dht::prelude::ArqClamping;
-use kitsune_p2p_types::dht::spacetime::SpaceDimension;
-use kitsune_p2p_types::dht::Arq;
+use kitsune_p2p_types::dht::prelude::*;
 use kitsune_p2p_types::dht_arc::{DhtArcRange, DhtArcSet};
-use kitsune_p2p_types::tx2::tx2_utils::TxUrl;
+use kitsune_p2p_types::tx_utils::TxUrl;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicBool;
 use url2::Url2;
@@ -216,7 +210,6 @@ impl SpaceInternalHandler for Space {
         };
         let space = self.space.clone();
         let mut mdns_handles = self.mdns_handles.clone();
-        let network_type = self.config.network_type.clone();
         let mut agent_list = Vec::with_capacity(self.local_joined_agents.len());
         for agent in self.local_joined_agents.keys().cloned() {
             let arq = self.get_agent_arq(&agent);
@@ -244,8 +237,7 @@ impl SpaceInternalHandler for Space {
                     urls: &urls,
                     evt_sender: &evt_sender,
                     internal_sender: &internal_sender,
-                    network_type: network_type.clone(),
-                    mdns_handles: &mut mdns_handles,
+                    _mdns_handles: &mut mdns_handles,
                     bootstrap_service: &bootstrap_service,
                     dynamic_arcs,
                 };
@@ -271,7 +263,6 @@ impl SpaceInternalHandler for Space {
         let space = self.space.clone();
         let bootstrap_net = self.ro_inner.bootstrap_net;
         let mut mdns_handles = self.mdns_handles.clone();
-        let network_type = self.config.network_type.clone();
         let evt_sender = self.host_api.legacy.clone();
         let internal_sender = self.i_s.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
@@ -293,8 +284,7 @@ impl SpaceInternalHandler for Space {
                 urls: &urls,
                 evt_sender: &evt_sender,
                 internal_sender: &internal_sender,
-                network_type: network_type.clone(),
-                mdns_handles: &mut mdns_handles,
+                _mdns_handles: &mut mdns_handles,
                 bootstrap_service: &bootstrap_service,
                 dynamic_arcs,
             };
@@ -678,8 +668,7 @@ struct UpdateAgentInfoInput<'borrow> {
     urls: &'borrow Vec<TxUrl>,
     evt_sender: &'borrow futures::channel::mpsc::Sender<KitsuneP2pEvent>,
     internal_sender: &'borrow ghost_actor::GhostSender<SpaceInternal>,
-    network_type: NetworkType,
-    mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
+    _mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
     dynamic_arcs: bool,
 }
@@ -724,8 +713,7 @@ async fn update_single_agent_info(
         urls,
         evt_sender,
         internal_sender,
-        network_type,
-        mdns_handles,
+        _mdns_handles,
         bootstrap_service,
         dynamic_arcs,
     } = input;
@@ -773,37 +761,18 @@ async fn update_single_agent_info(
     put_local_agent_info(evt_sender.clone(), agent_info_signed.clone()).await?;
 
     // Push to the network as well
-    match network_type {
-        NetworkType::QuicMdns => {
-            // Broadcast only valid AgentInfo
-            if !urls.is_empty() {
-                // Kill previous broadcast for this space + agent
-                let key = [space.get_bytes(), agent.get_bytes()].concat();
-                if let Some(current_handle) = mdns_handles.get(&key) {
-                    mdns_kill_thread(current_handle.to_owned());
-                }
-                // Broadcast by using Space as service type and Agent as service name
-                let space_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&space[..]);
-                let agent_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&agent[..]);
-                //println!("(MDNS) - Broadcasting of Agent {:?} ({}) in space {:?} ({} ; {})",
-                // agent, agent.get_bytes().len(), space, space.get_bytes().len(), space_b64.len());
-                // Broadcast rmp encoded agent_info_signed
-                let mut buffer = Vec::new();
-                rmp_encode(&mut buffer, &agent_info_signed)?;
-                tracing::trace!(?space_b64, ?agent_b64);
-                let handle = mdns_create_broadcast_thread(space_b64, agent_b64, &buffer);
-                // store handle in self
-                mdns_handles.insert(key, handle);
-            }
-        }
-        NetworkType::QuicBootstrap => {
-            kitsune_p2p_bootstrap_client::put(
-                bootstrap_service.clone(),
-                agent_info_signed.clone(),
-                bootstrap_net,
-            )
-            .await?;
-        }
+    {
+        // TODO: "mdns" stuff
+    }
+
+    // bootstrap stuff
+    {
+        kitsune_p2p_bootstrap_client::put(
+            bootstrap_service.clone(),
+            agent_info_signed.clone(),
+            bootstrap_net,
+        )
+        .await?;
     }
     Ok(agent_info_signed)
 }
@@ -863,53 +832,9 @@ impl KitsuneP2pHandler for Space {
         for module in self.gossip_mod.values() {
             module.local_agent_join(agent.clone());
         }
+
+        // TODO: make network join a purely local operation
         let fut = self.i_s.update_single_agent_info(agent);
-        let evt_sender = self.host_api.legacy.clone();
-        match self.config.network_type {
-            NetworkType::QuicMdns => {
-                // Listen to MDNS service that has that space as service type
-                let space_b64 = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&space[..]);
-                if !self.mdns_listened_spaces.contains(&space_b64) {
-                    self.mdns_listened_spaces.insert(space_b64.clone());
-                    tokio::task::spawn(async move {
-                        let stream = mdns_listen(space_b64);
-                        tokio::pin!(stream);
-                        while let Some(maybe_response) = stream.next().await {
-                            match maybe_response {
-                                Ok(response) => {
-                                    tracing::trace!(msg = "Peer found via MDNS", ?response);
-                                    // Decode response
-                                    let maybe_agent_info_signed =
-                                        rmp_decode(&mut &*response.buffer);
-                                    if let Err(e) = maybe_agent_info_signed {
-                                        tracing::error!(msg = "Failed to decode MDNS peer", ?e);
-                                        continue;
-                                    }
-                                    if let Ok(remote_agent_info_signed) = maybe_agent_info_signed {
-                                        // Add to local storage
-                                        if let Err(e) = evt_sender
-                                            .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                                peer_data: vec![remote_agent_info_signed],
-                                            })
-                                            .await
-                                        {
-                                            tracing::error!(msg = "Failed to store MDNS peer", ?e);
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    tracing::error!(msg = "Failed to get peers from MDNS", ?e);
-                                }
-                            }
-                        }
-                    });
-                }
-            }
-            NetworkType::QuicBootstrap => {
-                // quic bootstrap is managed for the whole space
-                // see the Space::new() constructor
-            }
-        }
 
         Ok(fut.boxed().into())
     }
@@ -1401,7 +1326,7 @@ pub(crate) struct Space {
     pub(crate) agent_arqs: HashMap<Arc<KitsuneAgent>, Arq>,
     pub(crate) config: Arc<KitsuneP2pConfig>,
     mdns_handles: HashMap<Vec<u8>, Arc<AtomicBool>>,
-    mdns_listened_spaces: HashSet<String>,
+    _mdns_listened_spaces: HashSet<String>,
     gossip_mod: HashMap<GossipModuleType, GossipModule>,
 }
 
@@ -1506,12 +1431,14 @@ impl Space {
             ),
         );
 
-        if let NetworkType::QuicBootstrap = &config.network_type {
+        if config.bootstrap_service.is_some() {
             // spawn the periodic bootstrap pull
             BootstrapTask::spawn(
                 i_s.clone(),
                 host_api.legacy.clone(),
                 space.clone(),
+                // TODO: refactor to take just the Url. We know that nothing will
+                //       happen if this is None.
                 config.bootstrap_service.clone(),
                 bootstrap_net,
                 config
@@ -1545,7 +1472,7 @@ impl Space {
             agent_arqs: HashMap::new(),
             config,
             mdns_handles: HashMap::new(),
-            mdns_listened_spaces: HashSet::new(),
+            _mdns_listened_spaces: HashSet::new(),
             gossip_mod,
         }
     }
@@ -1564,7 +1491,6 @@ impl Space {
         agent: Arc<KitsuneAgent>,
     ) -> KitsuneP2pHandlerResult<()> {
         let space = self.space.clone();
-        let network_type = self.config.network_type.clone();
         let bootstrap_net = self.ro_inner.bootstrap_net;
         let evt_sender = self.host_api.legacy.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
@@ -1578,7 +1504,7 @@ impl Space {
                 space.clone(),
                 agent.clone(),
                 ArqSize::empty(), // no storage arc
-                Vec::new(), // no urls
+                Vec::new(),       // no urls
                 signed_at_ms,
                 expires_at_ms,
                 |d| {
@@ -1609,21 +1535,23 @@ impl Space {
                 .map_err(KitsuneP2pError::other)?;
 
             // Push to the network as well
-            match network_type {
-                NetworkType::QuicMdns => tracing::warn!("NOT publishing leaves to mdns"),
-                NetworkType::QuicBootstrap => {
-                    match kitsune_p2p_bootstrap_client::put(
-                        bootstrap_service.clone(),
-                        agent_info_signed,
-                        bootstrap_net,
-                    )
-                    .await {
-                        Ok(_) => {
-                            tracing::debug!("Successfully publish agent info to the bootstrap service");
-                        }
-                        Err(err) => {
-                            tracing::info!(?err, "Failed to publish agent info to the bootstrap service while leaving");
-                        }
+
+            {
+                match kitsune_p2p_bootstrap_client::put(
+                    bootstrap_service.clone(),
+                    agent_info_signed,
+                    bootstrap_net,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        tracing::debug!("Successfully publish agent info to the bootstrap service");
+                    }
+                    Err(err) => {
+                        tracing::info!(
+                            ?err,
+                            "Failed to publish agent info to the bootstrap service while leaving"
+                        );
                     }
                 }
             }

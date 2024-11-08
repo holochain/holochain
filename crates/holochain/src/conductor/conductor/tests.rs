@@ -28,6 +28,7 @@ use matches::assert_matches;
 mod agent_key_revocation;
 // Module with tests related to an agent's key lineage. Agents can update their key. Both old and new
 // key belong to the same key lineage, they belong to the same agent.
+#[cfg(feature = "unstable-functions")]
 pub mod agent_lineage;
 mod test_dpki;
 
@@ -39,20 +40,19 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-
+    let config = ConductorConfig {
+        data_root_path: Some(db_dir.path().to_path_buf().into()),
+        ..Default::default()
+    };
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(
-        ConductorConfig {
-            data_root_path: Some(db_dir.path().to_path_buf().into()),
-            ..Default::default()
-        }
-        .into(),
+        config.clone().into(),
         sodoken::BufRead::new_no_lock(b"passphrase"),
     )
     .await
     .unwrap();
     let conductor = Conductor::new(
-        Default::default(),
+        config.into(),
         ribosome_store,
         keystore,
         holochain_p2p,
@@ -97,18 +97,18 @@ async fn app_ids_are_unique() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
+    let config = ConductorConfig {
+        data_root_path: Some(db_dir.path().to_path_buf().into()),
+        ..Default::default()
+    };
     let spaces = Spaces::new(
-        ConductorConfig {
-            data_root_path: Some(db_dir.path().to_path_buf().into()),
-            ..Default::default()
-        }
-        .into(),
+        config.clone().into(),
         sodoken::BufRead::new_no_lock(b"passphrase"),
     )
     .await
     .unwrap();
     let conductor = Conductor::new(
-        Default::default(),
+        config.into(),
         ribosome_store,
         test_keystore(),
         holochain_p2p,

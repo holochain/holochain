@@ -15,7 +15,7 @@ use kitsune_p2p_timestamp::Timestamp;
 use std::{collections::HashMap, sync::Arc};
 use tokio::time::{Duration, Instant};
 
-use kitsune_p2p_types::{tx2::tx2_utils::ShareOpen, KSpace};
+use kitsune_p2p_types::{tx_utils::ShareOpen, KSpace};
 
 use crate::{
     queue::MapQueue,
@@ -445,7 +445,7 @@ mod tests {
     use crate::TransferMethod;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
-    use kitsune_p2p_types::GossipType;
+    use kitsune_p2p_types::fetch_pool::GossipType;
     use pretty_assertions::assert_eq;
     use rand::RngCore;
     use std::collections::HashSet;

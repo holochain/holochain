@@ -131,11 +131,7 @@ pub fn sys_time() -> ExternResult<Timestamp> {
 ///
 /// The only argument to `schedule` is the name of the schedulable function in the
 /// current zome to be scheduled.
+#[cfg(feature = "unstable-functions")]
 pub fn schedule(scheduled_fn: &str) -> ExternResult<()> {
     HDK.with(|h| h.borrow().schedule(String::from(scheduled_fn)))
-}
-
-/// @todo Not implemented
-pub fn sleep(wake_after: std::time::Duration) -> ExternResult<()> {
-    HDK.with(|h| h.borrow().sleep(wake_after))
 }

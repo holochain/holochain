@@ -18,7 +18,6 @@ use std::sync::Arc;
  * The idea here is to prevent the call count increasing and have some way to measure when we reduce it. The host is a limited
  * resource and we don't want to keep it busy giving back the same information over and over when it has other work to do.
  */
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky in CI"]
 async fn minimise_p2p_agent_store_host_calls() {

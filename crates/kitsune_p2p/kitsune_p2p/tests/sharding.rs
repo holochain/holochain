@@ -103,7 +103,6 @@ async fn gossip_arc_clamping_required_when_junk_config_provided() {
 ///   4. Publish an op with a basis location set to the location of the 4th agent. This should also be visible to the 3rd agent by 2. above.
 ///   5. Wait for the 3rd agent to receive the data.
 ///   6. Assert that the op was never published to the 1st, 2nd, or 5th agents. (Note that we cannot check if we sent it to ourselves because the op was already in our store)
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky on CI"]
 async fn publish_to_basis_from_inside() {
@@ -211,7 +210,6 @@ async fn publish_to_basis_from_inside() {
 /// This is a valid scenario because any hash might be produced by creating data and the publish
 /// should still go to the correct agents. It also stays with the publisher, so we need to account
 /// for that when checking the op stores at the end of the test.
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky on CI"]
 async fn publish_to_basis_from_outside() {
@@ -345,8 +343,8 @@ async fn publish_to_basis_from_outside() {
 ///   4. The 4th agent creates an op and places it in their store. This should be gossipped to the 3rd agent by 2. above.
 ///   5. Wait for the 3rd agent to receive the data.
 ///   6. Assert that the op was never gossipped to the 1st, 2nd, or 5th agents.
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky--this is flaky both with and without unstable-sharding feature"]
 async fn gossip_to_basis_from_inside() {
     holochain_trace::test_run();
 
@@ -446,7 +444,6 @@ async fn gossip_to_basis_from_inside() {
 ///
 /// This is important because, while publish should cross arcs, gossip should not. If we gossip with everyone
 /// on a network then we could go a long time between talking to each node and maintain a lot of connections.
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn no_gossip_to_basis_from_outside() {
     holochain_trace::test_run();

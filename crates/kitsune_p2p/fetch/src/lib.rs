@@ -3,7 +3,7 @@
 
 //! Kitsune P2p Fetch Queue Logic
 
-use kitsune_p2p_types::{GossipType, KOpHash, KSpace};
+use kitsune_p2p_types::{fetch_pool::GossipType, KOpHash, KSpace};
 
 mod backoff;
 mod pool;
