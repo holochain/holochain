@@ -155,7 +155,7 @@ If this application, unaware of total global ordering, ran at the scale of X (fo
 
 [^latency-as-partition]: It should be noted that communication latency induces conditions equivalent to a network partition, differing only in scope; therefore, there is still a risk of conflicting username registrations even in an unpartitioned network.
 
-Now, a given group's rules for social coherence may not require username registrations to be unique across all participants. Systems that refer to participants by a random unique key, allowing participants to identify themselves and others by assigning non-unique "petnames"[^petnames] (personally meaningful identifiers) to those keys, are proven to be usable in cases such as Signal Messenger and Secure Scuttlebutt.
+Now, a given group's rules for social coherence may not require username registrations to be unique across all participants. Systems that refer to participants by a random unique key, allowing participants to identify themselves and others by assigning non-unique "petnames"[^petnames] (personally meaningful identifiers) to those keys, are proven to be usable in cases such as Signal Messenger and Secure Scuttlebutt[^petnames-usecases].
 
 [^petnames]: *An Introduction to Petname Systems*, Marc Stiegler, 2005 <http://www.skyhunter.com/marcs/petnames/IntroPetNames.html>.
 
