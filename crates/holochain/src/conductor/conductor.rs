@@ -60,12 +60,12 @@ pub use agent_key_operations::RevokeAgentKeyForAppResult;
 pub use builder::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::{DpkiConfig, KeystoreConfig};
+use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::JsonDump;
-use holochain_conductor_api::{AppInfo, ZomeCall};
 pub use holochain_conductor_services::*;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
@@ -107,7 +107,7 @@ use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
 
-use super::api::AppInterfaceApi;
+use super::api::{AppInterfaceApi, ZomeCall};
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
 use super::entry_def_store::get_entry_defs;
@@ -834,7 +834,6 @@ mod network_impls {
     use std::time::Duration;
 
     use futures::future::join_all;
-    use holochain_conductor_api::ZomeCall;
     use rusqlite::params;
 
     use holochain_conductor_api::{
@@ -850,6 +849,7 @@ mod network_impls {
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
     };
+    use crate::conductor::api::ZomeCall;
 
     use super::*;
 

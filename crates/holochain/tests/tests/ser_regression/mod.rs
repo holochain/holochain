@@ -4,8 +4,8 @@ use hdk::prelude::*;
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
-use holochain::conductor::api::ZomeCall;
 use holochain::sweettest::*;
+use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -76,9 +76,9 @@ async fn ser_regression_test() {
     let channel = ChannelName("hello world".into());
 
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    let mut invocation = ZomeCall::try_from_unsigned_zome_call(
+    let mut invocation = ZomeCallParamsSigned::try_from_params(
         &conductors[0].keystore(),
-        ZomeCallUnsigned {
+        ZomeCallParams {
             cell_id: alice.cell_id().clone(),
             zome_name: TestWasm::SerRegression.into(),
             cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
@@ -124,9 +124,9 @@ async fn ser_regression_test() {
         content: "Hello from alice :)".into(),
     };
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    let mut invocation = ZomeCall::try_from_unsigned_zome_call(
+    let mut invocation = ZomeCallParamsSigned::try_from_params(
         &conductors[0].keystore(),
-        ZomeCallUnsigned {
+        ZomeCallParams {
             cell_id: alice.cell_id().clone(),
             zome_name: TestWasm::SerRegression.into(),
             cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),

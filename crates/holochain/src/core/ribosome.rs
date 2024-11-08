@@ -59,6 +59,7 @@ mod check_clone_access;
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::DpkiApi;
+use crate::conductor::api::ZomeCall;
 use crate::conductor::api::ZomeCallParamsSigned;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
@@ -77,7 +78,6 @@ use guest_callback::init::InitHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use holo_hash::AgentPubKey;
-use holochain_conductor_api::ZomeCall;
 use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::*;
@@ -768,6 +768,7 @@ pub fn weigh_placeholder() -> EntryRateWeight {
 
 #[cfg(test)]
 pub mod wasm_test {
+    use crate::conductor::api::ZomeCall;
     use crate::core::ribosome::FnComponents;
     use crate::sweettest::SweetCell;
     use crate::sweettest::SweetConductor;
@@ -777,7 +778,6 @@ pub mod wasm_test {
     use core::time::Duration;
     use hdk::prelude::*;
     use holo_hash::AgentPubKey;
-    use holochain_conductor_api::ZomeCall;
     use holochain_keystore::AgentPubKeyExt;
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;

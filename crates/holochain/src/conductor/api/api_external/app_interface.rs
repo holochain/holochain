@@ -227,30 +227,34 @@ pub struct AppAuthentication {
 /// the serialized bytes of the parameters and the provenance's signature of the serialized bytes.
 #[derive(Clone, Debug)]
 pub struct ZomeCall {
-    pub signed: ZomeCallParamsSigned,
+    /// Parameters required to call a zome.
     pub params: ZomeCallParams,
+    /// Zome call parameters serialized and signed.
+    pub signed: ZomeCallParamsSigned,
 }
 
 impl ZomeCall {
+    /// Create a zome call from parameters by serializing and signing them.
     pub async fn try_from_params(
         keystore: &MetaLairClient,
-        unsigned_zome_call: ZomeCallParams,
+        zome_call_params: ZomeCallParams,
     ) -> LairResult<Self> {
         let signed_zome_call =
-            ZomeCallParamsSigned::try_from_params(keystore, unsigned_zome_call.clone()).await?;
+            ZomeCallParamsSigned::try_from_params(keystore, zome_call_params.clone()).await?;
         Ok(Self {
             signed: signed_zome_call,
-            params: unsigned_zome_call,
+            params: zome_call_params,
         })
     }
 
+    ///
     pub async fn resign_zome_call(
         self,
         keystore: &MetaLairClient,
         agent_key: AgentPubKey,
     ) -> LairResult<Self> {
-        let mut unsigned_zome_call = self.params.clone();
-        unsigned_zome_call.provenance = agent_key;
-        Self::try_from_params(keystore, unsigned_zome_call).await
+        let mut zome_call_params = self.params.clone();
+        zome_call_params.provenance = agent_key;
+        Self::try_from_params(keystore, zome_call_params).await
     }
 }

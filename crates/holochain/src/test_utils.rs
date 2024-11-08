@@ -1,5 +1,6 @@
 //! Utils for Holochain tests
 use crate::conductor::api::AppInterfaceApi;
+use crate::conductor::api::ZomeCall;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
@@ -16,7 +17,6 @@ use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
-use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::actor::HolochainP2pRefToDna;

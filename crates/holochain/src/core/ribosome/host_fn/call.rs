@@ -1,10 +1,10 @@
+use crate::conductor::api::ZomeCall;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallParamsSigned;
 use futures::future::join_all;
-use holochain_conductor_api::ZomeCall;
 use holochain_nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -216,11 +216,11 @@ pub fn call(
 
 #[cfg(test)]
 pub mod wasm_test {
+    use crate::conductor::api::ZomeCall;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
     use holo_hash::ActionHash;
-    use holochain_conductor_api::ZomeCall;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
