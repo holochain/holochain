@@ -746,6 +746,7 @@ pub mod test {
             .unwrap()
             .into();
         zome_call.params.cell_id = cell_id;
+        zome_call.params.provenance = fixt!(AgentPubKey, Predictable, 0);
         zome_call.signed =
             ZomeCallParamsSigned::try_from_params(&test_keystore(), zome_call.params)
                 .await
