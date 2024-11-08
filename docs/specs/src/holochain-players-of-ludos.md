@@ -2,6 +2,7 @@
 title: 'Beyond Byzantium: The Players of Ludos'
 author:
  - Eric Harris-Braun
+date: '2024-07-01'
 documentclass: 'revtex4-1'
 ---
 
