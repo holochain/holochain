@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.5.0-dev.4
 
+- **BREAKING**: Zome call API `AppRequest::CallZome` takes simple serialized bytes of the zome call parameters and the signature now. Previously client-side serialization of zome call parameters required to exactly match Holochain's way of serializing, because Holochain re-serialized the parameters to verify the signature. This is no longer necessary, as the serialized bytes are signed by the provenance and sent as is. In Holochain the signature is directly verified against the serialized bytes. There used to be a step to hash the serialized bytes and sign the hash, which has been dropped now. No more hashing required, instead the zome call parameters are simply serialized and the resulting bytes are signed.
 - **BREAKING**: As the DPKI feature is unstable and incomplete, it is disabled with default cargo features and put behind a feature called `unstable-dpki`. If this feature is specified at compile time, DPKI is enabled by default.
 - **BREAKING**: Issuing and persisting warrants is behind a feature `unstable-warrants` now. Warrants have not been tested extensively and there is no way to recover from a warrant. Hence the feature is considered unstable and must be explicitly enabled. Note that once warrants are issued some functions or calls may not work correctly.
 - **BREAKING**: Conductor::get\_dna\_definitions now returns an `IndexMap` to ensure consistent ordering.
