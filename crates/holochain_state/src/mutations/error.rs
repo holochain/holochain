@@ -24,6 +24,8 @@ pub enum StateMutationError {
     HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
     #[error("Authors of actions must all be the same when inserting to the source chain")]
     AuthorsMustMatch,
+    #[error("Cannot remove a fully published countersigning session")]
+    CannotRemoveFullyPublished,
 }
 
 pub type StateMutationResult<T> = Result<T, StateMutationError>;

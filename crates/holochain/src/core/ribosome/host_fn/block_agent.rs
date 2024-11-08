@@ -52,6 +52,7 @@ mod test {
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
     pub struct CapFor(CapSecret, AgentPubKey);
 
+    #[cfg(feature = "unstable-functions")]
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_call_verify_block() {
         holochain_trace::test_run();
@@ -91,7 +92,6 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
     async fn zome_call_get_block() {
-        // hc_sleuth::init_subscriber();
         holochain_trace::test_run();
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;

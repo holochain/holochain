@@ -2,15 +2,18 @@ use crate::actor::*;
 use crate::event::*;
 use crate::HostApi;
 use crate::HostApiLegacy;
+use actor::create_meta_net;
+use actor::KitsuneP2pActor;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 mod actor;
-pub(crate) use actor::meta_net;
-use actor::*;
 
-#[cfg(any(test, feature = "test_utils"))]
+pub(crate) use actor::meta_net;
+
+#[cfg(feature = "test_utils")]
 pub use actor::MockKitsuneP2pEventHandler;
 
+use self::actor::Internal;
 use self::meta_net::PreflightUserData;
 
 /// Spawn a new KitsuneP2p actor.
@@ -23,6 +26,17 @@ pub async fn spawn_kitsune_p2p(
     ghost_actor::GhostSender<KitsuneP2p>,
     KitsuneP2pEventReceiver,
 )> {
+    #[cfg(not(feature = "unstable-sharding"))]
+    if config.tuning_params.arc_clamping().is_none() {
+        tracing::warn!(
+            "\
+            gossip_arc_clamping network tuning parameter is not set. \
+            This is not permitted without \"unstable-sharding\" feature enabled. \
+            Please choose either \"empty\" or \"full\""
+        );
+        return Err("gossip_arc_clamping must be set".into());
+    }
+
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
     let builder = ghost_actor::actor_builder::GhostActorBuilder::new();
 

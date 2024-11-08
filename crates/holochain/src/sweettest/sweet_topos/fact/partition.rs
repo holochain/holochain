@@ -7,12 +7,12 @@ use rand::Rng;
 /// Fact:
 /// - The network has a specific number of partitions.
 /// - The network is partitioned as strictly as possible. This means that there
-///  are no edges between nodes in different partitions.
+///   are no edges between nodes in different partitions.
 /// - The partition generation process has a specific efficiency. More efficient
-/// partitioning means that the partitions heal more quickly which can lead to
-/// one or a few partitions dominating the network. Less efficient partitioning
-/// means that the partitions heal more slowly which can lead to a more even
-/// distribution of partitions.
+///   partitioning means that the partitions heal more quickly which can lead to
+///   one or a few partitions dominating the network. Less efficient partitioning
+///   means that the partitions heal more slowly which can lead to a more even
+///   distribution of partitions.
 #[derive(Clone, Debug)]
 pub struct StrictlyPartitionedNetworkFact {
     /// The number of partitions in the network.

@@ -31,11 +31,13 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
+use kitsune_p2p_types::config::KitsuneP2pConfig;
 use matches::assert_matches;
 use serde::Serialize;
 use std::time::Duration;
 use std::{path::PathBuf, process::Stdio};
 use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::process::Child;
 use tokio::process::Command;
@@ -64,21 +66,84 @@ impl Drop for SupervisedChild {
     }
 }
 
+pub async fn start_local_services() -> (
+    SupervisedChild,
+    tokio::sync::oneshot::Receiver<String>,
+    tokio::sync::oneshot::Receiver<String>,
+) {
+    tracing::info!("\n----\nstarting local bootstrap server\n----\n");
+    let cmd = std::process::Command::cargo_bin("hc-run-local-services").unwrap();
+    let mut cmd = Command::from(cmd);
+    cmd.stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    let mut child = cmd.spawn().expect("Failed to spawn local services");
+    let (tx_bootstrap, rx_bootstrap) = tokio::sync::oneshot::channel();
+    let (tx_signal, rx_signal) = tokio::sync::oneshot::channel();
+    let stdout = child.stdout.take().unwrap();
+    let mut tx_bootstrap = Some(tx_bootstrap);
+    let mut tx_signal = Some(tx_signal);
+    tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            println!("hc local services stdout: {line}");
+            if let Some(addr) = line.strip_prefix("# HC BOOTSTRAP - ADDR: ") {
+                if let Some(sender) = tx_bootstrap.take() {
+                    let _ = sender.send(addr.to_string());
+                }
+            }
+            if let Some(addr) = line.strip_prefix("# HC SIGNAL - ADDR: ") {
+                if let Some(sender) = tx_signal.take() {
+                    let _ = sender.send(addr.to_string());
+                }
+            }
+        }
+    });
+    let stderr = child.stderr.take().unwrap();
+    tokio::task::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            eprintln!("hc local services stderr: {line}");
+        }
+    });
+    (
+        SupervisedChild("Local Holochain Services".to_string(), child),
+        rx_bootstrap,
+        rx_signal,
+    )
+}
+
 pub async fn start_holochain(
     config_path: PathBuf,
+) -> (SupervisedChild, tokio::sync::oneshot::Receiver<u16>) {
+    start_holochain_with_lair(config_path, false).await
+}
+
+pub async fn start_holochain_with_lair(
+    config_path: PathBuf,
+    full_keystore: bool,
 ) -> (SupervisedChild, tokio::sync::oneshot::Receiver<u16>) {
     tracing::info!("\n\n----\nstarting holochain\n----\n\n");
     let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = Command::from(cmd);
     let rust_log = std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string());
-    cmd.arg("--structured")
-        .arg("--config-path")
+    cmd.arg("--config-path")
         .arg(config_path)
         .env("RUST_LOG", rust_log)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    if full_keystore {
+        cmd.arg("--piped").stdin(Stdio::piped());
+    }
     let mut child = cmd.spawn().expect("Failed to spawn holochain");
+    if full_keystore {
+        // Pass in lair keystore password.
+        let mut stdin = child.stdin.take().unwrap();
+        stdin.write_all("pass".as_bytes()).await.unwrap();
+        stdin.flush().await.unwrap();
+    }
+    // Wait for admin port output.
     let admin_port = spawn_output(&mut child);
     check_started(&mut child).await;
     (SupervisedChild("Holochain".to_string(), child), admin_port)
@@ -118,16 +183,17 @@ pub async fn grant_zome_call_capability(
     Ok(cap_secret)
 }
 
-pub async fn call_zome_fn<S>(
+pub async fn call_zome_fn_fallible<I>(
     app_tx: &WebsocketSender,
     cell_id: CellId,
     signing_keypair: &SigningKey,
     cap_secret: CapSecret,
     zome_name: ZomeName,
     fn_name: FunctionName,
-    input: &S,
-) where
-    S: Serialize + std::fmt::Debug,
+    input: &I,
+) -> AppResponse
+where
+    I: Serialize + std::fmt::Debug,
 {
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
@@ -155,9 +221,35 @@ pub async fn call_zome_fn<S>(
     };
     let request = AppRequest::CallZome(Box::new(call));
     let response = app_tx.request(request);
-    let call_response = check_timeout(response, 6000).await.unwrap();
-    trace!(?call_response);
-    assert_matches!(call_response, AppResponse::ZomeCalled(_));
+    check_timeout(response, 6000).await.unwrap()
+}
+
+pub async fn call_zome_fn<I>(
+    app_tx: &WebsocketSender,
+    cell_id: CellId,
+    signing_keypair: &SigningKey,
+    cap_secret: CapSecret,
+    zome_name: ZomeName,
+    fn_name: FunctionName,
+    input: &I,
+) -> ExternIO
+where
+    I: Serialize + std::fmt::Debug,
+{
+    let call_response = call_zome_fn_fallible(
+        app_tx,
+        cell_id,
+        signing_keypair,
+        cap_secret,
+        zome_name,
+        fn_name,
+        input,
+    )
+    .await;
+    match call_response {
+        AppResponse::ZomeCalled(response) => *response,
+        _ => panic!("zome call failed {call_response:?}"),
+    }
 }
 
 pub async fn attach_app_interface(client: &WebsocketSender, port: Option<u16>) -> u16 {
@@ -296,33 +388,26 @@ pub async fn register_and_install_dna_named(
 }
 
 pub fn spawn_output(holochain: &mut Child) -> tokio::sync::oneshot::Receiver<u16> {
-    let stdout = holochain.stdout.take();
-    let stderr = holochain.stderr.take();
+    let stdout = holochain.stdout.take().unwrap();
+    let stderr = holochain.stderr.take().unwrap();
     let (tx, rx) = tokio::sync::oneshot::channel();
+    // Wrap in an Option because it is used in a loop and cannot be cloned.
     let mut tx = Some(tx);
     tokio::task::spawn(async move {
-        if let Some(stdout) = stdout {
-            let mut reader = BufReader::new(stdout).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                println!("holochain bin stdout: {}", &line);
-                tx = tx
-                    .take()
-                    .and_then(|tx| match check_line_for_admin_port(&line) {
-                        Some(port) => {
-                            let _ = tx.send(port);
-                            None
-                        }
-                        None => Some(tx),
-                    });
+        let mut reader = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            println!("holochain bin stdout: {}", &line);
+            if let Some(port) = check_line_for_admin_port(&line) {
+                if let Some(tx) = tx.take() {
+                    let _ = tx.send(port);
+                }
             }
         }
     });
     tokio::task::spawn(async move {
-        if let Some(stderr) = stderr {
-            let mut reader = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                eprintln!("holochain bin stderr: {}", &line);
-            }
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            eprintln!("holochain bin stderr: {}", &line);
         }
     });
     rx
@@ -355,6 +440,7 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
         dpki: DpkiConfig::disabled(),
+        network: KitsuneP2pConfig::mem(),
         ..Default::default()
     }
 }

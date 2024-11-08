@@ -47,6 +47,8 @@ pub enum TestWasm {
     HashPath,
     HdkExtern,
     InitFail,
+    InitInvalidReturn,
+    InitInvalidParams,
     InitPass,
     Link,
     MigrateInitial,
@@ -72,6 +74,8 @@ pub enum TestWasm {
     ValidateValid,
     ValidateCreateLinkValid,
     ValidateRejectAppTypes,
+    ValidateInvalidReturn,
+    ValidateInvalidParams,
     WhoAmI,
     ZomeInfo,
 }
@@ -157,6 +161,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
+            TestWasm::InitInvalidReturn => "init_invalid_return",
+            TestWasm::InitInvalidParams => "init_invalid_params",
             TestWasm::InitPass => "init_pass",
             TestWasm::Link => "link",
             TestWasm::MigrateInitial => "migrate_initial",
@@ -182,6 +188,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidateValid => "validate_valid",
             TestWasm::ValidateCreateLinkValid => "validate_link_add_valid",
             TestWasm::ValidateRejectAppTypes => "validate_reject_app_types",
+            TestWasm::ValidateInvalidReturn => "validate_invalid_return",
+            TestWasm::ValidateInvalidParams => "validate_invalid_params",
             TestWasm::WhoAmI => "whoami",
             TestWasm::ZomeInfo => "zome_info",
         })
@@ -242,6 +250,8 @@ impl From<TestWasm> for PathBuf {
             TestWasm::HashPath => "wasm32-unknown-unknown/release/test_wasm_hash_path.wasm",
             TestWasm::HdkExtern => "wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm",
             TestWasm::InitFail => "wasm32-unknown-unknown/release/test_wasm_init_fail.wasm",
+            TestWasm::InitInvalidReturn => "wasm32-unknown-unknown/release/test_wasm_init_invalid_return.wasm",
+            TestWasm::InitInvalidParams => "wasm32-unknown-unknown/release/test_wasm_init_invalid_params.wasm",
             TestWasm::InitPass => "wasm32-unknown-unknown/release/test_wasm_init_pass.wasm",
             TestWasm::Link => "wasm32-unknown-unknown/release/test_wasm_link.wasm",
             TestWasm::MigrateInitial => {
@@ -293,6 +303,8 @@ impl From<TestWasm> for PathBuf {
             TestWasm::ValidateRejectAppTypes => {
                 "wasm32-unknown-unknown/release/test_wasm_validate_reject_app_types.wasm"
             }
+            TestWasm::ValidateInvalidReturn => "wasm32-unknown-unknown/release/test_wasm_validate_invalid_return.wasm",
+            TestWasm::ValidateInvalidParams => "wasm32-unknown-unknown/release/test_wasm_validate_invalid_params.wasm",
             TestWasm::WhoAmI => "wasm32-unknown-unknown/release/test_wasm_whoami.wasm",
             TestWasm::ZomeInfo => "wasm32-unknown-unknown/release/test_wasm_zome_info.wasm",
         })

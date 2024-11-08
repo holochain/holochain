@@ -175,8 +175,8 @@ mod tests {
         KAgent, KBasis, KSpace, MaybeDelegate, OpHashList, Payload, SpaceInternal,
         SpaceInternalHandler, SpaceInternalHandlerResult, VecMXM, WireConHnd,
     };
+    use crate::spawn::actor::test_util::LegacyHostStub;
     use crate::spawn::actor::MetaNetCon;
-    use crate::spawn::test_util::LegacyHostStub;
     use crate::types::actor::BroadcastData;
     use crate::wire::Wire;
     use crate::KitsuneP2pResult;
@@ -628,6 +628,7 @@ mod tests {
             _space: KSpace,
             _to_agent: KAgent,
             _source: KAgent,
+            _transfer_method: kitsune_p2p_fetch::TransferMethod,
             _op_hash_list: OpHashList,
             _context: FetchContext,
             _maybe_delegate: MaybeDelegate,

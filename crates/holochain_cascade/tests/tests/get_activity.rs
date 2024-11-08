@@ -335,6 +335,7 @@ async fn filter_out_entries_with_chain_query() {
     assert_agent_activity_responses_eq!(expected, r);
 }
 
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_activity_with_warrants() {
     holochain_trace::test_run();
@@ -379,7 +380,7 @@ async fn get_activity_with_warrants() {
     dht.test_write({
         let op = DhtOp::from(warrant.clone()).into_hashed();
         move |txn| {
-            insert_op(txn, &op).unwrap();
+            insert_op_dht(txn, &op, None).unwrap();
         }
     });
 
@@ -455,6 +456,7 @@ struct Data {
     warrants: Vec<WarrantOp>,
 }
 
+#[cfg(feature = "unstable-warrants")]
 fn warrant(author: u8, action: u8) -> WarrantOp {
     let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
         action_author: AgentPubKey::from_raw_36(vec![author; 36]),
@@ -570,14 +572,6 @@ impl GetActivityTestScenario {
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
     => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2")]
 #[test_case(
-    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(1, 1)], ..Default::default() },
-    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2 with 1 unrelated chain warrant")]
-#[test_case(
-    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0, 0)], ..Default::default() },
-    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
-    => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 1; "1 to genesis with dht 0 till 2 with 1 chain warrant")]
-#[test_case(
     Data { cache: agent_chain(&[(0, 0..3)]), ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
     => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with cache 0 till 2")]
@@ -595,6 +589,32 @@ impl GetActivityTestScenario {
     => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 4; "4 take 4 until 0 with authored 0 till 5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_must_get_agent_activity(
+    data: Data,
+    author: AgentPubKey,
+    filter: ChainFilter,
+) -> MustGetAgentActivityResponse {
+    test_must_get_agent_activity_inner(data, author, filter).await
+}
+
+#[cfg(feature = "unstable-warrants")]
+#[test_case(
+    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(1, 1)], ..Default::default() },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+    => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2 with 1 unrelated chain warrant")]
+#[test_case(
+    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0, 0)], ..Default::default() },
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
+    => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 1; "1 to genesis with dht 0 till 2 with 1 chain warrant")]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_must_get_agent_activity_with_warrants(
+    data: Data,
+    author: AgentPubKey,
+    filter: ChainFilter,
+) -> MustGetAgentActivityResponse {
+    test_must_get_agent_activity_inner(data, author, filter).await
+}
+
+async fn test_must_get_agent_activity_inner(
     data: Data,
     author: AgentPubKey,
     filter: ChainFilter,
@@ -623,7 +643,7 @@ async fn test_must_get_agent_activity(
     authored.test_write(|txn| {
         for w in warrants {
             let w = DhtOp::from(w).into_hashed();
-            insert_op(txn, &w).unwrap();
+            insert_op_authored(txn, &w).unwrap();
         }
     });
 

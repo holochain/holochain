@@ -75,7 +75,7 @@ pub fn must_get_entry(
                             Err(wasm_error!(WasmErrorInner::HostShortCircuit(
                                 holochain_serialized_bytes::encode(
                                     &ExternIO::encode(
-                                        &ValidateCallbackResult::UnresolvedDependencies(
+                                        ValidateCallbackResult::UnresolvedDependencies(
                                             UnresolvedDependencies::Hashes(
                                                 vec![entry_hash.into(),]
                                             )

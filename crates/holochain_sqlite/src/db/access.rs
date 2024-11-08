@@ -11,6 +11,7 @@ use holochain_util::log_elapsed;
 use parking_lot::Mutex;
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
+use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -24,6 +25,28 @@ use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric
 static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
 static THREAD_ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);
 
+/// Wrapper around a Transaction reference which is typed by database kind.
+///
+/// This allows us to write functions which can only operate on a specific database kind,
+/// or sets of database kinds (with the introduction of a new trait that covers those kinds).
+#[derive(derive_more::Deref, derive_more::DerefMut, derive_more::Into)]
+pub struct Txn<'a, 'txn, D: DbKindT> {
+    #[deref]
+    #[deref_mut]
+    #[into]
+    txn: &'a mut Transaction<'txn>,
+    db_kind: std::marker::PhantomData<D>,
+}
+
+impl<'a, 'txn, D: DbKindT> From<&'a mut Transaction<'txn>> for Txn<'a, 'txn, D> {
+    fn from(txn: &'a mut Transaction<'txn>) -> Self {
+        Txn {
+            txn,
+            db_kind: PhantomData,
+        }
+    }
+}
+
 #[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that
 /// both implement read access.
@@ -32,7 +55,7 @@ pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        F: FnOnce(&Txn<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static;
 
     /// Access the kind of database.
@@ -45,7 +68,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbWrite<Kind> {
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        F: FnOnce(&Txn<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         let db: &DbRead<Kind> = self.as_ref();
@@ -63,7 +86,7 @@ impl<Kind: DbKindT> ReadAccess<Kind> for DbRead<Kind> {
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        F: FnOnce(&Txn<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         DbRead::read_async(self, f).await
@@ -121,7 +144,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     pub async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(Transaction) -> Result<R, E> + Send + 'static,
+        F: FnOnce(&Txn<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
         let mut conn = self
@@ -136,7 +159,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
                 let _s = span.enter();
                 log_elapsed!([10, 100, 1000], start, "read_async:before-closure");
-                let r = conn.execute_in_read_txn(f);
+                let r = conn.execute_in_read_txn(|mut txn| f(&Txn::from(&mut txn)));
                 log_elapsed!([10, 100, 1000], start, "read_async:after-closure");
                 r
             }).in_current_span()).in_current_span().await.map_err(|e| {
@@ -205,7 +228,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
     pub fn test_read<R, F>(&self, f: F) -> R
     where
-        F: FnOnce(Transaction) -> R + Send + 'static,
+        F: FnOnce(&Txn<Kind>) -> R + Send + 'static,
         R: Send + 'static,
     {
         holochain_util::tokio_helper::block_forever_on(async {
@@ -320,11 +343,26 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     pub async fn write_async<E, R, F>(&self, f: F) -> Result<R, E>
     where
         E: From<DatabaseError> + Send + 'static,
-        F: FnOnce(&mut Transaction) -> Result<R, E> + Send + 'static,
+        F: FnOnce(&mut Txn<Kind>) -> Result<R, E> + Send + 'static,
         R: Send + 'static,
     {
-        let _permit = acquire_semaphore_permit(self.0.write_semaphore.clone()).await?;
+        let permit = acquire_semaphore_permit(self.0.write_semaphore.clone()).await?;
+        self.write_async_with_permit(permit, f)
+            .await
+            .map(|(r, _permit)| r)
+    }
 
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(kind = ?self.kind)))]
+    pub async fn write_async_with_permit<E, R, F>(
+        &self,
+        permit: OwnedSemaphorePermit,
+        f: F,
+    ) -> Result<(R, OwnedSemaphorePermit), E>
+    where
+        E: From<DatabaseError> + Send + 'static,
+        F: FnOnce(&mut Txn<Kind>) -> Result<R, E> + Send + 'static,
+        R: Send + 'static,
+    {
         let mut conn = self.get_connection_from_pool()?;
 
         let start = tokio::time::Instant::now();
@@ -335,13 +373,22 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         tokio::time::timeout(std::time::Duration::from_millis(THREAD_ACQUIRE_TIMEOUT_MS.load(Ordering::Acquire)), tokio::task::spawn_blocking(move || {
             let _s = span.enter();
             log_elapsed!([10, 100, 1000], start, "write_async:before-closure");
-            let r = conn.execute_in_exclusive_rw_txn(f);
+            let r = conn.execute_in_exclusive_rw_txn(|txn| f(&mut Txn::from(txn)));
             log_elapsed!([10, 100, 1000], start, "write_async:after-closure");
-            r
+            r.map(|r| (r, permit))
         }).in_current_span()).in_current_span().await.map_err(|e| {
             tracing::error!("Failed to claim a thread to run the database write transaction. It's likely that the program is out of threads.");
             DatabaseError::Timeout(e)
         })?.map_err(DatabaseError::from)?
+    }
+
+    /// Acquire the single write permit for the database.
+    ///
+    /// This will prevent any other writes from proceeding until the semaphore is released.
+    /// It can be used to ensure that a read, followed by other operations, followed by another
+    /// write, will not be interleaved with some other write.
+    pub async fn acquire_write_permit(&self) -> DatabaseResult<OwnedSemaphorePermit> {
+        acquire_semaphore_permit(self.0.write_semaphore.clone()).await
     }
 
     pub fn available_writer_count(&self) -> usize {
@@ -407,7 +454,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]
     pub fn test_write<R, F>(&self, f: F) -> R
     where
-        F: FnOnce(&mut Transaction) -> R + Send + 'static,
+        F: FnOnce(&mut Txn<Kind>) -> R + Send + 'static,
         R: Send + 'static,
     {
         holochain_util::tokio_helper::block_forever_on(async {

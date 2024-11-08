@@ -173,6 +173,7 @@
             export PATH="$CARGO_INSTALL_ROOT/bin:$PATH"
             export NIX_PATH="nixpkgs=${pkgs.path}"
             export PS1='\n\[\033[1;34m\][rustDev:\w]\$\[\033[0m\] '
+            export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
             echo Rust development shell spawned. Type 'exit' to leave.
           ''
           + (lib.strings.optionalString pkgs.stdenv.isDarwin ''

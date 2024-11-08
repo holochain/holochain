@@ -14,3 +14,6 @@ mockall = { version = "0.11.3" }
 
 [lints]
 workspace = true
+
+[features]
+unstable-functions = ["hdi/unstable-functions"]

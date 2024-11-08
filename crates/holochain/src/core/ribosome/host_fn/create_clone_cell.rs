@@ -8,7 +8,6 @@ use holochain_types::{
     app::CreateCloneCellPayload,
 };
 use holochain_util::tokio_helper;
-use holochain_wasmer_host::prelude::wasm_error;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::clone::{ClonedCell, CreateCloneCellInput};
 use wasmer::RuntimeError;

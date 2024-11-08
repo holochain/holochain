@@ -9,7 +9,7 @@ use holochain_state::prelude::*;
 
 #[cfg(test)]
 mod query_tests;
-#[cfg(feature = "test_utils")]
+#[cfg(test)]
 mod tests;
 
 #[cfg_attr(

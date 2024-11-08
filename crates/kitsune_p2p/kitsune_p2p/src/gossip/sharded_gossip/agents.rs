@@ -37,8 +37,8 @@ impl ShardedGossipLocal {
 
     /// Incoming missing agents.
     /// - Add these agents to the peer store
-    /// for this space for agents that contain the
-    /// incoming agents within their arcs.
+    ///   for this space for agents that contain the
+    ///   incoming agents within their arcs.
     pub(super) async fn incoming_missing_agents(
         &self,
         agents: &[Arc<AgentInfoSigned>],

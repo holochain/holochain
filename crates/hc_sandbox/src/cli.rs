@@ -199,7 +199,10 @@ impl HcSandbox {
                 root,
                 directories,
                 in_process_lair,
+                #[cfg(feature = "unstable-dpki")]
                 no_dpki,
+                #[cfg(feature = "unstable-dpki")]
+                dpki_network_seed,
                 #[cfg(feature = "chc")]
                 chc_url,
             }) => {
@@ -215,7 +218,10 @@ impl HcSandbox {
                         root.clone(),
                         directories.get(i).cloned(),
                         in_process_lair,
+                        #[cfg(feature = "unstable-dpki")]
                         no_dpki,
+                        #[cfg(feature = "unstable-dpki")]
+                        dpki_network_seed.clone(),
                         #[cfg(feature = "chc")]
                         chc_url.clone(),
                     )?;

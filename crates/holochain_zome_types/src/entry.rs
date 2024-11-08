@@ -24,6 +24,7 @@ pub use holochain_integrity_types::entry::*;
 /// Either an [`EntryDefIndex`] or one of:
 /// - [EntryType::CapGrant]
 /// - [EntryType::CapClaim]
+///
 /// Which don't have an index.
 pub enum EntryDefLocation {
     /// App defined entries always have a unique [`u8`] index

@@ -126,7 +126,6 @@ use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
 
 use parking_lot::Mutex;
-use rusqlite::Transaction;
 use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -134,8 +133,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
 
-#[cfg(todo_redo_old_tests)]
-mod network_call_tests;
 #[cfg(test)]
 mod tests;
 
@@ -215,8 +212,6 @@ async fn app_validation_workflow_inner(
     let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
     let num_ops_to_validate = sorted_dht_ops.len();
 
-    let sleuth_id = conductor.config.sleuth_id();
-
     let cascade = Arc::new(workspace.full_cascade(network.clone()));
     let accepted_ops = Arc::new(AtomicUsize::new(0));
     let awaiting_ops = Arc::new(AtomicUsize::new(0));
@@ -224,6 +219,7 @@ async fn app_validation_workflow_inner(
     let warranted_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity = vec![];
+    #[cfg(feature = "unstable-warrants")]
     let mut warrant_op_hashes = vec![];
 
     // Validate ops sequentially
@@ -263,7 +259,6 @@ async fn app_validation_workflow_inner(
             Err(OutcomeOrError::Err(err)) => AppValidationResult::Err(err),
         };
 
-        let sleuth_id = sleuth_id.clone();
         match validation_outcome {
             Ok(outcome) => {
                 // Collect all agent activity.
@@ -281,6 +276,7 @@ async fn app_validation_workflow_inner(
                 let awaiting_ops = awaiting_ops.clone();
                 let rejected_ops = rejected_ops.clone();
 
+                #[cfg(feature = "unstable-warrants")]
                 if let Outcome::Rejected(_) = &outcome {
                     let warrant_op =
                         crate::core::workflow::sys_validation_workflow::make_warrant_op(
@@ -297,7 +293,7 @@ async fn app_validation_workflow_inner(
                         .authored_db
                         .write_async(move |txn| {
                             warn!("Inserting warrant op");
-                            insert_op(txn, &warrant_op)
+                            insert_op_authored(txn, &warrant_op)
                         })
                         .await?;
 
@@ -309,16 +305,9 @@ async fn app_validation_workflow_inner(
                     .write_async(move|txn| match outcome {
                         Outcome::Accepted => {
                             accepted_ops.fetch_add(1, Ordering::SeqCst);
-                            aitia::trace!(&hc_sleuth::Event::AppValidated {
-                                by: sleuth_id.clone(),
-                                op: dht_op_hash.clone()
-                            });
+
 
                             if deps.is_empty() {
-                                aitia::trace!(&hc_sleuth::Event::Integrated {
-                                    by: sleuth_id.clone(),
-                                    op: dht_op_hash.clone()
-                                });
 
                                 put_integrated(txn, &dht_op_hash, ValidationStatus::Valid)
                             } else {
@@ -362,6 +351,7 @@ async fn app_validation_workflow_inner(
     }
 
     // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
+    #[cfg(feature = "unstable-warrants")]
     holochain_state::integrate::authored_ops_to_dht_db(
         network,
         warrant_op_hashes,
@@ -911,7 +901,7 @@ impl AppValidationWorkspace {
 }
 
 pub fn put_validation_limbo(
-    txn: &mut Transaction<'_>,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     status: ValidationStage,
 ) -> WorkflowResult<()> {
@@ -920,7 +910,7 @@ pub fn put_validation_limbo(
 }
 
 pub fn put_integration_limbo(
-    txn: &mut Transaction<'_>,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     status: ValidationStatus,
 ) -> WorkflowResult<()> {
@@ -930,7 +920,7 @@ pub fn put_integration_limbo(
 }
 
 pub fn put_integrated(
-    txn: &mut Transaction<'_>,
+    txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
     status: ValidationStatus,
 ) -> WorkflowResult<()> {

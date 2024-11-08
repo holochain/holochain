@@ -295,11 +295,6 @@ impl SearchRemotesCoveringBasisLogic {
             }
 
             if node.storage_arc().contains(self.basis_loc) {
-                tracing::info!(
-                    "found node covering basis_loc {:?} {:?}",
-                    node,
-                    self.basis_loc
-                );
                 cover_nodes.push(node);
             } else {
                 near_nodes.push(node);

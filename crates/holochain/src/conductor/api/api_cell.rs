@@ -242,6 +242,13 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
     /// Expose delete_clone_cell functionality to zomes.
     async fn delete_clone_cell(&self, payload: DeleteCloneCellPayload) -> ConductorResult<()>;
+
+    /// Accept a countersigning session.
+    async fn accept_countersigning_session(
+        &self,
+        cell_id: CellId,
+        request: PreflightRequest,
+    ) -> ConductorResult<PreflightRequestAcceptance>;
 }
 
 #[async_trait]
@@ -356,6 +363,16 @@ impl CellConductorReadHandleT for CellConductorApi {
         self.conductor_handle
             .clone()
             .delete_clone_cell(&payload)
+            .await
+    }
+
+    async fn accept_countersigning_session(
+        &self,
+        cell_id: CellId,
+        request: PreflightRequest,
+    ) -> ConductorResult<PreflightRequestAcceptance> {
+        self.conductor_handle
+            .accept_countersigning_session(cell_id, request)
             .await
     }
 }

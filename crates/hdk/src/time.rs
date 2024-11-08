@@ -18,9 +18,8 @@ use crate::prelude::*;
 ///     - the user manually changed the system time backwards between this host_fn being called and
 ///       an entry using it being committed (NTP avoids making time go backward by stretching it)
 ///     - the sys_time call ran on a different machine, e.g. via a call_remote, to the machine that
-///       commits it into an entry
-///   so your app can decide to implement validation logic that fails any sys time that comes after
-///   the time signed in the action if that makes sense.
+///       commits it into an entry so your app can decide to implement validation logic that fails
+///       any sys time that comes after the time signed in the action if that makes sense.
 /// - the times in the actions of the local source chain must increase monotonically and all
 ///   actions are pushed to the neighbourhood of the agent publishing them, so the agent activity
 ///   authorities will immediately warrant any actions running chronologically backwards
@@ -132,11 +131,7 @@ pub fn sys_time() -> ExternResult<Timestamp> {
 ///
 /// The only argument to `schedule` is the name of the schedulable function in the
 /// current zome to be scheduled.
+#[cfg(feature = "unstable-functions")]
 pub fn schedule(scheduled_fn: &str) -> ExternResult<()> {
     HDK.with(|h| h.borrow().schedule(String::from(scheduled_fn)))
-}
-
-/// @todo Not implemented
-pub fn sleep(wake_after: std::time::Duration) -> ExternResult<()> {
-    HDK.with(|h| h.borrow().sleep(wake_after))
 }

@@ -345,6 +345,7 @@ impl SignedActionHashedExt for SignedActionHashed {
         let (action, signature) = signed_action.into();
         Self::with_presigned(action.into_hashed(), signature)
     }
+
     /// Construct by signing the Action (NOT including the hash)
     async fn sign(keystore: &MetaLairClient, action_hashed: ActionHashed) -> LairResult<Self> {
         let signature = action_hashed

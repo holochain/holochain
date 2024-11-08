@@ -3,8 +3,8 @@ use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
+use indexmap::IndexMap;
 use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
-use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -32,6 +32,90 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::ZomeCalled`]
     CallZome(Box<ZomeCall>),
+
+    /// Get the state of a countersigning session.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CountersigningSessionState`]
+    ///
+    /// # Errors
+    ///
+    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
+    /// passed in to the call.
+    GetCountersigningSessionState(Box<CellId>),
+
+    /// Abandon an unresolved countersigning session.
+    ///
+    /// If the current session has not been resolved automatically, it can be forcefully abandoned.
+    /// A condition for this call to succeed is that at least one attempt has been made to resolve
+    /// it automatically.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::CountersigningSessionAbandoned`]
+    ///
+    /// The session is marked for abandoning and the countersigning workflow was triggered. The session
+    /// has not been abandoned yet.
+    ///
+    /// Upon successful abandoning the system signal [`SystemSignal::AbandonedCountersigning`] will
+    /// be emitted and the session removed from state, so that [`AppRequest::GetCountersigningSessionState`]
+    /// would return `None`.
+    ///
+    /// In the countersigning workflow it will first be attempted to resolve the session with incoming
+    /// signatures of the countersigned entries, before force-abandoning the session. In a very rare event
+    /// it could happen that in just the moment where the [`AppRequest::AbandonCountersigningSession`]
+    /// is made, signatures for this session come in. If they are valid, the session will be resolved and
+    /// published as usual. Should they be invalid, however, the flag to abandon the session is erased.
+    /// In such cases this request can be retried until the session has been abandoned successfully.
+    ///
+    /// # Errors
+    ///
+    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
+    /// passed in to the call.
+    ///
+    /// [`CountersigningError::SessionNotFound`] when no ongoing session could be found for the provided
+    /// cell id.
+    ///
+    /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
+    /// automatically has not been made.
+    AbandonCountersigningSession(Box<CellId>),
+
+    /// Publish an unresolved countersigning session.
+    ///
+    /// If the current session has not been resolved automatically, it can be forcefully published.
+    /// A condition for this call to succeed is that at least one attempt has been made to resolve
+    /// it automatically.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::PublishCountersigningSessionTriggered`]
+    ///
+    /// The session is marked for publishing and the countersigning workflow was triggered. The session
+    /// has not been published yet.
+    ///
+    /// Upon successful publishing the system signal [`SystemSignal::SuccessfulCountersigning`] will
+    /// be emitted and the session removed from state, so that [`AppRequest::GetCountersigningSessionState`]
+    /// would return `None`.
+    ///
+    /// In the countersigning workflow it will first be attempted to resolve the session with incoming
+    /// signatures of the countersigned entries, before force-publishing the session. In a very rare event
+    /// it could happen that in just the moment where the [`AppRequest::PublishCountersigningSession`]
+    /// is made, signatures for this session come in. If they are valid, the session will be resolved and
+    /// published as usual. Should they be invalid, however, the flag to publish the session is erased.
+    /// In such cases this request can be retried until the session has been published successfully.
+    ///
+    /// # Errors
+    ///
+    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
+    /// passed in to the call.
+    ///
+    /// [`CountersigningError::SessionNotFound`] when no ongoing session could be found for the provided
+    /// cell id.
+    ///
+    /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
+    /// automatically has not been made.
+    PublishCountersigningSession(Box<CellId>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
@@ -131,6 +215,15 @@ pub enum AppResponse {
     ///
     /// [msgpack]: https://msgpack.org/
     ZomeCalled(Box<ExternIO>),
+
+    /// The successful response to an [`AppRequest::GetCountersigningSessionState`].
+    CountersigningSessionState(Box<Option<CountersigningSessionState>>),
+
+    /// The successful response to an [`AppRequest::AbandonCountersigningSession`].
+    CountersigningSessionAbandoned,
+
+    /// The successful response to an [`AppRequest::PublishCountersigningSession`].
+    PublishCountersigningSessionTriggered,
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
     ///
@@ -320,7 +413,7 @@ pub struct AppInfo {
     /// Info about the cells installed in this app. Lists of cells are ordered
     /// and contain first the provisioned cell, then enabled clone cells and
     /// finally disabled clone cells.
-    pub cell_info: HashMap<RoleName, Vec<CellInfo>>,
+    pub cell_info: IndexMap<RoleName, Vec<CellInfo>>,
     /// The app's current status, in an API-friendly format
     pub status: AppInfoStatus,
     /// The app's agent pub key.
@@ -328,19 +421,22 @@ pub struct AppInfo {
     /// The original AppManifest used to install the app, which can also be used to
     /// install the app again under a new agent.
     pub manifest: AppManifest,
+    /// The timestamp when this app was installed.
+    pub installed_at: Timestamp,
 }
 
 impl AppInfo {
     pub fn from_installed_app(
         app: &InstalledApp,
-        dna_definitions: &HashMap<CellId, DnaDefHashed>,
+        dna_definitions: &IndexMap<CellId, DnaDefHashed>,
     ) -> Self {
         let installed_app_id = app.id().clone();
         let status = app.status().clone().into();
         let agent_pub_key = app.agent_key().to_owned();
         let mut manifest = app.manifest().clone();
+        let installed_at = *app.installed_at();
 
-        let mut cell_info: HashMap<RoleName, Vec<CellInfo>> = HashMap::new();
+        let mut cell_info: IndexMap<RoleName, Vec<CellInfo>> = IndexMap::new();
         app.roles().iter().for_each(|(role_name, role_assignment)| {
             // create a vector with info of all cells for this role
             let mut cell_info_for_role: Vec<CellInfo> = Vec::new();
@@ -427,6 +523,7 @@ impl AppInfo {
             status,
             agent_pub_key,
             manifest,
+            installed_at,
         }
     }
 }

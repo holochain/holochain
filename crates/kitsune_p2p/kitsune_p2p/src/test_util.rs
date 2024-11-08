@@ -65,6 +65,19 @@ pub fn hash_op_data(data: &[u8]) -> Arc<KitsuneOpHash> {
     ))
 }
 
+/// Start a test signal server
+pub async fn start_signal_srv() -> (std::net::SocketAddr, sbd_server::SbdServer) {
+    let server = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
+        bind: vec!["127.0.0.1:0".to_string(), "[::1]:0".to_string()],
+        limit_clients: 100,
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
+
+    (*server.bind_addrs().first().unwrap(), server)
+}
+
 mod harness_event;
 pub(crate) use harness_event::*;
 
@@ -76,8 +89,5 @@ mod harness_actor;
 pub(crate) use harness_actor::*;
 
 pub(crate) mod scenario_def_local;
-
-#[cfg(feature = "mock_network")]
-pub mod mock_network;
 
 pub mod data;

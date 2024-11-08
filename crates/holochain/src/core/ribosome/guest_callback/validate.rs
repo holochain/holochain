@@ -229,15 +229,21 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::ValidateResult;
+    use crate::conductor::api::error::ConductorApiError;
+    use crate::conductor::CellError;
     use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::core::ribosome::RibosomeError;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
+    use crate::core::workflow::WorkflowError;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
     use ::fixt::prelude::*;
     use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
+    use assert2::{assert, let_assert};
+    use holochain_state::source_chain::SourceChainError;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::op::Op;
@@ -274,6 +280,86 @@ mod slow_tests {
             .await
             .unwrap();
         assert_eq!(result, ValidateResult::Valid,);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_validate_implemented_invalid_return() {
+        let mut u = Unstructured::new(&NOISE);
+        let mut validate_invocation = ValidateInvocation::arbitrary(&mut u).unwrap();
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalidReturn]))
+            .next()
+            .unwrap();
+        validate_invocation.zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidReturn).erase_type());
+
+        let err = ribosome
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
+            .unwrap_err();
+
+        let_assert!(RibosomeError::CallbackInvalidReturnType(err_msg) = err);
+        assert!(err_msg.starts_with("invalid value: integer `42`"));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_adding_entry_when_validate_implemented_invalid_return() {
+        holochain_trace::test_run();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::ValidateInvalidReturn).await;
+
+        let err = conductor
+            .call_fallible::<_, Record>(&alice, "create_entry_to_validate", ())
+            .await
+            .unwrap_err();
+
+        let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
+        let_assert!(
+            WorkflowError::SourceChainError(SourceChainError::Other(other_err)) = *workflow_err
+        );
+        // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
+        assert!(other_err
+            .to_string()
+            .starts_with("The callback has an invalid return type: invalid value: integer `42`"));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_validate_implemented_invalid_params() {
+        let mut u = Unstructured::new(&NOISE);
+        let mut validate_invocation = ValidateInvocation::arbitrary(&mut u).unwrap();
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalidParams]))
+            .next()
+            .unwrap();
+        validate_invocation.zomes_to_invoke =
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidParams).erase_type());
+
+        let err = ribosome
+            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
+            .await
+            .unwrap_err();
+
+        let_assert!(RibosomeError::CallbackInvalidParameters(err_msg) = err);
+        assert!(err_msg == String::default());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_adding_entry_when_validate_implemented_invalid_params() {
+        holochain_trace::test_run();
+        let RibosomeTestFixture {
+            conductor, alice, ..
+        } = RibosomeTestFixture::new(TestWasm::ValidateInvalidParams).await;
+
+        let err = conductor
+            .call_fallible::<_, Record>(&alice, "create_entry_to_validate", ())
+            .await
+            .unwrap_err();
+
+        let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
+        let_assert!(
+            WorkflowError::SourceChainError(SourceChainError::Other(other_err)) = *workflow_err
+        );
+        // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
+        assert!(other_err.to_string() == "The callback has invalid parameters: ");
     }
 
     #[tokio::test(flavor = "multi_thread")]

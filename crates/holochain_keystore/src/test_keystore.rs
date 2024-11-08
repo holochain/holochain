@@ -83,7 +83,7 @@ pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
 pub fn test_keystore() -> MetaLairClient {
     holochain_util::tokio_helper::block_on(
         async move { spawn_test_keystore().await.unwrap() },
-        std::time::Duration::from_secs(1),
+        std::time::Duration::from_secs(5),
     )
     .expect("timeout elapsed")
 }

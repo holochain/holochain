@@ -138,6 +138,8 @@ impl NetworkTopology {
     /// - There are no edges that reference conductors that are not equal to
     ///   their origin node.
     pub fn integrity_check(&self) -> Result<(), NetworkTopologyError> {
+        // TODO This is a good point that Clippy is making here!
+        #[allow(clippy::mutable_key_type)]
         let mut edge_set = HashSet::new();
         for edge in self.edge_references() {
             // Check that there are no self edges.

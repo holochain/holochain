@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{ArgAction, Parser};
+use clap::Parser;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use kitsune_p2p_types::config::TransportConfig;
 use url2::Url2;
@@ -41,8 +41,14 @@ pub struct Create {
     pub in_process_lair: bool,
 
     /// Launch Holochain with the DPKI service disabled.
-    #[arg(long, action = ArgAction::SetFalse)]
+    #[cfg(feature = "unstable-dpki")]
+    #[arg(long)]
     pub no_dpki: bool,
+
+    /// Set the network seed for the DPKI service.
+    #[cfg(feature = "unstable-dpki")]
+    #[arg(long, conflicts_with = "no_dpki")]
+    pub dpki_network_seed: Option<String>,
 
     /// Set the conductor config CHC (Chain Head Coordinator) URL
     #[cfg(feature = "chc")]
@@ -95,33 +101,6 @@ pub enum NetworkType {
         webrtc_config: Option<std::path::PathBuf>,
     },
 }
-
-/*
-#[derive(Debug, Parser, Clone)]
-pub struct Quic {
-    /// The network interface and port to bind to.
-    /// Default: "kitsune-quic://0.0.0.0:0".
-    #[arg(short, long, value_parser = try_parse_url2)]
-    pub bind_to: Option<Url2>,
-
-    /// If you have port-forwarding set up,
-    /// or wish to apply a vanity domain name,
-    /// you may need to override the local NIC IP.
-    /// Default: None = use NIC IP.
-    #[arg(long)]
-    pub override_host: Option<String>,
-
-    /// If you have port-forwarding set up,
-    /// you may need to override the local NIC port.
-    /// Default: None = use NIC port.
-    #[arg(long)]
-    pub override_port: Option<u16>,
-
-    /// Run through an external proxy at this URL.
-    #[arg(short, value_parser = try_parse_url2)]
-    pub proxy: Option<Url2>,
-}
-*/
 
 #[derive(Debug, Parser, Clone)]
 pub struct Existing {
@@ -212,51 +191,11 @@ impl Network {
             Some(n) => (*n).clone(),
         };
 
-        let mut kit = KitsuneP2pConfig::default();
+        let mut kit = KitsuneP2pConfig::mem();
         kit.bootstrap_service = bootstrap;
 
         match transport {
             NetworkType::Mem => (),
-            /*
-            NetworkType::Mdns => {
-                kit.network_type = kitsune_p2p_types::config::NetworkType::QuicMdns;
-                kit.transport_pool = vec![TransportConfig::Quic {
-                    bind_to: None,
-                    override_host: None,
-                    override_port: None,
-                }];
-            }
-            NetworkType::Quic(Quic {
-                bind_to,
-                override_host,
-                override_port,
-                proxy: None,
-            }) => {
-                kit.transport_pool = vec![TransportConfig::Quic {
-                    bind_to,
-                    override_host,
-                    override_port,
-                }];
-            }
-            NetworkType::Quic(Quic {
-                bind_to,
-                override_host,
-                override_port,
-                proxy: Some(proxy_url),
-            }) => {
-                let transport = TransportConfig::Quic {
-                    bind_to,
-                    override_host,
-                    override_port,
-                };
-                kit.transport_pool = vec![TransportConfig::Proxy {
-                    sub_transport: Box::new(transport),
-                    proxy_config: holochain_p2p::kitsune_p2p::ProxyConfig::RemoteProxyClient {
-                        proxy_url,
-                    },
-                }];
-            }
-            */
             NetworkType::WebRTC {
                 signal_url,
                 webrtc_config,
@@ -291,7 +230,10 @@ impl Default for Create {
             root: None,
             directories: Vec::with_capacity(0),
             in_process_lair: false,
+            #[cfg(feature = "unstable-dpki")]
             no_dpki: false,
+            #[cfg(feature = "unstable-dpki")]
+            dpki_network_seed: None,
             #[cfg(feature = "chc")]
             chc_url: None,
         }

@@ -23,7 +23,6 @@ pub fn spawn_sys_validation_consumer(
     let trigger_self = tx.clone();
     let workspace = Arc::new(workspace);
     let space = Arc::new(space);
-    let config = conductor.config.clone();
 
     let current_validation_dependencies = SysValDeps::default();
 
@@ -43,7 +42,6 @@ pub fn spawn_sys_validation_consumer(
                     trigger_publish.clone(),
                     trigger_self.clone(),
                     network.clone(),
-                    config.clone(),
                     keystore.clone(),
                     representative_agent,
                 ))

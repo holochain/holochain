@@ -1,10 +1,12 @@
 #![allow(clippy::type_complexity)]
+
 use crate::actor::BroadcastData;
+use crate::actor::*;
 use crate::spawn::actor::{
-    EvtRcv, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,
+    EvtRcv, InternalHandler, InternalHandlerResult, KSpace, MaybeDelegate, OpHashList, VecMXM,
 };
 use crate::spawn::meta_net::MetaNetCon;
-use crate::spawn::{Internal, InternalHandler};
+use crate::spawn::Internal;
 use crate::{GossipModuleType, KitsuneP2pError};
 use futures::FutureExt;
 use ghost_actor::GhostError;
@@ -18,6 +20,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub struct InternalStub {
     fetch_calls: Vec<(FetchKey, KSpace, FetchSource)>,
     pub incoming_publish_calls: Arc<
@@ -26,6 +29,7 @@ pub struct InternalStub {
                 KSpace,
                 crate::spawn::actor::KAgent,
                 crate::spawn::actor::KAgent,
+                kitsune_p2p_fetch::TransferMethod,
                 OpHashList,
                 FetchContext,
                 MaybeDelegate,
@@ -124,6 +128,7 @@ impl InternalHandler for InternalStub {
         space: crate::spawn::actor::KSpace,
         to_agent: crate::spawn::actor::KAgent,
         source: crate::spawn::actor::KAgent,
+        transfer_method: kitsune_p2p_fetch::TransferMethod,
         op_hash_list: OpHashList,
         context: FetchContext,
         maybe_delegate: MaybeDelegate,
@@ -136,6 +141,7 @@ impl InternalHandler for InternalStub {
             space,
             to_agent,
             source,
+            transfer_method,
             op_hash_list,
             context,
             maybe_delegate,

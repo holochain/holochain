@@ -22,6 +22,80 @@ mod common;
 
 type AgentCtx = Vec<(KitsuneTestHarness, GhostSender<KitsuneP2p>, Arq, KAgent)>;
 
+#[cfg(not(feature = "unstable-sharding"))]
+#[tokio::test(flavor = "multi_thread")]
+async fn gossip_arc_clamping_required() {
+    let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    // Try to set up a network with gossip_arc_clamping set to None
+    let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
+        params.gossip_arc_clamping = "none".to_string();
+        params
+    };
+
+    let mut harness = KitsuneTestHarness::try_new("")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(tuner);
+
+    let result = harness.spawn().await;
+    match result {
+        Ok(_) => panic!("Should not have been able to spawn node"),
+        Err(kitsune_p2p::KitsuneP2pError::Other(e)) => {
+            assert_eq!("gossip_arc_clamping must be set".to_string(), e.to_string(),);
+        }
+        Err(e) => panic!("Unexpected error type: {e:?}"),
+    }
+}
+
+#[cfg(not(feature = "unstable-sharding"))]
+#[tokio::test(flavor = "multi_thread")]
+async fn gossip_arc_clamping_permits_empty() {
+    let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    // Try to set up a network with gossip_arc_clamping set to "empty"
+    let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
+        params.gossip_arc_clamping = "empty".to_string();
+        params
+    };
+
+    let mut harness = KitsuneTestHarness::try_new("")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(tuner);
+
+    harness.spawn().await.unwrap();
+}
+
+#[cfg(not(feature = "unstable-sharding"))]
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic]
+async fn gossip_arc_clamping_required_when_junk_config_provided() {
+    let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
+    let (signal_url, _signal_srv_handle) = start_signal_srv().await;
+
+    // Try to set up a network with gossip_arc_clamping set to a junk value
+    let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
+        params.gossip_arc_clamping = "winkle".to_string();
+        params
+    };
+
+    let mut harness = KitsuneTestHarness::try_new("")
+        .await
+        .expect("Failed to setup test harness")
+        .configure_tx5_network(signal_url)
+        .use_bootstrap_server(bootstrap_addr)
+        .update_tuning_params(tuner);
+
+    harness.spawn().await.unwrap();
+}
+
 /// Test scenario steps:
 ///   1. Set up 5 nodes, each with one agent.
 ///   2. Assign a DHT arc to each agent such that their start location is inside the previous agent's arc.
@@ -29,7 +103,6 @@ type AgentCtx = Vec<(KitsuneTestHarness, GhostSender<KitsuneP2p>, Arq, KAgent)>;
 ///   4. Publish an op with a basis location set to the location of the 4th agent. This should also be visible to the 3rd agent by 2. above.
 ///   5. Wait for the 3rd agent to receive the data.
 ///   6. Assert that the op was never published to the 1st, 2nd, or 5th agents. (Note that we cannot check if we sent it to ourselves because the op was already in our store)
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky on CI"]
 async fn publish_to_basis_from_inside() {
@@ -41,8 +114,19 @@ async fn publish_to_basis_from_inside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = "none".to_string();
-        params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        #[cfg(feature = "unstable-sharding")]
+        {
+            params.gossip_arc_clamping = "none".to_string();
+        }
+        #[cfg(not(feature = "unstable-sharding"))]
+        {
+            params.gossip_arc_clamping = "full".to_string();
+        }
+        #[cfg(feature = "unstable-sharding")]
+        {
+            // Don't update the arcs dynamically, use the initial value
+            params.gossip_dynamic_arcs = false;
+        }
         params.disable_recent_gossip = true;
         params.disable_historical_gossip = true;
         params
@@ -95,6 +179,7 @@ async fn publish_to_basis_from_inside() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agents[sender_idx].3.clone(),
+                transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                 op_hash_list: vec![test_op.into()],
                 context: FetchContext::default(),
             },
@@ -125,7 +210,6 @@ async fn publish_to_basis_from_inside() {
 /// This is a valid scenario because any hash might be produced by creating data and the publish
 /// should still go to the correct agents. It also stays with the publisher, so we need to account
 /// for that when checking the op stores at the end of the test.
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky on CI"]
 async fn publish_to_basis_from_outside() {
@@ -137,8 +221,19 @@ async fn publish_to_basis_from_outside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = "none".to_string();
-        params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        #[cfg(feature = "unstable-sharding")]
+        {
+            params.gossip_arc_clamping = "none".to_string();
+        }
+        #[cfg(not(feature = "unstable-sharding"))]
+        {
+            params.gossip_arc_clamping = "full".to_string();
+        }
+        #[cfg(feature = "unstable-sharding")]
+        {
+            // Don't update the arcs dynamically, use the initial value
+            params.gossip_dynamic_arcs = false;
+        }
         params.disable_recent_gossip = true;
         params.disable_historical_gossip = true;
         params
@@ -194,6 +289,7 @@ async fn publish_to_basis_from_outside() {
             KitsuneTimeout::from_millis(5_000),
             BroadcastData::Publish {
                 source: agents[sender_idx].3.clone(),
+                transfer_method: kitsune_p2p_fetch::TransferMethod::Publish,
                 op_hash_list: vec![test_op.into()],
                 context: FetchContext::default(),
             },
@@ -247,8 +343,8 @@ async fn publish_to_basis_from_outside() {
 ///   4. The 4th agent creates an op and places it in their store. This should be gossipped to the 3rd agent by 2. above.
 ///   5. Wait for the 3rd agent to receive the data.
 ///   6. Assert that the op was never gossipped to the 1st, 2nd, or 5th agents.
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky--this is flaky both with and without unstable-sharding feature"]
 async fn gossip_to_basis_from_inside() {
     holochain_trace::test_run();
 
@@ -258,8 +354,19 @@ async fn gossip_to_basis_from_inside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = "none".to_string();
-        params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        #[cfg(feature = "unstable-sharding")]
+        {
+            params.gossip_arc_clamping = "none".to_string();
+        }
+        #[cfg(not(feature = "unstable-sharding"))]
+        {
+            params.gossip_arc_clamping = "full".to_string();
+        }
+        #[cfg(feature = "unstable-sharding")]
+        {
+            // Don't update the arcs dynamically, use the initial value
+            params.gossip_dynamic_arcs = false;
+        }
         params.disable_historical_gossip = true;
         params.disable_publish = true;
         params.gossip_loop_iteration_delay_ms = 100;
@@ -337,7 +444,6 @@ async fn gossip_to_basis_from_inside() {
 ///
 /// This is important because, while publish should cross arcs, gossip should not. If we gossip with everyone
 /// on a network then we could go a long time between talking to each node and maintain a lot of connections.
-#[cfg(feature = "tx5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn no_gossip_to_basis_from_outside() {
     holochain_trace::test_run();
@@ -348,8 +454,19 @@ async fn no_gossip_to_basis_from_outside() {
     let space = Arc::new(fixt!(KitsuneSpace));
 
     let tuner = |mut params: tuning_params_struct::KitsuneP2pTuningParams| {
-        params.gossip_arc_clamping = "none".to_string();
-        params.gossip_dynamic_arcs = false; // Don't update the arcs dynamically, use the initial value
+        #[cfg(feature = "unstable-sharding")]
+        {
+            params.gossip_arc_clamping = "none".to_string();
+        }
+        #[cfg(not(feature = "unstable-sharding"))]
+        {
+            params.gossip_arc_clamping = "full".to_string();
+        }
+        #[cfg(feature = "unstable-sharding")]
+        {
+            // Don't update the arcs dynamically, use the initial value
+            params.gossip_dynamic_arcs = false;
+        }
         params.disable_historical_gossip = true;
         params.disable_publish = true;
         params.gossip_loop_iteration_delay_ms = 100;

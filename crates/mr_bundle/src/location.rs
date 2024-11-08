@@ -93,11 +93,13 @@ mod tests {
     /// human-readable manifests, e.g. YAML
     ///
     /// The YAML produced by this test looks like:
+    /// ```yaml
     /// ---
     /// celery:
     ///   - !bundled: b
     ///   - !path: p
     /// url: "http://r.co"
+    /// ```
     #[test]
     fn location_flattening() {
         use serde_yaml::Value;

@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS DhtOp (
     action_hash      BLOB           NOT NULL,
 
     storage_center_loc          INTEGER   NOT NULL,
+
+    -- The timestamp on the DhtOp itself. NOT the timestamp of the row being created.
     authored_timestamp       INTEGER   NOT NULL,
 
     -- This is the order that process ops should result

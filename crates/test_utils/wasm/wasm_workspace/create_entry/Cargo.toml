@@ -24,3 +24,7 @@ hdi = { path = "../../../../hdi" }
 default = ["holochain_test_wasm_common", "hdk"]
 integrity = []
 mock = ["hdk/mock", "default"]
+unstable-functions = [
+    "hdk?/unstable-functions",
+    "hdi/unstable-functions",
+]

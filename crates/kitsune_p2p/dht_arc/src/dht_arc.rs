@@ -238,7 +238,7 @@ impl<T: num_traits::AsPrimitive<u32>> DhtArcRange<T> {
         if len == 0 {
             DhtArcRange::Empty
         } else {
-            let end = start.wrapping_add(((len - 1) as u32).min(u32::MAX));
+            let end = start.wrapping_add((len - 1) as u32);
             DhtArcRange::from_bounds(start, end)
         }
     }

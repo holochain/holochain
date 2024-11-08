@@ -49,6 +49,7 @@ use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
 use holochain_wasmer_host::module::ModuleCache;
+use indexmap::IndexMap;
 use itertools::Itertools;
 use rusqlite::Transaction;
 use tokio::sync::mpsc::error::SendError;
@@ -592,8 +593,8 @@ mod dna_impls {
         pub fn get_dna_definitions(
             &self,
             app: &InstalledApp,
-        ) -> ConductorResult<HashMap<CellId, DnaDefHashed>> {
-            let mut dna_defs = HashMap::new();
+        ) -> ConductorResult<IndexMap<CellId, DnaDefHashed>> {
+            let mut dna_defs = IndexMap::new();
             for cell_id in app.all_cells() {
                 let ribosome = self.get_ribosome(cell_id.dna_hash())?;
                 let dna_def = ribosome.dna_def();
@@ -643,7 +644,7 @@ mod dna_impls {
             let (wasms, defs) = db
                 .read_async(move |txn| {
                     // Get all the dna defs.
-                    let dna_defs: Vec<_> = holochain_state::dna_def::get_all(&txn)?
+                    let dna_defs: Vec<_> = holochain_state::dna_def::get_all(txn)?
                         .into_iter()
                         .collect();
 
@@ -661,13 +662,13 @@ mod dna_impls {
                     let wasms = unique_wasms
                         .into_iter()
                         .map(|wasm_hash| {
-                            holochain_state::wasm::get(&txn, &wasm_hash)?
+                            holochain_state::wasm::get(txn, &wasm_hash)?
                                 .map(|hashed| hashed.into_content())
                                 .ok_or(ConductorError::WasmMissing)
                                 .map(|wasm| (wasm_hash, wasm))
                         })
                         .collect::<ConductorResult<HashMap<_, _>>>()?;
-                    let wasms = holochain_state::dna_def::get_all(&txn)?
+                    let wasms = holochain_state::dna_def::get_all(txn)?
                         .into_iter()
                         .map(|dna_def| {
                             // Load all wasms for each dna_def from the wasm db into memory
@@ -681,7 +682,7 @@ mod dna_impls {
                         })
                         // This needs to happen due to the environment not being Send
                         .collect::<Vec<_>>();
-                    let defs = holochain_state::entry_def::get_all(&txn)?;
+                    let defs = holochain_state::entry_def::get_all(txn)?;
                     ConductorResult::Ok((wasms, defs))
                 })
                 .await?;
@@ -1437,6 +1438,7 @@ pub struct InstallAppCommonFlags {
 /// Methods related to app installation and management
 mod app_impls {
     use holochain_types::deepkey_roundtrip_backward;
+    use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairEntryInfo;
 
     use crate::conductor::state::is_app;
 
@@ -1580,6 +1582,7 @@ mod app_impls {
                     agent_key.clone(),
                     roles,
                     manifest,
+                    Timestamp::now(),
                 )?;
 
                 let (_, app) = self
@@ -1600,6 +1603,7 @@ mod app_impls {
                         agent_key.clone(),
                         roles,
                         manifest,
+                        Timestamp::now(),
                     )?;
 
                     // Update the db
@@ -1788,7 +1792,8 @@ mod app_impls {
                 .collect())
         }
 
-        /// List Apps with their information
+        /// List Apps with their information,
+        /// sorted by their installed_at timestamp, in descending order
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn list_apps(
             &self,
@@ -1830,13 +1835,14 @@ mod app_impls {
                     .collect(),
             };
 
-            let app_infos: Vec<AppInfo> = apps_ids
+            let mut app_infos: Vec<AppInfo> = apps_ids
                 .into_iter()
                 .map(|app_id| self.get_app_info_inner(app_id, &conductor_state))
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .flatten()
                 .collect();
+            app_infos.sort_by_key(|app_info| std::cmp::Reverse(app_info.installed_at));
 
             Ok(app_infos)
         }
@@ -2006,48 +2012,68 @@ mod app_impls {
 
             let dst_tag = format!("{lair_tag}.{dst_tag_suffix}");
 
-            let result = self
+            let entry_info = self
                 .keystore()
                 .lair_client()
-                .derive_seed(
-                    lair_tag.clone().into(),
-                    None,
-                    dst_tag.clone().into(),
-                    None,
-                    derivation_path.clone().into_boxed_slice(),
-                )
+                .get_entry(dst_tag.clone().into())
                 .await;
+            let seed_info = match entry_info {
+                Ok(LairEntryInfo::Seed { seed_info, .. }) => {
+                    // If the seed already exists, we don't need to create it again.
+                    seed_info
+                }
+                Ok(_) => {
+                    return Err(ConductorError::other(
+                        "DPKI could not be installed because the device seed points to an entry in lair that is not a seed.",
+                    ));
+                }
+                // Errors on not found, so try to create the seed and if that fails because there's
+                // some issue connecting to Lair then we'll get the error from trying to derive the seed.
+                Err(_) => {
+                    let result = self
+                        .keystore()
+                        .lair_client()
+                        .derive_seed(
+                            lair_tag.clone().into(),
+                            None,
+                            dst_tag.clone().into(),
+                            None,
+                            derivation_path.clone().into_boxed_slice(),
+                        )
+                        .await;
 
-            let info = match result {
-                Err(err) => {
-                    // If the seed could not be derived, assume that this is because there was no device seed
-                    // to derive from and attempt to create a throwaway seed if that was set in the config
-                    if config.danger_generate_throwaway_device_seed {
-                        tracing::info!("Failed to derive seed from lair, falling back to random seed. This is to be expected. Error: {:?}", err);
+                    match result {
+                        Ok(info) => info,
+                        Err(err) => {
+                            // If the seed could not be derived, assume that this is because there was no device seed
+                            // to derive from and attempt to create a throwaway seed if that was set in the config
+                            if config.danger_generate_throwaway_device_seed {
+                                tracing::info!("Failed to derive seed from lair, falling back to random seed. This is to be expected. Error: {:?}", err);
 
-                        self.keystore()
-                            .lair_client()
-                            .new_seed(lair_tag.clone().into(), None, false)
-                            .await?;
+                                self.keystore()
+                                    .lair_client()
+                                    .new_seed(lair_tag.clone().into(), None, false)
+                                    .await?;
 
-                        self.keystore()
-                            .lair_client()
-                            .derive_seed(
-                                lair_tag.into(),
-                                None,
-                                dst_tag.into(),
-                                None,
-                                derivation_path.into_boxed_slice(),
-                            )
-                            .await?
-                    } else {
-                        return Err(err.into());
+                                self.keystore()
+                                    .lair_client()
+                                    .derive_seed(
+                                        lair_tag.into(),
+                                        None,
+                                        dst_tag.into(),
+                                        None,
+                                        derivation_path.into_boxed_slice(),
+                                    )
+                                    .await?
+                            } else {
+                                return Err(err.into());
+                            }
+                        }
                     }
                 }
-                Ok(info) => info,
             };
 
-            let seed = info.ed25519_pub_key.0.to_vec();
+            let seed = seed_info.ed25519_pub_key.0.to_vec();
             Ok(seed)
         }
     }
@@ -2456,7 +2482,6 @@ mod app_status_impls {
             // Add agents to local agent store in kitsune
 
             future::join_all(new_cells.iter().enumerate().map(|(i, (cell, _))| {
-                let sleuth_id = self.config.sleuth_id();
                 async move {
                     let p2p_agents_db = cell.p2p_agents_db().clone();
                     let cell_id = cell.id().clone();
@@ -2479,10 +2504,8 @@ mod app_status_impls {
                         Ok(r) => {
                             match r {
                                 Ok(_) => {
-                                    aitia::trace!(&hc_sleuth::Event::AgentJoined {
-                                        node: sleuth_id,
-                                        agent: cell_id.agent_pubkey().clone()
-                                    });
+                                    // all good
+
                                 }
                                 Err(e) => {
                                     tracing::error!(
@@ -2593,7 +2616,6 @@ mod app_status_impls {
 
 /// Methods related to management of Conductor state
 mod service_impls {
-
     use super::*;
 
     impl Conductor {
@@ -2777,6 +2799,7 @@ mod scheduler_impls {
         /// Calling this will:
         /// - Delete/unschedule all ephemeral scheduled functions GLOBALLY
         /// - Add an interval that runs IN ADDITION to previous invocations
+        ///
         /// So ideally this would be called ONCE per conductor lifecycle ONLY.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn start_scheduler(
@@ -2790,7 +2813,8 @@ mod scheduler_impls {
                     let all_dbs = space.get_all_authored_dbs();
 
                     all_dbs.into_iter().map(|db| async move {
-                        db.write_async(delete_all_ephemeral_scheduled_fns).await
+                        db.write_async(|txn| delete_all_ephemeral_scheduled_fns(txn))
+                            .await
                     })
                 })
                 .into_iter()
@@ -3025,21 +3049,6 @@ mod misc_impls {
             Ok(())
         }
 
-        /// Inject records into a source chain for a cell.
-        /// If the records form a chain segment that can be "grafted" onto the existing chain, it will be.
-        /// Otherwise, a new chain will be formed using the specified records.
-        pub async fn graft_records_onto_source_chain(
-            self: Arc<Self>,
-            cell_id: CellId,
-            validate: bool,
-            records: Vec<Record>,
-        ) -> ConductorApiResult<()> {
-            graft_records_onto_source_chain::graft_records_onto_source_chain(
-                self, cell_id, validate, records,
-            )
-            .await
-        }
-
         /// Update coordinator zomes on an existing dna.
         pub async fn update_coordinators(
             &self,
@@ -3196,6 +3205,7 @@ mod accessor_impls {
     }
 }
 
+/// Methods related to app authentication tokens
 mod authenticate_token_impls {
     use super::*;
     use holochain_conductor_api::{
@@ -3247,6 +3257,122 @@ mod authenticate_token_impls {
             self.app_auth_token_store.share_mut(|app_connection_auth| {
                 app_connection_auth.authenticate_token(token, app_id)
             })
+        }
+    }
+}
+
+/// Methods for bridging from host calls to workflows for countersigning
+mod countersigning_impls {
+    use super::*;
+    use crate::core::workflow::{self, countersigning_workflow::CountersigningWorkspace};
+
+    impl Conductor {
+        /// Accept a countersigning session
+        pub(crate) async fn accept_countersigning_session(
+            &self,
+            cell_id: CellId,
+            request: PreflightRequest,
+        ) -> ConductorResult<PreflightRequestAcceptance> {
+            let countersigning_trigger = self
+                .cell_by_id(&cell_id)
+                .await?
+                .triggers()
+                .countersigning
+                .clone();
+
+            Ok(
+                workflow::countersigning_workflow::accept_countersigning_request(
+                    self.spaces.get_or_create_space(cell_id.dna_hash())?,
+                    self.keystore.clone(),
+                    cell_id.agent_pubkey().clone(),
+                    request,
+                    countersigning_trigger,
+                )
+                .await?,
+            )
+        }
+
+        /// Get in-memory state of an ongoing countersigning session.
+        pub async fn get_countersigning_session_state(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<Option<CountersigningSessionState>> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let maybe_countersigning_workspace =
+                space.countersigning_workspaces.lock().get(cell_id).cloned();
+            match maybe_countersigning_workspace {
+                None => Err(ConductorError::CountersigningError(
+                    CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                )),
+                Some(workspace) => Ok(workspace.get_countersigning_session_state()),
+            }
+        }
+
+        /// Abandon an ongoing countersigning session when it can not be automatically resolved.
+        pub async fn abandon_countersigning_session(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let countersigning_workspace = self
+                .get_workspace_of_unresolved_session(&space, cell_id)
+                .await?;
+            let cell = self.cell_by_id(cell_id).await?;
+            countersigning_workspace.mark_countersigning_session_for_force_abandon(cell_id)?;
+            cell.triggers()
+                .countersigning
+                .trigger(&"force_abandon_session");
+            Ok(())
+        }
+
+        /// Publish an ongoing countersigning session when it has not be automatically resolved.
+        pub async fn publish_countersigning_session(
+            &self,
+            cell_id: &CellId,
+        ) -> ConductorResult<()> {
+            let space = self.get_or_create_space(cell_id.dna_hash())?;
+            let countersigning_workspace = self
+                .get_workspace_of_unresolved_session(&space, cell_id)
+                .await?;
+            let cell = self.cell_by_id(cell_id).await?;
+            countersigning_workspace.mark_countersigning_session_for_force_publish(cell_id)?;
+            cell.triggers()
+                .countersigning
+                .trigger(&"force_publish_session");
+            Ok(())
+        }
+
+        async fn get_workspace_of_unresolved_session(
+            &self,
+            space: &Space,
+            cell_id: &CellId,
+        ) -> ConductorResult<Arc<CountersigningWorkspace>> {
+            let maybe_countersigning_workspace =
+                space.countersigning_workspaces.lock().get(cell_id).cloned();
+            match maybe_countersigning_workspace {
+                None => Err(ConductorError::CountersigningError(
+                    CountersigningError::WorkspaceDoesNotExist(cell_id.clone()),
+                )),
+                Some(countersigning_workspace) => {
+                    match countersigning_workspace.get_countersigning_session_state() {
+                        None => Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotFound(cell_id.clone()),
+                        )),
+                        Some(CountersigningSessionState::Unknown { resolution, .. }) => {
+                            if resolution.attempts >= 1 {
+                                Ok(countersigning_workspace)
+                            } else {
+                                Err(ConductorError::CountersigningError(
+                                    CountersigningError::SessionNotUnresolved(cell_id.clone()),
+                                ))
+                            }
+                        }
+                        _ => Err(ConductorError::CountersigningError(
+                            CountersigningError::SessionNotUnresolved(cell_id.clone()),
+                        )),
+                    }
+                }
+            }
         }
     }
 }
@@ -3392,7 +3518,7 @@ impl Conductor {
             let mut path = db.path().clone();
             if let Err(err) = ffs::remove_file(&path).await {
                 tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
-                db.write_async(purge_data).await?;
+                db.write_async(|txn| purge_data(txn)).await?;
             }
             path.set_extension("");
             let stem = path.to_string_lossy();
@@ -3413,12 +3539,12 @@ impl Conductor {
                     self.spaces
                         .dht_db(dna_hash)
                         .unwrap()
-                        .write_async(purge_data)
+                        .write_async(|txn| purge_data(txn))
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
                         .unwrap()
-                        .write_async(purge_data)
+                        .write_async(|txn| purge_data(txn))
                         .boxed(),
                     // TODO: also delete stale Wasms
                 ]
@@ -3658,7 +3784,7 @@ impl Conductor {
         Ok(installed_clone_cell)
     }
 
-    /// Print the current setup in a machine readable way
+    /// Print the current setup in a machine-readable way
     fn print_setup(&self) {
         use std::fmt::Write;
         let mut out = String::new();
@@ -3827,7 +3953,7 @@ pub fn app_manifest_from_dnas(
             let dna = dr.dna();
             let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let mut modifiers = DnaModifiersOpt::none();
-            modifiers.network_seed = network_seed.clone();
+            modifiers.network_seed.clone_from(&network_seed);
             AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {
@@ -3895,16 +4021,16 @@ pub async fn full_integration_dump(
     vault
         .read_async(move |txn| {
             let integrated =
-                query_dht_ops_from_statement(&txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
+                query_dht_ops_from_statement(txn, state_dump::DHT_OPS_INTEGRATED, dht_ops_cursor)?;
 
             let validation_limbo = query_dht_ops_from_statement(
-                &txn,
+                txn,
                 state_dump::DHT_OPS_IN_VALIDATION_LIMBO,
                 dht_ops_cursor,
             )?;
 
             let integration_limbo = query_dht_ops_from_statement(
-                &txn,
+                txn,
                 state_dump::DHT_OPS_IN_INTEGRATION_LIMBO,
                 dht_ops_cursor,
             )?;

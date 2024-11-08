@@ -1,16 +1,18 @@
 use super::*;
-use crate::core::workflow::sys_validation_workflow::types::Outcome;
 use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::*;
-use crate::test_utils::inline_zomes::simple_crud_zome;
 use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
 use holochain_wasm_test_utils::TestWasm;
 use rusqlite::named_params;
 use rusqlite::Transaction;
 use std::convert::TryFrom;
-use std::convert::TryInto;
 use std::time::Duration;
+#[cfg(feature = "unstable-warrants")]
+use {
+    crate::core::workflow::sys_validation_workflow::types::Outcome,
+    crate::test_utils::inline_zomes::simple_crud_zome, std::convert::TryInto,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
@@ -31,6 +33,7 @@ async fn sys_validation_workflow_test() {
     run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
 }
 
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_produces_invalid_chain_warrant() {
     holochain_trace::test_run();
@@ -76,7 +79,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
     let op = DhtOpHashed::from_content_sync(op);
     let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op(txn, &op).unwrap();
+        insert_op_dht(txn, &op, None).unwrap();
     });
 
     //- Trigger sys validation
@@ -96,7 +99,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
                 .get_all_authored_dbs(dna.dna_hash())
                 .unwrap()[0]
                 .test_read(move |txn| {
-                    let store = Txn::from(&txn);
+                    let store = CascadeTxnWrapper::from(txn);
 
                     let warrants = store.get_warrants_for_basis(&basis, false).unwrap();
                     warrants.len()
@@ -106,6 +109,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
     );
 }
 
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn sys_validation_produces_forked_chain_warrant() {
     holochain_trace::test_run();
@@ -170,7 +174,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let forked_op = DhtOpHashed::from_content_sync(forked_op);
     let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op(txn, &forked_op).unwrap();
+        insert_op_dht(txn, &forked_op, None).unwrap();
     });
 
     //- Check that bob authored a chain fork warrant
@@ -190,7 +194,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
                 .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
                 .unwrap()
                 .test_read(move |txn| {
-                    let store = Txn::from(&txn);
+                    let store = CascadeTxnWrapper::from(txn);
                     store.get_warrants_for_basis(&basis, false).unwrap()
                 })
         },
@@ -247,8 +251,8 @@ async fn run_test(
     // holochain_state::prelude::dump_tmp(&alice_dht_db);
     // Validation should be empty
     alice_dht_db.read_async(move |txn| -> DatabaseResult<()> {
-        let limbo = show_limbo(&txn);
-        assert!(limbo_is_empty(&txn), "{:?}", limbo);
+        let limbo = show_limbo(txn);
+        assert!(limbo_is_empty(txn), "{:?}", limbo);
 
         let num_valid_ops: usize = txn
             .query_row("SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
@@ -266,8 +270,11 @@ async fn run_test(
     let (bad_update_action, bad_update_entry_hash, link_add_hash) =
         bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
 
-    // Integration should have 14 chain ops in it + 1 warrant op + the running tally
+    // Integration should have 14 chain ops in it + 1 warrant op (if unstable-warrants enabled) + the running tally
+    #[cfg(feature = "unstable-warrants")]
     let expected_count = 14 + 1 + expected_count;
+    #[cfg(not(feature = "unstable-warrants"))]
+    let expected_count = 14 + expected_count;
 
     let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
@@ -275,7 +282,7 @@ async fn run_test(
         .unwrap();
 
     let bad_update_entry_hash: AnyDhtHash = bad_update_entry_hash.into();
-    let num_valid_ops = move |txn: Transaction| -> DatabaseResult<usize> {
+    let num_valid_ops = move |txn: &Transaction| -> DatabaseResult<usize> {
         let valid_ops: usize = txn
                 .query_row(
                     "
@@ -320,8 +327,8 @@ async fn run_test(
     let (limbo, empty) = alice_db
         .read_async(move |txn| {
             // Validation should be empty
-            let limbo = show_limbo(&txn);
-            let empty = limbo_is_empty(&txn);
+            let limbo = show_limbo(txn);
+            let empty = limbo_is_empty(txn);
             DatabaseResult::Ok((limbo, empty))
         })
         .await
@@ -329,7 +336,10 @@ async fn run_test(
 
     assert!(empty, "{:?}", limbo);
 
-    let valid_ops = alice_db.read_async(num_valid_ops.clone()).await.unwrap();
+    let valid_ops = alice_db
+        .read_async(move |txn| num_valid_ops(txn))
+        .await
+        .unwrap();
     assert_eq!(valid_ops, expected_count);
 }
 

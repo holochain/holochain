@@ -48,6 +48,7 @@ pub fn is_not_entry_action<'a>() -> impl Fact<'a, Action> {
 /// - constrain action types based on position
 /// - constrain seq num
 /// - constrain prev_hashes
+///
 /// ...but, this does it all in one Fact
 pub fn valid_chain<'a>(len: usize, author: AgentPubKey) -> impl Fact<'a, Vec<Action>> {
     vec_of_length(len, valid_chain_action(author))

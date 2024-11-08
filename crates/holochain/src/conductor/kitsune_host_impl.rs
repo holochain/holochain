@@ -291,29 +291,17 @@ impl KitsuneHost for KitsuneHostImpl {
     fn handle_op_hash_received(
         &self,
         _space: &KitsuneSpace,
-        op_hash: &RoughSized<KOpHash>,
-        transfer_method: TransferMethod,
+        _op_hash: &RoughSized<KOpHash>,
+        _transfer_method: TransferMethod,
     ) {
-        let hash = DhtOpHash::from_kitsune(&op_hash.data());
-        aitia::trace!(&hc_sleuth::Event::ReceivedHash {
-            by: self.config.sleuth_id(),
-            op: hash,
-            method: transfer_method,
-        });
     }
 
     fn handle_op_hash_transmitted(
         &self,
         _space: &KitsuneSpace,
-        op_hash: &RoughSized<KOpHash>,
-        transfer_method: TransferMethod,
+        _op_hash: &RoughSized<KOpHash>,
+        _transfer_method: TransferMethod,
     ) {
-        let hash = DhtOpHash::from_kitsune(&op_hash.data());
-        aitia::trace!(&hc_sleuth::Event::SentHash {
-            by: self.config.sleuth_id(),
-            op: hash,
-            method: transfer_method,
-        });
     }
 
     fn lair_tag(&self) -> Option<Arc<str>> {

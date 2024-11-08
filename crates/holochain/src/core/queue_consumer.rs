@@ -26,17 +26,29 @@
 //! Implicitly, every workflow also writes to its own source queue, i.e. to
 //! remove the item it has just processed.
 
+use super::metrics::create_workflow_duration_metric;
+use super::workflow::app_validation_workflow::AppValidationWorkspace;
+use super::workflow::sys_validation_workflow::SysValidationWorkspace;
+use super::workflow::{WorkflowError, WorkflowResult};
+use crate::conductor::conductor::{RwShare, StopReceiver};
+use crate::conductor::manager::TaskManagerClient;
+use crate::conductor::space::Space;
+use crate::conductor::ConductorHandle;
+use crate::conductor::{error::ConductorError, manager::ManagedTaskResult};
+use derive_more::Display;
+use futures::future::Either;
+use futures::{Future, Stream, StreamExt};
+use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::*;
+use holochain_types::prelude::*;
+use publish_dht_ops_consumer::*;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-
-use derive_more::Display;
-use futures::future::Either;
-use futures::{Future, Stream, StreamExt};
-use holochain_types::prelude::*;
 use tokio::sync::broadcast;
+use witnessing_consumer::*;
 
 // MAYBE: move these to workflow mod
 mod integrate_dht_ops_consumer;
@@ -45,29 +57,20 @@ mod sys_validation_consumer;
 use sys_validation_consumer::*;
 mod app_validation_consumer;
 use app_validation_consumer::*;
+
 mod publish_dht_ops_consumer;
+use crate::conductor::error::ConductorResult;
+use crate::core::queue_consumer::countersigning_consumer::spawn_countersigning_consumer;
+use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use validation_receipt_consumer::*;
-mod validation_receipt_consumer;
-use crate::conductor::conductor::{RwShare, StopReceiver};
-use crate::conductor::manager::TaskManagerClient;
-use crate::conductor::space::Space;
-use crate::conductor::ConductorHandle;
-use crate::conductor::{error::ConductorError, manager::ManagedTaskResult};
-use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::*;
-use holochain_sqlite::prelude::DatabaseResult;
-use publish_dht_ops_consumer::*;
 
 mod countersigning_consumer;
-use countersigning_consumer::*;
+mod validation_receipt_consumer;
+
+mod witnessing_consumer;
 
 #[cfg(test)]
 mod tests;
-
-use super::metrics::create_workflow_duration_metric;
-use super::workflow::app_validation_workflow::AppValidationWorkspace;
-use super::workflow::sys_validation_workflow::SysValidationWorkspace;
-use super::workflow::{WorkflowError, WorkflowResult};
 
 /// Spawns several long-running tasks which are responsible for processing work
 /// which shows up on various databases.
@@ -80,7 +83,7 @@ pub async fn spawn_queue_consumer_tasks(
     network: HolochainP2pDna,
     space: &Space,
     conductor: ConductorHandle,
-) -> DatabaseResult<(QueueTriggers, InitialQueueTriggers)> {
+) -> ConductorResult<(QueueTriggers, InitialQueueTriggers)> {
     let Space {
         dht_db,
         cache_db: cache,
@@ -95,7 +98,7 @@ pub async fn spawn_queue_consumer_tasks(
 
     // Publish
     let tx_publish = spawn_publish_dht_ops_consumer(
-        cell_id,
+        cell_id.clone(),
         authored_db.clone(),
         conductor.clone(),
         network.clone(),
@@ -180,8 +183,35 @@ pub async fn spawn_queue_consumer_tasks(
         )
     });
 
-    let tx_cs = queue_consumer_map.spawn_once_countersigning(dna_hash, || {
-        spawn_countersigning_consumer(
+    let workspace = {
+        let mut guard = space.countersigning_workspaces.lock();
+        guard
+            .entry(cell_id.clone())
+            .or_insert_with(|| {
+                Arc::new(CountersigningWorkspace::new(
+                    conductor
+                        .config
+                        .conductor_tuning_params()
+                        .countersigning_resolution_retry_delay(),
+                    conductor
+                        .config
+                        .conductor_tuning_params()
+                        .countersigning_resolution_retry_limit,
+                ))
+            })
+            .clone()
+    };
+    let tx_countersigning = spawn_countersigning_consumer(
+        space.clone(),
+        workspace,
+        cell_id,
+        conductor.clone(),
+        tx_integration.clone(),
+        tx_publish.clone(),
+    );
+
+    let tx_witnessing = queue_consumer_map.spawn_once_witnessing(dna_hash, || {
+        spawn_witnessing_consumer(
             space.clone(),
             conductor.task_manager(),
             network.clone(),
@@ -193,10 +223,18 @@ pub async fn spawn_queue_consumer_tasks(
         QueueTriggers {
             sys_validation: tx_sys.clone(),
             publish_dht_ops: tx_publish.clone(),
-            countersigning: tx_cs,
+            countersigning: tx_countersigning.clone(),
+            witnessing: tx_witnessing,
             integrate_dht_ops: tx_integration.clone(),
         },
-        InitialQueueTriggers::new(tx_sys, tx_publish, tx_app, tx_integration, tx_receipt),
+        InitialQueueTriggers::new(
+            tx_sys,
+            tx_publish,
+            tx_app,
+            tx_integration,
+            tx_receipt,
+            tx_countersigning,
+        ),
     ))
 }
 
@@ -248,11 +286,11 @@ impl QueueConsumerMap {
         self.spawn_once(QueueEntry(dna_hash, QueueType::AppValidation), spawn)
     }
 
-    fn spawn_once_countersigning<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender
+    fn spawn_once_witnessing<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender
     where
         S: FnOnce() -> TriggerSender,
     {
-        self.spawn_once(QueueEntry(dna_hash, QueueType::Countersigning), spawn)
+        self.spawn_once(QueueEntry(dna_hash, QueueType::Witnessing), spawn)
     }
 
     /// Get the validation receipt trigger for this dna hash.
@@ -278,6 +316,11 @@ impl QueueConsumerMap {
     /// Get the countersigning trigger for this dna hash.
     pub fn countersigning_trigger(&self, dna_hash: Arc<DnaHash>) -> Option<TriggerSender> {
         self.get_trigger(&QueueEntry(dna_hash, QueueType::Countersigning))
+    }
+
+    /// Get the witnessing trigger for this dna hash.
+    pub fn witnessing_trigger(&self, dna_hash: Arc<DnaHash>) -> Option<TriggerSender> {
+        self.get_trigger(&QueueEntry(dna_hash, QueueType::Witnessing))
     }
 
     fn get_trigger(&self, key: &QueueEntry) -> Option<TriggerSender> {
@@ -308,6 +351,7 @@ enum QueueType {
     AppValidation,
     SysValidation,
     Countersigning,
+    Witnessing,
 }
 
 /// The entry points for kicking off a chain reaction of queue activity
@@ -317,9 +361,10 @@ pub struct QueueTriggers {
     pub sys_validation: TriggerSender,
     /// Notify the ProduceDhtOps workflow to run, i.e. after InvokeCallZome
     pub publish_dht_ops: TriggerSender,
-    /// Notify the countersigning workflow to run, i.e. after receiving
-    /// new countersigning data.
+    /// Notify the countersigning workflow to run and manage sessions state.
     pub countersigning: TriggerSender,
+    /// Notify the witnessing workflow to run and check for complete signature sets for sessions.
+    pub witnessing: TriggerSender,
     /// Notify the IntegrateDhtOps workflow to run, i.e. after InvokeCallZome
     pub integrate_dht_ops: TriggerSender,
 }
@@ -334,6 +379,7 @@ pub struct InitialQueueTriggers {
     app_validation: TriggerSender,
     integrate_dht_ops: TriggerSender,
     validation_receipt: TriggerSender,
+    countersigning: TriggerSender,
 }
 
 impl InitialQueueTriggers {
@@ -343,6 +389,7 @@ impl InitialQueueTriggers {
         app_validation: TriggerSender,
         integrate_dht_ops: TriggerSender,
         validation_receipt: TriggerSender,
+        countersigning: TriggerSender,
     ) -> Self {
         Self {
             sys_validation,
@@ -350,6 +397,7 @@ impl InitialQueueTriggers {
             app_validation,
             integrate_dht_ops,
             validation_receipt,
+            countersigning,
         }
     }
 
@@ -360,6 +408,7 @@ impl InitialQueueTriggers {
         self.integrate_dht_ops.trigger(&"init");
         self.publish_dht_ops.trigger(&"init");
         self.validation_receipt.trigger(&"init");
+        self.countersigning.trigger(&"init");
     }
 }
 
@@ -575,6 +624,11 @@ impl TriggerReceiver {
     /// Check whether the backoff loop is paused. Will always return false if there is no backoff for this receiver.
     pub fn is_paused(&self) -> bool {
         self.back_off.as_ref().map_or(false, |b| b.is_paused())
+    }
+
+    #[cfg(test)]
+    pub fn try_recv(&mut self) -> Option<&'static &'static str> {
+        self.rx.try_recv().ok()
     }
 }
 

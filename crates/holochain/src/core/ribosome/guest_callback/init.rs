@@ -226,6 +226,7 @@ mod test {
 mod slow_tests {
     use super::InitResult;
     use crate::conductor::api::error::ConductorApiResult;
+    use crate::core::ribosome::RibosomeError;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
@@ -236,6 +237,7 @@ mod slow_tests {
     use crate::sweettest::SweetZome;
     use crate::test_utils::host_fn_caller::Post;
     use ::fixt::prelude::*;
+    use assert2::{assert, let_assert};
     use holo_hash::ActionHash;
     use holochain_types::app::DisableCloneCellPayload;
     use holochain_types::prelude::CreateCloneCellPayload;
@@ -313,6 +315,42 @@ mod slow_tests {
             result,
             InitResult::Fail(TestWasm::InitFail.into(), "because i said so".into()),
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_init_implemented_invalid_return() {
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitInvalidReturn]))
+            .next()
+            .unwrap();
+        let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
+        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
+
+        let host_access = fixt!(InitHostAccess);
+        let err = ribosome
+            .run_init(host_access, init_invocation)
+            .await
+            .unwrap_err();
+
+        let_assert!(RibosomeError::CallbackInvalidReturnType(err_msg) = err);
+        assert!(err_msg == "invalid type: unit value, expected variant identifier");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_init_implemented_invalid_params() {
+        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitInvalidParams]))
+            .next()
+            .unwrap();
+        let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
+        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
+
+        let host_access = fixt!(InitHostAccess);
+        let err = ribosome
+            .run_init(host_access, init_invocation)
+            .await
+            .unwrap_err();
+
+        let_assert!(RibosomeError::CallbackInvalidParameters(err_msg) = err);
+        assert!(err_msg == String::default());
     }
 
     #[tokio::test(flavor = "multi_thread")]

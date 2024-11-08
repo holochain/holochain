@@ -393,7 +393,7 @@ async fn create_test_data(
 
     // This is gonna get dropped at the end of this fn.
     let tmpdir = tempfile::TempDir::new().unwrap();
-    let mut network = KitsuneP2pConfig::default();
+    let mut network = KitsuneP2pConfig::mem();
     network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
         network,
@@ -426,7 +426,7 @@ async fn create_test_data(
             .read_async({
                 let agent_pk = cell.agent_pubkey().clone();
                 move |txn| -> DatabaseResult<HashMap<Arc<DhtOpHash>, ChainOpHashed>> {
-                    Ok(get_authored_chain_ops(&txn, &agent_pk))
+                    Ok(get_authored_chain_ops(txn, &agent_pk))
                 }
             })
             .await

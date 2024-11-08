@@ -1,11 +1,13 @@
-use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::prelude::InlineZomeSet;
 use crate::sweettest::*;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use hdk::prelude::*;
 use holo_hash::DhtOpHash;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_state::prelude::*;
+#[cfg(feature = "unstable-warrants")]
+use {
+    crate::core::ribosome::guest_callback::validate::ValidateResult, crate::prelude::InlineZomeSet,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky, doesn't take into account timing or retries"]
@@ -36,7 +38,9 @@ async fn test_validation_receipt() {
     let vault = alice.dht_db();
     let record = vault
         .read_async(move |txn| -> StateQueryResult<Record> {
-            Ok(Txn::from(&txn).get_record(&hash.clone().into())?.unwrap())
+            Ok(CascadeTxnWrapper::from(txn)
+                .get_record(&hash.clone().into())?
+                .unwrap())
         })
         .await
         .unwrap();
@@ -54,8 +58,8 @@ async fn test_validation_receipt() {
                 let count = vault
                     .read_async({
                         let query_hash = hash.clone();
-                        move |r| -> StateQueryResult<usize> {
-                            Ok(list_receipts(&r, &query_hash)?.len())
+                        move |txn| -> StateQueryResult<usize> {
+                            Ok(list_receipts(txn, &query_hash)?.len())
                         }
                     })
                     .await
@@ -72,7 +76,7 @@ async fn test_validation_receipt() {
         let receipts: Vec<_> = vault
             .read_async({
                 let query_hash = hash.clone();
-                move |r| list_receipts(&r, &query_hash)
+                move |txn| list_receipts(txn, &query_hash)
             })
             .await
             .unwrap();
@@ -92,7 +96,7 @@ async fn test_validation_receipt() {
     crate::assert_eq_retry_1m!(
         {
             vault
-                .read_async(move |txn: Transaction| -> DatabaseResult<Vec<u32>> {
+                .read_async(move |txn| -> DatabaseResult<Vec<u32>> {
                     let mut stmt = txn
                         .prepare("SELECT COUNT(hash) FROM ValidationReceipt GROUP BY op_hash")
                         .unwrap();
@@ -109,6 +113,7 @@ async fn test_validation_receipt() {
     );
 }
 
+#[cfg(feature = "unstable-warrants")]
 macro_rules! wait_until {
     ($expression:expr; $interval_ms:literal; $timeout_ms:literal; $wait_msg:literal; $timeout_msg:literal;) => {
         let timeout = (Timestamp::now() + std::time::Duration::from_millis($timeout_ms)).unwrap();
@@ -124,6 +129,7 @@ macro_rules! wait_until {
     };
 }
 
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "macos", ignore = "flaky")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]

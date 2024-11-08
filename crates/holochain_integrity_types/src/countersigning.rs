@@ -257,6 +257,13 @@ impl PreflightRequest {
         }
         Ok(())
     }
+
+    /// Compute a fingerprint for this preflight request.
+    pub fn fingerprint(&self) -> Result<Vec<u8>, SerializedBytesError> {
+        Ok(holo_hash::encode::blake2b_256(
+            &holochain_serialized_bytes::encode(self)?,
+        ))
+    }
 }
 
 /// Every agent must send back a preflight response.
@@ -353,6 +360,8 @@ pub enum PreflightRequestAcceptance {
     UnacceptableFutureStart,
     /// The preflight request does not include the agent.
     UnacceptableAgentNotFound,
+    /// The preflight hasn't been checked because another session is already in progress.
+    AnotherSessionIsInProgress,
     /// The preflight request is invalid as it failed some integrity check.
     Invalid(String),
 }

@@ -28,6 +28,7 @@ use matches::assert_matches;
 mod agent_key_revocation;
 // Module with tests related to an agent's key lineage. Agents can update their key. Both old and new
 // key belong to the same key lineage, they belong to the same agent.
+#[cfg(feature = "unstable-functions")]
 pub mod agent_lineage;
 mod test_dpki;
 
@@ -39,20 +40,19 @@ async fn can_update_state() {
     let holochain_p2p = holochain_p2p::stub_network().await;
     let (post_commit_sender, _post_commit_receiver) =
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
-
+    let config = ConductorConfig {
+        data_root_path: Some(db_dir.path().to_path_buf().into()),
+        ..Default::default()
+    };
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(
-        ConductorConfig {
-            data_root_path: Some(db_dir.path().to_path_buf().into()),
-            ..Default::default()
-        }
-        .into(),
+        config.clone().into(),
         sodoken::BufRead::new_no_lock(b"passphrase"),
     )
     .await
     .unwrap();
     let conductor = Conductor::new(
-        Default::default(),
+        config.into(),
         ribosome_store,
         keystore,
         holochain_p2p,
@@ -97,18 +97,18 @@ async fn app_ids_are_unique() {
         tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
 
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
+    let config = ConductorConfig {
+        data_root_path: Some(db_dir.path().to_path_buf().into()),
+        ..Default::default()
+    };
     let spaces = Spaces::new(
-        ConductorConfig {
-            data_root_path: Some(db_dir.path().to_path_buf().into()),
-            ..Default::default()
-        }
-        .into(),
+        config.clone().into(),
         sodoken::BufRead::new_no_lock(b"passphrase"),
     )
     .await
     .unwrap();
     let conductor = Conductor::new(
-        Default::default(),
+        config.into(),
         ribosome_store,
         test_keystore(),
         holochain_p2p,
@@ -1361,4 +1361,102 @@ async fn test_deferred_memproof_provisioning_uninstall() {
         .await
         .unwrap();
     assert_eq!(conductor.list_apps(None).await.unwrap().len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_list_apps_sorted_consistently() {
+    holochain_trace::test_run();
+
+    // Create a DNA
+    let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
+    let (dna1, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome1", zome)).await;
+
+    // Install two apps on the Conductor:
+    // Both share a CellId in common, and also include a distinct CellId each.
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let _ = conductor.setup_app("app1", [&dna1]).await.unwrap();
+    let _ = conductor.setup_app("app2", [&dna1]).await.unwrap();
+    let _ = conductor.setup_app("app3", [&dna1]).await.unwrap();
+
+    let list_app_ids = |conductor: ConductorHandle| async move {
+        conductor
+            .list_apps(None)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|app_info| app_info.installed_app_id)
+            .collect::<Vec<String>>()
+    };
+
+    // Ensure that ordering is sorted by installed_at descending
+    assert_eq!(
+        list_app_ids(conductor.clone()).await,
+        ["app3".to_string(), "app2".to_string(), "app1".to_string()]
+    );
+
+    // Ensure that ordering is consistent every time
+    assert_eq!(
+        list_app_ids(conductor.clone()).await,
+        ["app3".to_string(), "app2".to_string(), "app1".to_string()]
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_app_info_cells_sorted_consistently() {
+    holochain_trace::test_run();
+
+    // Create a DNA
+    let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
+    let (dna1, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome1", zome.clone())).await;
+    let (dna2, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome1", zome.clone())).await;
+    let (dna3, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome1", zome)).await;
+
+    // Install app on the Conductor:
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let _ = conductor
+        .setup_app(
+            "app1",
+            [
+                &("dna1".to_string(), dna1),
+                &("dna2".to_string(), dna2),
+                &("dna3".to_string(), dna3),
+            ],
+        )
+        .await
+        .unwrap();
+
+    let get_app_info = |conductor: ConductorHandle| async move {
+        conductor
+            .get_app_info(&"app1".to_string())
+            .await
+            .expect("Failed to get app info")
+            .unwrap()
+            .cell_info
+    };
+
+    // Ensure that ordering is sorted
+    assert_eq!(
+        get_app_info(conductor.clone())
+            .await
+            .keys()
+            .collect::<Vec<&String>>(),
+        vec![
+            &"dna1".to_string(),
+            &"dna2".to_string(),
+            &"dna3".to_string()
+        ]
+    );
+
+    // Ensure that ordering is consistent every time
+    assert_eq!(
+        get_app_info(conductor.clone())
+            .await
+            .keys()
+            .collect::<Vec<&String>>(),
+        vec![
+            &"dna1".to_string(),
+            &"dna2".to_string(),
+            &"dna3".to_string()
+        ]
+    );
 }

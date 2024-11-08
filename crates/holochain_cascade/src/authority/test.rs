@@ -1,10 +1,10 @@
 use super::*;
-use crate::authority::handle_get_agent_activity;
 use crate::test_utils::*;
 use holochain_p2p::actor;
 use holochain_p2p::event::GetRequest;
 use holochain_state::prelude::test_dht_db;
-use holochain_types::activity::ChainItems;
+#[cfg(feature = "unstable-warrants")]
+use {crate::authority::handle_get_agent_activity, holochain_types::activity::ChainItems};
 
 fn options() -> holochain_p2p::event::GetOptions {
     holochain_p2p::event::GetOptions {
@@ -188,6 +188,7 @@ async fn get_links() {
     assert_eq!(result, expected);
 }
 
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn get_agent_activity() {
     use ::fixt::fixt;
@@ -236,14 +237,14 @@ async fn get_agent_activity() {
             {
                 let op: DhtOpHashed = warrant_op_valid.downcast();
                 let hash = op.to_hash();
-                insert_op(txn, &op).unwrap();
+                insert_op_dht(txn, &op, None).unwrap();
                 set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
                 set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
             }
             {
                 let op: DhtOpHashed = warrant_op_invalid.downcast();
                 let hash = op.to_hash();
-                insert_op(txn, &op).unwrap();
+                insert_op_dht(txn, &op, None).unwrap();
                 set_validation_status(txn, &hash, ValidationStatus::Rejected).unwrap();
                 set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
             }

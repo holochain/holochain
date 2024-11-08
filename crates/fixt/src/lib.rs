@@ -572,7 +572,8 @@ macro_rules! fixt {
 /// unpredictable curves seek to:
 /// - disrupt 'just so' implementations of algorithms that lean too heavily on fragile assumptions
 /// - have a high probability of generating common edge cases that developers fail to cover
-/// a classic example is broken/forgotten NaN handling in code that uses floats for calculations
+///
+/// A classic example is broken/forgotten NaN handling in code that uses floats for calculations
 ///
 /// in general this is what we want from our tests, to remind us of where we are _wrong_ about our
 /// assumptions in our code.

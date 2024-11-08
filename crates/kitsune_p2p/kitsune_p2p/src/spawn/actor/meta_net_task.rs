@@ -364,6 +364,7 @@ impl MetaNetTask {
             }) => match data {
                 BroadcastData::Publish {
                     source,
+                    transfer_method,
                     op_hash_list,
                     context,
                 } => {
@@ -373,6 +374,7 @@ impl MetaNetTask {
                             space,
                             to_agent,
                             source,
+                            transfer_method,
                             op_hash_list,
                             context,
                             Some((basis, mod_idx, mod_cnt)),
@@ -441,12 +443,21 @@ impl MetaNetTask {
                 }
                 BroadcastData::Publish {
                     source,
+                    transfer_method,
                     op_hash_list,
                     context,
                 } => {
                     if let Err(err) = self
                         .i_s
-                        .incoming_publish(space, to_agent, source, op_hash_list, context, None)
+                        .incoming_publish(
+                            space,
+                            to_agent,
+                            source,
+                            transfer_method,
+                            op_hash_list,
+                            context,
+                            None,
+                        )
                         .await
                     {
                         tracing::warn!(?err, "failed to handle incoming broadcast");
@@ -661,9 +672,11 @@ mod tests {
     use kitsune_p2p::KitsuneBinType;
     use kitsune_p2p_block::{Block, BlockTarget, NodeBlockReason, NodeId};
     use kitsune_p2p_fetch::test_utils::{test_key_op, test_req_op, test_source, test_space};
+    use kitsune_p2p_fetch::TransferMethod;
     use kitsune_p2p_fetch::{FetchPool, FetchResponseQueue};
     use kitsune_p2p_timestamp::{InclusiveTimestampInterval, Timestamp};
     use kitsune_p2p_types::bin_types::NodeCert;
+    use kitsune_p2p_types::config::KitsuneP2pConfig;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
@@ -1077,6 +1090,7 @@ mod tests {
                     mod_cnt: 0,
                     data: BroadcastData::Publish {
                         source: test_agent(5),
+                        transfer_method: TransferMethod::Publish,
                         op_hash_list: vec![],
                         context: Default::default(),
                     },
@@ -1118,6 +1132,7 @@ mod tests {
                     mod_cnt: 0,
                     data: BroadcastData::Publish {
                         source: test_agent(5),
+                        transfer_method: TransferMethod::Publish,
                         op_hash_list: vec![],
                         context: Default::default(),
                     },
@@ -1168,6 +1183,7 @@ mod tests {
                     mod_cnt: 0,
                     data: BroadcastData::Publish {
                         source: test_agent(5),
+                        transfer_method: TransferMethod::Publish,
                         op_hash_list: vec![],
                         context: Default::default(),
                     },
@@ -1362,6 +1378,7 @@ mod tests {
                     to_agent: test_agent(2),
                     data: BroadcastData::Publish {
                         source: test_agent(5),
+                        transfer_method: TransferMethod::Publish,
                         op_hash_list: vec![],
                         context: Default::default(),
                     },
@@ -1400,6 +1417,7 @@ mod tests {
                     to_agent: test_agent(2),
                     data: BroadcastData::Publish {
                         source: test_agent(5),
+                        transfer_method: TransferMethod::Publish,
                         op_hash_list: vec![],
                         context: Default::default(),
                     },
@@ -1447,6 +1465,7 @@ mod tests {
                     to_agent: test_agent(2),
                     data: BroadcastData::Publish {
                         source: test_agent(5),
+                        transfer_method: TransferMethod::Publish,
                         op_hash_list: vec![],
                         context: Default::default(),
                     },
@@ -2172,7 +2191,7 @@ mod tests {
 
         let meta_net_task = MetaNetTask::new(
             host_stub.clone().legacy(host_sender),
-            Default::default(),
+            KitsuneP2pConfig::mem(),
             fetch_pool.clone(),
             fetch_response_queue.clone(),
             ep_evt_rcv,

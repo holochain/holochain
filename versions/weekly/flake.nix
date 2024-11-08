@@ -2,12 +2,12 @@
   inputs =
     {
       holochain = {
-        url = "github:holochain/holochain/holochain-0.4.0-dev.24";
+        url = "github:holochain/holochain/holochain-0.5.0-dev.4";
         flake = false;
       };
 
       lair = {
-        url = "github:holochain/lair/lair_keystore-v0.5.0";
+        url = "github:holochain/lair/lair_keystore-v0.5.2";
         flake = false;
       };
 
@@ -24,5 +24,7 @@
       };
     };
 
-  outputs = { ... }: { };
+  outputs = { ... }: {
+    rustVersion = "1.81.0";
+  };
 }

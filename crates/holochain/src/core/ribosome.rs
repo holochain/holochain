@@ -458,7 +458,8 @@ impl ZomeCallInvocation {
     /// - the nonce must not have already been seen
     /// - the grant must be valid
     /// - the provenance must not have any active blocks against them right now
-    /// the checks MUST be done in this order as witnessing the nonce is a write
+    ///
+    /// The checks MUST be done in this order as witnessing the nonce is a write operation,
     /// and so we MUST NOT write nonces until after we verify the signature.
     #[allow(clippy::extra_unused_lifetimes)]
     pub async fn is_authorized<'a>(

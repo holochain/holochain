@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "crates/aitia",
   "crates/fixt",
   "crates/fixt/test",
   "crates/hdk",
@@ -36,7 +35,6 @@ members = [
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
-  "crates/hc_sleuth",
   "crates/hc_run_local_services",
   "crates/hc_demo_cli",
   "crates/hc_service_check",
@@ -49,15 +47,11 @@ members = [
   "crates/kitsune_p2p/fetch",
   "crates/kitsune_p2p/kitsune_p2p",
   "crates/kitsune_p2p/mdns",
-  "crates/kitsune_p2p/proxy",
   "crates/kitsune_p2p/timestamp",
   "crates/kitsune_p2p/types",
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
-
-  "crates/holochain_diagnostics",
-  "crates/diagnostic_tests",
 ]
 
 exclude = ["crates/release-automation"]
@@ -73,15 +67,21 @@ resolver = "2"
 # it will publish unbuildable releases to crates.io
 
 [workspace.lints.clippy]
-nursery = "allow"
-cargo = "allow"
-pedantic = "allow"
-restriction = "allow"
+nursery = { level = "allow", priority = -1 }
+cargo = { level = "allow", priority = -1 }
+pedantic = { level = "allow", priority = -1 }
+restriction = { level = "allow", priority = -1 }
 style = "deny"
 complexity = "deny"
 perf = "deny"
 correctness = "deny"
 dbg_macro = "deny"
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(build_wasm)',
+  'cfg(loom)',
+] }
 
 [profile.dev]
 debug = 1

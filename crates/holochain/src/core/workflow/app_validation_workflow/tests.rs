@@ -8,9 +8,7 @@ use crate::core::workflow::app_validation_workflow::{
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
-use crate::test_utils::{
-    host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration, ConsistencyConditions,
-};
+use crate::test_utils::{host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration};
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
@@ -19,9 +17,8 @@ use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, 
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_sqlite::error::DatabaseResult;
-use holochain_state::mutations::insert_op;
-use holochain_state::prelude::{from_blob, StateQueryResult};
-use holochain_state::query::{Store, Txn};
+use holochain_state::mutations::insert_op_dht;
+use holochain_state::prelude::{from_blob, insert_op_cache, StateQueryResult};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::DhtOpHashed;
@@ -37,6 +34,11 @@ use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
+#[cfg(feature = "unstable-warrants")]
+use {
+    crate::test_utils::ConsistencyConditions,
+    holochain_state::query::{CascadeTxnWrapper, Store},
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn main_workflow() {
@@ -112,7 +114,7 @@ async fn main_workflow() {
 
     // insert op to validate in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op(txn, &dht_delete_op_hashed).unwrap();
+        insert_op_dht(txn, &dht_delete_op_hashed, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
     });
 
@@ -154,8 +156,7 @@ async fn main_workflow() {
     // insert dependent create op in dht cache db
     // as cascade would do with fetched dependent ops
     app_validation_workspace.cache.test_write(move |txn| {
-        insert_op(txn, &dht_create_op_hashed).unwrap();
-        put_validation_limbo(txn, &dht_create_op_hashed.hash, ValidationStage::Pending).unwrap();
+        insert_op_cache(txn, &dht_create_op_hashed).unwrap();
     });
 
     // there is still the 1 delete op to be validated
@@ -298,9 +299,9 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
 
     // insert create and delete op in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op(txn, &dht_delete_op_hashed).unwrap();
+        insert_op_dht(txn, &dht_delete_op_hashed, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
-        insert_op(txn, &dht_create_op_hashed).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
         put_validation_limbo(
             txn,
             &dht_create_op_hashed.hash,
@@ -437,9 +438,9 @@ async fn validate_ops_in_sequence_must_get_action() {
 
     // insert create and delete op in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op(txn, &dht_delete_op_hashed).unwrap();
+        insert_op_dht(txn, &dht_delete_op_hashed, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
-        insert_op(txn, &dht_create_op_hashed).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
         put_validation_limbo(
             txn,
             &dht_create_op_hashed.hash,
@@ -507,6 +508,12 @@ async fn multi_create_link_validation() {
     let apps = conductors.setup_app("posts_test", &[dna]).await.unwrap();
 
     let ((alice,), (bobbo,)) = apps.into_tuples();
+
+    // Make sure the conductors are gossiping before creating posts
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(&alice, 2, Duration::from_secs(30))
+        .await
+        .unwrap();
 
     let alice_zome = alice.zome(TestWasm::AppValidation.coordinator_zome_name());
     let bob_zome = bobbo.zome(TestWasm::AppValidation.coordinator_zome_name());
@@ -596,9 +603,9 @@ async fn handle_error_in_op_validation() {
     // insert both ops in dht db and mark ready for app validation
     let expected_failed_dht_op_hash = dht_create_op_hash.clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op(txn, &dht_create_op_hashed).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
         put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
-        insert_op(txn, &dht_store_entry_op_hashed).unwrap();
+        insert_op_dht(txn, &dht_store_entry_op_hashed, None).unwrap();
         put_validation_limbo(txn, &dht_store_entry_op_hash, ValidationStage::SysValidated).unwrap();
     });
 
@@ -927,7 +934,9 @@ async fn check_app_entry_def_test() {
 /// Alice and Bob join the network, and Alice commits an invalid action.
 /// Bob blocks Alice and authors a Warrant.
 /// Carol joins the network, and receives Bob's warrant via gossip.
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky"]
 async fn app_validation_produces_warrants() {
     holochain_trace::test_run();
 
@@ -1041,7 +1050,7 @@ async fn app_validation_produces_warrants() {
     //- Ensure that bob authored a warrant
     let alice_pubkey = alice.agent_pubkey().clone();
     conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
-        let store = Txn::from(&txn);
+        let store = CascadeTxnWrapper::from(txn);
 
         let warrants = store
             .get_warrants_for_basis(&alice_pubkey.into(), false)
@@ -1071,7 +1080,7 @@ async fn app_validation_produces_warrants() {
                 .dht_db(dna_hash)
                 .unwrap()
                 .test_read(move |txn| {
-                    let store = Txn::from(&txn);
+                    let store = CascadeTxnWrapper::from(txn);
                     store.get_warrants_for_basis(&basis, true).unwrap()
                 })
                 .len()
@@ -1261,10 +1270,10 @@ async fn run_test(
     alice_db
         .read_async(move |txn| -> DatabaseResult<()> {
             // Validation should be empty
-            let limbo = show_limbo(&txn);
-            assert!(limbo_is_empty(&txn), "{:?}", limbo);
+            let limbo = show_limbo(txn);
+            assert!(limbo_is_empty(txn), "{:?}", limbo);
 
-            assert_eq!(num_valid(&txn), expected_count);
+            assert_eq!(num_valid(txn), expected_count);
 
             Ok(())
         })
@@ -1291,16 +1300,16 @@ async fn run_test(
 
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
-                let limbo = show_limbo(&txn);
-                assert!(limbo_is_empty(&txn), "{:?}", limbo);
+                let limbo = show_limbo(txn);
+                assert!(limbo_is_empty(txn), "{:?}", limbo);
 
                 assert!(expected_invalid_entry(
-                    &txn,
+                    txn,
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
                 // Expect having one invalid op for the store entry.
-                assert_eq!(num_valid(&txn), expected_count - 1);
+                assert_eq!(num_valid(txn), expected_count - 1);
 
                 Ok(())
             }
@@ -1333,16 +1342,16 @@ async fn run_test(
 
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
-                let limbo = show_limbo(&txn);
-                assert!(limbo_is_empty(&txn), "{:?}", limbo);
+                let limbo = show_limbo(txn);
+                assert!(limbo_is_empty(txn), "{:?}", limbo);
 
                 assert!(expected_invalid_entry(
-                    &txn,
+                    txn,
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
                 // Expect having one invalid op for the store entry.
-                assert_eq!(num_valid(&txn), expected_count - 1);
+                assert_eq!(num_valid(txn), expected_count - 1);
 
                 Ok(())
             }
@@ -1384,17 +1393,17 @@ async fn run_test(
 
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
-                let limbo = show_limbo(&txn);
-                assert!(limbo_is_empty(&txn), "{:?}", limbo);
+                let limbo = show_limbo(txn);
+                assert!(limbo_is_empty(txn), "{:?}", limbo);
 
                 assert!(expected_invalid_entry(
-                    &txn,
+                    txn,
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
-                assert!(expected_invalid_link(&txn, &check_invalid_link_hash));
+                assert!(expected_invalid_link(txn, &check_invalid_link_hash));
                 // Expect having two invalid ops for the two store entries.
-                assert_eq!(num_valid(&txn), expected_count - 2);
+                assert_eq!(num_valid(txn), expected_count - 2);
 
                 Ok(())
             }
@@ -1434,17 +1443,17 @@ async fn run_test(
 
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
-                let limbo = show_limbo(&txn);
-                assert!(limbo_is_empty(&txn), "{:?}", limbo);
+                let limbo = show_limbo(txn);
+                assert!(limbo_is_empty(txn), "{:?}", limbo);
 
                 assert!(expected_invalid_entry(
-                    &txn,
+                    txn,
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
-                assert!(expected_invalid_link(&txn, &check_invalid_link_hash));
+                assert!(expected_invalid_link(txn, &check_invalid_link_hash));
                 // Expect having two invalid ops for the two store entries.
-                assert_eq!(num_valid(&txn), expected_count - 2);
+                assert_eq!(num_valid(txn), expected_count - 2);
 
                 Ok(())
             }
@@ -1486,18 +1495,18 @@ async fn run_test(
 
             move |txn| -> DatabaseResult<()> {
                 // Validation should be empty
-                let limbo = show_limbo(&txn);
-                assert!(limbo_is_empty(&txn), "{:?}", limbo);
+                let limbo = show_limbo(txn);
+                assert!(limbo_is_empty(txn), "{:?}", limbo);
 
                 assert!(expected_invalid_entry(
-                    &txn,
+                    txn,
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
-                assert!(expected_invalid_link(&txn, &check_invalid_link_hash));
-                assert!(expected_invalid_remove_link(&txn, &invalid_remove_hash));
+                assert!(expected_invalid_link(txn, &check_invalid_link_hash));
+                assert!(expected_invalid_remove_link(txn, &invalid_remove_hash));
                 // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
-                assert_eq!(num_valid(&txn), expected_count - (3 + 1));
+                assert_eq!(num_valid(txn), expected_count - (3 + 1));
 
                 Ok(())
             }
@@ -1539,16 +1548,16 @@ async fn run_test_entry_def_id(
     alice_db
         .read_async(move |txn| -> DatabaseResult<()> {
             // Validation should be empty
-            let limbo = show_limbo(&txn);
-            assert!(limbo_is_empty(&txn), "{:?}", limbo);
+            let limbo = show_limbo(txn);
+            assert!(limbo_is_empty(txn), "{:?}", limbo);
 
             assert!(expected_invalid_entry(
-                &txn,
+                txn,
                 &invalid_action_hash,
                 &invalid_entry_hash
             ));
             // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
-            assert_eq!(num_valid(&txn), expected_count - 5);
+            assert_eq!(num_valid(txn), expected_count - 5);
 
             Ok(())
         })

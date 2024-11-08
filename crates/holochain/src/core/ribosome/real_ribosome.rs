@@ -7,7 +7,6 @@ use super::host_fn::delete_clone_cell::delete_clone_cell;
 use super::host_fn::disable_clone_cell::disable_clone_cell;
 use super::host_fn::enable_clone_cell::enable_clone_cell;
 use super::host_fn::get_agent_activity::get_agent_activity;
-use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
 use super::host_fn::HostFnApi;
 use super::HostContext;
 use super::ZomeCallHostAccess;
@@ -27,9 +26,7 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::CallStream;
-use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
-use crate::core::ribosome::host_fn::block_agent::block_agent;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::call_info::call_info;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
@@ -51,21 +48,17 @@ use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::hash::hash;
-use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
 use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
 use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::send_remote_signal::send_remote_signal;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
-use crate::core::ribosome::host_fn::sleep::sleep;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::trace::trace;
-use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
 use crate::core::ribosome::host_fn::version::version;
@@ -90,6 +83,7 @@ use holochain_util::timed;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
+use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use tokio_stream::StreamExt;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
@@ -103,11 +97,25 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
+#[cfg(feature = "unstable-functions")]
+use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::block_agent::block_agent;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::schedule::schedule;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::sleep::sleep;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
+
 use crate::core::ribosome::host_fn::close_chain::close_chain;
 use crate::core::ribosome::host_fn::count_links::count_links;
 use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
 use crate::core::ribosome::host_fn::open_chain::open_chain;
-use crate::holochain_wasmer_host::module::WASM_METERING_LIMIT;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_types::zome_types::ZomeTypesError;
 use holochain_wasmer_host::prelude::*;
@@ -118,9 +126,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
-use wasmer_middlewares::metering::get_remaining_points;
-use wasmer_middlewares::metering::set_remaining_points;
-use wasmer_middlewares::metering::MeteringPoints;
+
+#[cfg(feature = "wasmer_sys")]
+mod wasmer_sys;
+#[cfg(feature = "wasmer_sys")]
+use wasmer_sys::*;
+
+#[cfg(feature = "wasmer_wamr")]
+mod wasmer_wamr;
+#[cfg(feature = "wasmer_wamr")]
+use wasmer_wamr::*;
 
 pub(crate) type ModuleCacheLock = parking_lot::RwLock<ModuleCache>;
 
@@ -212,12 +227,12 @@ impl HostFnBuilder {
                                         WasmError {
                                             error: WasmErrorInner::HostShortCircuit(_),
                                             ..
-                                        } => return Err(wasm_error.into()),
-                                        _ => Err(wasm_error),
+                                        } => return Err(WasmHostError(wasm_error).into()),
+                                        _ => Err(WasmHostError(wasm_error)),
                                     },
                                     Err(runtime_error) => return Err(runtime_error),
                                 },
-                                Ok(o) => Result::<_, WasmError>::Ok(o),
+                                Ok(o) => Result::<_, WasmHostError>::Ok(o),
                             })?
                             .to_le_bytes(),
                         ))
@@ -369,10 +384,7 @@ impl RealRibosome {
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    pub async fn runtime_compiled_module(
-        &self,
-        zome_name: &ZomeName,
-    ) -> RibosomeResult<Arc<Module>> {
+    pub async fn build_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
         let cache_key = self.get_module_cache_key(zome_name)?;
         // When running tests, use cache folder accessible to all tests.
         #[cfg(test)]
@@ -404,11 +416,10 @@ impl RealRibosome {
     pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
         match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
-                if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                    let module = holochain_wasmer_host::module::get_ios_module_from_file(path)?;
-                    Ok(Arc::new(module))
+                if let Some(module) = get_prebuilt_module(wasm_zome)? {
+                    Ok(module)
                 } else {
-                    self.runtime_compiled_module(zome.zome_name()).await
+                    self.build_module(zome.zome_name()).await
                 }
             }
             _ => RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
@@ -422,6 +433,7 @@ impl RealRibosome {
         &self,
         module: Arc<Module>,
         context_key: u64,
+        name: &str,
     ) -> RibosomeResult<Arc<InstanceWithStore>> {
         let store = Arc::new(Mutex::new(Store::default()));
         let function_env = FunctionEnv::new(&mut store.lock().as_store_mut(), Env::default());
@@ -431,7 +443,9 @@ impl RealRibosome {
             let mut store = store.lock();
             let mut store_mut = store.as_store_mut();
             instance = Arc::new(Instance::new(&mut store_mut, &module, &imports).map_err(
-                |e| -> RuntimeError { wasm_error!(WasmErrorInner::Compile(e.to_string())).into() },
+                |e| -> RuntimeError {
+                    wasm_error!(WasmErrorInner::Compile(format!("{}: {}", name, e))).into()
+                },
             )?);
         }
 
@@ -529,20 +543,7 @@ impl RealRibosome {
         };
 
         host_fn_builder
-            .with_host_function(
-                &mut ns,
-                "__hc__accept_countersigning_preflight_request_1",
-                accept_countersigning_preflight_request,
-            )
-            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
-            .with_host_function(
-                &mut ns,
-                "__hc__get_agent_key_lineage_1",
-                get_agent_key_lineage,
-            )
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
-            .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             .with_host_function(&mut ns, "__hc__trace_1", trace)
             .with_host_function(&mut ns, "__hc__hash_1", hash)
             .with_host_function(&mut ns, "__hc__version_1", version)
@@ -605,7 +606,6 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__call_info_1", call_info)
             .with_host_function(&mut ns, "__hc__random_bytes_1", random_bytes)
             .with_host_function(&mut ns, "__hc__sys_time_1", sys_time)
-            .with_host_function(&mut ns, "__hc__sleep_1", sleep)
             .with_host_function(&mut ns, "__hc__capability_claims_1", capability_claims)
             .with_host_function(&mut ns, "__hc__capability_grants_1", capability_grants)
             .with_host_function(&mut ns, "__hc__capability_info_1", capability_info)
@@ -636,8 +636,6 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__delete_link_1", delete_link)
             .with_host_function(&mut ns, "__hc__update_1", update)
             .with_host_function(&mut ns, "__hc__delete_1", delete)
-            .with_host_function(&mut ns, "__hc__schedule_1", schedule)
-            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             .with_host_function(&mut ns, "__hc__create_clone_cell_1", create_clone_cell)
             .with_host_function(&mut ns, "__hc__disable_clone_cell_1", disable_clone_cell)
             .with_host_function(&mut ns, "__hc__enable_clone_cell_1", enable_clone_cell)
@@ -649,6 +647,25 @@ impl RealRibosome {
                 "__hc__get_validation_receipts_1",
                 get_validation_receipts,
             );
+
+        #[cfg(feature = "unstable-functions")]
+        host_fn_builder
+            .with_host_function(
+                &mut ns,
+                "__hc__accept_countersigning_preflight_request_1",
+                accept_countersigning_preflight_request,
+            )
+            .with_host_function(
+                &mut ns,
+                "__hc__get_agent_key_lineage_1",
+                get_agent_key_lineage,
+            )
+            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
+            .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
+            .with_host_function(&mut ns, "__hc__schedule_1", schedule)
+            .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
+            // TODO deprecated, remove me
+            .with_host_function(&mut ns, "__hc__sleep_1", sleep);
 
         imports.register_namespace("env", ns);
 
@@ -730,24 +747,45 @@ macro_rules! do_callback {
         // fallible iterator syntax instead of for loop
         let mut call_stream = $self.call_stream($access.into(), $invocation);
         loop {
-            let (zome_name, callback_result): (ZomeName, $callback_result) =
-                match call_stream.next().await {
-                    Some(Ok((zome, extern_io))) => (
-                        zome.into(),
-                        extern_io
-                            .decode()
-                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })?,
-                    ),
-                    Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => (
-                        zome.into(),
-                        <$callback_result>::try_from_wasm_error(runtime_error.downcast()?)
-                            .map_err(|e| -> RuntimeError { e.into() })?,
-                    ),
-                    Some(Err((_zome, other_error))) => return Err(other_error),
-                    None => {
-                        break;
+            let (zome_name, callback_result): (ZomeName, $callback_result) = match call_stream
+                .next()
+                .await
+            {
+                Some(Ok((zome, extern_io))) => match extern_io.decode() {
+                    Ok(callback_result) => (zome.into(), callback_result),
+                    Err(SerializedBytesError::Deserialize(err_msg)) => {
+                        // Error returned when deserialization fails due to an invalid return type
+                        return Err(RibosomeError::CallbackInvalidReturnType(err_msg));
                     }
-                };
+                    Err(e) => return Err(RibosomeError::WasmRuntimeError(wasm_error!(e).into())),
+                },
+                Some(Err((zome, RibosomeError::WasmRuntimeError(runtime_error)))) => {
+                    let wasm_error: WasmError = runtime_error.downcast()?;
+                    if let WasmErrorInner::Deserialize(_) = wasm_error.error {
+                        // Error returned when callback called via ribosome with invalid parameters
+                        return Err(RibosomeError::CallbackInvalidParameters(String::default()));
+                    }
+
+                    (
+                        zome.into(),
+                        <$callback_result>::try_from_wasm_error(wasm_error)
+                            .map_err(|e| -> RuntimeError { WasmHostError(e).into() })?,
+                    )
+                }
+                Some(Err((
+                    _zome,
+                    RibosomeError::InlineZomeError(InlineZomeError::SerializationError(
+                        SerializedBytesError::Deserialize(err_msg),
+                    )),
+                ))) => {
+                    // Error returned when callback called via zome call with invalid parameters
+                    return Err(RibosomeError::CallbackInvalidParameters(err_msg));
+                }
+                Some(Err((_zome, other_error))) => return Err(other_error),
+                None => {
+                    break;
+                }
+            };
             // return early if we have a definitive answer, no need to keep invoking callbacks
             // if we know we are done
             if callback_result.is_definitive() {
@@ -815,7 +853,7 @@ impl RealRibosome {
                     // there is a corresponding zome fn
                     let context_key = Self::next_context_key();
                     let instance_with_store =
-                        self.build_instance_with_store(module, context_key)?;
+                        self.build_instance_with_store(module, context_key, &zome.name.0)?;
                     // add call context to map for the following call
                     {
                         CONTEXT_MAP
@@ -823,16 +861,8 @@ impl RealRibosome {
                             .insert(context_key, Arc::new(call_context));
                     }
 
-                    let instance = instance_with_store.instance.clone();
-                    {
-                        let mut store_lock = instance_with_store.store.lock();
-                        let mut store_mut = store_lock.as_store_mut();
-                        set_remaining_points(
-                            &mut store_mut,
-                            instance.as_ref(),
-                            WASM_METERING_LIMIT,
-                        );
-                    }
+                    // Reset available metering points to the maximum allowed per zome call
+                    reset_metering_points(instance_with_store.clone());
 
                     // be aware of this clone!
                     // the whole invocation is cloned!
@@ -845,16 +875,9 @@ impl RealRibosome {
                     })
                     .await?;
 
-                    {
-                        let mut store_lock = instance_with_store.store.lock();
-                        let mut store_mut = store_lock.as_store_mut();
-                        let points_used =
-                            match get_remaining_points(&mut store_mut, instance.as_ref()) {
-                                MeteringPoints::Remaining(points) => WASM_METERING_LIMIT - points,
-                                MeteringPoints::Exhausted => WASM_METERING_LIMIT,
-                            };
-                        self.usage_meter.add(points_used, &otel_info);
-                    }
+                    // Get metering points consumed in zome call and save to usage_meter
+                    let points_used = get_used_metering_points(instance_with_store.clone());
+                    self.usage_meter.add(points_used, &otel_info);
 
                     // remove context from map after call
                     {
@@ -928,14 +951,10 @@ impl RibosomeT for RealRibosome {
             extern_fns: {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
-                        let module = if let Some(path) = wasm_zome.preserialized_path.as_ref() {
-                            Arc::new(holochain_wasmer_host::module::get_ios_module_from_file(
-                                path,
-                            )?)
+                        let module = if let Some(module) = get_prebuilt_module(wasm_zome)? {
+                            module
                         } else {
-                            tokio_helper::block_forever_on(
-                                self.runtime_compiled_module(zome.zome_name()),
-                            )?
+                            tokio_helper::block_forever_on(self.build_module(zome.zome_name()))?
                         };
                         self.get_extern_fns_for_wasm(module.clone())
                     }
@@ -992,7 +1011,7 @@ impl RibosomeT for RealRibosome {
                     // create a new key for the context map.
                     let context_key = Self::next_context_key();
                     let instance_with_store =
-                        self.build_instance_with_store(module, context_key)?;
+                        self.build_instance_with_store(module, context_key, &zome.name.0)?;
 
                     // add call context to map for following call
                     {
@@ -1325,10 +1344,12 @@ pub mod wasm_test {
     async fn wasm_tooling_test() {
         holochain_trace::test_run();
 
-        assert_eq!(
+        pretty_assertions::assert_eq!(
             vec![
+                #[cfg(feature = "unstable-functions")]
                 "__hc__accept_countersigning_preflight_request_1",
                 "__hc__agent_info_1",
+                #[cfg(feature = "unstable-functions")]
                 "__hc__block_agent_1",
                 "__hc__call_1",
                 "__hc__call_info_1",
@@ -1353,12 +1374,14 @@ pub mod wasm_test {
                 "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
+                #[cfg(feature = "unstable-functions")]
                 "__hc__get_agent_key_lineage_1",
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",
                 "__hc__get_validation_receipts_1",
                 "__hc__hash_1",
+                #[cfg(feature = "unstable-functions")]
                 "__hc__is_same_agent_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
@@ -1367,13 +1390,16 @@ pub mod wasm_test {
                 "__hc__open_chain_1",
                 "__hc__query_1",
                 "__hc__random_bytes_1",
+                #[cfg(feature = "unstable-functions")]
                 "__hc__schedule_1",
                 "__hc__send_remote_signal_1",
                 "__hc__sign_1",
                 "__hc__sign_ephemeral_1",
+                #[cfg(feature = "unstable-functions")]
                 "__hc__sleep_1",
                 "__hc__sys_time_1",
                 "__hc__trace_1",
+                #[cfg(feature = "unstable-functions")]
                 "__hc__unblock_agent_1",
                 "__hc__update_1",
                 "__hc__verify_signature_1",

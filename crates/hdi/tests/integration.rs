@@ -113,7 +113,7 @@ fn to_local_types_test_nested() {
 
     assert_eq!(to_coords(Nesting::A(Nested1::A)), (0, 0));
     assert_eq!(to_coords(Nesting::A(Nested1::B)), (0, 1));
-    assert_eq!(to_coords(&Nesting::A(Nested1::B)), (0, 1));
+    assert_eq!(to_coords(Nesting::A(Nested1::B)), (0, 1));
     assert_eq!(to_coords(Nesting::B { nested: Nested2::X }), (1, 0));
     assert_eq!(to_coords(Nesting::B { nested: Nested2::Y }), (1, 1));
     assert_eq!(to_coords(Nesting::B { nested: Nested2::Z }), (1, 2));
