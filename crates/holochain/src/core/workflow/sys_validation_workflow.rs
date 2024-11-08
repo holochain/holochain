@@ -129,7 +129,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     trigger_publish: TriggerSender,
     trigger_self: TriggerSender,
     network: Network,
-    config: Arc<ConductorConfig>,
+    _config: Arc<ConductorConfig>,
     keystore: MetaLairClient,
     representative_agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
@@ -137,7 +137,6 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     let outcome_summary = sys_validation_workflow_inner(
         workspace.clone(),
         current_validation_dependencies.clone(),
-        config,
         &network,
         keystore,
         representative_agent,
@@ -242,7 +241,6 @@ async fn sys_validation_workflow_inner(
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
-    let sleuth_id = config.sleuth_id();
 
     // Forget what dependencies are currently in use
     current_validation_dependencies
@@ -353,10 +351,6 @@ async fn sys_validation_workflow_inner(
                                 put_integrated(txn, &op_hash, ValidationStatus::Valid)?
                             }
                         };
-                        aitia::trace!(&hc_sleuth::Event::SysValidated {
-                            by: sleuth_id.clone(),
-                            op: op_hash
-                        });
                     }
                     Outcome::MissingDhtDep => {
                         summary.missing += 1;
