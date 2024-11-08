@@ -293,7 +293,7 @@ pub fn hdk_entry_helper(attrs: TokenStream, code: TokenStream) -> TokenStream {
 /// Helper for decoding DNA Properties into a struct.
 ///
 /// # Implements
-/// - `[holochain_integrity_types::TryFromDnaProperties]
+/// - [`holochain_integrity_types::TryFromDnaProperties`]
 ///
 /// # Examples
 /// ```ignore
