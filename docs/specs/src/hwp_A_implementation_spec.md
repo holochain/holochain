@@ -162,7 +162,7 @@ Many, though not all, actions comprise intentions to create, read, update, or de
     }
     ```
 
-* `InitZomesComplete`: indicates the creation of the final genesis entry that marks that all zome init functions have successfully completed (see the [HDK section](#hdk) for details), and the chain is ready for commits. Requires no additional data.
+* `InitZomesComplete`: indicates the creation of the final genesis entry that marks that all zome init functions have successfully completed (see the [HDK] section for details), and the chain is ready for commits. Requires no additional data.
 
 * `Create`: indicates the creation of an application-defined entry, or a system-defined entry that needs to exist as content-addressed data.
 
@@ -298,7 +298,7 @@ enum Entry {
     }
     ```
 
-    Its entry data can be of either `Entry::App` or `Entry::CounterSign`, where the inner data is an arbitrary vector of bytes (typically a serialized data structure). If the data is `Entry::CounterSign`, the bytes are accompanied by a struct that gives the details of the countersigning session (this struct will be dealt with in the section on countersigning).
+    Its entry data can be of either `Entry::App` or `Entry::CounterSign`, where the inner data is an arbitrary vector of bytes (typically a serialized data structure). If the data is `Entry::CounterSign`, the bytes are accompanied by a struct that gives the details of the countersigning session (this struct will be dealt with in the [Countersigning] section).
 
     Note that in both these cases the data is stored using a serialization that is declared by the `entry_defs()` function of the HDI.
 
@@ -384,7 +384,7 @@ Comparing this structure to a Resource Description Framework (RDF) triple:
 
 ##### The `Op` Data Type
 
-The `Op` types that hold the chain entry data that is published to different portions of the DHT (formally described in [section four](hwp_4_formal.md#graph-transformation)) are listed below. The integrity zome defines a validation callback for the entry and link types it defines, and is called with an `Op` enum variant as its single parameter, which indicates the DHT perspective from which to validate the data. Each variant holds a struct containing the DHT operation payload:
+The `Op` types that hold the chain entry data that is published to different portions of the DHT (formally described in the [Graph Transformation] section of Formal Design Elements) are listed below. The integrity zome defines a validation callback for the entry and link types it defines, and is called with an `Op` enum variant as its single parameter, which indicates the DHT perspective from which to validate the data. Each variant holds a struct containing the DHT operation payload:
 
 * `StoreRecord`: executed by the record (action) authorities to store data. It contains the record to be validated, including the entry if it is public.
 
@@ -624,7 +624,7 @@ The HDK contains all the functions and callbacks needed for Holochain applicatio
 
 #### Initialization
 
-The HDK MUST allow application developers to define an `init() -> ExternResult<InitCallbackResult>` callback in each coordinator zome. All `init` callbacks in all coordinator zomes MUST complete successfully, and an `InitZomesComplete` action MUST be written to a cell's source chain, before zome functions (see following section) may be called. Implementations SHOULD allow this to happen lazily; that is, a zome function is permitted to be called before initialization, and the call zome workflow runs the initialization workflow in-process if `InitZomesComplete` does not exist on the source chain yet.
+The HDK MUST allow application developers to define an `init() -> ExternResult<InitCallbackResult>` callback in each coordinator zome. All `init` callbacks in all coordinator zomes MUST complete successfully, and an `InitZomesComplete` action MUST be written to a cell's source chain, before zome functions (see [following section](#arbitrary-api-functions-zome-functions)) may be called. Implementations SHOULD allow this to happen lazily; that is, a zome function is permitted to be called before initialization, and the call zome workflow runs the initialization workflow in-process if `InitZomesComplete` does not exist on the source chain yet.
 
 The return value of the callback is defined as:
 
@@ -944,7 +944,7 @@ It is the application's responsibility to retrieve a stored capability claim usi
     }
     ```
 
-    The initial and latest public key may vary throughout the life of the source chain, as an `AgentPubKey` is an entry which may be updated like other entries. Updating a key entry is normally handled through a DPKI implementation (see section above on Human Error).
+    The initial and latest public key may vary throughout the life of the source chain, as an `AgentPubKey` is an entry which may be updated like other entries. Updating a key entry is normally handled through a DPKI implementation (see [Human Error] section of System Correctness: Confidence).
 
 * `call_info() -> ExternResult<CallInfo>`: Get contextual information about the current zome call, where the return value is defined as:
 
@@ -1567,9 +1567,9 @@ While the monotonic accumulation of operations is the most fundamental truth abo
     * Agent activity as a tree of metadata,
     * Validation status as metadata, and
     * Warrants as metadata.
-* **CRUD**: The total set of metadata on a basis address can always be accessed and interpreted as the application developer sees fit (see `get_details` in the DHT Data Retrieval section of this appendix), but certain opinionated interpretations of that set are useful to provide as defaults[^crdt-like]:
-    * The set difference between all record creates/updates and deletes that refer to them can be accessed as a "tombstone" set that yields the list of non-deleted records, the liveness of an entry or record, or the earliest live non-deleted record for an entry (see `get` in the DHT Data Retrieval section).
-    * The set difference between all link creates and link deletes that refer to them can be accessed as a tombstone set that yields the list of non-deleted links (see `get_links` in the DHT Data Retrieval section).
+* **CRUD**: The total set of metadata on a basis address can always be accessed and interpreted as the application developer sees fit (see `get_details` in the [DHT Data Retrieval] section of this appendix), but certain opinionated interpretations of that set are useful to provide as defaults[^crdt-like]:
+    * The set difference between all record creates/updates and deletes that refer to them can be accessed as a "tombstone" set that yields the list of non-deleted records, the liveness of an entry or record, or the earliest live non-deleted record for an entry (see `get` in the [DHT Data Retrieval] section).
+    * The set difference between all link creates and link deletes that refer to them can be accessed as a tombstone set that yields the list of non-deleted links (see `get_links` in the [DHT Data Retrieval] section).
 
 [^crdt-like]: While this interpretation indicates that the set of metadata can be validly seen as operations in a simple operation-based conflict-free replicated data type (CRDT) (see <https://crdt.tech>), we have chosen not to use this term in order to avoid overlaying of preconceptions formed by more capable CRDTs.
 
@@ -1719,7 +1719,7 @@ The following messages types MUST be implemented. In our implementation, they ar
         }
         ```
 
-    * **Response**: The expected response is a `ZomeCallResponse`, which is defined above in the section on the HDK.
+    * **Response**: The expected response is a `ZomeCallResponse`, which is defined above in the [HDK] section.
 
 * `ValidationReceipts`: Send validation receipts to the node that authored the DHT operations to which the receipts apply, as a result of integrating published operations.
 publish
@@ -1953,7 +1953,7 @@ publish
 
     * **Response**: The response is defined as a `Vec<ActionHash>`, where the included action hashes are non-tombstoned link creation actions matching the query.
 
-* `GetAgentActivity`: Request information about the given agent's activity, optionally filtered by the given predicate, which is defined above in the HDK section, and including or excluding data specified by the options,
+* `GetAgentActivity`: Request information about the given agent's activity, optionally filtered by the given predicate, which is defined above in the [HDK] section, and including or excluding data specified by the options,
 
     * **Payload**: The payload is defined as:
 
@@ -2009,7 +2009,7 @@ publish
         }
         ```
 
-* `MustGetAgentActivity`: Request a contiguous sequence of agent activity actions for the given agent, bounded by the specified `ChainFilter`, which is defined above in the HDK section.
+* `MustGetAgentActivity`: Request a contiguous sequence of agent activity actions for the given agent, bounded by the specified `ChainFilter`, which is defined above in the [HDK] section.
 
     * **Payload**: The payload is defined as:
 
@@ -2253,7 +2253,7 @@ These are the message types that MUST be implemented. They are all defined as va
         }
         ```
 
-        The structure of the messages that appear in the `data` argument are documented in the following section on Gossip.
+        The structure of the messages that appear in the `data` argument are documented in the following section on [Gossip].
 
 * `PeerGet`: Ask a remote node if they know about a specific agent.
 

@@ -318,7 +318,7 @@ For links, we refer to an address with link metadata as a **Base** and the addre
 
 ### Graph Transformation
 
-While source chain entries and actions contain all the information needed to construct a graphing DHT, the data must be restructured from a linear local chain under single authority and location, to a graph across many nodes (where a node is an address or hash, optionally with content) with many authorities taking responsibility for redundantly storing content and metadata for the entire range of nodes. In this section we focus only on the transformation from source chain to DHT. The next section will focus on the election of authoritative sources for data.
+While source chain entries and actions contain all the information needed to construct a graphing DHT, the data must be restructured from a linear local chain under single authority and location, to a graph across many nodes (where a node is an address or hash, optionally with content) with many authorities taking responsibility for redundantly storing content and metadata for the entire range of nodes. In this section we focus only on the transformation from source chain to DHT. The [next section](#authority-election) will focus on the election of authoritative sources for data.
 
 The linking/graphing aspects must be constructed from the state changes committed to source chains.
 
@@ -495,7 +495,7 @@ The following Holochain-specific message types are implemented using the precedi
 * **GetMeta** requests all metadata stored at the given basis hash.
 * **GetLinks** requests only link metadata of a certain type at the given basis hash, optionally with a filter predicate.
 * **CountLinks** is similar to GetLinks, but only requests the count of all links matching the type and filter predicate.
-* **GetAgentActivity** requests all or a portion of the 'agent activity' metadata for the given agent ID, which includes source chain actions, chain status (whether it has been forked), and any outstanding [warrants](#warrants) collected for that agent (see the following section for a description of warrants).
+* **GetAgentActivity** requests all or a portion of the 'agent activity' metadata for the given agent ID, which includes source chain actions, chain status (whether it has been forked), and any outstanding warrants collected for that agent (see the [following section](#warrants) for a description of warrants).
 * **MustGetAgentActivity** requests only the portion of the agent activity metadata that can be guaranteed to be unchanging (if it exists) regardless of the current state at the agent's basis hash --- that is, a contiguous sequence of source chain actions, notwithstanding any contiguous sequence that may exist in a fork of that agent's chain.
 * There are three message types used in negotiating a countersigning session, all of which use the **User** broadcast message:
     * Counterparties use **CountersigningSessionNegotiation**, with a subtype of **EnzymePush**, to send their signed **Create** or **Update** action to the designated facilitator of the session (the Enzyme) when such an agent has been elected.
