@@ -1,0 +1,23 @@
+[package]
+name = "kitsune2"
+version = "0.5.0-dev.0"
+description = "p2p / dht communication framework"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/kitsune2"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo", "p2p", "dht", "networking"]
+categories = ["network-programming"]
+edition = "2021"
+
+# reminder - do not use workspace deps
+[dependencies]
+bytes = "1.8.0"
+futures = "0.3.31"
+kitsune2_api = { version = "0.5.0-dev.0", path = "../kitsune2_api" }
+
+[dev-dependencies]
+tokio = { version = "1.41.1", features = ["full"] }
+
+[lints]
+workspace = true

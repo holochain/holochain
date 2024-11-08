@@ -49,6 +49,8 @@ members = [
   "crates/kitsune_p2p/mdns",
   "crates/kitsune_p2p/timestamp",
   "crates/kitsune_p2p/types",
+  "crates/kitsune_p2p/kitsune2_api",
+  "crates/kitsune_p2p/kitsune2",
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",

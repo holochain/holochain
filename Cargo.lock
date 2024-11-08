@@ -2903,7 +2903,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "must_future",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -3248,7 +3248,7 @@ dependencies = [
  "holochain_util",
  "kitsune_p2p_timestamp",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -4331,6 +4331,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "kitsune2"
+version = "0.5.0-dev.0"
+dependencies = [
+ "bytes",
+ "futures",
+ "kitsune2_api",
+ "tokio",
+]
+
+[[package]]
+name = "kitsune2_api"
+version = "0.5.0-dev.0"
+dependencies = [
+ "bytes",
+ "futures",
+]
+
+[[package]]
 name = "kitsune_p2p"
 version = "0.5.0-dev.4"
 dependencies = [
@@ -4395,7 +4413,7 @@ dependencies = [
  "holochain_util",
  "kitsune_p2p_dht_arc",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
@@ -7887,9 +7905,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.41.0"
+version = "1.41.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "145f3413504347a2be84393cc8a7d2fb4d863b375909ea59f2158261aa258bbb"
+checksum = "22cfb5bee7a6a52939ca9224d6ac897bb669134078daa8735560897f69de4d33"
 dependencies = [
  "backtrace",
  "bytes",
