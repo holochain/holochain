@@ -129,7 +129,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     trigger_publish: TriggerSender,
     trigger_self: TriggerSender,
     network: Network,
-    config: Arc<ConductorConfig>,
+    _config: Arc<ConductorConfig>,
     keystore: MetaLairClient,
     representative_agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
@@ -137,7 +137,6 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     let outcome_summary = sys_validation_workflow_inner(
         workspace.clone(),
         current_validation_dependencies.clone(),
-        config,
         &network,
         keystore,
         representative_agent,
@@ -231,17 +230,17 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     }
 }
 
+type ForkedPair = ((ActionHash, Signature), (ActionHash, Signature));
+
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: SysValDeps,
-    config: Arc<ConductorConfig>,
-    network: &impl HolochainP2pDnaT,
-    keystore: MetaLairClient,
-    representative_agent: AgentPubKey,
+    _network: &impl HolochainP2pDnaT,
+    _keystore: MetaLairClient,
+    _representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone();
     let sorted_ops = validation_query::get_ops_to_sys_validate(&db).await?;
-    let sleuth_id = config.sleuth_id();
 
     // Forget what dependencies are currently in use
     current_validation_dependencies
@@ -307,19 +306,20 @@ async fn sys_validation_workflow_inner(
         }
     }
 
-    let mut warrants = vec![];
-
-    let (mut summary, invalid_ops, forked_pairs) = workspace
+    // Allow unused mutable, because it's mutated when feature unstable-warrants is enabled.
+    #[allow(unused_mut)]
+    let (mut summary, _invalid_ops, _forked_pairs) = workspace
         .dht_db
         .write_async(move |txn| {
             let mut summary = OutcomeSummary::default();
             let mut invalid_ops = vec![];
-            let mut forked_pairs = vec![];
+            let mut forked_pairs: Vec<(AgentPubKey, ForkedPair)> = vec![];
 
             for (hashed_op, outcome) in validation_outcomes {
                 let (op, op_hash) = hashed_op.into_inner();
                 let op_type = op.get_type();
 
+                #[cfg(feature = "unstable-warrants")]
                 if let DhtOp::ChainOp(chain_op) = &op {
                     // Author a ChainFork warrant if fork is detected
                     let action = chain_op.action();
@@ -347,13 +347,10 @@ async fn sys_validation_workflow_inner(
                             DhtOpType::Warrant(_) => {
                                 // XXX: integrate accepted warrants immediately, because we don't
                                 //      want them to go to app validation.
+                                #[cfg(feature = "unstable-warrants")]
                                 put_integrated(txn, &op_hash, ValidationStatus::Valid)?
                             }
                         };
-                        aitia::trace!(&hc_sleuth::Event::SysValidated {
-                            by: sleuth_id.clone(),
-                            op: op_hash
-                        });
                     }
                     Outcome::MissingDhtDep => {
                         summary.missing += 1;
@@ -376,52 +373,56 @@ async fn sys_validation_workflow_inner(
         })
         .await?;
 
-    for (_, op) in invalid_ops {
-        if let Some(chain_op) = op.as_chain_op() {
-            let warrant_op = crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op_inner(
-                &keystore,
-                representative_agent.clone(),
+    #[cfg(feature = "unstable-warrants")]
+    {
+        let mut warrants = vec![];
+        for (_, op) in _invalid_ops {
+            if let Some(chain_op) = op.as_chain_op() {
+                let warrant_op = crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op_inner(
+                &_keystore,
+                _representative_agent.clone(),
                 chain_op,
                 ValidationType::Sys,
             )
             .await?;
+                warrants.push(warrant_op);
+            }
+        }
+
+        for (author, pair) in _forked_pairs {
+            let warrant_op =
+                make_fork_warrant_op_inner(&_keystore, _representative_agent.clone(), author, pair)
+                    .await?;
             warrants.push(warrant_op);
         }
-    }
 
-    for (author, pair) in forked_pairs {
-        let warrant_op =
-            make_fork_warrant_op_inner(&keystore, representative_agent.clone(), author, pair)
-                .await?;
-        warrants.push(warrant_op);
-    }
+        let warrant_op_hashes = warrants
+            .iter()
+            .map(|w| (w.as_hash().clone(), w.dht_basis()))
+            .collect::<Vec<_>>();
 
-    let warrant_op_hashes = warrants
-        .iter()
-        .map(|w| (w.as_hash().clone(), w.dht_basis()))
-        .collect::<Vec<_>>();
+        workspace
+            .authored_db
+            .write_async(move |txn| {
+                for warrant_op in warrants {
+                    insert_op(txn, &warrant_op)?;
+                    summary.warranted += 1;
+                }
+                StateMutationResult::Ok(())
+            })
+            .await?;
 
-    workspace
-        .authored_db
-        .write_async(move |txn| {
-            for warrant_op in warrants {
-                insert_op(txn, &warrant_op)?;
-                summary.warranted += 1;
-            }
-            StateMutationResult::Ok(())
-        })
-        .await?;
-
-    if let Some(cache) = workspace.dht_query_cache.as_ref() {
-        // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
-        holochain_state::integrate::authored_ops_to_dht_db(
-            network,
-            warrant_op_hashes,
-            workspace.authored_db.clone().into(),
-            workspace.dht_db.clone(),
-            cache,
-        )
-        .await?;
+        if let Some(cache) = workspace.dht_query_cache.as_ref() {
+            // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
+            holochain_state::integrate::authored_ops_to_dht_db(
+                _network,
+                warrant_op_hashes,
+                workspace.authored_db.clone().into(),
+                workspace.dht_db.clone(),
+                cache,
+            )
+            .await?;
+        }
     }
 
     tracing::debug!(

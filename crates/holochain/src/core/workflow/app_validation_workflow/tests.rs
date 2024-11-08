@@ -8,9 +8,7 @@ use crate::core::workflow::app_validation_workflow::{
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
-use crate::test_utils::{
-    host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration, ConsistencyConditions,
-};
+use crate::test_utils::{host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration};
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
@@ -21,7 +19,6 @@ use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::insert_op;
 use holochain_state::prelude::{from_blob, StateQueryResult};
-use holochain_state::query::{Store, Txn};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::DhtOpHashed;
@@ -37,6 +34,8 @@ use std::convert::{TryFrom, TryInto};
 use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
+#[cfg(feature = "unstable-warrants")]
+use {crate::test_utils::ConsistencyConditions, holochain_state::query::Store};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn main_workflow() {
@@ -933,8 +932,11 @@ async fn check_app_entry_def_test() {
 /// Alice and Bob join the network, and Alice commits an invalid action.
 /// Bob blocks Alice and authors a Warrant.
 /// Carol joins the network, and receives Bob's warrant via gossip.
+#[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn app_validation_produces_warrants() {
+    use holochain_state::query::Txn;
+
     holochain_trace::test_run();
 
     #[derive(Serialize, Deserialize, SerializedBytes, Debug)]

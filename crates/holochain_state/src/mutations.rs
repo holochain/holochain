@@ -113,6 +113,9 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
     let op_order = OpOrder::new(op_type, op.timestamp());
     let deps = op.sys_validation_dependencies();
 
+    #[cfg(not(feature = "unstable-warrants"))]
+    let create_op = true;
+    #[cfg(feature = "unstable-warrants")]
     let mut create_op = true;
 
     match op {
@@ -128,11 +131,14 @@ pub fn insert_op(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult
             let action_hashed = SignedActionHashed::with_presigned(action_hashed, signature);
             insert_action(txn, &action_hashed)?;
         }
-        DhtOp::WarrantOp(warrant_op) => {
-            let warrant = (***warrant_op).clone();
-            let inserted = insert_warrant(txn, warrant)?;
-            if inserted == 0 {
-                create_op = false;
+        DhtOp::WarrantOp(_warrant_op) => {
+            #[cfg(feature = "unstable-warrants")]
+            {
+                let warrant = (***_warrant_op).clone();
+                let inserted = insert_warrant(txn, warrant)?;
+                if inserted == 0 {
+                    create_op = false;
+                }
             }
         }
     }
@@ -186,14 +192,15 @@ pub fn insert_op_lite(
             })?;
         }
         DhtOpLite::Warrant(op) => {
-            let warrant_hash = op.warrant().to_hash();
+            let _warrant_hash = op.warrant().to_hash();
+            #[cfg(feature = "unstable-warrants")]
             sql_insert!(txn, DhtOp, {
                 "hash": hash,
                 "type": op_lite.get_type(),
                 "storage_center_loc": basis.get_loc(),
                 "authored_timestamp": timestamp,
                 "basis_hash": basis,
-                "action_hash": warrant_hash,
+                "action_hash": _warrant_hash,
                 "require_receipt": 0,
                 "op_order": order,
             })?;
@@ -530,6 +537,7 @@ pub fn set_receipts_complete(
     Ok(())
 }
 
+#[cfg(feature = "unstable-warrants")]
 /// Insert a [`Warrant`] into the Action table.
 pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMutationResult<usize> {
     let warrant_type = warrant.get_type();
@@ -953,6 +961,7 @@ pub fn remove_countersigning_session(
     Ok(())
 }
 
+#[cfg(feature = "unstable-warrants")]
 #[cfg(test)]
 mod tests {
     use ::fixt::fixt;

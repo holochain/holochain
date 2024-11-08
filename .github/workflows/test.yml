@@ -12,7 +12,7 @@ concurrency:
 
 env:
   CARGO_INCREMENTAL: 0
-  RUSTFLAGS: '-Dwarnings'
+  RUSTFLAGS: "-Dwarnings"
   RUST_BACKTRACE: 1
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: 'Common Test Setup Actions'
+      - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
       - name: static-fmt
@@ -38,7 +38,7 @@ jobs:
       - name: static-doc
         run: make static-doc
 
-      - name: 'Common Test Teardown Actions'
+      - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
 
   test-job-id:
@@ -69,7 +69,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: 'Common Test Setup Actions'
+      - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
       - name: install build dependencies (macos-latest, wasmer_wamr)
@@ -101,13 +101,13 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: make test-workspace-${{ matrix.target }}
 
-      - name: 'Common Test Teardown Actions'
+      - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
 
   ci-pass:
     if: ${{ always() }}
-    name: 'All Jobs Pass'
-    runs-on: 'ubuntu-latest'
+    name: "All Jobs Pass"
+    runs-on: "ubuntu-latest"
     needs:
       - static-job-id
       - test-job-id
