@@ -77,7 +77,7 @@ use guest_callback::init::InitHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use holo_hash::AgentPubKey;
-use holochain_conductor_api::ZomeCallDeserialized;
+use holochain_conductor_api::ZomeCall;
 use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::*;
@@ -542,11 +542,11 @@ impl Invocation for ZomeCallInvocation {
 impl ZomeCallInvocation {
     pub async fn try_from_interface_call(
         conductor_api: CellConductorHandle,
-        call: ZomeCallDeserialized,
+        call: ZomeCall,
     ) -> RibosomeResult<Self> {
-        let ZomeCallDeserialized {
-            signed_zome_call,
-            unsigned_zome_call:
+        let ZomeCall {
+            signed: signed_zome_call,
+            params:
                 ZomeCallParams {
                     cap_secret,
                     cell_id,
@@ -576,7 +576,7 @@ impl ZomeCallInvocation {
     }
 }
 
-impl From<ZomeCallInvocation> for ZomeCallDeserialized {
+impl From<ZomeCallInvocation> for ZomeCall {
     fn from(inv: ZomeCallInvocation) -> Self {
         let ZomeCallInvocation {
             cell_id,
@@ -591,11 +591,11 @@ impl From<ZomeCallInvocation> for ZomeCallDeserialized {
             expires_at,
         } = inv;
         Self {
-            signed_zome_call: SignedZomeCall {
+            signed: SignedZomeCall {
                 bytes: zome_call_payload,
                 signature,
             },
-            unsigned_zome_call: ZomeCallParams {
+            params: ZomeCallParams {
                 cell_id,
                 provenance,
                 zome_name: zome.zome_name().clone(),
@@ -781,7 +781,7 @@ pub mod wasm_test {
     use core::time::Duration;
     use hdk::prelude::*;
     use holo_hash::AgentPubKey;
-    use holochain_conductor_api::ZomeCallDeserialized;
+    use holochain_conductor_api::ZomeCall;
     use holochain_keystore::AgentPubKeyExt;
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
@@ -816,7 +816,7 @@ pub mod wasm_test {
             nonce,
             expires_at,
         };
-        let alice_signed_zome_call = ZomeCallDeserialized::try_from_unsigned_zome_call(
+        let alice_signed_zome_call = ZomeCall::try_from_params(
             &conductor.keystore(),
             alice_unsigned_zome_call.clone(),
         )
@@ -826,7 +826,7 @@ pub mod wasm_test {
         // Bob observes or forges a valid zome call from alice.
         // He removes Alice's signature but leaves her provenance and adds his own signature.
         let mut bob_signed_zome_call = alice_signed_zome_call.clone();
-        bob_signed_zome_call.signed_zome_call.signature = bob_pubkey
+        bob_signed_zome_call.signed.signature = bob_pubkey
             .sign_raw(
                 &conductor.keystore(),
                 alice_unsigned_zome_call.data_to_sign().unwrap(),

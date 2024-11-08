@@ -1,4 +1,4 @@
-use holochain_conductor_api::ZomeCallDeserialized;
+use holochain_conductor_api::ZomeCall;
 use holochain_nonce::fresh_nonce;
 use holochain_nonce::Nonce256Bits;
 use holochain_state::source_chain::SourceChainRead;
@@ -114,7 +114,7 @@ async fn signed_zome_call() {
     // signing key should be rejected
     let response = conductor
         .call_zome(
-            ZomeCallDeserialized::try_from_unsigned_zome_call(
+            ZomeCall::try_from_params(
                 &conductor.keystore(),
                 ZomeCallParams {
                     provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
@@ -139,7 +139,7 @@ async fn signed_zome_call() {
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     let response = conductor
         .call_zome(
-            ZomeCallDeserialized::try_from_unsigned_zome_call(
+            ZomeCall::try_from_params(
                 &conductor.keystore(),
                 ZomeCallParams {
                     provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
@@ -241,7 +241,7 @@ async fn signed_zome_call_wildcard() {
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     let response = conductor
         .call_zome(
-            ZomeCallDeserialized::try_from_unsigned_zome_call(
+            ZomeCall::try_from_params(
                 &conductor.keystore(),
                 ZomeCallParams {
                     provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup

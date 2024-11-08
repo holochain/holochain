@@ -4,7 +4,7 @@ use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::SignedZomeCall;
 use futures::future::join_all;
-use holochain_conductor_api::ZomeCallDeserialized;
+use holochain_conductor_api::ZomeCall;
 use holochain_nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::*;
@@ -75,17 +75,14 @@ pub fn call(
                                     nonce,
                                     expires_at,
                                 };
-                                let zome_call_payload =
-                                    SignedZomeCall::try_from_unsigned_zome_call(
-                                        call_context.host_context.keystore(),
-                                        zome_call_unsigned.clone(),
-                                    )
-                                    .await
-                                    .map_err(
-                                        |e| -> RuntimeError {
-                                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                                        },
-                                    )?;
+                                let zome_call_payload = SignedZomeCall::try_from_params(
+                                    call_context.host_context.keystore(),
+                                    zome_call_unsigned.clone(),
+                                )
+                                .await
+                                .map_err(|e| -> RuntimeError {
+                                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                                })?;
                                 match call_context
                                     .host_context()
                                     .network()
@@ -157,18 +154,14 @@ pub fn call(
                                             nonce,
                                             expires_at,
                                         };
-                                        let call =
-                                            ZomeCallDeserialized::try_from_unsigned_zome_call(
-                                                call_context.host_context.keystore(),
-                                                zome_call_unsigned,
-                                            )
-                                            .await
-                                            .map_err(
-                                                |e| -> RuntimeError {
-                                                    wasm_error!(WasmErrorInner::Host(e.to_string()))
-                                                        .into()
-                                                },
-                                            )?;
+                                        let call = ZomeCall::try_from_params(
+                                            call_context.host_context.keystore(),
+                                            zome_call_unsigned,
+                                        )
+                                        .await
+                                        .map_err(|e| -> RuntimeError {
+                                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                                        })?;
                                         match call_context
                                             .host_context()
                                             .call_zome_handle()
@@ -227,7 +220,7 @@ pub mod wasm_test {
     use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
     use holo_hash::ActionHash;
-    use holochain_conductor_api::ZomeCallDeserialized;
+    use holochain_conductor_api::ZomeCall;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
@@ -305,15 +298,13 @@ pub mod wasm_test {
         let zome_call_unsigned =
             new_zome_call_unsigned(alice.cell_id(), "call_create_entry", (), TestWasm::Create)
                 .unwrap();
-        let zome_call = SignedZomeCall::try_from_unsigned_zome_call(
-            handle.keystore(),
-            zome_call_unsigned.clone(),
-        )
-        .await
-        .unwrap();
-        let call = ZomeCallDeserialized {
-            signed_zome_call: zome_call,
-            unsigned_zome_call: zome_call_unsigned,
+        let zome_call =
+            SignedZomeCall::try_from_params(handle.keystore(), zome_call_unsigned.clone())
+                .await
+                .unwrap();
+        let call = ZomeCall {
+            signed: zome_call,
+            params: zome_call_unsigned,
         };
         let result = handle.call_zome(call).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));

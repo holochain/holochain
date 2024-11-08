@@ -635,7 +635,7 @@ pub mod test {
         // Call Zome
         let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
         let request = AppRequest::CallZome(Box::new(
-            SignedZomeCall::try_from_unsigned_zome_call(
+            SignedZomeCall::try_from_params(
                 conductor_handle.keystore(),
                 ZomeCallParams {
                     provenance: agent_key.clone(),
@@ -735,7 +735,7 @@ pub mod test {
         respond: R,
     ) {
         // Now make sure we can call a zome once again
-        let mut zome_call: ZomeCallDeserialized =
+        let mut zome_call: ZomeCall =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 cell_id.clone(),
                 wasm,
@@ -745,14 +745,14 @@ pub mod test {
             .next()
             .unwrap()
             .into();
-        zome_call.unsigned_zome_call.cell_id = cell_id;
-        zome_call.signed_zome_call = zome_call
-            .signed_zome_call
+        zome_call.params.cell_id = cell_id;
+        zome_call.signed = zome_call
+            .signed
             .resign_zome_call(&test_keystore(), fixt!(AgentPubKey, Predictable, 0))
             .await
             .unwrap();
 
-        let msg = AppRequest::CallZome(Box::new(zome_call.signed_zome_call));
+        let msg = AppRequest::CallZome(Box::new(zome_call.signed));
         test_handle_incoming_app_message(
             "".to_string(),
             msg,

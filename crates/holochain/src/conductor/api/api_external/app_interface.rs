@@ -79,22 +79,22 @@ impl AppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
-            AppRequest::CallZome(call) => {
-                let zome_call_unsigned = call
+            AppRequest::CallZome(signed_zome_call) => {
+                let zome_call_params = signed_zome_call
                     .bytes
                     .clone()
                     .decode::<ZomeCallParams>()
                     .map_err(|e| ConductorApiError::SerializationError(e.into()))?;
-                let zome_call = ZomeCallDeserialized {
-                    signed_zome_call: *call,
-                    unsigned_zome_call: zome_call_unsigned,
+                let zome_call = ZomeCall {
+                    signed: *signed_zome_call,
+                    params: zome_call_params,
                 };
                 match self.conductor_handle.call_zome(zome_call.clone()).await? {
                     Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),
                     Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, _, zome_name, fn_name, _)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
                             "Call was not authorized with reason {:?}, cap secret {:?} to call the function {} in zome {}",
-                            zome_call_authorization, zome_call.unsigned_zome_call.cap_secret, fn_name, zome_name
+                            zome_call_authorization, zome_call.params.cap_secret, fn_name, zome_name
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(

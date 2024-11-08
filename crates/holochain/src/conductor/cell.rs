@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use futures::future::FutureExt;
 use holochain_conductor_api::SignedZomeCall;
-use holochain_conductor_api::ZomeCallDeserialized;
+use holochain_conductor_api::ZomeCall;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
 use tokio::sync::broadcast;
@@ -313,7 +313,7 @@ impl Cell {
 
                     tasks.push(
                         self.call_zome(
-                            match ZomeCallDeserialized::try_from_unsigned_zome_call(
+                            match ZomeCall::try_from_params(
                                 self.conductor_handle.keystore(),
                                 unsigned_zome_call,
                             )
@@ -891,12 +891,12 @@ impl Cell {
         nonce: Nonce256Bits,
         expires_at: Timestamp,
     ) -> CellResult<SerializedBytes> {
-        let invocation = ZomeCallDeserialized {
-            signed_zome_call: SignedZomeCall {
+        let invocation = ZomeCall {
+            signed: SignedZomeCall {
                 bytes: zome_call_payload,
                 signature: from_signature,
             },
-            unsigned_zome_call: ZomeCallParams {
+            params: ZomeCallParams {
                 cell_id: self.id.clone(),
                 cap_secret,
                 payload,
@@ -921,7 +921,7 @@ impl Cell {
     // to access the Cell itself, as it was previously done.
     pub async fn call_zome(
         &self,
-        call: ZomeCallDeserialized,
+        call: ZomeCall,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
         // Only check if init has run if this call is not coming from

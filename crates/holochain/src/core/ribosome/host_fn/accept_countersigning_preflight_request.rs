@@ -63,7 +63,7 @@ pub fn accept_countersigning_preflight_request<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::conductor::api::error::ConductorApiError;
-    use crate::conductor::api::ZomeCallDeserialized;
+    use crate::conductor::api::ZomeCall;
     use crate::conductor::CellError;
     use crate::core::ribosome::error::RibosomeError;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
@@ -354,7 +354,7 @@ pub mod wasm_test {
     #[cfg(feature = "slow_tests")]
     #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_invalid_session() {
-        use holochain_conductor_api::ZomeCallDeserialized;
+        use holochain_conductor_api::ZomeCall;
         use holochain_nonce::fresh_nonce;
 
         holochain_trace::test_run();
@@ -421,7 +421,7 @@ pub mod wasm_test {
         let thing_fail_create_alice = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
@@ -448,7 +448,7 @@ pub mod wasm_test {
         let countersign_fail_create_alice = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
@@ -478,7 +478,7 @@ pub mod wasm_test {
     #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     #[cfg_attr(target_os = "windows", ignore = "stack overflow on windows")]
     async fn lock_chain() {
-        use holochain_conductor_api::ZomeCallDeserialized;
+        use holochain_conductor_api::ZomeCall;
         use holochain_nonce::fresh_nonce;
         holochain_trace::test_run();
         let RibosomeTestFixture {
@@ -543,7 +543,7 @@ pub mod wasm_test {
         let preflight_acceptance_fail = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
@@ -586,7 +586,7 @@ pub mod wasm_test {
         let thing_fail_create_alice = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
@@ -610,7 +610,7 @@ pub mod wasm_test {
         let thing_fail_create_bob = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: bob.cell_id().clone(),
@@ -644,7 +644,7 @@ pub mod wasm_test {
         let thing_fail_create_alice = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
@@ -686,7 +686,7 @@ pub mod wasm_test {
         let thing_fail_create_bob = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: bob.cell_id().clone(),
@@ -854,7 +854,7 @@ pub mod wasm_test {
         let preflight_acceptance_fail = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
@@ -897,7 +897,7 @@ pub mod wasm_test {
         let thing_fail_create_alice = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
@@ -921,7 +921,7 @@ pub mod wasm_test {
         let thing_fail_create_bob = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: bob.cell_id().clone(),
@@ -955,7 +955,7 @@ pub mod wasm_test {
         let thing_fail_create_alice = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
@@ -997,7 +997,7 @@ pub mod wasm_test {
         let thing_fail_create_bob = conductor
             .raw_handle()
             .call_zome(
-                ZomeCallDeserialized::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: bob.cell_id().clone(),

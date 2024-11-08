@@ -249,7 +249,7 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
             |(cell, client)| async move {
                 let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
                 let cell_id = cell.cell_id().clone();
-                let call = SignedZomeCall::try_from_unsigned_zome_call(
+                let call = SignedZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: cell_id.clone(),
