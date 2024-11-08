@@ -29,6 +29,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   a conductor that has been built without the `unstable-functions` feature. You will get import errors when Holochain tries
   to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto
   a conductor which has been compiled with `unstable-functions` but the reverse is not true. #4371
+- Fix a problem with countersigning where it would stay in resolution when entering an unknown state from a restart. This
+  was intended behaviour previously to ensure the agent got a change to get online before giving up on countersigning but
+  it is not necessary now that we consider network errors to be a failed resolution and always retry.
 
 ## 0.4.0-rc.0
 
