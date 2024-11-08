@@ -19,7 +19,9 @@ documentclass: 'revtex4-1'
 
 ## Preamble -- A Focus on Practice, Not Just Theory
 
-The original/alpha version of the Holochain white paper (<https://github.com/holochain/holochain-proto/blob/whitepaper/holochain.pdf>) took a formal approach to modeling generalized distributed computation schemes and contrasted Holochain's approach with blockchain-based systems. It also provided formal reasoning for the scaling and performance benefits of Holochain's agent-centric approach.
+The original/alpha version of the Holochain white paper[^hwp-alpha] took a formal approach to modeling generalized distributed computation schemes and contrasted Holochain's approach with blockchain-based systems. It also provided formal reasoning for the scaling and performance benefits of Holochain's agent-centric approach.
+
+[^hwp-alpha]: <https://github.com/holochain/holochain-proto/blob/whitepaper/holochain.pdf>
 
 When dealing with distributed systems, however, the application of logical models and formal proofs are often deceiving. This stems from how easy it is to define sets and conditions which are logically solid in theory but fundamentally impossible and unintelligible in practice. Since our primary intent with Holochain is to provide a highly functional and scalable framework for sophisticated decentralized coordination, our focus must be on what is practicable, and resist the pull of the purely conceptual which frequently steers builders into unwieldy architectures.
 
@@ -155,9 +157,11 @@ If this application, unaware of total global ordering, ran at the scale of X (fo
 
 [^latency-as-partition]: It should be noted that communication latency induces conditions equivalent to a network partition, differing only in scope; therefore, there is still a risk of conflicting username registrations even in an unpartitioned network.
 
-Now, a given group's rules for social coherence may not require username registrations to be unique across all participants. Systems that refer to participants by a random unique key, allowing participants to identify themselves and others by assigning non-unique "petnames"[^petnames] (personally meaningful identifiers) to those keys, are proven to be usable in cases such as Signal Messenger (<https://signal.org>) and Secure Scuttlebutt (<https://scuttlebutt.nz>).
+Now, a given group's rules for social coherence may not require username registrations to be unique across all participants. Systems that refer to participants by a random unique key, allowing participants to identify themselves and others by assigning non-unique "petnames"[^petnames] (personally meaningful identifiers) to those keys, are proven to be usable in cases such as Signal Messenger and Secure Scuttlebutt.
 
 [^petnames]: *An Introduction to Petname Systems*, Marc Stiegler, 2005 <http://www.skyhunter.com/marcs/petnames/IntroPetNames.html>.
+
+[^petnames-usecases]: See <https://signal.org> and <https://scuttlebutt.nz>.
 
 But let us assume that users of this application demand unique usernames in the manner of X. It could employ one of a number of strategies for resolving or preventing conflicts:
 
