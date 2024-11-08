@@ -489,6 +489,7 @@ pub mod test {
     use crate::conductor::api::AdminRequest;
     use crate::conductor::api::AdminResponse;
     use crate::conductor::api::AppInterfaceApi;
+    use crate::conductor::api::ZomeCall;
     use crate::conductor::conductor::ConductorBuilder;
     use crate::conductor::state::ConductorState;
     use crate::conductor::Conductor;
