@@ -200,11 +200,7 @@ pub fn insert_op_lite(
                 "storage_center_loc": basis.get_loc(),
                 "authored_timestamp": timestamp,
                 "basis_hash": basis,
-                "action_hash": warrant_hash,
                 "action_hash": _warrant_hash,
-                "transfer_source": transfer_source,
-                "transfer_method": transfer_method,
-                "transfer_time": transfer_time,
                 "require_receipt": 0,
                 "op_order": order,
             })?;
