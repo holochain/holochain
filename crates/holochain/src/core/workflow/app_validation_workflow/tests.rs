@@ -35,10 +35,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 use std::time::Duration;
 #[cfg(feature = "unstable-warrants")]
-use {
-    crate::test_utils::ConsistencyConditions,
-    holochain_state::query::{CascadeTxnWrapper, Store},
-};
+use {crate::test_utils::ConsistencyConditions, holochain_state::query::Store};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn main_workflow() {
@@ -938,6 +935,8 @@ async fn check_app_entry_def_test() {
 #[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
 async fn app_validation_produces_warrants() {
+    use holochain_state::query::Txn;
+
     holochain_trace::test_run();
 
     #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
