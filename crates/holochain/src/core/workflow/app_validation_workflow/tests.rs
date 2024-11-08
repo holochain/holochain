@@ -17,8 +17,8 @@ use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, 
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_sqlite::error::DatabaseResult;
-use holochain_state::mutations::insert_op_dht;
-use holochain_state::prelude::{from_blob, insert_op_cache, StateQueryResult};
+use holochain_state::mutations::insert_op;
+use holochain_state::prelude::{from_blob, StateQueryResult};
 use holochain_state::test_utils::test_db_dir;
 use holochain_state::validation_db::ValidationStage;
 use holochain_types::dht_op::DhtOpHashed;
