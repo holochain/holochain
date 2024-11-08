@@ -314,8 +314,8 @@ unstable-dpki = ["holochain_conductor_api/unstable-dpki"]
 
 # Enables unstable warrants feature.
 unstable-warrants = [
-    "holochain_state/unstable-warrants",
-    "holochain_cascade/unstable-warrants",
+  "holochain_state/unstable-warrants",
+  "holochain_cascade/unstable-warrants",
 ]
 
 # Enable sharding for networks. This is currently considered an unstable feature
