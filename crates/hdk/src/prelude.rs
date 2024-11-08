@@ -7,6 +7,7 @@ pub use crate::chain::get_agent_activity;
 pub use crate::chain::must_get_agent_activity;
 pub use crate::chain::query;
 pub use crate::clone::*;
+#[cfg(feature = "unstable-countersigning")]
 pub use crate::countersigning::session_times_from_millis;
 pub use crate::ed25519::sign;
 pub use crate::ed25519::sign_ephemeral;

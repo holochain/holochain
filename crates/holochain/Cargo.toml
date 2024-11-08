@@ -336,3 +336,5 @@ unstable-functions = [
   "holochain_wasm_test_utils/unstable-functions",
   "hdk/unstable-functions",
 ]
+
+unstable-countersigning = ["hdk/unstable-countersigning"]

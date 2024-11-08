@@ -340,6 +340,7 @@ pub mod agent;
 // @todo in the future grant secrets may be moved to lair somehow.
 pub mod capability;
 
+#[cfg(feature = "unstable-countersigning")]
 /// Signing a single chain entry between multiple participants.
 ///
 /// The basic goal is to enable a kind of atomicity across multiple source chains

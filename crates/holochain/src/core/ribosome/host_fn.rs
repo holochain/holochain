@@ -66,7 +66,7 @@ host_fn_api_impls! {
     // MAYBE: is there a way to unhygienically import this code in both places?
 
     // Attempt to accept a preflight request.
-    #[cfg(feature = "unstable-functions")]
+    #[cfg(feature = "unstable-countersigning")]
     fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
 
     // Info about the calling agent.
