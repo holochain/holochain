@@ -44,7 +44,7 @@ use tokio::process::Command;
 
 use hdk::prelude::*;
 use holochain::{
-    conductor::api::SignedZomeCall,
+    conductor::api::ZomeCallParamsSigned,
     conductor::api::{AdminRequest, AdminResponse, AppRequest},
 };
 use holochain_conductor_api::AppResponse;
@@ -209,7 +209,7 @@ where
     };
     let bytes = zome_call_unsigned.data_to_sign().unwrap();
     let signature = signing_keypair.sign(&bytes);
-    let request = AppRequest::CallZome(Box::new(SignedZomeCall::new(
+    let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(
         bytes,
         Signature::from(signature.to_bytes()),
     )));

@@ -47,7 +47,7 @@ pub enum AppRequest {
     ///
     /// [`SerializedBytesError`] is returned when the serialized bytes could not be deserialized
     /// to the expected [`ZomeCallParams`].
-    CallZome(Box<SignedZomeCall>),
+    CallZome(Box<ZomeCallParamsSigned>),
 
     /// Get the state of a countersigning session.
     ///
@@ -272,7 +272,7 @@ pub enum AppResponse {
 
 /// The data provided over an app interface in order to make a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct SignedZomeCall {
+pub struct ZomeCallParamsSigned {
     /// Bytes of the serialized zome call payload that consists of all fields of the
     /// [`ZomeCallParams`].
     pub bytes: ExternIO,
@@ -280,7 +280,7 @@ pub struct SignedZomeCall {
     pub signature: Signature,
 }
 
-impl SignedZomeCall {
+impl ZomeCallParamsSigned {
     pub fn new(bytes: Arc<[u8]>, signature: Signature) -> Self {
         Self {
             bytes: ExternIO::from(bytes.to_vec()),
@@ -296,25 +296,12 @@ impl SignedZomeCall {
         let signature = params.provenance.sign_raw(keystore, bytes.clone()).await?;
         Ok(Self::new(bytes, signature))
     }
-
-    pub async fn resign_zome_call(
-        self,
-        keystore: &MetaLairClient,
-        agent_key: AgentPubKey,
-    ) -> LairResult<Self> {
-        let mut zome_call_unsigned = self
-            .bytes
-            .decode::<ZomeCallParams>()
-            .map_err(|e| e.to_string())?;
-        zome_call_unsigned.provenance = agent_key;
-        SignedZomeCall::try_from_params(keystore, zome_call_unsigned).await
-    }
 }
 
 ///
 #[derive(Clone, Debug)]
 pub struct ZomeCall {
-    pub signed: SignedZomeCall,
+    pub signed: ZomeCallParamsSigned,
     pub params: ZomeCallParams,
 }
 
@@ -324,7 +311,7 @@ impl ZomeCall {
         unsigned_zome_call: ZomeCallParams,
     ) -> LairResult<Self> {
         let signed_zome_call =
-            SignedZomeCall::try_from_params(keystore, unsigned_zome_call.clone()).await?;
+            ZomeCallParamsSigned::try_from_params(keystore, unsigned_zome_call.clone()).await?;
         Ok(Self {
             signed: signed_zome_call,
             params: unsigned_zome_call,

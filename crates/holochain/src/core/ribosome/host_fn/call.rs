@@ -2,7 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use crate::core::ribosome::SignedZomeCall;
+use crate::core::ribosome::ZomeCallParamsSigned;
 use futures::future::join_all;
 use holochain_conductor_api::ZomeCall;
 use holochain_nonce::fresh_nonce;
@@ -75,7 +75,7 @@ pub fn call(
                                     nonce,
                                     expires_at,
                                 };
-                                let zome_call_payload = SignedZomeCall::try_from_params(
+                                let zome_call_payload = ZomeCallParamsSigned::try_from_params(
                                     call_context.host_context.keystore(),
                                     zome_call_unsigned.clone(),
                                 )
@@ -228,7 +228,7 @@ pub mod wasm_test {
 
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::test_utils::new_zome_call_unsigned;
-    use holochain_conductor_api::SignedZomeCall;
+    use holochain_conductor_api::ZomeCallParamsSigned;
     use holochain_sqlite::prelude::DatabaseResult;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -299,7 +299,7 @@ pub mod wasm_test {
             new_zome_call_unsigned(alice.cell_id(), "call_create_entry", (), TestWasm::Create)
                 .unwrap();
         let zome_call =
-            SignedZomeCall::try_from_params(handle.keystore(), zome_call_unsigned.clone())
+            ZomeCallParamsSigned::try_from_params(handle.keystore(), zome_call_unsigned.clone())
                 .await
                 .unwrap();
         let call = ZomeCall {

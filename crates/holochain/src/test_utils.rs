@@ -16,7 +16,6 @@ use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
-use holochain_conductor_api::SignedZomeCall;
 use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
@@ -906,11 +905,9 @@ where
     P: serde::Serialize + std::fmt::Debug,
 {
     let zome_call_unsigned = new_zome_call_unsigned(cell_id, func, payload, zome)?;
-    Ok(
-        ZomeCall::try_from_params(keystore, zome_call_unsigned)
-            .await
-            .unwrap(),
-    )
+    Ok(ZomeCall::try_from_params(keystore, zome_call_unsigned)
+        .await
+        .unwrap())
 }
 
 /// Helper to create an unsigned zome invocation for tests
@@ -948,11 +945,7 @@ where
     P: serde::Serialize + std::fmt::Debug,
 {
     let ZomeCall {
-        signed:
-            SignedZomeCall {
-                bytes: zome_call_payload,
-                signature,
-            },
+        signed,
         params:
             ZomeCallParams {
                 cell_id,
@@ -966,14 +959,13 @@ where
             },
     } = new_zome_call(keystore, cell_id, func, payload, zome.clone().into()).await?;
     Ok(ZomeCallInvocation {
+        signed_params: signed,
         cell_id,
-        zome_call_payload,
         zome: zome.into(),
         cap_secret,
         fn_name,
         payload,
         provenance,
-        signature,
         nonce,
         expires_at,
     })

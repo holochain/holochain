@@ -635,7 +635,7 @@ pub mod test {
         // Call Zome
         let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
         let request = AppRequest::CallZome(Box::new(
-            SignedZomeCall::try_from_params(
+            ZomeCallParamsSigned::try_from_params(
                 conductor_handle.keystore(),
                 ZomeCallParams {
                     provenance: agent_key.clone(),
@@ -746,11 +746,10 @@ pub mod test {
             .unwrap()
             .into();
         zome_call.params.cell_id = cell_id;
-        zome_call.signed = zome_call
-            .signed
-            .resign_zome_call(&test_keystore(), fixt!(AgentPubKey, Predictable, 0))
-            .await
-            .unwrap();
+        zome_call.signed =
+            ZomeCallParamsSigned::try_from_params(&test_keystore(), zome_call.params)
+                .await
+                .unwrap();
 
         let msg = AppRequest::CallZome(Box::new(zome_call.signed));
         test_handle_incoming_app_message(

@@ -190,7 +190,7 @@ async fn stuck_conductor_wasm_calls() -> anyhow::Result<()> {
 #[cfg(feature = "slow_tests")]
 #[ignore = "performance test meant to be run manually"]
 async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
-    use holochain_conductor_api::{AppRequest, AppResponse, SignedZomeCall};
+    use holochain_conductor_api::{AppRequest, AppResponse, ZomeCallParamsSigned};
     use std::time::Instant;
 
     holochain_trace::test_run();
@@ -249,7 +249,7 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
             |(cell, client)| async move {
                 let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
                 let cell_id = cell.cell_id().clone();
-                let call = SignedZomeCall::try_from_params(
+                let call = ZomeCallParamsSigned::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
                         cell_id: cell_id.clone(),
