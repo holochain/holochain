@@ -923,7 +923,7 @@ version = "0.5.0-dev.2"
 dependencies = [
  "base64",
  "derive_more",
- "holochain_util",
+ "hex",
  "kitsune_p2p_dht_arc",
  "serde",
  "serde_bytes",

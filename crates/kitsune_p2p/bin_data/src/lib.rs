@@ -100,7 +100,7 @@ macro_rules! make_kitsune_bin_type {
 
             impl std::fmt::Debug for $name {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    f.write_fmt(format_args!("{}(0x{})", stringify!($name), &holochain_util::hex::bytes_to_hex(&self.0, false)))
+                    f.write_fmt(format_args!("{}(0x{})", stringify!($name), hex::encode(&self.0)))
                 }
             }
 
@@ -197,10 +197,13 @@ impl From<Vec<u8>> for KitsuneOpData {
 
 impl std::fmt::Debug for KitsuneOpData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "KitsuneOpData({})",
-            &holochain_util::hex::many_bytes_string(self.0.as_slice())
-        ))
+        let mut data = hex::encode(&self.0[0..(self.0.len().min(32))]);
+        if self.0.len() > 32 {
+            data.push_str(".., bytes=");
+            data.push_str(&(self.0.len() / 8).to_string());
+        }
+
+        f.write_fmt(format_args!("KitsuneOpData(0x{data})",))
     }
 }
 
@@ -255,8 +258,9 @@ pub struct NodeCert(std::sync::Arc<[u8; 32]>);
 
 impl std::fmt::Debug for NodeCert {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+
         f.debug_tuple("NodeCert")
-            .field(&holochain_util::hex::many_bytes_string(self.0.as_slice()))
+            .field(&format_args!("0x{}", hex::encode(self.0.as_slice())))
             .finish()
     }
 }

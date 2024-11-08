@@ -4392,7 +4392,7 @@ dependencies = [
  "base64 0.22.1",
  "derive_more",
  "fixt",
- "holochain_util",
+ "hex",
  "kitsune_p2p_dht_arc",
  "proptest",
  "proptest-derive 0.4.0",
