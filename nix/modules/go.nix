@@ -14,7 +14,7 @@
       packages = {
         goWrapper =
           let
-            go = pkgs.go_1_21;
+            go = pkgs.go_1_23;
           in
           # there is interference only in this specific case, we assemble a go derivationt that not propagate anything but still has everything available required for our specific use-case
             #
