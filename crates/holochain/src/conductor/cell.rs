@@ -9,7 +9,6 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use futures::future::FutureExt;
-use holochain_conductor_api::ZomeCall;
 use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
@@ -51,6 +50,7 @@ use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
 
 use super::api::CellConductorHandle;
+use super::api::ZomeCall;
 use super::space::Space;
 use super::ConductorHandle;
 
@@ -400,9 +400,9 @@ impl Cell {
 
             CallRemote {
                 span_context: _,
-                from_agent,
-                zome_call_payload,
+                zome_call_params_serialized,
                 signature,
+                from_agent,
                 zome_name,
                 fn_name,
                 cap_secret,
@@ -416,7 +416,7 @@ impl Cell {
                     let res = self
                         .handle_call_remote(
                             from_agent,
-                            zome_call_payload,
+                            zome_call_params_serialized,
                             signature,
                             zome_name,
                             fn_name,
@@ -882,7 +882,7 @@ impl Cell {
     async fn handle_call_remote(
         &self,
         from_agent: AgentPubKey,
-        zome_call_payload: ExternIO,
+        zome_call_params_serialized: ExternIO,
         from_signature: Signature,
         zome_name: ZomeName,
         fn_name: FunctionName,
@@ -893,7 +893,7 @@ impl Cell {
     ) -> CellResult<SerializedBytes> {
         let invocation = ZomeCall {
             signed: ZomeCallParamsSigned {
-                bytes: zome_call_payload,
+                bytes: zome_call_params_serialized,
                 signature: from_signature,
             },
             params: ZomeCallParams {

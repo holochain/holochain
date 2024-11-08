@@ -37,7 +37,7 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
         from_agent: AgentPubKey,
-        zome_call_payload: ExternIO,
+        zome_call_params_serialized: ExternIO,
         signature: Signature,
         to_agent: AgentPubKey,
         zome_name: ZomeName,

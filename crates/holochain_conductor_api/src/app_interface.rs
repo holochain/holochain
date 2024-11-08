@@ -298,37 +298,6 @@ impl ZomeCallParamsSigned {
     }
 }
 
-///
-#[derive(Clone, Debug)]
-pub struct ZomeCall {
-    pub signed: ZomeCallParamsSigned,
-    pub params: ZomeCallParams,
-}
-
-impl ZomeCall {
-    pub async fn try_from_params(
-        keystore: &MetaLairClient,
-        unsigned_zome_call: ZomeCallParams,
-    ) -> LairResult<Self> {
-        let signed_zome_call =
-            ZomeCallParamsSigned::try_from_params(keystore, unsigned_zome_call.clone()).await?;
-        Ok(Self {
-            signed: signed_zome_call,
-            params: unsigned_zome_call,
-        })
-    }
-
-    pub async fn resign_zome_call(
-        self,
-        keystore: &MetaLairClient,
-        agent_key: AgentPubKey,
-    ) -> LairResult<Self> {
-        let mut unsigned_zome_call = self.params.clone();
-        unsigned_zome_call.provenance = agent_key;
-        Self::try_from_params(keystore, unsigned_zome_call).await
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CellInfo {
