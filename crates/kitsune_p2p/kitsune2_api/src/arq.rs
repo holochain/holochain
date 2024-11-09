@@ -12,54 +12,59 @@ use crate::*;
 // - DhtArq
 // - DhtArqSet
 pub trait Arq: 'static + Send + Sync + std::fmt::Debug {
-    /// Returns the full set of inclusive bounds defined by this Arq.
-    /// - If this Arq is empty, it returns `[]`.
-    /// - If this Arq is full, it returns `[(0, u32::MAX)]`.
-    fn inclusive_bounds(&self) -> &[(u32, u32)];
-
     /// Returns `true` if any parts of these two arqs overlap.
-    fn overlap(&self, _oth: &DynArq) -> bool {
-        // TODO - actually implement this
-        false
-    }
+    fn overlap(&self, _oth: &DynArq) -> bool;
 
     /// Get the closest distance (in either direction) from the specified
     /// location to a covered part of this arq.
     /// - If this arq is empty, u32::MAX will be returned.
     /// - If this arq is full, 0 will be returned.
-    fn dist(&self, _loc: u32) -> u32 {
-        // TODO - actually implement this
-        u32::MAX
-    }
+    fn dist(&self, _loc: u32) -> u32;
 }
 
 /// Trait-object [Arq].
 pub type DynArq = Arc<dyn Arq>;
 
-/// Arq constructed directly from inclusive bounds.
+/// An empty arq.
 #[derive(Debug)]
-pub struct InclusiveBoundArq(pub Box<[(u32, u32)]>);
+pub struct ArqEmpty;
 
-impl InclusiveBoundArq {
-    /// Construct this Arq from a Vec.
-    pub fn from_vec(b: Vec<(u32, u32)>) -> DynArq {
-        Arc::new(Self(b.into_boxed_slice()))
+impl ArqEmpty {
+    /// Construct an empty arq.
+    pub fn create() -> DynArq {
+        let out: DynArq = Arc::new(ArqEmpty);
+        out
     }
 }
 
-impl Arq for InclusiveBoundArq {
-    fn inclusive_bounds(&self) -> &[(u32, u32)] {
-        &self.0
+impl Arq for ArqEmpty {
+    fn overlap(&self, _oth: &DynArq) -> bool {
+        false
+    }
+
+    fn dist(&self, _loc: u32) -> u32 {
+        u32::MAX
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+/// A full arq.
+#[derive(Debug)]
+pub struct ArqFull;
 
-    #[test]
-    fn empty_does_not_overlap() {
-        assert!(!InclusiveBoundArq::from_vec(vec![])
-            .overlap(&InclusiveBoundArq::from_vec(vec![(0, u32::MAX)])));
+impl ArqFull {
+    /// Construct a full arq.
+    pub fn create() -> DynArq {
+        let out: DynArq = Arc::new(ArqFull);
+        out
+    }
+}
+
+impl Arq for ArqFull {
+    fn overlap(&self, _oth: &DynArq) -> bool {
+        true
+    }
+
+    fn dist(&self, _loc: u32) -> u32 {
+        0
     }
 }

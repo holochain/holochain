@@ -15,6 +15,7 @@ edition = "2021"
 bytes = "1.8.0"
 futures = "0.3.31"
 kitsune2_api = { version = "0.5.0-dev.0", path = "../kitsune2_api" }
+rand = "0.8.5"
 
 [dev-dependencies]
 tokio = { version = "1.41.1", features = ["full"] }

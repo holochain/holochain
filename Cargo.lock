@@ -4337,6 +4337,7 @@ dependencies = [
  "bytes",
  "futures",
  "kitsune2_api",
+ "rand 0.8.5",
  "tokio",
 ]
 
