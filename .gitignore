@@ -27,3 +27,6 @@ test_cert
 
 .direnv
 /.pre-commit-config.yaml
+
+*.tex.swp
+svg-inkscape/
