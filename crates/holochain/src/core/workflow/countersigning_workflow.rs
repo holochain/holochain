@@ -28,13 +28,14 @@ mod refresh;
 /// Success handler for receiving signature bundles from the network.
 mod success;
 
+#[cfg(feature = "unstable-countersigning")]
 #[cfg(test)]
 mod tests;
 
-pub(crate) use accept::accept_countersigning_request;
 use holochain_keystore::MetaLairClient;
 use holochain_state::chain_lock::get_chain_lock;
-pub(crate) use success::countersigning_success;
+#[cfg(feature = "unstable-countersigning")]
+pub(crate) use {accept::accept_countersigning_request, success::countersigning_success};
 
 /// Countersigning workspace to hold session state.
 #[derive(Clone)]

@@ -101,6 +101,7 @@ impl AppInterfaceApi {
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
+            #[cfg(feature = "unstable-countersigning")]
             AppRequest::GetCountersigningSessionState(payload) => {
                 let countersigning_session_state = self
                     .conductor_handle
@@ -111,6 +112,7 @@ impl AppInterfaceApi {
                     countersigning_session_state,
                 )))
             }
+            #[cfg(feature = "unstable-countersigning")]
             AppRequest::AbandonCountersigningSession(payload) => {
                 self.conductor_handle
                     .clone()
@@ -118,6 +120,7 @@ impl AppInterfaceApi {
                     .await?;
                 Ok(AppResponse::CountersigningSessionAbandoned)
             }
+            #[cfg(feature = "unstable-countersigning")]
             AppRequest::PublishCountersigningSession(payload) => {
                 self.conductor_handle
                     .clone()

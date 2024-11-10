@@ -108,7 +108,7 @@ pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
 
-#[cfg(feature = "unstable-functions")]
+#[cfg(feature = "unstable-countersigning")]
 pub use crate::countersigning::accept_countersigning_preflight_request;
 
 #[cfg(feature = "unstable-functions")]
@@ -178,9 +178,13 @@ macro_rules! holochain_externs {
             get_validation_receipts:1
         );
 
+        #[cfg(feature = "unstable-countersigning")]
+        holochain_wasmer_guest::host_externs!(
+            accept_countersigning_preflight_request:1
+        );
+
         #[cfg(feature = "unstable-functions")]
         holochain_wasmer_guest::host_externs!(
-            accept_countersigning_preflight_request:1,
             get_agent_key_lineage:1,
             block_agent:1,
             unblock_agent:1,

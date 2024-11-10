@@ -33,6 +33,7 @@ pub enum AppRequest {
     /// [`AppResponse::ZomeCalled`]
     CallZome(Box<ZomeCall>),
 
+    #[cfg(feature = "unstable-countersigning")]
     /// Get the state of a countersigning session.
     ///
     /// # Returns
@@ -45,6 +46,7 @@ pub enum AppRequest {
     /// passed in to the call.
     GetCountersigningSessionState(Box<CellId>),
 
+    #[cfg(feature = "unstable-countersigning")]
     /// Abandon an unresolved countersigning session.
     ///
     /// If the current session has not been resolved automatically, it can be forcefully abandoned.
@@ -81,6 +83,7 @@ pub enum AppRequest {
     /// automatically has not been made.
     AbandonCountersigningSession(Box<CellId>),
 
+    #[cfg(feature = "unstable-countersigning")]
     /// Publish an unresolved countersigning session.
     ///
     /// If the current session has not been resolved automatically, it can be forcefully published.
@@ -216,12 +219,15 @@ pub enum AppResponse {
     /// [msgpack]: https://msgpack.org/
     ZomeCalled(Box<ExternIO>),
 
+    #[cfg(feature = "unstable-countersigning")]
     /// The successful response to an [`AppRequest::GetCountersigningSessionState`].
     CountersigningSessionState(Box<Option<CountersigningSessionState>>),
 
+    #[cfg(feature = "unstable-countersigning")]
     /// The successful response to an [`AppRequest::AbandonCountersigningSession`].
     CountersigningSessionAbandoned,
 
+    #[cfg(feature = "unstable-countersigning")]
     /// The successful response to an [`AppRequest::PublishCountersigningSession`].
     PublishCountersigningSessionTriggered,
 

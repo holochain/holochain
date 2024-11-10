@@ -56,4 +56,4 @@ unstable-functions = [
   "unstable-countersigning",
 ]
 
-unstable-countersigning = []
+unstable-countersigning = ["holochain_zome_types/unstable-countersigning"]

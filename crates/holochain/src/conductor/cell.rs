@@ -21,7 +21,6 @@ use holochain_cascade::authority;
 use holochain_chc::ChcImpl;
 use holochain_conductor_api::ZomeCall;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -38,16 +37,20 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
-use crate::core::workflow::countersigning_workflow::countersigning_success;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
-use crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops;
 use crate::core::workflow::CallZomeWorkflowArgs;
 use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
+#[cfg(feature = "unstable-countersigning")]
+use {
+    crate::core::workflow::countersigning_workflow::countersigning_success,
+    crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops,
+    holochain_p2p::event::CountersigningSessionNegotiationMessage,
+};
 
 use super::api::CellConductorHandle;
 use super::space::Space;
@@ -569,14 +572,17 @@ impl Cell {
             }
 
             CountersigningSessionNegotiation {
-                respond, message, ..
+                respond: _respond,
+                message: _message,
+                ..
             } => {
+                #[cfg(feature = "unstable-countersigning")]
                 async {
                     let res = self
-                        .handle_countersigning_session_negotiation(message)
+                        .handle_countersigning_session_negotiation(_message)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
+                    _respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_countersigning_response"))
                 .await;
@@ -585,6 +591,7 @@ impl Cell {
         Ok(())
     }
 
+    #[cfg(feature = "unstable-countersigning")]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     /// we are receiving a response from a countersigning authority
     async fn handle_countersigning_session_negotiation(
