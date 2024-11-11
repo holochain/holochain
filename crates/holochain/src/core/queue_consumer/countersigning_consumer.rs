@@ -7,17 +7,18 @@ use tracing::*;
 
 /// Spawn the QueueConsumer for the countersigning workflow
 #[instrument(skip_all)]
+#[allow(unused_variables)]
 pub(crate) fn spawn_countersigning_consumer(
-    _space: Space,
-    _workspace: Arc<CountersigningWorkspace>,
+    space: Space,
+    workspace: Arc<CountersigningWorkspace>,
     cell_id: CellId,
     conductor: ConductorHandle,
-    _integration_trigger: TriggerSender,
-    _publish_trigger: TriggerSender,
+    integration_trigger: TriggerSender,
+    publish_trigger: TriggerSender,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
 
-    let _self_trigger = tx.clone();
+    let self_trigger = tx.clone();
     queue_consumer_cell_bound(
         "countersigning_consumer",
         cell_id.clone(),
@@ -28,13 +29,13 @@ pub(crate) fn spawn_countersigning_consumer(
         #[cfg(feature = "unstable-countersigning")]
         move || {
             countersigning_workflow_fn(
-                _space.clone(),
-                _workspace.clone(),
+                space.clone(),
+                workspace.clone(),
                 cell_id.clone(),
                 conductor.clone(),
-                _self_trigger.clone(),
-                _integration_trigger.clone(),
-                _publish_trigger.clone(),
+                self_trigger.clone(),
+                integration_trigger.clone(),
+                publish_trigger.clone(),
             )
         },
     );
