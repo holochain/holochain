@@ -524,44 +524,6 @@ impl InternalHandler for KitsuneP2pActor {
 impl ghost_actor::GhostHandler<KitsuneP2pEvent> for KitsuneP2pActor {}
 
 impl KitsuneP2pEventHandler for KitsuneP2pActor {
-    fn handle_put_agent_info_signed(
-        &mut self,
-        input: crate::event::PutAgentInfoSignedEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>> {
-        let legacy_host = self.host_api.legacy.clone();
-        let ep_hnd = self.ep_hnd.clone();
-
-        Ok(async move {
-            let puts = legacy_host.put_agent_info_signed(input).await?;
-
-            for removed_url in puts.iter().flat_map(|r| r.removed_urls.clone()) {
-                tracing::debug!(?removed_url, "peer URL changed, closing connection");
-                if let Err(e) = ep_hnd.close_peer_con(removed_url.clone()) {
-                    tracing::debug!(?e, ?removed_url, "could not close peer connection");
-                }
-            }
-
-            Ok(puts)
-        }
-        .boxed()
-        .into())
-    }
-
-    fn handle_query_agents(
-        &mut self,
-        input: crate::event::QueryAgentsEvt,
-    ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>> {
-        Ok(self.host_api.legacy.query_agents(input))
-    }
-
-    fn handle_query_peer_density(
-        &mut self,
-        space: Arc<KitsuneSpace>,
-        arq: kitsune_p2p_types::dht_arc::DhtArc,
-    ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView> {
-        Ok(self.host_api.legacy.query_peer_density(space, arq))
-    }
-
     fn handle_call(
         &mut self,
         space: Arc<KitsuneSpace>,
@@ -948,23 +910,6 @@ mockall::mock! {
     pub KitsuneP2pEventHandler {}
 
     impl KitsuneP2pEventHandler for KitsuneP2pEventHandler {
-
-        fn handle_put_agent_info_signed(
-            &mut self,
-            input: crate::event::PutAgentInfoSignedEvt,
-        ) -> KitsuneP2pEventHandlerResult<Vec<AgentInfoPut>>;
-
-        fn handle_query_agents(
-            &mut self,
-            input: crate::event::QueryAgentsEvt,
-        ) -> KitsuneP2pEventHandlerResult<Vec<crate::types::agent_store::AgentInfoSigned>>;
-
-        fn handle_query_peer_density(
-            &mut self,
-            space: Arc<KitsuneSpace>,
-            arq: kitsune_p2p_types::dht_arc::DhtArc,
-        ) -> KitsuneP2pEventHandlerResult<kitsune_p2p_types::dht::PeerView>;
-
         fn handle_call(
             &mut self,
             space: Arc<KitsuneSpace>,

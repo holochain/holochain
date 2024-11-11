@@ -150,7 +150,7 @@ impl Inner {
                     return None;
                 }
 
-                if !arq.overlap(info.storage_arq()) {
+                if !arq.overlap(&info.storage_arq()) {
                     return None;
                 }
 
@@ -192,7 +192,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn empty_query_by_loc() {
-        let store = builder::Builder::create_test()
+        let store = builder::Builder::create_default()
             .create_peer_store()
             .await
             .unwrap();
@@ -201,7 +201,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn happy_store_and_get() {
-        let store = builder::Builder::create_test()
+        let store = builder::Builder::create_default()
             .create_peer_store()
             .await
             .unwrap();

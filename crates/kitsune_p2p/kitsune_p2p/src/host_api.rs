@@ -16,8 +16,6 @@ use kitsune_p2p_types::{
     KOpData, KOpHash,
 };
 
-use crate::event::GetAgentInfoSignedEvt;
-
 /// A boxed future result with dynamic error type
 pub type KitsuneHostResult<'a, T> =
     MustBoxFuture<'a, Result<T, Box<dyn Send + Sync + std::error::Error>>>;
@@ -38,6 +36,7 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
         timestamp: Timestamp,
     ) -> KitsuneHostResult<bool>;
 
+    /*
     /// We need to get previously stored agent info.
     fn get_agent_info_signed(
         &self,
@@ -53,6 +52,7 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
         space: Arc<KitsuneSpace>,
         dht_arc_set: DhtArcSet,
     ) -> KitsuneHostResult<Vec<f64>>;
+    */
 
     /// Query aggregate dht op data to form an LTCS set of region data.
     fn query_region_set(

@@ -1,4 +1,4 @@
-use crate::event::{KitsuneP2pEvent, KitsuneP2pEventSender, PutAgentInfoSignedEvt};
+use crate::event::{KitsuneP2pEvent, KitsuneP2pEventSender};
 use crate::spawn::actor::space::{SpaceInternal, SpaceInternalSender};
 use crate::{KitsuneP2pError, KitsuneP2pResult, KitsuneSpace};
 use futures::channel::mpsc::Sender;

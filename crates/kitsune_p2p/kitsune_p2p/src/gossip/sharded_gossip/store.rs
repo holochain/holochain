@@ -5,9 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-use crate::event::{
-    PutAgentInfoSignedEvt, QueryAgentsEvt, QueryOpHashesEvt, TimeWindow, TimeWindowInclusive,
-};
+use crate::event::{QueryOpHashesEvt, TimeWindow, TimeWindowInclusive};
 use crate::types::event::KitsuneP2pEventSender;
 use crate::{HostApi, HostApiLegacy};
 use kitsune_p2p_timestamp::Timestamp;
@@ -284,18 +282,4 @@ pub(super) async fn query_region_set<'a>(
         .query_region_set(space, common_arq_set)
         .await
         .map_err(KitsuneError::other)
-}
-
-/// Add new agent info to the p2p store.
-pub(super) async fn put_agent_info(
-    host_api: &HostApiLegacy,
-    agents: &[Arc<AgentInfoSigned>],
-) -> KitsuneResult<()> {
-    let peer_data: Vec<_> = agents.iter().map(|i| (**i).clone()).collect();
-    host_api
-        .legacy
-        .put_agent_info_signed(PutAgentInfoSignedEvt { peer_data })
-        .await
-        .map_err(KitsuneError::other)?;
-    Ok(())
 }

@@ -147,7 +147,7 @@ pub(crate) async fn spawn_space(
 
     let host = HostApiLegacy::new(host, evt_send);
 
-    tokio::task::spawn(builder.spawn(Space::new(
+    let space = Space::new(
         space,
         i_s.clone(),
         host,
@@ -158,7 +158,9 @@ pub(crate) async fn spawn_space(
         parallel_notify_permit,
         fetch_pool,
         local_url,
-    )));
+    ).await?;
+
+    tokio::task::spawn(builder.spawn(space));
 
     Ok((sender, i_s, evt_recv))
 }
@@ -1247,6 +1249,7 @@ pub(crate) struct PendingDelegate {
 }
 
 pub(crate) struct SpaceReadOnlyInner {
+    pub(crate) peer_store: kitsune2_api::peer_store::DynPeerStore,
     pub(crate) local_url: Arc<std::sync::Mutex<Option<String>>>,
     pub(crate) space: Arc<KitsuneSpace>,
     #[allow(dead_code)]
@@ -1333,7 +1336,7 @@ pub(crate) struct Space {
 impl Space {
     /// space constructor
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub async fn new(
         space: Arc<KitsuneSpace>,
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         host_api: HostApiLegacy,
@@ -1344,7 +1347,7 @@ impl Space {
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
         fetch_pool: FetchPool,
         local_url: Arc<std::sync::Mutex<Option<String>>>,
-    ) -> Self {
+    ) -> std::io::Result<Self> {
         let metrics = MetricsSync::default();
 
         {
@@ -1448,7 +1451,17 @@ impl Space {
             );
         }
 
+        // TODO - as we fill out the kitsune2 usage, this should come
+        //        from a builder. But for now, we're just instantiating it
+        //        directly.
+        let peer_store = {
+            use kitsune2::BuilderExt;
+            kitsune2::factories::MemPeerStoreFactory::create()
+                .create(Arc::new(kitsune2_api::builder::Builder::create_default())).await?
+        };
+
         let ro_inner = Arc::new(SpaceReadOnlyInner {
+            peer_store,
             local_url,
             space: space.clone(),
             i_s: i_s.clone(),
@@ -1463,7 +1476,7 @@ impl Space {
             fetch_pool,
         });
 
-        Self {
+        Ok(Self {
             ro_inner,
             space,
             i_s,
@@ -1474,7 +1487,7 @@ impl Space {
             mdns_handles: HashMap::new(),
             _mdns_listened_spaces: HashSet::new(),
             gossip_mod,
-        }
+        })
     }
 
     fn update_metric_exchange_arcset(&mut self) {

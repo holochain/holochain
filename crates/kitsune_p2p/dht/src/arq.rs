@@ -46,7 +46,7 @@ pub(crate) const U32_LEN: u64 = u32::MAX as u64 + 1;
 ///    to an Agent's location, and which can be requantized, resized, etc.
 /// 2. An Arq which has no absolute location defined, and which simply represents
 ///    a (quantized) range.
-pub trait ArqStart: Sized + Copy + std::fmt::Debug {
+pub trait ArqStart: 'static + Send + Sync + Sized + Copy + std::fmt::Debug {
     /// Get the DhtLocation representation
     fn to_loc(&self, dim: impl SpaceDim, power: u8) -> Loc;
     /// Get the exponential SpaceOffset representation
@@ -143,6 +143,16 @@ pub struct Arq<S: ArqStart = Loc> {
     /// We never expect the count to be less than 4 or so, and not much larger
     /// than 32.
     pub count: SpaceOffset,
+}
+
+impl<S: ArqStart> kitsune2_api::arq::Arq for Arq<S> {
+    fn overlap(&self, _oth: &kitsune2_api::arq::DynArq) -> bool {
+        todo!()
+    }
+
+    fn dist(&self, loc: u32) -> u32 {
+        self.to_dht_arc_range_std().dist(loc)
+    }
 }
 
 /// Alias for Arq with an Loc start

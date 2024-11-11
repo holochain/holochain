@@ -135,38 +135,6 @@ impl KitsuneHost for HostStub {
         async move { Ok(blocked) }.boxed().into()
     }
 
-    fn get_agent_info_signed(
-        &self,
-        input: GetAgentInfoSignedEvt,
-    ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        if let Ok(true) =
-            self.fail_next_request
-                .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
-        {
-            self.fail_count.fetch_add(1, Ordering::SeqCst);
-            return KitsuneHostDefaultError::get_agent_info_signed(&self.err, input);
-        }
-
-        async move {
-            let signed = mk_agent_info(*input.agent.0.to_vec().first().unwrap()).await;
-            Ok(Some(signed))
-        }
-        .boxed()
-        .into()
-    }
-
-    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
-        KitsuneHostDefaultError::remove_agent_info_signed(&self.err, input)
-    }
-
-    fn peer_extrapolated_coverage(
-        &self,
-        space: Arc<KitsuneSpace>,
-        dht_arc_set: DhtArcSet,
-    ) -> KitsuneHostResult<Vec<f64>> {
-        KitsuneHostDefaultError::peer_extrapolated_coverage(&self.err, space, dht_arc_set)
-    }
-
     fn query_region_set(
         &self,
         space: Arc<KitsuneSpace>,

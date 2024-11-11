@@ -30,47 +30,6 @@ pub trait KitsuneHostDefaultError: KitsuneHost + FetchPoolConfig {
         box_fut(Ok(false))
     }
 
-    fn put_agent_info_signed(
-        &self,
-        _input: Vec<crate::types::agent_store::AgentInfoSigned>,
-    ) -> KitsuneHostResult<()> {
-        box_fut(Ok(()))
-    }
-
-    fn get_agent_info_signed(
-        &self,
-        _input: GetAgentInfoSignedEvt,
-    ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        box_fut(Err(format!(
-            "error for unimplemented KitsuneHost test behavior: method {} of {}",
-            "get_agent_info_signed",
-            Self::NAME
-        )
-        .into()))
-    }
-
-    fn remove_agent_info_signed(&self, _input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
-        box_fut(Err(format!(
-            "error for unimplemented KitsuneHost test behavior: method {} of {}",
-            "remove_agent_info_signed",
-            Self::NAME
-        )
-        .into()))
-    }
-
-    fn peer_extrapolated_coverage(
-        &self,
-        _space: Arc<KitsuneSpace>,
-        _dht_arc_set: DhtArcSet,
-    ) -> KitsuneHostResult<Vec<f64>> {
-        box_fut(Err(format!(
-            "error for unimplemented KitsuneHost test behavior: method {} of {}",
-            "peer_extrapolated_coverage",
-            Self::NAME
-        )
-        .into()))
-    }
-
     fn record_metrics(
         &self,
         _space: Arc<KitsuneSpace>,
@@ -165,25 +124,6 @@ impl<T: KitsuneHostDefaultError> KitsuneHost for T {
         timestamp: Timestamp,
     ) -> crate::KitsuneHostResult<bool> {
         KitsuneHostDefaultError::is_blocked(self, input, timestamp)
-    }
-
-    fn get_agent_info_signed(
-        &self,
-        input: GetAgentInfoSignedEvt,
-    ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>> {
-        KitsuneHostDefaultError::get_agent_info_signed(self, input)
-    }
-
-    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool> {
-        KitsuneHostDefaultError::remove_agent_info_signed(self, input)
-    }
-
-    fn peer_extrapolated_coverage(
-        &self,
-        space: Arc<KitsuneSpace>,
-        dht_arc_set: DhtArcSet,
-    ) -> KitsuneHostResult<Vec<f64>> {
-        KitsuneHostDefaultError::peer_extrapolated_coverage(self, space, dht_arc_set)
     }
 
     fn record_metrics(

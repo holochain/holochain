@@ -71,6 +71,18 @@ macro_rules! make_kitsune_bin_type {
                 #[cfg_attr(feature = "fuzzing", proptest(strategy = "proptest::collection::vec(0u8..128, 36)"))]
                 pub Vec<u8>);
 
+            impl kitsune2_api::Id for $name {
+                fn bytes(&self) -> bytes::Bytes {
+                    // TODO - make the core storage type Bytes so this is
+                    //        no longer a copy
+                    bytes::Bytes::copy_from_slice(&self.0[..self.0.len() - 4])
+                }
+
+                fn loc(&self) -> u32 {
+                    bytes_to_loc(&self.0[self.0.len() - 4..])
+                }
+            }
+
             impl KitsuneBinType for $name {
 
                 // TODO This actually allows mixups, for example a KitsuneAgent can be constructed with a 36 byte vector

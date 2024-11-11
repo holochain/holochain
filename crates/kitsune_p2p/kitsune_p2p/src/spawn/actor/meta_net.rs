@@ -17,7 +17,6 @@ use kitsune_p2p_types::tx_utils::TxUrl;
 
 use crate::spawn::actor::InternalSender;
 use crate::spawn::KitsuneP2pEvent;
-use crate::spawn::PutAgentInfoSignedEvt;
 use crate::types::event::KitsuneP2pEventSender;
 use kitsune_p2p_block::BlockTargetId;
 use kitsune_p2p_timestamp::Timestamp;

@@ -56,6 +56,9 @@ impl TestId {
 /// A test agent.
 #[derive(Debug)]
 pub struct TestAgentInfo {
+    /// Reference to self for downcasting.
+    pub this: std::sync::Weak<Self>,
+
     /// The agent identifier.
     pub id: DynId,
 
@@ -73,8 +76,12 @@ pub struct TestAgentInfo {
 }
 
 impl agent::AgentInfo for TestAgentInfo {
-    fn id(&self) -> &DynId {
-        &self.id
+    fn as_any(&self) -> Arc<dyn std::any::Any + 'static + Send + Sync> {
+        self.this.upgrade().expect("InvalidArc")
+    }
+
+    fn id(&self) -> DynId {
+        self.id.clone()
     }
 
     fn is_active(&self) -> bool {
@@ -89,14 +96,15 @@ impl agent::AgentInfo for TestAgentInfo {
         self.expires_at
     }
 
-    fn storage_arq(&self) -> &arq::DynArq {
-        &self.storage_arq
+    fn storage_arq(&self) -> arq::DynArq {
+        self.storage_arq.clone()
     }
 }
 
 impl Default for TestAgentInfo {
     fn default() -> Self {
         Self {
+            this: std::sync::Weak::new(),
             id: TestId::default().into_dyn(),
             is_active: true,
             created_at: Timestamp::now(),
@@ -108,8 +116,11 @@ impl Default for TestAgentInfo {
 
 impl TestAgentInfo {
     /// Convert to the dyn type.
-    pub fn into_dyn(self) -> agent::DynAgentInfo {
-        let out: agent::DynAgentInfo = Arc::new(self);
+    pub fn into_dyn(mut self) -> agent::DynAgentInfo {
+        let out: agent::DynAgentInfo = Arc::new_cyclic(move |this| {
+            self.this = this.clone();
+            self
+        });
         out
     }
 }

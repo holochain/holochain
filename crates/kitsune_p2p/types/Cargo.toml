@@ -21,6 +21,7 @@ kitsune_p2p_dht = { version = "^0.5.0-dev.1", path = "../dht" }
 kitsune_p2p_dht_arc = { version = "^0.5.0-dev.1", path = "../dht_arc" }
 kitsune_p2p_bin_data = { version = "^0.5.0-dev.2", path = "../bin_data" }
 kitsune_p2p_timestamp = { version = "^0.5.0-dev.0", path = "../timestamp" }
+kitsune2_api = { version = "^0.5.0-dev.0", path = "../kitsune2_api" }
 mockall = { version = "0.11.3", optional = true }
 holochain_trace = { version = "^0.5.0-dev.1", path = "../../holochain_trace" }
 once_cell = "1.4"

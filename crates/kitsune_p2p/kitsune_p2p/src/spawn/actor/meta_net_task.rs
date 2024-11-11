@@ -1,8 +1,5 @@
 use crate::actor::BroadcastData;
-use crate::event::{
-    FetchOpDataEvt, FetchOpDataEvtQuery, GetAgentInfoSignedEvt, KitsuneP2pEventSender,
-    PutAgentInfoSignedEvt, QueryAgentsEvt,
-};
+use crate::event::{FetchOpDataEvt, FetchOpDataEvtQuery, KitsuneP2pEventSender};
 use crate::spawn::actor::fetch::FetchResponseConfig;
 use crate::spawn::actor::{
     Internal, InternalSender, UNAUTHORIZED_DISCONNECT_CODE, UNAUTHORIZED_DISCONNECT_REASON,

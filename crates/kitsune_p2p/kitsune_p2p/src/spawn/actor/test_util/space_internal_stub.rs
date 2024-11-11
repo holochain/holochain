@@ -1,5 +1,4 @@
 use crate::actor::BroadcastData;
-use crate::event::PutAgentInfoSignedEvt;
 use crate::spawn::actor::space::WireConHnd;
 use crate::spawn::actor::space::{SpaceInternal, SpaceInternalHandler, SpaceInternalHandlerResult};
 use crate::spawn::actor::MaybeDelegate;

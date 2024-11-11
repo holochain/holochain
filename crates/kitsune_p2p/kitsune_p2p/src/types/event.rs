@@ -65,6 +65,7 @@ pub struct SignNetworkDataEvt {
     pub data: Arc<Vec<u8>>,
 }
 
+/*
 /// Store the AgentInfo as signed by the agent themselves.
 #[derive(Debug, Clone)]
 pub struct PutAgentInfoSignedEvt {
@@ -146,6 +147,7 @@ impl QueryAgentsEvt {
         self
     }
 }
+*/
 
 /// An exclusive range of timestamps, measured in microseconds
 pub type TimeWindow = std::ops::Range<Timestamp>;
@@ -173,7 +175,7 @@ ghost_actor::ghost_chan! {
     /// The KitsuneP2pEvent stream allows handling events generated from the
     /// KitsuneP2p actor.
     pub chan KitsuneP2pEvent<super::KitsuneP2pError> {
-
+        /*
         /// We need to store signed agent info.
         fn put_agent_info_signed(input: PutAgentInfoSignedEvt) -> Vec<kitsune_p2p_types::bootstrap::AgentInfoPut>;
 
@@ -182,6 +184,7 @@ ghost_actor::ghost_chan! {
 
         /// Query the peer density of a space for a given [`DhtArc`].
         fn query_peer_density(space: KSpace, dht_arc: kitsune_p2p_types::dht_arc::DhtArc) -> kitsune_p2p_types::dht::PeerView;
+        */
 
         /// We are receiving a request from a remote node.
         fn call(space: KSpace, to_agent: KAgent, payload: Payload) -> Vec<u8>;

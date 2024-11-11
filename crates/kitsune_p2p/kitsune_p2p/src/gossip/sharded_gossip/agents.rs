@@ -34,17 +34,4 @@ impl ShardedGossipLocal {
             vec![]
         })
     }
-
-    /// Incoming missing agents.
-    /// - Add these agents to the peer store
-    ///   for this space for agents that contain the
-    ///   incoming agents within their arcs.
-    pub(super) async fn incoming_missing_agents(
-        &self,
-        agents: &[Arc<AgentInfoSigned>],
-    ) -> KitsuneResult<()> {
-        // Add the agents to the stores.
-        store::put_agent_info(&self.host_api, agents).await?;
-        Ok(())
-    }
 }

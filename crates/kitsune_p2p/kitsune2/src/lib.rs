@@ -16,8 +16,10 @@ use kitsune2_api::*;
 
 /// Extend the api Builder with additional concrete functions.
 pub trait BuilderExt {
-    /// Create a default test builder.
-    fn create_test() -> kitsune2_api::builder::Builder;
+    /// Create a default builder. Note, this build will be populated
+    /// with default factories. These factories may or may not be appropriate
+    /// for your given application.
+    fn create_default() -> kitsune2_api::builder::Builder;
 
     #[cfg(test)]
     /// A test-api to generate a PeerStore instance from this builder.
@@ -25,7 +27,7 @@ pub trait BuilderExt {
 }
 
 impl BuilderExt for kitsune2_api::builder::Builder {
-    fn create_test() -> kitsune2_api::builder::Builder {
+    fn create_default() -> kitsune2_api::builder::Builder {
         kitsune2_api::builder::Builder {
             peer_store: factories::MemPeerStoreFactory::create(),
         }

@@ -1,7 +1,5 @@
 #![allow(clippy::type_complexity)]
-use crate::event::{
-    FetchOpDataEvtQuery, KitsuneP2pEvent, KitsuneP2pEventHandlerResult, PutAgentInfoSignedEvt,
-};
+use crate::event::{FetchOpDataEvtQuery, KitsuneP2pEvent, KitsuneP2pEventHandlerResult};
 use crate::spawn::actor::{KAgent, KSpace};
 use crate::test_util::data::mk_agent_info;
 use crate::types::event::Payload;

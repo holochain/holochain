@@ -6,6 +6,7 @@ use crate::tx_utils::TxUrl;
 use crate::*;
 use agent_info_helper::*;
 use dht::Arq;
+use std::sync::Weak;
 
 /// A list of Urls.
 pub type UrlList = Vec<TxUrl>;
@@ -66,11 +67,12 @@ pub mod agent_info_helper {
 }
 
 /// The inner constructable AgentInfo struct
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct AgentInfoInner {
+    /// Cyclic reference so dyn types can downcast to concrete types.
+    #[cfg_attr(feature = "fuzzing", arbitrary(default))]
+    pub this: Weak<Self>,
+
     /// The space this agent info is relevant to.
     pub space: Arc<KitsuneSpace>,
 
@@ -99,6 +101,33 @@ pub struct AgentInfoInner {
 
     /// the raw encoded bytes sent to bootstrap server to use for sig verify.
     pub encoded_bytes: Box<[u8]>,
+}
+
+impl kitsune2_api::agent::AgentInfo for AgentInfoInner {
+    fn as_any(&self) -> Arc<dyn std::any::Any + 'static + Send + Sync> {
+        self.this.upgrade().expect("InvalidArc")
+    }
+
+    fn id(&self) -> kitsune2_api::DynId {
+        let out: kitsune2_api::DynId = self.agent.clone();
+        out
+    }
+
+    fn is_active(&self) -> bool {
+        AgentInfoInner::is_active(self)
+    }
+
+    fn created_at(&self) -> kitsune2_api::Timestamp {
+        kitsune2_api::Timestamp::from_micros(self.signed_at_ms as i64 * 1000)
+    }
+
+    fn expires_at(&self) -> kitsune2_api::Timestamp {
+        kitsune2_api::Timestamp::from_micros(self.expires_at_ms as i64 * 1000)
+    }
+
+    fn storage_arq(&self) -> kitsune2_api::arq::DynArq {
+        Arc::new(self.storage_arq)
+    }
 }
 
 impl AgentInfoInner {
@@ -137,10 +166,7 @@ impl std::hash::Hash for AgentInfoInner {
 
 /// Value in the peer database that tracks an Agent's representation as signed by that agent.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct AgentInfoSigned(pub Arc<AgentInfoInner>);
 
 impl std::ops::Deref for AgentInfoSigned {
@@ -198,7 +224,8 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
             ..
         } = info;
 
-        let inner = AgentInfoInner {
+        let inner = Arc::new_cyclic(|this| AgentInfoInner {
+            this: this.clone(),
             space,
             agent,
             storage_arq,
@@ -207,13 +234,27 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
             expires_at_ms: signed_at_ms + expires_after_ms,
             signature,
             encoded_bytes: agent_info,
-        };
+        });
 
-        Ok(AgentInfoSigned(Arc::new(inner)))
+        Ok(AgentInfoSigned(inner))
     }
 }
 
 impl AgentInfoSigned {
+    /// Downcast a kitsune2 dyn agent info into a concrete AgentInfoSigned
+    pub fn downcast(agent: kitsune2_api::agent::DynAgentInfo) -> Option<AgentInfoSigned> {
+        if let Ok(agent) = agent.as_any().downcast::<AgentInfoInner>() {
+            Some(AgentInfoSigned(agent))
+        } else {
+            None
+        }
+    }
+
+    /// Translate this instance into a kitsune2 DynAgentInfo.
+    pub fn into_dyn(self) -> kitsune2_api::agent::DynAgentInfo {
+        self.0
+    }
+
     /// Construct and sign a new AgentInfoSigned instance.
     pub async fn sign<'a, R, F>(
         space: Arc<KitsuneSpace>,
@@ -249,7 +290,8 @@ impl AgentInfoSigned {
 
         let signature = f(&encoded_bytes).await?;
 
-        let inner = AgentInfoInner {
+        let inner = Arc::new_cyclic(|this| AgentInfoInner {
+            this: this.clone(),
             space,
             agent,
             storage_arq,
@@ -258,9 +300,9 @@ impl AgentInfoSigned {
             expires_at_ms,
             signature,
             encoded_bytes,
-        };
+        });
 
-        Ok(Self(Arc::new(inner)))
+        Ok(Self(inner))
     }
 
     /// decode from msgpack
