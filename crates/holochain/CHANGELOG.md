@@ -7,6 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING** The following HDK functions have been temporarily removed as "unstable". They can be re-enabled by building Holochain with the "unstable-functions" feature flag:
+  - `accept_countersigning_preflight_request`
+  - `block_agent`
+  - `unblock_agent`
+  - `get_agent_key_lineage`
+  - `is_same_agent`
+  - `schedule`
+  - the function `sleep` has been removed entirely because it wasn't implemented
+  - and the HDI function `is_same_agent`
+    Note that installing apps that have been built with an HDK from before this change will not be possible to install on
+    a conductor that has been built without the `unstable-functions` feature. You will get import errors when Holochain tries
+    to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto
+    a conductor which has been compiled with `unstable-functions` but the reverse is not true. #4371
+- Fix a problem with countersigning where it would stay in resolution when entering an unknown state from a restart. This 
+  was intended behaviour previously to ensure the agent got a change to get online before giving up on countersigning but 
+  it is not necessary now that we consider network errors to be a failed resolution and always retry.
+
 ## 0.5.0-dev.4
 
 - **BREAKING**: As the DPKI feature is unstable and incomplete, it is disabled with default cargo features and put behind a feature called `unstable-dpki`. If this feature is specified at compile time, DPKI is enabled by default.
