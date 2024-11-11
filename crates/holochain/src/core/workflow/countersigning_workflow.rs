@@ -58,16 +58,17 @@ pub struct CountersigningWorkspace {
 
 impl CountersigningWorkspace {
     /// Create a new countersigning workspace.
+    #[allow(unused_variables)]
     pub fn new(
-        _countersigning_resolution_retry_delay: Duration,
-        _countersigning_resolution_retry_limit: Option<usize>,
+        countersigning_resolution_retry_delay: Duration,
+        countersigning_resolution_retry_limit: Option<usize>,
     ) -> Self {
         Self {
             inner: Default::default(),
             #[cfg(feature = "unstable-countersigning")]
-            countersigning_resolution_retry_delay: _countersigning_resolution_retry_delay,
+            countersigning_resolution_retry_delay,
             #[cfg(feature = "unstable-countersigning")]
-            countersigning_resolution_retry_limit: _countersigning_resolution_retry_limit,
+            countersigning_resolution_retry_limit,
         }
     }
 

@@ -33,7 +33,6 @@ pub enum AppRequest {
     /// [`AppResponse::ZomeCalled`]
     CallZome(Box<ZomeCall>),
 
-    #[cfg(feature = "unstable-countersigning")]
     /// Get the state of a countersigning session.
     ///
     /// # Returns
@@ -44,9 +43,9 @@ pub enum AppRequest {
     ///
     /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
     /// passed in to the call.
+    #[cfg(feature = "unstable-countersigning")]
     GetCountersigningSessionState(Box<CellId>),
 
-    #[cfg(feature = "unstable-countersigning")]
     /// Abandon an unresolved countersigning session.
     ///
     /// If the current session has not been resolved automatically, it can be forcefully abandoned.
@@ -81,9 +80,9 @@ pub enum AppRequest {
     ///
     /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
     /// automatically has not been made.
+    #[cfg(feature = "unstable-countersigning")]
     AbandonCountersigningSession(Box<CellId>),
 
-    #[cfg(feature = "unstable-countersigning")]
     /// Publish an unresolved countersigning session.
     ///
     /// If the current session has not been resolved automatically, it can be forcefully published.
@@ -118,6 +117,7 @@ pub enum AppRequest {
     ///
     /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
     /// automatically has not been made.
+    #[cfg(feature = "unstable-countersigning")]
     PublishCountersigningSession(Box<CellId>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
@@ -219,16 +219,16 @@ pub enum AppResponse {
     /// [msgpack]: https://msgpack.org/
     ZomeCalled(Box<ExternIO>),
 
-    #[cfg(feature = "unstable-countersigning")]
     /// The successful response to an [`AppRequest::GetCountersigningSessionState`].
+    #[cfg(feature = "unstable-countersigning")]
     CountersigningSessionState(Box<Option<CountersigningSessionState>>),
 
-    #[cfg(feature = "unstable-countersigning")]
     /// The successful response to an [`AppRequest::AbandonCountersigningSession`].
+    #[cfg(feature = "unstable-countersigning")]
     CountersigningSessionAbandoned,
 
-    #[cfg(feature = "unstable-countersigning")]
     /// The successful response to an [`AppRequest::PublishCountersigningSession`].
+    #[cfg(feature = "unstable-countersigning")]
     PublishCountersigningSessionTriggered,
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].

@@ -571,18 +571,17 @@ impl Cell {
                 .await;
             }
 
+            #[allow(unused_variables)]
             CountersigningSessionNegotiation {
-                respond: _respond,
-                message: _message,
-                ..
+                respond, message, ..
             } => {
                 #[cfg(feature = "unstable-countersigning")]
                 async {
                     let res = self
-                        .handle_countersigning_session_negotiation(_message)
+                        .handle_countersigning_session_negotiation(message)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
-                    _respond.respond(Ok(async move { res }.boxed().into()));
+                    respond.respond(Ok(async move { res }.boxed().into()));
                 }
                 .instrument(debug_span!("cell_handle_countersigning_response"))
                 .await;
