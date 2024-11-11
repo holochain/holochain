@@ -336,7 +336,7 @@ mod tests {
             .call_remote(
                 dna,
                 a1,
-                ExternIO(bytes.to_vec()),
+                ExternIO(bytes),
                 signature,
                 a2,
                 zome_name,

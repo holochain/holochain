@@ -80,7 +80,7 @@ pub fn send_remote_signal(
                             .await
                         {
                             Ok(signature) => {
-                                to_agent_list.push((agent, ExternIO(bytes.to_vec()), signature))
+                                to_agent_list.push((agent, ExternIO(bytes), signature))
                             }
                             Err(e) => {
                                 tracing::info!(

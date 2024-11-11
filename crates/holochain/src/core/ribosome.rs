@@ -821,7 +821,7 @@ pub mod wasm_test {
         let mut bob_signed_zome_call = alice_signed_zome_call.clone();
         let (_, bytes_hash) = alice_unsigned_zome_call.serialize_and_hash().unwrap();
         bob_signed_zome_call.signed.signature = bob_pubkey
-            .sign_raw(&conductor.keystore(), bytes_hash)
+            .sign_raw(&conductor.keystore(), bytes_hash.into())
             .await
             .unwrap();
 

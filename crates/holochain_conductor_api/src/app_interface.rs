@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{AppAuthenticationToken, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
@@ -282,9 +280,9 @@ pub struct ZomeCallParamsSigned {
 }
 
 impl ZomeCallParamsSigned {
-    pub fn new(bytes: Arc<[u8]>, signature: Signature) -> Self {
+    pub fn new(bytes: Vec<u8>, signature: Signature) -> Self {
         Self {
-            bytes: ExternIO::from(bytes.to_vec()),
+            bytes: ExternIO::from(bytes),
             signature,
         }
     }
