@@ -59,6 +59,17 @@ harness = false
 workspace = true
 
 [features]
+sqlite-encrypted = [
+  "kitsune_p2p_dht/sqlite-encrypted",
+  "kitsune_p2p_dht_arc/sqlite-encrypted",
+  "kitsune_p2p_bin_data/sqlite-encrypted",
+]
+sqlite = [
+  "kitsune_p2p_dht/sqlite",
+  "kitsune_p2p_dht_arc/sqlite",
+  "kitsune_p2p_bin_data/sqlite",
+]
+unstable-sharding = []
 
 fuzzing = [
   "arbitrary",
@@ -68,7 +79,6 @@ fuzzing = [
   "kitsune_p2p_dht_arc/fuzzing",
   "kitsune_p2p_dht/fuzzing",
 ]
-
 test_utils = [
   "kitsune_p2p_bin_data/test_utils",
   "kitsune_p2p_dht_arc/test_utils",
@@ -78,19 +88,4 @@ test_utils = [
   "fuzzing",
   "fixt",
 ]
-
 fixt = ["dep:fixt", "kitsune_p2p_bin_data/fixt"]
-
-unstable-sharding = []
-
-sqlite-encrypted = [
-  "kitsune_p2p_dht/sqlite-encrypted",
-  "kitsune_p2p_dht_arc/sqlite-encrypted",
-  "kitsune_p2p_bin_data/sqlite-encrypted",
-]
-
-sqlite = [
-  "kitsune_p2p_dht/sqlite",
-  "kitsune_p2p_dht_arc/sqlite",
-  "kitsune_p2p_bin_data/sqlite",
-]

@@ -82,8 +82,24 @@ itertools = "0.12"
 workspace = true
 
 [features]
+sqlite-encrypted = [
+  "kitsune_p2p_fetch/sqlite-encrypted",
+  "kitsune_p2p_timestamp/sqlite-encrypted",
+  "kitsune_p2p_block/sqlite-encrypted",
+  "kitsune_p2p_types/sqlite-encrypted",
+]
+sqlite = [
+  "kitsune_p2p_fetch/sqlite",
+  "kitsune_p2p_timestamp/sqlite",
+  "kitsune_p2p_block/sqlite",
+  "kitsune_p2p_types/sqlite",
+]
+instrument = []
 
-default = []
+unstable-sharding = [
+  "kitsune_p2p_types/unstable-sharding",
+]
+
 
 fuzzing = [
   "arbitrary",
@@ -94,7 +110,6 @@ fuzzing = [
   "kitsune_p2p_timestamp/fuzzing",
   "kitsune_p2p_types/fuzzing",
 ]
-
 test_utils = [
   "blake2b_simd",
   "tokio/test-util",
@@ -109,24 +124,4 @@ test_utils = [
   "fixt",
   "dep:tracing-subscriber",
 ]
-
 mock_network = ["kitsune_p2p_types/test_utils", "mockall"]
-
-instrument = []
-
-unstable-sharding = [
-  "kitsune_p2p_types/unstable-sharding",
-]
-
-sqlite-encrypted = [
-  "kitsune_p2p_fetch/sqlite-encrypted",
-  "kitsune_p2p_timestamp/sqlite-encrypted",
-  "kitsune_p2p_block/sqlite-encrypted",
-  "kitsune_p2p_types/sqlite-encrypted",
-]
-sqlite = [
-  "kitsune_p2p_fetch/sqlite",
-  "kitsune_p2p_timestamp/sqlite",
-  "kitsune_p2p_block/sqlite",
-  "kitsune_p2p_types/sqlite",
-]

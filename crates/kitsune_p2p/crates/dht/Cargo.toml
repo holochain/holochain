@@ -47,6 +47,13 @@ workspace = true
 
 [features]
 default = ["kitsune_p2p_timestamp/now"]
+
+sqlite-encrypted = [
+  "kitsune_p2p_timestamp/sqlite-encrypted",
+  "kitsune_p2p_dht_arc/sqlite-encrypted",
+]
+sqlite = ["kitsune_p2p_timestamp/sqlite", "kitsune_p2p_dht_arc/sqlite"]
+
 test_utils = ["dep:colored", "dep:futures", "dep:must_future", "fuzzing"]
 fuzzing = [
   "arbitrary",
@@ -55,8 +62,3 @@ fuzzing = [
   "kitsune_p2p_dht_arc/fuzzing",
   "kitsune_p2p_timestamp/fuzzing",
 ]
-sqlite-encrypted = [
-  "kitsune_p2p_timestamp/sqlite-encrypted",
-  "kitsune_p2p_dht_arc/sqlite-encrypted",
-]
-sqlite = ["kitsune_p2p_timestamp/sqlite", "kitsune_p2p_dht_arc/sqlite"]

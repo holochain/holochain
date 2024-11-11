@@ -37,8 +37,8 @@ workspace = true
 [features]
 sqlite-encrypted = ["rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl"]
 sqlite = ["rusqlite", "rusqlite/bundled"]
-slow_tests = []
 
+slow_tests = []
 fuzzing = [
   "arbitrary",
   "proptest",
@@ -46,5 +46,4 @@ fuzzing = [
   "kitsune_p2p_timestamp",
   "kitsune_p2p_timestamp/fuzzing",
 ]
-
 test_utils = ["fuzzing"]

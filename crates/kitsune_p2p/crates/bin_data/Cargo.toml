@@ -29,6 +29,8 @@ fixt = { version = "^0.5.0-dev.0", path = "../../../fixt", optional = true }
 workspace = true
 
 [features]
+sqlite-encrypted = ["kitsune_p2p_dht_arc/sqlite-encrypted"]
+sqlite = ["kitsune_p2p_dht_arc/sqlite"]
 
 fuzzing = [
   "arbitrary",
@@ -36,10 +38,5 @@ fuzzing = [
   "proptest-derive",
   "kitsune_p2p_dht_arc/fuzzing",
 ]
-
 test_utils = []
-
 fixt = ["dep:fixt"]
-
-sqlite-encrypted = ["kitsune_p2p_dht_arc/sqlite-encrypted"]
-sqlite = ["kitsune_p2p_dht_arc/sqlite"]

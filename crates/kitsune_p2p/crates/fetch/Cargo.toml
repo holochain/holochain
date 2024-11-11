@@ -10,7 +10,6 @@ keywords = ["holochain", "holo", "p2p", "dht", "networking"]
 categories = ["network-programming"]
 edition = "2021"
 
-
 # reminder - do not use workspace deps
 [dependencies]
 derive_more = "0.99"
@@ -46,6 +45,13 @@ rand = "0.8.5"
 workspace = true
 
 [features]
+sqlite-encrypted = [
+  "rusqlite",
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "kitsune_p2p_types/sqlite-encrypted",
+]
+sqlite = ["rusqlite", "rusqlite/bundled", "kitsune_p2p_types/sqlite"]
+
 fuzzing = [
   "arbitrary",
   "proptest",
@@ -53,14 +59,4 @@ fuzzing = [
   "kitsune_p2p_timestamp/fuzzing",
   "kitsune_p2p_types/fuzzing",
 ]
-
 test_utils = ["human-repr", "kitsune_p2p_types/test_utils"]
-
-default = []
-
-sqlite-encrypted = [
-  "rusqlite",
-  "rusqlite/bundled-sqlcipher-vendored-openssl",
-  "kitsune_p2p_types/sqlite-encrypted",
-]
-sqlite = ["rusqlite", "rusqlite/bundled", "kitsune_p2p_types/sqlite"]

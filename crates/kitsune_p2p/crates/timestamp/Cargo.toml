@@ -44,10 +44,8 @@ workspace = true
 [features]
 default = ["chrono"]
 now = ["chrono"]
-
 full = ["now"]
-
-fuzzing = ["arbitrary", "proptest", "proptest-derive", "once_cell", "rand"]
-
 sqlite-encrypted = ["rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl"]
 sqlite = ["rusqlite", "rusqlite/bundled"]
+
+fuzzing = ["arbitrary", "proptest", "proptest-derive", "once_cell", "rand"]

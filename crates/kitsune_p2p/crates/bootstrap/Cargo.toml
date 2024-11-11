@@ -51,4 +51,5 @@ workspace = true
 [features]
 sqlite-encrypted = ["kitsune_p2p_types/sqlite-encrypted"]
 sqlite = ["kitsune_p2p_types/sqlite"]
+
 test_utils = ["kitsune_p2p_types/fixt", "kitsune_p2p_bin_data/fixt"]
