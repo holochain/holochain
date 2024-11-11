@@ -8,7 +8,7 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn can_install_app_with_custom_modifiers_correctly() {
+async fn can_install_app_with_custom_modifiers_correctly_1() {
     let conductor = SweetConductor::from_standard_config().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -210,13 +210,61 @@ async fn can_install_app_with_custom_modifiers_correctly() {
         installed_app_role_2.dna.modifiers.quantum_time,
         Some(manifest_quantum_time)
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn can_install_app_with_custom_modifiers_correctly_2() {
+    let conductor = SweetConductor::from_standard_config().await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let path = PathBuf::from(format!("{}", dna.dna_hash()));
+
+    let manifest_network_seed = String::from("initial seed from the manifest");
+    let manifest_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
+        "some properties in the manifest",
+    )));
+    let manifest_origin_time = Timestamp::now().saturating_sub(&std::time::Duration::from_secs(1));
+    let manifest_quantum_time = std::time::Duration::from_secs(60);
+
+    let modifiers = DnaModifiersOpt::default()
+        .with_network_seed(manifest_network_seed.clone())
+        .with_properties(manifest_properties.clone())
+        .with_origin_time(manifest_origin_time)
+        .with_quantum_time(manifest_quantum_time);
+
+    let role_name = String::from("role");
+
+    let roles = vec![AppRoleManifest {
+        name: role_name.clone(),
+        dna: AppRoleDnaManifest {
+            location: Some(DnaLocation::Bundled(path.clone())),
+            modifiers: modifiers.clone(),
+            // Note that there is no installed hash provided. We'll check that this changes later.
+            installed_hash: None,
+            clone_limit: 0,
+        },
+        provisioning: Some(CellProvisioning::Create { deferred: false }),
+    }];
+
+    let manifest = AppManifestCurrentBuilder::default()
+        .name("test_app".into())
+        .description(None)
+        .roles(roles)
+        .build()
+        .unwrap();
+
+    let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
+
+    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
+        .await
+        .unwrap();
 
     //- Test that modifier fields that are None in the modifiers map do not overwrite existing
     //  modifiers from the manifest
     let custom_modifiers = DnaModifiersOpt::default();
 
     let role_settings = (
-        role_name_1.clone(),
+        role_name.clone(),
         RoleSettings::Provisioned {
             membrane_proof: Default::default(),
             modifiers: Some(custom_modifiers.clone()),
@@ -228,7 +276,7 @@ async fn can_install_app_with_custom_modifiers_correctly() {
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
             source: AppBundleSource::Bundle(bundle.clone()),
-            installed_app_id: Some("app_2".into()),
+            installed_app_id: Some("app".into()),
             network_seed: None,
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
@@ -238,7 +286,7 @@ async fn can_install_app_with_custom_modifiers_correctly() {
         .unwrap();
 
     let manifest = conductor
-        .get_app_info(&"app_2".to_string())
+        .get_app_info(&"app".to_string())
         .await
         .unwrap()
         .unwrap()
@@ -247,7 +295,7 @@ async fn can_install_app_with_custom_modifiers_correctly() {
     let installed_app_role_1 = manifest
         .app_roles()
         .into_iter()
-        .find(|r| r.name == role_name_1)
+        .find(|r| r.name == role_name)
         .unwrap();
 
     // Check that the modifers have been set correctly
@@ -267,13 +315,20 @@ async fn can_install_app_with_custom_modifiers_correctly() {
         installed_app_role_1.dna.modifiers.quantum_time,
         Some(manifest_quantum_time)
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn installing_with_modifiers_for_non_existing_role_fails() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let bundle = app_bundle_from_dnas(&[("role-name".into(), dna)], false, None).await;
 
     //- Check that installing with modifiers for a non-existent role fails
     let role_settings = (
         "unknown role name".into(),
         RoleSettings::Provisioned {
             membrane_proof: Default::default(),
-            modifiers: Some(custom_modifiers.clone()),
+            modifiers: Some(DnaModifiersOpt::default()),
         },
     );
 
@@ -291,10 +346,14 @@ async fn can_install_app_with_custom_modifiers_correctly() {
         .await;
 
     assert!(result.is_err());
+}
 
+#[tokio::test(flavor = "multi_thread")]
+async fn providing_membrane_proof_skips_deferred_provisioning() {
     //- Check that if providing a membrane proof in the role settings for an app with `allow_deferred_memproofs`
     //  set to `true` in the app manifest, membrane proofs are not deferred and the app has
     //  AppInfoStatus::Running after installation
+    let conductor = SweetConductor::from_standard_config().await;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
@@ -304,7 +363,7 @@ async fn can_install_app_with_custom_modifiers_correctly() {
         role_name,
         RoleSettings::Provisioned {
             membrane_proof: Some(MembraneProof::new(fixt!(SerializedBytes))),
-            modifiers: Some(custom_modifiers.clone()),
+            modifiers: None,
         },
     );
 
@@ -322,10 +381,12 @@ async fn can_install_app_with_custom_modifiers_correctly() {
         })
         .await
         .unwrap();
+
     assert_eq!(app.role_assignments().len(), 1);
 
     //- Status is now Disabled with the normal `NeverStarted` reason.
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+
     assert_eq!(
         app_info.status,
         AppInfoStatus::Disabled {
@@ -337,5 +398,6 @@ async fn can_install_app_with_custom_modifiers_correctly() {
 
     //- Status is Running, i.e. membrane proof provisioning has not been deferred
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+
     assert_eq!(app_info.status, AppInfoStatus::Running);
 }
