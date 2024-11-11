@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate as zt;
 use crate::prelude::*;
 use holo_hash::AgentPubKey;
@@ -309,9 +311,12 @@ pub struct ZomeCallParams {
 }
 
 impl ZomeCallParams {
-    /// Prepare the canonical bytes for an unsigned zome call so that it is
+    /// Prepare the canonical bytes for zome call parameters so that they are
     /// always signed and verified in the same way.
-    pub fn serialize(&self) -> Result<std::sync::Arc<[u8]>, SerializedBytesError> {
-        Ok(holochain_serialized_bytes::encode(&self)?.into())
+    /// Signature is generated for the hash of the bytes.
+    pub fn serialize_and_hash(&self) -> Result<(Arc<[u8]>, Arc<[u8]>), SerializedBytesError> {
+        let bytes = holochain_serialized_bytes::encode(&self)?;
+        let bytes_hash = blake2b_256(&bytes);
+        Ok((bytes.into(), bytes_hash.into()))
     }
 }

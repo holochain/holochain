@@ -207,9 +207,7 @@ where
         nonce,
         expires_at,
     };
-    let bytes = zome_call_params.serialize().unwrap();
-    // Signature is generated for the hash of the serialized bytes.
-    let bytes_hash = blake2b_256(&bytes);
+    let (bytes, bytes_hash) = zome_call_params.serialize_and_hash().unwrap();
     let signature = signing_keypair.sign(&bytes_hash);
     let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(
         bytes,

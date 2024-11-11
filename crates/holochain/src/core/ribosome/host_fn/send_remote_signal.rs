@@ -2,7 +2,6 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
-use holo_hash::blake2b_256;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_nonce::fresh_nonce;
 use holochain_types::access::Permission;
@@ -65,8 +64,8 @@ pub fn send_remote_signal(
                             nonce,
                             expires_at,
                         };
-                        let zome_call_param_bytes = match zome_call_params.serialize() {
-                            Ok(bytes) => bytes,
+                        let (bytes, bytes_hash) = match zome_call_params.serialize_and_hash() {
+                            Ok(bytes_and_hash) => bytes_and_hash,
                             Err(e) => {
                                 tracing::info!(
                                     "Failed to serialize zome call for signal because of {:?}",
@@ -75,18 +74,14 @@ pub fn send_remote_signal(
                                 return;
                             }
                         };
-                        // Signature is generated for the hash of the serialized bytes.
-                        let bytes_hash = blake2b_256(&zome_call_param_bytes);
 
                         match from_agent
                             .sign_raw(call_context.host_context.keystore(), bytes_hash.into())
                             .await
                         {
-                            Ok(signature) => to_agent_list.push((
-                                agent,
-                                ExternIO(zome_call_param_bytes.to_vec()),
-                                signature,
-                            )),
+                            Ok(signature) => {
+                                to_agent_list.push((agent, ExternIO(bytes.to_vec()), signature))
+                            }
                             Err(e) => {
                                 tracing::info!(
                                     "Failed to sign and send remote signals because of {:?}",

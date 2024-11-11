@@ -819,11 +819,9 @@ pub mod wasm_test {
         // Bob observes or forges a valid zome call from alice.
         // He removes Alice's signature but leaves her provenance and adds his own signature.
         let mut bob_signed_zome_call = alice_signed_zome_call.clone();
+        let (_, bytes_hash) = alice_unsigned_zome_call.serialize_and_hash().unwrap();
         bob_signed_zome_call.signed.signature = bob_pubkey
-            .sign_raw(
-                &conductor.keystore(),
-                alice_unsigned_zome_call.serialize().unwrap(),
-            )
+            .sign_raw(&conductor.keystore(), bytes_hash)
             .await
             .unwrap();
 
