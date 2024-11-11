@@ -35,6 +35,7 @@ mod complete;
 /// State integrity function to ensure that the database and the workspace are in sync.
 mod refresh;
 
+#[cfg(feature = "unstable-countersigning")]
 /// Success handler for receiving signature bundles from the network.
 mod success;
 
