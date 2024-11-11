@@ -17,6 +17,7 @@ use num_traits::AsPrimitive;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use kitsune_p2p::test_util::init_tracing;
 
 mod common;
 
@@ -106,7 +107,7 @@ async fn gossip_arc_clamping_required_when_junk_config_provided() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky on CI"]
 async fn publish_to_basis_from_inside() {
-    holochain_trace::test_run();
+    init_tracing();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
@@ -213,7 +214,7 @@ async fn publish_to_basis_from_inside() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky on CI"]
 async fn publish_to_basis_from_outside() {
-    holochain_trace::test_run();
+    init_tracing();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
@@ -346,7 +347,7 @@ async fn publish_to_basis_from_outside() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky--this is flaky both with and without unstable-sharding feature"]
 async fn gossip_to_basis_from_inside() {
-    holochain_trace::test_run();
+    init_tracing();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;
@@ -446,7 +447,7 @@ async fn gossip_to_basis_from_inside() {
 /// on a network then we could go a long time between talking to each node and maintain a lot of connections.
 #[tokio::test(flavor = "multi_thread")]
 async fn no_gossip_to_basis_from_outside() {
-    holochain_trace::test_run();
+    init_tracing();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;

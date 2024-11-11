@@ -1,6 +1,9 @@
-use ghost_actor::dependencies::tracing;
+#![allow(dead_code)]
 
-holochain_trace::metrics!(
+use ghost_actor::dependencies::tracing;
+use crate::types::metrics_helper;
+
+metrics_helper::metrics!(
     KitsuneMetrics,
     Failure,
     Call,
@@ -18,7 +21,7 @@ holochain_trace::metrics!(
 #[cfg_attr(feature = "instrument", tracing::instrument)]
 #[allow(dead_code)]
 pub fn print_all_metrics() {
-    if holochain_trace::metrics::is_enabled() {
+    if metrics_helper::is_enabled() {
         use std::fmt::Write;
         use KitsuneMetrics::*;
         let mut out = String::new();
@@ -59,7 +62,7 @@ pub fn print_all_metrics() {
 pub fn init() {
     if let Some(km) = std::env::var_os("KITSUNE_METRICS") {
         if km == "ON" {
-            holochain_trace::metrics::init();
+            metrics_helper::init();
         }
     }
 }

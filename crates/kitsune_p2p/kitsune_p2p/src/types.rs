@@ -91,3 +91,4 @@ pub use kitsune_p2p_types::dht_arc;
 
 #[allow(missing_docs)]
 pub mod metrics;
+mod metrics_helper;

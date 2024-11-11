@@ -10,6 +10,7 @@ use kitsune_p2p_dht::prelude::ArqClamping;
 use kitsune_p2p_dht::spacetime::Topology;
 use kitsune_p2p_dht::*;
 
+use crate::common::init_tracing;
 use kitsune_p2p_dht::test_utils::generate_ideal_coverage;
 use kitsune_p2p_dht::test_utils::seeded_rng;
 use kitsune_p2p_dht_arc::DhtArcRange;
@@ -250,7 +251,8 @@ fn test_grow_by_multiple_chunks() {
 ///
 /// (not a very good test, probably)
 fn test_degenerate_asymmetrical_coverage() {
-    holochain_trace::test_run();
+    init_tracing();
+
     let topo = Topology::unit_zero();
     let other = ArqBounds::from_interval(&topo, 4, DhtArcRange::from_bounds(0x0u32, 0x80))
         .unwrap()

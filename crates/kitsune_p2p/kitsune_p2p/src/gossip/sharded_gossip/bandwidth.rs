@@ -244,12 +244,13 @@ where
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
-
+    use crate::test_util::init_tracing;
     use super::*;
 
     #[tokio::test(flavor = "current_thread", start_paused = true)]
     async fn test_limiter() {
-        holochain_trace::test_run();
+        init_tracing();
+
         let clock = governor::clock::FakeRelativeClock::default();
         // max * 2 * 8 = 0.1 * 1_000_000 * burst_ratio => burst_ratio = max * 2 * 8 / 0.1 / 1_000_000
         let burst_ratio = MAX_SEND_BUF_BYTES as f64 * 2.0 * 8.0 / 1_000_000.0 / 0.1;

@@ -1,5 +1,6 @@
 #![cfg(feature = "test_utils")]
 
+use crate::common::init_tracing;
 use kitsune_p2p_dht::{
     arq::*,
     hash::AgentKey,
@@ -14,6 +15,8 @@ use kitsune_p2p_dht::{
 use kitsune_p2p_timestamp::Timestamp;
 use maplit::hashmap;
 use rand::Rng;
+
+mod common;
 
 /// Test that alice and bob can each gossip a single op to each other, using
 /// the PoC gossip_direct implementation
@@ -156,7 +159,8 @@ fn test_mismatched_powers() {
 /// of the nodes after enough gossip rounds
 #[test]
 fn gossip_scenario_full_sync() {
-    holochain_trace::test_run();
+    init_tracing();
+
     let topo = Topology::standard_zero();
     let gopa = GossipParams::new(1.into(), 0);
 

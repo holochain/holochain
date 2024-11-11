@@ -37,7 +37,7 @@ kitsune_p2p_dht = { path = ".", features = ["test_utils", "sqlite"] }
 kitsune_p2p_dht_arc = { path = "../dht_arc", features = ["test_utils"] }
 holochain_serialized_bytes = "=0.0.55"
 maplit = "1"
-holochain_trace = { version = "^0.5.0-dev.1", path = "../../holochain_trace" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 pretty_assertions = "1.4.0"
 proptest = "1"
 test-case = "3.3"

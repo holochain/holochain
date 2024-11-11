@@ -1,5 +1,6 @@
 mod common;
 
+use crate::common::init_tracing;
 use common::quantized::*;
 use kitsune_p2p_dht::{
     spacetime::Topology,
@@ -41,7 +42,7 @@ fn pass_redundancy(stats: &Stats, redundancy_target: f64) {
 /// Equilibrium test for a single distribution
 #[test]
 fn stability_test_case_near_ideal() {
-    holochain_trace::test_run();
+    init_tracing();
 
     let topo = Topology::standard_zero();
     let detail = false;
@@ -62,7 +63,7 @@ fn stability_test_case_near_ideal() {
 
 #[test]
 fn stability_test_case_messy() {
-    holochain_trace::test_run();
+    init_tracing();
 
     let topo = Topology::standard_zero();
     let detail = true;
@@ -87,7 +88,7 @@ proptest::proptest! {
     #[ignore = "takes a very long time. run sparingly."]
     fn stability_test(num_peers in 100u32..300, min_coverage in 50.0f64..100.0, j in 0.0..1.0) {
         std::env::set_var("RUST_LOG", "debug");
-        holochain_trace::test_run();
+        init_tracing();
 
         let topo = Topology::unit_zero();
         let detail = false;

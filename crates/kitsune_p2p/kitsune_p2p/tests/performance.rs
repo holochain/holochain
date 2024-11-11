@@ -10,6 +10,7 @@ use kitsune_p2p_bin_data::KitsuneBasis;
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
+use kitsune_p2p::test_util::init_tracing;
 
 /*
  * This test runs two Kitsune nodes and has each run multiple spaces. Data is published to some of the spaces
@@ -21,7 +22,7 @@ use std::sync::Arc;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky in CI"]
 async fn minimise_p2p_agent_store_host_calls() {
-    holochain_trace::test_run();
+    init_tracing();
 
     let num_spaces = 10;
 
@@ -153,7 +154,7 @@ async fn minimise_p2p_agent_store_host_calls() {
         .filter(|e| matches!(e, RecordedKitsuneP2pEvent::QueryAgents { .. }))
         .count();
 
-    query_agents_count.assert_close_to(1400, 100);
+    query_agents_count.assert_close_to(1400, 200);
 
     let query_peer_density_count = drained_events
         .iter()

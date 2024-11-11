@@ -677,7 +677,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn remove_fetch_item() {
-        holochain_trace::test_run();
+        init_tracing();
 
         let cfg = Arc::new(TestFetchConfig(1, 10));
         let mut q: State = {
@@ -924,5 +924,12 @@ mod tests {
         assert_eq!(FLAG_1, merged & FLAG_1);
         assert_eq!(FLAG_2, merged & FLAG_2);
         assert_eq!(0, merged ^ (FLAG_1 | FLAG_2)); // Clear FLAG_1 and FLAG_2 to check no other bits are set
+    }
+
+    fn init_tracing() {
+        tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
+            .try_init()
+            .ok();
     }
 }

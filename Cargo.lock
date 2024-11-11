@@ -4346,7 +4346,6 @@ dependencies = [
  "futures",
  "ghost_actor",
  "governor",
- "holochain_trace",
  "itertools 0.12.1",
  "kitsune_p2p",
  "kitsune_p2p_bin_data",
@@ -4461,7 +4460,6 @@ dependencies = [
  "derive_more",
  "futures",
  "holochain_serialized_bytes",
- "holochain_trace",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
  "kitsune_p2p_timestamp",
@@ -4477,6 +4475,7 @@ dependencies = [
  "test-case",
  "thiserror",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -4486,7 +4485,6 @@ dependencies = [
  "arbitrary",
  "derive_more",
  "gcollections",
- "holochain_trace",
  "intervallum",
  "kitsune_p2p_timestamp",
  "maplit",
@@ -4509,7 +4507,6 @@ dependencies = [
  "backon",
  "derive_more",
  "holochain_serialized_bytes",
- "holochain_trace",
  "human-repr",
  "indexmap 2.6.0",
  "kitsune_p2p_fetch",
@@ -4524,6 +4521,7 @@ dependencies = [
  "test-case",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -4566,7 +4564,6 @@ dependencies = [
  "fixt",
  "futures",
  "ghost_actor",
- "holochain_trace",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
@@ -4587,6 +4584,7 @@ dependencies = [
  "sysinfo",
  "thiserror",
  "tokio",
+ "tracing",
  "tracing-subscriber",
  "url",
  "url2",

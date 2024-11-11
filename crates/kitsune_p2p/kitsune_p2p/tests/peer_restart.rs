@@ -9,6 +9,7 @@ use common::*;
 use fixt::prelude::*;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::fixt::KitsuneSpaceFixturator;
+use kitsune_p2p::test_util::init_tracing;
 
 // When Kitsune restarts, it will create a new connection to the signal server. That means a new
 // peer URL will be distributed with the agent info. The connection via the old peer URL should be
@@ -16,7 +17,7 @@ use kitsune_p2p::fixt::KitsuneSpaceFixturator;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "flaky on CI"]
 async fn connection_close_on_peer_restart() {
-    holochain_trace::test_run();
+    init_tracing();
 
     let (bootstrap_addr, _bootstrap_handle) = start_bootstrap().await;
     let (signal_url, _signal_srv_handle) = start_signal_srv().await;

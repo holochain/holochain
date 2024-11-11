@@ -95,7 +95,6 @@ use fmt::*;
 
 mod flames;
 mod fmt;
-pub mod metrics;
 mod writer;
 
 mod open;

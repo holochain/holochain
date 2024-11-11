@@ -197,11 +197,16 @@ impl From<Vec<u8>> for KitsuneOpData {
 
 impl std::fmt::Debug for KitsuneOpData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut data = hex::encode(&self.0[0..(self.0.len().min(32))]);
-        if self.0.len() > 32 {
-            data.push_str(".., bytes=");
+        let data = if self.0.len() > 32 {
+            let mut data = hex::encode(&self.0[0..8]);
+            data.push_str("..");
+            data.push_str(&hex::encode(&self.0[self.0.len() - 8..]));
+            data.push_str("; len=");
             data.push_str(&(self.0.len() / 8).to_string());
-        }
+            data
+        } else {
+            hex::encode(&self.0)
+        };
 
         f.write_fmt(format_args!("KitsuneOpData(0x{data})",))
     }

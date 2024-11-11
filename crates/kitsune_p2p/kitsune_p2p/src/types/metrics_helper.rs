@@ -24,7 +24,6 @@ pub fn is_enabled() -> bool {
 /// Create a metrics set.
 /// Takes the name of the metric set followed by
 /// a list of metric names.
-#[macro_export]
 macro_rules! metrics {
     ($name:ident, $($metric:ident),+) => {
         #[allow(missing_docs)]
@@ -47,7 +46,7 @@ macro_rules! metrics {
                 std::num::TryFromIntError: From<E>,
                 N: std::convert::TryInto<u64, Error = E>,
             {
-                $crate::metrics::__inner::count(&metrics_inner::METRICS[..], &metrics_inner::NAMES[..], metric as usize, n, "none")
+                $crate::types::metrics_helper::__inner::count(&metrics_inner::METRICS[..], &metrics_inner::NAMES[..], metric as usize, n, "none")
             }
             /// Add to this counter and emit tracing event
             /// with a field that can be used as a filter.
@@ -59,7 +58,7 @@ macro_rules! metrics {
                 std::num::TryFromIntError: From<E>,
                 N: std::convert::TryInto<u64, Error = E>,
             {
-                $crate::metrics::__inner::count(&metrics_inner::METRICS[..], &metrics_inner::NAMES[..], metric as usize, n, filter)
+                $crate::types::metrics_helper::__inner::count(&metrics_inner::METRICS[..], &metrics_inner::NAMES[..], metric as usize, n, filter)
             }
             /// Add to this counter without emit tracing event
             pub fn count_silent<N, E>(metric: Self, n: N) -> u64
@@ -68,24 +67,24 @@ macro_rules! metrics {
                 std::num::TryFromIntError: From<E>,
                 N: std::convert::TryInto<u64, Error = E>,
             {
-                $crate::metrics::__inner::count_silent(&metrics_inner::METRICS[..], metric as usize, n)
+                $crate::types::metrics_helper::__inner::count_silent(&metrics_inner::METRICS[..], metric as usize, n)
             }
             /// Get the current value of this metric
             pub fn get(metric: Self) -> u64 {
-                $crate::metrics::__inner::get(&metrics_inner::METRICS[..], metric as usize)
+                $crate::types::metrics_helper::__inner::get(&metrics_inner::METRICS[..], metric as usize)
             }
             /// Get an iterator over all metrics
             pub fn iter() -> impl Iterator<Item = (Self, u64)> {
-                $crate::metrics::__inner::iter(&metrics_inner::METRICS[..], &metrics_inner::NAMES[..])
+                $crate::types::metrics_helper::__inner::iter(&metrics_inner::METRICS[..], &metrics_inner::NAMES[..])
                     .map(|(n, i)|(n.into(), i))
             }
             /// Emit tracing events for every metric
             pub fn print() {
-                $crate::metrics::__inner::print(&metrics_inner::METRICS[..], &metrics_inner::NAMES[..])
+                $crate::types::metrics_helper::__inner::print(&metrics_inner::METRICS[..], &metrics_inner::NAMES[..])
             }
             /// Save all metrics to csv
             pub fn save_csv(path: &std::path::Path) {
-                $crate::metrics::__inner::save_csv(&metrics_inner::METRICS[..], &metrics_inner::NAMES[..], path)
+                $crate::types::metrics_helper::__inner::save_csv(&metrics_inner::METRICS[..], &metrics_inner::NAMES[..], path)
             }
         }
 
@@ -101,6 +100,9 @@ macro_rules! metrics {
 
     };
 }
+
+pub(crate) use metrics;
+
 #[macro_export]
 #[allow(missing_docs)]
 #[doc(hidden)]

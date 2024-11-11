@@ -37,6 +37,7 @@ use crate::event::GetAgentInfoSignedEvt;
 use crate::event::*;
 
 use crate::spawn::Internal;
+use crate::test_util::init_tracing;
 
 macro_rules! write_test_struct {
     ($(
@@ -637,7 +638,7 @@ async fn basic_notify() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn basic_broadcast() {
-    holochain_trace::test_run();
+    init_tracing();
 
     let recv_done = Arc::new(atomic::AtomicUsize::new(0));
 

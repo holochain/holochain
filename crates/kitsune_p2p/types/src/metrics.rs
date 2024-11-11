@@ -1,13 +1,13 @@
 //! Utilities for helping with metric tracking.
 
 use crate::tracing;
-use holochain_trace::tracing::Instrument;
 use kitsune_p2p_bin_data::KitsuneAgent;
 use kitsune_p2p_timestamp::Timestamp;
 use std::sync::{
     atomic::{AtomicU64, AtomicUsize, Ordering},
     Arc, Once,
 };
+use tracing::Instrument;
 
 static SYS_INFO: Once = Once::new();
 
@@ -455,10 +455,18 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_sys_info() {
-        holochain_trace::test_run();
+        init_tracing();
+
         init_sys_info_poll();
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         let sys_info = get_sys_info();
         ghost_actor::dependencies::tracing::info!(?sys_info);
+    }
+
+    fn init_tracing() {
+        tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::filter::EnvFilter::from_default_env())
+            .try_init()
+            .ok();
     }
 }

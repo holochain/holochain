@@ -38,7 +38,7 @@ fn debug_format_op_data_long() {
     let op_data = KitsuneOpData::new(input_bytes.clone());
 
     assert_eq!(
-        "KitsuneOpData(0x0505050505050505050505050505050505050505050505050505050505050505.., bytes=16)",
+        "KitsuneOpData(0x0505050505050505..0505050505050505; len=16)",
         format!("{:?}", op_data)
     );
 }
