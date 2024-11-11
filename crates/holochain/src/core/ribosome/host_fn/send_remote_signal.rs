@@ -2,6 +2,7 @@ use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
+use holo_hash::blake2b_256;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_nonce::fresh_nonce;
 use holochain_types::access::Permission;
@@ -74,12 +75,11 @@ pub fn send_remote_signal(
                                 return;
                             }
                         };
+                        // Signature is generated for the hash of the serialized bytes.
+                        let bytes_hash = blake2b_256(&zome_call_param_bytes);
 
                         match from_agent
-                            .sign_raw(
-                                call_context.host_context.keystore(),
-                                zome_call_param_bytes.clone(),
-                            )
+                            .sign_raw(call_context.host_context.keystore(), bytes_hash.into())
                             .await
                         {
                             Ok(signature) => to_agent_list.push((

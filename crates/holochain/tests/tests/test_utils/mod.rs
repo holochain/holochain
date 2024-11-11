@@ -209,8 +209,8 @@ where
     };
     let bytes = zome_call_params.serialize().unwrap();
     // Signature is generated for the hash of the serialized bytes.
-    let hashed_bytes = blake2b_256(&bytes);
-    let signature = signing_keypair.sign(&hashed_bytes);
+    let bytes_hash = blake2b_256(&bytes);
+    let signature = signing_keypair.sign(&bytes_hash);
     let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(
         bytes,
         Signature::from(signature.to_bytes()),

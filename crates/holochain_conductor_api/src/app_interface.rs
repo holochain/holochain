@@ -29,10 +29,11 @@ pub enum AppRequest {
     /// Call a zome function.
     ///
     /// The payload to this call is composed of the serialized [`ZomeCallParams`] as bytes
-    /// and the signature of the bytes, signed by the provenance.
+    /// and the provenance's signature.
     ///
-    /// Serialization must be performed with MessagePack. The resulting bytes are signed with the
-    /// provenance's private ed25519 key.
+    /// Serialization must be performed with MessagePack. The resulting bytes are hashed using the
+    /// Blake2b 256-bit algorithm, and the hash is signed with the provenance's private ed25519 key.
+    /// The hash is not included in the call's payload.
     ///
     /// # Returns
     ///

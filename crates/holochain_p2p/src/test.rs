@@ -331,8 +331,8 @@ mod tests {
         .serialize()
         .unwrap();
         // Signature is generated for the hash of the serialized bytes.
-        let hashed_bytes = blake2b_256(&bytes);
-        let signature = a1.sign_raw(&keystore, hashed_bytes.into()).await.unwrap();
+        let bytes_hash = blake2b_256(&bytes);
+        let signature = a1.sign_raw(&keystore, bytes_hash.into()).await.unwrap();
 
         let res = p2p
             .call_remote(
