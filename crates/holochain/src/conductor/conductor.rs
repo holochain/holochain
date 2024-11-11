@@ -263,7 +263,7 @@ pub struct Conductor {
 
     /// File system and in-memory cache for wasmer modules.
     // Used in ribosomes but kept here as a single instance.
-    pub(crate) wasmer_module_cache: Arc<ModuleCacheLock>,
+    pub(crate) wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
 
     app_auth_token_store: RwShare<AppAuthTokenStore>,
 
@@ -325,9 +325,12 @@ mod startup_shutdown_impls {
                 holochain_p2p,
                 post_commit,
                 running_services: RwShare::new(ConductorServices::default()),
-                wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
+                #[cfg(feature = "wasmer_sys")]
+                wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(
                     maybe_data_root_path.map(|p| p.join(WASM_CACHE)),
-                ))),
+                )))),
+                #[cfg(feature = "wasmer_wamr")]
+                wasmer_module_cache: None,
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
             }
@@ -689,8 +692,14 @@ mod dna_impls {
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
+
+                #[cfg(feature = "wasmer_sys")]
                 let ribosome =
                     RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
+                #[cfg(feature = "wasmer_wamr")]
+                let ribosome =
+                    RealRibosome::new(dna_file, None).await?;
+
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
             let dnas = futures::future::try_join_all(wasms).await?;

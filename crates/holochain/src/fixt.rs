@@ -59,10 +59,17 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
         let (dna_file, _, _) = tokio_helper::block_forever_on(async move {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
         });
-
+        
+        #[cfg(feature = "wasmer_sys")]
         let ribosome = tokio_helper::block_forever_on(RealRibosome::new(
             dna_file,
-            Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
+            Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
+        ))
+        .unwrap();
+        #[cfg(feature = "wasmer_wamr")]
+        let ribosome = tokio_helper::block_forever_on(RealRibosome::new(
+            dna_file,
+            None,
         ))
         .unwrap();
 

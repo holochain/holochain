@@ -83,6 +83,7 @@ use holochain_util::timed;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
+use holochain_wasmer_host::module::build_module as build_wasmer_module;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use tokio_stream::StreamExt;
 use wasmer::AsStoreMut;
@@ -158,7 +159,7 @@ pub struct RealRibosome {
     pub usage_meter: Arc<Counter<u64>>,
 
     /// File system and in-memory cache for wasm modules.
-    pub wasmer_module_cache: Arc<ModuleCacheLock>,
+    pub wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
 
     #[cfg(test)]
     /// Wasm cache for Deepkey wasm in a temporary directory to be shared across all tests.
@@ -263,7 +264,7 @@ impl RealRibosome {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn new(
         dna_file: DnaFile,
-        wasmer_module_cache: Arc<ModuleCacheLock>,
+        wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
     ) -> RibosomeResult<Self> {
         let mut _shared_test_module_cache: Option<PathBuf> = None;
         #[cfg(test)]
@@ -377,7 +378,7 @@ impl RealRibosome {
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
-            wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
+            wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
             #[cfg(test)]
             shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
@@ -385,19 +386,24 @@ impl RealRibosome {
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn build_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
-        let cache_key = self.get_module_cache_key(zome_name)?;
-        // When running tests, use cache folder accessible to all tests.
-        #[cfg(test)]
-        let cache_lock = self.shared_test_module_cache.clone();
-        #[cfg(not(test))]
-        let cache_lock = self.wasmer_module_cache.clone();
-
         let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        tokio::task::spawn_blocking(move || {
-            let cache = timed!([1, 10, 1000], cache_lock.write());
-            Ok(timed!([1, 1000, 10_000], cache.get(cache_key, &wasm))?)
-        })
-        .await?
+
+        if self.wasmer_module_cache.is_some() {
+            let cache_key = self.get_module_cache_key(zome_name)?;
+            // When running tests, use cache folder accessible to all tests.
+            #[cfg(test)]
+            let cache_lock = self.shared_test_module_cache.clone();
+            #[cfg(not(test))]
+            let cache_lock = self.wasmer_module_cache.clone().unwrap();
+
+            return tokio::task::spawn_blocking(move || {
+                let cache = timed!([1, 10, 1000], cache_lock.write());
+                Ok(timed!([1, 1000, 10_000], cache.get(cache_key, &wasm))?)
+            })
+            .await?;
+        } else {
+            return Ok(build_wasmer_module(&wasm)?)
+        }
     }
 
     // Create a key for module cache.
@@ -508,7 +514,7 @@ impl RealRibosome {
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
         let empty_ribosome = RealRibosome::new(
             empty_dna_file,
-            Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
+            Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
         )
         .await?;
         let context_key = RealRibosome::next_context_key();
