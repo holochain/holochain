@@ -26,10 +26,10 @@ tokio = { version = "1", features = ["full"] }
 warp = "0.3"
 
 [dev-dependencies]
-kitsune_p2p_bootstrap = { path = ".", features = ["test_utils"] }
+kitsune_p2p_bootstrap = { path = "", features = ["test_utils"] }
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 kitsune_p2p = { path = "../kitsune_p2p", features = ["sqlite", "test_utils"] }
-fixt = { path = "../../fixt", version = "^0.5.0-dev.0" }
+fixt = { path = "../../../fixt", version = "^0.5.0-dev.0" }
 criterion = "0.5.1"
 reqwest = { version = "0.12", features = ["native-tls-vendored"] }
 

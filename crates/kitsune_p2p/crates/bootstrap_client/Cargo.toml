@@ -24,11 +24,11 @@ url2 = "0.0.6"
 
 [dev-dependencies]
 arbitrary = { version = "1.0", features = ["derive"] }
-kitsune_p2p_bootstrap_client = { path = ".", features = ["test_utils"] }
+kitsune_p2p_bootstrap_client = { path = "", features = ["test_utils"] }
 kitsune_p2p_types = { version = "^0.5.0-dev.4", path = "../types", features = [
   "test_utils",
 ] }
-fixt = { version = "^0.5.0-dev.0", path = "../../fixt" }
+fixt = { version = "^0.5.0-dev.0", path = "../../../fixt" }
 tokio = "1"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 rand = "0.8.5"

@@ -45,7 +45,7 @@ holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.0-dev
   "full",
 ] }
 itertools = { version = "0.12" }
-kitsune_p2p_dht = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/dht" }
+kitsune_p2p_dht = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/crates/dht" }
 mr_bundle = { path = "../mr_bundle", features = [
   "packing",
 ], version = "^0.5.0-dev.0" }

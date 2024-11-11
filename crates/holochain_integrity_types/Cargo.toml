@@ -22,7 +22,7 @@ serde_bytes = "0.11"
 
 # Just the bare minimum timestamp with no extra features.
 # TODO: This needs to point to a published version of this crate and be pinned.
-kitsune_p2p_timestamp = { version = "^0.5.0-dev.0", path = "../kitsune_p2p/timestamp", default-features = false }
+kitsune_p2p_timestamp = { version = "^0.5.0-dev.0", path = "../kitsune_p2p/crates/timestamp", default-features = false }
 
 # TODO: Figure out how to remove these dependencies.
 subtle = "2"

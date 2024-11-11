@@ -11,9 +11,9 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-kitsune_p2p_dht = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/dht", optional = true }
-kitsune_p2p_timestamp = { version = "^0.5.0-dev.0", path = "../kitsune_p2p/timestamp" }
-kitsune_p2p_block = { version = "^0.5.0-dev.2", path = "../kitsune_p2p/block" }
+kitsune_p2p_dht = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/crates/dht", optional = true }
+kitsune_p2p_timestamp = { version = "^0.5.0-dev.0", path = "../kitsune_p2p/crates/timestamp" }
+kitsune_p2p_block = { version = "^0.5.0-dev.2", path = "../kitsune_p2p/crates/block" }
 holo_hash = { version = "^0.5.0-dev.2", path = "../holo_hash", features = [
   "encoding",
 ] }

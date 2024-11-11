@@ -25,7 +25,7 @@ holochain_trace = { version = "^0.5.0-dev.1", path = "../holochain_trace" }
 holochain_util = { version = "^0.5.0-dev.0", path = "../holochain_util" }
 holochain_zome_types = { version = "^0.5.0-dev.4", path = "../holochain_zome_types" }
 holochain_nonce = { version = "^0.5.0-dev.0", path = "../holochain_nonce" }
-kitsune_p2p = { version = "^0.5.0-dev.4", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p = { version = "^0.5.0-dev.4", path = "../kitsune_p2p/crates/kitsune_p2p" }
 tokio = { version = "1.36.0", features = ["full"] }
 thiserror = "1.0"
 tracing = "0.1"

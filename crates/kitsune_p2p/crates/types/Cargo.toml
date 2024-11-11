@@ -37,7 +37,7 @@ url = "2"
 url2 = "0.0.6"
 tracing = "0.1"
 
-fixt = { version = "^0.5.0-dev.0", path = "../../fixt", optional = true }
+fixt = { version = "^0.5.0-dev.0", path = "../../../fixt", optional = true }
 
 # arbitrary
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
@@ -47,7 +47,7 @@ proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 
 [dev-dependencies]
-kitsune_p2p_types = { path = ".", features = ["test_utils", "sqlite"] }
+kitsune_p2p_types = { path = "", features = ["test_utils", "sqlite"] }
 criterion = "0.5.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
