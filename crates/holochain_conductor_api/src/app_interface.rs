@@ -292,8 +292,13 @@ impl ZomeCallParamsSigned {
         keystore: &MetaLairClient,
         params: ZomeCallParams,
     ) -> LairResult<Self> {
-        let bytes = params.data_to_sign().map_err(|e| e.to_string())?;
-        let signature = params.provenance.sign_raw(keystore, bytes.clone()).await?;
+        let bytes = params.serialize().map_err(|e| e.to_string())?;
+        // Signature is generated for the hash of the serialized zome call params.
+        let bytes_hash = blake2b_256(&bytes);
+        let signature = params
+            .provenance
+            .sign_raw(keystore, bytes_hash.into())
+            .await?;
         Ok(Self::new(bytes, signature))
     }
 }

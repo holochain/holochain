@@ -371,13 +371,12 @@ pub trait Invocation: Clone + Send + Sync {
 
 impl ZomeCallInvocation {
     pub async fn verify_signature(&self) -> RibosomeResult<ZomeCallAuthorization> {
+        // Signature is verified against the hash of the signed zome call parameter bytes.
+        let bytes_hash = blake2b_256(self.signed_params.bytes.as_bytes());
         Ok(
             if self
                 .provenance
-                .verify_signature_raw(
-                    &self.signed_params.signature,
-                    self.signed_params.bytes.as_bytes().into(),
-                )
+                .verify_signature_raw(&self.signed_params.signature, bytes_hash.into())
                 .await?
             {
                 ZomeCallAuthorization::Authorized
@@ -823,7 +822,7 @@ pub mod wasm_test {
         bob_signed_zome_call.signed.signature = bob_pubkey
             .sign_raw(
                 &conductor.keystore(),
-                alice_unsigned_zome_call.data_to_sign().unwrap(),
+                alice_unsigned_zome_call.serialize().unwrap(),
             )
             .await
             .unwrap();

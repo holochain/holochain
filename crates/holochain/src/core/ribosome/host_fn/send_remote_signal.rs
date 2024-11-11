@@ -54,7 +54,7 @@ pub fn send_remote_signal(
                     };
 
                     for agent in agents {
-                        let zome_call_unsigned = ZomeCallParams {
+                        let zome_call_params = ZomeCallParams {
                             provenance: from_agent.clone(),
                             cell_id: CellId::new(network.dna_hash(), agent.clone()),
                             zome_name: zome_name.clone(),
@@ -64,8 +64,8 @@ pub fn send_remote_signal(
                             nonce,
                             expires_at,
                         };
-                        let zome_call_payload = match zome_call_unsigned.data_to_sign() {
-                            Ok(to_sign) => to_sign,
+                        let zome_call_param_bytes = match zome_call_params.serialize() {
+                            Ok(bytes) => bytes,
                             Err(e) => {
                                 tracing::info!(
                                     "Failed to serialize zome call for signal because of {:?}",
@@ -78,13 +78,13 @@ pub fn send_remote_signal(
                         match from_agent
                             .sign_raw(
                                 call_context.host_context.keystore(),
-                                zome_call_payload.clone(),
+                                zome_call_param_bytes.clone(),
                             )
                             .await
                         {
                             Ok(signature) => to_agent_list.push((
                                 agent,
-                                ExternIO(zome_call_payload.to_vec()),
+                                ExternIO(zome_call_param_bytes.to_vec()),
                                 signature,
                             )),
                             Err(e) => {

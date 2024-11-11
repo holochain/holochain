@@ -318,7 +318,7 @@ mod tests {
         let payload = ExternIO::encode(b"yippo").unwrap();
         let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
 
-        let zome_call_payload = ZomeCallParams {
+        let bytes = ZomeCallParams {
             provenance: a1.clone(),
             cell_id: CellId::new(dna.clone(), a2.clone()),
             zome_name: zome_name.clone(),
@@ -328,18 +328,17 @@ mod tests {
             nonce,
             expires_at,
         }
-        .data_to_sign()
+        .serialize()
         .unwrap();
-        let signature = a1
-            .sign_raw(&keystore, zome_call_payload.clone())
-            .await
-            .unwrap();
+        // Signature is generated for the hash of the serialized bytes.
+        let hashed_bytes = blake2b_256(&bytes);
+        let signature = a1.sign_raw(&keystore, hashed_bytes.into()).await.unwrap();
 
         let res = p2p
             .call_remote(
                 dna,
                 a1,
-                ExternIO(zome_call_payload.to_vec()),
+                ExternIO(bytes.to_vec()),
                 signature,
                 a2,
                 zome_name,

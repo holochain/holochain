@@ -197,7 +197,7 @@ where
 {
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
-    let zome_call_unsigned = ZomeCallParams {
+    let zome_call_params = ZomeCallParams {
         cap_secret: Some(cap_secret),
         cell_id: cell_id.clone(),
         zome_name: zome_name.clone(),
@@ -207,8 +207,10 @@ where
         nonce,
         expires_at,
     };
-    let bytes = zome_call_unsigned.data_to_sign().unwrap();
-    let signature = signing_keypair.sign(&bytes);
+    let bytes = zome_call_params.serialize().unwrap();
+    // Signature is generated for the hash of the serialized bytes.
+    let hashed_bytes = blake2b_256(&bytes);
+    let signature = signing_keypair.sign(&hashed_bytes);
     let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(
         bytes,
         Signature::from(signature.to_bytes()),
