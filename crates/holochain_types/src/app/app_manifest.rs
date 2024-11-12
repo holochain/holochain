@@ -51,7 +51,7 @@ pub use error::*;
 
 use self::app_manifest_validated::AppManifestValidated;
 
-use super::InstalledCell;
+use super::{InstalledCell, ModifiersMap};
 
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
@@ -104,6 +104,15 @@ impl AppManifest {
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         match self {
             Self::V1(manifest) => manifest.set_network_seed(network_seed),
+        }
+    }
+
+    /// Selectively override the modifiers for the specified roles. Only modifier fields with
+    /// `Some(T)` will override existing values. If `None` is provided for a modifier field
+    /// the corresponding value in the manifest will remain untouched.
+    pub fn override_modifiers(&mut self, modifiers: ModifiersMap) -> AppManifestResult<()> {
+        match self {
+            Self::V1(manifest) => manifest.override_modifiers(modifiers),
         }
     }
 
