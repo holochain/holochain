@@ -1672,30 +1672,33 @@ mod app_impls {
                 source,
                 agent_key,
                 installed_app_id,
-                membrane_proofs,
-                existing_cells,
                 network_seed,
+                roles_settings,
                 ignore_genesis_failure,
                 allow_throwaway_random_agent_key,
             } = payload;
 
+            let modifiers = get_modifiers_map_from_role_settings(&roles_settings);
+            let membrane_proofs = get_memproof_map_from_role_settings(&roles_settings);
+            let existing_cells = get_existing_cells_map_from_role_settings(&roles_settings);
+
             let bundle = {
                 let original_bundle = source.resolve().await?;
+                let mut manifest = original_bundle.manifest().to_owned();
                 if let Some(network_seed) = network_seed {
-                    let mut manifest = original_bundle.manifest().to_owned();
                     manifest.set_network_seed(network_seed);
-                    AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
-                } else {
-                    original_bundle
                 }
+                manifest.override_modifiers(modifiers)?;
+                AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
             };
+
             let manifest = bundle.manifest().clone();
 
-            // Use deferred memproofs only if no memproofs are provided.
-            // If a memproof map is provided, it will override the allow_deferred_memproofs setting,
-            // and the provided memproofs will be used immediately.
+            // Use deferred memproofs only if no memproofs are provided for any of the roles.
+            // If a memproof is provided for any of the roles, it will override the app wide
+            // allow_deferred_memproofs setting and the provided memproofs will be used immediately.
             let defer_memproofs = match &manifest {
-                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_none(),
+                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_empty(),
             };
 
             let flags = InstallAppCommonFlags {
@@ -1703,8 +1706,6 @@ mod app_impls {
                 ignore_genesis_failure,
                 allow_throwaway_random_agent_key,
             };
-
-            let membrane_proofs = membrane_proofs.unwrap_or_default();
 
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
@@ -2689,11 +2690,11 @@ mod service_impls {
                 self.keystore().new_sign_keypair_random().await?
             } else {
                 return Err(ConductorError::other(
-"DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config. 
+"DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config.
 If using DPKI, a device seed must be created in lair, and the tag specified in the conductor config.
 
 (If this is a throwaway test environment, you can also set the config `dpki.allow_throwaway_random_dpki_agent_key`
-to `true` instead of instead of setting up a `device_seed_lair_tag`, but then you will lose the ability to recover 
+to `true` instead of instead of setting up a `device_seed_lair_tag`, but then you will lose the ability to recover
 your agent keys if you lose access to your device. This is not recommended!!)
 "));
             };
@@ -4131,4 +4132,52 @@ async fn p2p_event_task(
         .await;
 
     tracing::info!("p2p_event_task has ended");
+}
+
+/// Extract the modifiers from the RoleSettingsMap into their own HashMap
+fn get_modifiers_map_from_role_settings(roles_settings: &Option<RoleSettingsMap>) -> ModifiersMap {
+    match roles_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .filter_map(|(role_name, role_settings)| match role_settings {
+                RoleSettings::UseExisting(_) => None,
+                RoleSettings::Provisioned { modifiers, .. } => {
+                    modifiers.as_ref().map(|m| (role_name.clone(), m.clone()))
+                }
+            })
+            .collect(),
+        None => HashMap::new(),
+    }
+}
+
+/// Extract the memproofs from the RoleSettingsMap into their own HashMap
+fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) -> MemproofMap {
+    match role_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .filter_map(|(role_name, role_settings)| match role_settings {
+                RoleSettings::UseExisting(_) => None,
+                RoleSettings::Provisioned { membrane_proof, .. } => membrane_proof
+                    .as_ref()
+                    .map(|m| (role_name.clone(), m.clone())),
+            })
+            .collect(),
+        None => HashMap::new(),
+    }
+}
+
+/// Extract the existing cells ids from the RoleSettingsMap into their own HashMap
+fn get_existing_cells_map_from_role_settings(
+    roles_settings: &Option<RoleSettingsMap>,
+) -> ExistingCellsMap {
+    match roles_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .filter_map(|(role_name, role_settings)| match role_settings {
+                RoleSettings::UseExisting(cell_id) => Some((role_name.clone(), cell_id.clone())),
+                _ => None,
+            })
+            .collect(),
+        None => HashMap::new(),
+    }
 }
