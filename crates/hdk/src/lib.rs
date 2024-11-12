@@ -361,6 +361,7 @@ pub mod capability;
 /// cons. There are also cryptographic methods of countersigning such as
 /// threshold signatures that produce a single proof between multiple
 /// participants, which are NOT included in this crate.
+#[cfg(feature = "unstable-countersigning")]
 pub mod countersigning;
 
 /// Working with app and system entries.

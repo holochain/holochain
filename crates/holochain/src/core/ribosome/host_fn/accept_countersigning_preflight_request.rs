@@ -60,7 +60,7 @@ pub fn accept_countersigning_preflight_request<'a>(
 }
 
 #[cfg(test)]
-#[cfg(feature = "slow_tests")]
+#[cfg(all(feature = "slow_tests", feature = "unstable-countersigning"))]
 pub mod wasm_test {
     use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::api::ZomeCall;
@@ -110,7 +110,6 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "slow_tests")]
     #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn unlock_timeout_session() {
         holochain_trace::test_run();
@@ -351,7 +350,6 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "slow_tests")]
     #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_invalid_session() {
         use holochain_nonce::fresh_nonce;
@@ -473,7 +471,6 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "slow_tests")]
     #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     #[cfg_attr(target_os = "windows", ignore = "stack overflow on windows")]
     async fn lock_chain() {
@@ -787,7 +784,6 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "slow_tests")]
     #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
     async fn lock_chain_failure() {
         use holochain_nonce::fresh_nonce;
@@ -1098,7 +1094,6 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "slow_tests")]
     #[ignore = "flaky"]
     /// TODO: this test and the following one (`enzymatic_session_success_forced_init`) form a pair.
     /// The latter includes a "fix" to the test to remove the flakiness, but the flakiness itself is a problem
@@ -1269,7 +1264,6 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg(feature = "slow_tests")]
     #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
     async fn enzymatic_session_failure() {
         holochain_trace::test_run();
