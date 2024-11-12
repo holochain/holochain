@@ -57,7 +57,7 @@ impl ProxyUrl {
                 Some(s) => s,
             },
         };
-        let mut base = url2::url2!("{}://", base_scheme);
+        let mut base = url2::try_url2!("{}://", base_scheme).map_err(KitsuneError::other)?;
         {
             let mut path = full.path_segments().ok_or_else(|| err!("read base"))?;
             path.next();
@@ -103,7 +103,7 @@ impl ProxyUrl {
     pub fn new(base: &str, cert_digest: CertDigest) -> KitsuneResult<Self> {
         let base = url2::try_url2!("{}", base).map_err(KitsuneError::other)?;
         let tls = base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(&cert_digest[..]);
-        let mut full = url2::url2!("kitsune-proxy://{}", tls);
+        let mut full = url2::try_url2!("kitsune-proxy://{}", tls).map_err(KitsuneError::other)?;
         {
             let mut path = full
                 .path_segments_mut()
