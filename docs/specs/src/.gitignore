@@ -1,0 +1,16 @@
+!*.svg
+media/*
+*.fdb_latexmk
+*.synctex.gz
+*.pdf
+*.fls
+*.tex
+*.aux
+*.docx
+*.bib
+*.bbl
+*.blg
+*.out
+hwp.*
+holochain-white-paper*
+!holochain-white-paper-alpha.tex
