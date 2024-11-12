@@ -14,7 +14,7 @@ use futures::future::join_all;
 mod tests;
 
 /// A bundle of an AppManifest and collection of DNAs
-#[derive(Debug, Serialize, Deserialize, derive_more::From, shrinkwraprs::Shrinkwrap)]
+#[derive(Debug, Serialize, Deserialize, Clone, derive_more::From, shrinkwraprs::Shrinkwrap)]
 pub struct AppBundle(mr_bundle::Bundle<AppManifest>);
 
 impl AppBundle {
