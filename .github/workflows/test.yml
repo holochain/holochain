@@ -26,6 +26,10 @@ jobs:
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: taplo-cli@0.9
+
       - name: static-fmt
         run: make static-fmt
 
@@ -40,6 +44,10 @@ jobs:
 
       - name: static-doc
         run: make static-doc
+
+      - name: Kitsune check
+        working-directory: ./crates/kitsune_p2p
+        run: make check
 
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
@@ -127,11 +135,7 @@ jobs:
 
     - uses: taiki-e/install-action@v2
       with:
-        tool: nextest@0.9,taplo-cli@0.9
-
-    - name: Static
-      working-directory: ./crates/kitsune_p2p
-      run: make check
+        tool: nextest@0.9
 
     - name: Build the workspace
       working-directory: ./crates/kitsune_p2p
@@ -144,6 +148,9 @@ jobs:
     - name: Test
       working-directory: ./crates/kitsune_p2p
       run: make test
+
+    - name: "Common Test Teardown Actions"
+      uses: ./.github/actions/common-post
 
   ci-pass:
     if: ${{ always() }}
