@@ -659,6 +659,7 @@ mod tests {
     use crate::spawn::actor::Internal;
     use crate::spawn::meta_net::{MetaNetCon, MetaNetConTest, MetaNetEvt};
     use crate::test_util::data::mk_agent_info;
+    use crate::test_util::init_tracing;
     use crate::types::wire;
     use crate::wire::PushOpItem;
     use crate::{
@@ -680,7 +681,6 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
-    use crate::test_util::init_tracing;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handle_connect() {

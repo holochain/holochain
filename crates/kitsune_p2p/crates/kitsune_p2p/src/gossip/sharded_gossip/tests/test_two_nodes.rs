@@ -1,9 +1,9 @@
 use super::common::*;
 use super::*;
+use crate::test_util::init_tracing;
 use crate::NOISE;
 use arbitrary::Arbitrary;
 use itertools::Itertools;
-use crate::test_util::init_tracing;
 
 #[tokio::test(flavor = "multi_thread")]
 /// Runs through a happy path gossip round between two agents.

@@ -263,7 +263,6 @@ pub struct NodeCert(std::sync::Arc<[u8; 32]>);
 
 impl std::fmt::Debug for NodeCert {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-
         f.debug_tuple("NodeCert")
             .field(&format_args!("0x{}", hex::encode(self.0.as_slice())))
             .finish()

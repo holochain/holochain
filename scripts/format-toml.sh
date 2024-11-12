@@ -1,5 +1,5 @@
 #!/usr/bin/env nix-shell
-#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-23.11.tar.gz -i bash --pure --packages taplo
+#! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-24.05.tar.gz -i bash --pure --packages taplo
 
 # Usage to format: ./scripts/format-toml.sh
 # Usage to check: ./scripts/format-toml.sh --check

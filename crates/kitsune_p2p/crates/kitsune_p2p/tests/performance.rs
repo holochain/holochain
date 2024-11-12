@@ -5,12 +5,12 @@ use fixt::prelude::*;
 use kitsune_p2p::actor::BroadcastData;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::fixt::KitsuneSpaceFixturator;
+use kitsune_p2p::test_util::init_tracing;
 use kitsune_p2p::KitsuneBinType;
 use kitsune_p2p_bin_data::KitsuneBasis;
 use kitsune_p2p_fetch::FetchContext;
 use kitsune_p2p_types::KitsuneTimeout;
 use std::sync::Arc;
-use kitsune_p2p::test_util::init_tracing;
 
 /*
  * This test runs two Kitsune nodes and has each run multiple spaces. Data is published to some of the spaces

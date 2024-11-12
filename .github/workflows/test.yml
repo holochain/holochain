@@ -107,6 +107,44 @@ jobs:
       - name: "Common Test Teardown Actions"
         uses: ./.github/actions/common-post
 
+  kitsune:
+    name: Test Kitsune
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: macos-13
+          - os: windows-latest
+    steps:
+    - name: checkout
+      uses: actions/checkout@v4
+
+    - name: "Common Test Setup Actions"
+      uses: ./.github/actions/common-pre
+
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: nextest@0.9,taplo-cli@0.9
+
+    - name: Static
+      working-directory: ./crates/kitsune_p2p
+      run: make check
+
+    - name: Build the workspace
+      working-directory: ./crates/kitsune_p2p
+      run: make build
+
+    - name: Build each crate
+      working-directory: ./crates/kitsune_p2p
+      run: make build-each
+
+    - name: Test
+      working-directory: ./crates/kitsune_p2p
+      run: make test
+
   ci-pass:
     if: ${{ always() }}
     name: "All Jobs Pass"

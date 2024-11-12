@@ -1,22 +1,19 @@
 [workspace]
 members = [
-    "crates/bin_data",
-    "crates/block",
-    "crates/bootstrap",
-    "crates/bootstrap_client",
-    "crates/dht",
-    "crates/dht_arc",
-    "crates/fetch",
-    "crates/kitsune_p2p",
-    "crates/mdns",
-    "crates/timestamp",
-    "crates/types",
+  "crates/bin_data",
+  "crates/block",
+  "crates/bootstrap",
+  "crates/bootstrap_client",
+  "crates/dht",
+  "crates/dht_arc",
+  "crates/fetch",
+  "crates/kitsune_p2p",
+  "crates/mdns",
+  "crates/timestamp",
+  "crates/types",
 ]
 
 resolver = "2"
-
-[workspace.dependencies]
-
 
 [workspace.lints.clippy]
 nursery = { level = "allow", priority = -1 }

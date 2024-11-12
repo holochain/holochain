@@ -82,7 +82,8 @@ pub async fn start_signal_srv() -> (std::net::SocketAddr, sbd_server::SbdServer)
 pub fn init_tracing() {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .try_init().ok();
+        .try_init()
+        .ok();
 }
 
 mod harness_event;

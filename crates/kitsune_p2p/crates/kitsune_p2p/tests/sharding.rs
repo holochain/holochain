@@ -7,6 +7,7 @@ use kitsune_p2p::actor::{BroadcastData, KitsuneP2p, KitsuneP2pSender};
 use kitsune_p2p::dht::arq::LocalStorageConfig;
 use kitsune_p2p::dht::prelude::SpaceDimension;
 use kitsune_p2p::dht_arc::DhtLocation;
+use kitsune_p2p::test_util::init_tracing;
 use kitsune_p2p_bin_data::fixt::KitsuneSpaceFixturator;
 use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneBasis, KitsuneBinType, KitsuneSpace};
 use kitsune_p2p_fetch::FetchContext;
@@ -17,7 +18,6 @@ use num_traits::AsPrimitive;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use kitsune_p2p::test_util::init_tracing;
 
 mod common;
 

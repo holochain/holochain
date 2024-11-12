@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use ghost_actor::dependencies::tracing;
 use crate::types::metrics_helper;
+use ghost_actor::dependencies::tracing;
 
 metrics_helper::metrics!(
     KitsuneMetrics,

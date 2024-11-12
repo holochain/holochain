@@ -243,9 +243,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-    use crate::test_util::init_tracing;
     use super::*;
+    use crate::test_util::init_tracing;
+    use std::time::Duration;
 
     #[tokio::test(flavor = "current_thread", start_paused = true)]
     async fn test_limiter() {
