@@ -149,9 +149,6 @@ jobs:
       working-directory: ./crates/kitsune_p2p
       run: make test
 
-    - name: "Common Test Teardown Actions"
-      uses: ./.github/actions/common-post
-
   ci-pass:
     if: ${{ always() }}
     name: "All Jobs Pass"
