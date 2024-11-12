@@ -37,7 +37,7 @@ pub trait HdkT: HdiT {
     fn get(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Record>>>;
     fn get_details(&self, get_input: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>>;
     // CounterSigning
-    #[cfg(feature = "unstable-functions")]
+    #[cfg(feature = "unstable-countersigning")]
     fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,
@@ -354,7 +354,7 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     // CounterSigning
-    #[cfg(feature = "unstable-functions")]
+    #[cfg(feature = "unstable-countersigning")]
     fn accept_countersigning_preflight_request(
         &self,
         _: PreflightRequest,
@@ -611,8 +611,8 @@ impl HdkT for HostHdk {
     fn get_details(&self, get_inputs: Vec<GetInput>) -> ExternResult<Vec<Option<Details>>> {
         host_call::<Vec<GetInput>, Vec<Option<Details>>>(__hc__get_details_1, get_inputs)
     }
+    #[cfg(feature = "unstable-countersigning")]
     // CounterSigning
-    #[cfg(feature = "unstable-functions")]
     fn accept_countersigning_preflight_request(
         &self,
         preflight_request: PreflightRequest,

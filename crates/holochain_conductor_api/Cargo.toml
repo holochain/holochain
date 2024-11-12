@@ -47,6 +47,7 @@ workspace = true
 chc = []
 unstable-dpki = []
 unstable-sharding = ["kitsune_p2p_types/unstable-sharding"]
+unstable-countersigning = []
 sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
   "holochain_types/sqlite-encrypted",

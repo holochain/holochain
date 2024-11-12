@@ -66,7 +66,7 @@ host_fn_api_impls! {
     // MAYBE: is there a way to unhygienically import this code in both places?
 
     // Attempt to accept a preflight request.
-    #[cfg(feature = "unstable-functions")]
+    #[cfg(feature = "unstable-countersigning")]
     fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
 
     // Info about the calling agent.
@@ -157,6 +157,7 @@ host_fn_api_impls! {
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
     // Query agent key lineage for the provided key.
+    #[cfg(feature = "unstable-functions")]
     fn get_agent_key_lineage (AgentPubKey) -> Vec<AgentPubKey>;
 
     fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
