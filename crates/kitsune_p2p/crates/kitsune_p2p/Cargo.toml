@@ -64,7 +64,7 @@ tracing-subscriber = { version = "0.3", features = [
 
 [dev-dependencies]
 # include self with test_utils feature, to allow integration tests to run properly
-kitsune_p2p = { path = "", features = ["test_utils", "fuzzing", "sqlite"] }
+kitsune_p2p = { path = ".", features = ["test_utils", "fuzzing", "sqlite"] }
 
 kitsune_p2p_fetch = { path = "../fetch", features = ["test_utils"] }
 kitsune_p2p_bootstrap = { path = "../bootstrap", features = ["sqlite"] }
