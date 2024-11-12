@@ -1,6 +1,3 @@
-// Countersigning HDK functions needed
-#![cfg(feature = "unstable-functions")]
-
 use hdk::prelude::{PreflightRequest, PreflightRequestAcceptance};
 use holo_hash::{ActionHash, EntryHash};
 use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};

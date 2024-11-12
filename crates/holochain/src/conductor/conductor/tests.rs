@@ -30,6 +30,7 @@ mod agent_key_revocation;
 // key belong to the same key lineage, they belong to the same agent.
 #[cfg(feature = "unstable-functions")]
 pub mod agent_lineage;
+#[cfg(feature = "unstable-dpki")]
 mod test_dpki;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -175,8 +176,8 @@ async fn can_set_fake_state() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "This kind of cell sharing is no longer possible. 
-            Keeping the test here to highlight the intention, 
+#[ignore = "This kind of cell sharing is no longer possible.
+            Keeping the test here to highlight the intention,
             though it will have to be removed or totally rewritten some day."]
 async fn test_list_running_apps_for_dependent_cell_id() {
     holochain_trace::test_run();
@@ -1216,8 +1217,7 @@ async fn test_deferred_memproof_provisioning() {
             source: AppBundleSource::Bundle(bundle),
             agent_key: None,
             installed_app_id: Some(app_id.clone()),
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
@@ -1345,8 +1345,7 @@ async fn test_deferred_memproof_provisioning_uninstall() {
             source: AppBundleSource::Bundle(bundle),
             agent_key: None,
             installed_app_id: Some(app_id.clone()),
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,

@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING** Countersigning has been put behind the feature `unstable-countersigning`. Even though in many use cases countersigning is expected to work correctly, it has known problems which can put the source chain into an unrecoverable state. Included in this feature is the HDK function `accept_countersigning_preflight_request` as well as `AppRequest`s related to countersigning and the counersigning workflow itself too. The `unstable-countersigning` feature is included in `unstable-functions`, hence when `unstable-functions` is enabled, so is `unstable-countersigning`. 
 - **BREAKING** The following HDK functions have been temporarily removed as "unstable". They can be re-enabled by building Holochain with the "unstable-functions" feature flag:
   - `accept_countersigning_preflight_request`
   - `block_agent`
