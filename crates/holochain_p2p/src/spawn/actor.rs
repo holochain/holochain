@@ -143,33 +143,19 @@ impl WrapEvtSender {
     fn call_remote(
         &self,
         dna_hash: DnaHash,
-        from: AgentPubKey,
-        zome_call_payload: ExternIO,
-        signature: Signature,
         to_agent: AgentPubKey,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
     ) -> impl Future<Output = HolochainP2pResult<SerializedBytes>> + 'static + Send {
-        let byte_count = payload.0.len();
+        let byte_count = zome_call_params_serialized.0.len();
         timing_trace!(
             true,
             {
                 self.0.call_remote(
-                    dna_hash,
-                    from,
-                    zome_call_payload,
-                    signature,
+                    dna_hash, // from,
                     to_agent,
-                    zome_name,
-                    fn_name,
-                    cap_secret,
-                    payload,
-                    nonce,
-                    expires_at,
+                    zome_call_params_serialized,
+                    signature,
                 )
             },
             byte_count,
@@ -451,32 +437,18 @@ impl HolochainP2pActor {
     fn handle_incoming_call_remote(
         &mut self,
         dna_hash: DnaHash,
-        from: AgentPubKey,
-        zome_call_payload: ExternIO,
-        signature: Signature,
         to_agent: AgentPubKey,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap_secret: Option<CapSecret>,
-        data: Vec<u8>,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
     ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             let res = evt_sender
                 .call_remote(
                     dna_hash,
-                    from,
-                    zome_call_payload,
-                    signature,
                     to_agent,
-                    zome_name,
-                    fn_name,
-                    cap_secret,
-                    ExternIO::from(data),
-                    nonce,
-                    expires_at,
+                    zome_call_params_serialized,
+                    signature,
                 )
                 .await;
             res.map_err(kitsune_p2p::KitsuneP2pError::from)
@@ -831,19 +803,11 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 
         match request {
             crate::wire::WireMessage::CallRemote {
-                zome_name,
-                fn_name,
-                cap_secret,
-                data,
-                from_agent,
-                zome_call_params_serialized: zome_call_payload,
-                signature,
                 to_agent,
-                nonce,
-                expires_at,
+                zome_call_params_serialized,
+                signature,
             } => self.handle_incoming_call_remote(
-                space, from_agent, zome_call_payload,signature, to_agent, zome_name, fn_name, cap_secret, data,
-                *nonce, expires_at,
+                space,to_agent,  zome_call_params_serialized,signature, 
             ),
             crate::wire::WireMessage::CallRemoteMulti {
                 zome_name,
@@ -860,8 +824,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                     .find(|( agent,_zome_call_payload, _signature)| agent == &to_agent)
                 {
                     Some((to_agent, zome_call_payload, signature)) => self.handle_incoming_call_remote(
-                        space, from_agent,zome_call_payload, signature, to_agent, zome_name, fn_name, cap_secret,
-                        data, *nonce, expires_at,
+                        space, to_agent,zome_call_payload, signature
                     ),
                     None => Err(HolochainP2pError::RoutingAgentError(to_agent).into()),
                 }
@@ -934,29 +897,15 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 .into())
             }
             crate::wire::WireMessage::CallRemote {
-                zome_name,
-                fn_name,
-                from_agent,
-                zome_call_params_serialized: zome_call_payload,
-                signature,
                 to_agent,
-                cap_secret,
-                data,
-                nonce,
-                expires_at,
+                zome_call_params_serialized,
+                signature,
             } => {
                 let fut = self.handle_incoming_call_remote(
                     space,
-                    from_agent,
-                    zome_call_payload,
-                    signature,
                     to_agent,
-                    zome_name,
-                    fn_name,
-                    cap_secret,
-                    data,
-                    *nonce,
-                    expires_at,
+                    zome_call_params_serialized,
+                    signature,
                 );
                 Ok(async move {
                     let _ = fut?.await?;
@@ -982,16 +931,9 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                     Some((to_agent, zome_call_payload, signature)) => {
                         let fut = self.handle_incoming_call_remote(
                             space,
-                            from_agent,
+                            to_agent,
                             zome_call_payload,
                             signature,
-                            to_agent,
-                            zome_name,
-                            fn_name,
-                            cap_secret,
-                            data,
-                            *nonce,
-                            expires_at,
                         );
                         Ok(async move {
                             let _ = fut?.await?;
@@ -1221,35 +1163,18 @@ impl HolochainP2pHandler for HolochainP2pActor {
     fn handle_call_remote(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
+        to_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
-        to_agent: AgentPubKey,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         let space = dna_hash.into_kitsune();
         let to_agent_kitsune = to_agent.clone().into_kitsune();
 
-        let byte_count = payload.0.len();
+        let byte_count = zome_call_params_serialized.0.len();
 
-        let req = crate::wire::WireMessage::call_remote(
-            zome_name,
-            fn_name,
-            from_agent,
-            zome_call_params_serialized,
-            signature,
-            to_agent,
-            cap_secret,
-            payload,
-            nonce,
-            expires_at,
-        )
-        .encode()?;
+        let req =
+            crate::wire::WireMessage::call_remote(to_agent, zome_call_params_serialized, signature)
+                .encode()?;
 
         let kitsune_p2p = self.kitsune_p2p.clone();
         timing_trace_out!(

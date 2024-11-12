@@ -62,7 +62,7 @@ pub fn call(
 
                         let result: Result<ZomeCallResponse, RuntimeError> = match target {
                             CallTarget::NetworkAgent(target_agent) => {
-                                let zome_call_unsigned = ZomeCallParams {
+                                let zome_call_params = ZomeCallParams {
                                     provenance: provenance.clone(),
                                     cell_id: CellId::new(
                                         ribosome.dna_def().as_hash().clone(),
@@ -77,7 +77,7 @@ pub fn call(
                                 };
                                 let zome_call_payload = ZomeCallParamsSigned::try_from_params(
                                     call_context.host_context.keystore(),
-                                    zome_call_unsigned.clone(),
+                                    zome_call_params.clone(),
                                 )
                                 .await
                                 .map_err(|e| -> RuntimeError {
@@ -87,16 +87,9 @@ pub fn call(
                                     .host_context()
                                     .network()
                                     .call_remote(
-                                        provenance.clone(),
+                                        target_agent,
                                         zome_call_payload.bytes,
                                         zome_call_payload.signature,
-                                        target_agent,
-                                        zome_call_unsigned.zome_name,
-                                        zome_call_unsigned.fn_name,
-                                        zome_call_unsigned.cap_secret,
-                                        zome_call_unsigned.payload,
-                                        zome_call_unsigned.nonce,
-                                        zome_call_unsigned.expires_at,
                                     )
                                     .await
                                 {
@@ -144,7 +137,7 @@ pub fn call(
                                 };
                                 match cell_id_result {
                                     Ok(cell_id) => {
-                                        let zome_call_unsigned = ZomeCallParams {
+                                        let zome_call_params = ZomeCallParams {
                                             cell_id,
                                             zome_name,
                                             fn_name,
@@ -156,7 +149,7 @@ pub fn call(
                                         };
                                         let call = ZomeCall::try_from_params(
                                             call_context.host_context.keystore(),
-                                            zome_call_unsigned,
+                                            zome_call_params,
                                         )
                                         .await
                                         .map_err(|e| -> RuntimeError {

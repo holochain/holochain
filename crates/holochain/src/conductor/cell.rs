@@ -402,29 +402,12 @@ impl Cell {
                 span_context: _,
                 zome_call_params_serialized,
                 signature,
-                from_agent,
-                zome_name,
-                fn_name,
-                cap_secret,
                 respond,
-                payload,
-                nonce,
-                expires_at,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(
-                            from_agent,
-                            zome_call_params_serialized,
-                            signature,
-                            zome_name,
-                            fn_name,
-                            cap_secret,
-                            payload,
-                            nonce,
-                            expires_at,
-                        )
+                        .handle_call_remote(zome_call_params_serialized, signature)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -881,26 +864,29 @@ impl Cell {
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
         &self,
-        from_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
-        from_signature: Signature,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
+        signature: Signature,
     ) -> CellResult<SerializedBytes> {
+        let ZomeCallParams {
+            cap_secret,
+            payload,
+            provenance,
+            zome_name,
+            fn_name,
+            nonce,
+            expires_at,
+            ..
+        } = zome_call_params_serialized.decode()?;
         let invocation = ZomeCall {
             signed: ZomeCallParamsSigned {
                 bytes: zome_call_params_serialized,
-                signature: from_signature,
+                signature,
             },
             params: ZomeCallParams {
                 cell_id: self.id.clone(),
                 cap_secret,
                 payload,
-                provenance: from_agent,
+                provenance,
                 zome_name,
                 fn_name,
                 nonce,

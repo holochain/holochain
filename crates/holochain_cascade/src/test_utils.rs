@@ -259,16 +259,9 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn call_remote(
         &self,
-        _from_agent: AgentPubKey,
+        _to_agent: AgentPubKey,
         _zome_call_payload: ExternIO,
         _from_signature: Signature,
-        _to_agent: AgentPubKey,
-        _zome_name: ZomeName,
-        _fn_name: FunctionName,
-        _cap: Option<CapSecret>,
-        _payload: ExternIO,
-        _nonce: Nonce256Bits,
-        _expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }

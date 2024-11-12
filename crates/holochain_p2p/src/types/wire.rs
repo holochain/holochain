@@ -26,17 +26,9 @@ impl WireDhtOpData {
 #[allow(missing_docs)]
 pub enum WireMessage {
     CallRemote {
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        from_agent: holo_hash::AgentPubKey,
+        to_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
-        to_agent: AgentPubKey,
-        cap_secret: Option<CapSecret>,
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
-        nonce: Box<Nonce256Bits>,
-        expires_at: Timestamp,
     },
     CallRemoteMulti {
         zome_name: ZomeName,
@@ -100,30 +92,15 @@ impl WireMessage {
     }
 
     /// For an outgoing remote call.
-    #[allow(clippy::too_many_arguments)]
     pub fn call_remote(
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        from_agent: holo_hash::AgentPubKey,
+        to_agent: holo_hash::AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
-        to_agent: holo_hash::AgentPubKey,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
     ) -> WireMessage {
         Self::CallRemote {
-            zome_name,
-            fn_name,
-            from_agent,
-            zome_call_params_serialized,
             to_agent,
+            zome_call_params_serialized,
             signature,
-            cap_secret,
-            data: payload.into_vec(),
-            nonce: Box::new(nonce),
-            expires_at,
         }
     }
 

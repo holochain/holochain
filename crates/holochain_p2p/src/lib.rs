@@ -52,16 +52,9 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     #[allow(clippy::too_many_arguments)]
     async fn call_remote(
         &self,
-        from_agent: AgentPubKey,
-        zome_call_payload: ExternIO,
-        from_signature: Signature,
         to_agent: AgentPubKey,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
     ) -> actor::HolochainP2pResult<SerializedBytes>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -217,30 +210,16 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     /// Invoke a zome function on a remote node (if you have been granted the capability).
     async fn call_remote(
         &self,
-        from_agent: AgentPubKey,
-        zome_call_payload: ExternIO,
-        from_signature: Signature,
         to_agent: AgentPubKey,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
     ) -> actor::HolochainP2pResult<SerializedBytes> {
         self.sender
             .call_remote(
                 (*self.dna_hash).clone(),
-                from_agent,
-                zome_call_payload,
-                from_signature,
                 to_agent,
-                zome_name,
-                fn_name,
-                cap_secret,
-                payload,
-                nonce,
-                expires_at,
+                zome_call_params_serialized,
+                signature,
             )
             .await
     }

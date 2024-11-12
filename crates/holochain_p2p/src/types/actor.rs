@@ -267,16 +267,9 @@ ghost_actor::ghost_chan! {
         /// Invoke a zome function on a remote node (if you have been granted the capability).
         fn call_remote(
             dna_hash: DnaHash,
-            from_agent: AgentPubKey,
-            zome_call_payload: ExternIO,
-            signature: Signature,
             to_agent: AgentPubKey,
-            zome_name: ZomeName,
-            fn_name: FunctionName,
-            cap_secret: Option<CapSecret>,
-            payload: ExternIO,
-            nonce: Nonce256Bits,
-            expires_at: Timestamp,
+            zome_call_params_serialized: ExternIO,
+            signature: Signature,
         ) -> SerializedBytes;
 
         /// Invoke a zome function on a remote node (if you have been granted the capability).
