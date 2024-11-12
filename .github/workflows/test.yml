@@ -156,6 +156,7 @@ jobs:
     needs:
       - static-job-id
       - test-job-id
+      - kitsune
     steps:
       - name: check status
         uses: re-actors/alls-green@release/v1
