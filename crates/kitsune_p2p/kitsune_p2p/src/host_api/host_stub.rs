@@ -1,6 +1,5 @@
 use super::*;
 use crate::event::KitsuneP2pEvent;
-use crate::test_util::data::mk_agent_info;
 use crate::{KitsuneBinType, KitsuneHostDefaultError};
 use futures::FutureExt;
 use kitsune_p2p_block::{Block, BlockTarget, BlockTargetId};

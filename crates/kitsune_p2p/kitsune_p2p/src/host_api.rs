@@ -12,7 +12,6 @@ use kitsune_p2p_types::{
         region_set::RegionSetLtcs,
         spacetime::Topology,
     },
-    dht_arc::DhtArcSet,
     KOpData, KOpHash,
 };
 

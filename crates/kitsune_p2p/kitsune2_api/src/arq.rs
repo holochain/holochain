@@ -12,6 +12,9 @@ use crate::*;
 // - DhtArq
 // - DhtArqSet
 pub trait Arq: 'static + Send + Sync + std::fmt::Debug {
+    /// Helper required for downcast.
+    fn as_any(&self) -> Arc<dyn std::any::Any + 'static + Send + Sync>;
+
     /// Returns `true` if any parts of these two arqs overlap.
     fn overlap(&self, _oth: &DynArq) -> bool;
 
@@ -27,17 +30,21 @@ pub type DynArq = Arc<dyn Arq>;
 
 /// An empty arq.
 #[derive(Debug)]
-pub struct ArqEmpty;
+pub struct ArqEmpty(std::sync::Weak<Self>);
 
 impl ArqEmpty {
     /// Construct an empty arq.
     pub fn create() -> DynArq {
-        let out: DynArq = Arc::new(ArqEmpty);
+        let out: DynArq = Arc::new_cyclic(|this| ArqEmpty(this.clone()));
         out
     }
 }
 
 impl Arq for ArqEmpty {
+    fn as_any(&self) -> Arc<dyn std::any::Any + 'static + Send + Sync> {
+        self.0.upgrade().expect("InvalidArc")
+    }
+
     fn overlap(&self, _oth: &DynArq) -> bool {
         false
     }
@@ -49,17 +56,21 @@ impl Arq for ArqEmpty {
 
 /// A full arq.
 #[derive(Debug)]
-pub struct ArqFull;
+pub struct ArqFull(std::sync::Weak<Self>);
 
 impl ArqFull {
     /// Construct a full arq.
     pub fn create() -> DynArq {
-        let out: DynArq = Arc::new(ArqFull);
+        let out: DynArq = Arc::new_cyclic(|this| ArqFull(this.clone()));
         out
     }
 }
 
 impl Arq for ArqFull {
+    fn as_any(&self) -> Arc<dyn std::any::Any + 'static + Send + Sync> {
+        self.0.upgrade().expect("InvalidArc")
+    }
+
     fn overlap(&self, _oth: &DynArq) -> bool {
         true
     }

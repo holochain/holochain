@@ -145,13 +145,72 @@ pub struct Arq<S: ArqStart = Loc> {
     pub count: SpaceOffset,
 }
 
-impl<S: ArqStart> kitsune2_api::arq::Arq for Arq<S> {
-    fn overlap(&self, _oth: &kitsune2_api::arq::DynArq) -> bool {
-        todo!()
+enum KArqInner {
+    Base(Arq<Loc>),
+    Set(ArqSet<SpaceOffset>),
+}
+
+impl std::fmt::Debug for KArqInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Base(a) => a.fmt(f),
+            Self::Set(a) => a.fmt(f),
+        }
+    }
+}
+
+struct KArq {
+    this: std::sync::Weak<Self>,
+    inner: KArqInner,
+}
+
+impl std::fmt::Debug for KArq {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.inner.fmt(f)
+    }
+}
+
+impl kitsune2_api::arq::Arq for KArq {
+    fn as_any(&self) -> std::sync::Arc<dyn std::any::Any + 'static + Send + Sync> {
+        self.this.upgrade().expect("InvalidArc")
+    }
+
+    fn overlap(&self, oth: &kitsune2_api::arq::DynArq) -> bool {
+        let a = match &self.inner {
+            KArqInner::Base(a) => kitsune_p2p_dht_arc::DhtArcSet::from(DhtArcRange::from(a.to_dht_arc_std())),
+            KArqInner::Set(a) => a.to_dht_arc_set_std(),
+        };
+        let b: std::sync::Arc<Self> = oth.as_any().downcast().expect("InvalidArqType");
+        let b = match &b.inner {
+            KArqInner::Base(a) => kitsune_p2p_dht_arc::DhtArcSet::from(DhtArcRange::from(a.to_dht_arc_std())),
+            KArqInner::Set(a) => a.to_dht_arc_set_std(),
+        };
+        a.overlap(&b)
     }
 
     fn dist(&self, loc: u32) -> u32 {
-        self.to_dht_arc_range_std().dist(loc)
+        match &self.inner {
+            KArqInner::Base(a) => a.to_dht_arc_std().dist(loc),
+            _ => panic!("InvalidArqType"),
+        }
+    }
+}
+
+impl From<Arq<Loc>> for kitsune2_api::arq::DynArq {
+    fn from(a: Arq<Loc>) -> Self {
+        std::sync::Arc::new_cyclic(|this| KArq {
+            this: this.clone(),
+            inner: KArqInner::Base(a),
+        })
+    }
+}
+
+impl From<ArqSet<SpaceOffset>> for kitsune2_api::arq::DynArq {
+    fn from(a: ArqSet<SpaceOffset>) -> Self {
+        std::sync::Arc::new_cyclic(|this| KArq {
+            this: this.clone(),
+            inner: KArqInner::Set(a),
+        })
     }
 }
 
@@ -674,6 +733,30 @@ mod tests {
     use super::*;
 
     use test_case::test_case;
+
+    #[test]
+    fn test_kitsune2_full_overlap() {
+        let topo = Topology::standard_epoch_full();
+        let full1: kitsune2_api::arq::DynArq = Arq::<Loc>::new_full(&topo, 0u32.into(), 1).into();
+        let full2: kitsune2_api::arq::DynArq = Arq::<Loc>::new_full(&topo, 2u32.pow(31).into(), 2).into();
+        assert!(full1.overlap(&full2));
+    }
+
+    #[test]
+    fn test_kitsune2_empty_overlap() {
+        let topo = Topology::standard_epoch_full();
+        let empty1: kitsune2_api::arq::DynArq = Arq::<Loc>::new_empty(&topo, 0u32.into()).into();
+        let empty2: kitsune2_api::arq::DynArq = Arq::<Loc>::new_empty(&topo, 2u32.pow(31).into()).into();
+        let full1: kitsune2_api::arq::DynArq = Arq::<Loc>::new_full(&topo, 2u32.pow(31).into(), 2).into();
+        assert!(!empty1.overlap(&empty2));
+        assert!(!empty1.overlap(&full1));
+    }
+
+    #[test]
+    fn test_kitsune2_dist() {
+        let a: kitsune2_api::arq::DynArq = Arq::<Loc>::new(10, (u32::MAX / 4).into(), 54.into()).into();
+        assert_eq!(1073741823, a.dist(0));
+    }
 
     #[test]
     fn test_is_full() {

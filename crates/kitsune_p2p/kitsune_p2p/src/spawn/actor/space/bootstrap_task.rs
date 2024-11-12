@@ -1,10 +1,10 @@
-use crate::event::{KitsuneP2pEvent, KitsuneP2pEventSender};
+use crate::event::KitsuneP2pEvent;
 use crate::spawn::actor::space::{SpaceInternal, SpaceInternalSender};
-use crate::{KitsuneP2pError, KitsuneP2pResult, KitsuneSpace};
+use crate::{KitsuneP2pResult, KitsuneSpace};
 use futures::channel::mpsc::Sender;
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use ghost_actor::{GhostControlSender, GhostError, GhostSender};
+use ghost_actor::{GhostControlSender, GhostSender};
 use kitsune_p2p_bootstrap_client::BootstrapNet;
 use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::RandomQuery;

@@ -95,14 +95,11 @@ pub(crate) async fn spawn_test_agent(
 }
 
 use kitsune_p2p_fetch::FetchPoolConfig;
-use kitsune_p2p_timestamp::Timestamp;
-use kitsune_p2p_types::bootstrap::AgentInfoPut;
 use kitsune_p2p_types::box_fut;
 use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken;
 use kitsune_p2p_types::dht::prelude::RegionSetLtcs;
-use kitsune_p2p_types::dht::spacetime::{SpaceOffset, Topology};
-use kitsune_p2p_types::dht::{ArqStrat, PeerStrat};
-use kitsune_p2p_types::dht_arc::DhtArcSet;
+use kitsune_p2p_types::dht::spacetime::Topology;
+use kitsune_p2p_types::dht::ArqStrat;
 
 struct AgentHarness {
     agent: Arc<KitsuneAgent>,

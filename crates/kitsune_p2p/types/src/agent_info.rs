@@ -126,7 +126,7 @@ impl kitsune2_api::agent::AgentInfo for AgentInfoInner {
     }
 
     fn storage_arq(&self) -> kitsune2_api::arq::DynArq {
-        Arc::new(self.storage_arq)
+        self.storage_arq.into()
     }
 }
 

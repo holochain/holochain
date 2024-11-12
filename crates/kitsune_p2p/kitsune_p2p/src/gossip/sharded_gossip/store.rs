@@ -84,7 +84,7 @@ impl AgentInfoSession {
     pub(super) async fn agent_info_within_arc_set(
         &mut self,
         peer_store: &kitsune2_api::peer_store::DynPeerStore,
-        space: &Arc<KitsuneSpace>,
+        _space: &Arc<KitsuneSpace>,
         arc_set: ArqSet,
     ) -> KitsuneResult<Vec<AgentInfoSigned>> {
         match self.agents_by_arc_set_cache.entry(arc_set.clone()) {
@@ -94,7 +94,7 @@ impl AgentInfoSession {
                     .query_by_time_and_arq(
                         kitsune2_api::Timestamp::from_micros(i64::MIN),
                         kitsune2_api::Timestamp::from_micros(i64::MAX),
-                        Arc::new(arc_set),
+                        arc_set.into(),
                     )
                     .await?
                     .into_iter()

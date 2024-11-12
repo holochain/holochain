@@ -1,15 +1,13 @@
 //! Definitions for events emited from the KitsuneP2p actor.
 
-use crate::dht::prelude::ArqSet;
-use crate::types::agent_store::AgentInfoSigned;
 use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::{
     bin_types::KOp,
     dht::region::RegionBounds,
-    dht_arc::{DhtArcSet, DhtLocation},
+    dht_arc::DhtArcSet,
     KOpHash,
 };
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 /// Gather a list of op-hashes from our implementor that meet criteria.
 /// Also get the start and end times for ops within a time window
