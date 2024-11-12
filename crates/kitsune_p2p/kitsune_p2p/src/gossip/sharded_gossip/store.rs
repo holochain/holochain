@@ -83,35 +83,28 @@ impl AgentInfoSession {
 
     pub(super) async fn agent_info_within_arc_set(
         &mut self,
-        host_api: &HostApiLegacy,
+        peer_store: &kitsune2_api::peer_store::DynPeerStore,
         space: &Arc<KitsuneSpace>,
         arc_set: ArqSet,
     ) -> KitsuneResult<Vec<AgentInfoSigned>> {
         match self.agents_by_arc_set_cache.entry(arc_set.clone()) {
             std::collections::hash_map::Entry::Occupied(o) => Ok(o.get().clone()),
             std::collections::hash_map::Entry::Vacant(v) => {
-                let agents = host_api
-                    .legacy
-                    .query_agents(QueryAgentsEvt::new(space.clone()).by_arq_set(arc_set))
-                    .await
-                    .map_err(KitsuneError::other)?;
+                let agents: Vec<AgentInfoSigned> = peer_store
+                    .query_by_time_and_arq(
+                        kitsune2_api::Timestamp::from_micros(i64::MIN),
+                        kitsune2_api::Timestamp::from_micros(i64::MAX),
+                        Arc::new(arc_set),
+                    )
+                    .await?
+                    .into_iter()
+                    .filter_map(AgentInfoSigned::downcast)
+                    .collect();
                 v.insert(agents.clone());
                 Ok(agents)
             }
         }
     }
-}
-
-/// Get all agent info signed for a space.
-pub(super) async fn all_agent_info(
-    host_api: &HostApiLegacy,
-    space: &Arc<KitsuneSpace>,
-) -> KitsuneResult<Vec<AgentInfoSigned>> {
-    host_api
-        .legacy
-        .query_agents(QueryAgentsEvt::new(space.clone()))
-        .await
-        .map_err(KitsuneError::other)
 }
 
 /// Get all ops for all agents that fall within the specified arcset.

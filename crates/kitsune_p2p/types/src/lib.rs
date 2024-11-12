@@ -116,6 +116,10 @@ pub enum KitsuneErrorKind {
     #[error("Bad external input. Error: {0}  Input: {1}")]
     BadInput(Box<dyn std::error::Error + Send + Sync>, String),
 
+    /// IoError.
+    #[error("IoError: {0}")]
+    IoError(std::io::Error),
+
     /// Unspecified error.
     #[error(transparent)]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -158,6 +162,12 @@ impl KitsuneError {
     /// promote a custom error type to a KitsuneError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
         Self(Arc::new(KitsuneErrorKind::Other(e.into())))
+    }
+}
+
+impl From<std::io::Error> for KitsuneError {
+    fn from(e: std::io::Error) -> Self {
+        KitsuneErrorKind::IoError(e).into()
     }
 }
 

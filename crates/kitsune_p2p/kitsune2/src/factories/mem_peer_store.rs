@@ -39,13 +39,28 @@ impl MemPeerStore {
 }
 
 impl peer_store::PeerStore for MemPeerStore {
-    fn insert(&self, agent: agent::DynAgentInfo) -> BoxFuture<'_, Result<()>> {
-        self.0.lock().unwrap().insert(agent);
+    fn clear(&self) -> BoxFuture<'_, Result<()>> {
+        self.0.lock().unwrap().clear();
+        Box::pin(async move { Ok(()) })
+    }
+
+    fn insert(&self, agent_list: Vec<agent::DynAgentInfo>) -> BoxFuture<'_, Result<()>> {
+        self.0.lock().unwrap().insert(agent_list);
         Box::pin(async move { Ok(()) })
     }
 
     fn get(&self, agent: DynId) -> BoxFuture<'_, Result<Option<agent::DynAgentInfo>>> {
         let r = self.0.lock().unwrap().get(agent);
+        Box::pin(async move { Ok(r) })
+    }
+
+    fn get_all(&self) -> BoxFuture<'_, Result<Vec<agent::DynAgentInfo>>> {
+        let r = self.0.lock().unwrap().get_all();
+        Box::pin(async move { Ok(r) })
+    }
+
+    fn get_many(&self, agent_list: Vec<DynId>) -> BoxFuture<'_, Result<Vec<agent::DynAgentInfo>>> {
+        let r = self.0.lock().unwrap().get_many(agent_list);
         Box::pin(async move { Ok(r) })
     }
 
@@ -103,28 +118,50 @@ impl Inner {
         self.no_prune_until = inst_now + std::time::Duration::from_secs(10)
     }
 
-    pub fn insert(&mut self, agent_info: agent::DynAgentInfo) {
+    pub fn clear(&mut self) {
+        self.store.clear();
+        self.no_prune_until = std::time::Instant::now() + std::time::Duration::from_secs(10)
+    }
+
+    pub fn insert(&mut self, agent_list: Vec<agent::DynAgentInfo>) {
         self.check_prune();
 
-        // Don't insert expired infos.
-        if agent_info.expires_at() < Timestamp::now() {
-            return;
-        }
-
-        if let Some(a) = self.store.get(&agent_info.id().bytes()) {
-            // If we already have a newer (or equal) one, abort.
-            if a.created_at() >= agent_info.created_at() {
-                return;
+        for agent in agent_list {
+            // Don't insert expired infos.
+            if agent.expires_at() < Timestamp::now() {
+                continue;
             }
-        }
 
-        self.store.insert(agent_info.id().bytes(), agent_info);
+            if let Some(a) = self.store.get(&agent.id().bytes()) {
+                // If we already have a newer (or equal) one, abort.
+                if a.created_at() >= agent.created_at() {
+                    continue;
+                }
+            }
+
+            self.store.insert(agent.id().bytes(), agent);
+        }
     }
 
     pub fn get(&mut self, agent: DynId) -> Option<agent::DynAgentInfo> {
         self.check_prune();
 
         self.store.get(&agent.bytes()).cloned()
+    }
+
+    pub fn get_all(&mut self) -> Vec<agent::DynAgentInfo> {
+        self.check_prune();
+
+        self.store.values().cloned().collect()
+    }
+
+    fn get_many(&mut self, agent_list: Vec<DynId>) -> Vec<agent::DynAgentInfo> {
+        self.check_prune();
+
+        agent_list
+            .into_iter()
+            .filter_map(|agent| self.store.get(&agent.bytes()).cloned())
+            .collect()
     }
 
     pub fn query_by_time_and_arq(
@@ -206,7 +243,7 @@ mod test {
             .await
             .unwrap();
         let agent = TestAgentInfo::default().into_dyn();
-        store.insert(agent.clone()).await.unwrap();
+        store.insert(vec![agent.clone()]).await.unwrap();
         let got = store.get(agent.id().clone()).await.unwrap().unwrap();
         assert_eq!(agent.id().to_string(), got.id().to_string());
     }

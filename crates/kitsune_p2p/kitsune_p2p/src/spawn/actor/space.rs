@@ -33,6 +33,7 @@ pub(crate) type WireConHnd = MetaNetCon;
 type Payload = Box<[u8]>;
 type OpHashList = Vec<OpHashSized>;
 type MaybeDelegate = Option<(KBasis, u32, u32)>;
+type VecInfo = Vec<super::AgentInfoSigned>;
 
 ghost_actor::ghost_chan! {
     #[allow(clippy::too_many_arguments)]
@@ -53,7 +54,7 @@ ghost_actor::ghost_chan! {
 
         // TODO what about this, this is different again and not properly documented
         /// Update / publish a single agent info
-        fn publish_agent_info_signed(input: PutAgentInfoSignedEvt) -> ();
+        fn publish_agent_info_signed(input: VecInfo) -> ();
 
         fn get_all_local_joined_agent_infos() -> Vec<AgentInfoSigned>;
 
@@ -118,6 +119,7 @@ ghost_actor::ghost_chan! {
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn spawn_space(
     space: Arc<KitsuneSpace>,
+    peer_store: kitsune2_api::peer_store::DynPeerStore,
     ep_hnd: MetaNet,
     host: HostApi,
     config: Arc<KitsuneP2pConfig>,
@@ -130,6 +132,7 @@ pub(crate) async fn spawn_space(
     ghost_actor::GhostSender<KitsuneP2p>,
     ghost_actor::GhostSender<SpaceInternal>,
     KitsuneP2pEventReceiver,
+    Arc<SpaceReadOnlyInner>,
 )> {
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
@@ -149,6 +152,7 @@ pub(crate) async fn spawn_space(
 
     let space = Space::new(
         space,
+        peer_store,
         i_s.clone(),
         host,
         ep_hnd,
@@ -159,10 +163,11 @@ pub(crate) async fn spawn_space(
         fetch_pool,
         local_url,
     ).await?;
+    let ro_inner = space.ro_inner.clone();
 
     tokio::task::spawn(builder.spawn(space));
 
-    Ok((sender, i_s, evt_recv))
+    Ok((sender, i_s, evt_recv, ro_inner))
 }
 
 impl ghost_actor::GhostHandler<SpaceInternal> for Space {}
@@ -246,7 +251,7 @@ impl SpaceInternalHandler for Space {
                 peer_data.push(update_single_agent_info(input).await?);
             }
             internal_sender
-                .publish_agent_info_signed(PutAgentInfoSignedEvt { peer_data })
+                .publish_agent_info_signed(peer_data)
                 .await?;
             Ok(())
         }
@@ -292,7 +297,7 @@ impl SpaceInternalHandler for Space {
             };
             let peer_data = vec![update_single_agent_info(input).await?];
             internal_sender
-                .publish_agent_info_signed(PutAgentInfoSignedEvt { peer_data })
+                .publish_agent_info_signed(peer_data)
                 .await?;
             Ok(())
         }
@@ -302,11 +307,10 @@ impl SpaceInternalHandler for Space {
 
     fn handle_publish_agent_info_signed(
         &mut self,
-        input: PutAgentInfoSignedEvt,
+        input: Vec<super::AgentInfoSigned>,
     ) -> SpaceInternalHandlerResult<()> {
         let timeout = self.config.tuning_params.implicit_timeout();
         let tasks: Result<Vec<_>, _> = input
-            .peer_data
             .iter()
             .map(|agent_info| {
                 self.handle_broadcast(
@@ -322,7 +326,7 @@ impl SpaceInternalHandler for Space {
             futures::future::join(
                 ep_hnd.broadcast(
                     &wire::Wire::PeerUnsolicited(crate::wire::PeerUnsolicited {
-                        peer_list: input.peer_data,
+                        peer_list: input,
                     }),
                     timeout,
                 ),
@@ -408,14 +412,10 @@ impl SpaceInternalHandler for Space {
                     .values()
                     .any(|arc| arc.to_dht_arc_std().contains(basis.get_loc()))
                 {
-                    let fut = self
-                        .host_api
-                        .legacy
-                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            peer_data: vec![agent_info.clone()],
-                        });
+                    let peer_store = self.peer_store.clone();
+                    let agent_info = vec![agent_info.clone()];
                     local_agent_info_events.push(async move {
-                        if let Err(err) = fut.await {
+                        if let Err(err) = peer_store.insert(agent_info).await {
                             tracing::warn!(?err, "failed local broadcast");
                         }
                     });
@@ -1336,8 +1336,9 @@ pub(crate) struct Space {
 impl Space {
     /// space constructor
     #[allow(clippy::too_many_arguments)]
-    pub async fn new(
+    pub fn new(
         space: Arc<KitsuneSpace>,
+        peer_store: kitsune2_api::peer_store::DynPeerStore,
         i_s: ghost_actor::GhostSender<SpaceInternal>,
         host_api: HostApiLegacy,
         ep_hnd: MetaNet,
@@ -1347,7 +1348,7 @@ impl Space {
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
         fetch_pool: FetchPool,
         local_url: Arc<std::sync::Mutex<Option<String>>>,
-    ) -> std::io::Result<Self> {
+    ) -> Self {
         let metrics = MetricsSync::default();
 
         {
@@ -1437,6 +1438,7 @@ impl Space {
         if config.bootstrap_service.is_some() {
             // spawn the periodic bootstrap pull
             BootstrapTask::spawn(
+                peer_store.clone(),
                 i_s.clone(),
                 host_api.legacy.clone(),
                 space.clone(),
@@ -1450,15 +1452,6 @@ impl Space {
                 config.tuning_params.bootstrap_max_delay_s,
             );
         }
-
-        // TODO - as we fill out the kitsune2 usage, this should come
-        //        from a builder. But for now, we're just instantiating it
-        //        directly.
-        let peer_store = {
-            use kitsune2::BuilderExt;
-            kitsune2::factories::MemPeerStoreFactory::create()
-                .create(Arc::new(kitsune2_api::builder::Builder::create_default())).await?
-        };
 
         let ro_inner = Arc::new(SpaceReadOnlyInner {
             peer_store,
@@ -1476,7 +1469,7 @@ impl Space {
             fetch_pool,
         });
 
-        Ok(Self {
+        Self {
             ro_inner,
             space,
             i_s,
@@ -1487,7 +1480,7 @@ impl Space {
             mdns_handles: HashMap::new(),
             _mdns_listened_spaces: HashSet::new(),
             gossip_mod,
-        })
+        }
     }
 
     fn update_metric_exchange_arcset(&mut self) {
@@ -1508,7 +1501,7 @@ impl Space {
         let evt_sender = self.host_api.legacy.clone();
         let bootstrap_service = self.config.bootstrap_service.clone();
         let expires_after = self.config.tuning_params.agent_info_expires_after_ms as u64;
-        let host = self.host_api.clone();
+        let peer_store = self.peer_store.clone();
 
         Ok(async move {
             let signed_at_ms = kitsune_p2p_bootstrap_client::now_once(None, bootstrap_net).await?;
@@ -1540,12 +1533,7 @@ impl Space {
 
             tracing::debug!(?agent_info_signed);
 
-            // TODO: at some point, we should not remove agents who have left, but rather
-            // there should be a flag indicating they have left. The removed agent may just
-            // get re-gossiped to another local agent in the same space, defeating the purpose.
-            host.remove_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
-                .await
-                .map_err(KitsuneP2pError::other)?;
+            let _ = peer_store.insert(vec![agent_info_signed.clone()]).await;
 
             // Push to the network as well
 
@@ -1603,19 +1591,4 @@ impl Space {
             }
         }
     }
-}
-
-/// Function to add local agent info to the store.
-/// There's nothing special about this method, it's just helpful to
-/// semantically see the situations where local info is being added.
-async fn put_local_agent_info(
-    evt_sender: futures::channel::mpsc::Sender<KitsuneP2pEvent>,
-    agent_info: AgentInfoSigned,
-) -> KitsuneP2pResult<()> {
-    evt_sender
-        .put_agent_info_signed(PutAgentInfoSignedEvt {
-            peer_data: vec![agent_info],
-        })
-        .await?;
-    Ok(())
 }

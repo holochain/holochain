@@ -640,7 +640,7 @@ impl MetaNet {
                     })
                 }),
                 Arc::new(move |url, data| {
-                    let e_s = evt_sender.clone();
+                    let i_s = kitsune_internal_sender.clone();
                     let url = url.clone();
                     match PreflightData::decode_ref(&data) {
                         Ok((
@@ -670,10 +670,8 @@ impl MetaNet {
                                 )));
                             }
                             Box::pin(async move {
-                                if let Err(err) = e_s
-                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        peer_data: peer_list,
-                                    })
+                                if let Err(err) = i_s
+                                    .put_agent_infos_in_spaces(peer_list)
                                     .await
                                 {
                                     tracing::warn!(

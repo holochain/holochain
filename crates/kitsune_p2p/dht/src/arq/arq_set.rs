@@ -35,6 +35,16 @@ pub struct ArqSet<S: ArqStart = SpaceOffset> {
     power: u8,
 }
 
+impl<S: ArqStart> kitsune2_api::arq::Arq for ArqSet<S> {
+    fn overlap(&self, _oth: &kitsune2_api::arq::DynArq) -> bool {
+        todo!()
+    }
+
+    fn dist(&self, _loc: u32) -> u32 {
+        todo!()
+    }
+}
+
 impl<S: ArqStart> ArqSet<S> {
     /// Normalize all arqs to be of the same power (use the minimum power)
     pub fn new(arqs: Vec<Arq<S>>) -> Self {

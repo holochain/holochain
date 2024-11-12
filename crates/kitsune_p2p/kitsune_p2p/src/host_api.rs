@@ -36,24 +36,6 @@ pub trait KitsuneHost: 'static + Send + Sync + std::fmt::Debug {
         timestamp: Timestamp,
     ) -> KitsuneHostResult<bool>;
 
-    /*
-    /// We need to get previously stored agent info.
-    fn get_agent_info_signed(
-        &self,
-        input: GetAgentInfoSignedEvt,
-    ) -> KitsuneHostResult<Option<crate::types::agent_store::AgentInfoSigned>>;
-
-    /// Remove an agent info from storage
-    fn remove_agent_info_signed(&self, input: GetAgentInfoSignedEvt) -> KitsuneHostResult<bool>;
-
-    /// Extrapolated Peer Coverage.
-    fn peer_extrapolated_coverage(
-        &self,
-        space: Arc<KitsuneSpace>,
-        dht_arc_set: DhtArcSet,
-    ) -> KitsuneHostResult<Vec<f64>>;
-    */
-
     /// Query aggregate dht op data to form an LTCS set of region data.
     fn query_region_set(
         &self,

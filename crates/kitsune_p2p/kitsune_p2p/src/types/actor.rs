@@ -66,7 +66,7 @@ pub struct RpcMultiResponse {
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
 #[cfg_attr(
     feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+    derive(arbitrary::Arbitrary)
 )]
 pub enum BroadcastData {
     /// User broadcast.

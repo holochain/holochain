@@ -50,6 +50,7 @@ type VecMXM = Vec<MetricExchangeMsg>;
 type Payload = Box<[u8]>;
 type OpHashList = Vec<OpHashSized>;
 type MaybeDelegate = Option<(KBasis, u32, u32)>;
+type VecInfo = Vec<AgentInfoSigned>;
 
 /// Random number.
 const UNAUTHORIZED_DISCONNECT_CODE: u32 = 0x59ea599e;
@@ -116,17 +117,62 @@ ghost_actor::ghost_chan! {
     }
 }
 
+type StoreFut = futures::future::Shared<futures::future::BoxFuture<
+    'static,
+    std::result::Result<kitsune2_api::peer_store::DynPeerStore, Arc<std::io::Error>>,
+>>;
+
+type StoreMap = HashMap<Arc<KitsuneSpace>, StoreFut>;
+
+#[derive(Clone)]
+pub(crate) struct PeerSuperStore(Arc<std::sync::Mutex<StoreMap>>);
+
+impl Default for PeerSuperStore {
+    fn default() -> Self {
+        Self(Arc::new(std::sync::Mutex::new(StoreMap::new())))
+    }
+}
+
+impl PeerSuperStore {
+    /// Get a space, or None.
+    pub async fn get(&self, space: Arc<KitsuneSpace>) -> Option<kitsune2_api::peer_store::DynPeerStore> {
+        let fut = self.0.lock().unwrap().get(space).cloned();
+        match fut {
+            Some(fut) => match fut.await {
+                Ok(store) => Some(store),
+                None => None,
+            }
+            None => None,
+        }
+    }
+
+    /// Get a space, creating a new one if one doesn't already exist.
+    pub async fn assert(&self, space: Arc<KitsuneSpace>) -> std::io::Result<kitsune2_api::peer_store::DynPeerStore> {
+        self.0.lock().unwrap().entry(space).or_insert_with(move || {
+            Box::pin(async move {
+                // TODO - as we fill out the kitsune2 usage, this should come
+                //        from a builder. But for now, we're just instantiating
+                //        itdirectly.
+                let factory = kitsune2::factories::MemPeerStoreFactory::create();
+                factory.create(Arc::new(kitsune2_api::builder::Builder::create_default())).await.map_err(Arc::new)
+            })
+        }).clone()
+    }
+}
+
 pub(crate) struct KitsuneP2pActor {
     channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
     internal_sender: ghost_actor::GhostSender<Internal>,
     ep_hnd: MetaNet,
     host_api: HostApiLegacy,
+    peer_super: PeerSuperStore,
     #[allow(clippy::type_complexity)]
     spaces: HashMap<
         Arc<KitsuneSpace>,
         AsyncLazy<(
             ghost_actor::GhostSender<KitsuneP2p>,
             ghost_actor::GhostSender<space::SpaceInternal>,
+            Arc<SpaceReadOnlyInner>,
         )>,
     >,
     config: Arc<KitsuneP2pConfig>,
@@ -190,6 +236,7 @@ impl KitsuneP2pActor {
             internal_sender,
             ep_hnd,
             host_api: direct_host_api,
+            peer_super: PeerSuperStore::default(),
             spaces: HashMap::new(),
             config: Arc::new(config),
             bootstrap_net,
@@ -584,6 +631,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         initial_arq: Option<Arq>,
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
+        let peer_super = self.peer_super.clone();
         let space2 = space.clone();
         let ep_hnd = self.ep_hnd.clone();
         let host = self.host_api.clone().api;
@@ -597,8 +645,14 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         let space_sender = match self.spaces.entry(space.clone()) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(AsyncLazy::new(async move {
-                let (send, send_inner, evt_recv) = spawn_space(
+                // TODO - would be good to fix this expect,
+                //        but right now, while we're using the mem store
+                //        it is actually true that it cannot fail.
+                let peer_store = peer_super.assert(space2.clone()).await.expect("cannot fail to create peer store");
+
+                let (send, send_inner, evt_recv, ro_inner) = spawn_space(
                     space2,
+                    peer_store,
                     ep_hnd,
                     host,
                     config,
@@ -614,7 +668,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
                     .register_space_event_handler(evt_recv)
                     .await
                     .expect("FAIL");
-                (send, send_inner)
+                (send, send_inner, ro_inner)
             })),
         };
         let space_sender = space_sender.get();

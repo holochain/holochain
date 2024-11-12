@@ -140,6 +140,7 @@ impl ShardedGossip {
     pub fn new(
         config: Arc<KitsuneP2pConfig>,
         space: Arc<KitsuneSpace>,
+        peer_store: kitsune2_api::peer_store::DynPeerStore,
         ep_hnd: MetaNet,
         host_api: HostApiLegacy,
         gossip_type: GossipType,
@@ -206,14 +207,10 @@ impl ShardedGossip {
     }
 
     async fn create_agent_info_session(&self) -> KitsuneResult<AgentInfoSession> {
-        let all_agents =
-            match store::all_agent_info(&self.gossip.host_api, &self.gossip.space).await {
-                Ok(a) => a,
-                Err(e) => {
-                    tracing::error!("Failed to query for all agents - {:?}", e);
-                    vec![]
-                }
-            };
+        let all_agents = self.gossip.peer_store.get_all().await?
+            .into_iter()
+            .filter_map(AgentInfoSigned::downcast)
+            .collect::<Vec<_>>();
 
         // Find local agents by filtering the complete list of known agents against the agents which have joined Kitsune.
         let local_agents = self.gossip.inner.share_ref(|s| {
@@ -458,6 +455,7 @@ pub struct ShardedGossipLocal {
     gossip_type: GossipType,
     tuning_params: KitsuneP2pTuningParams,
     space: Arc<KitsuneSpace>,
+    peer_store: kitsune2_api::peer_store::DynPeerStore,
     host_api: HostApiLegacy,
     inner: Share<ShardedGossipLocalState>,
     closing: AtomicBool,
@@ -921,7 +919,7 @@ impl ShardedGossipLocal {
             }
             ShardedGossipWire::MissingAgents(MissingAgents { agents }) => {
                 if self.get_state(&peer_cert)?.is_some() {
-                    self.incoming_missing_agents(agents.as_slice()).await?;
+                    self.peer_store.insert(agents.into_iter().map(AgentInfoSigned::into_dyn).collect()).await?;
                 }
                 Vec::with_capacity(0)
             }
@@ -1247,7 +1245,7 @@ kitsune_p2p_types::write_codec_enum! {
         /// Any agents that were missing from the remote bloom.
         MissingAgents(0x40) {
             /// The missing agents
-            agents.0: Vec<Arc<AgentInfoSigned>>,
+            agents.0: Vec<AgentInfoSigned>,
         },
 
         /// Send Op Bloom filter

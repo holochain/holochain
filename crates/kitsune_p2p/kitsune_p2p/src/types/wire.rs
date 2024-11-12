@@ -14,7 +14,7 @@ use std::sync::Arc;
 )]
 #[cfg_attr(
     feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+    derive(arbitrary::Arbitrary)
 )]
 pub struct WireData(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
@@ -29,7 +29,7 @@ impl std::fmt::Debug for WireData {
 #[serde(tag = "type", rename_all = "camelCase")]
 #[cfg_attr(
     feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
+    derive(arbitrary::Arbitrary)
 )]
 pub enum MetricExchangeMsg {
     /// To start off, let's use a naive single message sending
@@ -50,7 +50,6 @@ pub enum MetricExchangeMsg {
 /// An individual op item within a "PushOpData" wire message.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct PushOpItem {
     /// The payload of this op.
     pub op_data: Arc<KitsuneOpData>,

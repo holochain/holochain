@@ -71,13 +71,6 @@ impl SpaceInternalHandler for SpaceInternalStub {
         unreachable!()
     }
 
-    fn handle_publish_agent_info_signed(
-        &mut self,
-        _input: PutAgentInfoSignedEvt,
-    ) -> SpaceInternalHandlerResult<()> {
-        unreachable!()
-    }
-
     fn handle_get_all_local_joined_agent_infos(
         &mut self,
     ) -> SpaceInternalHandlerResult<Vec<AgentInfoSigned>> {

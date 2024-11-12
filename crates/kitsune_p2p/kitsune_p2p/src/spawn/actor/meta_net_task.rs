@@ -29,6 +29,7 @@ struct DelegateBroadcastItem {
 }
 
 pub struct MetaNetTask {
+    peer_super: super::PeerSuperStore,
     host: HostApiLegacy,
     config: KitsuneP2pConfig,
     fetch_pool: FetchPool,
@@ -70,6 +71,7 @@ type MetaNetTaskResult<T> = Result<T, MetaNetTaskError>;
 
 impl MetaNetTask {
     pub fn new(
+        peer_super: super::PeerSuperStore,
         host: HostApiLegacy,
         config: KitsuneP2pConfig,
         fetch_pool: FetchPool,
@@ -103,6 +105,7 @@ impl MetaNetTask {
         });
 
         Self {
+            peer_super,
             host,
             config,
             fetch_pool,
@@ -307,12 +310,18 @@ impl MetaNetTask {
         respond: Respond,
     ) {
         let resp = match self
-            .host
-            .get_agent_info_signed(GetAgentInfoSignedEvt { space, agent })
+            .peer_super
+            .get(space)
             .await
         {
-            Ok(info) => wire::Wire::peer_get_resp(info),
-            Err(err) => wire::Wire::failure(format!("Error getting agent: {:?}", err,)),
+            Some(peer_store) => {
+                match peer_store.get(agent).await {
+                    Ok(Some(info)) => wire::Wire::peer_get_resp(info),
+                    Ok(None) => wire::Wire::failure("No such agent".into()),
+                    Err(err) => wire::Wire::failure(format!("Error getting agent: {:?}", err,)),
+                }
+            }
+            None => wire::Wire::failure("No such space".into()),
         };
         respond(resp).await;
     }
@@ -424,19 +433,10 @@ impl MetaNetTask {
                 BroadcastData::AgentInfo(agent_info) => {
                     // TODO: Should we check if the basis is
                     //       held before calling put_agent_info_signed?
-                    if let Err(err) = self
-                        .host
-                        .legacy
-                        .put_agent_info_signed(PutAgentInfoSignedEvt {
-                            peer_data: vec![agent_info],
-                        })
-                        .await
-                    {
-                        tracing::warn!(?err, "error processing incoming agent info broadcast");
-                        Err(err.into())
-                    } else {
-                        Ok(())
+                    if let Some(peer_store) = self.peer_super.get(agent_info.space()).await {
+                        let _ = peer_store.insert(vec![agent_info]).await;
                     }
+                    Ok(())
                 }
                 BroadcastData::Publish {
                     source,
@@ -609,24 +609,16 @@ impl MetaNetTask {
                 }
             }
             wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }) => {
-                if let Err(err) = self
-                    .host
-                    .legacy
-                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                        peer_data: peer_list,
-                    })
-                    .await
-                {
-                    tracing::warn!(?err, "error processing incoming agent info unsolicited");
-
-                    match err {
-                        KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                            return Err(MetaNetTaskError::RequiredChannelClosed)
-                        }
-                        e => {
-                            tracing::error!("Failed to put agent info: {:?}", e);
-                        }
-                    };
+                use std::collections::HashMap;
+                let r: HashMap<Arc<KitsuneSpace>, Vec<super::AgentInfoSigned>> = peer_list
+                    .into_iter()
+                    .fold(HashMap::new(), |mut m, i| {
+                        m.entry(i.space()).or_default().push(i);
+                    });
+                for (space, peer_list) in r {
+                    if let Some(peer_store) = self.peer_store.get(space).await {
+                        let _ = peer_store.insert(peer_list).await;
+                    }
                 }
 
                 Ok(())

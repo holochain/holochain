@@ -18,11 +18,9 @@ pub struct LegacyHostStub {
     pub respond_with_error: Arc<AtomicBool>,
     pub respond_with_error_count: Arc<AtomicUsize>,
 
-    pub put_agent_info_signed_calls: Arc<parking_lot::RwLock<Vec<PutAgentInfoSignedEvt>>>,
     pub notify_calls: Arc<parking_lot::RwLock<Vec<(KSpace, KAgent, Payload)>>>,
     pub receive_ops_calls: Arc<parking_lot::RwLock<Vec<OpsCalls>>>,
 
-    put_events: Receiver<PutAgentInfoSignedEvt>,
     abort_handle: AbortHandle,
 }
 
@@ -32,7 +30,6 @@ impl LegacyHostStub {
     pub fn start(mut host_receiver: Receiver<KitsuneP2pEvent>) -> Self {
         let (mut sender, receiver) = channel(10);
 
-        let put_agent_info_signed_calls = Arc::new(parking_lot::RwLock::new(Vec::new()));
         let notify_calls = Arc::new(parking_lot::RwLock::new(Vec::new()));
         let receive_ops_calls = Arc::new(parking_lot::RwLock::new(Vec::new()));
 
@@ -43,30 +40,12 @@ impl LegacyHostStub {
             let task_respond_with_error = respond_with_error.clone();
             let task_respond_with_error_count = respond_with_error_count.clone();
 
-            let task_put_agent_info_signed_calls = put_agent_info_signed_calls.clone();
             let task_notify_calls = notify_calls.clone();
             let task_receive_ops_calls = receive_ops_calls.clone();
 
             async move {
                 while let Some(evt) = host_receiver.next().await {
                     match evt {
-                        KitsuneP2pEvent::PutAgentInfoSigned { input, respond, .. } => {
-                            let respond = maybe_respond_error(
-                                task_respond_with_error.clone(),
-                                task_respond_with_error_count.clone(),
-                                respond,
-                            );
-                            if respond.is_none() {
-                                continue;
-                            }
-
-                            task_put_agent_info_signed_calls.write().push(input.clone());
-                            sender.send(input).await.unwrap();
-
-                            respond
-                                .unwrap()
-                                .respond(Ok(async move { Ok(vec![]) }.boxed().into()));
-                        }
                         KitsuneP2pEvent::Call {
                             payload, respond, ..
                         } => {
@@ -193,26 +172,10 @@ impl LegacyHostStub {
         LegacyHostStub {
             respond_with_error,
             respond_with_error_count,
-            put_agent_info_signed_calls,
             notify_calls,
             receive_ops_calls,
-            put_events: receiver,
             abort_handle: handle.abort_handle(),
         }
-    }
-
-    pub async fn next_event(&mut self, timeout: Duration) -> PutAgentInfoSignedEvt {
-        tokio::time::timeout(timeout, self.put_events.next())
-            .await
-            .unwrap()
-            .unwrap()
-    }
-
-    pub async fn try_next_event(
-        &mut self,
-        timeout: Duration,
-    ) -> Result<Option<PutAgentInfoSignedEvt>, Elapsed> {
-        tokio::time::timeout(timeout, self.put_events.next()).await
     }
 
     pub fn abort(&self) {

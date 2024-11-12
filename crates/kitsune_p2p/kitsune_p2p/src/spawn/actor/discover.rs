@@ -41,10 +41,7 @@ impl SearchAndDiscoverPeerConnect for Arc<SpaceReadOnlyInner> {
         agent: Arc<KitsuneAgent>,
     ) -> MustBoxFuture<'_, Result<Option<AgentInfoSigned>, Box<dyn Send + Sync + std::error::Error>>>
     {
-        self.host_api.get_agent_info_signed(GetAgentInfoSignedEvt {
-            space: self.space.clone(),
-            agent,
-        })
+        self.peer_store.get(agent)
     }
 }
 
@@ -155,11 +152,8 @@ pub(crate) fn search_and_discover_peer_connect(
                                 agent_info_signed: Some(agent_info_signed),
                             })) => {
                                 if let Err(err) = inner
-                                    .host_api
-                                    .legacy
-                                    .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                        peer_data: vec![agent_info_signed.clone()],
-                                    })
+                                    .peer_store
+                                    .insert(vec![agent_info_signed.clone()])
                                     .await
                                 {
                                     tracing::error!(
@@ -383,11 +377,8 @@ pub(crate) fn search_remotes_covering_basis(
                             }
                             // if we got results, add them to our peer store
                             if let Err(err) = inner
-                                .host_api
-                                .legacy
-                                .put_agent_info_signed(PutAgentInfoSignedEvt {
-                                    peer_data: peer_list,
-                                })
+                                .peer_store
+                                .insert(peer_list)
                                 .await
                             {
                                 tracing::error!(?err, "error storing peer_queried agent_info");
@@ -419,7 +410,8 @@ pub(crate) trait GetCachedRemotesNearBasisSpace: 'static + Send + Sync {
 
     fn query_agents(
         &self,
-        query: QueryAgentsEvt,
+        loc: u32,
+        limit: usize,
     ) -> MustBoxFuture<'static, KitsuneP2pResult<Vec<AgentInfoSigned>>>;
 
     fn is_agent_local(
@@ -435,9 +427,15 @@ impl GetCachedRemotesNearBasisSpace for Arc<SpaceReadOnlyInner> {
 
     fn query_agents(
         &self,
-        query: QueryAgentsEvt,
+        loc: u32,
+        limit: usize,
     ) -> MustBoxFuture<'static, KitsuneP2pResult<Vec<AgentInfoSigned>>> {
-        self.host_api.legacy.query_agents(query)
+        let peer_store = self.peer_store.clone();
+        Box::pin(async move {
+            peer_store.query_by_location(loc, limit).await.map(|r| {
+                r.into_iter().map(AgentInfoSigned::downcast).collect()
+            })
+        }).into()
     }
 
     fn is_agent_local(
@@ -461,10 +459,7 @@ pub(crate) fn get_cached_remotes_near_basis<S: GetCachedRemotesNearBasisSpace>(
     async move {
         let mut nodes = Vec::new();
 
-        let query = QueryAgentsEvt::new(inner.space())
-            .near_basis(basis_loc)
-            .limit(LIMIT);
-        for node in inner.query_agents(query).await? {
+        for node in inner.query_agents(basis_loc, LIMIT).await? {
             if !inner.is_agent_local(node.agent.clone()).await? {
                 nodes.push(node);
             }

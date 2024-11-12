@@ -41,6 +41,7 @@ impl BootstrapService for DefaultBootstrapService {
 
 impl BootstrapTask {
     pub(super) fn spawn(
+        peer_store: kitsune2_api::peer_store::DynPeerStore,
         internal_sender: GhostSender<SpaceInternal>,
         host_sender: Sender<KitsuneP2pEvent>,
         space: Arc<KitsuneSpace>,
@@ -65,6 +66,7 @@ impl BootstrapTask {
         };
 
         BootstrapTask::spawn_inner(
+            peer_store,
             this,
             internal_sender,
             host_sender,
@@ -75,6 +77,7 @@ impl BootstrapTask {
     }
 
     fn spawn_inner(
+        peer_store: kitsune2_api::peer_store::DynPeerStore,
         this: Arc<RwLock<Self>>,
         internal_sender: GhostSender<SpaceInternal>,
         host_sender: Sender<KitsuneP2pEvent>,
@@ -141,20 +144,7 @@ impl BootstrapTask {
                             }
                         }
 
-                        if let Err(err) = host_sender
-                            .put_agent_info_signed(PutAgentInfoSignedEvt { peer_data })
-                            .await
-                        {
-                            match err {
-                                KitsuneP2pError::GhostError(GhostError::Disconnected) => {
-                                    tracing::error!(?err, "Bootstrap task cannot communicate with the host, shutting down");
-                                    break;
-                                }
-                                _ => {
-                                    tracing::error!(?err, "error storing bootstrap agent_info");
-                                }
-                            }
-                        }
+                        let _ = peer_store.insert(peer_data).await;
                     }
                 }
             }

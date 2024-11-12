@@ -15,14 +15,13 @@ impl ShardedGossipLocal {
         // Get all agents within common arc and filter out
         // the ones in the remote bloom.
         let missing: Vec<_> = agent_info_session
-            .agent_info_within_arc_set(&self.host_api, &self.space, (*common_arq_set).clone())
+            .agent_info_within_arc_set(&self.peer_store, &self.space, (*common_arq_set).clone())
             .await?
             .into_iter()
             .filter(|info| {
                 // Check them against the bloom
                 !remote_bloom.check(&MetaOpKey::Agent(info.agent.clone(), info.signed_at_ms))
             })
-            .map(Arc::new)
             .collect();
 
         // Send any missing.
