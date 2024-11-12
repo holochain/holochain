@@ -63,14 +63,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     /// it may decide not to deliver some of the signals.
     async fn send_remote_signal(
         &self,
-        from_agent: AgentPubKey,
         to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()>;
 
     /// Publish data to the correct neighborhood.
@@ -230,27 +223,10 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     /// it may decide not to deliver some of the signals.
     async fn send_remote_signal(
         &self,
-        from_agent: AgentPubKey,
         to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
     ) -> actor::HolochainP2pResult<()> {
         self.sender
-            .send_remote_signal(
-                (*self.dna_hash).clone(),
-                from_agent,
-                to_agent_list,
-                zome_name,
-                fn_name,
-                cap,
-                payload,
-                nonce,
-                expires_at,
-            )
+            .send_remote_signal((*self.dna_hash).clone(), to_agent_list)
             .await
     }
 

@@ -19,7 +19,6 @@ use crate::types::AgentPubKeyExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 
-use holochain_zome_types::zome::FunctionName;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::AgentInfoPut;
@@ -810,14 +809,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 space,to_agent,  zome_call_params_serialized,signature, 
             ),
             crate::wire::WireMessage::CallRemoteMulti {
-                zome_name,
-                fn_name,
-                cap_secret,
-                data,
-                from_agent,
                 to_agents,
-                nonce,
-                expires_at,
             } => {
                 match to_agents
                     .into_iter()
@@ -915,14 +907,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 .into())
             }
             crate::wire::WireMessage::CallRemoteMulti {
-                zome_name,
-                fn_name,
-                from_agent,
                 to_agents,
-                cap_secret,
-                data,
-                nonce,
-                expires_at,
             } => {
                 match to_agents
                     .into_iter()
@@ -1197,27 +1182,13 @@ impl HolochainP2pHandler for HolochainP2pActor {
     fn handle_send_remote_signal(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<()> {
-        let byte_count = payload.0.len();
+        let byte_count = to_agent_list.first().map(|to_agent|to_agent.1.0.len()).unwrap_or_else(||0);
         let space = dna_hash.into_kitsune();
 
         let req = crate::wire::WireMessage::call_remote_multi(
-            zome_name,
-            fn_name,
-            from_agent,
             to_agent_list.clone(),
-            cap,
-            payload,
-            nonce,
-            expires_at,
         )
         .encode()?;
 

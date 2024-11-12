@@ -1,5 +1,4 @@
 use crate::*;
-use holochain_zome_types::zome::FunctionName;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// Struct for encoding DhtOp as bytes.
@@ -31,15 +30,7 @@ pub enum WireMessage {
         signature: Signature,
     },
     CallRemoteMulti {
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        from_agent: holo_hash::AgentPubKey,
         to_agents: Vec<(holo_hash::AgentPubKey, ExternIO, Signature)>,
-        cap_secret: Option<CapSecret>,
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
-        nonce: Box<Nonce256Bits>,
-        expires_at: Timestamp,
     },
     ValidationReceipts {
         receipts: ValidationReceiptBundle,
@@ -106,25 +97,9 @@ impl WireMessage {
 
     #[allow(clippy::too_many_arguments)]
     pub fn call_remote_multi(
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        from_agent: holo_hash::AgentPubKey,
         to_agents: Vec<(holo_hash::AgentPubKey, ExternIO, Signature)>,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
     ) -> WireMessage {
-        Self::CallRemoteMulti {
-            zome_name,
-            fn_name,
-            from_agent,
-            to_agents,
-            cap_secret,
-            data: payload.into_vec(),
-            nonce: Box::new(nonce),
-            expires_at,
-        }
+        Self::CallRemoteMulti { to_agents }
     }
 
     pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {

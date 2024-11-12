@@ -46,14 +46,7 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_send_remote_signal(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
         to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }

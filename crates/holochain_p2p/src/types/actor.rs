@@ -278,14 +278,7 @@ ghost_actor::ghost_chan! {
         /// it may decide not to deliver some of the signals.
         fn send_remote_signal(
             dna_hash: DnaHash,
-            from_agent: AgentPubKey,
             to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
-            zome_name: ZomeName,
-            fn_name: FunctionName,
-            cap: Option<CapSecret>,
-            payload: ExternIO,
-            nonce: Nonce256Bits,
-            expires_at: Timestamp,
         ) -> ();
 
         /// Publish data to the correct neighborhood.

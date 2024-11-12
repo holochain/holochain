@@ -92,19 +92,7 @@ pub fn send_remote_signal(
                         };
                     }
 
-                    if let Err(e) = network
-                        .send_remote_signal(
-                            from_agent,
-                            to_agent_list,
-                            zome_name,
-                            fn_name,
-                            None,
-                            signal,
-                            nonce,
-                            expires_at,
-                        )
-                        .await
-                    {
+                    if let Err(e) = network.send_remote_signal(to_agent_list).await {
                         tracing::info!("Failed to send remote signals because of {:?}", e);
                     }
                 }
