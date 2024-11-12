@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+# Changed
+- chore: Kitsune P2P is now its own workspace. All individual changelogs have been merged into this one.
+- chore(bin_data): The dependency on `holochain_util` has been removed and replaced with `hex`. Functionality hasn't changed 
+  but the dependency on Holochain crates wasn't wanted.
+- chore(dht): The dependency on `holochain_trace` has been removed in favour of just using `tracing-subscriber` directly. This was for tests only.
+- chore(dht_arc): The dependency on `holochain_trace` has been removed in favour of just using `tracing-subscriber` directly. This was for tests only.
+- chore(fetch): The dependency on `holochain_trace` has been removed in favour of just using `tracing-subscriber` directly. This was for tests only.
+- chore(kitsune_p2p): The dependency on `holochain_trace` has been removed in favour of just using `tracing-subscriber` directly. This was for tests only.
+- chore(kitsune_p2p): Add `metrics_helper` module from the `holochain_trace` crate.
+
 ## 0.5.0-dev.4
 
 - kitsune_p2p: Removed `network_type` from `KitsuneP2pConfig`
