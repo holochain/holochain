@@ -1081,6 +1081,13 @@ impl<'a> ReleaseWorkspace<'a> {
             let mut members = vec![];
 
             for package in self.cargo_workspace()?.members() {
+                // The workspace lookup will not only find members but also any path dependencies
+                // which Kitsune still is. So for now, filter it out.
+                // Once Kitsune has been moved to another repository, this condition can be removed.
+                if package.name().starts_with("kitsune") {
+                    continue;
+                }
+
                 members.push(Crate::with_cargo_package(package.to_owned(), self)?);
             }
 
