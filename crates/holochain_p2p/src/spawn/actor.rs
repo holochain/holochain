@@ -443,12 +443,7 @@ impl HolochainP2pActor {
         let evt_sender = self.evt_sender.clone();
         Ok(async move {
             let res = evt_sender
-                .call_remote(
-                    dna_hash,
-                    to_agent,
-                    zome_call_params_serialized,
-                    signature,
-                )
+                .call_remote(dna_hash, to_agent, zome_call_params_serialized, signature)
                 .await;
             res.map_err(kitsune_p2p::KitsuneP2pError::from)
                 .map(|res| UnsafeBytes::from(res).into())
@@ -806,7 +801,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 zome_call_params_serialized,
                 signature,
             } => self.handle_incoming_call_remote(
-                space,to_agent,  zome_call_params_serialized,signature, 
+                space,to_agent,  zome_call_params_serialized,signature,
             ),
             crate::wire::WireMessage::CallRemoteMulti {
                 to_agents,
@@ -906,9 +901,7 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
                 .boxed()
                 .into())
             }
-            crate::wire::WireMessage::CallRemoteMulti {
-                to_agents,
-            } => {
+            crate::wire::WireMessage::CallRemoteMulti { to_agents } => {
                 match to_agents
                     .into_iter()
                     .find(|(agent, _zome_call_payload, _signature)| agent == &to_agent)
@@ -1184,13 +1177,13 @@ impl HolochainP2pHandler for HolochainP2pActor {
         dna_hash: DnaHash,
         to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
     ) -> HolochainP2pHandlerResult<()> {
-        let byte_count = to_agent_list.first().map(|to_agent|to_agent.1.0.len()).unwrap_or_else(||0);
+        let byte_count = to_agent_list
+            .first()
+            .map(|to_agent| to_agent.1 .0.len())
+            .unwrap_or_else(|| 0);
         let space = dna_hash.into_kitsune();
 
-        let req = crate::wire::WireMessage::call_remote_multi(
-            to_agent_list.clone(),
-        )
-        .encode()?;
+        let req = crate::wire::WireMessage::call_remote_multi(to_agent_list.clone()).encode()?;
 
         let timeout = self.config.tuning_params.implicit_timeout();
 
