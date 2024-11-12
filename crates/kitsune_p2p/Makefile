@@ -46,4 +46,5 @@ build-each:
 test:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
-		--locked
+		--locked \
+		--no-fail-fast
