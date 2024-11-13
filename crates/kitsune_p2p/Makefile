@@ -48,3 +48,34 @@ test:
 		--workspace \
 		--locked \
 		--no-fail-fast
+
+bump:
+	@if [ "$(ver)x" = "x" ]; then \
+		echo "USAGE: make bump ver=0.5.0-dev.1"; \
+		exit 1; \
+	fi
+	sed -i 's/^\(kitsune_p2p[^=]*= { \|\)version = "[^"]*"/\1version = "$(ver)"/g' $$(find . -name Cargo.toml)
+
+RELEASE_ORDER=\
+	mdns \
+	timestamp \
+	dht_arc \
+	dht \
+	bin_data \
+	types \
+	fetch \
+	bootstrap \
+	bootstrap_client \
+	kitsune_p2p
+publish: SHELL:=/usr/bin/env bash
+publish:
+	set -euo pipefail
+	git diff --exit-code
+	@$(foreach CRATE,$(RELEASE_ORDER),\
+		cd crates/$(CRATE); \
+		NAME="$$(grep name Cargo.toml | head -1 | cut -d ' ' -f 3 | cut -d \" -f 2)"; \
+		VER="v$$(grep version Cargo.toml | head -1 | cut -d ' ' -f 3 | cut -d \" -f 2)"; \
+		cargo publish; \
+		git tag -a "$$NAME-$$VER" -m "$$VER"; \
+		cd ../.. ; \
+		)
