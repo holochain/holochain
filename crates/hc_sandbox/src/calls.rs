@@ -180,8 +180,7 @@ pub struct InstallApp {
     pub network_seed: Option<NetworkSeed>,
 
     /// Optional path to a yaml file containing role settings to override
-    /// the values in the dna manifest(s)
-    ///
+    /// the values in the dna manifest(s).
     /// See https://github.com/holochain/holochain/tree/develop/crates/hc_sandbox/tests/fixtures/roles-settings.yaml
     /// for an example of such a yaml file.
     pub roles_settings: Option<PathBuf>,

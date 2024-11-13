@@ -86,7 +86,6 @@ pub enum HcSandboxSubcommand {
 
         /// Optional path to a yaml file containing role settings to override
         /// the values in the dna manifest(s).
-        ///
         /// See https://github.com/holochain/holochain/tree/develop/crates/hc_sandbox/tests/fixtures/roles-settings.yaml
         /// for an example of such a yaml file.
         #[arg(long)]
