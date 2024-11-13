@@ -16,7 +16,7 @@ static-toml:
 
 # Ensure our chosen style lints are followed
 static-clippy:
-	CHK_SQL_FMT=1 cargo clippy --all-targets -- --deny warnings
+	cargo clippy --all-targets -- --deny warnings
 
 # Check that the docs for this workspace can by generated without warnings
 static-doc:
