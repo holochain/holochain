@@ -29,6 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto
   a conductor which has been compiled with `unstable-functions` but the reverse is not true. #4371
 
+## 0.4.0-rc.0
+
 ## 0.4.0-dev.28
 
 ## 0.4.0-dev.27
