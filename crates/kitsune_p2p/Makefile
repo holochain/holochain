@@ -1,6 +1,6 @@
 STATIC_CHECKS := static-fmt static-toml static-clippy static-doc
 
-.PHONY: $(STATIC_CHECKS) format build build-each test
+.PHONY: check $(STATIC_CHECKS) format build build-each test
 
 # Run all static checks
 check: $(STATIC_CHECKS)
