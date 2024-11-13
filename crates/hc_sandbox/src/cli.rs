@@ -83,6 +83,14 @@ pub enum HcSandboxSubcommand {
         /// Network seed to use when installing the provided hApp.
         #[arg(long, short = 's')]
         network_seed: Option<String>,
+
+        /// Optional path to a yaml file containing role settings to override
+        /// the values in the dna manifest(s).
+        ///
+        /// See https://github.com/holochain/holochain/tree/develop/crates/hc_sandbox/tests/fixtures/roles-settings.yaml
+        /// for an example of such a yaml file.
+        #[arg(long)]
+        roles_settings: Option<PathBuf>,
     },
 
     /// Run conductor(s) from existing sandbox(es).
@@ -132,6 +140,7 @@ impl HcSandbox {
                 run,
                 happ,
                 network_seed,
+                roles_settings,
             } => {
                 let paths = generate(
                     &self.holochain_path,
@@ -139,6 +148,7 @@ impl HcSandbox {
                     create,
                     app_id,
                     network_seed,
+                    roles_settings,
                     self.structured.clone(),
                 )
                 .await?;
@@ -309,6 +319,7 @@ pub async fn generate(
     create: Create,
     app_id: InstalledAppId,
     network_seed: Option<String>,
+    roles_settings: Option<PathBuf>,
     structured: Output,
 ) -> anyhow::Result<Vec<ConfigRootPath>> {
     let happ = crate::bundles::parse_happ(happ)?;
@@ -318,6 +329,7 @@ pub async fn generate(
         happ,
         app_id,
         network_seed,
+        roles_settings,
         structured,
     )
     .await?;

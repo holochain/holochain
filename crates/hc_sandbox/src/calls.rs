@@ -18,6 +18,7 @@ use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
 use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
 use holochain_types::app::AppManifest;
+use holochain_types::app::RoleSettingsMap;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
@@ -177,6 +178,13 @@ pub struct InstallApp {
 
     /// Optional network seed override for every DNA in this app
     pub network_seed: Option<NetworkSeed>,
+
+    /// Optional path to a yaml file containing role settings to override
+    /// the values in the dna manifest(s)
+    ///
+    /// See https://github.com/holochain/holochain/tree/develop/crates/hc_sandbox/tests/fixtures/roles-settings.yaml
+    /// for an example of such a yaml file.
+    pub roles_settings: Option<PathBuf>,
 }
 
 /// Calls AdminRequest::UninstallApp
@@ -540,13 +548,22 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         agent_key,
         path,
         network_seed,
+        roles_settings,
     } = args;
+
+    let roles_settings = match roles_settings {
+        None => None,
+        Some(path) => {
+            let yaml_string = std::fs::read_to_string(path)?;
+            Some(serde_yaml::from_str::<RoleSettingsMap>(&yaml_string)?)
+        }
+    };
 
     let payload = InstallAppPayload {
         installed_app_id: app_id,
         agent_key,
         source: AppBundleSource::Path(path),
-        roles_settings: Default::default(),
+        roles_settings,
         network_seed,
         ignore_genesis_failure: false,
         allow_throwaway_random_agent_key: true,

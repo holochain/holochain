@@ -22,6 +22,7 @@ pub async fn default_with_network(
     happ: PathBuf,
     app_id: InstalledAppId,
     network_seed: Option<String>,
+    roles_settings: Option<PathBuf>,
     structured: Output,
 ) -> anyhow::Result<ConfigRootPath> {
     let Create {
@@ -56,6 +57,7 @@ pub async fn default_with_network(
         agent_key: None,
         path: happ,
         network_seed,
+        roles_settings,
     };
     crate::calls::install_app_bundle(&mut cmd, install_bundle).await?;
     Ok(path)
@@ -69,6 +71,7 @@ pub async fn default_n(
     happ: PathBuf,
     app_id: InstalledAppId,
     network_seed: Option<String>,
+    roles_settings: Option<PathBuf>,
     structured: Output,
 ) -> anyhow::Result<Vec<ConfigRootPath>> {
     let num_sandboxes = create.num_sandboxes;
@@ -85,6 +88,7 @@ pub async fn default_n(
             happ.clone(),
             app_id.clone(),
             network_seed.clone(),
+            roles_settings.clone(),
             structured.clone(),
         )
         .await?;
