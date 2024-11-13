@@ -317,7 +317,7 @@ impl ZomeCallParams {
     /// Signature is generated for the hash of the bytes.
     pub fn serialize_and_hash(&self) -> Result<(Vec<u8>, Vec<u8>), SerializedBytesError> {
         let bytes = holochain_serialized_bytes::encode(&self)?;
-        let bytes_hash = blake2b_256(&bytes);
+        let bytes_hash = sha2_512(&bytes);
         Ok((bytes, bytes_hash))
     }
 }

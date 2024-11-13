@@ -21,6 +21,7 @@ mod new_lair;
 mod publish;
 mod regression;
 mod send_signal;
+mod ser_regression;
 #[cfg(not(target_os = "macos"))]
 mod sharded_gossip;
 mod signals;
