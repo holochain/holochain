@@ -15,6 +15,7 @@ use crate::CmdRunner;
 /// Generates a new sandbox with a default [`ConductorConfig`](holochain_conductor_api::config::conductor::ConductorConfig)
 /// and optional network.
 /// Then installs the specified hApp.
+#[allow(clippy::too_many_arguments)]
 pub async fn default_with_network(
     holochain_path: &Path,
     create: Create,
