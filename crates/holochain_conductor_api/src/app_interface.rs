@@ -43,6 +43,7 @@ pub enum AppRequest {
     ///
     /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
     /// passed in to the call.
+    #[cfg(feature = "unstable-countersigning")]
     GetCountersigningSessionState(Box<CellId>),
 
     /// Abandon an unresolved countersigning session.
@@ -79,6 +80,7 @@ pub enum AppRequest {
     ///
     /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
     /// automatically has not been made.
+    #[cfg(feature = "unstable-countersigning")]
     AbandonCountersigningSession(Box<CellId>),
 
     /// Publish an unresolved countersigning session.
@@ -115,6 +117,7 @@ pub enum AppRequest {
     ///
     /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
     /// automatically has not been made.
+    #[cfg(feature = "unstable-countersigning")]
     PublishCountersigningSession(Box<CellId>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
@@ -217,12 +220,15 @@ pub enum AppResponse {
     ZomeCalled(Box<ExternIO>),
 
     /// The successful response to an [`AppRequest::GetCountersigningSessionState`].
+    #[cfg(feature = "unstable-countersigning")]
     CountersigningSessionState(Box<Option<CountersigningSessionState>>),
 
     /// The successful response to an [`AppRequest::AbandonCountersigningSession`].
+    #[cfg(feature = "unstable-countersigning")]
     CountersigningSessionAbandoned,
 
     /// The successful response to an [`AppRequest::PublishCountersigningSession`].
+    #[cfg(feature = "unstable-countersigning")]
     PublishCountersigningSessionTriggered,
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].

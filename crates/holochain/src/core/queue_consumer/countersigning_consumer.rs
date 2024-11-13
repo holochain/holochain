@@ -1,11 +1,13 @@
 //! The queue consumer for the countersigning workflow.
 
 use super::*;
+#[cfg(feature = "unstable-countersigning")]
 use crate::core::workflow::countersigning_workflow::countersigning_workflow;
 use tracing::*;
 
 /// Spawn the QueueConsumer for the countersigning workflow
 #[instrument(skip_all)]
+#[allow(unused_variables)]
 pub(crate) fn spawn_countersigning_consumer(
     space: Space,
     workspace: Arc<CountersigningWorkspace>,
@@ -22,6 +24,9 @@ pub(crate) fn spawn_countersigning_consumer(
         cell_id.clone(),
         conductor.task_manager(),
         (tx.clone(), rx),
+        #[cfg(not(feature = "unstable-countersigning"))]
+        move || async { WorkflowResult::Ok(WorkComplete::Complete) },
+        #[cfg(feature = "unstable-countersigning")]
         move || {
             countersigning_workflow_fn(
                 space.clone(),
@@ -38,6 +43,7 @@ pub(crate) fn spawn_countersigning_consumer(
     tx
 }
 
+#[cfg(feature = "unstable-countersigning")]
 async fn countersigning_workflow_fn(
     space: Space,
     workspace: Arc<CountersigningWorkspace>,
