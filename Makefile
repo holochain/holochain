@@ -101,3 +101,10 @@ test-workspace-wasmer_wamr:
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
+
+update-kitsune:
+	@if [ "$(ver)x" = "x" ]; then \
+		echo "USAGE: make update-kitsune ver=0.5.0-dev.1"; \
+		exit 1; \
+	fi
+	sed -i 's/^\(kitsune_p2p[^=]*= { \)version = "[^"]*"/\1version = "$(ver)"/g' $$(find . -name Cargo.toml -not -path "./crates/kitsune_p2p/*")
