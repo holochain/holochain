@@ -95,7 +95,7 @@ async fn ser_regression_test() {
 
     let app_api = AppInterfaceApi::new(conductors[0].clone());
     let request = Box::new(zome_call_params_signed.clone());
-    let request = AppRequest::CallZome(request).try_into().unwrap();
+    let request = AppRequest::CallZome(request);
     let response = app_api
         .handle_request("".to_string(), Ok(request))
         .await
@@ -140,7 +140,7 @@ async fn ser_regression_test() {
             .unwrap();
 
     let request = Box::new(zome_call_params_signed.clone());
-    let request = AppRequest::CallZome(request).try_into().unwrap();
+    let request = AppRequest::CallZome(request);
     let response = app_api
         .handle_request("".to_string(), Ok(request))
         .await
