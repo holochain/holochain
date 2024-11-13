@@ -7,28 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Kitsune P2P is no longer part of the root workspace for this repository. It is its own workspace, but the path references remain from 
+- Kitsune P2P is no longer part of the root workspace for this repository. It is its own workspace, but the path references remain from
   Holochain crates to Kitsune crates, so the build/test behaviour for Holochain should not change. This is in preparation for increasing
   the separation of the Kitsune module and allowing it to be moved to its own project to be maintained separately from this repository.
-- holochain_trace: **BREAKING** The `metrics` module has been removed from the `holochain_trace` crate. It was only used by Kitsune and 
+- holochain_trace: **BREAKING** The `metrics` module has been removed from the `holochain_trace` crate. It was only used by Kitsune and
   created a dependency into Holochain that Kitsune shouldn't have. The module has been moved to the `kitsune_p2p` create and renamed to `metrics_helper`.
-- **BREAKING** Countersigning has been put behind the feature `unstable-countersigning`. Even though in many use cases countersigning is expected to work correctly, it has known problems which can put the source chain into an unrecoverable state. Included in this feature is the HDK function `accept_countersigning_preflight_request` as well as `AppRequest`s related to countersigning and the counersigning workflow itself too. The `unstable-countersigning` feature is included in `unstable-functions`, hence when `unstable-functions` is enabled, so is `unstable-countersigning`. 
-- **BREAKING** The following HDK functions have been temporarily removed as "unstable". They can be re-enabled by building Holochain with the "unstable-functions" feature flag:
+
+## 0.5.0-dev.5
+
+- **BREAKING** Countersigning has been put behind the feature `unstable-countersigning`. Even though in many use cases countersigning is expected to work correctly, it has known problems which can put the source chain into an unrecoverable state. Included in this feature is the HDK function `accept_countersigning_preflight_request` as well as `AppRequest`s related to countersigning and the counersigning workflow itself too. The `unstable-countersigning` feature is included in `unstable-functions`, hence when `unstable-functions` is enabled, so is `unstable-countersigning`.
+- **BREAKING** The following HDK functions have been temporarily removed as “unstable”. They can be re-enabled by building Holochain with the “unstable-functions” feature flag:
   - `accept_countersigning_preflight_request`
   - `block_agent`
   - `unblock_agent`
   - `get_agent_key_lineage`
   - `is_same_agent`
   - `schedule`
-  - the function `sleep` has been removed entirely because it wasn't implemented
-  - and the HDI function `is_same_agent`
-    Note that installing apps that have been built with an HDK from before this change will not be possible to install on
-    a conductor that has been built without the `unstable-functions` feature. You will get import errors when Holochain tries
-    to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto
-    a conductor which has been compiled with `unstable-functions` but the reverse is not true. #4371
-- Fix a problem with countersigning where it would stay in resolution when entering an unknown state from a restart. This 
-  was intended behaviour previously to ensure the agent got a change to get online before giving up on countersigning but 
-  it is not necessary now that we consider network errors to be a failed resolution and always retry.
+  - the function `sleep` has been removed entirely because it wasn’t implemented
+  - and the HDI function `is_same_agent` Note that installing apps that have been built with an HDK from before this change will not be possible to install on a conductor that has been built without the `unstable-functions` feature. You will get import errors when Holochain tries to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto a conductor which has been compiled with `unstable-functions` but the reverse is not true. \#4371
+- Fix a problem with countersigning where it would stay in resolution when entering an unknown state from a restart. This was intended behaviour previously to ensure the agent got a change to get online before giving up on countersigning but it is not necessary now that we consider network errors to be a failed resolution and always retry.
 
 ## 0.5.0-dev.4
 
