@@ -40,7 +40,9 @@ pub type HoloHashOf<C> = HoloHash<<C as HashableContent>::HashType>;
 // (string encoding)
 
 #[cfg(feature = "encoding")]
-pub use encode::{blake2b_256, holo_hash_decode, holo_hash_decode_unchecked, holo_hash_encode};
+pub use encode::{
+    blake2b_256, holo_hash_decode, holo_hash_decode_unchecked, holo_hash_encode, sha2_512,
+};
 
 /// By default, disable string encoding and just display raw bytes
 #[cfg(not(feature = "encoding"))]
