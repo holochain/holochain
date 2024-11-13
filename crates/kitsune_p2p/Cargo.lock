@@ -2145,7 +2145,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.5.0-dev.4"
+version = "0.5.0-dev.5"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -2224,7 +2224,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap"
-version = "0.4.0-dev.4"
+version = "0.4.0-dev.5"
 dependencies = [
  "clap",
  "criterion",
@@ -2246,7 +2246,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap_client"
-version = "0.5.0-dev.4"
+version = "0.5.0-dev.5"
 dependencies = [
  "arbitrary",
  "ed25519-dalek",
@@ -2314,7 +2314,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_fetch"
-version = "0.5.0-dev.4"
+version = "0.5.0-dev.5"
 dependencies = [
  "arbitrary",
  "backon",
@@ -2368,7 +2368,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_types"
-version = "0.5.0-dev.4"
+version = "0.5.0-dev.5"
 dependencies = [
  "arbitrary",
  "base64 0.22.1",
