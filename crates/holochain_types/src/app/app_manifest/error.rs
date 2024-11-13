@@ -9,6 +9,9 @@ pub enum AppManifestError {
     #[error("Missing required field in app manifest: {0}")]
     MissingField(String),
 
+    #[error("Invalid role name: {0}")]
+    InvalidRoleName(String),
+
     #[error("Invalid manifest for app role '{0}': Using strategy 'clone-only' with clone_limit == 0 is pointless")]
     InvalidStrategyCloneOnly(RoleName),
 

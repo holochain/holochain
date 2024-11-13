@@ -27,6 +27,9 @@ pub enum ConductorError {
     AppHasDependents(InstalledAppId, Vec<InstalledAppId>),
 
     #[error(transparent)]
+    AppManifestError(#[from] AppManifestError),
+
+    #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
 
     #[error("Cell already exists. CellId: {0:?}")]
