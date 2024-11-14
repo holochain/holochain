@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p"
-version = "0.5.0-dev.4"
+version = "0.5.0-dev.5"
 description = "p2p / dht communication framework"
 license = "CAL-1.0"
 homepage = "https://github.com/holochain/holochain"
@@ -20,15 +20,15 @@ derive_more = "0.99"
 futures = "0.3"
 ghost_actor = "=0.3.0-alpha.6"
 governor = "0.3.2"
-kitsune_p2p_fetch = { version = "^0.5.0-dev.4", path = "../fetch" }
+kitsune_p2p_fetch = { version = "^0.5.0-dev.5", path = "../fetch" }
 kitsune_p2p_mdns = { version = "^0.5.0-dev.1", path = "../mdns" }
 kitsune_p2p_timestamp = { version = "^0.5.0-dev.0", path = "../timestamp", features = [
   "now",
 ] }
 kitsune_p2p_block = { version = "^0.5.0-dev.2", path = "../block" }
-kitsune_p2p_bootstrap_client = { version = "^0.5.0-dev.4", path = "../bootstrap_client" }
+kitsune_p2p_bootstrap_client = { version = "^0.5.0-dev.5", path = "../bootstrap_client" }
 kitsune_p2p_bin_data = { version = "^0.5.0-dev.2", path = "../bin_data" }
-kitsune_p2p_types = { version = "^0.5.0-dev.4", path = "../types", default-features = false }
+kitsune_p2p_types = { version = "^0.5.0-dev.5", path = "../types", default-features = false }
 must_future = "0.1.1"
 nanoid = "0.4"
 num-traits = "0.2"
@@ -44,7 +44,7 @@ thiserror = "1.0.22"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
 tokio-stream = "0.1"
-tx5 = { version = "=0.1.4-beta" }
+tx5 = { version = "=0.1.5-beta" }
 url2 = "0.0.6"
 
 # fuzzing
@@ -56,8 +56,8 @@ proptest-derive = { version = "0", optional = true }
 blake2b_simd = { version = "1.0", optional = true }
 maplit = { version = "1", optional = true }
 mockall = { version = "0.11.3", optional = true }
-sbd-server = { version = "=0.0.7-alpha", optional = true }
-tx5-signal-srv = { version = "=0.0.9-alpha", optional = true }
+sbd-server = { version = "=0.0.8-alpha", optional = true }
+tx5-signal-srv = { version = "=0.0.16-alpha", optional = true }
 fixt = { path = "../../fixt", version = "^0.5.0-dev.0", optional = true }
 
 [dev-dependencies]
@@ -73,7 +73,7 @@ kitsune_p2p_timestamp = { path = "../timestamp", features = [
 kitsune_p2p_types = { path = "../types", features = ["test_utils"] }
 maplit = "1"
 pretty_assertions = "1.4.0"
-sbd-server = "=0.0.7-alpha"
+sbd-server = "=0.0.8-alpha"
 test-case = "3.3"
 tokio = { version = "1.11", features = ["full", "test-util"] }
 tracing-subscriber = "0.3.16"
