@@ -28,7 +28,7 @@ use holochain_websocket::*;
 use matches::assert_matches;
 use rand::rngs::OsRng;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use tracing::*;
 
@@ -640,14 +640,31 @@ async fn connection_limit_is_respected() {
     // Disconnect all the clients
     handles.clear();
 
+    // Wait up to 2 seconds for new connections to be permitted
+    let now = Instant::now();
+    while now.elapsed() < Duration::from_secs(2) {
+        let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
+        let rx = WsPollRecv::new::<AdminResponse>(rx);
+
+        // Getting a sender back isn't enough to know that the connection succeeded because the other side takes a moment to shutdown, try sending to be sure
+        if sender
+            .request::<AdminRequest, AdminResponse>(AdminRequest::ListDnas)
+            .await
+            .is_ok()
+        {
+            handles.push((sender, rx));
+            break;
+        }
+    }
+
     // Should now be possible to connect new clients
-    for count in 0..MAX_CONNECTIONS {
+    while handles.len() < MAX_CONNECTIONS {
         let (sender, rx) = connect(cfg.clone(), addr).await.unwrap();
         let rx = WsPollRecv::new::<AdminResponse>(rx);
         let _: AdminResponse = sender
             .request(AdminRequest::ListDnas)
             .await
-            .map_err(|e| Error::other(format!("Admin request should succeed because there are enough available connections: {count}: {e:?}")))
+            .map_err(|e| Error::other(format!("Admin request should succeed because there are enough available connections: {e:?}")))
             .unwrap();
         handles.push((sender, rx));
     }
