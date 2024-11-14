@@ -551,11 +551,11 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
     } = args;
 
     let roles_settings = match roles_settings {
-        None => None,
         Some(path) => {
             let yaml_string = std::fs::read_to_string(path)?;
             Some(serde_yaml::from_str::<RoleSettingsMap>(&yaml_string)?)
         }
+        None => None,
     };
 
     let payload = InstallAppPayload {
