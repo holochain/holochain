@@ -197,6 +197,8 @@ impl From<Vec<u8>> for KitsuneOpData {
 
 impl std::fmt::Debug for KitsuneOpData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // If this data is more than 4 bytes then just output the first and last byte as hex,
+        // separated by an ellipsis and then the length in bytes.
         let data = if self.0.len() > 32 {
             let mut data = hex::encode(&self.0[0..8]);
             data.push_str("..");
