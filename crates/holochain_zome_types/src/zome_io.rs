@@ -309,8 +309,6 @@ pub struct ZomeCallParams {
     pub expires_at: Timestamp,
 }
 
-// type SerializedBytesAndHash = (Arc<[u8])
-
 impl ZomeCallParams {
     /// Prepare the canonical bytes for zome call parameters so that they are
     /// always signed and verified in the same way.
