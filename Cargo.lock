@@ -2903,7 +2903,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "must_future",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -3248,7 +3248,7 @@ dependencies = [
  "holochain_util",
  "kitsune_p2p_timestamp",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -4394,7 +4394,7 @@ dependencies = [
  "hex",
  "kitsune_p2p_dht_arc",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.0",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
@@ -6748,9 +6748,9 @@ dependencies = [
 
 [[package]]
 name = "sbd-client"
-version = "0.0.7-alpha"
+version = "0.0.8-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edff08e64eed2000fa285339a6b258bd0221af90f83890a15a28cfde0f7c08f0"
+checksum = "7af51493c7b0233ad96af18edaace4190d19a1b3b7c231f61b4a0c7f9bf13ef7"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -6767,9 +6767,9 @@ dependencies = [
 
 [[package]]
 name = "sbd-e2e-crypto-client"
-version = "0.0.7-alpha"
+version = "0.0.8-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e03a626b13060a9ffc48b112a7c67e860e43256be001c9c4b9bb566c040dd0c"
+checksum = "6213eb9eaa35d0e8e57172e5367f2a9c3cfd6011db268143a14c6324ea15c13b"
 dependencies = [
  "sbd-client",
  "sodoken 0.0.901-alpha",
@@ -6779,9 +6779,9 @@ dependencies = [
 
 [[package]]
 name = "sbd-server"
-version = "0.0.7-alpha"
+version = "0.0.8-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c0b583705127c7807a491c5ec849b989dd336c469e95762ce1691cdb10b2b6f"
+checksum = "1cda36e498d8b8d32fda399807b58c68f939a54777c104287840264725338ce9"
 dependencies = [
  "anstyle",
  "base64 0.22.1",
@@ -8170,9 +8170,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.1.4-beta"
+version = "0.1.5-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d32c6dcf4a0f15ea07fea5b23fbe8633a1e620e65ba6e92d789fb7ca1e4e5eb0"
+checksum = "3f994c9c78cd32bdf4fe814f73deb46346a2e3d8b0258a9cc6349f7cffea9532"
 dependencies = [
  "base64 0.22.1",
  "futures",
@@ -8182,30 +8182,32 @@ dependencies = [
  "tokio",
  "tracing",
  "tx5-connection",
- "tx5-core 0.1.4-beta",
+ "tx5-core 0.1.5-beta",
  "url",
 ]
 
 [[package]]
 name = "tx5-connection"
-version = "0.1.4-beta"
+version = "0.1.5-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "119bfe4084cd1dc59f1bd14c357d495d85c6d52ec98a86f4c8905596b626f957"
+checksum = "c768f3c4e732c8f4e5ac8c458eb638c9ee4d5cec9a079aaae3b14bc625027ada"
 dependencies = [
  "bit_field",
  "futures",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
- "tx5-core 0.1.4-beta",
+ "tx5-core 0.1.5-beta",
  "tx5-go-pion",
  "tx5-signal",
 ]
 
 [[package]]
 name = "tx5-core"
-version = "0.0.9-alpha"
+version = "0.0.16-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a45e91402a7c17bda8835acb47c7460dc3880dc067235d324401a7359857a75"
+checksum = "140653788727a8aa2b4bd4d0af87cdc374956104c27aa092c5c965a11db39073"
 dependencies = [
  "base64 0.13.1",
  "once_cell",
@@ -8219,9 +8221,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-core"
-version = "0.1.4-beta"
+version = "0.1.5-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adc73b936d41ca8841103d214a597c9a883abddc73829ef120345f9decd971d9"
+checksum = "fa653b3dc7b127c29fca5bd9ba70a31afa1c9df3c796f35efca576b10c2aaa13"
 dependencies = [
  "app_dirs2",
  "base64 0.22.1",
@@ -8238,9 +8240,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.1.4-beta"
+version = "0.1.5-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "420dc04917010c77377489529fb544d65d3da0510c0cd3822cdd67eecbeb1952"
+checksum = "a930b75b6baf3bae2090e44fe9ff4566f7ae4d979e6794f82ce0207b2fed7a82"
 dependencies = [
  "futures",
  "parking_lot 0.12.3",
@@ -8252,9 +8254,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.1.4-beta"
+version = "0.1.5-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ac53ef94f8c5f7279002337ec33a8fd20081aea6ce2bbf89fd208d6352ce898"
+checksum = "b9d40c7d4bec6f9ca0f379981a99ec8765f01e7812a4dc0a27c021cb988c89a5"
 dependencies = [
  "Inflector",
  "base64 0.22.1",
@@ -8265,15 +8267,15 @@ dependencies = [
  "ouroboros",
  "sha2",
  "tracing",
- "tx5-core 0.1.4-beta",
+ "tx5-core 0.1.5-beta",
  "zip 0.6.6",
 ]
 
 [[package]]
 name = "tx5-go-pion-turn"
-version = "0.1.4-beta"
+version = "0.1.5-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73a674c7204a6ad21f4d7118f147cedb2e43424a5430d06fc463366d4d63c571"
+checksum = "80a2648d5eaa7bc0feb2a90be2b84b148d1ae2a254d568f77d3cc41005648f03"
 dependencies = [
  "base64 0.22.1",
  "dirs",
@@ -8283,28 +8285,28 @@ dependencies = [
  "sha2",
  "tokio",
  "tracing",
- "tx5-core 0.1.4-beta",
+ "tx5-core 0.1.5-beta",
  "zip 0.6.6",
 ]
 
 [[package]]
 name = "tx5-signal"
-version = "0.1.4-beta"
+version = "0.1.5-beta"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9771237526b251b3b0276e4723dc142e632ff206a51e23321992fe953a3d4f6"
+checksum = "c4d507c5cd6e14fd81cc6d2a6571b1eba35eeda7c11cc00ac56ed7d109cd1265"
 dependencies = [
  "rand 0.8.5",
  "sbd-e2e-crypto-client",
  "tokio",
  "tracing",
- "tx5-core 0.1.4-beta",
+ "tx5-core 0.1.5-beta",
 ]
 
 [[package]]
 name = "tx5-signal-srv"
-version = "0.0.9-alpha"
+version = "0.0.16-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a24b13f9032042ef2c30647998ba21882dbf411435071b6fe587a2c1e0992b28"
+checksum = "129782eaa5ab5445b02776307f38a6eebe4a3de41c3821330ba7de9fc19195bc"
 dependencies = [
  "clap 4.5.20",
  "dirs",
@@ -8317,7 +8319,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "tx5-core 0.0.9-alpha",
+ "tx5-core 0.0.16-alpha",
  "warp",
 ]
 
