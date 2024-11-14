@@ -24,6 +24,7 @@ use crate::test_utils::fake_genesis;
 use ::fixt::prelude::*;
 pub use holo_hash::fixt::*;
 use holo_hash::WasmHash;
+use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_keystore::test_keystore;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaFixturator;
@@ -513,29 +514,39 @@ fixturator!(
 fixturator!(
     ZomeCallInvocation;
     curve Empty ZomeCallInvocation {
+        signed_params: ZomeCallParamsSigned {
+            bytes: ExternIoFixturator::new(Empty).next().unwrap(),
+            signature: SignatureFixturator::new(Empty).next().unwrap(),
+        },
         cell_id: CellIdFixturator::new(Empty).next().unwrap(),
         zome: ZomeFixturator::new(Empty).next().unwrap(),
         cap_secret: Some(CapSecretFixturator::new(Empty).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
         payload: ExternIoFixturator::new(Empty).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
-        signature: SignatureFixturator::new(Empty).next().unwrap(),
         nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()),
         expires_at: TimestampFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallInvocation {
+        signed_params: ZomeCallParamsSigned {
+            bytes: ExternIoFixturator::new(Unpredictable).next().unwrap(),
+            signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
+        },
         cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
         zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
         payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
         provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
-        signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
         nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()),
         // @todo should this be less predictable?
         expires_at: (Timestamp::now() + std::time::Duration::from_secs(30)).unwrap(),
     };
     curve Predictable ZomeCallInvocation {
+        signed_params: ZomeCallParamsSigned {
+            bytes: ExternIoFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+            signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
+        },
         cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
@@ -554,7 +565,6 @@ fixturator!(
         provenance: AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
         nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
         // @todo should this be more predictable?
         expires_at: (Timestamp::now() + std::time::Duration::from_secs(30)).unwrap(),

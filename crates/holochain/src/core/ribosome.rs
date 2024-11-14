@@ -60,6 +60,7 @@ use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::DpkiApi;
 use crate::conductor::api::ZomeCall;
+use crate::conductor::api::ZomeCallParamsSigned;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
@@ -370,13 +371,12 @@ pub trait Invocation: Clone + Send + Sync {
 
 impl ZomeCallInvocation {
     pub async fn verify_signature(&self) -> RibosomeResult<ZomeCallAuthorization> {
+        // Signature is verified against the hash of the signed zome call parameter bytes.
+        let bytes_hash = sha2_512(self.signed_params.bytes.as_bytes());
         Ok(
             if self
                 .provenance
-                .verify_signature_raw(
-                    &self.signature,
-                    ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?,
-                )
+                .verify_signature_raw(&self.signed_params.signature, bytes_hash.into())
                 .await?
             {
                 ZomeCallAuthorization::Authorized
@@ -498,6 +498,9 @@ mockall::mock! {
 /// i.e. coming from outside the Cell from an external Interface
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeCallInvocation {
+    /// The signed zome call consisting of serialized bytes of the zome call params and the
+    /// signature of the bytes.
+    pub signed_params: ZomeCallParamsSigned,
     /// The Id of the `Cell` in which this Zome-call would be invoked
     pub cell_id: CellId,
     /// The Zome containing the function that would be invoked
@@ -514,9 +517,6 @@ pub struct ZomeCallInvocation {
     /// The provenance of the call. Provenance means the 'source'
     /// so this expects the `AgentPubKey` of the agent calling the Zome function
     pub provenance: AgentPubKey,
-    /// The signature of the call from the provenance of the call.
-    /// Everything except the signature itself is signed.
-    pub signature: Signature,
     /// The nonce of the call. Must be unique and monotonic.
     /// If a higher nonce has been seen then older zome calls will be discarded.
     pub nonce: Nonce256Bits,
@@ -545,27 +545,30 @@ impl ZomeCallInvocation {
         call: ZomeCall,
     ) -> RibosomeResult<Self> {
         let ZomeCall {
-            cell_id,
-            zome_name,
-            fn_name,
-            cap_secret,
-            payload,
-            provenance,
-            signature,
-            nonce,
-            expires_at,
+            signed: signed_zome_call,
+            params:
+                ZomeCallParams {
+                    cap_secret,
+                    cell_id,
+                    expires_at,
+                    fn_name,
+                    nonce,
+                    payload,
+                    provenance,
+                    zome_name,
+                },
         } = call;
         let zome = conductor_api
             .get_zome(cell_id.dna_hash(), &zome_name)
             .map_err(|conductor_api_error| RibosomeError::from(Box::new(conductor_api_error)))?;
         Ok(Self {
+            signed_params: signed_zome_call,
             cell_id,
             zome,
             cap_secret,
             fn_name,
             payload,
             provenance,
-            signature,
             nonce,
             expires_at,
         })
@@ -575,26 +578,28 @@ impl ZomeCallInvocation {
 impl From<ZomeCallInvocation> for ZomeCall {
     fn from(inv: ZomeCallInvocation) -> Self {
         let ZomeCallInvocation {
+            signed_params: signed_zome_call,
             cell_id,
             zome,
             fn_name,
             cap_secret,
             payload,
             provenance,
-            signature,
             nonce,
             expires_at,
         } = inv;
         Self {
-            cell_id,
-            zome_name: zome.zome_name().clone(),
-            fn_name,
-            cap_secret,
-            payload,
-            provenance,
-            signature,
-            nonce,
-            expires_at,
+            signed: signed_zome_call,
+            params: ZomeCallParams {
+                cell_id,
+                provenance,
+                zome_name: zome.zome_name().clone(),
+                fn_name,
+                cap_secret,
+                payload,
+                nonce,
+                expires_at,
+            },
         }
     }
 }
@@ -762,8 +767,8 @@ pub fn weigh_placeholder() -> EntryRateWeight {
 
 #[cfg(test)]
 pub mod wasm_test {
+    use crate::conductor::api::ZomeCall;
     use crate::core::ribosome::FnComponents;
-    use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetCell;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
@@ -775,7 +780,7 @@ pub mod wasm_test {
     use holochain_keystore::AgentPubKeyExt;
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use holochain_zome_types::zome_io::ZomeCallParams;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -796,7 +801,7 @@ pub mod wasm_test {
 
         let now = Timestamp::now();
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
-        let alice_unsigned_zome_call = ZomeCallUnsigned {
+        let alice_unsigned_zome_call = ZomeCallParams {
             provenance: alice_pubkey.clone(),
             cell_id: alice.cell_id().clone(),
             zome_name: "foo".into(),
@@ -806,21 +811,17 @@ pub mod wasm_test {
             nonce,
             expires_at,
         };
-        let alice_signed_zome_call = ZomeCall::try_from_unsigned_zome_call(
-            &conductor.keystore(),
-            alice_unsigned_zome_call.clone(),
-        )
-        .await
-        .unwrap();
+        let alice_signed_zome_call =
+            ZomeCall::try_from_params(&conductor.keystore(), alice_unsigned_zome_call.clone())
+                .await
+                .unwrap();
 
         // Bob observes or forges a valid zome call from alice.
         // He removes Alice's signature but leaves her provenance and adds his own signature.
         let mut bob_signed_zome_call = alice_signed_zome_call.clone();
-        bob_signed_zome_call.signature = bob_pubkey
-            .sign_raw(
-                &conductor.keystore(),
-                alice_unsigned_zome_call.data_to_sign().unwrap(),
-            )
+        let (_, bytes_hash) = alice_unsigned_zome_call.serialize_and_hash().unwrap();
+        bob_signed_zome_call.signed.signature = bob_pubkey
+            .sign_raw(&conductor.keystore(), bytes_hash.into())
             .await
             .unwrap();
 

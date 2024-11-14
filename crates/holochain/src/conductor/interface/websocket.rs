@@ -489,6 +489,7 @@ pub mod test {
     use crate::conductor::api::AdminRequest;
     use crate::conductor::api::AdminResponse;
     use crate::conductor::api::AppInterfaceApi;
+    use crate::conductor::api::ZomeCall;
     use crate::conductor::conductor::ConductorBuilder;
     use crate::conductor::state::ConductorState;
     use crate::conductor::Conductor;
@@ -634,9 +635,9 @@ pub mod test {
         // Call Zome
         let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
         let request = AppRequest::CallZome(Box::new(
-            ZomeCall::try_from_unsigned_zome_call(
+            ZomeCallParamsSigned::try_from_params(
                 conductor_handle.keystore(),
-                ZomeCallUnsigned {
+                ZomeCallParams {
                     provenance: agent_key.clone(),
                     cell_id: cell_id.clone(),
                     zome_name: TestWasm::EmitSignal.coordinator_zome_name(),
@@ -734,7 +735,7 @@ pub mod test {
         respond: R,
     ) {
         // Now make sure we can call a zome once again
-        let mut request: ZomeCall =
+        let mut zome_call: ZomeCall =
             crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
                 cell_id.clone(),
                 wasm,
@@ -744,13 +745,14 @@ pub mod test {
             .next()
             .unwrap()
             .into();
-        request.cell_id = cell_id;
-        request = request
-            .resign_zome_call(&test_keystore(), fixt!(AgentPubKey, Predictable, 0))
-            .await
-            .unwrap();
+        zome_call.params.cell_id = cell_id;
+        zome_call.params.provenance = fixt!(AgentPubKey, Predictable, 0);
+        zome_call.signed =
+            ZomeCallParamsSigned::try_from_params(&test_keystore(), zome_call.params)
+                .await
+                .unwrap();
 
-        let msg = AppRequest::CallZome(Box::new(request));
+        let msg = AppRequest::CallZome(Box::new(zome_call.signed));
         test_handle_incoming_app_message(
             "".to_string(),
             msg,
