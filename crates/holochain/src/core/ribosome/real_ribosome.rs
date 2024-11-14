@@ -1178,7 +1178,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use holochain_zome_types::zome_io::ZomeCallParams;
     use parking_lot::Mutex;
     use std::collections::HashMap;
     use std::sync::Arc;
@@ -1313,9 +1313,9 @@ pub mod wasm_test {
         let infallible_result = conductor
             .raw_handle()
             .call_zome(
-                ZomeCall::try_from_unsigned_zome_call(
+                ZomeCall::try_from_params(
                     conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
+                    ZomeCallParams {
                         cell_id: alice.cell_id().clone(),
                         zome_name: alice.name().clone(),
                         fn_name: "infallible".into(),

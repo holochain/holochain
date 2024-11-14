@@ -290,7 +290,7 @@ impl ZomeCallResponse {
 /// Zome calls need to be signed regardless of how they are called.
 /// This defines exactly what needs to be signed.
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ZomeCallUnsigned {
+pub struct ZomeCallParams {
     /// Provenance to sign.
     pub provenance: AgentPubKey,
     /// Cell ID to sign.
@@ -309,10 +309,13 @@ pub struct ZomeCallUnsigned {
     pub expires_at: Timestamp,
 }
 
-impl ZomeCallUnsigned {
-    /// Prepare the canonical bytes for an unsigned zome call so that it is
+impl ZomeCallParams {
+    /// Prepare the canonical bytes for zome call parameters so that they are
     /// always signed and verified in the same way.
-    pub fn data_to_sign(&self) -> Result<std::sync::Arc<[u8]>, SerializedBytesError> {
-        Ok(holo_hash::encode::blake2b_256(&holochain_serialized_bytes::encode(&self)?).into())
+    /// Signature is generated for the hash of the bytes.
+    pub fn serialize_and_hash(&self) -> Result<(Vec<u8>, Vec<u8>), SerializedBytesError> {
+        let bytes = holochain_serialized_bytes::encode(&self)?;
+        let bytes_hash = sha2_512(&bytes);
+        Ok((bytes, bytes_hash))
     }
 }
