@@ -869,6 +869,7 @@ impl MetaNet {
         preflight_user_data: PreflightUserData,
     ) -> KitsuneP2pResult<(Self, MetaNetEvtRecv, Option<String>)> {
         use kitsune_p2p_types::codec::{rmp_decode, rmp_encode};
+        use tx5::backend::BackendModule;
 
         let (mut evt_send, evt_recv) =
             futures::channel::mpsc::channel(tuning_params.concurrent_limit_per_thread);
@@ -895,6 +896,8 @@ impl MetaNet {
             timeout: std::time::Duration::from_secs(tuning_params.tx5_timeout_s as u64),
             backoff_start: std::time::Duration::from_secs(tuning_params.tx5_backoff_start_s as u64),
             backoff_max: std::time::Duration::from_secs(tuning_params.tx5_backoff_max_s as u64),
+            backend_module: BackendModule::GoPion,
+            backend_module_config: None,
             preflight: Some((
                 Arc::new(move |_| {
                     let i_s = kitsune_internal_sender.clone();
