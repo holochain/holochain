@@ -274,7 +274,7 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
     assert!(exit_code.success());
 }
 
-/// Generates a new sandbox with roles settings overriden by a yaml file passed via
+/// Generates a new sandbox with roles settings overridden by a yaml file passed via
 /// the --roles-settings argument and verifies that the modifiers have been set
 /// correctly
 #[tokio::test(flavor = "multi_thread")]
