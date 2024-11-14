@@ -262,13 +262,15 @@ impl MetaNetTask {
             wire::Wire::PeerQuery(wire::PeerQuery { space, basis_loc }) => {
                 // this *does* go over the network...
                 // so we don't want it to be too many
-                const LIMIT: u32 = 8;
-                let query = QueryAgentsEvt::new(space)
-                    .near_basis(basis_loc)
-                    .limit(LIMIT);
-                let resp = match self.host.legacy.query_agents(query).await {
-                    Ok(list) => wire::Wire::peer_query_resp(list),
-                    Err(err) => wire::Wire::failure(format!("Error querying agents: {:?}", err,)),
+                const LIMIT: usize = 8;
+                let resp = match self.peer_super.get(&space).await {
+                    Some(peer_store) => {
+                        match peer_store.query_by_location(basis_loc.into(), LIMIT).await {
+                            Ok(list) => wire::Wire::peer_query_resp(list.into_iter().filter_map(super::AgentInfoSigned::downcast).collect()),
+                            Err(err) => wire::Wire::failure(format!("Error querying agents: {:?}", err,)),
+                        }
+                    }
+                    None => wire::Wire::failure("No such space".into()),
                 };
                 respond(resp).await;
             }
@@ -311,12 +313,12 @@ impl MetaNetTask {
     ) {
         let resp = match self
             .peer_super
-            .get(space)
+            .get(&space)
             .await
         {
             Some(peer_store) => {
                 match peer_store.get(agent).await {
-                    Ok(Some(info)) => wire::Wire::peer_get_resp(info),
+                    Ok(Some(info)) =>  wire::Wire::peer_get_resp(super::AgentInfoSigned::downcast(info)),
                     Ok(None) => wire::Wire::failure("No such agent".into()),
                     Err(err) => wire::Wire::failure(format!("Error getting agent: {:?}", err,)),
                 }
@@ -433,8 +435,8 @@ impl MetaNetTask {
                 BroadcastData::AgentInfo(agent_info) => {
                     // TODO: Should we check if the basis is
                     //       held before calling put_agent_info_signed?
-                    if let Some(peer_store) = self.peer_super.get(agent_info.space()).await {
-                        let _ = peer_store.insert(vec![agent_info]).await;
+                    if let Some(peer_store) = self.peer_super.get(&agent_info.space).await {
+                        let _ = peer_store.insert(vec![agent_info.into_dyn()]).await;
                     }
                     Ok(())
                 }
@@ -609,17 +611,7 @@ impl MetaNetTask {
                 }
             }
             wire::Wire::PeerUnsolicited(wire::PeerUnsolicited { peer_list }) => {
-                use std::collections::HashMap;
-                let r: HashMap<Arc<KitsuneSpace>, Vec<super::AgentInfoSigned>> = peer_list
-                    .into_iter()
-                    .fold(HashMap::new(), |mut m, i| {
-                        m.entry(i.space()).or_default().push(i);
-                    });
-                for (space, peer_list) in r {
-                    if let Some(peer_store) = self.peer_store.get(space).await {
-                        let _ = peer_store.insert(peer_list).await;
-                    }
-                }
+                self.peer_super.insert(peer_list).await;
 
                 Ok(())
             }

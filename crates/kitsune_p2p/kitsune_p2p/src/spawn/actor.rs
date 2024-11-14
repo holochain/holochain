@@ -134,13 +134,28 @@ impl Default for PeerSuperStore {
 }
 
 impl PeerSuperStore {
+    /// Put a list of multi-space agent infos into their correct stores
+    pub async fn insert(&self, list: Vec<AgentInfoSigned>) {
+        let r: HashMap<Arc<KitsuneSpace>, Vec<kitsune2_api::agent::DynAgentInfo>> = list
+            .into_iter()
+            .fold(HashMap::new(), |mut m, i| {
+                m.entry(i.space.clone()).or_default().push(i.into_dyn());
+                m
+            });
+        for (space, peer_list) in r {
+            if let Some(peer_store) = self.get(&space).await {
+                let _ = peer_store.insert(peer_list).await;
+            }
+        }
+    }
+
     /// Get a space, or None.
-    pub async fn get(&self, space: Arc<KitsuneSpace>) -> Option<kitsune2_api::peer_store::DynPeerStore> {
+    pub async fn get(&self, space: &Arc<KitsuneSpace>) -> Option<kitsune2_api::peer_store::DynPeerStore> {
         let fut = self.0.lock().unwrap().get(space).cloned();
         match fut {
             Some(fut) => match fut.await {
                 Ok(store) => Some(store),
-                None => None,
+                _ => None,
             }
             None => None,
         }
@@ -149,14 +164,15 @@ impl PeerSuperStore {
     /// Get a space, creating a new one if one doesn't already exist.
     pub async fn assert(&self, space: Arc<KitsuneSpace>) -> std::io::Result<kitsune2_api::peer_store::DynPeerStore> {
         self.0.lock().unwrap().entry(space).or_insert_with(move || {
-            Box::pin(async move {
+            async move {
+                use kitsune2::BuilderExt;
                 // TODO - as we fill out the kitsune2 usage, this should come
                 //        from a builder. But for now, we're just instantiating
-                //        itdirectly.
+                //        it directly.
                 let factory = kitsune2::factories::MemPeerStoreFactory::create();
                 factory.create(Arc::new(kitsune2_api::builder::Builder::create_default())).await.map_err(Arc::new)
-            })
-        }).clone()
+            }.boxed().shared()
+        }).clone().await.map_err(std::io::Error::other)
     }
 }
 
@@ -189,6 +205,7 @@ impl KitsuneP2pActor {
         config: KitsuneP2pConfig,
         channel_factory: ghost_actor::actor_builder::GhostActorChannelFactory<Self>,
         internal_sender: ghost_actor::GhostSender<Internal>,
+        peer_super: PeerSuperStore,
         direct_host_api: HostApiLegacy,
         self_host_api: HostApiLegacy,
         ep_hnd: MetaNet,
@@ -222,6 +239,7 @@ impl KitsuneP2pActor {
         ));
 
         MetaNetTask::new(
+            peer_super.clone(),
             self_host_api.clone(),
             config.clone(),
             fetch_pool.clone(),
@@ -236,7 +254,7 @@ impl KitsuneP2pActor {
             internal_sender,
             ep_hnd,
             host_api: direct_host_api,
-            peer_super: PeerSuperStore::default(),
+            peer_super,
             spaces: HashMap::new(),
             config: Arc::new(config),
             bootstrap_net,
@@ -252,6 +270,7 @@ pub(super) async fn create_meta_net(
     config: &KitsuneP2pConfig,
     _tls_config: tls::TlsConfig,
     internal_sender: ghost_actor::GhostSender<Internal>,
+    peer_super: PeerSuperStore,
     host: HostApiLegacy,
     preflight_user_data: PreflightUserData,
 ) -> KitsuneP2pResult<(MetaNet, MetaNetEvtRecv, BootstrapNet, Option<String>)> {
@@ -282,6 +301,7 @@ pub(super) async fn create_meta_net(
         };
         let (h, e, p) = MetaNet::new_tx5(
             Arc::new(tune),
+            peer_super,
             host.clone(),
             internal_sender.clone(),
             signal_url,
@@ -628,6 +648,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         agent: Arc<KitsuneAgent>,
         maybe_agent_info: Option<AgentInfoSigned>,
         initial_arq: Option<Arq>,
+        topo: crate::dht::prelude::Topology
     ) -> KitsuneP2pHandlerResult<()> {
         let internal_sender = self.internal_sender.clone();
         let peer_super = self.peer_super.clone();
@@ -674,7 +695,7 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         Ok(async move {
             let (space_sender, _) = space_sender.await;
             space_sender
-                .join(space, agent, maybe_agent_info, initial_arq)
+                .join(space, agent, maybe_agent_info, initial_arq, topo)
                 .await
         }
         .boxed()

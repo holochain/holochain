@@ -128,11 +128,11 @@ pub(crate) async fn spawn_space(
     parallel_notify_permit: Arc<tokio::sync::Semaphore>,
     fetch_pool: FetchPool,
     local_url: Arc<std::sync::Mutex<Option<String>>>,
+    topo: crate::dht::prelude::Topology,
 ) -> KitsuneP2pResult<(
     ghost_actor::GhostSender<KitsuneP2p>,
     ghost_actor::GhostSender<SpaceInternal>,
     KitsuneP2pEventReceiver,
-    Arc<SpaceReadOnlyInner>,
 )> {
     let (evt_send, evt_recv) = futures::channel::mpsc::channel(10);
 
@@ -162,12 +162,12 @@ pub(crate) async fn spawn_space(
         parallel_notify_permit,
         fetch_pool,
         local_url,
-    ).await?;
-    let ro_inner = space.ro_inner.clone();
+        topo,
+    );
 
     tokio::task::spawn(builder.spawn(space));
 
-    Ok((sender, i_s, evt_recv, ro_inner))
+    Ok((sender, i_s, evt_recv))
 }
 
 impl ghost_actor::GhostHandler<SpaceInternal> for Space {}
@@ -673,16 +673,36 @@ struct UpdateAgentInfoInput<'borrow> {
     _mdns_handles: &'borrow mut HashMap<Vec<u8>, Arc<AtomicBool>>,
     bootstrap_service: &'borrow Option<Url2>,
     dynamic_arcs: bool,
+    peer_store: &'borrow kitsune2_api::peer_store::DynPeerStore,
+    strat: &'borrow PeerStrat,
+    topo: &'borrow crate::dht::prelude::Topology,
 }
 
+/// TODO -
+/// arc length management should be split up into a separate "sharding" module.
 async fn update_arc_length(
-    evt_sender: &futures::channel::mpsc::Sender<KitsuneP2pEvent>,
+    peer_store: &kitsune2_api::peer_store::DynPeerStore,
+    strat: &PeerStrat,
+    topo: &crate::dht::prelude::Topology,
     space: Arc<KitsuneSpace>,
     arq: &mut Arq,
 ) -> KitsuneP2pResult<()> {
     let dim = SpaceDimension::standard();
-    let arc = arq.to_dht_arc(dim);
-    let view = evt_sender.query_peer_density(space.clone(), arc).await?;
+
+    let arqs: Vec<_> = peer_store
+        .get_all()
+        .await?
+        .into_iter()
+        .filter_map(|v| {
+            let now = kitsune2_api::Timestamp::now();
+            if v.expires_at() < now {
+                return None;
+            }
+            AgentInfoSigned::downcast(v).map(|v| v.storage_arq)
+        })
+        .collect();
+
+    let view = strat.view(topo.clone(), arqs.as_slice());
 
     let cov_before = arq.coverage(dim) * 100.0;
     tracing::trace!("Updating arc for space {:?}:", space);
@@ -718,10 +738,13 @@ async fn update_single_agent_info(
         _mdns_handles,
         bootstrap_service,
         dynamic_arcs,
+        peer_store,
+        strat,
+        topo,
     } = input;
 
     if dynamic_arcs {
-        update_arc_length(evt_sender, space.clone(), &mut arq).await?;
+        update_arc_length(peer_store, strat, topo, space.clone(), &mut arq).await?;
     }
 
     // Update the agents arc through the internal sender.
@@ -812,8 +835,13 @@ impl KitsuneP2pHandler for Space {
         agent: Arc<KitsuneAgent>,
         maybe_agent_info: Option<AgentInfoSigned>,
         initial_arq: Option<Arq>,
+        topo: crate::dht::prelude::Topology,
     ) -> KitsuneP2pHandlerResult<()> {
-        tracing::debug!(?space, ?agent, ?initial_arq, "handle_join");
+        tracing::debug!(?space, ?agent, ?initial_arq, ?topo, "handle_join");
+
+        if topo != self.ro_inner.topo {
+            return Err(std::io::Error::other(format!("invalid topo does not match space topology, space: {:?}, supplied: {:?}", self.ro_inner.topo, topo)).into());
+        }
 
         match initial_arq {
             // This agent has been on the network before and has an arc stored on the Kitsune host.
@@ -1265,6 +1293,7 @@ pub(crate) struct SpaceReadOnlyInner {
     pub(crate) publish_pending_delegates: parking_lot::Mutex<HashMap<KOpHash, PendingDelegate>>,
     #[allow(dead_code)]
     pub(crate) fetch_pool: FetchPool,
+    pub(crate) topo: crate::dht::prelude::Topology,
 }
 
 impl SpaceReadOnlyInner {
@@ -1348,6 +1377,7 @@ impl Space {
         parallel_notify_permit: Arc<tokio::sync::Semaphore>,
         fetch_pool: FetchPool,
         local_url: Arc<std::sync::Mutex<Option<String>>>,
+        topo: crate::dht::prelude::Topology,
     ) -> Self {
         let metrics = MetricsSync::default();
 
@@ -1467,6 +1497,7 @@ impl Space {
             metric_exchange,
             publish_pending_delegates: parking_lot::Mutex::new(HashMap::new()),
             fetch_pool,
+            topo,
         });
 
         Self {

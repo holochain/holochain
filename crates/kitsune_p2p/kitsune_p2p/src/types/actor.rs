@@ -104,7 +104,7 @@ ghost_actor::ghost_chan! {
     /// The KitsuneP2pSender allows async remote-control of the KitsuneP2p actor.
     pub chan KitsuneP2p<super::KitsuneP2pError> {
         /// Announce a space/agent pair on this network.
-        fn join(space: KSpace, agent: KAgent, maybe_agent_info: Option<kitsune_p2p_types::agent_info::AgentInfoSigned>, initial_arq: OptArq) -> ();
+        fn join(space: KSpace, agent: KAgent, maybe_agent_info: Option<kitsune_p2p_types::agent_info::AgentInfoSigned>, initial_arq: OptArq, topo: crate::dht::prelude::Topology) -> ();
 
         /// Withdraw this space/agent pair from this network.
         fn leave(space: KSpace, agent: KAgent) -> ();

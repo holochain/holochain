@@ -582,6 +582,7 @@ impl MetaNet {
     /// Construct abstraction with tx5 backend.
     pub async fn new_tx5(
         tuning_params: KitsuneP2pTuningParams,
+        peer_super: super::PeerSuperStore,
         host: HostApiLegacy,
         kitsune_internal_sender: ghost_actor::GhostSender<crate::spawn::Internal>,
         signal_url: String,
@@ -640,7 +641,7 @@ impl MetaNet {
                     })
                 }),
                 Arc::new(move |url, data| {
-                    let i_s = kitsune_internal_sender.clone();
+                    let peer_super = peer_super.clone();
                     let url = url.clone();
                     match PreflightData::decode_ref(&data) {
                         Ok((
@@ -670,15 +671,7 @@ impl MetaNet {
                                 )));
                             }
                             Box::pin(async move {
-                                if let Err(err) = i_s
-                                    .put_agent_infos_in_spaces(peer_list)
-                                    .await
-                                {
-                                    tracing::warn!(
-                                        ?err,
-                                        "error processing incoming agent info unsolicited"
-                                    );
-                                }
+                                peer_super.insert(peer_list).await;
                                 Ok(())
                             })
                         }

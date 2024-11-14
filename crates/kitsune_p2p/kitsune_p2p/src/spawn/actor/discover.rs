@@ -153,7 +153,7 @@ pub(crate) fn search_and_discover_peer_connect(
                             })) => {
                                 if let Err(err) = inner
                                     .peer_store
-                                    .insert(vec![agent_info_signed.clone()])
+                                    .insert(vec![agent_info_signed.clone().into_dyn()])
                                     .await
                                 {
                                     tracing::error!(
@@ -378,7 +378,7 @@ pub(crate) fn search_remotes_covering_basis(
                             // if we got results, add them to our peer store
                             if let Err(err) = inner
                                 .peer_store
-                                .insert(peer_list)
+                                .insert(peer_list.into_iter().map(AgentInfoSigned::into_dyn).collect())
                                 .await
                             {
                                 tracing::error!(?err, "error storing peer_queried agent_info");
@@ -454,12 +454,12 @@ pub(crate) fn get_cached_remotes_near_basis<S: GetCachedRemotesNearBasisSpace>(
 ) -> impl Future<Output = KitsuneP2pResult<Vec<AgentInfoSigned>>> + 'static + Send {
     // as this is a local request, there isn't much cost to getting more
     // results than we strictly need
-    const LIMIT: u32 = 20;
+    const LIMIT: usize = 20;
 
     async move {
         let mut nodes = Vec::new();
 
-        for node in inner.query_agents(basis_loc, LIMIT).await? {
+        for node in inner.query_agents(basis_loc.into(), LIMIT).await? {
             if !inner.is_agent_local(node.agent.clone()).await? {
                 nodes.push(node);
             }
