@@ -231,7 +231,6 @@ pub enum HostFnApiError {
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ZomeCallAuthorization {
     Authorized,
-    BadSignature,
     BadCapGrant,
     BadNonce(String),
     BlockedProvenance,

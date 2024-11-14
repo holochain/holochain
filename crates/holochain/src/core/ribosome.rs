@@ -370,22 +370,6 @@ pub trait Invocation: Clone + Send + Sync {
 }
 
 impl ZomeCallInvocation {
-    pub async fn verify_signature(&self) -> RibosomeResult<ZomeCallAuthorization> {
-        // Signature is verified against the hash of the signed zome call parameter bytes.
-        let bytes_hash = sha2_512(self.signed_params.bytes.as_bytes());
-        Ok(
-            if self
-                .provenance
-                .verify_signature_raw(&self.signed_params.signature, bytes_hash.into())
-                .await?
-            {
-                ZomeCallAuthorization::Authorized
-            } else {
-                ZomeCallAuthorization::BadSignature
-            },
-        )
-    }
-
     /// to decide if a zome call grant is authorized:
     /// - we need to find a live (committed and not deleted) cap grant that matches the secret
     /// - if the live cap grant is for the current author the call is ALWAYS authorized ELSE
@@ -454,7 +438,6 @@ impl ZomeCallInvocation {
     }
 
     /// to verify if the zome call is authorized:
-    /// - the signature must be valid
     /// - the nonce must not have already been seen
     /// - the grant must be valid
     /// - the provenance must not have any active blocks against them right now
@@ -466,14 +449,11 @@ impl ZomeCallInvocation {
         &self,
         host_access: &ZomeCallHostAccess,
     ) -> RibosomeResult<ZomeCallAuthorization> {
-        Ok(match self.verify_signature().await? {
-            ZomeCallAuthorization::Authorized => match self.verify_nonce(host_access).await? {
-                ZomeCallAuthorization::Authorized => match self.verify_grant(host_access).await? {
-                    ZomeCallAuthorization::Authorized => {
-                        self.verify_blocked_provenance(host_access).await?
-                    }
-                    unauthorized => unauthorized,
-                },
+        Ok(match self.verify_nonce(host_access).await? {
+            ZomeCallAuthorization::Authorized => match self.verify_grant(host_access).await? {
+                ZomeCallAuthorization::Authorized => {
+                    self.verify_blocked_provenance(host_access).await?
+                }
                 unauthorized => unauthorized,
             },
             unauthorized => unauthorized,
