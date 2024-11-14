@@ -36,15 +36,9 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_call_remote(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
-        signature: Signature,
         to_agent: AgentPubKey,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
     ) -> HolochainP2pHandlerResult<SerializedBytes> {
         Err("stub".into())
     }
@@ -52,14 +46,7 @@ impl HolochainP2pHandler for StubNetwork {
     fn handle_send_remote_signal(
         &mut self,
         dna_hash: DnaHash,
-        from_agent: AgentPubKey,
-        to_agent_list: Vec<(Signature, AgentPubKey)>,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
+        to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
     ) -> HolochainP2pHandlerResult<()> {
         Err("stub".into())
     }
@@ -317,32 +304,159 @@ mod tests {
         let payload = ExternIO::encode(b"yippo").unwrap();
         let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
 
-        let signature = a1
-            .sign_raw(
-                &keystore,
-                ZomeCallUnsigned {
-                    provenance: a1.clone(),
-                    cell_id: CellId::new(dna.clone(), a2.clone()),
-                    zome_name: zome_name.clone(),
-                    fn_name: fn_name.clone(),
-                    cap_secret,
-                    payload: payload.clone(),
-                    nonce,
-                    expires_at,
-                }
-                .data_to_sign()
-                .unwrap(),
-            )
-            .await
-            .unwrap();
+        let (bytes, bytes_hash) = ZomeCallParams {
+            provenance: a1.clone(),
+            cell_id: CellId::new(dna.clone(), a2.clone()),
+            zome_name: zome_name.clone(),
+            fn_name: fn_name.clone(),
+            cap_secret,
+            payload: payload.clone(),
+            nonce,
+            expires_at,
+        }
+        .serialize_and_hash()
+        .unwrap();
+        let signature = a1.sign_raw(&keystore, bytes_hash.into()).await.unwrap();
 
         let res = p2p
-            .call_remote(
-                dna, a1, signature, a2, zome_name, fn_name, None, payload, nonce, expires_at,
-            )
+            .call_remote(dna, a2, ExternIO(bytes), signature)
             .await
             .unwrap();
         let res: Vec<u8> = UnsafeBytes::from(res).into();
+
+        assert_eq!(b"yada".to_vec(), res);
+
+        p2p.ghost_actor_shutdown().await.unwrap();
+        r_task.await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn t() {
+        println!("hello test");
+        let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv().await;
+
+        let (sender, mut receiver) = spawn_holochain_p2p(
+            KitsuneP2pConfig::from_signal_addr(signal_url),
+            TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
+            NetworkCompatParams::default(),
+        )
+        .await
+        .unwrap();
+        let dna_hash = fixt!(DnaHash);
+        let alice = fixt!(AgentPubKey);
+
+        let r_task = tokio::task::spawn(async move {
+            use tokio_stream::StreamExt;
+            while let Some(evt) = receiver.next().await {
+                use crate::types::event::HolochainP2pEvent::*;
+                match evt {
+                    // CallRemote { respond, .. } => {
+                    //     respond.r(Ok(
+                    //         async move { Ok(UnsafeBytes::from(b"yada".to_vec()).into()) }
+                    //             .boxed()
+                    //             .into(),
+                    //     ));
+                    // }
+                    SignNetworkData { respond, .. } => {
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
+                    }
+                    PutAgentInfoSigned { respond, .. } => {
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    QueryPeerDensity { respond, .. } => {
+                        let view = test_peer_view();
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        println!("joining");
+        sender.join(dna_hash, alice, None, None).await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_call_remote_interface() {
+        let (dna, alice, bob, _) = test_setup();
+        let keystore = test_keystore();
+        let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv().await;
+
+        let (p2p, mut evt) = spawn_holochain_p2p(
+            KitsuneP2pConfig::from_signal_addr(signal_url),
+            TlsConfig::new_ephemeral().await.unwrap(),
+            kitsune_p2p::HostStub::new(),
+            NetworkCompatParams::default(),
+        )
+        .await
+        .unwrap();
+
+        let r_task = tokio::task::spawn(async move {
+            use tokio_stream::StreamExt;
+            while let Some(evt) = evt.next().await {
+                use crate::types::event::HolochainP2pEvent::*;
+                match evt {
+                    CallRemote { respond, .. } => {
+                        println!("incoming call remote");
+                        respond.r(Ok(
+                            async move { Ok(UnsafeBytes::from(b"yada".to_vec()).into()) }
+                                .boxed()
+                                .into(),
+                        ));
+                    }
+                    SignNetworkData { respond, .. } => {
+                        println!("incoming sign network data");
+                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
+                    }
+                    PutAgentInfoSigned { respond, .. } => {
+                        println!("incoming put agent info signed");
+                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
+                    }
+                    QueryPeerDensity { respond, .. } => {
+                        println!("incoming query peer density");
+                        let view = test_peer_view();
+                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        p2p.join(dna.clone(), alice.clone(), None, None)
+            .await
+            .unwrap();
+        p2p.join(dna.clone(), bob.clone(), None, None)
+            .await
+            .unwrap();
+
+        let zome_name: ZomeName = "".into();
+        let fn_name: FunctionName = "".into();
+        let nonce = Nonce256Bits::from([0; 32]);
+        let cap_secret = None;
+        let payload = ExternIO::encode(b"yippo").unwrap();
+        let expires_at = (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
+
+        let (bytes, bytes_hash) = ZomeCallParams {
+            provenance: alice.clone(),
+            cell_id: CellId::new(dna.clone(), bob.clone()),
+            zome_name: zome_name.clone(),
+            fn_name: fn_name.clone(),
+            cap_secret,
+            payload: payload.clone(),
+            nonce,
+            expires_at,
+        }
+        .serialize_and_hash()
+        .unwrap();
+        let signature = alice.sign_raw(&keystore, bytes_hash.into()).await.unwrap();
+
+        let res = p2p
+            .call_remote(dna, bob, ExternIO(bytes), signature)
+            .await
+            .unwrap();
+        let res: Vec<u8> = UnsafeBytes::from(res).into();
+        println!("received res {res:?}");
 
         assert_eq!(b"yada".to_vec(), res);
 

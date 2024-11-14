@@ -1,5 +1,6 @@
 //! Utils for Holochain tests
 use crate::conductor::api::AppInterfaceApi;
+use crate::conductor::api::ZomeCall;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
@@ -16,7 +17,6 @@ use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
-use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::actor::HolochainP2pRefToDna;
@@ -905,11 +905,9 @@ where
     P: serde::Serialize + std::fmt::Debug,
 {
     let zome_call_unsigned = new_zome_call_unsigned(cell_id, func, payload, zome)?;
-    Ok(
-        ZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned)
-            .await
-            .unwrap(),
-    )
+    Ok(ZomeCall::try_from_params(keystore, zome_call_unsigned)
+        .await
+        .unwrap())
 }
 
 /// Helper to create an unsigned zome invocation for tests
@@ -918,12 +916,12 @@ pub fn new_zome_call_unsigned<P, Z: Into<ZomeName>>(
     func: &str,
     payload: P,
     zome: Z,
-) -> Result<ZomeCallUnsigned, SerializedBytesError>
+) -> Result<ZomeCallParams, SerializedBytesError>
 where
     P: serde::Serialize + std::fmt::Debug,
 {
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    Ok(ZomeCallUnsigned {
+    Ok(ZomeCallParams {
         cell_id: cell_id.clone(),
         zome_name: zome.into(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
@@ -947,24 +945,27 @@ where
     P: serde::Serialize + std::fmt::Debug,
 {
     let ZomeCall {
-        cell_id,
-        cap_secret,
-        fn_name,
-        payload,
-        provenance,
-        signature,
-        nonce,
-        expires_at,
-        ..
+        signed,
+        params:
+            ZomeCallParams {
+                cell_id,
+                cap_secret,
+                fn_name,
+                payload,
+                provenance,
+                nonce,
+                expires_at,
+                ..
+            },
     } = new_zome_call(keystore, cell_id, func, payload, zome.clone().into()).await?;
     Ok(ZomeCallInvocation {
+        signed_params: signed,
         cell_id,
         zome: zome.into(),
         cap_secret,
         fn_name,
         payload,
         provenance,
-        signature,
         nonce,
         expires_at,
     })

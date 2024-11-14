@@ -5,6 +5,7 @@ use std::sync::Arc;
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
 use super::DpkiApi;
+use super::ZomeCall;
 use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::ConductorHandle;
@@ -13,7 +14,6 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
-use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::WitnessNonceResult;
@@ -61,7 +61,7 @@ impl CellConductorApiT for CellConductorApi {
         cell_id: &CellId,
         call: ZomeCall,
     ) -> ConductorApiResult<ZomeCallResult> {
-        if *cell_id == call.cell_id {
+        if *cell_id == call.params.cell_id {
             self.conductor_handle
                 .call_zome(call)
                 .await
@@ -69,7 +69,7 @@ impl CellConductorApiT for CellConductorApi {
         } else {
             Err(ConductorApiError::ZomeCallCellMismatch {
                 api_cell_id: cell_id.clone(),
-                call_cell_id: call.cell_id,
+                call_cell_id: call.params.cell_id,
             })
         }
     }
@@ -263,7 +263,7 @@ impl CellConductorReadHandleT for CellConductorApi {
         call: ZomeCall,
         workspace_lock: SourceChainWorkspace,
     ) -> ConductorApiResult<ZomeCallResult> {
-        if self.cell_id == call.cell_id {
+        if self.cell_id == call.params.cell_id {
             self.conductor_handle
                 .call_zome_with_workspace(call, workspace_lock)
                 .await

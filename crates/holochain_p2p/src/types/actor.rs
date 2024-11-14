@@ -267,15 +267,9 @@ ghost_actor::ghost_chan! {
         /// Invoke a zome function on a remote node (if you have been granted the capability).
         fn call_remote(
             dna_hash: DnaHash,
-            from_agent: AgentPubKey,
-            signature: Signature,
             to_agent: AgentPubKey,
-            zome_name: ZomeName,
-            fn_name: FunctionName,
-            cap_secret: Option<CapSecret>,
-            payload: ExternIO,
-            nonce: Nonce256Bits,
-            expires_at: Timestamp,
+            zome_call_params_serialized: ExternIO,
+            signature: Signature,
         ) -> SerializedBytes;
 
         /// Invoke a zome function on a remote node (if you have been granted the capability).
@@ -284,14 +278,7 @@ ghost_actor::ghost_chan! {
         /// it may decide not to deliver some of the signals.
         fn send_remote_signal(
             dna_hash: DnaHash,
-            from_agent: AgentPubKey,
-            to_agent_list: Vec<(Signature, AgentPubKey)>,
-            zome_name: ZomeName,
-            fn_name: FunctionName,
-            cap: Option<CapSecret>,
-            payload: ExternIO,
-            nonce: Nonce256Bits,
-            expires_at: Timestamp,
+            to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
         ) -> ();
 
         /// Publish data to the correct neighborhood.

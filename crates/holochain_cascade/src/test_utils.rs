@@ -9,7 +9,6 @@ use holo_hash::AnyDhtHash;
 use holo_hash::AnyDhtHashPrimitive;
 use holo_hash::EntryHash;
 use holochain_chc::ChcImpl;
-use holochain_nonce::Nonce256Bits;
 use holochain_p2p::actor;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDnaT;
@@ -190,14 +189,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn send_remote_signal(
         &self,
-        _from_agent: AgentPubKey,
-        _to_agent_list: Vec<(Signature, AgentPubKey)>,
-        _zome_name: ZomeName,
-        _fn_name: FunctionName,
-        _cap: Option<CapSecret>,
-        _payload: ExternIO,
-        _nonce: Nonce256Bits,
-        _expires_at: Timestamp,
+        _to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
     ) -> actor::HolochainP2pResult<()> {
         todo!()
     }
@@ -259,15 +251,9 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 
     async fn call_remote(
         &self,
-        _from_agent: AgentPubKey,
-        _from_signature: Signature,
         _to_agent: AgentPubKey,
-        _zome_name: ZomeName,
-        _fn_name: FunctionName,
-        _cap: Option<CapSecret>,
-        _payload: ExternIO,
-        _nonce: Nonce256Bits,
-        _expires_at: Timestamp,
+        _zome_call_payload: ExternIO,
+        _from_signature: Signature,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
         todo!()
     }

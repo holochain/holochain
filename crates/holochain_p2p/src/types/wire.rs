@@ -1,5 +1,4 @@
 use crate::*;
-use holochain_zome_types::zome::FunctionName;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// Struct for encoding DhtOp as bytes.
@@ -26,27 +25,12 @@ impl WireDhtOpData {
 #[allow(missing_docs)]
 pub enum WireMessage {
     CallRemote {
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        from_agent: holo_hash::AgentPubKey,
-        signature: Signature,
         to_agent: AgentPubKey,
-        cap_secret: Option<CapSecret>,
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
-        nonce: Box<Nonce256Bits>,
-        expires_at: Timestamp,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
     },
     CallRemoteMulti {
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        from_agent: holo_hash::AgentPubKey,
-        to_agents: Vec<(Signature, holo_hash::AgentPubKey)>,
-        cap_secret: Option<CapSecret>,
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
-        nonce: Box<Nonce256Bits>,
-        expires_at: Timestamp,
+        to_agents: Vec<(holo_hash::AgentPubKey, ExternIO, Signature)>,
     },
     ValidationReceipts {
         receipts: ValidationReceiptBundle,
@@ -99,52 +83,23 @@ impl WireMessage {
     }
 
     /// For an outgoing remote call.
-    #[allow(clippy::too_many_arguments)]
     pub fn call_remote(
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        from_agent: holo_hash::AgentPubKey,
-        signature: Signature,
         to_agent: holo_hash::AgentPubKey,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
     ) -> WireMessage {
         Self::CallRemote {
-            zome_name,
-            fn_name,
-            from_agent,
             to_agent,
+            zome_call_params_serialized,
             signature,
-            cap_secret,
-            data: payload.into_vec(),
-            nonce: Box::new(nonce),
-            expires_at,
         }
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn call_remote_multi(
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        from_agent: holo_hash::AgentPubKey,
-        to_agents: Vec<(Signature, holo_hash::AgentPubKey)>,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
+        to_agents: Vec<(holo_hash::AgentPubKey, ExternIO, Signature)>,
     ) -> WireMessage {
-        Self::CallRemoteMulti {
-            zome_name,
-            fn_name,
-            from_agent,
-            to_agents,
-            cap_secret,
-            data: payload.into_vec(),
-            nonce: Box::new(nonce),
-            expires_at,
-        }
+        Self::CallRemoteMulti { to_agents }
     }
 
     pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {

@@ -107,8 +107,7 @@ use crate::{
     conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
 };
 
-use super::api::AppInterfaceApi;
-use super::api::ZomeCall;
+use super::api::{AppInterfaceApi, ZomeCall};
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
 use super::entry_def_store::get_entry_defs;
@@ -850,6 +849,7 @@ mod network_impls {
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
     };
+    use crate::conductor::api::ZomeCall;
 
     use super::*;
 
@@ -1369,7 +1369,7 @@ mod network_impls {
 
         /// Invoke a zome function on a Cell
         pub async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
-            let cell = self.cell_by_id(&call.cell_id).await?;
+            let cell = self.cell_by_id(&call.params.cell_id).await?;
             Ok(cell.call_zome(call, None).await?)
         }
 
@@ -1378,8 +1378,8 @@ mod network_impls {
             call: ZomeCall,
             workspace_lock: SourceChainWorkspace,
         ) -> ConductorApiResult<ZomeCallResult> {
-            debug!(cell_id = ?call.cell_id);
-            let cell = self.cell_by_id(&call.cell_id).await?;
+            debug!(cell_id = ?call.params.cell_id);
+            let cell = self.cell_by_id(&call.params.cell_id).await?;
             Ok(cell.call_zome(call, Some(workspace_lock)).await?)
         }
 
@@ -1402,7 +1402,7 @@ mod network_impls {
             let now = Timestamp::now();
             let (nonce, expires_at) =
                 holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
-            let call_unsigned = ZomeCallUnsigned {
+            let call_params = ZomeCallParams {
                 cell_id,
                 zome_name: zome_name.into(),
                 fn_name: fn_name.into(),
@@ -1412,8 +1412,7 @@ mod network_impls {
                 nonce,
                 expires_at,
             };
-            let call =
-                ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
+            let call = ZomeCall::try_from_params(self.keystore(), call_params).await?;
             let response = self.call_zome(call).await;
             match response {
                 Ok(Ok(response)) => Ok(zome_call_response_to_conductor_api_result(response)?),
@@ -3393,7 +3392,7 @@ impl holochain_conductor_services::CellRunner for Conductor {
         let now = Timestamp::now();
         let (nonce, expires_at) =
             holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
-        let call_unsigned = ZomeCallUnsigned {
+        let call_params = ZomeCallParams {
             cell_id,
             zome_name,
             fn_name,
@@ -3403,7 +3402,7 @@ impl holochain_conductor_services::CellRunner for Conductor {
             nonce,
             expires_at,
         };
-        let call = ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
+        let call = ZomeCall::try_from_params(self.keystore(), call_params).await?;
         let response = self.call_zome(call).await;
         match response {
             Ok(Ok(ZomeCallResponse::Ok(bytes))) => Ok(bytes),
