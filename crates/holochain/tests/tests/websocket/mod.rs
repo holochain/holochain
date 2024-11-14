@@ -104,6 +104,8 @@ how_many: 42
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn call_zome() {
+    use holochain_conductor_api::{ExternalApiWireError, ZomeCallParamsSigned};
+
     holochain_trace::test_run();
 
     // NOTE: This is a full integration test that
@@ -152,14 +154,46 @@ async fn call_zome() {
     let response = check_timeout(response, 3000).await.unwrap();
     assert_matches!(response, AdminResponse::AppEnabled { .. });
 
+    // Attach App Interface
+    let app_port = attach_app_interface(&admin_tx, None).await;
+
+    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
+    authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
+
+    // Authentication of zome call should fail with invalid signature.
+    let zome_name = TestWasm::Foo.coordinator_zome_name();
+    let fn_name = FunctionName("foo".into());
+    let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
+    let zome_call_params = ZomeCallParams {
+        cap_secret: None,
+        cell_id: cell_id.clone(),
+        zome_name: zome_name.clone(),
+        fn_name: fn_name.clone(),
+        provenance: cell_id.agent_pubkey().clone(),
+        payload: ExternIO::encode(&()).unwrap(),
+        nonce,
+        expires_at,
+    };
+    let bytes = encode(&zome_call_params).unwrap();
+    let signature = fixt!(Signature);
+    let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(
+        bytes,
+        signature.clone(),
+    )));
+    let response = app_tx.request(request);
+    let response = check_timeout(response, 6000).await.unwrap();
+    assert_matches!(
+        response,
+        AppResponse::Error(ExternalApiWireError::ZomeCallAuthenticationFailed(_))
+    );
+
     // Generate signing key pair
     let mut rng = OsRng;
     let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
     // Grant zome call capability for agent
-    let zome_name = TestWasm::Foo.coordinator_zome_name();
-    let fn_name = FunctionName("foo".into());
     let cap_secret = grant_zome_call_capability(
         &mut admin_tx,
         &cell_id,
@@ -169,13 +203,6 @@ async fn call_zome() {
     )
     .await
     .unwrap();
-
-    // Attach App Interface
-    let app_port = attach_app_interface(&admin_tx, None).await;
-
-    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
-    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
-    authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
 
     // Call Zome
     tracing::info!("Calling zome");

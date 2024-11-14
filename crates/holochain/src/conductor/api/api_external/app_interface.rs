@@ -81,14 +81,29 @@ impl AppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
-            AppRequest::CallZome(signed_zome_call) => {
-                let zome_call_params = signed_zome_call
+            AppRequest::CallZome(zome_call_params_signed) => {
+                let zome_call_params = zome_call_params_signed
                     .bytes
                     .clone()
                     .decode::<ZomeCallParams>()
                     .map_err(|e| ConductorApiError::SerializationError(e.into()))?;
+                if !is_valid_signature(
+                    &zome_call_params.provenance,
+                    zome_call_params_signed.bytes.as_bytes(),
+                    &zome_call_params_signed.signature,
+                )
+                .await?
+                {
+                    return Ok(AppResponse::Error(
+                        ExternalApiWireError::ZomeCallAuthenticationFailed(format!(
+                            "Authentication failure. Bad signature {:?} by provenance {:?}.",
+                            zome_call_params_signed.signature, zome_call_params.provenance,
+                        )),
+                    ));
+                }
+
                 let zome_call = ZomeCall {
-                    signed: *signed_zome_call,
+                    signed: *zome_call_params_signed,
                     params: zome_call_params,
                 };
                 match self.conductor_handle.call_zome(zome_call.clone()).await? {
@@ -224,6 +239,18 @@ pub struct AppAuthentication {
     /// If the app interface is bound to an installed app, this is the ID of that app. This field
     /// must be provided by Holochain and not the client.
     pub installed_app_id: Option<InstalledAppId>,
+}
+
+async fn is_valid_signature(
+    provenance: &AgentPubKey,
+    bytes: &[u8],
+    signature: &Signature,
+) -> ConductorApiResult<bool> {
+    // Signature is verified against the hash of the signed zome call parameter bytes.
+    let bytes_hash = sha2_512(bytes);
+    Ok(provenance
+        .verify_signature_raw(signature, bytes_hash.into())
+        .await?)
 }
 
 /// Combination of zome call parameters with individual fields and the signed form which includes
