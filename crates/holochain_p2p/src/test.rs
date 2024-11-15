@@ -331,53 +331,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn t() {
-        println!("hello test");
-        let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv().await;
-
-        let (sender, mut receiver) = spawn_holochain_p2p(
-            KitsuneP2pConfig::from_signal_addr(signal_url),
-            TlsConfig::new_ephemeral().await.unwrap(),
-            kitsune_p2p::HostStub::new(),
-            NetworkCompatParams::default(),
-        )
-        .await
-        .unwrap();
-        let dna_hash = fixt!(DnaHash);
-        let alice = fixt!(AgentPubKey);
-
-        let r_task = tokio::task::spawn(async move {
-            use tokio_stream::StreamExt;
-            while let Some(evt) = receiver.next().await {
-                use crate::types::event::HolochainP2pEvent::*;
-                match evt {
-                    // CallRemote { respond, .. } => {
-                    //     respond.r(Ok(
-                    //         async move { Ok(UnsafeBytes::from(b"yada".to_vec()).into()) }
-                    //             .boxed()
-                    //             .into(),
-                    //     ));
-                    // }
-                    SignNetworkData { respond, .. } => {
-                        respond.r(Ok(async move { Ok([0; 64].into()) }.boxed().into()));
-                    }
-                    PutAgentInfoSigned { respond, .. } => {
-                        respond.r(Ok(async move { Ok(vec![]) }.boxed().into()));
-                    }
-                    QueryPeerDensity { respond, .. } => {
-                        let view = test_peer_view();
-                        respond.r(Ok(async move { Ok(view) }.boxed().into()));
-                    }
-                    _ => {}
-                }
-            }
-        });
-
-        println!("joining");
-        sender.join(dna_hash, alice, None, None).await.unwrap();
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
     async fn test_call_remote_interface() {
         let (dna, alice, bob, _) = test_setup();
         let keystore = test_keystore();

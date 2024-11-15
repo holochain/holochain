@@ -52,6 +52,7 @@ use {
     holochain_p2p::event::CountersigningSessionNegotiationMessage,
 };
 
+use super::api::is_valid_signature;
 use super::api::CellConductorHandle;
 use super::api::ZomeCall;
 use super::space::Space;
@@ -883,6 +884,13 @@ impl Cell {
             expires_at,
             ..
         } = zome_call_params_serialized.decode()?;
+        let bytes_hash = sha2_512(zome_call_params_serialized.as_bytes());
+        if !is_valid_signature(&provenance, &bytes_hash, &signature)
+            .await
+            .map_err(|err| CellError::ConductorApiError(Box::new(err)))?
+        {
+            return CellResult::Err(CellError::InitTimeout);
+        }
         let invocation = ZomeCall {
             signed: ZomeCallParamsSigned {
                 bytes: zome_call_params_serialized,
