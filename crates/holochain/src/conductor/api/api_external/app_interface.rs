@@ -241,7 +241,7 @@ pub struct AppAuthentication {
     pub installed_app_id: Option<InstalledAppId>,
 }
 
-async fn is_valid_signature(
+pub(crate) async fn is_valid_signature(
     provenance: &AgentPubKey,
     bytes: &[u8],
     signature: &Signature,
