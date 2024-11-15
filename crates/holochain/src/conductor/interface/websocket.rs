@@ -747,12 +747,12 @@ pub mod test {
             .into();
         zome_call.params.cell_id = cell_id;
         zome_call.params.provenance = fixt!(AgentPubKey, Predictable, 0);
-        zome_call.signed =
+        let zome_call_params_signed =
             ZomeCallParamsSigned::try_from_params(&test_keystore(), zome_call.params)
                 .await
                 .unwrap();
 
-        let msg = AppRequest::CallZome(Box::new(zome_call.signed));
+        let msg = AppRequest::CallZome(Box::new(zome_call_params_signed));
         test_handle_incoming_app_message(
             "".to_string(),
             msg,

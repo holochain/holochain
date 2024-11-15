@@ -945,7 +945,8 @@ where
     P: serde::Serialize + std::fmt::Debug,
 {
     let ZomeCall {
-        signed,
+        bytes_hash,
+        signature,
         params:
             ZomeCallParams {
                 cell_id,
@@ -959,7 +960,8 @@ where
             },
     } = new_zome_call(keystore, cell_id, func, payload, zome.clone().into()).await?;
     Ok(ZomeCallInvocation {
-        signed_params: signed,
+        bytes_hash,
+        signature,
         cell_id,
         zome: zome.into(),
         cap_secret,

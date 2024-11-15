@@ -372,11 +372,10 @@ pub trait Invocation: Clone + Send + Sync {
 impl ZomeCallInvocation {
     pub async fn verify_signature(&self) -> RibosomeResult<ZomeCallAuthorization> {
         // Signature is verified against the hash of the signed zome call parameter bytes.
-        let bytes_hash = sha2_512(self.signed_params.bytes.as_bytes());
         Ok(
             if self
                 .provenance
-                .verify_signature_raw(&self.signed_params.signature, bytes_hash.into())
+                .verify_signature_raw(&self.signature, self.bytes_hash.clone().into())
                 .await?
             {
                 ZomeCallAuthorization::Authorized
@@ -498,9 +497,10 @@ mockall::mock! {
 /// i.e. coming from outside the Cell from an external Interface
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeCallInvocation {
-    /// The signed zome call consisting of serialized bytes of the zome call params and the
-    /// signature of the bytes.
-    pub signed_params: ZomeCallParamsSigned,
+    /// The hash of the serialized zome call parameters.
+    pub bytes_hash: Vec<u8>,
+    /// The signature of the hash.
+    pub signature: Signature,
     /// The Id of the `Cell` in which this Zome-call would be invoked
     pub cell_id: CellId,
     /// The Zome containing the function that would be invoked
@@ -545,7 +545,8 @@ impl ZomeCallInvocation {
         call: ZomeCall,
     ) -> RibosomeResult<Self> {
         let ZomeCall {
-            signed: signed_zome_call,
+            bytes_hash,
+            signature,
             params:
                 ZomeCallParams {
                     cap_secret,
@@ -562,7 +563,8 @@ impl ZomeCallInvocation {
             .get_zome(cell_id.dna_hash(), &zome_name)
             .map_err(|conductor_api_error| RibosomeError::from(Box::new(conductor_api_error)))?;
         Ok(Self {
-            signed_params: signed_zome_call,
+            bytes_hash,
+            signature,
             cell_id,
             zome,
             cap_secret,
@@ -578,7 +580,8 @@ impl ZomeCallInvocation {
 impl From<ZomeCallInvocation> for ZomeCall {
     fn from(inv: ZomeCallInvocation) -> Self {
         let ZomeCallInvocation {
-            signed_params: signed_zome_call,
+            bytes_hash,
+            signature,
             cell_id,
             zome,
             fn_name,
@@ -589,7 +592,8 @@ impl From<ZomeCallInvocation> for ZomeCall {
             expires_at,
         } = inv;
         Self {
-            signed: signed_zome_call,
+            bytes_hash,
+            signature,
             params: ZomeCallParams {
                 cell_id,
                 provenance,
@@ -820,7 +824,7 @@ pub mod wasm_test {
         // He removes Alice's signature but leaves her provenance and adds his own signature.
         let mut bob_signed_zome_call = alice_signed_zome_call.clone();
         let (_, bytes_hash) = alice_unsigned_zome_call.serialize_and_hash().unwrap();
-        bob_signed_zome_call.signed.signature = bob_pubkey
+        bob_signed_zome_call.signature = bob_pubkey
             .sign_raw(&conductor.keystore(), bytes_hash.into())
             .await
             .unwrap();
