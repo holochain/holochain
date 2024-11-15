@@ -15,6 +15,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   or `"empty"`, the previous default value of `"none"` will prevent the conductor from starting. We intend to stabilise
   this feature in the future, and it will return to being available without a feature flag. #4344
 - **BREAKING**: Issuing and persisting warrants is behind a feature `unstable-warrants` now. Warrants have not been tested extensively and there is no way to recover from a warrant. Hence the feature is considered unstable and must be explicitly enabled. Note that once warrants are issued some functions or calls may not work correctly.
+- **BREAKING** The following HDK functions have been temporarily removed as "unstable". They can be re-enabled by building Holochain with the "unstable-functions" feature flag:
+  - `accept_countersigning_preflight_request`
+  - `block_agent`
+  - `unblock_agent`
+  - `get_agent_key_lineage`
+  - `is_same_agent`
+  - `schedule`
+  - the function `sleep` has been removed entirely because it wasn't implemented
+  - and the HDI function `is_same_agent`
+  Note that installing apps that have been built with an HDK from before this change will not be possible to install on
+  a conductor that has been built without the `unstable-functions` feature. You will get import errors when Holochain tries
+  to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto
+  a conductor which has been compiled with `unstable-functions` but the reverse is not true. #4371
 
 ## 0.4.0-rc.0
 

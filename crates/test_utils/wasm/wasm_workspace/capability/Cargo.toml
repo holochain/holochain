@@ -21,3 +21,6 @@ hdk = { path = "../../../../hdk", optional = true }
 [features]
 default = ["hdk"]
 integrity = []
+unstable-functions = [
+    "hdk?/unstable-functions",
+]

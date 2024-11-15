@@ -34,13 +34,15 @@ impl<Ribosome: RibosomeT> HostFnApi<Ribosome> {
 }
 
 macro_rules! host_fn_api_impls {
-    ( $( fn $f:ident ( $input:ty ) -> $output:ty; )* ) => {
+    ( $( $(#[cfg(feature = $feat:literal)])? fn $f:ident ( $input:ty ) -> $output:ty; )* ) => {
         $(
+            $(#[cfg(feature = $feat)])?
             pub(crate) mod $f;
         )*
 
         impl<Ribosome: RibosomeT> HostFnApiT for HostFnApi<Ribosome> {
             $(
+                $(#[cfg(feature = $feat)])?
                 fn $f(&self, input: $input) -> Result<$output, HostFnApiError> {
                     $f::$f(
                         self.ribosome.clone(),
@@ -64,12 +66,14 @@ host_fn_api_impls! {
     // MAYBE: is there a way to unhygienically import this code in both places?
 
     // Attempt to accept a preflight request.
+    #[cfg(feature = "unstable-functions")]
     fn accept_countersigning_preflight_request(zt::countersigning::PreflightRequest) -> zt::countersigning::PreflightRequestAcceptance;
 
     // Info about the calling agent.
     fn agent_info (()) -> zt::info::AgentInfo;
 
     // Block some agent on the same DNA.
+    #[cfg(feature = "unstable-functions")]
     fn block_agent (zt::block::BlockAgentInput) -> ();
 
     // Info about the current DNA.
@@ -168,6 +172,8 @@ host_fn_api_impls! {
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
     // Check if agent key 2 is of the same lineage as agent key 2.
+    // TODO: This HDI function can't be easily removed, even though it's considered an
+    // unstable function.
     fn is_same_agent ((AgentPubKey, AgentPubKey)) -> bool;
 
     // Retreive a record from the DHT or short circuit.
@@ -190,13 +196,12 @@ host_fn_api_impls! {
     // Remotely signal many agents without waiting for responses
     fn send_remote_signal (zt::signal::RemoteSignal) -> ();
 
-    // // @todo
-    // fn send (()) -> ();
-
     // @todo
+    #[cfg(feature = "unstable-functions")]
     fn schedule (String) -> ();
 
-    // @todo
+    // TODO deprecated, remove me
+    #[cfg(feature = "unstable-functions")]
     fn sleep (core::time::Duration) -> ();
 
     // @todo
@@ -213,6 +218,7 @@ host_fn_api_impls! {
     fn sys_time (()) -> zt::timestamp::Timestamp;
 
     // Unblock some previously blocked agent.
+    #[cfg(feature = "unstable-functions")]
     fn unblock_agent (zt::block::BlockAgentInput) -> ();
 
     // Same as  but also takes the ActionHash of the updated record.

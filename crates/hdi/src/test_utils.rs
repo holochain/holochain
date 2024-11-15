@@ -35,6 +35,7 @@ pub fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
             todo!()
         }
 
+        #[cfg(feature = "unstable-functions")]
         fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool> {
             todo!()
         }

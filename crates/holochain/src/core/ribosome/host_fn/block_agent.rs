@@ -52,6 +52,7 @@ mod test {
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
     pub struct CapFor(CapSecret, AgentPubKey);
 
+    #[cfg(feature = "unstable-functions")]
     #[tokio::test(flavor = "multi_thread")]
     async fn zome_call_verify_block() {
         holochain_trace::test_run();
