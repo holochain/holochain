@@ -409,6 +409,7 @@ impl Cell {
                 respond,
                 ..
             } => {
+                println!("habsdidu");
                 async {
                     let res = self
                         .handle_call_remote(zome_call_params_serialized, signature)
@@ -884,12 +885,17 @@ impl Cell {
             expires_at,
             ..
         } = zome_call_params_serialized.decode()?;
-        let bytes_hash = sha2_512(zome_call_params_serialized.as_bytes());
-        if !is_valid_signature(&provenance, &bytes_hash, &signature)
-            .await
-            .map_err(|err| CellError::ConductorApiError(Box::new(err)))?
+        if !is_valid_signature(
+            &provenance,
+            zome_call_params_serialized.as_bytes(),
+            &signature,
+        )
+        .await
+        .map_err(|err| CellError::ConductorApiError(Box::new(err)))?
         {
-            return CellResult::Err(CellError::InitTimeout);
+            return Err(CellError::ZomeCallAuthenticationFailed(
+                signature, provenance,
+            ));
         }
         let invocation = ZomeCall {
             signed: ZomeCallParamsSigned {
