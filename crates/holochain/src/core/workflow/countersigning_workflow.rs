@@ -1,58 +1,75 @@
 //! Countersigning workflow to maintain countersigning session state.
 
-use super::error::WorkflowResult;
-use crate::conductor::space::Space;
-use crate::core::queue_consumer::{TriggerSender, WorkComplete};
-use holo_hash::AgentPubKey;
-use holochain_p2p::event::CountersigningSessionNegotiationMessage;
-use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
+use holochain_p2p::{
+    event::CountersigningSessionNegotiationMessage, HolochainP2pDna, HolochainP2pDnaT,
+};
 use holochain_state::prelude::*;
-use kitsune_p2p_types::tx2::tx2_utils::Share;
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::broadcast::Sender;
-use tokio::task::AbortHandle;
+#[cfg(feature = "unstable-countersigning")]
+use {
+    super::error::WorkflowResult,
+    crate::conductor::space::Space,
+    crate::core::queue_consumer::{TriggerSender, WorkComplete},
+    holo_hash::AgentPubKey,
+    holochain_keystore::MetaLairClient,
+    holochain_state::chain_lock::get_chain_lock,
+    kitsune_p2p_types::tx2::tx2_utils::Share,
+    std::sync::Arc,
+    tokio::sync::broadcast::Sender,
+    tokio::task::AbortHandle,
+};
 
+#[cfg(feature = "unstable-countersigning")]
 /// Accept handler for starting countersigning sessions.
 mod accept;
 
+#[cfg(feature = "unstable-countersigning")]
 /// Inner workflow for resolving an incomplete countersigning session.
 mod incomplete;
 
+#[cfg(feature = "unstable-countersigning")]
 /// Inner workflow for completing a countersigning session based on received signatures.
 mod complete;
 
+#[cfg(feature = "unstable-countersigning")]
 /// State integrity function to ensure that the database and the workspace are in sync.
 mod refresh;
 
+#[cfg(feature = "unstable-countersigning")]
 /// Success handler for receiving signature bundles from the network.
 mod success;
 
+#[cfg(feature = "unstable-countersigning")]
 #[cfg(test)]
 mod tests;
 
-pub(crate) use accept::accept_countersigning_request;
-use holochain_keystore::MetaLairClient;
-use holochain_state::chain_lock::get_chain_lock;
-pub(crate) use success::countersigning_success;
+#[cfg(feature = "unstable-countersigning")]
+pub(crate) use {accept::accept_countersigning_request, success::countersigning_success};
 
 /// Countersigning workspace to hold session state.
 #[derive(Clone)]
 pub struct CountersigningWorkspace {
+    #[cfg(feature = "unstable-countersigning")]
     inner: Share<CountersigningWorkspaceInner>,
+    #[cfg(feature = "unstable-countersigning")]
     countersigning_resolution_retry_delay: Duration,
+    #[cfg(feature = "unstable-countersigning")]
     countersigning_resolution_retry_limit: Option<usize>,
 }
 
 impl CountersigningWorkspace {
     /// Create a new countersigning workspace.
+    #[allow(unused_variables)]
     pub fn new(
         countersigning_resolution_retry_delay: Duration,
         countersigning_resolution_retry_limit: Option<usize>,
     ) -> Self {
         Self {
+            #[cfg(feature = "unstable-countersigning")]
             inner: Default::default(),
+            #[cfg(feature = "unstable-countersigning")]
             countersigning_resolution_retry_delay,
+            #[cfg(feature = "unstable-countersigning")]
             countersigning_resolution_retry_limit,
         }
     }
@@ -60,12 +77,16 @@ impl CountersigningWorkspace {
 
 /// The inner state of a countersigning workspace.
 #[derive(Default)]
+#[cfg(feature = "unstable-countersigning")]
 struct CountersigningWorkspaceInner {
+    #[cfg(feature = "unstable-countersigning")]
     session: Option<CountersigningSessionState>,
+    #[cfg(feature = "unstable-countersigning")]
     next_trigger: Option<NextTrigger>,
 }
 
 #[derive(Debug, Clone)]
+#[cfg(feature = "unstable-countersigning")]
 enum CountersigningSessionState {
     /// This is the entry state. Accepting a countersigning session through the HDK will immediately
     /// register the countersigning session in this state, for management by the countersigning workflow.
@@ -129,6 +150,7 @@ enum CountersigningSessionState {
     },
 }
 
+#[cfg(feature = "unstable-countersigning")]
 impl CountersigningSessionState {
     fn preflight_request(&self) -> &PreflightRequest {
         match self {
@@ -158,6 +180,7 @@ impl CountersigningSessionState {
 }
 
 #[derive(Debug, Clone)]
+#[cfg(feature = "unstable-countersigning")]
 enum ResolutionRequiredReason {
     /// The session has timed out, so we should try to resolve its state before abandoning.
     Timeout,
@@ -169,6 +192,7 @@ enum ResolutionRequiredReason {
 ///
 /// This tracks the numbers of attempts and the outcome of the most recent attempt.
 #[derive(Debug, Clone)]
+#[cfg(feature = "unstable-countersigning")]
 struct SessionResolutionSummary {
     /// The reason why session resolution is required.
     required_reason: ResolutionRequiredReason,
@@ -185,6 +209,7 @@ struct SessionResolutionSummary {
     pub outcomes: Vec<SessionResolutionOutcome>,
 }
 
+#[cfg(feature = "unstable-countersigning")]
 impl Default for SessionResolutionSummary {
     fn default() -> Self {
         Self {
@@ -201,6 +226,7 @@ impl Default for SessionResolutionSummary {
 /// [NUM_AUTHORITIES_TO_QUERY] authorities are made to agent activity authorities for each agent,
 /// and the decisions are collected into [SessionResolutionOutcome::decisions].
 #[derive(Debug, Clone)]
+#[cfg(feature = "unstable-countersigning")]
 struct SessionResolutionOutcome {
     /// The agent who participated in the countersigning session and is the subject of this
     /// resolution outcome.
@@ -213,9 +239,11 @@ struct SessionResolutionOutcome {
     pub decisions: Vec<SessionCompletionDecision>,
 }
 
+#[cfg(feature = "unstable-countersigning")]
 const NUM_AUTHORITIES_TO_QUERY: usize = 3;
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg(feature = "unstable-countersigning")]
 enum SessionCompletionDecision {
     /// Evidence found on the network that this session completed successfully.
     Complete(Box<SignedActionHashed>),
@@ -232,6 +260,7 @@ enum SessionCompletionDecision {
     Failed,
 }
 
+#[cfg(feature = "unstable-countersigning")]
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn countersigning_workflow(
@@ -410,6 +439,7 @@ pub(crate) async fn countersigning_workflow(
     Ok(WorkComplete::Complete)
 }
 
+#[cfg(feature = "unstable-countersigning")]
 async fn try_recover_failed_session(
     space: &Space,
     workspace: Arc<CountersigningWorkspace>,
@@ -547,6 +577,7 @@ async fn try_recover_failed_session(
     Ok(())
 }
 
+#[cfg(feature = "unstable-countersigning")]
 fn reschedule_self(
     workspace: Arc<CountersigningWorkspace>,
     self_trigger: TriggerSender,
@@ -566,6 +597,7 @@ fn reschedule_self(
         .unwrap();
 }
 
+#[cfg(feature = "unstable-countersigning")]
 fn update_last_attempted(
     workspace: Arc<CountersigningWorkspace>,
     add_to_attempts: bool,
@@ -605,6 +637,7 @@ fn update_last_attempted(
     }).unwrap()
 }
 
+#[cfg(feature = "unstable-countersigning")]
 fn get_resolution(workspace: Arc<CountersigningWorkspace>) -> Option<SessionResolutionSummary> {
     workspace
         .inner
@@ -622,6 +655,7 @@ fn get_resolution(workspace: Arc<CountersigningWorkspace>) -> Option<SessionReso
         .unwrap()
 }
 
+#[cfg(feature = "unstable-countersigning")]
 async fn apply_timeout(
     space: &Space,
     workspace: Arc<CountersigningWorkspace>,
@@ -754,6 +788,7 @@ async fn apply_timeout(
     Ok(())
 }
 
+#[cfg(feature = "unstable-countersigning")]
 async fn force_abandon_session(
     space: Space,
     author: &AgentPubKey,
@@ -846,6 +881,7 @@ pub async fn countersigning_publish(
     Ok(())
 }
 
+#[cfg(feature = "unstable-countersigning")]
 /// Abandon a countersigning session.
 async fn abandon_session(
     authored_db: DbWrite<DbKindAuthored>,
@@ -868,6 +904,7 @@ async fn abandon_session(
     Ok(())
 }
 
+#[cfg(feature = "unstable-countersigning")]
 // TODO unify with the other mechanisms for re-triggering. This is currently working around
 //      a performance issue with WorkComplete::Incomplete but is similar to the loop logic that
 //      other workflows use - the difference being that this workflow varies the loop delay.
@@ -876,6 +913,7 @@ struct NextTrigger {
     trigger_task: AbortHandle,
 }
 
+#[cfg(feature = "unstable-countersigning")]
 impl NextTrigger {
     fn new(trigger_at: Timestamp, trigger_sender: TriggerSender) -> Self {
         let delay = Self::calculate_delay(&trigger_at);

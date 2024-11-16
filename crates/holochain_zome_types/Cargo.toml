@@ -138,3 +138,5 @@ sqlite = [
 ]
 
 unstable-functions = []
+
+unstable-countersigning = []

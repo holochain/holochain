@@ -22,7 +22,6 @@ use holochain_cascade::authority;
 use holochain_chc::ChcImpl;
 use holochain_conductor_api::ZomeCall;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -32,23 +31,28 @@ use holochain_types::db_cache::DhtDbQueryCache;
 
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::cell::error::CellResult;
+use crate::core::queue_consumer::spawn_queue_consumer_tasks;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueTriggers;
-use crate::core::queue_consumer::{spawn_queue_consumer_tasks, TriggerSender};
 use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
-use crate::core::workflow::countersigning_workflow::countersigning_success;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
-use crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops;
 use crate::core::workflow::CallZomeWorkflowArgs;
 use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
+#[cfg(feature = "unstable-countersigning")]
+use {
+    crate::core::queue_consumer::TriggerSender,
+    crate::core::workflow::countersigning_workflow::countersigning_success,
+    crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops,
+    holochain_p2p::event::CountersigningSessionNegotiationMessage,
+};
 
 use super::api::CellConductorHandle;
 use super::space::Space;
@@ -569,9 +573,11 @@ impl Cell {
                 .await;
             }
 
+            #[allow(unused_variables)]
             CountersigningSessionNegotiation {
                 respond, message, ..
             } => {
+                #[cfg(feature = "unstable-countersigning")]
                 async {
                     let res = self
                         .handle_countersigning_session_negotiation(message)
@@ -586,6 +592,7 @@ impl Cell {
         Ok(())
     }
 
+    #[cfg(feature = "unstable-countersigning")]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     /// we are receiving a response from a countersigning authority
     async fn handle_countersigning_session_negotiation(
@@ -1083,6 +1090,7 @@ impl Cell {
             .trigger(&"publish_authored_ops");
     }
 
+    #[cfg(feature = "unstable-countersigning")]
     pub(crate) fn countersigning_trigger(&self) -> TriggerSender {
         self.queue_triggers.countersigning.clone()
     }

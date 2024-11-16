@@ -99,7 +99,7 @@ use wasmer::Type;
 
 #[cfg(feature = "unstable-functions")]
 use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
-#[cfg(feature = "unstable-functions")]
+#[cfg(feature = "unstable-countersigning")]
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 #[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::block_agent::block_agent;
@@ -648,13 +648,14 @@ impl RealRibosome {
                 get_validation_receipts,
             );
 
+        #[cfg(feature = "unstable-countersigning")]
+        host_fn_builder.with_host_function(
+            &mut ns,
+            "__hc__accept_countersigning_preflight_request_1",
+            accept_countersigning_preflight_request,
+        );
         #[cfg(feature = "unstable-functions")]
         host_fn_builder
-            .with_host_function(
-                &mut ns,
-                "__hc__accept_countersigning_preflight_request_1",
-                accept_countersigning_preflight_request,
-            )
             .with_host_function(
                 &mut ns,
                 "__hc__get_agent_key_lineage_1",
@@ -666,7 +667,6 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             // TODO deprecated, remove me
             .with_host_function(&mut ns, "__hc__sleep_1", sleep);
-
         imports.register_namespace("env", ns);
 
         (host_fn_builder.function_env, imports)
@@ -1325,7 +1325,7 @@ pub mod wasm_test {
 
         pretty_assertions::assert_eq!(
             vec![
-                #[cfg(feature = "unstable-functions")]
+                #[cfg(feature = "unstable-countersigning")]
                 "__hc__accept_countersigning_preflight_request_1",
                 "__hc__agent_info_1",
                 #[cfg(feature = "unstable-functions")]
