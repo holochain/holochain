@@ -3273,6 +3273,7 @@ mod authenticate_token_impls {
     }
 }
 
+#[cfg(feature = "unstable-countersigning")]
 /// Methods for bridging from host calls to workflows for countersigning
 mod countersigning_impls {
     use super::*;

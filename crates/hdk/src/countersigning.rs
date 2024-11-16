@@ -8,7 +8,6 @@ use crate::prelude::*;
 /// It doesn't matter how, although concurrent remote calls are probably the
 /// simplest mechanism to distribute and accept preflight requests before the
 /// session times out.
-#[cfg(feature = "unstable-functions")]
 pub fn accept_countersigning_preflight_request(
     preflight_request: PreflightRequest,
 ) -> ExternResult<PreflightRequestAcceptance> {

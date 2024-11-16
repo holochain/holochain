@@ -30,6 +30,7 @@ mod agent_key_revocation;
 // key belong to the same key lineage, they belong to the same agent.
 #[cfg(feature = "unstable-functions")]
 pub mod agent_lineage;
+#[cfg(feature = "unstable-dpki")]
 mod test_dpki;
 
 #[tokio::test(flavor = "multi_thread")]
