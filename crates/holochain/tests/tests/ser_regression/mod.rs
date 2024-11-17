@@ -4,7 +4,6 @@ use hdk::prelude::*;
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
-use holochain::conductor::api::ZomeCall;
 use holochain::sweettest::*;
 use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_nonce::fresh_nonce;
@@ -109,10 +108,11 @@ async fn ser_regression_test() {
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     zome_call_params.nonce = nonce;
     zome_call_params.expires_at = expires_at;
-    let zome_call = ZomeCall::try_from_params(&conductors[0].keystore(), zome_call_params)
+    let output = conductors[0]
+        .call_zome(zome_call_params)
         .await
+        .unwrap()
         .unwrap();
-    let output = conductors[0].call_zome(zome_call).await.unwrap().unwrap();
 
     let channel_hash: EntryHash = match output {
         ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
@@ -154,10 +154,11 @@ async fn ser_regression_test() {
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     zome_call_params.nonce = nonce;
     zome_call_params.expires_at = expires_at;
-    let zome_call = ZomeCall::try_from_params(&conductors[0].keystore(), zome_call_params)
+    let output = conductors[0]
+        .call_zome(zome_call_params)
         .await
+        .unwrap()
         .unwrap();
-    let output = conductors[0].call_zome(zome_call).await.unwrap().unwrap();
 
     let _msg_hash: EntryHash = match output {
         ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),

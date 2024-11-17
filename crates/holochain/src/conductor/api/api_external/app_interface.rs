@@ -5,8 +5,6 @@ use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
 
-use holochain_keystore::LairResult;
-use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::prelude::*;
 
 use holochain_types::prelude::*;
@@ -102,16 +100,12 @@ impl AppInterfaceApi {
                     ));
                 }
 
-                let zome_call = ZomeCall {
-                    signed: *zome_call_params_signed,
-                    params: zome_call_params,
-                };
-                match self.conductor_handle.call_zome(zome_call.clone()).await? {
+                match self.conductor_handle.call_zome(zome_call_params.clone()).await? {
                     Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),
                     Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, _, zome_name, fn_name, _)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
                             "Call was not authorized with reason {:?}, cap secret {:?} to call the function {} in zome {}",
-                            zome_call_authorization, zome_call.params.cap_secret, fn_name, zome_name
+                            zome_call_authorization, zome_call_params.cap_secret, fn_name, zome_name
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(
@@ -251,29 +245,4 @@ pub(crate) async fn is_valid_signature(
     Ok(provenance
         .verify_signature_raw(signature, bytes_hash.into())
         .await?)
-}
-
-/// Combination of zome call parameters with individual fields and the signed form which includes
-/// the serialized bytes of the parameters and the provenance's signature of the serialized bytes.
-#[derive(Clone, Debug)]
-pub struct ZomeCall {
-    /// Parameters required to call a zome.
-    pub params: ZomeCallParams,
-    /// Zome call parameters serialized and signed.
-    pub signed: ZomeCallParamsSigned,
-}
-
-impl ZomeCall {
-    /// Create a zome call from parameters by serializing and signing them.
-    pub async fn try_from_params(
-        keystore: &MetaLairClient,
-        zome_call_params: ZomeCallParams,
-    ) -> LairResult<Self> {
-        let signed_zome_call =
-            ZomeCallParamsSigned::try_from_params(keystore, zome_call_params.clone()).await?;
-        Ok(Self {
-            signed: signed_zome_call,
-            params: zome_call_params,
-        })
-    }
 }

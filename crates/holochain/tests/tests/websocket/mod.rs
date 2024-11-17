@@ -103,7 +103,8 @@ how_many: 42
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
-async fn call_zome() {
+async fn zome_call_authentication() {
+    use ed25519_dalek::ed25519::signature::SignerMut;
     use holochain_conductor_api::{ExternalApiWireError, ZomeCallParamsSigned};
 
     holochain_trace::test_run();
@@ -161,16 +162,16 @@ async fn call_zome() {
     let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
     authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
 
-    // Authentication of zome call should fail with invalid signature.
+    // // Authentication of zome call should fail with invalid signature.
     let zome_name = TestWasm::Foo.coordinator_zome_name();
     let fn_name = FunctionName("foo".into());
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
-    let zome_call_params = ZomeCallParams {
-        cap_secret: None,
+    let mut zome_call_params = ZomeCallParams {
+        provenance: cell_id.agent_pubkey().clone(),
         cell_id: cell_id.clone(),
         zome_name: zome_name.clone(),
         fn_name: fn_name.clone(),
-        provenance: cell_id.agent_pubkey().clone(),
+        cap_secret: None,
         payload: ExternIO::encode(&()).unwrap(),
         nonce,
         expires_at,
@@ -190,8 +191,25 @@ async fn call_zome() {
 
     // Generate signing key pair
     let mut rng = OsRng;
-    let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+    let mut signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
+
+    // Authentication of zome call should fail with if signature doesn't fit signed bytes.
+    let (_, bytes_hash) = zome_call_params.serialize_and_hash().unwrap();
+    let signature = signing_keypair.sign(&bytes_hash);
+    // Change request now so that serialized bytes differ.
+    zome_call_params.payload = ExternIO::encode("wrong").unwrap();
+    let (bytes, _) = zome_call_params.serialize_and_hash().unwrap();
+    let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(
+        bytes,
+        Signature::from(signature.to_bytes()),
+    )));
+    let response = app_tx.request(request);
+    let response = check_timeout(response, 6000).await.unwrap();
+    assert_matches!(
+        response,
+        AppResponse::Error(ExternalApiWireError::ZomeCallAuthenticationFailed(_))
+    );
 
     // Grant zome call capability for agent
     let cap_secret = grant_zome_call_capability(

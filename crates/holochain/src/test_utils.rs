@@ -1,6 +1,5 @@
 //! Utils for Holochain tests
 use crate::conductor::api::AppInterfaceApi;
-use crate::conductor::api::ZomeCall;
 use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
@@ -17,6 +16,7 @@ use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
+use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::actor::HolochainP2pRefToDna;
@@ -900,18 +900,20 @@ pub async fn new_zome_call<P, Z: Into<ZomeName>>(
     func: &str,
     payload: P,
     zome: Z,
-) -> Result<ZomeCall, SerializedBytesError>
+) -> Result<ZomeCallParamsSigned, SerializedBytesError>
 where
     P: serde::Serialize + std::fmt::Debug,
 {
-    let zome_call_unsigned = new_zome_call_unsigned(cell_id, func, payload, zome)?;
-    Ok(ZomeCall::try_from_params(keystore, zome_call_unsigned)
-        .await
-        .unwrap())
+    let zome_call_params = new_zome_call_params(cell_id, func, payload, zome)?;
+    Ok(
+        ZomeCallParamsSigned::try_from_params(keystore, zome_call_params)
+            .await
+            .unwrap(),
+    )
 }
 
 /// Helper to create an unsigned zome invocation for tests
-pub fn new_zome_call_unsigned<P, Z: Into<ZomeName>>(
+pub fn new_zome_call_params<P, Z>(
     cell_id: &CellId,
     func: &str,
     payload: P,
@@ -919,6 +921,7 @@ pub fn new_zome_call_unsigned<P, Z: Into<ZomeName>>(
 ) -> Result<ZomeCallParams, SerializedBytesError>
 where
     P: serde::Serialize + std::fmt::Debug,
+    Z: Into<ZomeName>,
 {
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     Ok(ZomeCallParams {
@@ -934,8 +937,7 @@ where
 }
 
 /// Helper to create a zome invocation for tests
-pub async fn new_invocation<P, Z: Into<Zome> + Clone>(
-    keystore: &MetaLairClient,
+pub async fn new_invocation<P, Z>(
     cell_id: &CellId,
     func: &str,
     payload: P,
@@ -943,23 +945,19 @@ pub async fn new_invocation<P, Z: Into<Zome> + Clone>(
 ) -> Result<ZomeCallInvocation, SerializedBytesError>
 where
     P: serde::Serialize + std::fmt::Debug,
+    Z: Into<Zome> + Clone,
 {
-    let ZomeCall {
-        signed,
-        params:
-            ZomeCallParams {
-                cell_id,
-                cap_secret,
-                fn_name,
-                payload,
-                provenance,
-                nonce,
-                expires_at,
-                ..
-            },
-    } = new_zome_call(keystore, cell_id, func, payload, zome.clone().into()).await?;
+    let ZomeCallParams {
+        cell_id,
+        cap_secret,
+        fn_name,
+        payload,
+        provenance,
+        nonce,
+        expires_at,
+        ..
+    } = new_zome_call_params(cell_id, func, payload, zome.clone().into())?;
     Ok(ZomeCallInvocation {
-        signed_params: signed,
         cell_id,
         zome: zome.into(),
         cap_secret,
