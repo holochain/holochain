@@ -172,7 +172,7 @@ async fn zome_call_authentication() {
         zome_name: zome_name.clone(),
         fn_name: fn_name.clone(),
         cap_secret: None,
-        payload: ExternIO::encode(&()).unwrap(),
+        payload: ExternIO::encode(()).unwrap(),
         nonce,
         expires_at,
     };

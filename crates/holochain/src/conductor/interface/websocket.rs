@@ -740,7 +740,7 @@ pub mod test {
             zome_name,
             fn_name: function_name.into(),
             cap_secret: None,
-            payload: ExternIO::encode(&()).unwrap(),
+            payload: ExternIO::encode(()).unwrap(),
             nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()),
             expires_at: (Timestamp::now() + std::time::Duration::from_secs(30)).unwrap(),
         };
