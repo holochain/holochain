@@ -379,9 +379,12 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
 async fn alice_can_recover_from_a_session_timeout() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|c| {
-        c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
-    });
+    let config = SweetConductorConfig::rendezvous(true)
+        .no_dpki()
+        .tune_conductor(|c| {
+            c.countersigning_resolution_retry_limit = Some(3);
+            c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
+        });
     let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;

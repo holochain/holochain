@@ -195,6 +195,7 @@ enum ResolutionRequiredReason {
 #[cfg(feature = "unstable-countersigning")]
 struct SessionResolutionSummary {
     /// The reason why session resolution is required.
+    #[allow(dead_code)]
     required_reason: ResolutionRequiredReason,
     /// How many attempts have been made to resolve the session.
     ///
@@ -512,12 +513,7 @@ async fn try_recover_failed_session(
                 update_last_attempted(workspace.clone(), true, outcomes, cell_id);
 
                 let resolution = get_resolution(workspace.clone());
-                if let Some(SessionResolutionSummary {
-                    required_reason: ResolutionRequiredReason::Timeout,
-                    attempts,
-                    ..
-                }) = resolution
-                {
+                if let Some(SessionResolutionSummary { attempts, .. }) = resolution {
                     let limit = workspace.countersigning_resolution_retry_limit.unwrap_or(0);
 
                     // If we have reached the limit of attempts, then abandon the session.
