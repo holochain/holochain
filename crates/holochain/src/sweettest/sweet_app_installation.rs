@@ -67,9 +67,18 @@ pub async fn get_install_app_payload_from_dnas(
 ) -> InstallAppPayload {
     let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
     let bundle = app_bundle_from_dnas(&dnas_with_roles, false, network_seed).await;
-    let membrane_proofs = Some(
+
+    let roles_settings = Some(
         data.iter()
-            .map(|(dr, memproof)| (dr.role(), memproof.clone().unwrap_or_default()))
+            .map(|(dr, memproof)| {
+                (
+                    dr.role(),
+                    RoleSettings::Provisioned {
+                        modifiers: Default::default(),
+                        membrane_proof: memproof.clone(),
+                    },
+                )
+            })
             .collect(),
     );
 
@@ -78,8 +87,7 @@ pub async fn get_install_app_payload_from_dnas(
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(installed_app_id.into()),
         network_seed: None,
-        membrane_proofs,
-        existing_cells: Default::default(),
+        roles_settings,
         ignore_genesis_failure: false,
         allow_throwaway_random_agent_key: false,
     }
