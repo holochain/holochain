@@ -180,6 +180,8 @@ async fn generate_sandbox_and_connect() {
 
     let launch_info = get_launch_info(hc_admin).await;
 
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
     // - Make a call to list app info to the port
     let app_info = get_app_info(
         launch_info.admin_port,
