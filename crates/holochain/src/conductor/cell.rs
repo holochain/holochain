@@ -391,7 +391,6 @@ impl Cell {
                 respond,
                 ..
             } => {
-                println!("habsdidu");
                 async {
                     let res = self
                         .handle_call_remote(zome_call_params_serialized, signature)
