@@ -162,7 +162,7 @@ async fn zome_call_authentication() {
     let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
     authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
 
-    // // Authentication of zome call should fail with invalid signature.
+    // Authentication of zome call should fail with invalid signature.
     let zome_name = TestWasm::Foo.coordinator_zome_name();
     let fn_name = FunctionName("foo".into());
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
@@ -194,7 +194,7 @@ async fn zome_call_authentication() {
     let mut signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
 
-    // Authentication of zome call should fail with if signature doesn't fit signed bytes.
+    // Authentication of zome call should fail if signature doesn't fit signed bytes.
     let (_, bytes_hash) = zome_call_params.serialize_and_hash().unwrap();
     let signature = signing_keypair.sign(&bytes_hash);
     // Change request now so that serialized bytes differ.
