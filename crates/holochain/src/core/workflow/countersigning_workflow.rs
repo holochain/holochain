@@ -195,6 +195,7 @@ enum ResolutionRequiredReason {
 #[cfg(feature = "unstable-countersigning")]
 struct SessionResolutionSummary {
     /// The reason why session resolution is required.
+    #[allow(dead_code)]
     required_reason: ResolutionRequiredReason,
     /// How many attempts have been made to resolve the session.
     ///
