@@ -137,6 +137,11 @@ mod graft_records_onto_source_chain;
 
 mod app_auth_token_store;
 
+/// Verify signature of a signed zome call.
+///
+/// [Signature verification](holochain_conductor_api::AppRequest::CallZome)
+pub(crate) mod zome_call_signature_verification;
+
 /// Operations to manipulate agent keys.
 ///
 /// Agent keys are handled in 2 places in Holochain, on the source chain of a cell and in the
@@ -846,11 +851,11 @@ mod network_impls {
     use holochain_zome_types::block::BlockTargetId;
     use kitsune_p2p::KitsuneAgent;
     use kitsune_p2p::KitsuneBinType;
+    use zome_call_signature_verification::is_valid_signature;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
     };
-    use crate::conductor::api::is_valid_signature;
 
     use super::*;
 

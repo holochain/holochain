@@ -51,8 +51,8 @@ use {
     holochain_p2p::event::CountersigningSessionNegotiationMessage,
 };
 
-use super::api::is_valid_signature;
 use super::api::CellConductorHandle;
+use super::conductor::zome_call_signature_verification::is_valid_signature;
 use super::space::Space;
 use super::ConductorHandle;
 
