@@ -786,8 +786,7 @@ pub mod wasm_test {
         let bob_call_result = conductor.raw_handle().call_zome(bob_zome_call_params).await;
 
         match bob_call_result {
-            Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* (☞ ͡° ͜ʖ ͡°)☞ */
-            }
+            Ok(Ok(ZomeCallResponse::Unauthorized(..))) => { /* (☞ ͡° ͜ʖ ͡°)☞ */ }
             _ => panic!("{:?}", bob_call_result),
         }
 
@@ -809,7 +808,7 @@ pub mod wasm_test {
             .await;
 
         match alice_call_result_1 {
-            Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* ☜(ﾟヮﾟ☜) */ }
+            Ok(Ok(ZomeCallResponse::Unauthorized(..))) => { /* ☜(ﾟヮﾟ☜) */ }
             _ => panic!("{:?}", bob_call_result),
         }
     }

@@ -85,7 +85,7 @@ pub mod wasm_test {
             )
             .await;
 
-        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _, _));
+        assert_matches!(output, ZomeCallResponse::Unauthorized(..));
 
         // BOB COMMITS A TRANSFERABLE GRANT WITH THE SECRET SHARED WITH ALICE
 
@@ -137,7 +137,7 @@ pub mod wasm_test {
             )
             .await;
 
-        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _, _));
+        assert_matches!(output, ZomeCallResponse::Unauthorized(..));
 
         let output: ZomeCallResponse = conductor
             .call(
@@ -162,7 +162,7 @@ pub mod wasm_test {
             )
             .await;
 
-        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _, _));
+        assert_matches!(output, ZomeCallResponse::Unauthorized(..));
 
         let output: ZomeCallResponse = conductor
             .call(
@@ -173,7 +173,7 @@ pub mod wasm_test {
             .await;
 
         // the inner response should be unauthorized
-        assert_matches!(output, ZomeCallResponse::Unauthorized(_, _, _, _, _));
+        assert_matches!(output, ZomeCallResponse::Unauthorized(..));
 
         let mut conductor = conductor;
         conductor.shutdown().await;

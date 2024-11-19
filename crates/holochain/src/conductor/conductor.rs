@@ -834,6 +834,7 @@ mod network_impls {
     use std::time::Duration;
 
     use futures::future::join_all;
+    use holochain_conductor_api::ZomeCallParamsSigned;
     use rusqlite::params;
 
     use holochain_conductor_api::{
@@ -849,6 +850,7 @@ mod network_impls {
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
     };
+    use crate::conductor::api::is_valid_signature;
 
     use super::*;
 
@@ -1364,6 +1366,32 @@ mod network_impls {
         /// List all host functions provided by this conductor for wasms.
         pub async fn list_wasm_host_functions(&self) -> ConductorApiResult<Vec<String>> {
             Ok(RealRibosome::tooling_imports().await?)
+        }
+
+        /// Handle a zome call coming from outside of the conductor, e.g. through the ConductorApi.
+        pub async fn handle_external_zome_call(
+            &self,
+            zome_call_params_signed: ZomeCallParamsSigned,
+        ) -> ConductorApiResult<ZomeCallResult> {
+            let zome_call_params = zome_call_params_signed
+                .bytes
+                .clone()
+                .decode::<ZomeCallParams>()
+                .map_err(|e| ConductorApiError::SerializationError(e.into()))?;
+            if !is_valid_signature(
+                &zome_call_params.provenance,
+                zome_call_params_signed.bytes.as_bytes(),
+                &zome_call_params_signed.signature,
+            )
+            .await?
+            {
+                return Ok(Ok(ZomeCallResponse::AuthenticationFailed(
+                    zome_call_params_signed.signature,
+                    zome_call_params.provenance,
+                )));
+            }
+
+            self.call_zome(zome_call_params.clone()).await
         }
 
         /// Invoke a zome function on a Cell

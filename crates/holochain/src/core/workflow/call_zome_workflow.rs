@@ -235,10 +235,9 @@ where
             ribosome,
             Ok(ZomeCallResponse::Unauthorized(
                 not_authorized_reason,
-                invocation.cell_id.clone(),
+                invocation.cap_secret.clone(),
                 invocation.zome.zome_name().clone(),
                 invocation.fn_name.clone(),
-                invocation.provenance.clone(),
             )),
         )),
     }

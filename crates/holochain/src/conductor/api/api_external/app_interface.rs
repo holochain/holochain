@@ -80,32 +80,18 @@ impl AppInterfaceApi {
                     .await?,
             )),
             AppRequest::CallZome(zome_call_params_signed) => {
-                let zome_call_params = zome_call_params_signed
-                    .bytes
-                    .clone()
-                    .decode::<ZomeCallParams>()
-                    .map_err(|e| ConductorApiError::SerializationError(e.into()))?;
-                if !is_valid_signature(
-                    &zome_call_params.provenance,
-                    zome_call_params_signed.bytes.as_bytes(),
-                    &zome_call_params_signed.signature,
-                )
-                .await?
-                {
-                    return Ok(AppResponse::Error(
+                match self.conductor_handle.handle_external_zome_call(*zome_call_params_signed).await? {
+                    Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),
+                    Ok(ZomeCallResponse::AuthenticationFailed(signature, provenance)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallAuthenticationFailed(format!(
                             "Authentication failure. Bad signature {:?} by provenance {:?}.",
-                            zome_call_params_signed.signature, zome_call_params.provenance,
+                            signature, provenance,
                         )),
-                    ));
-                }
-
-                match self.conductor_handle.call_zome(zome_call_params.clone()).await? {
-                    Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),
-                    Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, _, zome_name, fn_name, _)) => Ok(AppResponse::Error(
+                    )),
+                    Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, cap_secret, zome_name, fn_name)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
                             "Call was not authorized with reason {:?}, cap secret {:?} to call the function {} in zome {}",
-                            zome_call_authorization, zome_call_params.cap_secret, fn_name, zome_name
+                            zome_call_authorization, cap_secret, fn_name, zome_name
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(
