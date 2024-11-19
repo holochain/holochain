@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `role_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
+
 ## Holonix
 
 - Slim down the Rust toolchain [\#2854](https://github.com/holochain/holochain/pull/2854)
