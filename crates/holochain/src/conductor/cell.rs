@@ -9,7 +9,6 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use futures::future::FutureExt;
-use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
 use tokio::sync::broadcast;
@@ -883,11 +882,10 @@ impl Cell {
             expires_at,
             ..
         } = zome_call_params_serialized.decode()?;
-        let invocation = ZomeCall {
-            signed: ZomeCallParamsSigned {
-                bytes: zome_call_params_serialized,
-                signature,
-            },
+        let bytes_hash = sha2_512(zome_call_params_serialized.as_bytes());
+        let zome_call = ZomeCall {
+            bytes_hash,
+            signature,
             params: ZomeCallParams {
                 cell_id: self.id.clone(),
                 cap_secret,
@@ -902,7 +900,7 @@ impl Cell {
         // double ? because
         // - ConductorApiResult
         // - ZomeCallResult
-        Ok(self.call_zome(invocation, None).await??.try_into()?)
+        Ok(self.call_zome(zome_call, None).await??.try_into()?)
     }
 
     /// Function called by the Conductor

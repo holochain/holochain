@@ -5,7 +5,6 @@ use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
 
-use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_serialized_bytes::prelude::*;
 
@@ -81,16 +80,8 @@ impl AppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
-            AppRequest::CallZome(signed_zome_call) => {
-                let zome_call_params = signed_zome_call
-                    .bytes
-                    .clone()
-                    .decode::<ZomeCallParams>()
-                    .map_err(|e| ConductorApiError::SerializationError(e.into()))?;
-                let zome_call = ZomeCall {
-                    signed: *signed_zome_call,
-                    params: zome_call_params,
-                };
+            AppRequest::CallZome(zome_call_params_signed) => {
+                let zome_call = ZomeCall::try_from_params_signed(*zome_call_params_signed).await?;
                 match self.conductor_handle.call_zome(zome_call.clone()).await? {
                     Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),
                     Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, _, zome_name, fn_name, _)) => Ok(AppResponse::Error(
@@ -232,8 +223,10 @@ pub struct AppAuthentication {
 pub struct ZomeCall {
     /// Parameters required to call a zome.
     pub params: ZomeCallParams,
-    /// Zome call parameters serialized and signed.
-    pub signed: ZomeCallParamsSigned,
+    /// The hash of the serialized zome call parameters.
+    pub bytes_hash: Vec<u8>,
+    /// The signature of the hash.
+    pub signature: Signature,
 }
 
 impl ZomeCall {
@@ -241,12 +234,35 @@ impl ZomeCall {
     pub async fn try_from_params(
         keystore: &MetaLairClient,
         zome_call_params: ZomeCallParams,
-    ) -> LairResult<Self> {
-        let signed_zome_call =
-            ZomeCallParamsSigned::try_from_params(keystore, zome_call_params.clone()).await?;
+    ) -> ConductorApiResult<Self> {
+        let (_, bytes_hash) = zome_call_params
+            .serialize_and_hash()
+            .map_err(|err| ConductorApiError::SerializationError(err.into()))?;
+        let signature = zome_call_params
+            .provenance
+            .sign_raw(keystore, bytes_hash.clone().into())
+            .await?;
         Ok(Self {
-            signed: signed_zome_call,
+            bytes_hash,
+            signature,
             params: zome_call_params,
+        })
+    }
+
+    /// Create a zome call from parameters by serializing and signing them.
+    pub async fn try_from_params_signed(
+        signed_params: ZomeCallParamsSigned,
+    ) -> ConductorApiResult<Self> {
+        let params = signed_params
+            .bytes
+            .clone()
+            .decode::<ZomeCallParams>()
+            .map_err(|e| ConductorApiError::SerializationError(e.into()))?;
+        let bytes_hash = sha2_512(signed_params.bytes.as_bytes());
+        Ok(Self {
+            bytes_hash,
+            signature: signed_params.signature,
+            params,
         })
     }
 }

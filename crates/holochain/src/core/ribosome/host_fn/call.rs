@@ -221,7 +221,6 @@ pub mod wasm_test {
 
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::test_utils::new_zome_call_unsigned;
-    use holochain_conductor_api::ZomeCallParamsSigned;
     use holochain_sqlite::prelude::DatabaseResult;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -291,15 +290,10 @@ pub mod wasm_test {
         let zome_call_unsigned =
             new_zome_call_unsigned(alice.cell_id(), "call_create_entry", (), TestWasm::Create)
                 .unwrap();
-        let zome_call =
-            ZomeCallParamsSigned::try_from_params(handle.keystore(), zome_call_unsigned.clone())
-                .await
-                .unwrap();
-        let call = ZomeCall {
-            signed: zome_call,
-            params: zome_call_unsigned,
-        };
-        let result = handle.call_zome(call).await;
+        let zome_call = ZomeCall::try_from_params(handle.keystore(), zome_call_unsigned.clone())
+            .await
+            .unwrap();
+        let result = handle.call_zome(zome_call).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
 
         // Get the action hash of that entry
