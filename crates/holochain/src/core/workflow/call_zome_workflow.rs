@@ -235,7 +235,7 @@ where
             ribosome,
             Ok(ZomeCallResponse::Unauthorized(
                 not_authorized_reason,
-                invocation.cap_secret.clone(),
+                invocation.cap_secret,
                 invocation.zome.zome_name().clone(),
                 invocation.fn_name.clone(),
             )),
