@@ -562,7 +562,7 @@ async fn get_launch_info(mut child: tokio::process::Child, wait_for_install: boo
             }
             maybe_launch_info = Some(launch_info);
         }
-        if line.find("App installed with id").is_some() {
+        if line.contains("App installed with id") {
             app_installed = true;
         }
         if let (true, true) = (maybe_launch_info.is_some(), app_installed) {
