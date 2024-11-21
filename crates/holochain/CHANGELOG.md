@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Zome call authorization is split into autentication and authorization. Zome calls are authenticated when coming in over the network. The signature must match the hash of the serialized bytes, signed by the provenance of the call, as described above. This applies to zome calls over the App API as well as remote calls. Bridge calls, which are calls that zome call functions can make to other cells on the same conductor, do not require authentication.
+Authorization through zome call capabilities remains unchanged and is required for any kind of call as before.
+
 ## 0.5.0-dev.6
 
 - **BREAKING**: Zome call API `AppRequest::CallZome` takes simple serialized bytes of the zome call parameters and the signature now. Previously client-side serialization of zome call parameters required to exactly match Holochain’s way of serializing, because Holochain re-serialized the parameters to verify the signature. This is no longer the case. The signature is generated for the **hash of the serialized bytes**, using the **SHA2 512-bit** hashing algorithm. In short, zome call params are serialized, then hashed and the hash is signed. The payload of the `CallZome` request is the serialized bytes and the signature. On the Holochain side the serialized bytes of the zome call parameters are hashed with the same SHA2 512-bit algorithm to verify the signature.

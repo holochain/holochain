@@ -231,7 +231,6 @@ pub enum HostFnApiError {
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ZomeCallAuthorization {
     Authorized,
-    BadSignature,
     BadCapGrant,
     BadNonce(String),
     BlockedProvenance,
@@ -255,14 +254,15 @@ pub enum ZomeCallResponse {
     /// Arbitrary response from zome fns to the outside world.
     /// Something like a 200 http response.
     Ok(ExternIO),
+    /// Authentication failure - signature could not be verified by the provenance.
+    AuthenticationFailed(Signature, AgentPubKey),
     /// Cap grant failure.
     /// Something like a 401 http response.
     Unauthorized(
         ZomeCallAuthorization,
-        CellId,
+        Option<CapSecret>,
         ZomeName,
         FunctionName,
-        AgentPubKey,
     ),
     /// This was a zome call made remotely but
     /// something has failed on the network

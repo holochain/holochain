@@ -9,7 +9,6 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use futures::future::FutureExt;
-use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_serialized_bytes::SerializedBytes;
 use rusqlite::OptionalExtension;
 use tokio::sync::broadcast;
@@ -53,7 +52,7 @@ use {
 };
 
 use super::api::CellConductorHandle;
-use super::api::ZomeCall;
+use super::conductor::zome_call_signature_verification::is_valid_signature;
 use super::space::Space;
 use super::ConductorHandle;
 
@@ -314,23 +313,7 @@ impl Cell {
                         expires_at,
                     };
 
-                    tasks.push(
-                        self.call_zome(
-                            match ZomeCall::try_from_params(
-                                self.conductor_handle.keystore(),
-                                zome_call_params,
-                            )
-                                .await
-                            {
-                                Ok(zome_call) => zome_call,
-                                Err(e) => {
-                                    error!("scheduled zome call error in try_from_unsigned_zome_call: {:?}", e);
-                                    continue;
-                                }
-                            },
-                            None,
-                        ),
-                    );
+                    tasks.push(self.call_zome(zome_call_params, None));
                 }
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
@@ -873,36 +856,25 @@ impl Cell {
         zome_call_params_serialized: ExternIO,
         signature: Signature,
     ) -> CellResult<SerializedBytes> {
-        let ZomeCallParams {
-            cap_secret,
-            payload,
-            provenance,
-            zome_name,
-            fn_name,
-            nonce,
-            expires_at,
-            ..
-        } = zome_call_params_serialized.decode()?;
-        let invocation = ZomeCall {
-            signed: ZomeCallParamsSigned {
-                bytes: zome_call_params_serialized,
+        let zome_call_params = zome_call_params_serialized.decode::<ZomeCallParams>()?;
+        if !is_valid_signature(
+            &zome_call_params.provenance,
+            zome_call_params_serialized.as_bytes(),
+            &signature,
+        )
+        .await
+        .map_err(|err| CellError::ConductorApiError(Box::new(err)))?
+        {
+            return Err(CellError::ZomeCallAuthenticationFailed(
                 signature,
-            },
-            params: ZomeCallParams {
-                cell_id: self.id.clone(),
-                cap_secret,
-                payload,
-                provenance,
-                zome_name,
-                fn_name,
-                nonce,
-                expires_at,
-            },
-        };
+                zome_call_params.provenance,
+            ));
+        }
+
         // double ? because
         // - ConductorApiResult
         // - ZomeCallResult
-        Ok(self.call_zome(invocation, None).await??.try_into()?)
+        Ok(self.call_zome(zome_call_params, None).await??.try_into()?)
     }
 
     /// Function called by the Conductor
@@ -913,7 +885,7 @@ impl Cell {
     // to access the Cell itself, as it was previously done.
     pub async fn call_zome(
         &self,
-        call: ZomeCall,
+        params: ZomeCallParams,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
         // Only check if init has run if this call is not coming from
@@ -931,7 +903,7 @@ impl Cell {
         let conductor_handle = self.conductor_handle.clone();
         let ribosome = self.get_ribosome()?;
         let invocation =
-            ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
+            ZomeCallInvocation::try_from_params(self.conductor_api.clone(), params).await?;
 
         let dna_def = ribosome.dna_def().as_content().clone();
         // If there is no existing zome call then this is the root zome call

@@ -6,7 +6,6 @@ use criterion::Throughput;
 use hdk::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::core::ribosome::ZomeCallInvocation;
-use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;
 use once_cell::sync::Lazy;
@@ -75,10 +74,6 @@ pub fn wasm_call_n(c: &mut Criterion) {
             b.iter(|| {
                 let zome: Zome = TestZomes::from(TestWasm::Bench).coordinator.erase_type();
                 let i = ZomeCallInvocation {
-                    signed_params: ZomeCallParamsSigned {
-                        bytes: ExternIO(vec![]),
-                        signature: [0; 64].into(),
-                    },
                     cell_id: CELL_ID.lock().unwrap().clone(),
                     zome: zome.clone(),
                     cap_secret: Some(*CAP.lock().unwrap()),

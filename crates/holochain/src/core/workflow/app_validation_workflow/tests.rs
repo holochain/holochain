@@ -8,7 +8,9 @@ use crate::core::workflow::app_validation_workflow::{
 use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
-use crate::test_utils::{host_fn_caller::*, new_invocation, new_zome_call, wait_for_integration};
+use crate::test_utils::{
+    host_fn_caller::*, new_invocation, new_zome_call_params, wait_for_integration,
+};
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
@@ -1245,16 +1247,13 @@ async fn run_test(
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
 
-    let invocation = new_zome_call(
-        conductors[1].raw_handle().keystore(),
-        &bob_cell_id,
-        "always_validates",
-        (),
-        TestWasm::Validate,
-    )
-    .await
-    .unwrap();
-    conductors[1].call_zome(invocation).await.unwrap().unwrap();
+    let zome_call_params =
+        new_zome_call_params(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
+    conductors[1]
+        .call_zome(zome_call_params)
+        .await
+        .unwrap()
+        .unwrap();
 
     // Integration should have 3 ops in it
     // Plus another 16 for genesis + init
@@ -1317,16 +1316,13 @@ async fn run_test(
         .await
         .unwrap();
 
-    let invocation = new_zome_call(
-        conductors[1].raw_handle().keystore(),
-        &bob_cell_id,
-        "add_valid_link",
-        (),
-        TestWasm::ValidateLink,
-    )
-    .await
-    .unwrap();
-    conductors[1].call_zome(invocation).await.unwrap().unwrap();
+    let zome_call_params =
+        new_zome_call_params(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
+    conductors[1]
+        .call_zome(zome_call_params)
+        .await
+        .unwrap()
+        .unwrap();
 
     // Integration should have 6 ops in it
     let expected_count = 6 + expected_count;
@@ -1360,7 +1356,6 @@ async fn run_test(
         .unwrap();
 
     let invocation = new_invocation(
-        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "add_invalid_link",
         (),
@@ -1412,7 +1407,6 @@ async fn run_test(
         .unwrap();
 
     let invocation = new_invocation(
-        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "remove_valid_link",
         (),
@@ -1462,7 +1456,6 @@ async fn run_test(
         .unwrap();
 
     let invocation = new_invocation(
-        conductors[1].raw_handle().keystore(),
         &bob_cell_id,
         "remove_invalid_link",
         (),

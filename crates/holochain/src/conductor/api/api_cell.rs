@@ -5,7 +5,6 @@ use std::sync::Arc;
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
 use super::DpkiApi;
-use super::ZomeCall;
 use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::ConductorHandle;
@@ -54,24 +53,6 @@ impl CellConductorApi {
 impl CellConductorApiT for CellConductorApi {
     fn cell_id(&self) -> &CellId {
         &self.cell_id
-    }
-
-    async fn call_zome(
-        &self,
-        cell_id: &CellId,
-        call: ZomeCall,
-    ) -> ConductorApiResult<ZomeCallResult> {
-        if *cell_id == call.params.cell_id {
-            self.conductor_handle
-                .call_zome(call)
-                .await
-                .map_err(Into::into)
-        } else {
-            Err(ConductorApiError::ZomeCallCellMismatch {
-                api_cell_id: cell_id.clone(),
-                call_cell_id: call.params.cell_id,
-            })
-        }
     }
 
     fn conductor_services(&self) -> ConductorServices {
@@ -128,14 +109,6 @@ pub trait CellConductorApiT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
 
-    /// Invoke a zome function on any cell in this conductor.
-    /// A zome call on a different Cell than this one corresponds to a bridged call.
-    async fn call_zome(
-        &self,
-        cell_id: &CellId,
-        call: ZomeCall,
-    ) -> ConductorApiResult<ZomeCallResult>;
-
     /// Access to the conductor services
     fn conductor_services(&self) -> ConductorServices;
 
@@ -175,7 +148,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Invoke a zome function on a Cell
     async fn call_zome(
         &self,
-        call: ZomeCall,
+        params: ZomeCallParams,
         workspace_lock: SourceChainWorkspace,
     ) -> ConductorApiResult<ZomeCallResult>;
 
@@ -260,15 +233,15 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn call_zome(
         &self,
-        call: ZomeCall,
+        params: ZomeCallParams,
         workspace_lock: SourceChainWorkspace,
     ) -> ConductorApiResult<ZomeCallResult> {
-        if self.cell_id == call.params.cell_id {
+        if self.cell_id == params.cell_id {
             self.conductor_handle
-                .call_zome_with_workspace(call, workspace_lock)
+                .call_zome_with_workspace(params, workspace_lock)
                 .await
         } else {
-            self.conductor_handle.call_zome(call).await
+            self.conductor_handle.call_zome(params).await
         }
     }
 
