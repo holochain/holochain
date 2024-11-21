@@ -117,6 +117,7 @@ async fn zome_call_authentication() {
         _admin_rx,
         app_tx,
         app_rx,
+        holochain: _holochain,
         zome_name,
         fn_name,
         cap_secret,
@@ -124,7 +125,7 @@ async fn zome_call_authentication() {
         ..
     } = TestCase::new().await;
 
-    let _app_rx = WsPollRecv::new::<AdminResponse>(app_rx);
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
 
     // Authentication of zome call should fail with invalid signature.
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
@@ -140,10 +141,7 @@ async fn zome_call_authentication() {
     };
     let bytes = encode(&zome_call_params).unwrap();
     let signature = fixt!(Signature);
-    let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(
-        bytes,
-        signature.clone(),
-    )));
+    let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(bytes, signature)));
     let response = app_tx.request(request);
     let response = check_timeout(response, 6000).await.unwrap();
     assert_matches!(
