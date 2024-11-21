@@ -559,7 +559,7 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
     };
 
     let payload = InstallAppPayload {
-        installed_app_id: app_id,
+        installed_app_id: app_id.clone(),
         agent_key,
         source: AppBundleSource::Path(path),
         roles_settings,
@@ -586,6 +586,8 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
             }
         }
     }
+
+    msg!("App installed with id {:?}.", app_id);
 
     Ok(installed_app)
 }
