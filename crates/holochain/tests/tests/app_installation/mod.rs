@@ -8,7 +8,7 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn can_install_app_with_custom_modifiers_correctly_1() {
+async fn can_install_app_with_custom_modifiers_overridden_correctly() {
     let conductor = SweetConductor::from_standard_config().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -213,7 +213,7 @@ async fn can_install_app_with_custom_modifiers_correctly_1() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn can_install_app_with_custom_modifiers_correctly_2() {
+async fn install_app_with_custom_modifier_fields_none_does_not_override_existing_fields() {
     let conductor = SweetConductor::from_standard_config().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -349,7 +349,7 @@ async fn installing_with_modifiers_for_non_existing_role_fails() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn providing_membrane_proof_skips_deferred_provisioning() {
+async fn providing_membrane_proof_overrides_deferred_provisioning() {
     //- Check that if providing a membrane proof in the role settings for an app with `allow_deferred_memproofs`
     //  set to `true` in the app manifest, membrane proofs are not deferred and the app has
     //  AppInfoStatus::Running after installation

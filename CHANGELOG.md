@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
+- **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `roles_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
+- `hc sandbox generate` and `hc sandbox call install-app` now have an additional optional argument `--roles-settings <path>` where a path to a yaml file can be passed to override role settings defined in the dna manifest(s). An example of such a yaml file can be found here: https://github.com/holochain/holochain/tree/develop/crates/hc_sandbox/tests/fixtures/roles-settings.yaml
+
 ## Holonix
 
 - Slim down the Rust toolchain [\#2854](https://github.com/holochain/holochain/pull/2854)
