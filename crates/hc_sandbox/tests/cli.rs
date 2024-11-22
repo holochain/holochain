@@ -11,7 +11,6 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
-use matches::assert_matches;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -91,9 +90,9 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
         }
     })
     .await
-    .expect(&format!(
-        "Timeout waiting for the sandbox to install the app {installed_app_id}"
-    ));
+    .unwrap_or_else(|_| {
+        panic!("Timeout waiting for the sandbox to install the app {installed_app_id}")
+    });
 }
 
 async fn check_timeout<T>(response: impl Future<Output = WebsocketResult<T>>) -> T {
