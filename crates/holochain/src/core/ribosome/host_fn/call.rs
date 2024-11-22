@@ -1,4 +1,3 @@
-use crate::conductor::api::ZomeCall;
 use crate::core::ribosome::CallContext;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -147,19 +146,11 @@ pub fn call(
                                             nonce,
                                             expires_at,
                                         };
-                                        let call = ZomeCall::try_from_params(
-                                            call_context.host_context.keystore(),
-                                            zome_call_params,
-                                        )
-                                        .await
-                                        .map_err(|e| -> RuntimeError {
-                                            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                                        })?;
                                         match call_context
                                             .host_context()
                                             .call_zome_handle()
                                             .call_zome(
-                                                call,
+                                                zome_call_params,
                                                 call_context
                                                     .host_context()
                                                     .workspace_write()
@@ -209,7 +200,6 @@ pub fn call(
 
 #[cfg(test)]
 pub mod wasm_test {
-    use crate::conductor::api::ZomeCall;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
@@ -220,8 +210,7 @@ pub mod wasm_test {
     use rusqlite::named_params;
 
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::test_utils::new_zome_call_unsigned;
-    use holochain_conductor_api::ZomeCallParamsSigned;
+    use crate::test_utils::new_zome_call_params;
     use holochain_sqlite::prelude::DatabaseResult;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -288,18 +277,10 @@ pub mod wasm_test {
 
         let handle = conductor.raw_handle();
 
-        let zome_call_unsigned =
-            new_zome_call_unsigned(alice.cell_id(), "call_create_entry", (), TestWasm::Create)
+        let zome_call_params =
+            new_zome_call_params(alice.cell_id(), "call_create_entry", (), TestWasm::Create)
                 .unwrap();
-        let zome_call =
-            ZomeCallParamsSigned::try_from_params(handle.keystore(), zome_call_unsigned.clone())
-                .await
-                .unwrap();
-        let call = ZomeCall {
-            signed: zome_call,
-            params: zome_call_unsigned,
-        };
-        let result = handle.call_zome(call).await;
+        let result = handle.call_zome(zome_call_params).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
 
         // Get the action hash of that entry

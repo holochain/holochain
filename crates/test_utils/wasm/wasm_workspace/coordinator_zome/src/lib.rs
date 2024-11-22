@@ -120,10 +120,15 @@ fn call_create_entry(_: ()) -> ExternResult<ActionHash> {
 
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e))?),
-        ZomeCallResponse::Unauthorized(reason, cell_id, zome_name, function_name, agent_pubkey) => {
+        ZomeCallResponse::AuthenticationFailed(signature, provenance) => {
             Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Unauthorized: {} {} {} {} {}",
-                reason, cell_id, zome_name, function_name, agent_pubkey
+                "Authentication failed with signature {signature:?} from provenance {provenance}"
+            ))))
+        }
+        ZomeCallResponse::Unauthorized(reason, cap_secret, zome_name, function_name) => {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Unauthorized: {} {:?} {} {}",
+                reason, cap_secret, zome_name, function_name
             ))))
         }
         // Unbounded recursion.
@@ -146,10 +151,15 @@ fn call_create_entry_remotely(agent: AgentPubKey) -> ExternResult<ActionHash> {
 
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e))?),
-        ZomeCallResponse::Unauthorized(reason, cell_id, zome_name, function_name, agent_pubkey) => {
+        ZomeCallResponse::AuthenticationFailed(signature, provenance) => {
             Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Unauthorized: {} {} {} {} {}",
-                reason, cell_id, zome_name, function_name, agent_pubkey
+                "Authentication failed with signature {signature:?} from provenance {provenance}"
+            ))))
+        }
+        ZomeCallResponse::Unauthorized(reason, cap_secret, zome_name, function_name) => {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Unauthorized: {} {:?} {} {}",
+                reason, cap_secret, zome_name, function_name
             ))))
         }
         // Unbounded recursion.
@@ -178,10 +188,15 @@ fn call_create_entry_remotely_no_rec(agent: AgentPubKey) -> ExternResult<ActionH
 
     match zome_call_response {
         ZomeCallResponse::Ok(v) => Ok(v.decode().map_err(|e| wasm_error!(e))?),
-        ZomeCallResponse::Unauthorized(reason, cell_id, zome_name, function_name, agent_pubkey) => {
+        ZomeCallResponse::AuthenticationFailed(signature, provenance) => {
             Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Unauthorized: {} {} {} {} {}",
-                reason, cell_id, zome_name, function_name, agent_pubkey
+                "Authentication failed with signature {signature:?} from provenance {provenance}"
+            ))))
+        }
+        ZomeCallResponse::Unauthorized(reason, cap_secret, zome_name, function_name) => {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Unauthorized: {} {:?} {} {}",
+                reason, cap_secret, zome_name, function_name
             ))))
         }
         // Unbounded recursion.

@@ -1,5 +1,7 @@
 use ::fixt::prelude::*;
 use anyhow::Result;
+use ed25519_dalek::ed25519::signature::SignerMut;
+use ed25519_dalek::SigningKey;
 use hdk::prelude::RemoteSignal;
 use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
 use holochain::sweettest::SweetConductorBatch;
@@ -14,7 +16,10 @@ use holochain::{
     },
     fixt::*,
 };
+use holochain_conductor_api::ExternalApiWireError;
+use holochain_conductor_api::ZomeCallParamsSigned;
 use std::net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::path::PathBuf;
 
 use either::Either;
 use holochain_conductor_api::{AdminInterfaceConfig, AppRequest, InterfaceDriver};
@@ -103,81 +108,65 @@ how_many: 42
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
-async fn call_zome() {
-    holochain_trace::test_run();
-
+async fn zome_call_authentication() {
     // NOTE: This is a full integration test that
     // actually runs the holochain binary
 
-    let admin_port = 0;
+    let TestCase {
+        cell_id,
+        _admin_rx,
+        app_tx,
+        app_rx,
+        holochain: _holochain,
+        zome_name,
+        fn_name,
+        cap_secret,
+        mut signing_keypair,
+        ..
+    } = TestCase::new().await;
 
-    let tmp_dir = TempDir::new().unwrap();
-    let path = tmp_dir.path().to_path_buf();
-    let environment_path = path.clone();
-    let config = create_config(admin_port, environment_path.into());
-    let config_path = write_config(path, &config);
+    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
 
-    let (holochain, admin_port) = start_holochain(config_path.clone()).await;
-    let admin_port = admin_port.await.unwrap();
-
-    let (mut admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
-    let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
-    let (_, mut receiver2) = websocket_client_by_port(admin_port).await.unwrap();
-
-    let uuid = uuid::Uuid::new_v4();
-    let dna = fake_dna_zomes(
-        &uuid.to_string(),
-        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+    // Authentication of zome call should fail with invalid signature.
+    let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
+    let mut zome_call_params = ZomeCallParams {
+        provenance: cell_id.agent_pubkey().clone(),
+        cell_id: cell_id.clone(),
+        zome_name: zome_name.clone(),
+        fn_name: fn_name.clone(),
+        cap_secret: None,
+        payload: ExternIO::encode(()).unwrap(),
+        nonce,
+        expires_at,
+    };
+    let bytes = encode(&zome_call_params).unwrap();
+    let signature = fixt!(Signature);
+    let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(bytes, signature)));
+    let response = app_tx.request(request);
+    let response = check_timeout(response, 6000).await.unwrap();
+    assert_matches!(
+        response,
+        AppResponse::Error(ExternalApiWireError::ZomeCallAuthenticationFailed(_))
     );
 
-    // Install Dna
-    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-    let cell_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000)
-        .await
-        .unwrap();
-    let installed_dna_hash = cell_id.dna_hash().clone();
+    // Authentication of zome call should fail if signature doesn't fit signed bytes.
+    let (_, bytes_hash) = zome_call_params.serialize_and_hash().unwrap();
+    let signature = signing_keypair.sign(&bytes_hash);
+    // Change request now so that serialized bytes differ.
+    zome_call_params.payload = ExternIO::encode("wrong").unwrap();
+    let (bytes, _) = zome_call_params.serialize_and_hash().unwrap();
+    let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(
+        bytes,
+        Signature::from(signature.to_bytes()),
+    )));
+    let response = app_tx.request(request);
+    let response = check_timeout(response, 6000).await.unwrap();
+    assert_matches!(
+        response,
+        AppResponse::Error(ExternalApiWireError::ZomeCallAuthenticationFailed(_))
+    );
 
-    // List Dnas
-    let request = AdminRequest::ListDnas;
-    let response = admin_tx.request(request);
-    let response = check_timeout(response, 15000).await.unwrap();
-
-    assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
-
-    // Activate cells
-    let request = AdminRequest::EnableApp {
-        installed_app_id: "test".to_string(),
-    };
-    let response = admin_tx.request(request);
-    let response = check_timeout(response, 3000).await.unwrap();
-    assert_matches!(response, AdminResponse::AppEnabled { .. });
-
-    // Generate signing key pair
-    let mut rng = OsRng;
-    let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
-    let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
-
-    // Grant zome call capability for agent
-    let zome_name = TestWasm::Foo.coordinator_zome_name();
-    let fn_name = FunctionName("foo".into());
-    let cap_secret = grant_zome_call_capability(
-        &mut admin_tx,
-        &cell_id,
-        zome_name.clone(),
-        fn_name.clone(),
-        signing_key,
-    )
-    .await
-    .unwrap();
-
-    // Attach App Interface
-    let app_port = attach_app_interface(&admin_tx, None).await;
-
-    let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
-    let _app_rx = WsPollRecv::new::<AppResponse>(app_rx);
-    authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
-
-    // Call Zome
+    // Call zome should now authenticate successfully.
     tracing::info!("Calling zome");
     call_zome_fn(
         &app_tx,
@@ -189,6 +178,47 @@ async fn call_zome() {
         &(),
     )
     .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "slow_tests")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
+async fn zome_call_with_conductor_restart() {
+    // NOTE: This is a full integration test that
+    // actually runs the holochain binary
+
+    let TestCase {
+        cell_id,
+        admin_tx,
+        _admin_rx,
+        admin_port,
+        app_tx,
+        app_rx,
+        holochain,
+        config_path,
+        zome_name,
+        fn_name,
+        cap_secret,
+        signing_keypair,
+    } = TestCase::new().await;
+
+    let _app_rx = WsPollRecv::new::<AdminResponse>(app_rx);
+
+    // Call zome works before conductor restart.
+    tracing::info!("Calling zome");
+    call_zome_fn(
+        &app_tx,
+        cell_id.clone(),
+        &signing_keypair,
+        cap_secret,
+        zome_name.clone(),
+        fn_name.clone(),
+        &(),
+    )
+    .await;
+
+    // Connect another admin websocket.
+    let (_, mut receiver2) = websocket_client_by_port(admin_port).await.unwrap();
 
     // Ensure that the other client does not receive any messages, i.e. that
     // responses are not broadcast to all connected clients, only the one
@@ -1106,6 +1136,110 @@ async fn filter_messages_that_do_not_deserialize() {
         match response {
             AppResponse::AppInfo(_) => (),
             r => panic!("unexpected response: {:?}", r),
+        }
+    }
+}
+
+struct TestCase {
+    cell_id: CellId,
+    admin_tx: WebsocketSender,
+    _admin_rx: WsPollRecv,
+    app_tx: WebsocketSender,
+    app_rx: WebsocketReceiver,
+    admin_port: u16,
+    holochain: SupervisedChild,
+    config_path: PathBuf,
+    zome_name: ZomeName,
+    fn_name: FunctionName,
+    cap_secret: CapSecret,
+    signing_keypair: SigningKey,
+}
+
+impl TestCase {
+    async fn new() -> Self {
+        holochain_trace::test_run();
+        let admin_port = 0;
+
+        let tmp_dir = TempDir::new().unwrap();
+        let path = tmp_dir.into_path();
+        let environment_path = path.clone();
+        let config = create_config(admin_port, environment_path.into());
+        let config_path = write_config(path, &config);
+
+        let (holochain, admin_port) = start_holochain(config_path.clone()).await;
+        let admin_port = admin_port.await.unwrap();
+
+        let (mut admin_tx, admin_rx) = websocket_client_by_port(admin_port).await.unwrap();
+        let _admin_rx = WsPollRecv::new::<AdminResponse>(admin_rx);
+
+        let uuid = uuid::Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
+        );
+
+        // Install Dna
+        let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
+        let cell_id =
+            register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000)
+                .await
+                .unwrap();
+        let installed_dna_hash = cell_id.dna_hash().clone();
+
+        // List Dnas
+        let request = AdminRequest::ListDnas;
+        let response = admin_tx.request(request);
+        let response = check_timeout(response, 15000).await.unwrap();
+
+        assert_matches!(response, AdminResponse::DnasListed(a) if a.contains(&installed_dna_hash));
+
+        // Activate cells
+        let request = AdminRequest::EnableApp {
+            installed_app_id: "test".to_string(),
+        };
+        let response = admin_tx.request(request);
+        let response = check_timeout(response, 3000).await.unwrap();
+        assert_matches!(response, AdminResponse::AppEnabled { .. });
+
+        // Attach App Interface
+        let app_port = attach_app_interface(&admin_tx, None).await;
+
+        let (app_tx, app_rx) = websocket_client_by_port(app_port).await.unwrap();
+        authenticate_app_ws_client(app_tx.clone(), admin_port, "test".to_string()).await;
+
+        let zome_name = TestWasm::Foo.coordinator_zome_name();
+        let fn_name = FunctionName("foo".into());
+
+        // Generate signing key pair
+        let mut rng = OsRng;
+        let signing_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+        let signing_key =
+            AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
+
+        // Grant zome call capability for agent
+        let cap_secret = grant_zome_call_capability(
+            &mut admin_tx,
+            &cell_id,
+            zome_name.clone(),
+            fn_name.clone(),
+            signing_key,
+        )
+        .await
+        .unwrap();
+
+        TestCase {
+            cell_id,
+            admin_tx,
+            _admin_rx,
+            admin_port,
+            app_tx,
+            app_rx,
+            holochain,
+            config_path,
+            zome_name,
+            fn_name,
+            cap_secret,
+            signing_keypair,
         }
     }
 }

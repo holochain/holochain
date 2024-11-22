@@ -30,6 +30,8 @@ pub enum CellError {
     CellWithoutGenesis(CellId),
     #[error("The cell with id {0} is disabled.")]
     CellDisabled(CellId),
+    #[error("Authentication failure. Bad signature {0:?} by provenance {1}.")]
+    ZomeCallAuthenticationFailed(Signature, AgentPubKey),
     #[error(
         "The cell failed to cleanup its environment because: {0}. Recommend manually deleting the database at: {1}"
     )]

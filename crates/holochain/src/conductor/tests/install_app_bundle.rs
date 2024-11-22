@@ -589,7 +589,7 @@ async fn use_existing_integration() {
     assert_eq!(cells.len(), 1);
     let cell_id = cells.first().unwrap().clone();
 
-    let role_settings = ("extant".into(), RoleSettings::UseExisting(cell_id));
+    let role_settings = ("extant".into(), RoleSettings::UseExisting { cell_id });
 
     let app_2 = conductor
         .clone()

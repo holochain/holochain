@@ -11,7 +11,6 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
-use matches::assert_matches;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -203,7 +202,7 @@ async fn generate_sandbox_and_connect() {
 
     let launch_info = get_launch_info(hc_admin).await;
 
-    // - Make a call to list app info to the port
+    // - Connect to the app interface and wait for the app to show up in AppInfo
     let app_info = get_app_info(
         launch_info.admin_port,
         "test-app".into(),
