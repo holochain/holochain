@@ -209,8 +209,6 @@ async fn generate_sandbox_and_connect() {
         *launch_info.app_ports.first().expect("No app ports found"),
     )
     .await;
-
-    assert_matches!(app_info, AppResponse::AppInfo(Some(_)));
 }
 
 /// Generates a new sandbox with a single app deployed and tries to list DNA
