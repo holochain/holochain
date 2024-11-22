@@ -54,7 +54,7 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
 
     let issue_token_response = admin_tx
         .request(AdminRequest::IssueAppAuthenticationToken(
-            installed_app_id.into(),
+            installed_app_id.clone().into(),
         ))
         .await
         .unwrap();
@@ -71,9 +71,32 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
         .await
         .unwrap();
 
-    let request = AppRequest::AppInfo;
-    let response = app_tx.request(request);
-    check_timeout(response).await
+    tokio::time::timeout(Duration::from_secs(60), async move {
+        let app_response: AppResponse;
+        loop {
+            let request = AppRequest::AppInfo;
+            let response = app_tx.request(request);
+            let r: AppResponse = check_timeout(response).await;
+            match &r {
+                AppResponse::AppInfo(Some(_)) => {
+                    app_response = r;
+                    break;
+                }
+                AppResponse::AppInfo(None) => {
+                    // The sandbox hasn't installed the app yet
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+                _ => {
+                    panic!("Unexpected response {:?}", r);
+                }
+            }
+        }
+        app_response
+    })
+    .await
+    .unwrap_or_else(|_| {
+        panic!("Timeout waiting for the sandbox to install the app {installed_app_id}")
+    })
 }
 
 async fn check_timeout<T>(response: impl Future<Output = WebsocketResult<T>>) -> T {
@@ -178,7 +201,7 @@ async fn generate_sandbox_and_connect() {
 
     let hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(hc_admin, true).await;
+    let launch_info = get_launch_info(hc_admin).await;
 
     // - Make a call to list app info to the port
     let app_info = get_app_info(
@@ -216,7 +239,7 @@ async fn generate_sandbox_and_call_list_dna() {
 
     let hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(hc_admin, true).await;
+    let launch_info = get_launch_info(hc_admin).await;
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -258,7 +281,7 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
 
     let hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(hc_admin, true).await;
+    let launch_info = get_launch_info(hc_admin).await;
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -305,7 +328,7 @@ async fn generate_sandbox_with_roles_settings_override() {
 
     let hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(hc_admin, true).await;
+    let launch_info = get_launch_info(hc_admin).await;
 
     // - Make a call to list app info to the port
     let app_info = get_app_info(
@@ -547,26 +570,14 @@ fn get_sandbox_command() -> Command {
     Command::new(get_target("hc-sandbox"))
 }
 
-async fn get_launch_info(mut child: tokio::process::Child, wait_for_install: bool) -> LaunchInfo {
+async fn get_launch_info(mut child: Child) -> LaunchInfo {
     let stdout = child.stdout.take().unwrap();
     let mut lines = BufReader::new(stdout).lines();
-    let mut maybe_launch_info: Option<LaunchInfo> = None;
-    let mut app_installed = false;
     while let Ok(Some(line)) = lines.next_line().await {
         println!("@@@@@-{line}-@@@@@");
         if let Some(index) = line.find("#!0") {
             let launch_info_str = &line[index + 3..].trim();
-            let launch_info = serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();
-            if !wait_for_install {
-                return launch_info;
-            }
-            maybe_launch_info = Some(launch_info);
-        }
-        if line.contains("App installed with id") {
-            app_installed = true;
-        }
-        if let (true, true) = (maybe_launch_info.is_some(), app_installed) {
-            return maybe_launch_info.unwrap();
+            return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();
         }
     }
     panic!("Unable to find launch info in sandbox output. See stderr above.")
