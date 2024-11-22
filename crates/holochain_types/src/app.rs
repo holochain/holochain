@@ -204,7 +204,10 @@ pub type RoleSettingsMap = HashMap<RoleName, RoleSettings>;
 pub enum RoleSettings {
     /// If the role has the UseExisting strategy defined in the app manifest
     /// the cell id to use needs to be specified here.
-    UseExisting(CellId),
+    UseExisting {
+        /// Existing cell id to use
+        cell_id: CellId,
+    },
     /// Optional settings for a normally provisioned cell
     Provisioned {
         /// When the app being installed has the `allow_deferred_memproofs` manifest flag set,
