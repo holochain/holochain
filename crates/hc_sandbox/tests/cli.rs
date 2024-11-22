@@ -11,7 +11,6 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
-use matches::assert_matches;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -54,7 +53,7 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
 
     let issue_token_response = admin_tx
         .request(AdminRequest::IssueAppAuthenticationToken(
-            installed_app_id.into(),
+            installed_app_id.clone().into(),
         ))
         .await
         .unwrap();
@@ -71,10 +70,29 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
         .await
         .unwrap();
 
-    let request = AppRequest::AppInfo;
-    let response = app_tx.request(request);
-    let r: AppResponse = check_timeout(response).await;
-    assert_matches!(r, AppResponse::AppInfo(Some(_)));
+    tokio::time::timeout(Duration::from_secs(60), async move {
+        loop {
+            let request = AppRequest::AppInfo;
+            let response = app_tx.request(request);
+            let r: AppResponse = check_timeout(response).await;
+            match &r {
+                AppResponse::AppInfo(Some(_)) => {
+                    break;
+                }
+                AppResponse::AppInfo(None) => {
+                    // The sandbox hasn't installed the app yet
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+                _ => {
+                    panic!("Unexpected response {:?}", r);
+                }
+            }
+        }
+    })
+    .await
+    .unwrap_or_else(|_| {
+        panic!("Timeout waiting for the sandbox to install the app {installed_app_id}")
+    });
 }
 
 async fn check_timeout<T>(response: impl Future<Output = WebsocketResult<T>>) -> T {
@@ -181,7 +199,7 @@ async fn generate_sandbox_and_connect() {
 
     let launch_info = get_launch_info(hc_admin).await;
 
-    // - Make a call to list app info to the port
+    // - Connect to the app interface and wait for the app to show up in AppInfo
     get_app_info(
         launch_info.admin_port,
         "test-app".into(),
@@ -425,7 +443,7 @@ fn get_sandbox_command() -> Command {
     Command::new(get_target("hc-sandbox"))
 }
 
-async fn get_launch_info(mut child: tokio::process::Child) -> LaunchInfo {
+async fn get_launch_info(mut child: Child) -> LaunchInfo {
     let stdout = child.stdout.take().unwrap();
     let mut lines = BufReader::new(stdout).lines();
     while let Ok(Some(line)) = lines.next_line().await {
