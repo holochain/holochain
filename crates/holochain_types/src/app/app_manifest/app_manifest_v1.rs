@@ -209,7 +209,7 @@ impl AppManifestV1 {
         for role_name in modifiers.keys() {
             if !existing_role_names.contains(&role_name) {
                 return Err(AppManifestError::InvalidRoleName(format!(
-                    "Tried to set modifiers for a role name that does not exist in the dna manifest: {role_name}"
+                    "Tried to set modifiers for a role name that does not exist in the app manifest: {role_name}"
                 )));
             }
         }

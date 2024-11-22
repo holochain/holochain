@@ -7,12 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `roles_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
 - Zome call authorization is split into autentication and authorization. Zome calls are authenticated when coming in over the network. The signature must match the hash of the serialized bytes, signed by the provenance of the call, as described above. This applies to zome calls over the App API as well as remote calls. Bridge calls, which are calls that zome call functions can make to other cells on the same conductor, do not require authentication.
 Authorization through zome call capabilities remains unchanged and is required for any kind of call as before.
 
 ## 0.5.0-dev.6
 
 - **BREAKING**: Zome call API `AppRequest::CallZome` takes simple serialized bytes of the zome call parameters and the signature now. Previously client-side serialization of zome call parameters required to exactly match Holochain’s way of serializing, because Holochain re-serialized the parameters to verify the signature. This is no longer the case. The signature is generated for the **hash of the serialized bytes**, using the **SHA2 512-bit** hashing algorithm. In short, zome call params are serialized, then hashed and the hash is signed. The payload of the `CallZome` request is the serialized bytes and the signature. On the Holochain side the serialized bytes of the zome call parameters are hashed with the same SHA2 512-bit algorithm to verify the signature.
+
 
 ## 0.5.0-dev.5
 
@@ -27,6 +29,7 @@ Authorization through zome call capabilities remains unchanged and is required f
   - the function `sleep` has been removed entirely because it wasn’t implemented
   - and the HDI function `is_same_agent` Note that installing apps that have been built with an HDK from before this change will not be possible to install on a conductor that has been built without the `unstable-functions` feature. You will get import errors when Holochain tries to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto a conductor which has been compiled with `unstable-functions` but the reverse is not true. \#4371
 - Fix a problem with countersigning where it would stay in resolution when entering an unknown state from a restart. This was intended behaviour previously to ensure the agent got a change to get online before giving up on countersigning but it is not necessary now that we consider network errors to be a failed resolution and always retry.
+
 
 ## 0.5.0-dev.4
 
