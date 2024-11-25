@@ -7,7 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- `hc sandbox generate` and `hc sandbox call install-app` now have an additional optional argument `--roles-settings <path>` where a path to a yaml file can be passed to override role settings defined in the dna manifest(s). An example of such a yaml file can be found here: https://github.com/holochain/holochain/tree/main-0.4/crates/hc_sandbox/tests/fixtures/roles-settings.yaml
+## 0.4.0-rc.1
+
+- `hc sandbox generate` and `hc sandbox call install-app` now have an additional optional argument `--roles-settings <path>` where a path to a yaml file can be passed to override role settings defined in the dna manifest(s). An example of such a yaml file can be found here: https://github.com/holochain/holochain/tree/main-0.4/crates/hc\_sandbox/tests/fixtures/roles-settings.yaml
 
 ## 0.4.0-rc.0
 
