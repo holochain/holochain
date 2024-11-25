@@ -11,7 +11,6 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
-use matches::assert_matches;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -54,7 +53,7 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
 
     let issue_token_response = admin_tx
         .request(AdminRequest::IssueAppAuthenticationToken(
-            installed_app_id.into(),
+            installed_app_id.clone().into(),
         ))
         .await
         .unwrap();
