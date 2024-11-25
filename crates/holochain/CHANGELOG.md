@@ -7,33 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-rc.1
+
 - **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `roles_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
-- Use of WasmZome preserialized_path has been **deprecated**. Please use the wasm interpreter instead.
+- Use of WasmZome preserialized\_path has been **deprecated**. Please use the wasm interpreter instead.
 - **BREAKING**: As the DPKI feature is unstable and incomplete, it is disabled with default cargo features and put behind a feature called `unstable-dpki`. If this feature is specified at compile time, DPKI is enabled by default.
-- **BREAKING**: Conductor::get_dna_definitions now returns an `IndexMap` to ensure consistent ordering.
-- Added a new feature "unstable-sharding" which puts the network sharding behind a feature flag. It will not be possible
-  to configure network sharding unless Holochain is built with this feature enabled. By default, the network tuning
-  parameter `gossip_dynamic_arcs` is ignored, and the parameter `gossip_arc_clamping` must be set to either `"full"`
-  or `"empty"`, the previous default value of `"none"` will prevent the conductor from starting. We intend to stabilise
-  this feature in the future, and it will return to being available without a feature flag. #4344
+- **BREAKING**: Conductor::get\_dna\_definitions now returns an `IndexMap` to ensure consistent ordering.
+- Added a new feature “unstable-sharding” which puts the network sharding behind a feature flag. It will not be possible to configure network sharding unless Holochain is built with this feature enabled. By default, the network tuning parameter `gossip_dynamic_arcs` is ignored, and the parameter `gossip_arc_clamping` must be set to either `"full"` or `"empty"`, the previous default value of `"none"` will prevent the conductor from starting. We intend to stabilise this feature in the future, and it will return to being available without a feature flag. \#4344
 - **BREAKING**: Issuing and persisting warrants is behind a feature `unstable-warrants` now. Warrants have not been tested extensively and there is no way to recover from a warrant. Hence the feature is considered unstable and must be explicitly enabled. Note that once warrants are issued some functions or calls may not work correctly.
 - **BREAKING** Countersigning has been put behind the feature `unstable-countersigning`. Even though in many use cases countersigning is expected to work correctly, it has known problems which can put the source chain into an unrecoverable state. Included in this feature is the HDK function `accept_countersigning_preflight_request` as well as `AppRequest`s related to countersigning and the counersigning workflow itself too.
-- **BREAKING** The following HDK functions have been temporarily removed as "unstable". They can be re-enabled by building Holochain with the "unstable-functions" feature flag:
+- **BREAKING** The following HDK functions have been temporarily removed as “unstable”. They can be re-enabled by building Holochain with the “unstable-functions” feature flag:
   - `accept_countersigning_preflight_request`
   - `block_agent`
   - `unblock_agent`
   - `get_agent_key_lineage`
   - `is_same_agent`
   - `schedule`
-  - the function `sleep` has been removed entirely because it wasn't implemented
-  - and the HDI function `is_same_agent`
-  Note that installing apps that have been built with an HDK from before this change will not be possible to install on
-  a conductor that has been built without the `unstable-functions` feature. You will get import errors when Holochain tries
-  to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto
-  a conductor which has been compiled with `unstable-functions` but the reverse is not true. #4371
-- Fix a problem with countersigning where it would stay in resolution when entering an unknown state from a restart. This
-  was intended behaviour previously to ensure the agent got a change to get online before giving up on countersigning but
-  it is not necessary now that we consider network errors to be a failed resolution and always retry.
+  - the function `sleep` has been removed entirely because it wasn’t implemented
+  - and the HDI function `is_same_agent` Note that installing apps that have been built with an HDK from before this change will not be possible to install on a conductor that has been built without the `unstable-functions` feature. You will get import errors when Holochain tries to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto a conductor which has been compiled with `unstable-functions` but the reverse is not true. \#4371
+- Fix a problem with countersigning where it would stay in resolution when entering an unknown state from a restart. This was intended behaviour previously to ensure the agent got a change to get online before giving up on countersigning but it is not necessary now that we consider network errors to be a failed resolution and always retry.
 
 ## 0.4.0-rc.0
 
@@ -317,7 +309,7 @@ Now it serializes to
 - Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
 
 - Major refactor of the sys validation workflow to improve reliability and performance:
-
+  
   - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
   - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
   - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
@@ -554,7 +546,7 @@ Now it serializes to
 ## 0.0.154
 
 - Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
-
+  
   Reason: it causes a build failure of the *holochain*  crate on crates.io
 
 ## 0.0.153
@@ -720,7 +712,7 @@ network:
 - **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 
 - **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
-
+  
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
@@ -750,7 +742,7 @@ network:
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
-
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`
