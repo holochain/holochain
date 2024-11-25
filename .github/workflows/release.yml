@@ -294,6 +294,8 @@ jobs:
           cd "${HOLOCHAIN_REPO}"
 
           nix develop .#release \
+            # This means that 0_4_rc determines the Rust version that is used for the release on this branch
+            --override-input versions "github:holochain/holochain?dir=versions/0_4_rc" \
             --ignore-environment \
             --keep CARGO_REGISTRY_TOKEN \
             --command release-automation \
