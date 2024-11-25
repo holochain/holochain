@@ -1435,6 +1435,8 @@ pub struct InstallAppCommonFlags {
 }
 
 /// Methods related to app installation and management
+///
+/// Tests related to app installation can be found in ../../tests/tests/app_installation/mod.rs
 mod app_impls {
     use holochain_types::deepkey_roundtrip_backward;
     use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairEntryInfo;
