@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `roles_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
 - Zome call authorization is split into autentication and authorization. Zome calls are authenticated when coming in over the network. The signature must match the hash of the serialized bytes, signed by the provenance of the call, as described above. This applies to zome calls over the App API as well as remote calls. Bridge calls, which are calls that zome call functions can make to other cells on the same conductor, do not require authentication.
 Authorization through zome call capabilities remains unchanged and is required for any kind of call as before.
+- Remove `release-automation` crate from the `cargo update` script. `release-automation` isn't used externally so compatibility with all dependency versions isn't required and it often causes the job to fail.
 
 ## 0.5.0-dev.6
 
