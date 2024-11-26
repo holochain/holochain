@@ -169,8 +169,6 @@
 
             # Update the Holochain project Cargo.lock
             cargo update --manifest-path Cargo.toml
-            # Update the release-automation crate's Cargo.lock
-            cargo update --manifest-path crates/release-automation/Cargo.toml
             # Update the WASM workspace Cargo.lock
             cargo update --manifest-path crates/test_utils/wasm/wasm_workspace/Cargo.toml
           '';
