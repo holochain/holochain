@@ -12,7 +12,7 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-lair_keystore_api = "=0.5.2"
+lair_keystore_api = "=0.5.3"
 base64 = "0.22"
 derive_more = "0.99"
 futures = "0.3"
@@ -31,7 +31,7 @@ rustls = { version = "0.21", features = ["dangerous_configuration"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 serde_json = { version = "1", features = ["preserve_order"] }
-sysinfo = "0.30"
+sysinfo = "0.32"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = ["full"] }
 url = "2"
@@ -49,7 +49,6 @@ proptest-derive = { version = "0", optional = true }
 [dev-dependencies]
 kitsune_p2p_types = { path = ".", features = ["test_utils", "sqlite"] }
 criterion = "0.5.1"
-tracing-subscriber = "0.3.16"
 
 [[bench]]
 name = "api_thru"

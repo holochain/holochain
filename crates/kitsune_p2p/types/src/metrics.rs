@@ -8,6 +8,7 @@ use std::sync::{
     atomic::{AtomicU64, AtomicUsize, Ordering},
     Arc, Once,
 };
+use sysinfo::ProcessesToUpdate;
 
 static SYS_INFO: Once = Once::new();
 
@@ -244,7 +245,7 @@ pub fn init_sys_info_poll() {
             let mut p_count: usize = 0;
 
             loop {
-                system.refresh_process(pid);
+                system.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
                 networks.refresh_list();
 
                 let proc = system.process(pid).unwrap();
