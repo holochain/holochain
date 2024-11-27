@@ -6,9 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # \[Unreleased\]
 
-- **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `roles_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
-- `hc sandbox generate` and `hc sandbox call install-app` now have an additional optional argument `--roles-settings <path>` where a path to a yaml file can be passed to override role settings defined in the dna manifest(s). An example of such a yaml file can be found here: https://github.com/holochain/holochain/tree/develop/crates/hc_sandbox/tests/fixtures/roles-settings.yaml
-
 ## Holonix
 
 - Slim down the Rust toolchain [\#2854](https://github.com/holochain/holochain/pull/2854)
@@ -16,6 +13,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - only keep `wasm32-unknown-unknown` as a cross-compilation target.
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
+
+# 20241127.004859
+
+- **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `roles_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
+- `hc sandbox generate` and `hc sandbox call install-app` now have an additional optional argument `--roles-settings <path>` where a path to a yaml file can be passed to override role settings defined in the dna manifest(s). An example of such a yaml file can be found here: https://github.com/holochain/holochain/tree/develop/crates/hc\_sandbox/tests/fixtures/roles-settings.yaml
+
+## [hcterm-0.5.0-dev.7](crates/hcterm/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_cli-0.5.0-dev.7](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain-0.5.0-dev.7](crates/holochain/CHANGELOG.md#0.5.0-dev.7)
+
+- **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `roles_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
+- Zome call authorization is split into autentication and authorization. Zome calls are authenticated when coming in over the network. The signature must match the hash of the serialized bytes, signed by the provenance of the call, as described above. This applies to zome calls over the App API as well as remote calls. Bridge calls, which are calls that zome call functions can make to other cells on the same conductor, do not require authentication. Authorization through zome call capabilities remains unchanged and is required for any kind of call as before.
+- Remove `release-automation` crate from the `cargo update` script. `release-automation` isn’t used externally so compatibility with all dependency versions isn’t required and it often causes the job to fail.
+
+## [holochain\_cli\_bundle-0.5.0-dev.7](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.7](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.7)
+
+- `hc sandbox generate` and `hc sandbox call install-app` now have an additional optional argument `--roles-settings <path>` where a path to a yaml file can be passed to override role settings defined in the dna manifest(s). An example of such a yaml file can be found here: https://github.com/holochain/holochain/tree/develop/crates/hc\_sandbox/tests/fixtures/roles-settings.yaml
+
+## [holochain\_cascade-0.5.0-dev.7](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_conductor\_api-0.5.0-dev.7](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_conductor\_services-0.4.0-dev.7](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.7](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.7](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_websocket-0.5.0-dev.7](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.7)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.7](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.7)
+
+## [holochain\_state-0.5.0-dev.7](crates/holochain_state/CHANGELOG.md#0.5.0-dev.7)
+
+## [hdk-0.5.0-dev.7](crates/hdk/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_p2p-0.5.0-dev.7](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_chc-0.2.0-dev.7](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.7)
+
+## [holochain\_types-0.5.0-dev.7](crates/holochain_types/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_keystore-0.5.0-dev.7](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_sqlite-0.5.0-dev.7](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_zome\_types-0.5.0-dev.7](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.7)
 
 # 20241120.005400
 
