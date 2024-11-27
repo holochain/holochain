@@ -6,7 +6,8 @@
           (holochain.override holochainOverrides)
           lair-keystore
           hc-launch
-          hc-scaffold
+          # Temporarily excluded because it's not building, for the same reason that we're trying to fix
+          # hc-scaffold
         ];
       versionsFileText = builtins.concatStringsSep "\n"
         (
