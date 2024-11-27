@@ -4556,9 +4556,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e3ce2bfd2af30dddc1cd4fd4f7b6ed098a949222c59ccb986162ecc41a96472"
+checksum = "f5ccd895e47964d4fd7392947dc9974eca2377df27d2462beac859f7a3b44cf3"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions",
@@ -4572,9 +4572,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.4.6"
+version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "433083f77dcae8f66bc06934c18e9ae2804bccfa74a6c75bb89a3f8057d93267"
+checksum = "3a05265b4edc56b686aa359eb573d5d6e59ea41d54e1be7c1a5081fac7e032d5"
 dependencies = [
  "base64 0.22.1",
  "dunce",
@@ -4610,9 +4610,9 @@ checksum = "884e2677b40cc8c339eaefcb701c32ef1fd2493d71118dc0ca4b6a736c93bd67"
 
 [[package]]
 name = "libc"
-version = "0.2.155"
+version = "0.2.166"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
+checksum = "c2ccc108bbc0b1331bd061864e7cd823c0cab660bbe6970e66e2c0614decde36"
 
 [[package]]
 name = "libflate"
@@ -7666,17 +7666,16 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.30.13"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a5b4ddaee55fb2bea2bf0e5000747e5f5c0de765e5a5ff87f4cd106439f4bb3"
+checksum = "4c33cd241af0f2e9e3b5c32163b873b29956890b5342e6745b917ce9d490f4af"
 dependencies = [
- "cfg-if 1.0.0",
  "core-foundation-sys",
  "libc",
+ "memchr",
  "ntapi",
- "once_cell",
  "rayon",
- "windows 0.52.0",
+ "windows 0.54.0",
 ]
 
 [[package]]
@@ -8390,9 +8389,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.0.16-alpha"
+version = "0.0.17-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40fb6d10c9d131b745eb6c56e1449f932dd5c9ed4902dd09dec1d5163fcfa63f"
+checksum = "2af6c2596cb625aecc51ce72502077fe80db26b6d40a14b052ed442271fa1700"
 dependencies = [
  "bit_field",
  "bytes",
@@ -8415,9 +8414,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-core"
-version = "0.0.16-alpha"
+version = "0.0.17-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "140653788727a8aa2b4bd4d0af87cdc374956104c27aa092c5c965a11db39073"
+checksum = "ae89abda94075a20045c591ec8491f1a337b4df2974d894406f4b6fcfd33345b"
 dependencies = [
  "app_dirs2",
  "base64 0.13.1",
@@ -8434,9 +8433,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion"
-version = "0.0.16-alpha"
+version = "0.0.17-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fce5f0984becb7a05607331129680ff9245b3f640fa0011ea79ccc380332507"
+checksum = "11ea9c243ac926f4acc033c0979c0e845d1d9a7b8ee2e23b4ca49a57a2ac8781"
 dependencies = [
  "futures",
  "parking_lot 0.12.3",
@@ -8448,9 +8447,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-sys"
-version = "0.0.16-alpha"
+version = "0.0.17-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6eb61c0183be0fbe2f77469b2dc1f6af7b9f75bed8b288c1179675cc189aa6a6"
+checksum = "8599975d3d4d27f1598258b7ae364704136e257f1700a56607f0256af32cd327"
 dependencies = [
  "Inflector",
  "base64 0.13.1",
@@ -8467,9 +8466,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-go-pion-turn"
-version = "0.0.16-alpha"
+version = "0.0.17-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c619b2d5fa59f2174499349b8677d67c0d71d0b988619b13f38db0ce27d4e4c0"
+checksum = "94ee77026e1858d7b749d5385314122a5cde02eea4c32021a2652649c3a900d9"
 dependencies = [
  "base64 0.13.1",
  "dirs",
@@ -8485,9 +8484,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal"
-version = "0.0.16-alpha"
+version = "0.0.17-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acbf6ddf20d2039e2759fdc171b6ce04e298bd7745eacf625c2c666e6f16461b"
+checksum = "5f1ab16d7a72dfc886548328256f2736357583b3737e091b02b9dd05c45b4389"
 dependencies = [
  "futures",
  "lair_keystore_api",
@@ -8514,9 +8513,9 @@ dependencies = [
 
 [[package]]
 name = "tx5-signal-srv"
-version = "0.0.16-alpha"
+version = "0.0.17-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "129782eaa5ab5445b02776307f38a6eebe4a3de41c3821330ba7de9fc19195bc"
+checksum = "eaae6522c3b11ace0fa536fbc5f7a0cb2520086aab37e8111d04eea4c3168904"
 dependencies = [
  "clap 4.5.9",
  "dirs",
