@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_types"
-version = "0.3.5"
+version = "0.3.6-rc.0"
 description = "types subcrate for kitsune-p2p"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
