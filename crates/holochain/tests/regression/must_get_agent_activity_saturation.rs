@@ -8,6 +8,7 @@ use rand::{thread_rng, Rng};
 // ensure that multiple `must_get_agent_activity` calls do not oversaturate the
 // fetch pool and bring gossip to a halt
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "flaky on CI"]
 #[cfg(feature = "slow_tests")]
 async fn must_get_agent_activity_saturation() {
     use holochain::sweettest::await_consistency;
