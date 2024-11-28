@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.4.0-rc.2
+
 ## 0.4.0-rc.1
 
 - The flag `--dylib-ios` in `hc bundle dna pack` has been **deprecated**. Please use the wasm interpreter instead.

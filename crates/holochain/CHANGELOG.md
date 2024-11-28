@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.0-rc.2
+
 ## 0.4.0-rc.1
 
 - **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `roles_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
