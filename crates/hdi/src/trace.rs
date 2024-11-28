@@ -14,7 +14,7 @@ struct StringVisitor<'a> {
     message: &'a mut String,
 }
 
-impl<'a> tracing_core::field::Visit for StringVisitor<'a> {
+impl tracing_core::field::Visit for StringVisitor<'_> {
     fn record_debug(&mut self, field: &tracing_core::Field, value: &dyn std::fmt::Debug) {
         // Special case the message field so that it doesn't appear in the key/value format.
         if field.name() == "message" {

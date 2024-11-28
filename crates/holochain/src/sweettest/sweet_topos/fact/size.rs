@@ -65,7 +65,7 @@ impl<'a> Fact<'a, NetworkTopology> for SizedNetworkFact {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use super::*;
     use crate::prelude::unstructured_noise;
 

@@ -212,11 +212,8 @@ impl<T> ValidationDependencyState<T> {
     }
 
     pub fn set_source(&mut self, new_source: CascadeSource) {
-        match &mut self.dependency {
-            Some(ValidationDependency { fetched_from, .. }) => {
-                *fetched_from = new_source;
-            }
-            None => {}
+        if let Some(ValidationDependency { fetched_from, .. }) = &mut self.dependency {
+            *fetched_from = new_source;
         }
     }
 }

@@ -482,7 +482,7 @@ async fn handle_incoming_app_message(
 pub use crate::test_utils::setup_app_in_new_conductor;
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use super::*;
     use crate::conductor::api::error::ExternalApiWireError;
     use crate::conductor::api::AdminInterfaceApi;
