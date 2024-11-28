@@ -107,11 +107,7 @@ fn next_remote_node(
     metrics: &MetricsSync,
     tuning_params: KitsuneP2pTuningParams,
 ) -> Option<Node> {
-    use rand::prelude::*;
-    let mut rng = thread_rng();
-
     // Sort the nodes by longest time since we last successfully gossiped with them.
-    // Randomly break ties between nodes we haven't successfully gossiped with.
     // Note the smaller an Instant the longer it is in the past.
     remote_nodes.sort_unstable_by(|a, b| {
         match (
@@ -125,13 +121,7 @@ fn next_remote_node(
             // Put b behind a that hasn't been gossiped with.
             (None, Some(_)) => Ordering::Less,
             // Randomly break ties.
-            (None, None) => {
-                if rng.gen() {
-                    Ordering::Less
-                } else {
-                    Ordering::Greater
-                }
-            }
+            (None, None) => Ordering::Equal,
         }
     });
 
