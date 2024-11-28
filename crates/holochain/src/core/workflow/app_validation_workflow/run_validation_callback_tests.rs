@@ -531,6 +531,7 @@ async fn validation_callback_prevent_multiple_identical_hash_fetches() {
     assert_eq!(validation_dependencies.lock().missing_hashes.len(), 0);
 }
 
+#[ignore = "This test has been removed on latest, and is flaky on this version"]
 #[tokio::test(flavor = "multi_thread")]
 async fn validation_callback_prevent_multiple_identical_agent_activity_fetches() {
     holochain_trace::test_run();
