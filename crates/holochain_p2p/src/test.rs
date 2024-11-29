@@ -233,7 +233,7 @@ mod tests {
 
     macro_rules! newhash {
         ($p:ident, $c:expr) => {
-            holo_hash::$p::from_raw_36([$c as u8; HOLO_HASH_UNTYPED_LEN].to_vec())
+            holo_hash::$p::from_raw_36([$c; HOLO_HASH_UNTYPED_LEN].to_vec())
         };
     }
 
@@ -245,10 +245,10 @@ mod tests {
     ) {
         holochain_trace::test_run();
         (
-            newhash!(DnaHash, 's'),
+            newhash!(DnaHash, b's'),
             fixt!(AgentPubKey, Predictable, 0),
-            newhash!(AgentPubKey, '2'),
-            newhash!(AgentPubKey, '3'),
+            newhash!(AgentPubKey, b'2'),
+            newhash!(AgentPubKey, b'3'),
         )
     }
 

@@ -626,6 +626,7 @@ impl TriggerReceiver {
         self.back_off.as_ref().map_or(false, |b| b.is_paused())
     }
 
+    /// Try to receive a trigger without blocking.
     #[cfg(test)]
     pub fn try_recv(&mut self) -> Option<&'static &'static str> {
         self.rx.try_recv().ok()

@@ -1066,6 +1066,7 @@ impl Cell {
             .trigger(&"publish_authored_ops");
     }
 
+    #[cfg(any(test, feature = "test_utils"))]
     pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
     }

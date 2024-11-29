@@ -1,5 +1,3 @@
-#![cfg(feature = "wasmer_wamr")]
-
 use crate::core::ribosome::error::RibosomeResult;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_zome_types::prelude::WasmZome;

@@ -125,14 +125,21 @@ pub struct Space {
     db_key: DbKey,
 }
 
+/// Test spaces
 #[cfg(test)]
 pub struct TestSpaces {
+    /// The spaces
     pub spaces: Spaces,
+    /// The test spaces
     pub test_spaces: HashMap<DnaHash, TestSpace>,
+    /// The queue consumer map
     pub queue_consumer_map: QueueConsumerMap,
 }
+
+/// A test space
 #[cfg(test)]
 pub struct TestSpace {
+    /// The space
     pub space: Space,
     _temp_dir: tempfile::TempDir,
 }
@@ -919,11 +926,13 @@ pub async fn query_conductor_state(
 
 #[cfg(test)]
 impl TestSpaces {
+    /// Create a new test space
     pub async fn new(dna_hashes: impl IntoIterator<Item = DnaHash>) -> Self {
         let queue_consumer_map = QueueConsumerMap::new();
         Self::with_queue_consumer(dna_hashes, queue_consumer_map).await
     }
 
+    /// Create a new test space with a queue consumer
     pub async fn with_queue_consumer(
         dna_hashes: impl IntoIterator<Item = DnaHash>,
         queue_consumer_map: QueueConsumerMap,
@@ -963,6 +972,7 @@ impl TestSpaces {
 
 #[cfg(test)]
 impl TestSpace {
+    /// Create a new test space
     pub fn new(dna_hash: DnaHash) -> Self {
         let temp_dir = tempfile::Builder::new()
             .prefix("holochain-test-environments")
