@@ -293,11 +293,11 @@
       },
       "locked": {
         "dir": "versions/0_3",
-        "lastModified": 1732887569,
-        "narHash": "sha256-tdR2bpPsRi9PKP/IFKCdtBVkNeXS2ShiuujOMqM5zbU=",
+        "lastModified": 1732892877,
+        "narHash": "sha256-i62ZIC7zQ283uo/9iGGxUBeRDPpSdqnu8j8QJIOwmgM=",
         "owner": "holochain",
         "repo": "holochain",
-        "rev": "4bba9cf6b1d92faee6867a279599e0f321733abe",
+        "rev": "9ff3291ecf833c7627824ed3f4e8b7c8d9047cf7",
         "type": "github"
       },
       "original": {
