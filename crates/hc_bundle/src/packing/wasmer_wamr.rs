@@ -1,5 +1,3 @@
-#![cfg(feature = "wasmer_wamr")]
-
 use crate::error::HcBundleError;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;

@@ -1,5 +1,3 @@
-#![cfg(feature = "wasmer_sys")]
-
 use crate::{
     core::ribosome::error::RibosomeResult, holochain_wasmer_host::module::WASM_METERING_LIMIT,
 };
