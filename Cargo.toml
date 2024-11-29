@@ -77,10 +77,10 @@ nursery = { level = "allow", priority = -1 }
 cargo = { level = "allow", priority = -1 }
 pedantic = { level = "allow", priority = -1 }
 restriction = { level = "allow", priority = -1 }
-style = "deny"
-complexity = "deny"
-perf = "deny"
-correctness = "deny"
+style = { level = "deny", priority = -1 }
+complexity = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+correctness = { level = "deny", priority = -1 }
 dbg_macro = "deny"
 
 [workspace.lints.rust]

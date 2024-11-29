@@ -1,5 +1,3 @@
-#![cfg(feature = "wasmer_sys")]
-
 use crate::error::HcBundleError;
 use holochain_util::ffs;
 use holochain_wasmer_host::module::build_ios_module;
