@@ -802,6 +802,9 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     );
     assert_eq!(records_2, records_1);
 
+    // uncomment this and the test passes (locally)
+    // tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
     let dump1 = conductors[1]
         .dump_all_integrated_op_hashes(cells[1].cell_id().dna_hash())
         .await
