@@ -3072,7 +3072,6 @@ mod misc_impls {
                 .map(|op| match op {
                     DhtOp::ChainOp(op) => {
                         let a = op.action();
-                        let ah = a.to_hash();
                         format!("{:>3} {} {}", a.action_seq(), a.author(), op.to_hash())
                     }
                     DhtOp::WarrantOp(op) => format!("warrant {}", op.to_hash()),
