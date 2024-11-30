@@ -3044,6 +3044,44 @@ mod misc_impls {
             Ok(out)
         }
 
+        /// Dump all integrated ops, from authored dbs and DHT database
+        pub async fn dump_all_integrated_op_hashes(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> ConductorApiResult<Vec<String>> {
+            let mut ops = HashSet::new();
+            for db in self.spaces.get_all_authored_dbs(dna_hash)? {
+                let o = db
+                    .read_async(|txn| {
+                        query_dht_ops_from_statement(txn, state_dump::DHT_OPS_INTEGRATED, None)
+                    })
+                    .await?;
+                ops.extend(o.into_iter());
+            }
+
+            let o = self
+                .spaces
+                .dht_db(dna_hash)?
+                .read_async(|txn| {
+                    query_dht_ops_from_statement(txn, state_dump::DHT_OPS_INTEGRATED, None)
+                })
+                .await?;
+            ops.extend(o.into_iter());
+            let mut ops: Vec<_> = ops
+                .into_iter()
+                .map(|op| match op {
+                    DhtOp::ChainOp(op) => {
+                        let a = op.action();
+                        let ah = a.to_hash();
+                        format!("{:>3} {} {}", a.action_seq(), a.author(), op.to_hash())
+                    }
+                    DhtOp::WarrantOp(op) => format!("warrant {}", op.to_hash()),
+                })
+                .collect();
+            ops.sort();
+            Ok(ops)
+        }
+
         /// JSON dump of network metrics
         pub async fn dump_network_metrics(
             &self,

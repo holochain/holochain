@@ -698,7 +698,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
         .collect();
 
     let size = 3_000_000;
-    let num = 2;
+    let num = 3;
 
     let mut hashes = vec![];
     for i in 0..num {
@@ -708,6 +708,16 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     }
 
     await_consistency(10, [&cells[0], &cells[1]]).await.unwrap();
+
+    let dump0 = conductors[0]
+        .dump_all_integrated_op_hashes(cells[0].cell_id().dna_hash())
+        .await
+        .unwrap();
+    let dump1 = conductors[1]
+        .dump_all_integrated_op_hashes(cells[1].cell_id().dna_hash())
+        .await
+        .unwrap();
+    pretty_assertions::assert_eq!(dump0, dump1);
 
     println!(
         "Done waiting for consistency between first two nodes. Elapsed: {:?}",
@@ -767,7 +777,7 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
     );
 
     await_consistency_advanced(
-        10,
+        20,
         (),
         [(&cells[0], false), (&cells[1], true), (&cell, true)],
     )
@@ -791,6 +801,17 @@ async fn three_way_gossip(config: holochain::sweettest::SweetConductorConfig) {
             .collect::<Vec<_>>()
     );
     assert_eq!(records_2, records_1);
+
+    let dump1 = conductors[1]
+        .dump_all_integrated_op_hashes(cells[1].cell_id().dna_hash())
+        .await
+        .unwrap();
+    let dump2 = conductors[2]
+        .dump_all_integrated_op_hashes(cell.cell_id().dna_hash())
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(dump1, dump2);
 }
 
 #[cfg(feature = "test_utils")]
