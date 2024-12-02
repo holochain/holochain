@@ -16,6 +16,9 @@
         );
       hn-introspect =
         pkgs.writeShellScriptBin "hn-introspect" versionsFileText;
+      mkShell' = with pkgs; mkShell.override {
+        stdenv = if stdenv.isDarwin then overrideSDK stdenv "11.0" else stdenv;
+      };
     in
     {
       packages = {
@@ -25,7 +28,7 @@
       devShells = {
         default = self'.devShells.holonix;
         holonix = pkgs.lib.makeOverridable
-          ({ holochainOverrides }: pkgs.mkShell {
+          ({ holochainOverrides }: mkShell' {
             inputsFrom = [ self'.devShells.rustDev ];
             packages = (holonixPackages { inherit holochainOverrides; }) ++ [ hn-introspect ];
             shellHook = ''
