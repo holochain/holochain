@@ -26,6 +26,8 @@
 
         cargoExtraArgs = "--bin lair-keystore";
 
+        stdenv = if pkgs.stdenv.isDarwin then pkgs.overrideSDK pkgs.stdenv "11.0" else pkgs.stdenv;
+
         buildInputs = (with pkgs; [ openssl ])
           ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
