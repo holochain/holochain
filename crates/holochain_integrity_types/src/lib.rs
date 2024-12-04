@@ -10,6 +10,9 @@
 
 #![deny(missing_docs)]
 
+// For proptest-derive
+#![allow(non_local_definitions)]
+
 #[allow(missing_docs)]
 pub mod action;
 pub mod capability;
