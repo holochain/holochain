@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 ## 0.5.0-dev.8
+- made holo_hash encoding default in hdk cargo.toml for common B64 hashes
 
 ## 0.5.0-dev.7
 
