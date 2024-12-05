@@ -41,7 +41,7 @@ trybuild = "1.0"
 workspace = true
 
 [features]
-default = []
+default = ["encoding"]
 
 mock = ["hdk_derive/mock", "mockall"]
 encoding = ["holo_hash/encoding"]
