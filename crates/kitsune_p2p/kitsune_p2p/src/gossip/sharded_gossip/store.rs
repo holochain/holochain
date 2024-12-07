@@ -145,7 +145,7 @@ pub struct TimeChunk {
     /// The final hashes position.
     /// Note this is not the same as the window.end
     /// as the window is an exclusive range and
-    /// the cursor is purposely set the the last
+    /// the cursor is purposely set the last
     /// hashes position because the next hash could
     /// have the same timestamp.
     pub cursor: Timestamp,

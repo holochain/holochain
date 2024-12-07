@@ -133,7 +133,7 @@ pub struct PreflightRequest {
     /// first signer in BOTH signing_agents and optional_signing_agents.
     pub optional_signing_agents: CounterSigningAgents,
     /// The M in the M of N signers.
-    /// M MUST be strictly greater than than N / 2 and NOT larger than N.
+    /// M MUST be strictly greater than N / 2 and NOT larger than N.
     pub minimum_optional_signing_agents: u8,
     /// The first signing agent (index 0) is acting as an enzyme.
     /// If true AND optional_signing_agents are set then the first agent MUST
@@ -711,7 +711,7 @@ mod test {
             Err(CounterSigningError::CounterSigningSessionTimes(_))
         ));
 
-        // making the the start non-zero should fix it.
+        // making the start non-zero should fix it.
         *session_times.start_mut() =
             (session_times.start() + core::time::Duration::from_millis(1)).unwrap();
         session_times.check_integrity().unwrap();
