@@ -103,8 +103,8 @@ pub enum HcDnaBundleSubcommand {
     Schema,
     /// Print the B64 hash for a DNA file
     Hash {
-        /// The path to the dna file. 
-        path: std::path::PathBuf 
+        /// The path to the dna file.
+        path: std::path::PathBuf,
     },
 }
 
@@ -484,16 +484,18 @@ pub async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
 pub async fn resolve_dna_path(dna_path: &Path) -> HcBundleResult<PathBuf> {
     let dna_path_buf = dna_path.to_path_buf();
     if dna_path_buf.is_file() {
-        if dna_path_buf.extension() != Some("dna".as_ref()){
-            return Err(HcBundleError::FileExtensionMissing("dna", dna_path_buf))
+        if dna_path_buf.extension() != Some("dna".as_ref()) {
+            return Err(HcBundleError::FileExtensionMissing("dna", dna_path_buf));
         }
-        return Ok(dna_path_buf)
+        return Ok(dna_path_buf);
     }
     if dna_path_buf.is_dir() {
         let dna_name = get_dna_name(&dna_path_buf).await?;
-        return Ok(dna_path_buf.join(dna_name).with_extension("dna"))
-    }   
-    Err(HcBundleError::MiscError(format!("Invalid DNA path: {:?}", dna_path_buf.canonicalize()).into()))
+        return Ok(dna_path_buf.join(dna_name).with_extension("dna"));
+    }
+    Err(HcBundleError::MiscError(
+        format!("Invalid DNA path: {:?}", dna_path_buf.canonicalize()).into(),
+    ))
 }
 
 /// Load an [AppManifest] manifest from the given path and return its `app_name` field.
