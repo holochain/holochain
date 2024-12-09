@@ -62,11 +62,11 @@
     "scaffolding": {
       "flake": false,
       "locked": {
-        "lastModified": 1732649741,
-        "narHash": "sha256-Hn9ckh1eZblZ1uZ2SDsoEjgFbkRE4FCyPWp19duZOlU=",
+        "lastModified": 1733423723,
+        "narHash": "sha256-vtjxVjoDBqwt5KtBiahrMCQ76t8iwZDFUR/FNue+JNs=",
         "owner": "holochain",
         "repo": "scaffolding",
-        "rev": "bf8826dc48b5d828c62bd2ea8bf40c7ea471642d",
+        "rev": "934b6840af793ccbcf3ac65a5cae52c0397bed09",
         "type": "github"
       },
       "original": {
