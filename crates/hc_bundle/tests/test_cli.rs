@@ -284,6 +284,20 @@ async fn test_multi_integrity() {
 }
 
 #[test]
+fn test_hash_dna_function() {
+    {
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1"]);
+        cmd.assert().success();
+    }
+    {
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
+        cmd.assert().success();
+    }
+}
+
+#[test]
 fn test_all_dna_manifests_match_schema() {
     let schema = load_schema("dna-manifest");
 

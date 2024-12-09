@@ -36,14 +36,19 @@ impl DnaBundle {
 
     /// Convert to a DnaFile, and return what the hash of the Dna *would* have
     /// been without the provided modifier overrides
-    pub async fn into_dna_file(self, modifiers: DnaModifiersOpt) -> DnaResult<(DnaFile, DnaHash)> {
+    pub async fn into_dna_file(self, override_modifiers: DnaModifiersOpt) -> DnaResult<(DnaFile, DnaHash)> {
         let (integrity, coordinator, wasms) = self.inner_maps().await?;
-        let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, modifiers)?;
+        let (dna_def, original_hash) = self.to_dna_def(integrity, coordinator, override_modifiers)?;
 
         Ok((
             DnaFile::new(dna_def.content, wasms.into_iter().map(|(_, v)| v)).await,
             original_hash,
         ))
+    }
+
+      /// Convert to a DnaFile without overriding modifiers
+    pub async fn to_dna_file(self) -> DnaResult<(DnaFile, DnaHash)> {
+        self.into_dna_file(DnaModifiersOpt::none()).await
     }
 
     /// Construct from raw bytes
