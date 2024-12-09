@@ -351,10 +351,10 @@ impl HcDnaBundleSubcommand {
             }
             Self::Hash { path } => {
                 let dna_file_path = resolve_dna_path(&path).await?;
-                let bundle = DnaBundle::read_from_file(&dna_file_path.as_path()).await?;
+                let bundle = DnaBundle::read_from_file(dna_file_path.as_path()).await?;
                 let dna_file = bundle.to_dna_file().await?;
-                let dnahash_b64 = DnaHash::from_raw_39(dna_file.1.into_inner());
-                println!("{}", dnahash_b64.to_string());
+                let dnahash_b64 = DnaHash::from_raw_39(dna_file.1.into_inner()).to_string();
+                println!("{}", dnahash_b64);
             }
         }
         Ok(())
