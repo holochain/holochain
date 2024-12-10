@@ -350,18 +350,9 @@ impl HcDnaBundleSubcommand {
                 println!("{}", include_str!("../schema/dna-manifest.schema.json"));
             }
             Self::Hash { path } => {
-                match DnaBundle::read_from_file(path.as_path()).await {
-                    Ok(bundle) => {
-                        let dna_hash_b64 = bundle.to_dna_file().await?.0.dna_hash().to_string();
-                        println!("{}", dna_hash_b64);
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "Error: {}",
-                            e.to_string().split_once("backtrace:").unwrap().0
-                        );
-                    }
-                };
+                let bundle = DnaBundle::read_from_file(path.as_path()).await?;
+                let dna_hash_b64 = bundle.to_dna_file().await?.0.dna_hash().to_string();
+                println!("{}", dna_hash_b64);
             }
         }
         Ok(())
