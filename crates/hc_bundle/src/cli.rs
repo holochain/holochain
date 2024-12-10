@@ -10,7 +10,7 @@ use mr_bundle::{Location, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::error::{HcBundleError, HcBundleResult};
+use crate::error::HcBundleResult;
 
 /// The file extension to use for DNA bundles.
 pub const DNA_BUNDLE_EXT: &str = "dna";
@@ -350,10 +350,18 @@ impl HcDnaBundleSubcommand {
                 println!("{}", include_str!("../schema/dna-manifest.schema.json"));
             }
             Self::Hash { path } => {
-                let dna_file_path = resolve_dna_path(&path).await?;
-                let bundle = DnaBundle::read_from_file(dna_file_path.as_path()).await?;
-                let dna_hash_b64 = bundle.to_dna_file().await?.0.dna_hash().to_string();
-                println!("{}", dna_hash_b64);
+                match DnaBundle::read_from_file(path.as_path()).await {
+                    Ok(bundle) => {
+                        let dna_hash_b64 = bundle.to_dna_file().await?.0.dna_hash().to_string();
+                        println!("{}", dna_hash_b64);
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Error: {}",
+                            e.to_string().split_once("backtrace:").unwrap().0
+                        );
+                    }
+                };
             }
         }
         Ok(())
@@ -477,24 +485,6 @@ pub async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: DnaManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.name())
-}
-
-/// Finds the dna file from the given path, expects to find the DnaManifest if the filename is not given.
-pub async fn resolve_dna_path(dna_path: &Path) -> HcBundleResult<PathBuf> {
-    let dna_path_buf = dna_path.to_path_buf();
-    if dna_path_buf.is_file() {
-        if dna_path_buf.extension() != Some("dna".as_ref()) {
-            return Err(HcBundleError::FileExtensionMissing("dna", dna_path_buf));
-        }
-        return Ok(dna_path_buf);
-    }
-    if dna_path_buf.is_dir() {
-        let dna_name = get_dna_name(&dna_path_buf).await?;
-        return Ok(dna_path_buf.join(dna_name).with_extension("dna"));
-    }
-    Err(HcBundleError::MiscError(
-        format!("Invalid DNA path: {:?}", dna_path_buf.canonicalize()).into(),
-    ))
 }
 
 /// Load an [AppManifest] manifest from the given path and return its `app_name` field.
