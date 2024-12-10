@@ -3,6 +3,7 @@ use holochain_types::web_app::WebAppManifest;
 use holochain_types::{prelude::*, web_app::WebAppBundle};
 use holochain_util::ffs;
 use jsonschema::JSONSchema;
+use predicates::prelude::predicate;
 use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
@@ -281,6 +282,29 @@ async fn test_multi_integrity() {
         &["zome1".into(), "zome2".into()]
     );
     assert_eq!(*dna.dna_def(), expected);
+}
+
+#[tokio::test]
+async fn test_hash_dna_function() {
+    {
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1"]);
+        cmd.assert().success();
+    }
+    {
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
+        cmd.assert().success();
+    }
+    {
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
+        let original =
+            DnaHashB64::from_b64_str("uhC0klkazCjMK-V3HooCgXVCB7OGhGEplGD-UWFgCIeXGZfRB7ORO")
+                .unwrap()
+                .to_string();
+        cmd.assert().stdout(predicate::eq(original + "\n"));
+    }
 }
 
 #[test]
