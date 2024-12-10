@@ -2,7 +2,7 @@
 //! Binary `hc-dna` command executable.
 
 use clap::{Parser, Subcommand};
-use holochain_types::dna::{DnaBundle, DnaHash};
+use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::{AppManifest, DnaManifest, ValidatedDnaManifest};
 use holochain_types::web_app::WebAppManifest;
 use holochain_util::ffs;
@@ -352,9 +352,8 @@ impl HcDnaBundleSubcommand {
             Self::Hash { path } => {
                 let dna_file_path = resolve_dna_path(&path).await?;
                 let bundle = DnaBundle::read_from_file(dna_file_path.as_path()).await?;
-                let dna_file = bundle.to_dna_file().await?;
-                let dnahash_b64 = DnaHash::from_raw_39(dna_file.1.into_inner()).to_string();
-                println!("{}", dnahash_b64);
+                let dna_hash_b64 = bundle.to_dna_file().await?.0.dna_hash().to_string();
+                println!("{}", dna_hash_b64);
             }
         }
         Ok(())
@@ -480,7 +479,7 @@ pub async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
     Ok(manifest.name())
 }
 
-/// Finds the dna file from the given path, expects the DnaManifest if the filename is not given.
+/// Finds the dna file from the given path, expects to find the DnaManifest if the filename is not given.
 pub async fn resolve_dna_path(dna_path: &Path) -> HcBundleResult<PathBuf> {
     let dna_path_buf = dna_path.to_path_buf();
     if dna_path_buf.is_file() {
