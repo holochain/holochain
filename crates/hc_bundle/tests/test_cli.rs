@@ -301,7 +301,11 @@ async fn test_hash_dna_function() {
             DnaHashB64::from_b64_str("uhC0klkazCjMK-V3HooCgXVCB7OGhGEplGD-UWFgCIeXGZfRB7ORO")
                 .unwrap()
                 .to_string();
-        assert_eq!(expected, actual, "Expected: {}\nActual: {}", expected, actual);
+        assert_eq!(
+            expected, actual,
+            "Expected: {}\nActual: {}",
+            expected, actual
+        );
     }
 }
 
