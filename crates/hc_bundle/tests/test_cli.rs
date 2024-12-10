@@ -284,8 +284,8 @@ async fn test_multi_integrity() {
     assert_eq!(*dna.dna_def(), expected);
 }
 
-#[test]
-fn test_hash_dna_function() {
+#[tokio::test]
+async fn test_hash_dna_function() {
     {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
         let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1"]);
