@@ -283,6 +283,33 @@ async fn test_multi_integrity() {
     assert_eq!(*dna.dna_def(), expected);
 }
 
+#[tokio::test]
+async fn test_hash_dna_function() {
+    {
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
+        cmd.assert().success();
+    }
+    {
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
+        let stdout = cmd.assert().success().get_output().stdout.clone();
+        let actual = String::from_utf8_lossy(&stdout)
+            .replace('\r', "")
+            .replace('\n', "");
+        //.trim() // Normalize Windows/linux with trim `\r\n` or `\n` to empty
+        let expected =
+            DnaHashB64::from_b64_str("uhC0klkazCjMK-V3HooCgXVCB7OGhGEplGD-UWFgCIeXGZfRB7ORO")
+                .unwrap()
+                .to_string();
+        assert_eq!(
+            expected, actual,
+            "Expected: {}\nActual: {}",
+            expected, actual
+        );
+    }
+}
+
 #[test]
 fn test_all_dna_manifests_match_schema() {
     let schema = load_schema("dna-manifest");
