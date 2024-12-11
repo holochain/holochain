@@ -295,8 +295,9 @@ async fn test_hash_dna_function() {
         let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
         let stdout = cmd.assert().success().get_output().stdout.clone();
         let actual = String::from_utf8_lossy(&stdout)
-            .trim() // Normalize Windows/linux with trim `\r\n` or `\n` to empty
-            .to_string();
+            .replace('\r', "")
+            .replace('\n', "");
+        //.trim() // Normalize Windows/linux with trim `\r\n` or `\n` to empty
         let expected =
             DnaHashB64::from_b64_str("uhC0klkazCjMK-V3HooCgXVCB7OGhGEplGD-UWFgCIeXGZfRB7ORO")
                 .unwrap()
