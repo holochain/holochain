@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_api"
-version = "0.5.0-dev.8"
+version = "0.5.0-dev.9"
 description = "Message types for Holochain admin and app interface protocols"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -17,17 +17,17 @@ kitsune_p2p_bin_data = { version = "^0.5.0-dev.2", path = "../kitsune_p2p/bin_da
 holo_hash = { version = "^0.5.0-dev.3", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_state_types = { version = "^0.5.0-dev.4", path = "../holochain_state_types" }
+holochain_state_types = { version = "^0.5.0-dev.5", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_types = { version = "^0.5.0-dev.8", path = "../holochain_types" }
-holochain_zome_types = { version = "^0.5.0-dev.8", path = "../holochain_zome_types" }
+holochain_types = { version = "^0.5.0-dev.9", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.5.0-dev.9", path = "../holochain_zome_types" }
 nanoid = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tracing = "0.1.26"
 thiserror = "1.0.22"
 url2 = "0.0.6"
-holochain_keystore = { version = "^0.5.0-dev.8", path = "../holochain_keystore" }
+holochain_keystore = { version = "^0.5.0-dev.9", path = "../holochain_keystore" }
 shrinkwraprs = "0.3.0"
 indexmap = { version = "2.6.0", features = ["serde"] }
 

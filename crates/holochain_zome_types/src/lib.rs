@@ -8,6 +8,7 @@
 //! contains more types which are used by Holochain itself.
 
 #![deny(missing_docs)]
+#![allow(non_local_definitions)]
 
 #[allow(missing_docs)]
 pub mod action;
