@@ -19,7 +19,8 @@ const DPKI_NETWORK_SEED_TESTING: &str = "deepkey-testing";
 ///
 /// Note that the Deepkey DNA path and the network seed settings determine network compatibility.
 /// They have to match for all conductors on a network, for them to be able to communicate.
-/// Also see [`holochain_p2p::spawn::NetworkCompatParams`].
+///
+/// Also see `NetworkCompatParams` in the `holochain_p2p` crate.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
 pub struct DpkiConfig {
     /// Path to a DNA which implements the DPKI service, i.e. Deepkey.
@@ -35,7 +36,7 @@ pub struct DpkiConfig {
     pub network_seed: String,
 
     /// Allow the DPKI agent key to be generated randomly in the absence of a
-    /// [`ConductorConfig::device_seed_lair_tag`] setting. This is useful in test
+    /// [`crate::config::conductor::ConductorConfig::device_seed_lair_tag`] setting. This is useful in test
     /// environments where the device seed is not set and key regeneration is not
     /// needed. For any real use of Holochain, do not set this to true!
     #[serde(default)]
