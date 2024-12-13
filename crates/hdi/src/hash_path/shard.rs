@@ -22,7 +22,7 @@ pub type ShardDepth = u32;
 /// @todo stretch short shards out in a nice balanced way (append some bytes from the hash?)
 pub struct ShardStrategy(ShardWidth, ShardDepth);
 
-/// impl [ `ShardStrategy` ] as an immutable/read-only thingy.
+/// impl [`ShardStrategy`] as an immutable/read-only thingy.
 impl ShardStrategy {
     fn width(&self) -> ShardWidth {
         self.0
@@ -104,7 +104,7 @@ impl From<(&ShardStrategy, &[u8])> for Path {
     fn from((strategy, bytes): (&ShardStrategy, &[u8])) -> Path {
         let full_length = strategy.width() * strategy.depth();
         // Fold a flat slice of bytes into `strategy.depth` number of `strategy.width` length byte
-        // [ `Component` ]s.
+        // [`Component`]s.
         let sharded: Vec<Component> = bytes
             .iter()
             .take(full_length as _)
@@ -141,7 +141,7 @@ impl From<(&ShardStrategy, Vec<u8>)> for Path {
         Path::from((strategy, bytes))
     }
 }
-/// Create [ `Path` ] from [ `String` ].
+/// Create [`Path`] from [`String`].
 /// To ensure that this works for all utf8, which can have anywhere from 1-4 bytes for a single
 /// character, we first represent each character as a utf32 so it gets padded out with 0 bytes.
 /// This means the width is 4x what it would be for raw bytes with the same strategy.

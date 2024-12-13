@@ -24,7 +24,7 @@ pub fn x_salsa20_poly1305_decrypt(
 ///
 /// Opens encrypted data created by box.
 ///
-/// If the encrypted data fails authentication and cannot be decrypted this function returns [ `None` ].
+/// If the encrypted data fails authentication and cannot be decrypted this function returns [`None`].
 ///
 /// This means that if any decrypted data is returned by this function it was created by _either_
 /// keypair and has not been tampered with.

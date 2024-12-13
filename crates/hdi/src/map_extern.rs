@@ -110,5 +110,5 @@ macro_rules! map_extern_infallible {
     }
 }
 
-/// Every extern _must_ return a `WasmError` in the case of failure.
+/// Every extern _must_ return a [`WasmError`] in the case of failure.
 pub type ExternResult<T> = Result<T, WasmError>;
