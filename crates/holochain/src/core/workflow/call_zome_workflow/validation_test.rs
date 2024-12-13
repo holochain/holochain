@@ -3,7 +3,7 @@ use crate::conductor::CellError;
 use crate::conductor::ConductorHandle;
 use crate::core::workflow::WorkflowError;
 use crate::core::SourceChainError;
-use crate::test_utils::new_zome_call;
+use crate::test_utils::new_zome_call_params;
 use crate::test_utils::setup_app_with_names;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::prelude::*;
@@ -49,32 +49,18 @@ async fn direct_validation_test() {
     handle.shutdown().await.unwrap().unwrap();
 }
 
-/// - Commit a valid update should pass
-/// - Commit an invalid update should fail the zome call
+// - Commit a valid update should pass
+// - Commit an invalid update should fail the zome call
 async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
     // Valid update should work
-    let invocation = new_zome_call(
-        handle.keystore(),
-        &alice_cell_id,
-        "update_entry",
-        (),
-        TestWasm::Update,
-    )
-    .await
-    .unwrap();
-    handle.call_zome(invocation).await.unwrap().unwrap();
+    let zome_call_params =
+        new_zome_call_params(&alice_cell_id, "update_entry", (), TestWasm::Update).unwrap();
+    handle.call_zome(zome_call_params).await.unwrap().unwrap();
 
     // Invalid update should fail work
-    let invocation = new_zome_call(
-        handle.keystore(),
-        &alice_cell_id,
-        "invalid_update_entry",
-        (),
-        TestWasm::Update,
-    )
-    .await
-    .unwrap();
-    let result = handle.call_zome(invocation).await;
+    let zome_call_params =
+        new_zome_call_params(&alice_cell_id, "invalid_update_entry", (), TestWasm::Update).unwrap();
+    let result = handle.call_zome(zome_call_params).await;
     match &result {
         Err(ConductorApiError::CellError(CellError::WorkflowError(wfe))) => match **wfe {
             WorkflowError::SourceChainError(SourceChainError::InvalidCommit(_)) => {}

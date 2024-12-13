@@ -1,6 +1,6 @@
 [package]
 name = "holo_hash"
-version = "0.5.0-dev.2"
+version = "0.5.0-dev.3"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo", "hash", "blake", "blake2b"]
 categories = ["cryptography"]
@@ -33,6 +33,7 @@ rand = { version = "0.8.5", optional = true }
 rusqlite = { version = "0.32.1", optional = true }
 serde = { version = "1", optional = true }
 serde_bytes = { version = "0.11", optional = true }
+sha2 = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true }
 holochain_wasmer_common = { version = "=0.0.96", optional = true }
 
@@ -54,9 +55,9 @@ fuzzing = [
 ]
 
 fixturators = ["fixt", "rand", "hashing", "encoding"]
-hashing = ["futures", "must_future", "blake2b_simd", "serialization"]
+hashing = ["futures", "must_future", "dep:blake2b_simd", "serialization"]
 serialization = ["holochain_serialized_bytes", "serde", "serde_bytes"]
-encoding = ["base64", "blake2b_simd", "derive_more"]
+encoding = ["dep:base64", "dep:blake2b_simd", "dep:derive_more", "dep:sha2"]
 test_utils = ["fixturators"]
 holochain-wasmer = ["holochain_wasmer_common"]
 

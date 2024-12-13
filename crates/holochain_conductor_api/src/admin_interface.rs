@@ -585,6 +585,10 @@ pub enum ExternalApiWireError {
     RibosomeError(String),
     /// Error activating app.
     ActivateApp(String),
+    /// The zome call failed authentication.
+    ///
+    /// [How to sign zome calls.](crate::AppRequest::CallZome)
+    ZomeCallAuthenticationFailed(String),
     /// The zome call is unauthorized.
     ZomeCallUnauthorized(String),
     /// A countersigning session has failed.

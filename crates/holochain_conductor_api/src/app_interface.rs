@@ -26,12 +26,27 @@ pub enum AppRequest {
 
     /// Call a zome function.
     ///
-    /// See [`ZomeCall`] to understand the data that must be provided.
+    /// The payload to this call is composed of the serialized [`ZomeCallParams`] as bytes
+    /// and the provenance's signature.
+    ///
+    /// Serialization must be performed with MessagePack. The resulting bytes are hashed using the
+    /// SHA2 512-bit algorithm, and the hash is signed with the provenance's private ed25519 key.
+    /// The hash is not included in the call's payload.
     ///
     /// # Returns
     ///
-    /// [`AppResponse::ZomeCalled`]
-    CallZome(Box<ZomeCall>),
+    /// [`AppResponse::ZomeCalled`] Indicates the zome call was deserialized successfully. If the
+    /// call was authorized, the response yields the return value of the zome function as MessagePack
+    /// encoded bytes. The bytes can be deserialized to the expected return type.
+    ///
+    /// This response is also returned when authorization of the zome call failed because of an
+    /// invalid signature, capability grant or nonce.
+    ///
+    /// # Errors
+    ///
+    /// [`SerializedBytesError`] is returned when the serialized bytes could not be deserialized
+    /// to the expected [`ZomeCallParams`].
+    CallZome(Box<ZomeCallParamsSigned>),
 
     /// Get the state of a countersigning session.
     ///
@@ -43,6 +58,7 @@ pub enum AppRequest {
     ///
     /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
     /// passed in to the call.
+    #[cfg(feature = "unstable-countersigning")]
     GetCountersigningSessionState(Box<CellId>),
 
     /// Abandon an unresolved countersigning session.
@@ -79,6 +95,7 @@ pub enum AppRequest {
     ///
     /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
     /// automatically has not been made.
+    #[cfg(feature = "unstable-countersigning")]
     AbandonCountersigningSession(Box<CellId>),
 
     /// Publish an unresolved countersigning session.
@@ -115,6 +132,7 @@ pub enum AppRequest {
     ///
     /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
     /// automatically has not been made.
+    #[cfg(feature = "unstable-countersigning")]
     PublishCountersigningSession(Box<CellId>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
@@ -217,12 +235,15 @@ pub enum AppResponse {
     ZomeCalled(Box<ExternIO>),
 
     /// The successful response to an [`AppRequest::GetCountersigningSessionState`].
+    #[cfg(feature = "unstable-countersigning")]
     CountersigningSessionState(Box<Option<CountersigningSessionState>>),
 
     /// The successful response to an [`AppRequest::AbandonCountersigningSession`].
+    #[cfg(feature = "unstable-countersigning")]
     CountersigningSessionAbandoned,
 
     /// The successful response to an [`AppRequest::PublishCountersigningSession`].
+    #[cfg(feature = "unstable-countersigning")]
     PublishCountersigningSessionTriggered,
 
     /// The successful response to an [`AppRequest::CreateCloneCell`].
@@ -254,89 +275,34 @@ pub enum AppResponse {
     Ok,
 }
 
-/// The data provided over an app interface in order to make a zome call
+/// The data provided over an app interface in order to make a zome call.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ZomeCall {
-    /// The ID of the cell containing the zome to be called
-    pub cell_id: CellId,
-    /// The zome containing the function to be called
-    pub zome_name: ZomeName,
-    /// The name of the zome function to call
-    pub fn_name: FunctionName,
-    /// The serialized data to pass as an argument to the zome function call
-    pub payload: ExternIO,
-    /// The capability request authorization
-    ///
-    /// This can be `None` and still succeed in the case where the function
-    /// in the zome being called has been given an `Unrestricted` status
-    /// via a `CapGrant`. Otherwise it will be necessary to provide a `CapSecret` for every call.
-    pub cap_secret: Option<CapSecret>,
-    /// The provenance (source) of the call
-    /// MUST match the signature.
-    pub provenance: AgentPubKey,
+pub struct ZomeCallParamsSigned {
+    /// Bytes of the serialized zome call payload that consists of all fields of the
+    /// [`ZomeCallParams`].
+    pub bytes: ExternIO,
+    /// Signature by the provenance of the call, signing the bytes of the zome call payload.
     pub signature: Signature,
-    pub nonce: Nonce256Bits,
-    pub expires_at: Timestamp,
 }
 
-impl From<ZomeCall> for ZomeCallUnsigned {
-    fn from(zome_call: ZomeCall) -> Self {
+impl ZomeCallParamsSigned {
+    pub fn new(bytes: Vec<u8>, signature: Signature) -> Self {
         Self {
-            cell_id: zome_call.cell_id,
-            zome_name: zome_call.zome_name,
-            fn_name: zome_call.fn_name,
-            payload: zome_call.payload,
-            cap_secret: zome_call.cap_secret,
-            provenance: zome_call.provenance,
-            nonce: zome_call.nonce,
-            expires_at: zome_call.expires_at,
+            bytes: ExternIO::from(bytes),
+            signature,
         }
     }
-}
 
-impl ZomeCall {
-    pub async fn try_from_unsigned_zome_call(
+    pub async fn try_from_params(
         keystore: &MetaLairClient,
-        unsigned_zome_call: ZomeCallUnsigned,
+        params: ZomeCallParams,
     ) -> LairResult<Self> {
-        let signature = unsigned_zome_call
+        let (bytes, bytes_hash) = params.serialize_and_hash().map_err(|e| e.to_string())?;
+        let signature = params
             .provenance
-            .sign_raw(
-                keystore,
-                unsigned_zome_call
-                    .data_to_sign()
-                    .map_err(|e| e.to_string())?,
-            )
+            .sign_raw(keystore, bytes_hash.into())
             .await?;
-        Ok(Self {
-            cell_id: unsigned_zome_call.cell_id,
-            zome_name: unsigned_zome_call.zome_name,
-            fn_name: unsigned_zome_call.fn_name,
-            payload: unsigned_zome_call.payload,
-            cap_secret: unsigned_zome_call.cap_secret,
-            provenance: unsigned_zome_call.provenance,
-            nonce: unsigned_zome_call.nonce,
-            expires_at: unsigned_zome_call.expires_at,
-            signature,
-        })
-    }
-
-    pub async fn resign_zome_call(
-        self,
-        keystore: &MetaLairClient,
-        agent_key: AgentPubKey,
-    ) -> LairResult<Self> {
-        let zome_call_unsigned = ZomeCallUnsigned {
-            provenance: agent_key,
-            cell_id: self.cell_id,
-            zome_name: self.zome_name,
-            fn_name: self.fn_name,
-            cap_secret: self.cap_secret,
-            payload: self.payload,
-            nonce: self.nonce,
-            expires_at: self.expires_at,
-        };
-        ZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned).await
+        Ok(Self::new(bytes, signature))
     }
 }
 
@@ -582,10 +548,10 @@ pub enum ScottyPanel {
     GossipInfo { last_round: Option<Timestamp> },
 }
 
-/// The request payload that should be sent in a [`holochain_websocket::WireMessage::Authenticate`]
+/// The request payload sent on a Holochain app websocket to authenticate the connection.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppAuthenticationRequest {
-    /// The authentication token that was provided by the conductor when [`AdminRequest::IssueAppInterfaceToken`] was called.
+    /// The authentication token that was provided by the conductor when [`crate::admin_interface::AdminRequest::IssueAppAuthenticationToken`] was called.
     pub token: AppAuthenticationToken,
 }
 

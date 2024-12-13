@@ -79,13 +79,19 @@ impl AppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
-            AppRequest::CallZome(call) => {
-                match self.conductor_handle.call_zome(*call.clone()).await? {
+            AppRequest::CallZome(zome_call_params_signed) => {
+                match self.conductor_handle.handle_external_zome_call(*zome_call_params_signed).await? {
                     Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),
-                    Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, _, zome_name, fn_name, _)) => Ok(AppResponse::Error(
+                    Ok(ZomeCallResponse::AuthenticationFailed(signature, provenance)) => Ok(AppResponse::Error(
+                        ExternalApiWireError::ZomeCallAuthenticationFailed(format!(
+                            "Authentication failure. Bad signature {:?} by provenance {:?}.",
+                            signature, provenance,
+                        )),
+                    )),
+                    Ok(ZomeCallResponse::Unauthorized(zome_call_authorization, cap_secret, zome_name, fn_name)) => Ok(AppResponse::Error(
                         ExternalApiWireError::ZomeCallUnauthorized(format!(
                             "Call was not authorized with reason {:?}, cap secret {:?} to call the function {} in zome {}",
-                            zome_call_authorization, call.cap_secret, fn_name, zome_name
+                            zome_call_authorization, cap_secret, fn_name, zome_name
                         )),
                     )),
                     Ok(ZomeCallResponse::NetworkError(e)) => unreachable!(
@@ -101,6 +107,7 @@ impl AppInterfaceApi {
                     Err(e) => Ok(AppResponse::Error(e.into())),
                 }
             }
+            #[cfg(feature = "unstable-countersigning")]
             AppRequest::GetCountersigningSessionState(payload) => {
                 let countersigning_session_state = self
                     .conductor_handle
@@ -111,6 +118,7 @@ impl AppInterfaceApi {
                     countersigning_session_state,
                 )))
             }
+            #[cfg(feature = "unstable-countersigning")]
             AppRequest::AbandonCountersigningSession(payload) => {
                 self.conductor_handle
                     .clone()
@@ -118,6 +126,7 @@ impl AppInterfaceApi {
                     .await?;
                 Ok(AppResponse::CountersigningSessionAbandoned)
             }
+            #[cfg(feature = "unstable-countersigning")]
             AppRequest::PublishCountersigningSession(payload) => {
                 self.conductor_handle
                     .clone()

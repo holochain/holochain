@@ -19,9 +19,7 @@ use error::CellError;
 use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_chc::ChcImpl;
-use holochain_conductor_api::ZomeCall;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -38,18 +36,23 @@ use crate::core::ribosome::guest_callback::init::InitResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::call_zome_workflow;
-use crate::core::workflow::countersigning_workflow::countersigning_success;
 use crate::core::workflow::genesis_workflow::genesis_workflow;
 use crate::core::workflow::initialize_zomes_workflow;
-use crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops;
 use crate::core::workflow::CallZomeWorkflowArgs;
 use crate::core::workflow::GenesisWorkflowArgs;
 use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
+#[cfg(feature = "unstable-countersigning")]
+use {
+    crate::core::workflow::countersigning_workflow::countersigning_success,
+    crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops,
+    holochain_p2p::event::CountersigningSessionNegotiationMessage,
+};
 
 use super::api::CellConductorHandle;
+use super::conductor::zome_call_signature_verification::is_valid_signature;
 use super::space::Space;
 use super::ConductorHandle;
 
@@ -299,7 +302,7 @@ impl Cell {
                             continue;
                         }
                     };
-                    let unsigned_zome_call = ZomeCallUnsigned {
+                    let zome_call_params = ZomeCallParams {
                         provenance,
                         cell_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
@@ -310,23 +313,7 @@ impl Cell {
                         expires_at,
                     };
 
-                    tasks.push(
-                        self.call_zome(
-                            match ZomeCall::try_from_unsigned_zome_call(
-                                self.conductor_handle.keystore(),
-                                unsigned_zome_call,
-                            )
-                                .await
-                            {
-                                Ok(zome_call) => zome_call,
-                                Err(e) => {
-                                    error!("scheduled zome call error in try_from_unsigned_zome_call: {:?}", e);
-                                    continue;
-                                }
-                            },
-                            None,
-                        ),
-                    );
+                    tasks.push(self.call_zome(zome_call_params, None));
                 }
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
@@ -399,23 +386,14 @@ impl Cell {
 
             CallRemote {
                 span_context: _,
-                from_agent,
+                zome_call_params_serialized,
                 signature,
-                zome_name,
-                fn_name,
-                cap_secret,
                 respond,
-                payload,
-                nonce,
-                expires_at,
                 ..
             } => {
                 async {
                     let res = self
-                        .handle_call_remote(
-                            from_agent, signature, zome_name, fn_name, cap_secret, payload, nonce,
-                            expires_at,
-                        )
+                        .handle_call_remote(zome_call_params_serialized, signature)
                         .await
                         .map_err(holochain_p2p::HolochainP2pError::other);
                     respond.respond(Ok(async move { res }.boxed().into()));
@@ -568,9 +546,11 @@ impl Cell {
                 .await;
             }
 
+            #[allow(unused_variables)]
             CountersigningSessionNegotiation {
                 respond, message, ..
             } => {
+                #[cfg(feature = "unstable-countersigning")]
                 async {
                     let res = self
                         .handle_countersigning_session_negotiation(message)
@@ -585,6 +565,7 @@ impl Cell {
         Ok(())
     }
 
+    #[cfg(feature = "unstable-countersigning")]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     /// we are receiving a response from a countersigning authority
     async fn handle_countersigning_session_negotiation(
@@ -872,30 +853,28 @@ impl Cell {
     /// a remote agent is attempting a "call_remote" on this cell.
     async fn handle_call_remote(
         &self,
-        from_agent: AgentPubKey,
-        from_signature: Signature,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        cap_secret: Option<CapSecret>,
-        payload: ExternIO,
-        nonce: Nonce256Bits,
-        expires_at: Timestamp,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
     ) -> CellResult<SerializedBytes> {
-        let invocation = ZomeCall {
-            cell_id: self.id.clone(),
-            zome_name,
-            cap_secret,
-            payload,
-            provenance: from_agent,
-            signature: from_signature,
-            fn_name,
-            nonce,
-            expires_at,
-        };
+        let zome_call_params = zome_call_params_serialized.decode::<ZomeCallParams>()?;
+        if !is_valid_signature(
+            &zome_call_params.provenance,
+            zome_call_params_serialized.as_bytes(),
+            &signature,
+        )
+        .await
+        .map_err(|err| CellError::ConductorApiError(Box::new(err)))?
+        {
+            return Err(CellError::ZomeCallAuthenticationFailed(
+                signature,
+                zome_call_params.provenance,
+            ));
+        }
+
         // double ? because
         // - ConductorApiResult
         // - ZomeCallResult
-        Ok(self.call_zome(invocation, None).await??.try_into()?)
+        Ok(self.call_zome(zome_call_params, None).await??.try_into()?)
     }
 
     /// Function called by the Conductor
@@ -906,7 +885,7 @@ impl Cell {
     // to access the Cell itself, as it was previously done.
     pub async fn call_zome(
         &self,
-        call: ZomeCall,
+        params: ZomeCallParams,
         workspace_lock: Option<SourceChainWorkspace>,
     ) -> CellResult<ZomeCallResult> {
         // Only check if init has run if this call is not coming from
@@ -924,7 +903,7 @@ impl Cell {
         let conductor_handle = self.conductor_handle.clone();
         let ribosome = self.get_ribosome()?;
         let invocation =
-            ZomeCallInvocation::try_from_interface_call(self.conductor_api.clone(), call).await?;
+            ZomeCallInvocation::try_from_params(self.conductor_api.clone(), params).await?;
 
         let dna_def = ribosome.dna_def().as_content().clone();
         // If there is no existing zome call then this is the root zome call
@@ -1087,6 +1066,7 @@ impl Cell {
             .trigger(&"publish_authored_ops");
     }
 
+    #[cfg(any(test, feature = "test_utils"))]
     pub(crate) fn triggers(&self) -> &QueueTriggers {
         &self.queue_triggers
     }

@@ -1,7 +1,9 @@
+use holochain_nonce::fresh_nonce;
 use holochain_nonce::Nonce256Bits;
 use holochain_state::source_chain::SourceChainRead;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::*;
+use matches::assert_matches;
 use std::collections::BTreeSet;
 
 use crate::fixt::AgentPubKeyFixturator;
@@ -12,10 +14,6 @@ use arbitrary::Arbitrary;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn signed_zome_call() {
-    use holochain_conductor_api::ZomeCall;
-    use holochain_nonce::fresh_nonce;
-    use matches::assert_matches;
-
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -114,23 +112,16 @@ async fn signed_zome_call() {
     // a zome call without the cap secret that enables lookup of the authorized
     // signing key should be rejected
     let response = conductor
-        .call_zome(
-            ZomeCall::try_from_unsigned_zome_call(
-                &conductor.keystore(),
-                ZomeCallUnsigned {
-                    provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
-                    cell_id: cell_id.clone(),
-                    zome_name: zome.coordinator_zome_name(),
-                    fn_name: "get_entry".into(),
-                    cap_secret: None,
-                    payload: ExternIO::encode(()).unwrap(),
-                    nonce: Nonce256Bits::from([0; 32]),
-                    expires_at: Timestamp(Timestamp::now().as_micros() + 100000),
-                },
-            )
-            .await
-            .unwrap(),
-        )
+        .call_zome(ZomeCallParams {
+            provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
+            cell_id: cell_id.clone(),
+            zome_name: zome.coordinator_zome_name(),
+            fn_name: "get_entry".into(),
+            cap_secret: None,
+            payload: ExternIO::encode(()).unwrap(),
+            nonce: Nonce256Bits::from([0; 32]),
+            expires_at: Timestamp(Timestamp::now().as_micros() + 100000),
+        })
         .await
         .unwrap()
         .unwrap();
@@ -139,23 +130,16 @@ async fn signed_zome_call() {
     // a zome call with the cap secret of the authorized signing key should succeed
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     let response = conductor
-        .call_zome(
-            ZomeCall::try_from_unsigned_zome_call(
-                &conductor.keystore(),
-                ZomeCallUnsigned {
-                    provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
-                    cell_id: cell_id.clone(),
-                    zome_name: zome.coordinator_zome_name(),
-                    fn_name: "get_entry".into(),
-                    cap_secret: Some(cap_access_secret),
-                    payload: ExternIO::encode(()).unwrap(),
-                    nonce,
-                    expires_at,
-                },
-            )
-            .await
-            .unwrap(),
-        )
+        .call_zome(ZomeCallParams {
+            provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
+            cell_id: cell_id.clone(),
+            zome_name: zome.coordinator_zome_name(),
+            fn_name: "get_entry".into(),
+            cap_secret: Some(cap_access_secret),
+            payload: ExternIO::encode(()).unwrap(),
+            nonce,
+            expires_at,
+        })
         .await
         .unwrap()
         .unwrap();
@@ -165,11 +149,6 @@ async fn signed_zome_call() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn signed_zome_call_wildcard() {
-    use holochain_conductor_api::ZomeCall;
-    use holochain_nonce::fresh_nonce;
-    use holochain_zome_types::prelude::*;
-    use matches::assert_matches;
-
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -246,23 +225,16 @@ async fn signed_zome_call_wildcard() {
     // a zome call with the cap secret of the authorized signing key should succeed
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     let response = conductor
-        .call_zome(
-            ZomeCall::try_from_unsigned_zome_call(
-                &conductor.keystore(),
-                ZomeCallUnsigned {
-                    provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
-                    cell_id: cell_id.clone(),
-                    zome_name: zome.coordinator_zome_name(),
-                    fn_name: "get_entry".into(),
-                    cap_secret: Some(cap_access_secret),
-                    payload: ExternIO::encode(()).unwrap(),
-                    nonce,
-                    expires_at,
-                },
-            )
-            .await
-            .unwrap(),
-        )
+        .call_zome(ZomeCallParams {
+            provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
+            cell_id: cell_id.clone(),
+            zome_name: zome.coordinator_zome_name(),
+            fn_name: "get_entry".into(),
+            cap_secret: Some(cap_access_secret),
+            payload: ExternIO::encode(()).unwrap(),
+            nonce,
+            expires_at,
+        })
         .await
         .unwrap()
         .unwrap();

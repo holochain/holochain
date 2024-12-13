@@ -141,3 +141,12 @@ pub fn blake2b_256(data: &[u8]) -> Vec<u8> {
 pub fn blake2b_128(data: &[u8]) -> Vec<u8> {
     blake2b_n(data, 16).unwrap()
 }
+
+/// Compute a 512-bit SHA2 hash.
+pub fn sha2_512(data: &[u8]) -> Vec<u8> {
+    use sha2::Digest;
+    let mut hasher = sha2::Sha512::new();
+    hasher.update(data);
+    let result = hasher.finalize();
+    result.to_vec()
+}

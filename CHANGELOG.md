@@ -14,6 +14,315 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20241211.005655
+
+## [hcterm-0.5.0-dev.9](crates/hcterm/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_cli-0.5.0-dev.9](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain-0.5.0-dev.9](crates/holochain/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_cli\_bundle-0.5.0-dev.9](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.9](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_cascade-0.5.0-dev.9](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_conductor\_api-0.5.0-dev.9](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_conductor\_services-0.4.0-dev.9](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.9)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.9](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.9](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_websocket-0.5.0-dev.9](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.9)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.9](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.9)
+
+## [holochain\_state-0.5.0-dev.9](crates/holochain_state/CHANGELOG.md#0.5.0-dev.9)
+
+## [hc\_deepkey\_types-0.9.0-dev.6](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.6)
+
+## [hdk-0.5.0-dev.9](crates/hdk/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_p2p-0.5.0-dev.9](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_state\_types-0.5.0-dev.5](crates/holochain_state_types/CHANGELOG.md#0.5.0-dev.5)
+
+## [hdi-0.6.0-dev.6](crates/hdi/CHANGELOG.md#0.6.0-dev.6)
+
+## [holochain\_chc-0.2.0-dev.9](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.9)
+
+## [hdk\_derive-0.5.0-dev.6](crates/hdk_derive/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_types-0.5.0-dev.9](crates/holochain_types/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_keystore-0.5.0-dev.9](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_sqlite-0.5.0-dev.9](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_zome\_types-0.5.0-dev.9](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_integrity\_types-0.5.0-dev.5](crates/holochain_integrity_types/CHANGELOG.md#0.5.0-dev.5)
+
+# 20241204.005132
+
+## [hc\_service\_check-0.2.0-dev.7](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.7)
+
+## [hcterm-0.5.0-dev.8](crates/hcterm/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_cli-0.5.0-dev.8](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain-0.5.0-dev.8](crates/holochain/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_cli\_bundle-0.5.0-dev.8](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_cli\_run\_local\_services-0.5.0-dev.7](crates/holochain_cli_run_local_services/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.8](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_cascade-0.5.0-dev.8](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_conductor\_api-0.5.0-dev.8](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_conductor\_services-0.4.0-dev.8](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.8)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.8](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.8](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_websocket-0.5.0-dev.8](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.8)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.8](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.8)
+
+## [holochain\_state-0.5.0-dev.8](crates/holochain_state/CHANGELOG.md#0.5.0-dev.8)
+
+## [hc\_deepkey\_types-0.9.0-dev.5](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.5)
+
+## [hdk-0.5.0-dev.8](crates/hdk/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_p2p-0.5.0-dev.8](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_state\_types-0.5.0-dev.4](crates/holochain_state_types/CHANGELOG.md#0.5.0-dev.4)
+
+## [hdi-0.6.0-dev.5](crates/hdi/CHANGELOG.md#0.6.0-dev.5)
+
+## [holochain\_chc-0.2.0-dev.8](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.8)
+
+## [kitsune\_p2p-0.5.0-dev.7](crates/kitsune_p2p/CHANGELOG.md#0.5.0-dev.7)
+
+## [hdk\_derive-0.5.0-dev.5](crates/hdk_derive/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_types-0.5.0-dev.8](crates/holochain_types/CHANGELOG.md#0.5.0-dev.8)
+
+## [kitsune\_p2p\_bootstrap\_client-0.5.0-dev.6](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.5.0-dev.6)
+
+## [kitsune\_p2p\_fetch-0.5.0-dev.6](crates/kitsune_p2p_fetch/CHANGELOG.md#0.5.0-dev.6)
+
+## [kitsune\_p2p\_mdns-0.5.0-dev.2](crates/kitsune_p2p_mdns/CHANGELOG.md#0.5.0-dev.2)
+
+## [holochain\_keystore-0.5.0-dev.8](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_sqlite-0.5.0-dev.8](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.8)
+
+## [kitsune\_p2p\_bootstrap-0.4.0-dev.6](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_zome\_types-0.5.0-dev.8](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.8)
+
+## [kitsune\_p2p\_types-0.5.0-dev.6](crates/kitsune_p2p_types/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_integrity\_types-0.5.0-dev.4](crates/holochain_integrity_types/CHANGELOG.md#0.5.0-dev.4)
+
+# 20241127.004859
+
+- **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `roles_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
+- `hc sandbox generate` and `hc sandbox call install-app` now have an additional optional argument `--roles-settings <path>` where a path to a yaml file can be passed to override role settings defined in the dna manifest(s). An example of such a yaml file can be found here: https://github.com/holochain/holochain/tree/develop/crates/hc\_sandbox/tests/fixtures/roles-settings.yaml
+
+## [hcterm-0.5.0-dev.7](crates/hcterm/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_cli-0.5.0-dev.7](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain-0.5.0-dev.7](crates/holochain/CHANGELOG.md#0.5.0-dev.7)
+
+- **BREAKING**: The `InstallAppPayload` now unifies all settings that are per role in a `roles_settings` field and as part of this change adds the option to specify custom modifiers at install time to override the modifiers defined in the dna manifest(s).
+- Zome call authorization is split into autentication and authorization. Zome calls are authenticated when coming in over the network. The signature must match the hash of the serialized bytes, signed by the provenance of the call, as described above. This applies to zome calls over the App API as well as remote calls. Bridge calls, which are calls that zome call functions can make to other cells on the same conductor, do not require authentication. Authorization through zome call capabilities remains unchanged and is required for any kind of call as before.
+- Remove `release-automation` crate from the `cargo update` script. `release-automation` isn’t used externally so compatibility with all dependency versions isn’t required and it often causes the job to fail.
+
+## [holochain\_cli\_bundle-0.5.0-dev.7](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.7](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.7)
+
+- `hc sandbox generate` and `hc sandbox call install-app` now have an additional optional argument `--roles-settings <path>` where a path to a yaml file can be passed to override role settings defined in the dna manifest(s). An example of such a yaml file can be found here: https://github.com/holochain/holochain/tree/develop/crates/hc\_sandbox/tests/fixtures/roles-settings.yaml
+
+## [holochain\_cascade-0.5.0-dev.7](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_conductor\_api-0.5.0-dev.7](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_conductor\_services-0.4.0-dev.7](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.7)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.7](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.7](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_websocket-0.5.0-dev.7](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.7)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.7](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.7)
+
+## [holochain\_state-0.5.0-dev.7](crates/holochain_state/CHANGELOG.md#0.5.0-dev.7)
+
+## [hdk-0.5.0-dev.7](crates/hdk/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_p2p-0.5.0-dev.7](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_chc-0.2.0-dev.7](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.7)
+
+## [holochain\_types-0.5.0-dev.7](crates/holochain_types/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_keystore-0.5.0-dev.7](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_sqlite-0.5.0-dev.7](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_zome\_types-0.5.0-dev.7](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.7)
+
+# 20241120.005400
+
+## [hc\_service\_check-0.2.0-dev.6](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.6)
+
+## [hcterm-0.5.0-dev.6](crates/hcterm/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_cli-0.5.0-dev.6](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain-0.5.0-dev.6](crates/holochain/CHANGELOG.md#0.5.0-dev.6)
+
+- **BREAKING**: Zome call API `AppRequest::CallZome` takes simple serialized bytes of the zome call parameters and the signature now. Previously client-side serialization of zome call parameters required to exactly match Holochain’s way of serializing, because Holochain re-serialized the parameters to verify the signature. This is no longer the case. The signature is generated for the **hash of the serialized bytes**, using the **SHA2 512-bit** hashing algorithm. In short, zome call params are serialized, then hashed and the hash is signed. The payload of the `CallZome` request is the serialized bytes and the signature. On the Holochain side the serialized bytes of the zome call parameters are hashed with the same SHA2 512-bit algorithm to verify the signature.
+
+## [holochain\_cli\_bundle-0.5.0-dev.6](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_cli\_run\_local\_services-0.5.0-dev.6](crates/holochain_cli_run_local_services/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.6](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_cascade-0.5.0-dev.6](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_conductor\_api-0.5.0-dev.6](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_conductor\_services-0.4.0-dev.6](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.6)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.6](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.6](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_websocket-0.5.0-dev.6](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.6)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.6](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.6)
+
+## [holochain\_state-0.5.0-dev.6](crates/holochain_state/CHANGELOG.md#0.5.0-dev.6)
+
+## [hc\_deepkey\_types-0.9.0-dev.4](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.4)
+
+## [hdk-0.5.0-dev.6](crates/hdk/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_p2p-0.5.0-dev.6](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_state\_types-0.5.0-dev.3](crates/holochain_state_types/CHANGELOG.md#0.5.0-dev.3)
+
+## [hdi-0.6.0-dev.4](crates/hdi/CHANGELOG.md#0.6.0-dev.4)
+
+## [holochain\_chc-0.2.0-dev.6](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.6)
+
+## [kitsune\_p2p-0.5.0-dev.6](crates/kitsune_p2p/CHANGELOG.md#0.5.0-dev.6)
+
+## [hdk\_derive-0.5.0-dev.4](crates/hdk_derive/CHANGELOG.md#0.5.0-dev.4)
+
+## [holochain\_types-0.5.0-dev.6](crates/holochain_types/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_keystore-0.5.0-dev.6](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_sqlite-0.5.0-dev.6](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_zome\_types-0.5.0-dev.6](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_integrity\_types-0.5.0-dev.3](crates/holochain_integrity_types/CHANGELOG.md#0.5.0-dev.3)
+
+## [holo\_hash-0.5.0-dev.3](crates/holo_hash/CHANGELOG.md#0.5.0-dev.3)
+
+# 20241113.005114
+
+## [hc\_service\_check-0.2.0-dev.5](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.5)
+
+## [hcterm-0.5.0-dev.5](crates/hcterm/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_cli-0.5.0-dev.5](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain-0.5.0-dev.5](crates/holochain/CHANGELOG.md#0.5.0-dev.5)
+
+- **BREAKING** Countersigning has been put behind the feature `unstable-countersigning`. Even though in many use cases countersigning is expected to work correctly, it has known problems which can put the source chain into an unrecoverable state. Included in this feature is the HDK function `accept_countersigning_preflight_request` as well as `AppRequest`s related to countersigning and the counersigning workflow itself too. The `unstable-countersigning` feature is included in `unstable-functions`, hence when `unstable-functions` is enabled, so is `unstable-countersigning`.
+- **BREAKING** The following HDK functions have been temporarily removed as “unstable”. They can be re-enabled by building Holochain with the “unstable-functions” feature flag:
+  - `accept_countersigning_preflight_request`
+  - `block_agent`
+  - `unblock_agent`
+  - `get_agent_key_lineage`
+  - `is_same_agent`
+  - `schedule`
+  - the function `sleep` has been removed entirely because it wasn’t implemented
+  - and the HDI function `is_same_agent` Note that installing apps that have been built with an HDK from before this change will not be possible to install on a conductor that has been built without the `unstable-functions` feature. You will get import errors when Holochain tries to compile the WASM. It is valid to install an app that has been compiled without the `unstable-functions` feature onto a conductor which has been compiled with `unstable-functions` but the reverse is not true. \#4371
+- Fix a problem with countersigning where it would stay in resolution when entering an unknown state from a restart. This was intended behaviour previously to ensure the agent got a change to get online before giving up on countersigning but it is not necessary now that we consider network errors to be a failed resolution and always retry.
+
+## [holochain\_cli\_bundle-0.5.0-dev.5](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_cli\_run\_local\_services-0.5.0-dev.5](crates/holochain_cli_run_local_services/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.5](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_cascade-0.5.0-dev.5](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_conductor\_api-0.5.0-dev.5](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_conductor\_services-0.4.0-dev.5](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.5)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.5](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.5](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_websocket-0.5.0-dev.5](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.5)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.5](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.5)
+
+## [holochain\_state-0.5.0-dev.5](crates/holochain_state/CHANGELOG.md#0.5.0-dev.5)
+
+## [hc\_deepkey\_types-0.9.0-dev.3](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.3)
+
+## [hdk-0.5.0-dev.5](crates/hdk/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_p2p-0.5.0-dev.5](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.5)
+
+## [hdi-0.6.0-dev.3](crates/hdi/CHANGELOG.md#0.6.0-dev.3)
+
+## [holochain\_chc-0.2.0-dev.5](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.5)
+
+## [kitsune\_p2p-0.5.0-dev.5](crates/kitsune_p2p/CHANGELOG.md#0.5.0-dev.5)
+
+## [hdk\_derive-0.5.0-dev.3](crates/hdk_derive/CHANGELOG.md#0.5.0-dev.3)
+
+## [holochain\_types-0.5.0-dev.5](crates/holochain_types/CHANGELOG.md#0.5.0-dev.5)
+
+## [kitsune\_p2p\_bootstrap\_client-0.5.0-dev.5](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.5.0-dev.5)
+
+## [kitsune\_p2p\_fetch-0.5.0-dev.5](crates/kitsune_p2p_fetch/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_keystore-0.5.0-dev.5](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.5)
+
+## [holochain\_sqlite-0.5.0-dev.5](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.5)
+
+## [kitsune\_p2p\_bootstrap-0.4.0-dev.5](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.4.0-dev.5)
+
+## [mr\_bundle-0.5.0-dev.1](crates/mr_bundle/CHANGELOG.md#0.5.0-dev.1)
+
+## [holochain\_zome\_types-0.5.0-dev.5](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.5)
+
+## [kitsune\_p2p\_types-0.5.0-dev.5](crates/kitsune_p2p_types/CHANGELOG.md#0.5.0-dev.5)
+
 # 20241106.004411
 
 ## [hc\_service\_check-0.2.0-dev.4](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.4)

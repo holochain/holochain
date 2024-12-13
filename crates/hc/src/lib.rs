@@ -81,7 +81,7 @@ pub struct Cli {
 
 /// Describes all the possible CLI arguments for `hc`, including external subcommands like `hc-scaffold`.
 #[derive(Debug, Subcommand)]
-#[warn(clippy::large_enum_variant)]
+#[allow(clippy::large_enum_variant)]
 pub enum CliSubcommand {
     /// Work with DNA bundles.
     Dna(hc_bundle::HcDnaBundle),

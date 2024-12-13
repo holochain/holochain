@@ -108,7 +108,6 @@ use crate::{
 };
 
 use super::api::AppInterfaceApi;
-use super::api::ZomeCall;
 use super::config::AdminInterfaceConfig;
 use super::config::InterfaceDriver;
 use super::entry_def_store::get_entry_defs;
@@ -138,6 +137,11 @@ mod graft_records_onto_source_chain;
 
 mod app_auth_token_store;
 
+/// Verify signature of a signed zome call.
+///
+/// [Signature verification](holochain_conductor_api::AppRequest::CallZome)
+pub(crate) mod zome_call_signature_verification;
+
 /// Operations to manipulate agent keys.
 ///
 /// Agent keys are handled in 2 places in Holochain, on the source chain of a cell and in the
@@ -152,7 +156,7 @@ mod agent_key_operations;
 pub(crate) mod app_broadcast;
 
 #[cfg(test)]
-pub mod tests;
+pub(crate) mod tests;
 
 /// How long we should attempt to achieve a "network join" when first activating a cell,
 /// before moving on and letting the network health activity go on in the background.
@@ -844,6 +848,7 @@ mod network_impls {
     use std::time::Duration;
 
     use futures::future::join_all;
+    use holochain_conductor_api::ZomeCallParamsSigned;
     use rusqlite::params;
 
     use holochain_conductor_api::{
@@ -855,6 +860,7 @@ mod network_impls {
     use holochain_zome_types::block::BlockTargetId;
     use kitsune_p2p::KitsuneAgent;
     use kitsune_p2p::KitsuneBinType;
+    use zome_call_signature_verification::is_valid_signature;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -1376,20 +1382,49 @@ mod network_impls {
             Ok(RealRibosome::tooling_imports().await?)
         }
 
+        /// Handle a zome call coming from outside of the conductor, e.g. through the ConductorApi.
+        pub async fn handle_external_zome_call(
+            &self,
+            zome_call_params_signed: ZomeCallParamsSigned,
+        ) -> ConductorApiResult<ZomeCallResult> {
+            let zome_call_params = zome_call_params_signed
+                .bytes
+                .clone()
+                .decode::<ZomeCallParams>()
+                .map_err(|e| ConductorApiError::SerializationError(e.into()))?;
+            if !is_valid_signature(
+                &zome_call_params.provenance,
+                zome_call_params_signed.bytes.as_bytes(),
+                &zome_call_params_signed.signature,
+            )
+            .await?
+            {
+                return Ok(Ok(ZomeCallResponse::AuthenticationFailed(
+                    zome_call_params_signed.signature,
+                    zome_call_params.provenance,
+                )));
+            }
+
+            self.call_zome(zome_call_params.clone()).await
+        }
+
         /// Invoke a zome function on a Cell
-        pub async fn call_zome(&self, call: ZomeCall) -> ConductorApiResult<ZomeCallResult> {
-            let cell = self.cell_by_id(&call.cell_id).await?;
-            Ok(cell.call_zome(call, None).await?)
+        pub async fn call_zome(
+            &self,
+            params: ZomeCallParams,
+        ) -> ConductorApiResult<ZomeCallResult> {
+            let cell = self.cell_by_id(&params.cell_id).await?;
+            Ok(cell.call_zome(params, None).await?)
         }
 
         pub(crate) async fn call_zome_with_workspace(
             &self,
-            call: ZomeCall,
+            params: ZomeCallParams,
             workspace_lock: SourceChainWorkspace,
         ) -> ConductorApiResult<ZomeCallResult> {
-            debug!(cell_id = ?call.cell_id);
-            let cell = self.cell_by_id(&call.cell_id).await?;
-            Ok(cell.call_zome(call, Some(workspace_lock)).await?)
+            debug!(cell_id = ?params.cell_id);
+            let cell = self.cell_by_id(&params.cell_id).await?;
+            Ok(cell.call_zome(params, Some(workspace_lock)).await?)
         }
 
         /// Make a zome call with deserialization and some error unwrapping built in
@@ -1411,7 +1446,7 @@ mod network_impls {
             let now = Timestamp::now();
             let (nonce, expires_at) =
                 holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
-            let call_unsigned = ZomeCallUnsigned {
+            let call_params = ZomeCallParams {
                 cell_id,
                 zome_name: zome_name.into(),
                 fn_name: fn_name.into(),
@@ -1421,9 +1456,7 @@ mod network_impls {
                 nonce,
                 expires_at,
             };
-            let call =
-                ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
-            let response = self.call_zome(call).await;
+            let response = self.call_zome(call_params).await;
             match response {
                 Ok(Ok(response)) => Ok(zome_call_response_to_conductor_api_result(response)?),
                 Ok(Err(error)) => Err(ConductorApiError::Other(Box::new(error))),
@@ -1433,10 +1466,10 @@ mod network_impls {
     }
 }
 
-/// Flags for [`Conductor::install_app_common`]
+/// Common install app flags.
 #[derive(Default)]
 pub struct InstallAppCommonFlags {
-    /// From [`AppManifestV1::defer_memproofs`]
+    /// From [`AppManifestV1::allow_deferred_memproofs`]
     pub defer_memproofs: bool,
     /// From [`InstallAppPayload::ignore_genesis_failure`]
     pub ignore_genesis_failure: bool,
@@ -1445,6 +1478,8 @@ pub struct InstallAppCommonFlags {
 }
 
 /// Methods related to app installation and management
+///
+/// Tests related to app installation can be found in ../../tests/tests/app_installation/mod.rs
 mod app_impls {
     use holochain_types::deepkey_roundtrip_backward;
     use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairEntryInfo;
@@ -1681,30 +1716,33 @@ mod app_impls {
                 source,
                 agent_key,
                 installed_app_id,
-                membrane_proofs,
-                existing_cells,
                 network_seed,
+                roles_settings,
                 ignore_genesis_failure,
                 allow_throwaway_random_agent_key,
             } = payload;
 
+            let modifiers = get_modifiers_map_from_role_settings(&roles_settings);
+            let membrane_proofs = get_memproof_map_from_role_settings(&roles_settings);
+            let existing_cells = get_existing_cells_map_from_role_settings(&roles_settings);
+
             let bundle = {
                 let original_bundle = source.resolve().await?;
+                let mut manifest = original_bundle.manifest().to_owned();
                 if let Some(network_seed) = network_seed {
-                    let mut manifest = original_bundle.manifest().to_owned();
                     manifest.set_network_seed(network_seed);
-                    AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
-                } else {
-                    original_bundle
                 }
+                manifest.override_modifiers(modifiers)?;
+                AppBundle::from(original_bundle.into_inner().update_manifest(manifest)?)
             };
+
             let manifest = bundle.manifest().clone();
 
-            // Use deferred memproofs only if no memproofs are provided.
-            // If a memproof map is provided, it will override the allow_deferred_memproofs setting,
-            // and the provided memproofs will be used immediately.
+            // Use deferred memproofs only if no memproofs are provided for any of the roles.
+            // If a memproof is provided for any of the roles, it will override the app wide
+            // allow_deferred_memproofs setting and the provided memproofs will be used immediately.
             let defer_memproofs = match &manifest {
-                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_none(),
+                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_empty(),
             };
 
             let flags = InstallAppCommonFlags {
@@ -1712,8 +1750,6 @@ mod app_impls {
                 ignore_genesis_failure,
                 allow_throwaway_random_agent_key,
             };
-
-            let membrane_proofs = membrane_proofs.unwrap_or_default();
 
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
@@ -2698,11 +2734,11 @@ mod service_impls {
                 self.keystore().new_sign_keypair_random().await?
             } else {
                 return Err(ConductorError::other(
-"DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config. 
+"DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config.
 If using DPKI, a device seed must be created in lair, and the tag specified in the conductor config.
 
 (If this is a throwaway test environment, you can also set the config `dpki.allow_throwaway_random_dpki_agent_key`
-to `true` instead of instead of setting up a `device_seed_lair_tag`, but then you will lose the ability to recover 
+to `true` instead of instead of setting up a `device_seed_lair_tag`, but then you will lose the ability to recover
 your agent keys if you lose access to your device. This is not recommended!!)
 "));
             };
@@ -3270,6 +3306,7 @@ mod authenticate_token_impls {
     }
 }
 
+#[cfg(feature = "unstable-countersigning")]
 /// Methods for bridging from host calls to workflows for countersigning
 mod countersigning_impls {
     use super::*;
@@ -3400,7 +3437,7 @@ impl holochain_conductor_services::CellRunner for Conductor {
         let now = Timestamp::now();
         let (nonce, expires_at) =
             holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
-        let call_unsigned = ZomeCallUnsigned {
+        let call_params = ZomeCallParams {
             cell_id,
             zome_name,
             fn_name,
@@ -3410,8 +3447,7 @@ impl holochain_conductor_services::CellRunner for Conductor {
             nonce,
             expires_at,
         };
-        let call = ZomeCall::try_from_unsigned_zome_call(self.keystore(), call_unsigned).await?;
-        let response = self.call_zome(call).await;
+        let response = self.call_zome(call_params).await;
         match response {
             Ok(Ok(ZomeCallResponse::Ok(bytes))) => Ok(bytes),
             Ok(Ok(other)) => Err(anyhow::anyhow!(other.clone())),
@@ -4140,4 +4176,52 @@ async fn p2p_event_task(
         .await;
 
     tracing::info!("p2p_event_task has ended");
+}
+
+/// Extract the modifiers from the RoleSettingsMap into their own HashMap
+fn get_modifiers_map_from_role_settings(roles_settings: &Option<RoleSettingsMap>) -> ModifiersMap {
+    match roles_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .filter_map(|(role_name, role_settings)| match role_settings {
+                RoleSettings::UseExisting { .. } => None,
+                RoleSettings::Provisioned { modifiers, .. } => {
+                    modifiers.as_ref().map(|m| (role_name.clone(), m.clone()))
+                }
+            })
+            .collect(),
+        None => HashMap::new(),
+    }
+}
+
+/// Extract the memproofs from the RoleSettingsMap into their own HashMap
+fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) -> MemproofMap {
+    match role_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .filter_map(|(role_name, role_settings)| match role_settings {
+                RoleSettings::UseExisting { .. } => None,
+                RoleSettings::Provisioned { membrane_proof, .. } => membrane_proof
+                    .as_ref()
+                    .map(|m| (role_name.clone(), m.clone())),
+            })
+            .collect(),
+        None => HashMap::new(),
+    }
+}
+
+/// Extract the existing cells ids from the RoleSettingsMap into their own HashMap
+fn get_existing_cells_map_from_role_settings(
+    roles_settings: &Option<RoleSettingsMap>,
+) -> ExistingCellsMap {
+    match roles_settings {
+        Some(role_settings_map) => role_settings_map
+            .iter()
+            .filter_map(|(role_name, role_settings)| match role_settings {
+                RoleSettings::UseExisting { cell_id } => Some((role_name.clone(), cell_id.clone())),
+                _ => None,
+            })
+            .collect(),
+        None => HashMap::new(),
+    }
 }

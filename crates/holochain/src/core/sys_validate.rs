@@ -670,7 +670,7 @@ fn make_register_agent_activity(record: Record) -> ChainOp {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use super::check_countersigning_preflight_response_signature;
     use crate::core::sys_validate::error::SysValidationError;
     use crate::core::ValidationOutcome;
@@ -683,7 +683,7 @@ pub mod test {
     use matches::assert_matches;
 
     #[tokio::test(flavor = "multi_thread")]
-    pub async fn test_check_countersigning_preflight_response_signature() {
+    async fn test_check_countersigning_preflight_response_signature() {
         let keystore = holochain_keystore::test_keystore();
         let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_response = PreflightResponse::arbitrary(&mut u).unwrap();

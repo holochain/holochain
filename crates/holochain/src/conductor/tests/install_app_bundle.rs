@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 
 use crate::{conductor::error::ConductorError, sweettest::*};
@@ -52,8 +52,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
         }
@@ -174,8 +173,7 @@ async fn reject_duplicate_app_for_same_agent() {
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
         })
@@ -195,8 +193,7 @@ async fn reject_duplicate_app_for_same_agent() {
             source: AppBundleSource::Bundle(bundle),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
             network_seed: None,
@@ -220,8 +217,7 @@ async fn reject_duplicate_app_for_same_agent() {
             source: AppBundleSource::Bundle(bundle),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
             network_seed: None,
@@ -242,8 +238,7 @@ async fn reject_duplicate_app_for_same_agent() {
             source: AppBundleSource::Bundle(bundle),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
             network_seed: Some("network".into()),
@@ -294,8 +289,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_1".into()),
             network_seed: Some("final seed".into()),
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
         })
@@ -339,8 +333,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             source: AppBundleSource::Bundle(bundle),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
         })
@@ -535,8 +528,7 @@ async fn use_existing_integration() {
             source: AppBundleSource::Bundle(bundle1),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
         })
@@ -552,8 +544,7 @@ async fn use_existing_integration() {
                 source: AppBundleSource::Bundle(bundle2(false).await),
                 installed_app_id: Some("app_2".into()),
                 network_seed: None,
-                membrane_proofs: Default::default(),
-                existing_cells: Default::default(),
+                roles_settings: Default::default(),
                 ignore_genesis_failure: false,
                 allow_throwaway_random_agent_key: true,
             })
@@ -574,8 +565,7 @@ async fn use_existing_integration() {
                 source: AppBundleSource::Bundle(bundle2(true).await),
                 installed_app_id: Some("app_2".into()),
                 network_seed: None,
-                membrane_proofs: Default::default(),
-                existing_cells: Default::default(),
+                roles_settings: Default::default(),
                 ignore_genesis_failure: false,
                 allow_throwaway_random_agent_key: true,
             })
@@ -599,6 +589,8 @@ async fn use_existing_integration() {
     assert_eq!(cells.len(), 1);
     let cell_id = cells.first().unwrap().clone();
 
+    let role_settings = ("extant".into(), RoleSettings::UseExisting { cell_id });
+
     let app_2 = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -606,10 +598,7 @@ async fn use_existing_integration() {
             source: AppBundleSource::Bundle(bundle2(true).await),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
-            membrane_proofs: Default::default(),
-            existing_cells: maplit::hashmap! {
-                "extant".to_string() => cell_id
-            },
+            roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
         })

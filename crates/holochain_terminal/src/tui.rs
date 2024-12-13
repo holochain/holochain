@@ -43,7 +43,7 @@ impl<B: Backend> Tui<B> {
         Ok(())
     }
 
-    /// Draw the terminal interface by [`rendering`] the widgets.
+    /// Draw the terminal interface by [`render`]ing the widgets.
     pub fn draw(&mut self, app: &mut App) -> anyhow::Result<()> {
         self.terminal.draw(|frame| render(app, frame))?;
         Ok(())

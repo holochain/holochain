@@ -160,27 +160,18 @@ pub struct InstallAppPayload {
     #[serde(default)]
     pub installed_app_id: Option<InstalledAppId>,
 
-    /// Include proof-of-membrane-membership data for cells that require it,
-    /// keyed by the RoleName specified in the app bundle manifest.
+    /// Optional: Overwrites all network seeds for all DNAs of Cells created by this app.
+    /// This has a lower precedence than role-specific network seeds provided in the  `role_settings` field of the `InstallAppPayload`.
     ///
-    /// When the app being installed has the `allow_deferred_memproofs` manifest flag set,
-    /// passing `None` for this field will allow the app to enter the "deferred membrane proofs"
-    /// state, so that memproofs can be provided later via [`AppRequest::ProvideMemproofs`].
-    /// If `Some` is used here, whatever memproofs are provided will be used, and the app will
-    /// be installed as normal.
-    #[serde(default)]
-    pub membrane_proofs: Option<MemproofMap>,
-
-    /// For each role in the app manifest which has UseExisting cell provisioning,
-    /// a CellId of a currently installed cell must be specified in this map.
-    #[serde(default)]
-    pub existing_cells: ExistingCellsMap,
-
-    /// Optional: overwrites all network seeds for all DNAs of Cells created by this app.
     /// The app can still use existing Cells, i.e. this does not require that
     /// all Cells have DNAs with the same overridden DNA.
     #[serde(default)]
     pub network_seed: Option<NetworkSeed>,
+
+    /// Specify role specific settings or modifiers that will override any settings in
+    /// the dna manifets.
+    #[serde(default)]
+    pub roles_settings: Option<RoleSettingsMap>,
 
     /// Optional: If app installation fails due to genesis failure, normally the app will be
     /// immediately uninstalled. When this flag is set, the app is left installed with empty cells intact.
@@ -201,7 +192,44 @@ pub struct InstallAppPayload {
 /// Alias
 pub type MemproofMap = HashMap<RoleName, MembraneProof>;
 /// Alias
+pub type ModifiersMap = HashMap<RoleName, DnaModifiersOpt<YamlProperties>>;
+/// Alias
 pub type ExistingCellsMap = HashMap<RoleName, CellId>;
+/// Alias
+pub type RoleSettingsMap = HashMap<RoleName, RoleSettings>;
+
+/// Settings for a Role that may be passed on installation of an app
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type")]
+pub enum RoleSettings {
+    /// If the role has the UseExisting strategy defined in the app manifest
+    /// the cell id to use needs to be specified here.
+    UseExisting {
+        /// Existing cell id to use
+        cell_id: CellId,
+    },
+    /// Optional settings for a normally provisioned cell
+    Provisioned {
+        /// When the app being installed has the `allow_deferred_memproofs` manifest flag set,
+        /// passing `None` for this field for all roles in the app will allow the app to enter
+        /// the "deferred membrane proofs" state, so that memproofs can be provided later via
+        /// [`AppRequest::ProvideMemproofs`]. If `Some` is used here, whatever memproofs are
+        /// provided will be used, and the app will be installed as normal.
+        membrane_proof: Option<MembraneProof>,
+        /// Overwrites the dna modifiers from the dna manifest. Only
+        /// modifier fields for which `Some(T)` is provided will be overwritten.
+        modifiers: Option<DnaModifiersOpt<YamlProperties>>,
+    },
+}
+
+impl Default for RoleSettings {
+    fn default() -> Self {
+        Self::Provisioned {
+            membrane_proof: None,
+            modifiers: None,
+        }
+    }
+}
 
 /// The possible locations of an AppBundle
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

@@ -100,7 +100,7 @@ use wasmer::Type;
 
 #[cfg(feature = "unstable-functions")]
 use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
-#[cfg(feature = "unstable-functions")]
+#[cfg(feature = "unstable-countersigning")]
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 #[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::block_agent::block_agent;
@@ -654,13 +654,14 @@ impl RealRibosome {
                 get_validation_receipts,
             );
 
+        #[cfg(feature = "unstable-countersigning")]
+        host_fn_builder.with_host_function(
+            &mut ns,
+            "__hc__accept_countersigning_preflight_request_1",
+            accept_countersigning_preflight_request,
+        );
         #[cfg(feature = "unstable-functions")]
         host_fn_builder
-            .with_host_function(
-                &mut ns,
-                "__hc__accept_countersigning_preflight_request_1",
-                accept_countersigning_preflight_request,
-            )
             .with_host_function(
                 &mut ns,
                 "__hc__get_agent_key_lineage_1",
@@ -672,7 +673,6 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             // TODO deprecated, remove me
             .with_host_function(&mut ns, "__hc__sleep_1", sleep);
-
         imports.register_namespace("env", ns);
 
         (host_fn_builder.function_env, imports)
@@ -1175,7 +1175,6 @@ impl RibosomeT for RealRibosome {
 pub mod wasm_test {
     use crate::core::ribosome::real_ribosome::CONTEXT_MAP;
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
-    use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
@@ -1184,7 +1183,7 @@ pub mod wasm_test {
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use holochain_zome_types::zome_io::ZomeCallParams;
     use parking_lot::Mutex;
     use std::collections::HashMap;
     use std::sync::Arc;
@@ -1318,23 +1317,16 @@ pub mod wasm_test {
 
         let infallible_result = conductor
             .raw_handle()
-            .call_zome(
-                ZomeCall::try_from_unsigned_zome_call(
-                    conductor.raw_handle().keystore(),
-                    ZomeCallUnsigned {
-                        cell_id: alice.cell_id().clone(),
-                        zome_name: alice.name().clone(),
-                        fn_name: "infallible".into(),
-                        cap_secret: None,
-                        provenance: alice_pubkey.clone(),
-                        payload: ExternIO::encode(()).unwrap(),
-                        nonce,
-                        expires_at,
-                    },
-                )
-                .await
-                .unwrap(),
-            )
+            .call_zome(ZomeCallParams {
+                cell_id: alice.cell_id().clone(),
+                zome_name: alice.name().clone(),
+                fn_name: "infallible".into(),
+                cap_secret: None,
+                provenance: alice_pubkey.clone(),
+                payload: ExternIO::encode(()).unwrap(),
+                nonce,
+                expires_at,
+            })
             .await
             .unwrap()
             .unwrap();
@@ -1352,7 +1344,7 @@ pub mod wasm_test {
 
         pretty_assertions::assert_eq!(
             vec![
-                #[cfg(feature = "unstable-functions")]
+                #[cfg(feature = "unstable-countersigning")]
                 "__hc__accept_countersigning_preflight_request_1",
                 "__hc__agent_info_1",
                 #[cfg(feature = "unstable-functions")]

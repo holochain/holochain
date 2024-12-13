@@ -54,11 +54,13 @@
 //! All of these validation rules are declared in the `validate` callback. It
 //! is executed for a new action by each validation authority.
 //!
-//! There's a helper type called [`FlatOp`](crate::flat_op::FlatOp) available for easy
-//! access to all link and entry variants when validating an operation. In many cases, this type can
-//! be easier to work with than the bare [`Op`](crate::prelude::holochain_integrity_types::Op).
-//! `FlatOp` contains the same information as `Op` but with a flatter, more accessible data structure
-//! than `Op`'s deeply nested and concise structure.
+//! There's a helper type called [`FlatOp`](crate::flat_op::FlatOp) available for easy access to
+//! all link and entry variants when validating an operation. In many cases, this type can be
+//! easier to work with than the bare [`Op`](crate::prelude::holochain_integrity_types::Op).
+//! [`FlatOp`](crate::flat_op::FlatOp) contains the same information as
+//! [`Op`](crate::prelude::holochain_integrity_types::Op) but with a flatter, more accessible data
+//! structure than [`Op`](crate::prelude::holochain_integrity_types::Op)'s deeply nested and
+//! concise structure.
 //!
 //! ```
 //! # #[cfg(not(feature = "test_utils"))]
@@ -236,7 +238,7 @@ pub mod hash_path;
 ///
 /// - Have a globally unique name
 /// - Accept `serde::Serialize + std::fmt::Debug` input
-/// - Return `Result<O, WasmError>` (`ExternResult`) output where `O: serde::Serialize + std::fmt::Debug`
+/// - Return [`Result<O, WasmError>`] ([`map_extern::ExternResult`]) output where `O: serde::Serialize + std::fmt::Debug`
 ///
 /// This module only defines macros so check the HDI crate root to see more documentation.
 ///
@@ -313,15 +315,18 @@ pub mod info;
 /// Integrates HDI with the Rust tracing crate.
 ///
 /// The functions and structs in this module do _not_ need to be used directly.
-/// The `#[hdk_extern]` attribute on functions exposed externally all set the `WasmSubscriber` as the global default.
+/// The `#[hdk_extern]` attribute on functions exposed externally all set the
+/// [`trace::WasmSubscriber`] as the global default.
 ///
-/// This module defines a [ `trace::WasmSubscriber` ] that forwards all tracing macro calls to another subscriber on the host.
-/// The logging level can be changed for the host at runtime using the `WASM_LOG` environment variable that works exactly as `RUST_LOG` for other tracing.
+/// This module defines a [`trace::WasmSubscriber`] that forwards all tracing macro calls to
+/// another subscriber on the host.
+/// The logging level can be changed for the host at runtime using the `WASM_LOG` environment
+/// variable that works exactly as `RUST_LOG` for other tracing.
 pub mod trace;
 
-/// The interface between the host and guest is implemented as an `HdiT` trait.
+/// The interface between the host and guest is implemented as an [`hdi::HdiT`] trait.
 ///
-/// The `set_hdi` function globally sets a `RefCell` to track the current HDI implementation.
+/// The [`hdi::set_hdi`] function globally sets a [`std::cell::RefCell`] to track the current HDI implementation.
 /// When the `mock` feature is set then this will default to an HDI that always errors, else a WASM host is assumed to exist.
 /// The `mockall` crate (in prelude with `mock` feature) can be used to generate compatible mocks for unit testing.
 /// See mocking examples in the test WASMs crate, such as `agent_info`.

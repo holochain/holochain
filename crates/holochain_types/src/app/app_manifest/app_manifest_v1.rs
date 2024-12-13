@@ -194,6 +194,44 @@ impl AppManifestV1 {
         }
     }
 
+    /// Selectively overrides the modifiers for the given roles. Only fields with value `Some(T)` will
+    /// override the corresponding value in the manifest. If `None` is provided for a modifier field
+    /// the corresponding value in the manifest will remain untouched.
+    pub fn override_modifiers(
+        &mut self,
+        modifiers: HashMap<RoleName, DnaModifiersOpt<YamlProperties>>,
+    ) -> AppManifestResult<()> {
+        let existing_role_names = self
+            .roles
+            .iter()
+            .map(|manifest| &manifest.name)
+            .collect::<Vec<&String>>();
+        for role_name in modifiers.keys() {
+            if !existing_role_names.contains(&role_name) {
+                return Err(AppManifestError::InvalidRoleName(format!(
+                    "Tried to set modifiers for a role name that does not exist in the app manifest: {role_name}"
+                )));
+            }
+        }
+        for role in self.roles.iter_mut() {
+            if let Some(modifier_opts) = modifiers.get(&role.name) {
+                if let Some(network_seed) = modifier_opts.network_seed.clone() {
+                    role.dna.modifiers.network_seed = Some(network_seed);
+                }
+                if let Some(origin_time) = modifier_opts.origin_time {
+                    role.dna.modifiers.origin_time = Some(origin_time);
+                }
+                if let Some(props) = modifier_opts.properties.clone() {
+                    role.dna.modifiers.properties = Some(props);
+                }
+                if let Some(quantum_time) = modifier_opts.quantum_time {
+                    role.dna.modifiers.quantum_time = Some(quantum_time);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Convert this human-focused manifest into a validated, concise representation
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
         let AppManifestV1 {

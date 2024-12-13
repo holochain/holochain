@@ -355,7 +355,7 @@ impl<'lt> From<&'lt Arc<KitsuneAgent>> for AgentLike<'lt> {
     }
 }
 
-impl<'lt> AgentLike<'lt> {
+impl AgentLike<'_> {
     /// Get a raw agent pubkey from any variant type
     pub fn agent(&self) -> &Arc<KitsuneAgent> {
         match self {

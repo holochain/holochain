@@ -44,7 +44,7 @@ use tokio::process::Command;
 
 use hdk::prelude::*;
 use holochain::{
-    conductor::api::ZomeCall,
+    conductor::api::ZomeCallParamsSigned,
     conductor::api::{AdminRequest, AdminResponse, AppRequest},
 };
 use holochain_conductor_api::AppResponse;
@@ -197,7 +197,7 @@ where
 {
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
-    let zome_call_unsigned = ZomeCallUnsigned {
+    let zome_call_params = ZomeCallParams {
         cap_secret: Some(cap_secret),
         cell_id: cell_id.clone(),
         zome_name: zome_name.clone(),
@@ -207,19 +207,12 @@ where
         nonce,
         expires_at,
     };
-    let signature = signing_keypair.sign(&zome_call_unsigned.data_to_sign().unwrap());
-    let call = ZomeCall {
-        cell_id: zome_call_unsigned.cell_id,
-        zome_name: zome_call_unsigned.zome_name,
-        fn_name: zome_call_unsigned.fn_name,
-        payload: zome_call_unsigned.payload,
-        cap_secret: zome_call_unsigned.cap_secret,
-        provenance: zome_call_unsigned.provenance,
-        nonce: zome_call_unsigned.nonce,
-        expires_at: zome_call_unsigned.expires_at,
-        signature: Signature::from(signature.to_bytes()),
-    };
-    let request = AppRequest::CallZome(Box::new(call));
+    let (bytes, bytes_hash) = zome_call_params.serialize_and_hash().unwrap();
+    let signature = signing_keypair.sign(&bytes_hash);
+    let request = AppRequest::CallZome(Box::new(ZomeCallParamsSigned::new(
+        bytes,
+        Signature::from(signature.to_bytes()),
+    )));
     let response = app_tx.request(request);
     check_timeout(response, 6000).await.unwrap()
 }
@@ -372,8 +365,7 @@ pub async fn register_and_install_dna_named(
         source: AppBundleSource::Bundle(bundle),
         installed_app_id: Some(name),
         network_seed: None,
-        membrane_proofs: Default::default(),
-        existing_cells: Default::default(),
+        roles_settings: Default::default(),
         ignore_genesis_failure: false,
         allow_throwaway_random_agent_key: true,
     };

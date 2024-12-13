@@ -17,7 +17,6 @@ use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomeCallHostAccess;
-use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::ribosome::ZomesToInvoke;
 use crate::sweettest::SweetDnaFile;
 use crate::test_utils::fake_genesis;
@@ -516,78 +515,3 @@ fixturator!(
     CallContext;
     constructor fn new(Zome, FunctionName, HostContext, InvocationAuth);
 );
-
-fixturator!(
-    ZomeCallInvocation;
-    curve Empty ZomeCallInvocation {
-        cell_id: CellIdFixturator::new(Empty).next().unwrap(),
-        zome: ZomeFixturator::new(Empty).next().unwrap(),
-        cap_secret: Some(CapSecretFixturator::new(Empty).next().unwrap()),
-        fn_name: FunctionNameFixturator::new(Empty).next().unwrap(),
-        payload: ExternIoFixturator::new(Empty).next().unwrap(),
-        provenance: AgentPubKeyFixturator::new(Empty).next().unwrap(),
-        signature: SignatureFixturator::new(Empty).next().unwrap(),
-        nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Empty).next().unwrap()),
-        expires_at: TimestampFixturator::new(Empty).next().unwrap(),
-    };
-    curve Unpredictable ZomeCallInvocation {
-        cell_id: CellIdFixturator::new(Unpredictable).next().unwrap(),
-        zome: ZomeFixturator::new(Unpredictable).next().unwrap(),
-        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: FunctionNameFixturator::new(Unpredictable).next().unwrap(),
-        payload: ExternIoFixturator::new(Unpredictable).next().unwrap(),
-        provenance: AgentPubKeyFixturator::new(Unpredictable).next().unwrap(),
-        signature: SignatureFixturator::new(Unpredictable).next().unwrap(),
-        nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()),
-        // @todo should this be less predictable?
-        expires_at: (Timestamp::now() + std::time::Duration::from_secs(30)).unwrap(),
-    };
-    curve Predictable ZomeCallInvocation {
-        cell_id: CellIdFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        zome: ZomeFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        cap_secret: Some(CapSecretFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap()),
-        fn_name: FunctionNameFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        payload: ExternIoFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        provenance: AgentPubKeyFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
-        signature: SignatureFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
-        nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap()),
-        // @todo should this be more predictable?
-        expires_at: (Timestamp::now() + std::time::Duration::from_secs(30)).unwrap(),
-    };
-);
-
-/// Fixturator curve for a named zome invocation
-/// cell id, test wasm for zome to call, function name, host input payload
-pub struct NamedInvocation(pub CellId, pub TestWasm, pub String, pub ExternIO);
-
-impl Iterator for ZomeCallInvocationFixturator<NamedInvocation> {
-    type Item = ZomeCallInvocation;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut ret = ZomeCallInvocationFixturator::new(Unpredictable)
-            .next()
-            .unwrap();
-        ret.cell_id = self.0.curve.0.clone();
-        ret.zome = CoordinatorZome::from(self.0.curve.1).erase_type();
-        ret.fn_name = self.0.curve.2.clone().into();
-        ret.payload = self.0.curve.3.clone();
-
-        // simulate a local transaction by setting the cap to empty and matching the provenance of
-        // the call to the cell id
-        ret.cap_secret = None;
-        ret.provenance = ret.cell_id.agent_pubkey().clone();
-
-        Some(ret)
-    }
-}

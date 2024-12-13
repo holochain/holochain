@@ -672,7 +672,7 @@ impl CounterSigningSessionData {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use crate::CounterSigningAgentState;
     use crate::CounterSigningSessionData;
     use crate::Signature;
@@ -686,7 +686,7 @@ pub mod test {
     use arbitrary::Arbitrary;
 
     #[test]
-    pub fn test_check_countersigning_session_times() {
+    fn test_check_countersigning_session_times() {
         let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut session_times = CounterSigningSessionTimes::arbitrary(&mut u).unwrap();
 
@@ -726,7 +726,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_check_countersigning_preflight_request_optional_agents() {
+    fn test_check_countersigning_preflight_request_optional_agents() {
         let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
@@ -785,7 +785,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_check_countersigning_preflight_request_enzyme() {
+    fn test_check_countersigning_preflight_request_enzyme() {
         let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
@@ -835,7 +835,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_check_countersigning_preflight_request_agents_len() {
+    fn test_check_countersigning_preflight_request_agents_len() {
         let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 
@@ -864,7 +864,7 @@ pub mod test {
     }
 
     #[test]
-    pub fn test_check_countersigning_preflight_request_agents_dupes() {
+    fn test_check_countersigning_preflight_request_agents_dupes() {
         let mut u = arbitrary::Unstructured::new(&[0; 1000]);
         let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
 

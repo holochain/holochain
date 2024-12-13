@@ -59,7 +59,7 @@ mod check_clone_access;
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::DpkiApi;
-use crate::conductor::api::ZomeCall;
+use crate::conductor::api::ZomeCallParamsSigned;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
@@ -369,23 +369,6 @@ pub trait Invocation: Clone + Send + Sync {
 }
 
 impl ZomeCallInvocation {
-    pub async fn verify_signature(&self) -> RibosomeResult<ZomeCallAuthorization> {
-        Ok(
-            if self
-                .provenance
-                .verify_signature_raw(
-                    &self.signature,
-                    ZomeCallUnsigned::from(ZomeCall::from(self.clone())).data_to_sign()?,
-                )
-                .await?
-            {
-                ZomeCallAuthorization::Authorized
-            } else {
-                ZomeCallAuthorization::BadSignature
-            },
-        )
-    }
-
     /// to decide if a zome call grant is authorized:
     /// - we need to find a live (committed and not deleted) cap grant that matches the secret
     /// - if the live cap grant is for the current author the call is ALWAYS authorized ELSE
@@ -454,7 +437,6 @@ impl ZomeCallInvocation {
     }
 
     /// to verify if the zome call is authorized:
-    /// - the signature must be valid
     /// - the nonce must not have already been seen
     /// - the grant must be valid
     /// - the provenance must not have any active blocks against them right now
@@ -466,14 +448,11 @@ impl ZomeCallInvocation {
         &self,
         host_access: &ZomeCallHostAccess,
     ) -> RibosomeResult<ZomeCallAuthorization> {
-        Ok(match self.verify_signature().await? {
-            ZomeCallAuthorization::Authorized => match self.verify_nonce(host_access).await? {
-                ZomeCallAuthorization::Authorized => match self.verify_grant(host_access).await? {
-                    ZomeCallAuthorization::Authorized => {
-                        self.verify_blocked_provenance(host_access).await?
-                    }
-                    unauthorized => unauthorized,
-                },
+        Ok(match self.verify_nonce(host_access).await? {
+            ZomeCallAuthorization::Authorized => match self.verify_grant(host_access).await? {
+                ZomeCallAuthorization::Authorized => {
+                    self.verify_blocked_provenance(host_access).await?
+                }
                 unauthorized => unauthorized,
             },
             unauthorized => unauthorized,
@@ -514,9 +493,6 @@ pub struct ZomeCallInvocation {
     /// The provenance of the call. Provenance means the 'source'
     /// so this expects the `AgentPubKey` of the agent calling the Zome function
     pub provenance: AgentPubKey,
-    /// The signature of the call from the provenance of the call.
-    /// Everything except the signature itself is signed.
-    pub signature: Signature,
     /// The nonce of the call. Must be unique and monotonic.
     /// If a higher nonce has been seen then older zome calls will be discarded.
     pub nonce: Nonce256Bits,
@@ -540,21 +516,20 @@ impl Invocation for ZomeCallInvocation {
 }
 
 impl ZomeCallInvocation {
-    pub async fn try_from_interface_call(
+    pub async fn try_from_params(
         conductor_api: CellConductorHandle,
-        call: ZomeCall,
+        params: ZomeCallParams,
     ) -> RibosomeResult<Self> {
-        let ZomeCall {
-            cell_id,
-            zome_name,
-            fn_name,
+        let ZomeCallParams {
             cap_secret,
+            cell_id,
+            expires_at,
+            fn_name,
+            nonce,
             payload,
             provenance,
-            signature,
-            nonce,
-            expires_at,
-        } = call;
+            zome_name,
+        } = params;
         let zome = conductor_api
             .get_zome(cell_id.dna_hash(), &zome_name)
             .map_err(|conductor_api_error| RibosomeError::from(Box::new(conductor_api_error)))?;
@@ -565,14 +540,13 @@ impl ZomeCallInvocation {
             fn_name,
             payload,
             provenance,
-            signature,
             nonce,
             expires_at,
         })
     }
 }
 
-impl From<ZomeCallInvocation> for ZomeCall {
+impl From<ZomeCallInvocation> for ZomeCallParams {
     fn from(inv: ZomeCallInvocation) -> Self {
         let ZomeCallInvocation {
             cell_id,
@@ -581,18 +555,16 @@ impl From<ZomeCallInvocation> for ZomeCall {
             cap_secret,
             payload,
             provenance,
-            signature,
             nonce,
             expires_at,
         } = inv;
         Self {
             cell_id,
+            provenance,
             zome_name: zome.zome_name().clone(),
             fn_name,
             cap_secret,
             payload,
-            provenance,
-            signature,
             nonce,
             expires_at,
         }
@@ -763,7 +735,6 @@ pub fn weigh_placeholder() -> EntryRateWeight {
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
-    use crate::core::ribosome::ZomeCall;
     use crate::sweettest::SweetCell;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
@@ -772,10 +743,9 @@ pub mod wasm_test {
     use core::time::Duration;
     use hdk::prelude::*;
     use holo_hash::AgentPubKey;
-    use holochain_keystore::AgentPubKeyExt;
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::zome_io::ZomeCallUnsigned;
+    use holochain_zome_types::zome_io::ZomeCallParams;
 
     pub fn now() -> Duration {
         std::time::SystemTime::now()
@@ -792,51 +762,38 @@ pub mod wasm_test {
             alice_pubkey,
             bob_pubkey,
             ..
-        } = RibosomeTestFixture::new(TestWasm::Foo).await;
+        } = RibosomeTestFixture::new(TestWasm::Capability).await;
 
         let now = Timestamp::now();
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
-        let alice_unsigned_zome_call = ZomeCallUnsigned {
+        let alice_zome_call_params = ZomeCallParams {
             provenance: alice_pubkey.clone(),
             cell_id: alice.cell_id().clone(),
-            zome_name: "foo".into(),
-            fn_name: "foo".into(),
+            zome_name: TestWasm::Capability.coordinator_zome_name(),
+            fn_name: "needs_cap_claim".into(),
             cap_secret: None,
             payload: ExternIO::encode(()).unwrap(),
             nonce,
             expires_at,
         };
-        let alice_signed_zome_call = ZomeCall::try_from_unsigned_zome_call(
-            &conductor.keystore(),
-            alice_unsigned_zome_call.clone(),
-        )
-        .await
-        .unwrap();
 
         // Bob observes or forges a valid zome call from alice.
         // He removes Alice's signature but leaves her provenance and adds his own signature.
-        let mut bob_signed_zome_call = alice_signed_zome_call.clone();
-        bob_signed_zome_call.signature = bob_pubkey
-            .sign_raw(
-                &conductor.keystore(),
-                alice_unsigned_zome_call.data_to_sign().unwrap(),
-            )
-            .await
-            .unwrap();
+        let mut bob_zome_call_params = alice_zome_call_params.clone();
+        bob_zome_call_params.provenance = bob_pubkey.clone();
 
         // The call should fail for bob.
-        let bob_call_result = conductor.raw_handle().call_zome(bob_signed_zome_call).await;
+        let bob_call_result = conductor.raw_handle().call_zome(bob_zome_call_params).await;
 
         match bob_call_result {
-            Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* (☞ ͡° ͜ʖ ͡°)☞ */
-            }
+            Ok(Ok(ZomeCallResponse::Unauthorized(..))) => { /* (☞ ͡° ͜ʖ ͡°)☞ */ }
             _ => panic!("{:?}", bob_call_result),
         }
 
         // The call should NOT fail for alice (e.g. bob's forgery should not consume alice's nonce).
         let alice_call_result_0 = conductor
             .raw_handle()
-            .call_zome(alice_signed_zome_call.clone())
+            .call_zome(alice_zome_call_params.clone())
             .await;
 
         match alice_call_result_0 {
@@ -847,11 +804,11 @@ pub mod wasm_test {
         // The same call cannot be used a second time.
         let alice_call_result_1 = conductor
             .raw_handle()
-            .call_zome(alice_signed_zome_call)
+            .call_zome(alice_zome_call_params)
             .await;
 
         match alice_call_result_1 {
-            Ok(Ok(ZomeCallResponse::Unauthorized(_, _, _, _, _))) => { /* ☜(ﾟヮﾟ☜) */ }
+            Ok(Ok(ZomeCallResponse::Unauthorized(..))) => { /* ☜(ﾟヮﾟ☜) */ }
             _ => panic!("{:?}", bob_call_result),
         }
     }

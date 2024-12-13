@@ -13,7 +13,6 @@ use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::workflow::ZomeCallResult;
 use async_trait::async_trait;
 use holo_hash::DnaHash;
-use holochain_conductor_api::ZomeCall;
 use holochain_keystore::MetaLairClient;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::nonce::WitnessNonceResult;
@@ -54,24 +53,6 @@ impl CellConductorApi {
 impl CellConductorApiT for CellConductorApi {
     fn cell_id(&self) -> &CellId {
         &self.cell_id
-    }
-
-    async fn call_zome(
-        &self,
-        cell_id: &CellId,
-        call: ZomeCall,
-    ) -> ConductorApiResult<ZomeCallResult> {
-        if *cell_id == call.cell_id {
-            self.conductor_handle
-                .call_zome(call)
-                .await
-                .map_err(Into::into)
-        } else {
-            Err(ConductorApiError::ZomeCallCellMismatch {
-                api_cell_id: cell_id.clone(),
-                call_cell_id: call.cell_id,
-            })
-        }
     }
 
     fn conductor_services(&self) -> ConductorServices {
@@ -128,14 +109,6 @@ pub trait CellConductorApiT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
 
-    /// Invoke a zome function on any cell in this conductor.
-    /// A zome call on a different Cell than this one corresponds to a bridged call.
-    async fn call_zome(
-        &self,
-        cell_id: &CellId,
-        call: ZomeCall,
-    ) -> ConductorApiResult<ZomeCallResult>;
-
     /// Access to the conductor services
     fn conductor_services(&self) -> ConductorServices;
 
@@ -175,7 +148,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Invoke a zome function on a Cell
     async fn call_zome(
         &self,
-        call: ZomeCall,
+        params: ZomeCallParams,
         workspace_lock: SourceChainWorkspace,
     ) -> ConductorApiResult<ZomeCallResult>;
 
@@ -243,6 +216,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Expose delete_clone_cell functionality to zomes.
     async fn delete_clone_cell(&self, payload: DeleteCloneCellPayload) -> ConductorResult<()>;
 
+    #[cfg(feature = "unstable-countersigning")]
     /// Accept a countersigning session.
     async fn accept_countersigning_session(
         &self,
@@ -259,15 +233,15 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn call_zome(
         &self,
-        call: ZomeCall,
+        params: ZomeCallParams,
         workspace_lock: SourceChainWorkspace,
     ) -> ConductorApiResult<ZomeCallResult> {
-        if self.cell_id == call.cell_id {
+        if self.cell_id == params.cell_id {
             self.conductor_handle
-                .call_zome_with_workspace(call, workspace_lock)
+                .call_zome_with_workspace(params, workspace_lock)
                 .await
         } else {
-            self.conductor_handle.call_zome(call).await
+            self.conductor_handle.call_zome(params).await
         }
     }
 
@@ -366,6 +340,7 @@ impl CellConductorReadHandleT for CellConductorApi {
             .await
     }
 
+    #[cfg(feature = "unstable-countersigning")]
     async fn accept_countersigning_session(
         &self,
         cell_id: CellId,

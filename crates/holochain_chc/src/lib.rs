@@ -15,7 +15,7 @@
 //! Holochain specifies an optional `chc_url` field in its configuration which can point to an HTTP
 //! server that implements the CHC interface.
 //! See the [`chc_http`] module docs for specs on how to set up a remote CHC HTTP server that
-//! Holochain can talk to using the provided [`ChcHttp`] implementation.
+//! Holochain can talk to using the provided [chc_http::ChcHttp] implementation.
 //!
 //! The CHC trait contains two methods, and Holochain actually only uses one of them:
 //! Every time Holochain is about to commit some records to a source chain, it first calls

@@ -482,7 +482,7 @@ async fn handle_incoming_app_message(
 pub use crate::test_utils::setup_app_in_new_conductor;
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use super::*;
     use crate::conductor::api::error::ExternalApiWireError;
     use crate::conductor::api::AdminInterfaceApi;
@@ -576,8 +576,7 @@ pub mod test {
             source: AppBundleSource::Bundle(app_bundle),
             agent_key: None,
             installed_app_id: None,
-            membrane_proofs: Default::default(),
-            existing_cells: Default::default(),
+            roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
             allow_throwaway_random_agent_key: true,
@@ -635,9 +634,9 @@ pub mod test {
         // Call Zome
         let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
         let request = AppRequest::CallZome(Box::new(
-            ZomeCall::try_from_unsigned_zome_call(
+            ZomeCallParamsSigned::try_from_params(
                 conductor_handle.keystore(),
-                ZomeCallUnsigned {
+                ZomeCallParams {
                     provenance: agent_key.clone(),
                     cell_id: cell_id.clone(),
                     zome_name: TestWasm::EmitSignal.coordinator_zome_name(),
@@ -730,28 +729,27 @@ pub mod test {
     async fn call_zome<R: FnOnce(AppResponse) + 'static + Send>(
         conductor_handle: ConductorHandle,
         cell_id: CellId,
-        wasm: TestWasm,
+        zome_name: ZomeName,
         function_name: String,
         respond: R,
     ) {
         // Now make sure we can call a zome once again
-        let mut request: ZomeCall =
-            crate::fixt::ZomeCallInvocationFixturator::new(crate::fixt::NamedInvocation(
-                cell_id.clone(),
-                wasm,
-                function_name,
-                ExternIO::encode(()).unwrap(),
-            ))
-            .next()
-            .unwrap()
-            .into();
-        request.cell_id = cell_id;
-        request = request
-            .resign_zome_call(&test_keystore(), fixt!(AgentPubKey, Predictable, 0))
-            .await
-            .unwrap();
+        let zome_call_params = ZomeCallParams {
+            provenance: fixt!(AgentPubKey, Predictable, 0),
+            cell_id,
+            zome_name,
+            fn_name: function_name.into(),
+            cap_secret: None,
+            payload: ExternIO::encode(()).unwrap(),
+            nonce: Nonce256Bits::from(ThirtyTwoBytesFixturator::new(Unpredictable).next().unwrap()),
+            expires_at: (Timestamp::now() + std::time::Duration::from_secs(30)).unwrap(),
+        };
+        let zome_call_signed =
+            ZomeCallParamsSigned::try_from_params(&test_keystore(), zome_call_params)
+                .await
+                .unwrap();
 
-        let msg = AppRequest::CallZome(Box::new(request));
+        let msg = AppRequest::CallZome(Box::new(zome_call_signed));
         test_handle_incoming_app_message(
             "".to_string(),
             msg,
@@ -813,7 +811,7 @@ pub mod test {
         call_zome(
             handle.clone(),
             cell_id.clone(),
-            TestWasm::Foo,
+            TestWasm::Foo.coordinator_zome_name(),
             "foo".into(),
             |response: AppResponse| {
                 assert_matches!(response, AppResponse::ZomeCalled { .. });
@@ -1038,7 +1036,7 @@ pub mod test {
         call_zome(
             conductor_handle.clone(),
             cell_id_0.clone(),
-            TestWasm::Link,
+            TestWasm::Link.coordinator_zome_name(),
             "get_links".into(),
             |response: AppResponse| {
                 assert_matches!(response, AppResponse::ZomeCalled { .. });
@@ -1143,7 +1141,7 @@ pub mod test {
         call_zome(
             conductor_handle.clone(),
             cell_id_0.clone(),
-            TestWasm::Link,
+            TestWasm::Link.coordinator_zome_name(),
             "get_links".into(),
             |response: AppResponse| {
                 assert_matches!(response, AppResponse::ZomeCalled { .. });

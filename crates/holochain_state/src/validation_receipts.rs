@@ -13,8 +13,7 @@ use mutations::StateMutationResult;
 use std::collections::HashMap;
 
 use crate::mutations;
-use crate::prelude::from_blob;
-use crate::prelude::StateQueryResult;
+use crate::prelude::*;
 
 pub fn list_receipts(
     txn: &Transaction,

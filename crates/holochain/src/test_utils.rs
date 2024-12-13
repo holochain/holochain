@@ -16,7 +16,7 @@ use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
-use holochain_conductor_api::ZomeCall;
+use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
 use holochain_p2p::actor::HolochainP2pRefToDna;
@@ -900,30 +900,31 @@ pub async fn new_zome_call<P, Z: Into<ZomeName>>(
     func: &str,
     payload: P,
     zome: Z,
-) -> Result<ZomeCall, SerializedBytesError>
+) -> Result<ZomeCallParamsSigned, SerializedBytesError>
 where
     P: serde::Serialize + std::fmt::Debug,
 {
-    let zome_call_unsigned = new_zome_call_unsigned(cell_id, func, payload, zome)?;
+    let zome_call_params = new_zome_call_params(cell_id, func, payload, zome)?;
     Ok(
-        ZomeCall::try_from_unsigned_zome_call(keystore, zome_call_unsigned)
+        ZomeCallParamsSigned::try_from_params(keystore, zome_call_params)
             .await
             .unwrap(),
     )
 }
 
 /// Helper to create an unsigned zome invocation for tests
-pub fn new_zome_call_unsigned<P, Z: Into<ZomeName>>(
+pub fn new_zome_call_params<P, Z>(
     cell_id: &CellId,
     func: &str,
     payload: P,
     zome: Z,
-) -> Result<ZomeCallUnsigned, SerializedBytesError>
+) -> Result<ZomeCallParams, SerializedBytesError>
 where
     P: serde::Serialize + std::fmt::Debug,
+    Z: Into<ZomeName>,
 {
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    Ok(ZomeCallUnsigned {
+    Ok(ZomeCallParams {
         cell_id: cell_id.clone(),
         zome_name: zome.into(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
@@ -936,8 +937,7 @@ where
 }
 
 /// Helper to create a zome invocation for tests
-pub async fn new_invocation<P, Z: Into<Zome> + Clone>(
-    keystore: &MetaLairClient,
+pub async fn new_invocation<P, Z>(
     cell_id: &CellId,
     func: &str,
     payload: P,
@@ -945,18 +945,18 @@ pub async fn new_invocation<P, Z: Into<Zome> + Clone>(
 ) -> Result<ZomeCallInvocation, SerializedBytesError>
 where
     P: serde::Serialize + std::fmt::Debug,
+    Z: Into<Zome> + Clone,
 {
-    let ZomeCall {
+    let ZomeCallParams {
         cell_id,
         cap_secret,
         fn_name,
         payload,
         provenance,
-        signature,
         nonce,
         expires_at,
         ..
-    } = new_zome_call(keystore, cell_id, func, payload, zome.clone().into()).await?;
+    } = new_zome_call_params(cell_id, func, payload, zome.clone().into())?;
     Ok(ZomeCallInvocation {
         cell_id,
         zome: zome.into(),
@@ -964,7 +964,6 @@ where
         fn_name,
         payload,
         provenance,
-        signature,
         nonce,
         expires_at,
     })

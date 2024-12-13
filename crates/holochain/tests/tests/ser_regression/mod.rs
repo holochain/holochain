@@ -4,8 +4,8 @@ use hdk::prelude::*;
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;
-use holochain::conductor::api::ZomeCall;
 use holochain::sweettest::*;
+use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_nonce::fresh_nonce;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
@@ -55,6 +55,7 @@ async fn ser_regression_test() {
             coordinator_zomes: vec![TestZomes::from(TestWasm::SerRegression)
                 .coordinator
                 .into_inner()],
+            lineage: HashSet::new(),
         },
         <Vec<DnaWasm>>::from(TestWasm::SerRegression),
     )
@@ -76,25 +77,24 @@ async fn ser_regression_test() {
     let channel = ChannelName("hello world".into());
 
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    let mut invocation = ZomeCall::try_from_unsigned_zome_call(
-        &conductors[0].keystore(),
-        ZomeCallUnsigned {
-            cell_id: alice.cell_id().clone(),
-            zome_name: TestWasm::SerRegression.into(),
-            cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-            fn_name: "create_channel".into(),
-            payload: ExternIO::encode(channel).unwrap(),
-            provenance: alice.agent_pubkey().clone(),
-            nonce,
-            expires_at,
-        },
-    )
-    .await
-    .unwrap();
+    let mut zome_call_params = ZomeCallParams {
+        cell_id: alice.cell_id().clone(),
+        zome_name: TestWasm::SerRegression.into(),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        fn_name: "create_channel".into(),
+        payload: ExternIO::encode(channel).unwrap(),
+        provenance: alice.agent_pubkey().clone(),
+        nonce,
+        expires_at,
+    };
+    let zome_call_params_signed =
+        ZomeCallParamsSigned::try_from_params(&conductors[0].keystore(), zome_call_params.clone())
+            .await
+            .unwrap();
 
     let app_api = AppInterfaceApi::new(conductors[0].clone());
-    let request = Box::new(invocation.clone());
-    let request = AppRequest::CallZome(request).try_into().unwrap();
+    let request = Box::new(zome_call_params_signed.clone());
+    let request = AppRequest::CallZome(request);
     let response = app_api
         .handle_request("".to_string(), Ok(request))
         .await
@@ -106,13 +106,13 @@ async fn ser_regression_test() {
     };
 
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    invocation.nonce = nonce;
-    invocation.expires_at = expires_at;
-    let invocation = invocation
-        .resign_zome_call(&conductors[0].keystore(), alice.agent_pubkey().clone())
+    zome_call_params.nonce = nonce;
+    zome_call_params.expires_at = expires_at;
+    let output = conductors[0]
+        .call_zome(zome_call_params)
         .await
+        .unwrap()
         .unwrap();
-    let output = conductors[0].call_zome(invocation).await.unwrap().unwrap();
 
     let channel_hash: EntryHash = match output {
         ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
@@ -124,24 +124,23 @@ async fn ser_regression_test() {
         content: "Hello from alice :)".into(),
     };
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    let mut invocation = ZomeCall::try_from_unsigned_zome_call(
-        &conductors[0].keystore(),
-        ZomeCallUnsigned {
-            cell_id: alice.cell_id().clone(),
-            zome_name: TestWasm::SerRegression.into(),
-            cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-            fn_name: "create_message".into(),
-            payload: ExternIO::encode(message).unwrap(),
-            provenance: alice.agent_pubkey().clone(),
-            nonce,
-            expires_at,
-        },
-    )
-    .await
-    .unwrap();
+    let mut zome_call_params = ZomeCallParams {
+        cell_id: alice.cell_id().clone(),
+        zome_name: TestWasm::SerRegression.into(),
+        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
+        fn_name: "create_message".into(),
+        payload: ExternIO::encode(message).unwrap(),
+        provenance: alice.agent_pubkey().clone(),
+        nonce,
+        expires_at,
+    };
+    let zome_call_params_signed =
+        ZomeCallParamsSigned::try_from_params(&conductors[0].keystore(), zome_call_params.clone())
+            .await
+            .unwrap();
 
-    let request = Box::new(invocation.clone());
-    let request = AppRequest::CallZome(request).try_into().unwrap();
+    let request = Box::new(zome_call_params_signed.clone());
+    let request = AppRequest::CallZome(request);
     let response = app_api
         .handle_request("".to_string(), Ok(request))
         .await
@@ -153,13 +152,13 @@ async fn ser_regression_test() {
     };
 
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    invocation.nonce = nonce;
-    invocation.expires_at = expires_at;
-    let invocation = invocation
-        .resign_zome_call(&conductors[0].keystore(), alice.agent_pubkey().clone())
+    zome_call_params.nonce = nonce;
+    zome_call_params.expires_at = expires_at;
+    let output = conductors[0]
+        .call_zome(zome_call_params)
         .await
+        .unwrap()
         .unwrap();
-    let output = conductors[0].call_zome(invocation).await.unwrap().unwrap();
 
     let _msg_hash: EntryHash = match output {
         ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),

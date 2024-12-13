@@ -2,6 +2,7 @@
 //! Binary `hc-dna` command executable.
 
 use clap::{Parser, Subcommand};
+use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::{AppManifest, DnaManifest, ValidatedDnaManifest};
 use holochain_types::web_app::WebAppManifest;
 use holochain_util::ffs;
@@ -100,6 +101,11 @@ pub enum HcDnaBundleSubcommand {
 
     /// Print the schema for a DNA manifest
     Schema,
+    /// Print the Base64 hash for a DNA file
+    Hash {
+        /// The path to the dna file.
+        path: std::path::PathBuf,
+    },
 }
 
 /// Work with Holochain hApp bundles.
@@ -342,6 +348,11 @@ impl HcDnaBundleSubcommand {
             }
             Self::Schema => {
                 println!("{}", include_str!("../schema/dna-manifest.schema.json"));
+            }
+            Self::Hash { path } => {
+                let bundle = DnaBundle::read_from_file(path.as_path()).await?;
+                let dna_hash_b64 = bundle.to_dna_file().await?.0.dna_hash().to_string();
+                println!("{}", dna_hash_b64);
             }
         }
         Ok(())

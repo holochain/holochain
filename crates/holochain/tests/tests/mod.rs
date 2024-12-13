@@ -1,10 +1,13 @@
 mod agent_activity;
 mod agent_scaling;
+mod app_installation;
 mod app_interface_security;
 mod authored_test;
 mod clone_cell;
 #[cfg(feature = "unstable-dpki")]
 mod conductor_services;
+// Countersigning HDK functions needed
+#[cfg(feature = "unstable-countersigning")]
 mod countersigning;
 mod dht_arc;
 mod dna_properties;
@@ -18,6 +21,7 @@ mod new_lair;
 mod publish;
 mod regression;
 mod send_signal;
+mod ser_regression;
 #[cfg(not(target_os = "macos"))]
 mod sharded_gossip;
 mod signals;

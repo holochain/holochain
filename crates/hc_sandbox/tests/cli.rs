@@ -6,12 +6,11 @@ use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
 use holochain_types::app::InstalledAppId;
-use holochain_types::prelude::{SerializedBytes, SerializedBytesError};
+use holochain_types::prelude::{SerializedBytes, SerializedBytesError, Timestamp, YamlProperties};
 use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
-use matches::assert_matches;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -45,7 +44,7 @@ where
     Ok((tx, WsPoll::new::<D>(rx)))
 }
 
-async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u16) {
+async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u16) -> AppResponse {
     tracing::debug!(calling_app_interface = ?port, admin = ?admin_port);
 
     let (admin_tx, _admin_rx) = new_websocket_client_for_port::<AdminResponse>(admin_port)
@@ -54,7 +53,7 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
 
     let issue_token_response = admin_tx
         .request(AdminRequest::IssueAppAuthenticationToken(
-            installed_app_id.into(),
+            installed_app_id.clone().into(),
         ))
         .await
         .unwrap();
@@ -71,10 +70,32 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
         .await
         .unwrap();
 
-    let request = AppRequest::AppInfo;
-    let response = app_tx.request(request);
-    let r: AppResponse = check_timeout(response).await;
-    assert_matches!(r, AppResponse::AppInfo(Some(_)));
+    tokio::time::timeout(Duration::from_secs(60), async move {
+        let app_response: AppResponse;
+        loop {
+            let request = AppRequest::AppInfo;
+            let response = app_tx.request(request);
+            let r: AppResponse = check_timeout(response).await;
+            match &r {
+                AppResponse::AppInfo(Some(_)) => {
+                    app_response = r;
+                    break;
+                }
+                AppResponse::AppInfo(None) => {
+                    // The sandbox hasn't installed the app yet
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+                _ => {
+                    panic!("Unexpected response {:?}", r);
+                }
+            }
+        }
+        app_response
+    })
+    .await
+    .unwrap_or_else(|_| {
+        panic!("Timeout waiting for the sandbox to install the app {installed_app_id}")
+    })
 }
 
 async fn check_timeout<T>(response: impl Future<Output = WebsocketResult<T>>) -> T {
@@ -181,7 +202,7 @@ async fn generate_sandbox_and_connect() {
 
     let launch_info = get_launch_info(hc_admin).await;
 
-    // - Make a call to list app info to the port
+    // - Connect to the app interface and wait for the app to show up in AppInfo
     get_app_info(
         launch_info.admin_port,
         "test-app".into(),
@@ -271,6 +292,127 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
 
     let exit_code = hc_call.wait().await.unwrap();
     assert!(exit_code.success());
+}
+
+/// Generates a new sandbox with roles settings overridden by a yaml file passed via
+/// the --roles-settings argument and verifies that the modifiers have been set
+/// correctly
+#[tokio::test(flavor = "multi_thread")]
+async fn generate_sandbox_with_roles_settings_override() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--roles-settings")
+        .arg("tests/fixtures/roles-settings.yaml")
+        .arg("--in-process-lair")
+        .arg("--run=0")
+        .arg("tests/fixtures/my-app/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    println!("@@ {cmd:?}");
+
+    let hc_admin = input_piped_password(&mut cmd).await;
+
+    let launch_info = get_launch_info(hc_admin).await;
+
+    // - Make a call to list app info to the port
+    let app_info = get_app_info(
+        launch_info.admin_port,
+        "test-app".into(),
+        *launch_info.app_ports.first().expect("No app ports found"),
+    )
+    .await;
+
+    match app_info {
+        AppResponse::AppInfo(Some(info)) => {
+            let roles = info.manifest.app_roles();
+            assert!(roles.len() == 3);
+
+            //- Test that the modifiers for role 1 and role 2 have been overridden properly
+            let role1 = roles
+                .clone()
+                .into_iter()
+                .find(|r| r.name == "role-1")
+                .expect("role1 not found in the manifest of the isntalled app.");
+
+            assert_eq!(
+                role1.dna.modifiers.network_seed.unwrap(),
+                String::from("some random network seed")
+            );
+            assert_eq!(
+                role1.dna.modifiers.properties.unwrap(),
+                YamlProperties::new(serde_yaml::Value::String(String::from(
+                    "some properties in the manifest",
+                )))
+            );
+            assert_eq!(
+                role1.dna.modifiers.origin_time.unwrap(),
+                Timestamp::from_micros(1731436443698324)
+            );
+            assert_eq!(role1.dna.modifiers.quantum_time, None);
+
+            let role2 = roles
+                .clone()
+                .into_iter()
+                .find(|r| r.name == "role-2")
+                .expect("role2 not found in the manifest of the installed app.");
+
+            assert_eq!(
+                role2.dna.modifiers.network_seed.unwrap(),
+                String::from("another random network seed")
+            );
+            assert_eq!(
+                role2.dna.modifiers.properties.unwrap(),
+                YamlProperties::new(serde_yaml::Value::String(String::from(
+                    "some properties in the manifest",
+                )))
+            );
+            assert_eq!(
+                role2.dna.modifiers.origin_time.unwrap(),
+                Timestamp::from_micros(1731436443698326)
+            );
+            assert_eq!(
+                role2.dna.modifiers.quantum_time.unwrap(),
+                std::time::Duration::from_secs(60),
+            );
+
+            //- Test that the modifiers for role 3 have remained unaltered, i.e.
+            //  stay as defined in ./fixtures/my-app/happ.yaml
+            let role3 = roles
+                .into_iter()
+                .find(|r| r.name == "role-3")
+                .expect("role2 not found in the manifest of the installed app.");
+
+            assert_eq!(
+                role3.dna.modifiers.network_seed.unwrap(),
+                String::from("should remain untouched by roles settings test")
+            );
+            assert_eq!(
+                role3.dna.modifiers.properties.unwrap(),
+                YamlProperties::new(serde_yaml::Value::String(String::from(
+                    "should remain untouched by roles settings test",
+                )))
+            );
+            assert_eq!(
+                role3.dna.modifiers.origin_time.unwrap(),
+                Timestamp::from_micros(1000000000000000)
+            );
+            assert_eq!(role3.dna.modifiers.quantum_time, None,);
+        }
+        _ => panic!("AppResponse is of the wrong type"),
+    }
 }
 
 /// Create a new default sandbox which should have DPKI disabled in the conductor config.
@@ -425,7 +567,7 @@ fn get_sandbox_command() -> Command {
     Command::new(get_target("hc-sandbox"))
 }
 
-async fn get_launch_info(mut child: tokio::process::Child) -> LaunchInfo {
+async fn get_launch_info(mut child: Child) -> LaunchInfo {
     let stdout = child.stdout.take().unwrap();
     let mut lines = BufReader::new(stdout).lines();
     while let Ok(Some(line)) = lines.next_line().await {
