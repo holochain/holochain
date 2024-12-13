@@ -22,9 +22,6 @@
 //! 1. Stop all other tasks related to the cell, so they don't continue in the background.
 //! 2. Pause or disable any apps which depend on the cell, because the app cannot
 //!     function without the proper functioning of that cell.
-//!
-//! See [`crate::conductor::Conductor::reconcile_app_status_with_cell_status`] for more details
-//! on how app status is related to cell status.
 
 mod error;
 pub use error::*;

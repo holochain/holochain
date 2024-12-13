@@ -1457,10 +1457,10 @@ mod network_impls {
     }
 }
 
-/// Flags for [`Conductor::install_app_common`]
+/// Common install app flags.
 #[derive(Default)]
 pub struct InstallAppCommonFlags {
-    /// From [`AppManifestV1::defer_memproofs`]
+    /// From [`AppManifestV1::allow_deferred_memproofs`]
     pub defer_memproofs: bool,
     /// From [`InstallAppPayload::ignore_genesis_failure`]
     pub ignore_genesis_failure: bool,
