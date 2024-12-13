@@ -25,7 +25,7 @@ pub mod examples;
 /// - ALL actions pointing to it are ABANDONED by ALL authorities due to validation failure
 /// - Nobody knows about it on the currently visible network
 ///
-/// If an EntryHashed fails to be returned:
+/// If an [`EntryHashed`] fails to be returned:
 ///
 /// - Callbacks will return early with [`UnresolvedDependencies`]
 /// - Zome calls will receive a [`WasmError`] from the host
@@ -36,13 +36,14 @@ pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
     })
 }
 
-/// MUST get a SignedActionHashed at a given ActionHash.
+/// MUST get a [`SignedActionHashed`] at a given [`ActionHash`].
 ///
-/// The SignedActionHashed is NOT guaranteed to be a valid (or even validated) Record.
+/// The [`SignedActionHashed`] is NOT guaranteed to be a valid (or even validated) Record.
 /// For example, an invalid [`Action`] could be published and [`must_get_action`] would return the [`SignedActionHashed`].
 ///
-/// This may be useful during validation callbacks where the validity depends on an action existing regardless of its associated Entry.
-/// For example, we may simply need to check that the author is the same for two referenced Actions.
+/// This may be useful during validation callbacks where the validity depends on an action existing
+/// regardless of its associated [`Entry`].
+/// For example, we may simply need to check that the author is the same for two referenced [`Action`]'s.
 ///
 /// [`must_get_action`] is available in contexts such as validation where both determinism and network access is desirable.
 ///
@@ -63,7 +64,7 @@ pub fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHash
     })
 }
 
-/// MUST get a VALID [`Record`] at a given ActionHash.
+/// MUST get a VALID [`Record`] at a given [`ActionHash`].
 ///
 /// The [`Record`] is guaranteed to be valid.
 /// More accurately the [`Record`] is guarantee to be consistently reported as valid by the visible network.
@@ -86,7 +87,7 @@ pub fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHash
 /// - We can async (e.g. in a background task) be recursively validating [`Record`] dependencies ourselves, following hops until there is no room for lies
 /// - We can with small probability recursively validate to several hops inline to discourage potential eclipse attacks with a credible immediate threat
 ///
-/// If you do not care about validity and simply want a pair of Action+Entry data, then use both [`must_get_action`] and [`must_get_entry`] together.
+/// If you do not care about validity and simply want a pair of [`Action`]+[`Entry`] data, then use both [`must_get_action`] and [`must_get_entry`] together.
 ///
 /// [`must_get_valid_record`] is available in contexts such as validation where both determinism and network access is desirable.
 ///
@@ -113,8 +114,9 @@ pub fn must_get_valid_record(action_hash: ActionHash) -> ExternResult<Record> {
 /// If you have some need to implement custom serialization logic or metadata injection
 /// you can do so by implementing these traits manually instead.
 ///
-/// This requires that TryFrom and TryInto [`derive@SerializedBytes`] is implemented for the entry type,
-/// which implies that [`serde::Serialize`] and [`serde::Deserialize`] is also implemented.
+/// This requires that [`TryFrom<SerializedBytes>`] and [`TryInto<SerializedBytes>`]
+/// [`derive@SerializedBytes`] is implemented for the entry type, which implies that
+/// [`serde::Serialize`] and [`serde::Deserialize`] is also implemented.
 /// These can all be derived and there is an attribute macro that both does the default defines.
 #[macro_export]
 macro_rules! app_entry {
