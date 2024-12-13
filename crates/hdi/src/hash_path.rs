@@ -30,7 +30,7 @@ pub mod anchor;
 /// Note:
 ///
 /// - The path must always start at the root
-/// - [`path::Path`] are sequential and contigious
+/// - [`path::Path`] are sequential and contiguous
 /// - [`path::Path`] may be empty
 /// - [`path::Path`] only track one branch
 ///
