@@ -52,7 +52,7 @@ macro_rules! dht_op_update {
     }};
 }
 
-/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the [`Scratch`].
+/// Insert a [DhtOp] into the [`Scratch`].
 pub fn insert_op_scratch(
     scratch: &mut Scratch,
     op: ChainOpHashed,
@@ -90,7 +90,7 @@ pub fn insert_record_scratch(
     }
 }
 
-/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Authored database.
+/// Insert a [DhtOp] into the Authored database.
 pub fn insert_op_authored(
     txn: &mut Txn<DbKindAuthored>,
     op: &DhtOpHashed,
@@ -98,7 +98,7 @@ pub fn insert_op_authored(
     insert_op_when(txn, op, None, Timestamp::now())
 }
 
-/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the DHT database.
+/// Insert a [DhtOp] into the DHT database.
 ///
 /// If `transfer_data` is None, that means that the Op was locally validated
 /// and is being included in the DHT by self-authority
@@ -110,7 +110,7 @@ pub fn insert_op_dht(
     insert_op_when(txn, op, transfer_data, Timestamp::now())
 }
 
-/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the Cache database.
+/// Insert a [DhtOp] into the Cache database.
 ///
 /// TODO: no transfer data is hooked up for now, but ideally in the future we want:
 /// - an AgentPubKey from the remote node should be included
@@ -129,14 +129,14 @@ pub fn todo_no_cache_transfer_data() -> Option<(AgentPubKey, TransferMethod, Tim
     None
 }
 
-/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into any Op database.
+/// Insert a [DhtOp] into any Op database.
 /// The type is not checked, and transfer data is not set.
 #[cfg(feature = "test_utils")]
 pub fn insert_op_untyped(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
     insert_op_when(txn, op, None, Timestamp::now())
 }
 
-/// Insert a [`DhtOp`](holochain_types::dht_op::DhtOp) into the database.
+/// Insert a [DhtOp] into the database.
 pub fn insert_op_when(
     txn: &mut Transaction,
     op: &DhtOpHashed,
@@ -318,7 +318,7 @@ pub fn insert_validation_receipt_when(
     Ok(())
 }
 
-/// Insert a [`DnaWasm`](holochain_types::prelude::DnaWasm) into the database.
+/// Insert a [DnaWasm] into the database.
 pub fn insert_wasm(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationResult<()> {
     let (wasm, hash) = wasm.into_inner();
     sql_insert!(txn, Wasm, {
@@ -501,7 +501,7 @@ pub fn insert_unblock(txn: &mut Txn<DbKindConductor>, unblock: Block) -> Databas
     Ok(())
 }
 
-/// Set the validation status of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
+/// Set the validation status of a [DhtOp] in the database.
 pub fn set_validation_status(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -512,7 +512,7 @@ pub fn set_validation_status(
     })?;
     Ok(())
 }
-/// Set the integration dependency of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
+/// Set the integration dependency of a [DhtOp] in the database.
 pub fn set_dependency(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -529,7 +529,7 @@ pub fn set_dependency(
     Ok(())
 }
 
-/// Set the whether or not a receipt is required of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
+/// Set the whether or not a receipt is required of a [DhtOp] in the database.
 pub fn set_require_receipt(
     txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
@@ -541,7 +541,7 @@ pub fn set_require_receipt(
     Ok(())
 }
 
-/// Set the validation stage of a [`DhtOp`](holochain_types::dht_op::DhtOp) in the database.
+/// Set the validation stage of a [DhtOp] in the database.
 pub fn set_validation_stage(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -571,7 +571,7 @@ pub fn set_validation_stage(
     Ok(())
 }
 
-/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was sys validated.
+/// Set when a [DhtOp] was sys validated.
 pub fn set_when_sys_validated(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -583,7 +583,7 @@ pub fn set_when_sys_validated(
     Ok(())
 }
 
-/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was app validated.
+/// Set when a [DhtOp] was app validated.
 pub fn set_when_app_validated(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -595,7 +595,7 @@ pub fn set_when_app_validated(
     Ok(())
 }
 
-/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was integrated.
+/// Set when a [DhtOp] was integrated.
 pub fn set_when_integrated(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -607,7 +607,7 @@ pub fn set_when_integrated(
     Ok(())
 }
 
-/// Set when a [`DhtOp`](holochain_types::dht_op::DhtOp) was last publish time
+/// Set when a [DhtOp] was last publish time
 pub fn set_last_publish_time(
     txn: &mut Txn<DbKindAuthored>,
     hash: &DhtOpHash,
@@ -619,7 +619,7 @@ pub fn set_last_publish_time(
     Ok(())
 }
 
-/// Set withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
+/// Set withhold publish for a [DhtOp].
 pub fn set_withhold_publish(
     txn: &mut Txn<DbKindAuthored>,
     hash: &DhtOpHash,
@@ -630,7 +630,7 @@ pub fn set_withhold_publish(
     Ok(())
 }
 
-/// Unset withhold publish for a [`DhtOp`](holochain_types::dht_op::DhtOp).
+/// Unset withhold publish for a [DhtOp].
 pub fn unset_withhold_publish(
     txn: &mut Txn<DbKindAuthored>,
     hash: &DhtOpHash,
@@ -641,7 +641,7 @@ pub fn unset_withhold_publish(
     Ok(())
 }
 
-/// Set the receipt count for a [`DhtOp`](holochain_types::dht_op::DhtOp).
+/// Set the receipt count for a [DhtOp].
 pub fn set_receipts_complete(
     txn: &mut Txn<DbKindAuthored>,
     hash: &DhtOpHash,
@@ -650,7 +650,7 @@ pub fn set_receipts_complete(
     set_receipts_complete_redundantly_in_dht_db(txn, hash, complete)
 }
 
-/// Set the receipt count for a [`DhtOp`](holochain_types::dht_op::DhtOp).
+/// Set the receipt count for a [DhtOp].
 pub fn set_receipts_complete_redundantly_in_dht_db(
     txn: &mut Transaction,
     hash: &DhtOpHash,
@@ -888,8 +888,7 @@ pub fn insert_entry(
 /// used to create multiple locks though. The chain is either locked or unlocked for the author.
 /// The `subject` just allows information to be stored with the lock.
 ///
-/// Check whether the chain is locked using [crate::chain_lock::is_chain_locked]. Or check whether
-/// the lock has expired using [crate::chain_lock::is_chain_lock_expired].
+/// Check whether the chain is locked using [crate::chain_lock::get_chain_lock].
 pub fn lock_chain(
     txn: &mut Transaction,
     author: &AgentPubKey,
