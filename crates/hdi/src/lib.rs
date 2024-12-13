@@ -315,7 +315,7 @@ pub mod info;
 /// The functions and structs in this module do _not_ need to be used directly.
 /// The `#[hdk_extern]` attribute on functions exposed externally all set the `WasmSubscriber` as the global default.
 ///
-/// This module defines a [ `trace::WasmSubscriber` ] that forwards all tracing macro calls to another subscriber on the host.
+/// This module defines a [`trace::WasmSubscriber`] that forwards all tracing macro calls to another subscriber on the host.
 /// The logging level can be changed for the host at runtime using the `WASM_LOG` environment variable that works exactly as `RUST_LOG` for other tracing.
 pub mod trace;
 
