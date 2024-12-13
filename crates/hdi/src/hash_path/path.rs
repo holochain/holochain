@@ -93,7 +93,7 @@ impl From<String> for Component {
     }
 }
 
-/// Restoring a [ `String` ] from a [ `Component` ] requires [ `Vec<u8>` ] to [ `u32` ] to utf8 handling.
+/// Restoring a [`String`] from a [`Component`] requires [`Vec<u8>`] to [`u32`] to utf8 handling.
 impl TryFrom<&Component> for String {
     type Error = SerializedBytesError;
     fn try_from(component: &Component) -> Result<Self, Self::Error> {
@@ -273,14 +273,12 @@ impl TryInto<String> for Path {
 }
 
 impl Path {
-    /// Attach a [`LinkType`] to this path
-    /// so its type is known for [`create_link`] and [`get_links`].
+    /// Attach a [`LinkType`] to this path so its type is known for test utility functions.
     pub fn into_typed(self, link_type: impl Into<ScopedLinkType>) -> TypedPath {
         TypedPath::new(link_type, self)
     }
 
-    /// Try attaching a [`LinkType`] to this path
-    /// so its type is known for [`create_link`] and [`get_links`].
+    /// Try attaching a [`LinkType`] to this path so its type is known for test utility functions.
     pub fn typed<TY, E>(self, link_type: TY) -> Result<TypedPath, WasmError>
     where
         ScopedLinkType: TryFrom<TY, Error = E>,
@@ -288,7 +286,7 @@ impl Path {
     {
         Ok(TypedPath::new(ScopedLinkType::try_from(link_type)?, self))
     }
-    /// What is the hash for the current [ `Path` ]?
+    /// What is the hash for the current [`Path`]?
     pub fn path_entry_hash(&self) -> ExternResult<holo_hash::EntryHash> {
         hash_entry(Entry::App(AppEntryBytes(
             SerializedBytes::try_from(self).map_err(|e| wasm_error!(e))?,
