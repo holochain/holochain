@@ -101,7 +101,7 @@ pub enum HcDnaBundleSubcommand {
 
     /// Print the schema for a DNA manifest
     Schema,
-    /// Print the B64 hash for a DNA file
+    /// Print the Base64 hash for a DNA file
     Hash {
         /// The path to the dna file.
         path: std::path::PathBuf,

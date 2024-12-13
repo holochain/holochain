@@ -284,30 +284,25 @@ async fn test_multi_integrity() {
 }
 
 #[tokio::test]
+#[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
 async fn test_hash_dna_function() {
     {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
         let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
         cmd.assert().success();
     }
-    //Commenting this test until windows hash bug is fixed
-    /*     {
+    {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
         let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
         let stdout = cmd.assert().success().get_output().stdout.clone();
-        let actual = String::from_utf8_lossy(&stdout)
-            .replace(['\r','\n'], "");
-        //.trim() // Normalize Windows/linux with trim `\r\n` or `\n` to empty
-        let expected =
-            DnaHashB64::from_b64_str("uhC0klkazCjMK-V3HooCgXVCB7OGhGEplGD-UWFgCIeXGZfRB7ORO")
-                .unwrap()
-                .to_string();
+        let actual = String::from_utf8_lossy(&stdout).replace(['\r', '\n'], ""); // Normalize Windows/linux
+        let expected = "uhC0klkazCjMK-V3HooCgXVCB7OGhGEplGD-UWFgCIeXGZfRB7ORO";
         assert_eq!(
             expected, actual,
             "Expected: {}\nActual: {}",
             expected, actual
         );
-    } */
+    }
 }
 
 #[test]
