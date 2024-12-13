@@ -66,9 +66,9 @@ impl From<Component> for Vec<u8> {
 /// sharding based on strings by iterating over u32s rather than deciding what to do with variable
 /// width u8 or u16 characters.
 ///
-/// IMPORTANT: if you are not using sharding and make heavy use of `Path` then
-/// consider building your `Component` directly from `my_string.as_bytes()` to
-/// achieve much more compact utf8 representations of each `Component`.
+/// IMPORTANT: if you are not using sharding and make heavy use of [`Path`] then
+/// consider building your [`Component`] directly from `my_string.as_bytes()` to
+/// achieve much more compact utf8 representations of each [`Component`].
 impl From<&str> for Component {
     fn from(s: &str) -> Self {
         let bytes: Vec<u8> = s
@@ -293,14 +293,14 @@ impl Path {
         )))
     }
 
-    /// Mutate this `Path` into a child of itself by appending a `Component`.
+    /// Mutate this [`Path`] into a child of itself by appending a [`Component`].
     pub fn append_component(&mut self, component: Component) {
         self.0.push(component);
     }
 
-    /// Accessor for the last `Component` of this `Path`.
+    /// Accessor for the last [`Component`] of this [`Path`].
     /// This can be thought of as the leaf of the implied tree structure of
-    /// which this `Path` is one branch of.
+    /// which this [`Path`] is one branch of.
     pub fn leaf(&self) -> Option<&Component> {
         self.0.last()
     }
