@@ -64,7 +64,7 @@ enum WasmErrorInner {
     Guest(String),
     Host(String),
     HostShortCircuit(Vec<u8>),
-    Compile(String),
+    ModuleBuild(String),
     CallError(String),
     UninitializedSerializedModuleCache,
 }

@@ -450,7 +450,7 @@ impl RealRibosome {
             let mut store_mut = store.as_store_mut();
             instance = Arc::new(Instance::new(&mut store_mut, &module, &imports).map_err(
                 |e| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::Compile(format!("{}: {}", name, e))).into()
+                    wasm_error!(WasmErrorInner::ModuleBuild(format!("{}: {}", name, e))).into()
                 },
             )?);
         }
@@ -465,7 +465,7 @@ impl RealRibosome {
                     .exports
                     .get_memory("memory")
                     .map_err(|e| -> RuntimeError {
-                        wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
+                        wasm_error!(WasmErrorInner::ModuleBuild(e.to_string())).into()
                     })?
                     .clone(),
             );
@@ -474,7 +474,7 @@ impl RealRibosome {
                     .exports
                     .get_typed_function(&store_mut, "__hc__deallocate_1")
                     .map_err(|e| -> RuntimeError {
-                        wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
+                        wasm_error!(WasmErrorInner::ModuleBuild(e.to_string())).into()
                     })?,
             );
             data_mut.allocate = Some(
@@ -482,7 +482,7 @@ impl RealRibosome {
                     .exports
                     .get_typed_function(&store_mut, "__hc__allocate_1")
                     .map_err(|e| -> RuntimeError {
-                        wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
+                        wasm_error!(WasmErrorInner::ModuleBuild(e.to_string())).into()
                     })?,
             );
         }

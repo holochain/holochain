@@ -48,6 +48,7 @@ use futures::future;
 use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
+#[cfg(feature="wasmer_sys")]
 use holochain_wasmer_host::module::ModuleCache;
 use indexmap::IndexMap;
 use itertools::Itertools;
