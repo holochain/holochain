@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Get the DNA information.
-/// There are no inputs to [ `dna_info` ].
+/// There are no inputs to [`dna_info`].
 ///
 /// DNA information includes dna name, hash, properties, and zome names.
 pub fn dna_info() -> ExternResult<DnaInfo> {
@@ -9,7 +9,7 @@ pub fn dna_info() -> ExternResult<DnaInfo> {
 }
 
 /// Get the zome information.
-/// There are no inputs to [ `zome_info` ].
+/// There are no inputs to [`zome_info`].
 ///
 /// Zome information includes zome name, id and properties.
 ///

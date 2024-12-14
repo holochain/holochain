@@ -204,16 +204,18 @@ where
     }
 }
 
-/// Hash an `Action` into an `ActionHash`.
+/// Hash an [`Action`] into an [`ActionHash`].
 ///
-/// [`hash_entry`] has more of a discussion around different hash types and how
-/// they are used within the HDI.
+/// [`hash_entry`] has more of a discussion around different hash types and how they are used
+/// within the HDI.
 ///
-/// It is strongly recommended to use [`hash_action`] to calculate the hash rather than hand rolling an in-wasm solution.
-/// Any inconsistencies in serialization or hash handling will result in dangling references to things due to a "corrupt" hash.
+/// It is strongly recommended to use [`hash_action`] to calculate the hash rather than hand
+/// rolling an in-wasm solution. Any inconsistencies in serialization or hash handling will result
+/// in dangling references to things due to a "corrupt" hash.
 ///
-/// Note that usually relevant HDI functions return a [`ActionHashed`] or [`SignedActionHashed`] which already has associated methods to access the `ActionHash` of the inner `Action`.
-/// In normal usage it is unlikely to be required to separately hash a [`Action`] like this.
+/// Note that usually relevant HDI functions return a [`ActionHashed`] or [`SignedActionHashed`]
+/// which already has associated methods to access the [`ActionHash`] of the inner [`Action`]. In
+/// normal usage it is unlikely to be required to separately hash a [`Action`] like this.
 pub fn hash_action(input: Action) -> ExternResult<ActionHash> {
     match HDI.with(|h| h.borrow().hash(HashInput::Action(input)))? {
         HashOutput::Action(action_hash) => Ok(action_hash),
