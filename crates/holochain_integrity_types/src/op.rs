@@ -270,7 +270,7 @@ impl Op {
             }
         }
     }
-    /// Get the [`ActionHash`] for the the previous action from this op if there is one.
+    /// Get the [`ActionHash`] for the previous action from this op if there is one.
     pub fn prev_action(&self) -> Option<&ActionHash> {
         match self {
             Op::StoreRecord(StoreRecord { record }) => record.action().prev_action(),
