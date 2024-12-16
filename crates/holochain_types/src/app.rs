@@ -144,7 +144,7 @@ pub struct InstallAppPayload {
     /// agent keys if you lose access to the device with your conductor data
     /// (as long as you retain exclusive access to the device seed of course).
     ///
-    /// Holochain will only generate an agent key for you if [`ConductorConfig::device_seed_lair_tag`]
+    /// Holochain will only generate an agent key for you if a device seed tag
     /// is set and pointing to a seed present in lair. If this config is not set, installation
     /// will fail if no agent key is provided. This safety mechanism can however be overridden
     /// by setting the `allow_throwaway_random_agent_key` flag on this payload, which will cause
@@ -212,8 +212,8 @@ pub enum RoleSettings {
     Provisioned {
         /// When the app being installed has the `allow_deferred_memproofs` manifest flag set,
         /// passing `None` for this field for all roles in the app will allow the app to enter
-        /// the "deferred membrane proofs" state, so that memproofs can be provided later via
-        /// [`AppRequest::ProvideMemproofs`]. If `Some` is used here, whatever memproofs are
+        /// the "deferred membrane proofs" state, so that memproofs can be provided later.
+        /// If `Some` is used here, whatever memproofs are
         /// provided will be used, and the app will be installed as normal.
         membrane_proof: Option<MembraneProof>,
         /// Overwrites the dna modifiers from the dna manifest. Only
@@ -645,7 +645,7 @@ impl InstalledAppCommon {
             .ok_or_else(|| AppError::RoleNameMissing(role_name.clone()))
     }
 
-    /// If the role is primary, i.e. of variant [`AppRoleassignment::Primary`], return it
+    /// If the role is primary, i.e. of variant [`AppRoleAssignment::Primary`], return it
     /// as [`AppRolePrimary`]. If the role is not primary, return Err.
     pub fn primary_role(&self, role_name: &RoleName) -> AppResult<&AppRolePrimary> {
         let app_id = self.installed_app_id.clone();
@@ -963,8 +963,8 @@ pub enum AppStatus {
     /// and will not restart automaticaly on conductor reboot.
     Disabled(DisabledAppReason),
 
-    /// The app is installed, but genesis has not completed due to use of
-    /// [`MembraneProofProvisioning::Deferred`]
+    /// The app is installed, but genesis has not completed because Membrane Proofs
+    /// have not been provided.
     AwaitingMemproofs,
 }
 
@@ -1117,7 +1117,7 @@ pub enum StoppedAppReason {
     /// Same meaning as [`AppStatus::Disabled`].
     Disabled(DisabledAppReason),
 
-    /// Same meaning as [`AppStatus::AwaitingMemProofs`].
+    /// Same meaning as [`AppStatus::AwaitingMemproofs`].
     AwaitingMemproofs,
 }
 
