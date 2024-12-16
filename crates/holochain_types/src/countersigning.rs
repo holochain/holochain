@@ -68,7 +68,7 @@ pub enum CountersigningSessionState {
     ///
     /// Note that because the [PreflightRequest] is stored here, we only ever enter the unknown state
     /// if we managed to keep the preflight request in memory, or if we have been able to recover it
-    /// from the source chain as part of the committed [CounterSigningSessionData]. Otherwise, we
+    /// from the source chain as part of the committed countersigning session data. Otherwise, we
     /// are unable to discover what session we were participating in, and we must abandon the session
     /// without going through this recovery state.
     Unknown {
@@ -121,8 +121,6 @@ pub struct SessionResolutionSummary {
     /// The reason why session resolution is required.
     pub required_reason: ResolutionRequiredReason,
     /// How many attempts have been made to resolve the session.
-    ///
-    /// Attempts are made according to the frequency specified by [RETRY_UNKNOWN_SESSION_STATE_DELAY].
     ///
     /// This count is only correct for the current run of the Holochain conductor. If the conductor
     /// is restarted then this counter is also reset.
