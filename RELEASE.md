@@ -30,8 +30,8 @@
 
 ## Full release test
 
-- After release of full version, test again as before with the release candidate and also start a test of persistent DHT functionality that lasts approx. 2 weeks.
-- Once testing passes and persistent DHT is functional for the given time period and no bugs have been reported, declare release as "stable".
+- After release of full version, test again as before with the release candidate and also start another smoke test.
+- Once testing passes and persistent DHT is functional for the given time period and no bugs have been reported, elevate release to "recommended" status.
 
 ## Happy Path estimates:
 
