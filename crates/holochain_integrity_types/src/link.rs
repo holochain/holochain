@@ -42,7 +42,7 @@ impl LinkType {
     serde::Deserialize,
     PartialEq,
     Eq,
-    SerializedBytes,
+    //SerializedBytes
 )]
 #[cfg_attr(
     feature = "fuzzing",
@@ -58,7 +58,7 @@ impl LinkTag {
     {
         Self(t.into())
     }
-
+    
     pub fn into_inner(self) -> Vec<u8> {
         self.0
     }
@@ -193,4 +193,41 @@ impl TryInto<String> for LinkTag {
     fn try_into(self) -> Result<String, Self::Error> {
         String::from_utf8(self.0)
     }
+}
+
+impl TryInto<SerializedBytes> for LinkTag {
+    type Error = SerializedBytesError;
+
+    fn try_into(self) -> Result<SerializedBytes, SerializedBytesError> {
+        Ok(SerializedBytes::try_from(UnsafeBytes::from(self.0))?)
+    }
+} 
+
+impl TryFrom<SerializedBytes> for LinkTag {
+    type Error = SerializedBytesError;
+
+    fn try_from(sb: SerializedBytes) -> Result<Self, SerializedBytesError>
+    {
+        let serialized_bytes: SerializedBytes = sb.try_into()?;
+        Ok(Self(UnsafeBytes::from(serialized_bytes).try_into()?))
+    }
+}
+
+
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+pub struct Data {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+#[test]
+fn test_link_tag() {
+    let tag = Data {
+       latitude: f64::round(4.5),
+        longitude: f64::acos(4.7)
+    };   
+    let sb =  SerializedBytes::try_from(tag).unwrap();
+    let endtag = LinkTag::try_from(sb.clone()).unwrap();
+    let back_to_sb:SerializedBytes = endtag.clone().try_into().unwrap();
+    assert_eq!(sb.bytes().to_vec(), back_to_sb.bytes().to_vec());
 }
