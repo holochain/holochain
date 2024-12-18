@@ -3016,6 +3016,7 @@ dependencies = [
  "reqwest 0.12.9",
  "rusqlite",
  "sbd-server",
+ "schemars",
  "sd-notify",
  "serde",
  "serde_bytes",

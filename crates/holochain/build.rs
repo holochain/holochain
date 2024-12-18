@@ -119,6 +119,32 @@ mod version_info {
     }
 }
 
+mod schema_definitions {
+    use holochain_conductor_api::config::conductor::ConductorConfig;
+    use std::path::{Path, PathBuf};
+    use std::{env, fs};
+
+    fn generate_schema<T: schemars::JsonSchema>(name: &str, out_dir: &Path) {
+        let schema = schemars::schema_for!(T);
+        let schema_string = serde_json::to_string_pretty(&schema).unwrap();
+
+        fs::write(out_dir.join(format!("{}.json", name)), schema_string).unwrap();
+    }
+
+    pub(crate) fn generate_schemas() {
+        let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+
+        let out_dir = manifest_dir
+            .parent()
+            .unwrap()
+            .join("holochain_conductor_api")
+            .join("schemas");
+        fs::create_dir_all(&out_dir).unwrap();
+        generate_schema::<ConductorConfig>("conductor_config", &out_dir);
+    }
+}
+
 fn main() {
     version_info::populate_env();
+    schema_definitions::generate_schemas();
 }
