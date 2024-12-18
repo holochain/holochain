@@ -1,4 +1,5 @@
 pub use holochain_keystore::paths::*;
+use schemars::JsonSchema;
 use std::path::PathBuf;
 
 /// Subdirectory of the data directory where the conductor stores its
@@ -63,6 +64,7 @@ impl From<ConfigRootPath> for ConfigFilePath {
     serde::Serialize,
     serde::Deserialize,
     Clone,
+    JsonSchema,
 )]
 pub struct DataRootPath(PathBuf);
 
