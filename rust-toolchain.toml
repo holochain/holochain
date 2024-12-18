@@ -1,5 +1,5 @@
 [toolchain]
 channel = "1.83.0"
-components = ["rustfmt", "clippy"]
+components = ["rustfmt", "clippy", "cargo"]
 targets = ["wasm32-unknown-unknown"]
 profile = "minimal"

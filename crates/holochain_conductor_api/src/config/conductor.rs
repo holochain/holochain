@@ -56,6 +56,11 @@
 use crate::conductor::process::ERROR_CODE;
 use holochain_types::prelude::DbSyncStrategy;
 use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
+use schemars::gen::SchemaGenerator;
+use schemars::schema::InstanceType;
+use schemars::schema::Schema;
+use schemars::schema::SchemaObject;
+use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -83,7 +88,7 @@ use crate::config::conductor::paths::DataRootPath;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default, JsonSchema)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -211,7 +216,7 @@ impl ConductorConfig {
 }
 
 /// Tuning parameters to adjust the behaviour of the conductor.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
 pub struct ConductorTuningParams {
     /// The delay between retries of sys validation when there are missing dependencies waiting to be found on the DHT.
     ///
@@ -287,6 +292,15 @@ impl Default for ConductorTuningParams {
             min_publish_interval: None,
         }
     }
+}
+
+// custom schema for Url2
+pub(crate) fn url2_schema(_: &mut SchemaGenerator) -> Schema {
+    Schema::Object(SchemaObject {
+        instance_type: Some(InstanceType::String.into()),
+        format: Some("uri".to_string()),
+        ..Default::default()
+    })
 }
 
 #[cfg(test)]
