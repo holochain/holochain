@@ -4,6 +4,7 @@ use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
 use scheduled_thread_pool::ScheduledThreadPool;
+use schemars::JsonSchema;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{path::Path, sync::Arc, time::Duration};
 
@@ -36,7 +37,7 @@ pub enum DbSyncLevel {
 /// The strategy for database file system synchronization.
 /// Some databases like the cache can be safely rebuilt if
 /// corruption occurs due to using the faster [`DbSyncLevel::Off`].
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
 pub enum DbSyncStrategy {
     /// Allows databases that can be wiped and rebuilt to
     /// use the faster [`DbSyncLevel::Off`].
