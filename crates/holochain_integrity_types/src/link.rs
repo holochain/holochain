@@ -33,15 +33,7 @@ impl LinkType {
 /// Opaque tag for the link applied at the app layer, used to differentiate
 /// between different semantics and validation rules for different links
 #[derive(
-    Debug,
-    PartialOrd,
-    Ord,
-    Clone,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    PartialEq,
-    Eq,
+    Debug, PartialOrd, Ord, Clone, Hash, serde::Serialize, serde::Deserialize, PartialEq, Eq,
 )]
 #[cfg_attr(
     feature = "fuzzing",
@@ -199,18 +191,16 @@ impl TryInto<SerializedBytes> for LinkTag {
     fn try_into(self) -> Result<SerializedBytes, SerializedBytesError> {
         Ok(SerializedBytes::try_from(UnsafeBytes::from(self.0))?)
     }
-} 
+}
 
 impl TryFrom<SerializedBytes> for LinkTag {
     type Error = SerializedBytesError;
 
-    fn try_from(sb: SerializedBytes) -> Result<Self, SerializedBytesError>
-    {
+    fn try_from(sb: SerializedBytes) -> Result<Self, SerializedBytesError> {
         let serialized_bytes: SerializedBytes = sb.try_into()?;
         Ok(Self(UnsafeBytes::from(serialized_bytes).try_into()?))
     }
 }
-
 
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub struct Data {
@@ -225,11 +215,11 @@ mod tests {
     fn test_link_tag() {
         let location = Data {
             latitude: 4.518758758758,
-            longitude:4.718758758973
-        };   
-        let sb =  SerializedBytes::try_from(location).unwrap();
+            longitude: 4.718758758973,
+        };
+        let sb = SerializedBytes::try_from(location).unwrap();
         let endtag = LinkTag::try_from(sb.clone()).unwrap();
-        let back_to_sb:SerializedBytes = endtag.try_into().unwrap();
+        let back_to_sb: SerializedBytes = endtag.try_into().unwrap();
         assert_eq!(sb.bytes().to_vec(), back_to_sb.bytes().to_vec());
     }
 }
