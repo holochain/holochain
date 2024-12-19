@@ -60,11 +60,5 @@ default = ["wasmer_sys"]
 sqlite-encrypted = ["holochain_types/sqlite-encrypted"]
 sqlite = ["holochain_types/sqlite"]
 
-wasmer_sys = [
-  "wasmer/default",
-  "holochain_wasmer_host/wasmer_sys",
-]
-wasmer_wamr = [
-  "wasmer/wamr",
-  "holochain_wasmer_host/wasmer_wamr",
-]
+wasmer_sys = ["wasmer/default", "holochain_wasmer_host/wasmer_sys"]
+wasmer_wamr = ["wasmer/wamr", "holochain_wasmer_host/wasmer_wamr"]

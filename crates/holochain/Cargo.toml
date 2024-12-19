@@ -295,10 +295,7 @@ wasmer_sys = [
 
 # Enable wasm interpreter (experimental)
 # Incompatible with "wasmer_sys"
-wasmer_wamr = [
-  "wasmer/wamr",
-  "holochain_wasmer_host/wasmer_wamr",
-]
+wasmer_wamr = ["wasmer/wamr", "holochain_wasmer_host/wasmer_wamr"]
 
 # Enable chain head coordination
 chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_chc/http"]
