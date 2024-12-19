@@ -7,10 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.5.0-dev.10
+
 ## 0.5.0-dev.9
 
 ## 0.5.0-dev.8
-- The 'hc dna hash' option was added to obtain a Base64 hash from the bundle's DNA file 
+
+- The ‘hc dna hash’ option was added to obtain a Base64 hash from the bundle’s DNA file
 
 ## 0.5.0-dev.7
 

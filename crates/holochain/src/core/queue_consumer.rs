@@ -537,7 +537,7 @@ impl TriggerSender {
 
     /// Resume the trigger loop if there is one.
     ///
-    /// This will cause the loop to to resume after the
+    /// This will cause the loop to resume after the
     /// next trigger (or if the workflow is currently in progress).
     /// It will not cause the loop to resume immediately.
     /// If the loop is currently listening (the workflow is not running)

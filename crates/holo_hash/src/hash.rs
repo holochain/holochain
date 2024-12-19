@@ -49,7 +49,7 @@ pub const HOLO_HASH_UNTYPED_LEN: usize = HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN;
 /// Length of the full HoloHash bytes (39 = 3 + 32 + 4)
 pub const HOLO_HASH_FULL_LEN: usize = HOLO_HASH_PREFIX_LEN + HOLO_HASH_CORE_LEN + HOLO_HASH_LOC_LEN;
 
-/// Helper for ensuring the the proper number of bytes is used in various situations
+/// Helper for ensuring the proper number of bytes is used in various situations
 #[macro_export]
 macro_rules! assert_length {
     ($len:expr, $hash:expr) => {

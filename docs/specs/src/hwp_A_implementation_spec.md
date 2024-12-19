@@ -774,7 +774,7 @@ It is the application's responsibility to retrieve a stored capability claim usi
     }
     ```
 
-    If `strategy` is `GetStrategy::Network`, the request will always go to other DHT authorities, unless the the requestor is an authority for that basis hash themselves. If `strategy` is `GetStrategy::Local`, the request will always favor the requestor's local cache and will return nothing if the data is not cached.
+    If `strategy` is `GetStrategy::Network`, the request will always go to other DHT authorities, unless the requestor is an authority for that basis hash themselves. If `strategy` is `GetStrategy::Local`, the request will always favor the requestor's local cache and will return nothing if the data is not cached.
 
 * `get_details(AnyDhtHash, GetOptions) -> ExternResult<Option<Details>>`: Retrieve all of the addressable data and metadata at a basis hash. The return value is a variant of the following enum, depending on the data stored at the hash:
 
@@ -1130,7 +1130,7 @@ In order to safely facilitate the peer interaction necessary to complete a count
         // signers then the enzyme MUST be used and is the first signer in BOTH
         // signing_agents and optional_signing_agents.
         optional_signing_agents: Vec<(AgentHash, Vec<Role>)>,
-        // The M in the M of N signers. M MUST be strictly greater than than
+        // The M in the M of N signers. M MUST be strictly greater than
         // N / 2 and NOT larger than N.
         minimum_optional_signing_agents: u8,
         // The first signing agent (index 0) is acting as an enzyme. If true AND
@@ -1254,7 +1254,7 @@ The HDK SHOULD provide a way for zome code to notify the application user of eve
 
 A content-addressable store, accessible only by the hashes of stored items, is difficult to search because of the sparse nature of the hashes. Holochain's graph DHT makes it much easier to retrieve related information via the affordance of links that can be retrieved from a given hash address. A powerful pattern that can be built on top of links is what we call anchors and, more generally, paths. These patterns rely on the idea of starting from a known hash value that all parties can compute, and placing links from that hash to relevant entries. So, for example, one could take the hash of the string `#funnycats` and add links on that hash to all posts in a social media app that contain that hashtag. This pattern, the anchor pattern, affords the discovery of arbitrary collections or indexes of content-addressed data. The path pattern simply generalizes this to creating an arbitrary hierarchical tree of known values off of which to create links in the DHT.
 
-A note about efficiency: Because every attempt to create an entry or link results in another record that needs to be validated and stored, implementations of this pattern SHOULD attempt to be idempotent when creating anchors or tags; that is, they should check for the prior existence of the links and entries that would be created before attempting to create them. It is both semantically and practically appropriate to hash the anchor or path string in-memory and wrap it in an `ExternalHash` for link bases and targets, as this avoids the the overhead of creating an entry, and the hash, which exists only in memory, can truly be said to be external to the DHT.
+A note about efficiency: Because every attempt to create an entry or link results in another record that needs to be validated and stored, implementations of this pattern SHOULD attempt to be idempotent when creating anchors or tags; that is, they should check for the prior existence of the links and entries that would be created before attempting to create them. It is both semantically and practically appropriate to hash the anchor or path string in-memory and wrap it in an `ExternalHash` for link bases and targets, as this avoids the overhead of creating an entry, and the hash, which exists only in memory, can truly be said to be external to the DHT.
 
 ##### Anchors
 
