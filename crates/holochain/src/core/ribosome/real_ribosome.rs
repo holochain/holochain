@@ -80,10 +80,10 @@ use futures::FutureExt;
 use ghost_actor::dependencies::must_future::MustBoxFuture;
 use holochain_types::prelude::*;
 use holochain_util::timed;
+use holochain_wasmer_host::module::build_module as build_wasmer_module;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
-use holochain_wasmer_host::module::build_module as build_wasmer_module;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use tokio_stream::StreamExt;
 use wasmer::AsStoreMut;
@@ -396,13 +396,13 @@ impl RealRibosome {
             #[cfg(not(test))]
             let cache_lock = self.wasmer_module_cache.clone().unwrap();
 
-            return tokio::task::spawn_blocking(move || {
+            tokio::task::spawn_blocking(move || {
                 let cache = timed!([1, 10, 1000], cache_lock.write());
                 Ok(timed!([1, 1000, 10_000], cache.get(cache_key, &wasm))?)
             })
-            .await?;
+            .await?
         } else {
-            return Ok(build_wasmer_module(&wasm)?)
+            Ok(build_wasmer_module(&wasm)?)
         }
     }
 

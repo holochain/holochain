@@ -10,7 +10,7 @@ use crate::core::ribosome::guest_callback::init::InitInvocation;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateHostAccess;
-#[cfg(feature="wasmer_sys")]
+#[cfg(feature = "wasmer_sys")]
 use crate::core::ribosome::real_ribosome::ModuleCacheLock;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::CallContext;
@@ -60,18 +60,14 @@ impl Iterator for RealRibosomeFixturator<curve::Zomes> {
         let (dna_file, _, _) = tokio_helper::block_forever_on(async move {
             SweetDnaFile::from_test_wasms(uuid, input, Default::default()).await
         });
-        
+
         #[cfg(feature = "wasmer_wamr")]
         let module_cache = None;
         #[cfg(feature = "wasmer_sys")]
         let module_cache = Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None))));
-        
-        let ribosome = tokio_helper::block_forever_on(RealRibosome::new(
-            dna_file,
-            module_cache
-        ))
-        .unwrap();
 
+        let ribosome =
+            tokio_helper::block_forever_on(RealRibosome::new(dna_file, module_cache)).unwrap();
 
         // warm the module cache for each wasm in the ribosome
         for zome in self.0.curve.0.clone() {

@@ -48,7 +48,7 @@ use futures::future;
 use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
-#[cfg(feature="wasmer_sys")]
+#[cfg(feature = "wasmer_sys")]
 use holochain_wasmer_host::module::ModuleCache;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -702,8 +702,7 @@ mod dna_impls {
                 let ribosome =
                     RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
                 #[cfg(feature = "wasmer_wamr")]
-                let ribosome =
-                    RealRibosome::new(dna_file, None).await?;
+                let ribosome = RealRibosome::new(dna_file, None).await?;
 
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
