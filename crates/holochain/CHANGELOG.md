@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   This both fixes surprising behavior and allows `init` to be called directly to initialise a zome if desired.
 
 ## 0.5.0-dev.10
-
+  - Added LinkTag helper trait functions to go into and out with serialized bytes
 ## 0.5.0-dev.9
 
 ## 0.5.0-dev.8
