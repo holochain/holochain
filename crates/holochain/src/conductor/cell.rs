@@ -922,6 +922,16 @@ impl Cell {
             self.check_or_run_zome_init().await?;
         }
 
+        // The "init" function is a reserved function name that is only allowed to be called once
+        // by the `check_or_run_zome_init` function.
+        // It is acceptable to call it to get the conductor to call it once but after that we will
+        // just return a success with the same output that the init function would have returned.
+        if params.fn_name.as_ref() == "init" {
+            return Ok(Ok(ZomeCallResponse::Ok(ExternIO::encode(
+                InitCallbackResult::Pass,
+            )?)));
+        }
+
         let keystore = self.conductor_api.keystore().clone();
 
         let conductor_handle = self.conductor_handle.clone();
