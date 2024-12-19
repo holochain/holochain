@@ -458,4 +458,14 @@ async fn call_init_directly_only_calls_once() {
         "Wanted Pass but was: {:?}",
         callback_result
     );
+
+    let callback_result = conductor
+        .call::<_, InitCallbackResult>(&zome, "init", ())
+        .await;
+
+    assert!(
+        matches!(callback_result, InitCallbackResult::Pass),
+        "Wanted Pass but was: {:?}",
+        callback_result
+    );
 }
