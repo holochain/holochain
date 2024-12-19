@@ -189,7 +189,7 @@ impl TryInto<SerializedBytes> for LinkTag {
     type Error = SerializedBytesError;
 
     fn try_into(self) -> Result<SerializedBytes, SerializedBytesError> {
-        Ok(SerializedBytes::try_from(UnsafeBytes::from(self.0))?)
+        Ok(SerializedBytes::from(UnsafeBytes::from(self.0)))
     }
 }
 
@@ -197,8 +197,8 @@ impl TryFrom<SerializedBytes> for LinkTag {
     type Error = SerializedBytesError;
 
     fn try_from(sb: SerializedBytes) -> Result<Self, SerializedBytesError> {
-        let serialized_bytes: SerializedBytes = sb.try_into()?;
-        Ok(Self(UnsafeBytes::from(serialized_bytes).try_into()?))
+        let serialized_bytes: SerializedBytes = sb.into();
+        Ok(Self(UnsafeBytes::from(serialized_bytes).into()))
     }
 }
 
