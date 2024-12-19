@@ -33,6 +33,7 @@ members = [
   "init_invalid_return",
   "init_invalid_params",
   "init_pass",
+  "init_single",
   "integrity_zome",
   "link",
   "migrate_new",
