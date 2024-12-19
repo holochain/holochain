@@ -229,7 +229,7 @@ mod tests {
         };   
         let sb =  SerializedBytes::try_from(location).unwrap();
         let endtag = LinkTag::try_from(sb.clone()).unwrap();
-        let back_to_sb:SerializedBytes = endtag.clone().try_into().unwrap();
+        let back_to_sb:SerializedBytes = endtag.try_into().unwrap();
         assert_eq!(sb.bytes().to_vec(), back_to_sb.bytes().to_vec());
     }
 }
