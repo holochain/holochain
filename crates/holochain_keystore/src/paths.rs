@@ -2,6 +2,8 @@
 
 use std::path::PathBuf;
 
+use schemars::JsonSchema;
+
 /// Subdirectory of the data directory where the conductor stores its
 /// keystore. Keep the path short so that when it's used in CI the path doesn't
 /// get too long to be used as a domain socket
@@ -17,5 +19,6 @@ pub const KEYSTORE_DIRECTORY: &str = "ks";
     serde::Serialize,
     serde::Deserialize,
     Clone,
+    JsonSchema,
 )]
 pub struct KeystorePath(PathBuf);

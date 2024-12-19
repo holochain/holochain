@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use cfg_if::cfg_if;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -21,7 +22,7 @@ const DPKI_NETWORK_SEED_TESTING: &str = "deepkey-testing";
 /// They have to match for all conductors on a network, for them to be able to communicate.
 ///
 /// Also see `NetworkCompatParams` in the `holochain_p2p` crate.
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 pub struct DpkiConfig {
     /// Path to a DNA which implements the DPKI service, i.e. Deepkey.
     /// Defaults to the built-in Deepkey DNA from the holochain_deepkey_dna crate.
