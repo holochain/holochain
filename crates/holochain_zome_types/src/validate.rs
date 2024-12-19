@@ -36,7 +36,7 @@ impl CallbackResult for ValidateCallbackResult {
             }
             WasmErrorInner::Host(_)
             | WasmErrorInner::HostShortCircuit(_)
-            | WasmErrorInner::Compile(_)
+            | WasmErrorInner::ModuleBuild(_)
             | WasmErrorInner::CallError(_)
             | WasmErrorInner::PointerMap
             | WasmErrorInner::ErrorWhileError
