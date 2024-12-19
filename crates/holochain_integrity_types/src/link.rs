@@ -42,7 +42,6 @@ impl LinkType {
     serde::Deserialize,
     PartialEq,
     Eq,
-    //SerializedBytes
 )]
 #[cfg_attr(
     feature = "fuzzing",
@@ -58,7 +57,6 @@ impl LinkTag {
     {
         Self(t.into())
     }
-    
     pub fn into_inner(self) -> Vec<u8> {
         self.0
     }
@@ -220,14 +218,18 @@ pub struct Data {
     pub longitude: f64,
 }
 
-#[test]
-fn test_link_tag() {
-    let tag = Data {
-       latitude: f64::round(4.5),
-        longitude: f64::acos(4.7)
-    };   
-    let sb =  SerializedBytes::try_from(tag).unwrap();
-    let endtag = LinkTag::try_from(sb.clone()).unwrap();
-    let back_to_sb:SerializedBytes = endtag.clone().try_into().unwrap();
-    assert_eq!(sb.bytes().to_vec(), back_to_sb.bytes().to_vec());
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_link_tag() {
+        let location = Data {
+            latitude: 4.518758758758,
+            longitude:4.718758758973
+        };   
+        let sb =  SerializedBytes::try_from(location).unwrap();
+        let endtag = LinkTag::try_from(sb.clone()).unwrap();
+        let back_to_sb:SerializedBytes = endtag.clone().try_into().unwrap();
+        assert_eq!(sb.bytes().to_vec(), back_to_sb.bytes().to_vec());
+    }
 }
