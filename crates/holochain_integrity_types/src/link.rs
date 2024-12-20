@@ -33,16 +33,7 @@ impl LinkType {
 /// Opaque tag for the link applied at the app layer, used to differentiate
 /// between different semantics and validation rules for different links
 #[derive(
-    Debug,
-    PartialOrd,
-    Ord,
-    Clone,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    PartialEq,
-    Eq,
-    SerializedBytes,
+    Debug, PartialOrd, Ord, Clone, Hash, serde::Serialize, serde::Deserialize, PartialEq, Eq,
 )]
 #[cfg_attr(
     feature = "fuzzing",
@@ -58,7 +49,6 @@ impl LinkTag {
     {
         Self(t.into())
     }
-
     pub fn into_inner(self) -> Vec<u8> {
         self.0
     }
@@ -192,5 +182,43 @@ impl TryInto<String> for LinkTag {
 
     fn try_into(self) -> Result<String, Self::Error> {
         String::from_utf8(self.0)
+    }
+}
+
+/// convert `LinkTag` into `SerializedBytes` (Infallible)
+impl From<LinkTag> for SerializedBytes {
+    fn from(tag: LinkTag) -> SerializedBytes {
+        SerializedBytes::from(UnsafeBytes::from(tag.0))
+    }
+}
+
+/// Creates a `LinkTag` from `SerializedBytes` (Infallible)
+impl From<SerializedBytes> for LinkTag {
+    fn from(sb: SerializedBytes) -> Self {
+        Self(UnsafeBytes::from(sb).into())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+    pub struct Data {
+        pub latitude: f64,
+        pub longitude: f64,
+    }
+    #[test]
+    fn link_tag_roundtrip() {
+        let location = Data {
+            latitude: 4.518758758758,
+            longitude: 4.718758758973,
+        };
+        let sb = SerializedBytes::try_from(location.clone()).unwrap();
+        let tag = LinkTag::from(sb);
+        let back_to_sb: SerializedBytes = tag.into();
+        //let back_to_sb = SerializedBytes::from(tag); //  -> also works
+        let back_to_location: Data = back_to_sb.try_into().unwrap();
+        assert_eq!(location.latitude, back_to_location.latitude);
     }
 }
