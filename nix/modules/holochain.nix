@@ -21,8 +21,18 @@
 
         CARGO_PROFILE = "";
 
-        buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher cmake clang llvmPackages.libclang.lib ])
-          ++ (lib.optionals pkgs.stdenv.isDarwin
+        buildInputs = (with pkgs; [
+          openssl
+          self'.packages.opensslStatic
+          sqlcipher
+          cmake
+
+          # These packages and env vars are required to build holochain with the 'wasmer_wamr' feature 
+          clang
+          llvmPackages.libclang.lib
+          ninja
+        ])
+        ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
             CoreFoundation
