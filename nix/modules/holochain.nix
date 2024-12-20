@@ -26,11 +26,6 @@
           self'.packages.opensslStatic
           sqlcipher
           cmake
-
-          # These packages and env vars are required to build holochain with the 'wasmer_wamr' feature 
-          clang
-          llvmPackages.libclang.lib
-          ninja
         ])
         ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
@@ -41,8 +36,17 @@
             IOKit
           ]));
 
-        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config self'.packages.goWrapper ])
-          ++ lib.optionals pkgs.stdenv.isDarwin
+        nativeBuildInputs = (with pkgs; [
+          makeWrapper
+          perl
+          pkg-config
+          self'.packages.goWrapper
+          # These packages and env vars are required to build holochain with the 'wasmer_wamr' feature 
+          clang
+          llvmPackages.libclang.lib
+          ninja
+        ])
+        ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
 
         stdenv = config.rustHelper.defaultStdenv pkgs;
