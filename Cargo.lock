@@ -594,6 +594,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bit-set"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08807e080ed7f9d5433fa9b275196cfc35414f66a0c79d864dc51a0d825231a3"
+dependencies = [
+ "bit-vec 0.8.0",
+]
+
+[[package]]
 name = "bit-vec"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -607,6 +616,12 @@ checksum = "d2c54ff287cfc0a34f38a6b832ea1bd8e448a330b3e40a50859e6488bee07f22"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "bit-vec"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
 
 [[package]]
 name = "bit_field"
@@ -1859,7 +1874,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1907,7 +1922,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b95f7c0680e4142284cf8b22c14a476e87d61b004a3a0861872b32ef7ead40a2"
 dependencies = [
- "bit-set",
+ "bit-set 0.5.3",
  "regex",
 ]
 
@@ -2161,7 +2176,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f551fdf23ef80329f754919669147a71c67b6cfe3569cd93b6fabdd62044377"
 dependencies = [
- "bit-set",
+ "bit-set 0.5.3",
  "num-integer",
  "num-traits",
  "trilean",
@@ -2672,7 +2687,7 @@ dependencies = [
  "kitsune_p2p_dht_arc",
  "must_future",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.1",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -3015,7 +3030,7 @@ dependencies = [
  "holochain_util",
  "kitsune_p2p_timestamp",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.1",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3318,7 +3333,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.1",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3452,7 +3467,7 @@ dependencies = [
  "num_enum",
  "once_cell",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.1",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4056,7 +4071,7 @@ version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18bfda24d3930aa647f90044d5ef87d0c8120f13b86b2d60e8aade66e656e659"
 dependencies = [
- "bit-set",
+ "bit-set 0.5.3",
  "gcollections",
  "num-integer",
  "num-traits",
@@ -4255,7 +4270,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.1",
  "rand 0.8.5",
  "sbd-server",
  "serde",
@@ -4283,7 +4298,7 @@ dependencies = [
  "holochain_util",
  "kitsune_p2p_dht_arc",
  "proptest",
- "proptest-derive 0.5.0",
+ "proptest-derive 0.5.1",
  "serde",
  "serde_bytes",
  "shrinkwraprs",
@@ -4358,7 +4373,7 @@ dependencies = [
  "num-traits",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.5.0",
+ "proptest-derive 0.5.1",
  "rand 0.8.5",
  "serde",
  "statrs",
@@ -4381,7 +4396,7 @@ dependencies = [
  "num-traits",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.5.0",
+ "proptest-derive 0.5.1",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4405,7 +4420,7 @@ dependencies = [
  "kitsune_p2p_types",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.5.0",
+ "proptest-derive 0.5.1",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4436,7 +4451,7 @@ dependencies = [
  "holochain_serialized_bytes",
  "once_cell",
  "proptest",
- "proptest-derive 0.5.0",
+ "proptest-derive 0.5.1",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4466,7 +4481,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "paste",
  "proptest",
- "proptest-derive 0.5.0",
+ "proptest-derive 0.5.1",
  "rmp-serde",
  "rustls 0.21.12",
  "serde",
@@ -4578,7 +4593,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -4912,7 +4927,7 @@ dependencies = [
  "maplit",
  "matches",
  "proptest",
- "proptest-derive 0.5.0",
+ "proptest-derive 0.5.1",
  "reqwest 0.12.9",
  "rmp-serde",
  "serde",
@@ -5751,12 +5766,12 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "1.5.0"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4c2511913b88df1637da85cc8d96ec8e43a3f8bb8ccb71ee1ac240d6f3df58d"
+checksum = "14cae93065090804185d3b75f0bf93b8eeda30c7a9b4a33d3bdb3988d6229e50"
 dependencies = [
- "bit-set",
- "bit-vec 0.6.3",
+ "bit-set 0.8.0",
+ "bit-vec 0.8.0",
  "bitflags 2.6.0",
  "lazy_static",
  "num-traits",
@@ -5782,9 +5797,9 @@ dependencies = [
 
 [[package]]
 name = "proptest-derive"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ff7ff745a347b87471d859a377a9a404361e7efc2a971d73424a6d183c0fc77"
+checksum = "4ee1c9ac207483d5e7db4940700de86a9aae46ef90c48b57f99fe7edb8345e49"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6565,7 +6580,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7587,7 +7602,7 @@ dependencies = [
  "fastrand",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -8094,7 +8109,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
@@ -8915,7 +8930,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
