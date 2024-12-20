@@ -1265,13 +1265,21 @@ pub mod wasm_test {
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap();
 
+            // With the `wasmer_wamr` feature, we expect zome calls to take longer,
+            // because the wasm is interpreted instead of compiled.
+            #[cfg(feature = "wasmer_wamr")]
+            let maximum_response_time_ms = Duration::from_millis(60);
+
+            #[cfg(not(feature = "wasmer_wamr"))]
+            let maximum_response_time_ms = Duration::from_millis(15);
+
             assert!(
-                results[0] <= Duration::from_millis(15),
+                results[0] <= maximum_response_time_ms,
                 "{:?} > 15ms",
                 results[0]
             );
             assert!(
-                results[1] <= Duration::from_millis(15),
+                results[1] <= maximum_response_time_ms,
                 "{:?} > 15ms",
                 results[1]
             );
