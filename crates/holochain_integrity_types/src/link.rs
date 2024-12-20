@@ -33,15 +33,7 @@ impl LinkType {
 /// Opaque tag for the link applied at the app layer, used to differentiate
 /// between different semantics and validation rules for different links
 #[derive(
-    Debug,
-    PartialOrd,
-    Ord,
-    Clone,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    PartialEq,
-    Eq,
+    Debug, PartialOrd, Ord, Clone, Hash, serde::Serialize, serde::Deserialize, PartialEq, Eq,
 )]
 #[cfg_attr(
     feature = "fuzzing",
@@ -193,43 +185,40 @@ impl TryInto<String> for LinkTag {
     }
 }
 
-impl TryInto<SerializedBytes> for LinkTag {
-    type Error = SerializedBytesError;
-
-    fn try_into(self) -> Result<SerializedBytes, SerializedBytesError> {
-        Ok(SerializedBytes::try_from(UnsafeBytes::from(self.0))?)
-    }
-} 
-
-impl TryFrom<SerializedBytes> for LinkTag {
-    type Error = SerializedBytesError;
-
-    fn try_from(sb: SerializedBytes) -> Result<Self, SerializedBytesError>
-    {
-        let serialized_bytes: SerializedBytes = sb.try_into()?;
-        Ok(Self(UnsafeBytes::from(serialized_bytes).try_into()?))
+/// convert `LinkTag` into `SerializedBytes` (Infallible)
+impl From<LinkTag> for SerializedBytes {
+    fn from(tag: LinkTag) -> SerializedBytes {
+        SerializedBytes::from(UnsafeBytes::from(tag.0))
     }
 }
 
-
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
-pub struct Data {
-    pub latitude: f64,
-    pub longitude: f64,
+/// Creates a `LinkTag` from `SerializedBytes` (Infallible)
+impl From<SerializedBytes> for LinkTag {
+    fn from(sb: SerializedBytes) -> Self {
+        Self(UnsafeBytes::from(sb).into())
+    }
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
+
+    #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+    pub struct Data {
+        pub latitude: f64,
+        pub longitude: f64,
+    }
     #[test]
-    fn test_link_tag() {
+    fn link_tag_roundtrip() {
         let location = Data {
             latitude: 4.518758758758,
-            longitude:4.718758758973
-        };   
-        let sb =  SerializedBytes::try_from(location).unwrap();
-        let endtag = LinkTag::try_from(sb.clone()).unwrap();
-        let back_to_sb:SerializedBytes = endtag.clone().try_into().unwrap();
-        assert_eq!(sb.bytes().to_vec(), back_to_sb.bytes().to_vec());
+            longitude: 4.718758758973,
+        };
+        let sb = SerializedBytes::try_from(location.clone()).unwrap();
+        let tag = LinkTag::from(sb);
+        let back_to_sb: SerializedBytes = tag.into();
+        //let back_to_sb = SerializedBytes::from(tag); //  -> also works
+        let back_to_location: Data = back_to_sb.try_into().unwrap();
+        assert_eq!(location.latitude, back_to_location.latitude);
     }
 }
