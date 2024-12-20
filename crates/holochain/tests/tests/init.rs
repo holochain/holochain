@@ -9,6 +9,7 @@ use holochain::core::ribosome::error::RibosomeError;
 use holochain::core::workflow::WorkflowError;
 use holochain::prelude::*;
 use holochain::sweettest::*;
+use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_in_inline_zomes_passes() {
@@ -432,7 +433,39 @@ async fn call_init_with_invalid_parameters_from_init_across_cells() {
             .unwrap()
     );
     let_assert!(WasmErrorInner::Host(err_msg) = error);
+    assert_eq!(
+        err_msg,
+        "The callback has invalid parameters: invalid type: unit value, expected usize"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn call_init_directly_only_calls_once() {
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::InitSingle]).await;
+    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+
+    let zome = app.cells()[0].zome(TestWasm::InitSingle);
+    let callback_result = conductor
+        .call_fallible::<_, InitCallbackResult>(&zome, "init", ())
+        .await
+        .unwrap();
+
     assert!(
-        err_msg == "The callback has invalid parameters: invalid type: unit value, expected usize"
+        matches!(callback_result, InitCallbackResult::Pass),
+        "Wanted Pass but was: {:?}",
+        callback_result
+    );
+
+    let callback_result = conductor
+        .call::<_, InitCallbackResult>(&zome, "init", ())
+        .await;
+
+    assert!(
+        matches!(callback_result, InitCallbackResult::Pass),
+        "Wanted Pass but was: {:?}",
+        callback_result
     );
 }
