@@ -1,4 +1,5 @@
 use holo_hash::ActionHash;
+#[cfg(not(feature = "wasmer_wamr"))]
 use holochain::conductor::conductor::WASM_CACHE;
 use holochain::sweettest::*;
 use holochain_wasm_test_utils::TestWasm;
