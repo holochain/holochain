@@ -10,7 +10,14 @@
 
       craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
 
-      apple_sdk = if system == "x86_64-darwin" then [ pkgs.apple-sdk_10_15 ] else [ ];
+      apple_sdk = if system == "x86_64-darwin" then [ pkgs.apple-sdk_10_15 ] else
+      (with pkgs.darwin.apple_sdk_11_0.frameworks; [
+        AppKit
+        CoreFoundation
+        CoreServices
+        Security
+        IOKit
+      ]);
 
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
@@ -24,14 +31,7 @@
         CARGO_PROFILE = "";
 
         buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher cmake clang llvmPackages.libclang.lib ])
-          ++ (lib.optionals pkgs.stdenv.isDarwin
-          (apple_sdk ++ (with pkgs.darwin.apple_sdk_11_0.frameworks; [
-            AppKit
-            CoreFoundation
-            CoreServices
-            Security
-            IOKit
-          ])));
+          ++ (lib.optionals pkgs.stdenv.isDarwin apple_sdk);
 
         nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config self'.packages.goWrapper ])
           ++ lib.optionals pkgs.stdenv.isDarwin

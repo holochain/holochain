@@ -12,6 +12,15 @@
 
       crateInfo = craneLib.crateNameFromCargoToml { cargoToml = flake.config.reconciledInputs.lair + "/crates/lair_keystore/Cargo.toml"; };
 
+      apple_sdk = if system == "x86_64-darwin" then [ pkgs.apple-sdk_10_15 ] else
+      (with pkgs.darwin.apple_sdk_11_0.frameworks; [
+        AppKit
+        CoreFoundation
+        CoreServices
+        Security
+        IOKit
+      ]);
+
       commonArgs = {
 
         pname = "lair-keystore";
@@ -27,13 +36,7 @@
         cargoExtraArgs = "--bin lair-keystore";
 
         buildInputs = (with pkgs; [ openssl ])
-          ++ (lib.optionals pkgs.stdenv.isDarwin
-          (with pkgs.darwin.apple_sdk_11_0.frameworks; [
-            AppKit
-            CoreFoundation
-            CoreServices
-            Security
-          ]));
+          ++ (lib.optionals pkgs.stdenv.isDarwin apple_sdk);
 
         nativeBuildInputs = (with pkgs; [ perl pkg-config ])
           ++ lib.optionals pkgs.stdenv.isDarwin
