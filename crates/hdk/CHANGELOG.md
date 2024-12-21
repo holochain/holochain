@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update `holochain_wasmer_guest`.
+
 ## 0.5.0-dev.10
 
 ## 0.5.0-dev.9

@@ -63,9 +63,7 @@ jobs:
             target: wasmer_sys-unstable
 
           # Our intended target for wasmer_wamr feature is iOS and Android.
-          # For now, wasmer_wamr tests are only run on macos-latest.
-          # Additionally, building with wasmer_wamr feature flag on windows is not currently working.
-          # See https://github.com/holochain/holochain-wasmer/issues/117
+          # For now, wasmer_wamr tests are only run on macos-latest
           - os: macos-latest
             target: wasmer_wamr
     steps:
@@ -78,7 +76,7 @@ jobs:
       - name: install build dependencies (macos-latest, wasmer_wamr)
         if: matrix.os == 'macos-latest' && matrix.target == 'wasmer_wamr'
         shell: bash
-        run: brew install cmake
+        run: brew install cmake ninja
 
       - name: build (windows-latest)
         if: matrix.os == 'windows-latest'
