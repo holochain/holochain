@@ -1,4 +1,4 @@
-{ self, lib, ... }: {
+{ self, lib, inputs, ... }: {
   perSystem = { config, self', inputs', pkgs, system, ... }:
     let
       holonixPackages = { holochainOverrides ? { } }:
@@ -25,14 +25,21 @@
       devShells = {
         default = self'.devShells.holonix;
         holonix = pkgs.lib.makeOverridable
-          ({ holochainOverrides }: pkgs.mkShell {
+          ({ holochainOverrides }: (if inputs.versions.stub or false then pkgs.mkShell {
+            shellHook = ''
+                echo "This Holochain version is not supported on the current Holonix version. Please migrate to the new Holonix"
+                echo "See the instructions here: https://developer.holochain.org/resources/upgrade/upgrade-new-holonix/"
+                echo "Alternatively, you can use the quickstart guide provided with the updated Holonix: https://github.com/holochain/holonix"
+                exit 1;
+            '';
+          } else pkgs.mkShell {
             inputsFrom = [ self'.devShells.rustDev ];
             packages = (holonixPackages { inherit holochainOverrides; }) ++ [ hn-introspect ];
             shellHook = ''
               echo Holochain development shell spawned. Type 'exit' to leave.
               export PS1='\n\[\033[1;34m\][holonix:\w]\$\[\033[0m\] '
             '';
-          })
+          }))
           {
             holochainOverrides = { };
           };
