@@ -32,7 +32,7 @@
                 echo "Alternatively, you can use the quickstart guide provided with the updated Holonix: https://github.com/holochain/holonix"
                 exit 1;
             '';
-          } else pkgs.mkShell {
+          } else lib.warn "\n\nThis version of Holonix is being deprecated, please consider migrating: https://developer.holochain.org/resources/upgrade/upgrade-new-holonix/" pkgs.mkShell {
             inputsFrom = [ self'.devShells.rustDev ];
             packages = (holonixPackages { inherit holochainOverrides; }) ++ [ hn-introspect ];
             shellHook = ''
