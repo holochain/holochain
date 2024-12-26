@@ -217,7 +217,6 @@ mod test {
         let sb = SerializedBytes::try_from(location.clone()).unwrap();
         let tag = LinkTag::from(sb);
         let back_to_sb: SerializedBytes = tag.into();
-        //let back_to_sb = SerializedBytes::from(tag); //  -> also works
         let back_to_location: Data = back_to_sb.try_into().unwrap();
         assert_eq!(location.latitude, back_to_location.latitude);
     }
