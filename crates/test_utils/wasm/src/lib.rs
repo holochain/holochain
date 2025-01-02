@@ -50,6 +50,7 @@ pub enum TestWasm {
     InitInvalidReturn,
     InitInvalidParams,
     InitPass,
+    InitSingle,
     Link,
     MigrateInitial,
     MigrateNew,
@@ -164,6 +165,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::InitInvalidReturn => "init_invalid_return",
             TestWasm::InitInvalidParams => "init_invalid_params",
             TestWasm::InitPass => "init_pass",
+            TestWasm::InitSingle => "init_single",
             TestWasm::Link => "link",
             TestWasm::MigrateInitial => "migrate_initial",
             TestWasm::MigrateNew => "migrate_new",
@@ -253,6 +255,7 @@ impl From<TestWasm> for PathBuf {
             TestWasm::InitInvalidReturn => "wasm32-unknown-unknown/release/test_wasm_init_invalid_return.wasm",
             TestWasm::InitInvalidParams => "wasm32-unknown-unknown/release/test_wasm_init_invalid_params.wasm",
             TestWasm::InitPass => "wasm32-unknown-unknown/release/test_wasm_init_pass.wasm",
+            TestWasm::InitSingle => "wasm32-unknown-unknown/release/test_wasm_init_single.wasm",
             TestWasm::Link => "wasm32-unknown-unknown/release/test_wasm_link.wasm",
             TestWasm::MigrateInitial => {
                 "wasm32-unknown-unknown/release/test_wasm_migrate_initial.wasm"

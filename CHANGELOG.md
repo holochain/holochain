@@ -14,6 +14,138 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250101.005800
+
+## [hcterm-0.5.0-dev.12](crates/hcterm/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_cli-0.5.0-dev.12](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain-0.5.0-dev.12](crates/holochain/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_cli\_bundle-0.5.0-dev.12](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.12](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_cascade-0.5.0-dev.12](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_conductor\_api-0.5.0-dev.12](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_conductor\_services-0.4.0-dev.12](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.12)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.12](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_websocket-0.5.0-dev.12](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_state-0.5.0-dev.12](crates/holochain_state/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_p2p-0.5.0-dev.12](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.12)
+
+## [holochain\_chc-0.2.0-dev.12](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.12)
+
+## [holochain\_types-0.5.0-dev.12](crates/holochain_types/CHANGELOG.md#0.5.0-dev.12)
+
+# 20241225.004431
+
+## [hcterm-0.5.0-dev.11](crates/hcterm/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_cli-0.5.0-dev.11](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain-0.5.0-dev.11](crates/holochain/CHANGELOG.md#0.5.0-dev.11)
+
+- Prevent duplicate calls to `init`. Previously, calling `init` directly would result in 2 calls to `init` if the zome had not been initialised yet and 1 call if the zome had been initialised. Now, calling `init` directly will result in 1 call by the conductor to initialise the zome and all subsequent calls to `init` will return `InitCallbackResult::Pass`. This both fixes surprising behavior and allows `init` to be called directly to initialise a zome if desired.
+
+## [holochain\_cli\_bundle-0.5.0-dev.11](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.11](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_cascade-0.5.0-dev.11](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_conductor\_api-0.5.0-dev.11](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_conductor\_services-0.4.0-dev.11](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.11)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.11](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.11](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_websocket-0.5.0-dev.11](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.11)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.11](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.11)
+
+## [holochain\_state-0.5.0-dev.11](crates/holochain_state/CHANGELOG.md#0.5.0-dev.11)
+
+## [hc\_deepkey\_types-0.9.0-dev.8](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.8)
+
+## [hdk-0.5.0-dev.11](crates/hdk/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_p2p-0.5.0-dev.11](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.11)
+
+## [hdi-0.6.0-dev.8](crates/hdi/CHANGELOG.md#0.6.0-dev.8)
+
+## [holochain\_chc-0.2.0-dev.11](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.11)
+
+## [holochain\_types-0.5.0-dev.11](crates/holochain_types/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_keystore-0.5.0-dev.11](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_sqlite-0.5.0-dev.11](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.11)
+
+# 20241218.004735
+
+## [hcterm-0.5.0-dev.10](crates/hcterm/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_cli-0.5.0-dev.10](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain-0.5.0-dev.10](crates/holochain/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_cli\_bundle-0.5.0-dev.10](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.10](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_cascade-0.5.0-dev.10](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_conductor\_api-0.5.0-dev.10](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_conductor\_services-0.4.0-dev.10](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.10)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.10](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.10](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_websocket-0.5.0-dev.10](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.10)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.10](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.10)
+
+## [holochain\_state-0.5.0-dev.10](crates/holochain_state/CHANGELOG.md#0.5.0-dev.10)
+
+## [hc\_deepkey\_types-0.9.0-dev.7](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.7)
+
+## [hdk-0.5.0-dev.10](crates/hdk/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_p2p-0.5.0-dev.10](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_state\_types-0.5.0-dev.6](crates/holochain_state_types/CHANGELOG.md#0.5.0-dev.6)
+
+## [hdi-0.6.0-dev.7](crates/hdi/CHANGELOG.md#0.6.0-dev.7)
+
+## [holochain\_chc-0.2.0-dev.10](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.10)
+
+## [kitsune\_p2p-0.5.0-dev.8](crates/kitsune_p2p/CHANGELOG.md#0.5.0-dev.8)
+
+## [hdk\_derive-0.5.0-dev.7](crates/hdk_derive/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_types-0.5.0-dev.10](crates/holochain_types/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_keystore-0.5.0-dev.10](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_sqlite-0.5.0-dev.10](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_zome\_types-0.5.0-dev.10](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_integrity\_types-0.5.0-dev.6](crates/holochain_integrity_types/CHANGELOG.md#0.5.0-dev.6)
+
+## [holo\_hash-0.5.0-dev.4](crates/holo_hash/CHANGELOG.md#0.5.0-dev.4)
+
 # 20241211.005655
 
 ## [hcterm-0.5.0-dev.9](crates/hcterm/CHANGELOG.md#0.5.0-dev.9)

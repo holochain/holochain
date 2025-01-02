@@ -40,8 +40,8 @@ pub struct AppManifestV1 {
 
     /// Declares that the app may be installed without the need to
     /// specify membrane proofs at installation time. If memproofs are not
-    /// provided at install time, they must be provided later by the
-    /// [`AppRequest::ProvideMemproofs`] call. If memproofs are provided
+    /// provided at install time, they must be provided later before the
+    /// app can be enabled. If memproofs are provided
     /// at install time, the app will be installed as normal, without the
     /// special deferred memproof flow.
     #[serde(default)]
