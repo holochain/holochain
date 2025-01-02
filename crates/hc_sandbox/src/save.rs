@@ -8,7 +8,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use crate::config;
 use holochain_conductor_api::conductor::paths::ConfigFilePath;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 
@@ -97,7 +96,9 @@ pub fn list(hc_dir: PathBuf, verbose: bool) -> anyhow::Result<()> {
             let r = match verbose {
                 false => format!("{}{}: {}\n", out, i, path.display()),
                 true => {
-                    let config = config::read_config(ConfigRootPath::from(path.clone()))?;
+                    let config = holochain_conductor_config::config::read_config(
+                        ConfigRootPath::from(path.clone()),
+                    )?;
                     format!(
                         "{}{}: {}\nConductor Config:\n{:?}\n",
                         out,

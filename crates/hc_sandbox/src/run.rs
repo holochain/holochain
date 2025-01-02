@@ -1,13 +1,18 @@
 //! Helpers for running the conductor.
 
-use anyhow::anyhow;
 use std::path::Path;
 use std::process::Stdio;
 
+use anyhow::anyhow;
 use holochain_conductor_api::conductor::paths::ConfigFilePath;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
+use holochain_conductor_config::config::create_config;
+use holochain_conductor_config::config::read_config;
+use holochain_conductor_config::config::write_config;
+use holochain_conductor_config::ports::random_admin_port;
+use holochain_conductor_config::ports::set_admin_port;
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
 use tokio::io::AsyncBufReadExt;
@@ -18,9 +23,6 @@ use tokio::sync::oneshot;
 use crate::calls::attach_app_interface;
 use crate::calls::AddAppWs;
 use crate::cli::LaunchInfo;
-use crate::config::*;
-use crate::ports::random_admin_port;
-use crate::ports::set_admin_port;
 use crate::CmdRunner;
 
 // MAYBE: Export these strings from their respective repos
@@ -104,7 +106,7 @@ pub async fn run_async(
         Some(c) => c,
         None => {
             let passphrase = holochain_util::pw::pw_get()?;
-            let con_url = crate::generate::init_lair(
+            let con_url = holochain_conductor_config::generate::init_lair(
                 &config_root_path.is_also_data_root_path().try_into()?,
                 passphrase,
             )?;

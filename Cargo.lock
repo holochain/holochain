@@ -3185,6 +3185,7 @@ dependencies = [
  "futures",
  "holochain_chc",
  "holochain_conductor_api",
+ "holochain_conductor_config",
  "holochain_p2p",
  "holochain_trace",
  "holochain_types",
@@ -3235,7 +3236,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_config"
-version = "0.1.0"
+version = "0.5.0-dev.1"
 dependencies = [
  "ansi_term",
  "anyhow",

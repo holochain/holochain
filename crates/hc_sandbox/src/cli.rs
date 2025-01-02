@@ -107,9 +107,6 @@ pub enum HcSandboxSubcommand {
 
     /// Clean (completely remove) sandboxes that are listed in the `$(pwd)/.hc` file.
     Clean,
-
-    /// Create a fresh sandbox with no apps installed.
-    Create(Create),
 }
 
 /// Options for running a sandbox
@@ -202,43 +199,6 @@ impl HcSandbox {
                 crate::save::list(std::env::current_dir()?, verbose)?
             }
             HcSandboxSubcommand::Clean => crate::save::clean(std::env::current_dir()?, Vec::new())?,
-            HcSandboxSubcommand::Create(Create {
-                num_sandboxes,
-                network,
-                root,
-                directories,
-                in_process_lair,
-                #[cfg(feature = "unstable-dpki")]
-                no_dpki,
-                #[cfg(feature = "unstable-dpki")]
-                dpki_network_seed,
-                #[cfg(feature = "chc")]
-                chc_url,
-            }) => {
-                let mut paths = Vec::with_capacity(num_sandboxes);
-                msg!(
-                    "Creating {} conductor sandboxes with same settings",
-                    num_sandboxes
-                );
-                for i in 0..num_sandboxes {
-                    let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
-                    let path = crate::generate::generate(
-                        network,
-                        root.clone(),
-                        directories.get(i).cloned(),
-                        in_process_lair,
-                        #[cfg(feature = "unstable-dpki")]
-                        no_dpki,
-                        #[cfg(feature = "unstable-dpki")]
-                        dpki_network_seed.clone(),
-                        #[cfg(feature = "chc")]
-                        chc_url.clone(),
-                    )?;
-                    paths.push(path);
-                }
-                crate::save::save(std::env::current_dir()?, paths.clone())?;
-                msg!("Created {:?}", paths);
-            }
         }
 
         Ok(())

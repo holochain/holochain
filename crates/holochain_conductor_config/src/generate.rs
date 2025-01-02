@@ -13,7 +13,7 @@ use crate::config::write_config;
 use crate::msg;
 use crate::ports::random_admin_port;
 
-/// Generate a new sandbox.
+/// Generate configurations
 /// This creates a directory containing a [`ConductorConfig`],
 /// a keystore, and a database.
 /// The root directory and inner directory
@@ -71,7 +71,7 @@ pub fn generate_with_config(
     Ok(dir)
 }
 
-/// Generate a new directory structure for a sandbox.
+/// Generate a new directory structure for configurations
 pub fn generate_directory(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
@@ -96,10 +96,7 @@ pub fn generate_directory(
     Ok((config_root_path, con_url))
 }
 
-pub(crate) fn init_lair(
-    dir: &KeystorePath,
-    passphrase: sodoken::BufRead,
-) -> anyhow::Result<url2::Url2> {
+pub fn init_lair(dir: &KeystorePath, passphrase: sodoken::BufRead) -> anyhow::Result<url2::Url2> {
     match init_lair_inner(dir, passphrase) {
         Err(err) => Err(std::io::Error::new(
             std::io::ErrorKind::Other,
