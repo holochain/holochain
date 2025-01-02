@@ -64,7 +64,12 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
         }
         hc_dir.push(".hc");
         if hc_dir.exists() {
-            std::fs::remove_file(hc_dir)?;
+            std::fs::remove_file(&hc_dir)?;
+        }
+        hc_dir.pop();
+        hc_dir.push(".hc_auth");
+        if hc_dir.exists() {
+            std::fs::remove_file(&hc_dir)?;
         }
     }
     Ok(())
