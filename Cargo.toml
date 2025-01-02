@@ -28,6 +28,7 @@ members = [
   "crates/holochain_nonce",
   "crates/holochain_secure_primitive",
   "crates/holochain_conductor_services",
+  "crates/holochain_conductor_config",
 
   "crates/hc_deepkey_sdk",
   "crates/hc_deepkey_types",
