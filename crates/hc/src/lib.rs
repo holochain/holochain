@@ -25,7 +25,6 @@ use holochain_cli_run_local_services as hc_run_local_services;
 use holochain_cli_sandbox as hc_sandbox;
 use lazy_static::lazy_static;
 
-mod conductor_config;
 mod external_subcommands;
 
 // TODO: change this so it inherits clap's formatting.
@@ -95,7 +94,7 @@ pub enum CliSubcommand {
     /// Run a local bootstrap and WebRTC signalling server.
     RunLocalServices(hc_run_local_services::HcRunLocalServices),
     /// Work with holochain conductor config manifest files
-    ConductorConfig(conductor_config::ConductorConfigCli),
+    ConductorConfig(holochain_conductor_config::ConductorConfigCli),
     /// Allow redirect of external subcommands (like `hc-scaffold` and `hc-launch`).
     #[command(external_subcommand)]
     External(Vec<String>),

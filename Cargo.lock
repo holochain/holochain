@@ -3112,24 +3112,15 @@ dependencies = [
 name = "holochain_cli"
 version = "0.5.0-dev.9"
 dependencies = [
- "ansi_term",
  "anyhow",
  "clap 4.5.23",
  "holochain_cli_bundle",
  "holochain_cli_run_local_services",
  "holochain_cli_sandbox",
- "holochain_conductor_api",
+ "holochain_conductor_config",
  "holochain_trace",
- "holochain_types",
- "holochain_util",
- "kitsune_p2p_types",
  "lazy_static",
- "nanoid",
- "serde",
- "serde_yaml",
- "sodoken 0.0.11",
  "tokio",
- "url2",
 ]
 
 [[package]]
@@ -3228,6 +3219,26 @@ dependencies = [
  "shrinkwraprs",
  "thiserror 1.0.69",
  "tracing",
+ "url2",
+]
+
+[[package]]
+name = "holochain_conductor_config"
+version = "0.1.0"
+dependencies = [
+ "ansi_term",
+ "anyhow",
+ "clap 4.5.23",
+ "holochain_conductor_api",
+ "holochain_types",
+ "holochain_util",
+ "kitsune_p2p_types",
+ "nanoid",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sodoken 0.0.11",
+ "tokio",
  "url2",
 ]
 

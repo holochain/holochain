@@ -1,50 +1,17 @@
+//! Helpers for generating new directories and [`ConductorConfig`].
+
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand};
-use holochain_cli_sandbox::config::{create_config, write_config};
-use holochain_conductor_api::conductor::paths::{ConfigRootPath, KeystorePath};
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
-use holochain_types::websocket::AllowedOrigins;
+use holochain_conductor_api::config::conductor::KeystoreConfig;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
-macro_rules! msg {
-    ($($arg:tt)*) => ({
-        use ansi_term::Color::*;
-        print!("{} ", Blue.bold().paint("hc-sandbox:"));
-        println!($($arg)*);
-    })
-}
-
-#[derive(Debug, Parser, Clone)]
-pub struct ConductorConfigCli {
-    #[command(subcommand)]
-    command: ConductorConfigCmd,
-}
-
-#[derive(Debug, Subcommand, Clone)]
-pub enum ConductorConfigCmd {
-    Create {
-        #[arg(short, long)]
-        path: PathBuf,
-        #[arg(short, long)]
-        in_process_lair: bool,
-    },
-}
-
-impl ConductorConfigCli {
-    pub async fn run(self) -> anyhow::Result<()> {
-        match self.command {
-            ConductorConfigCmd::Create {
-                path,
-                in_process_lair,
-            } => {
-                let _ = generate(path, in_process_lair)?;
-            }
-        }
-        Ok(())
-    }
-}
+use crate::config::create_config;
+use crate::config::write_config;
+use crate::msg;
+use crate::ports::random_admin_port;
 
 /// Generate a new sandbox.
 /// This creates a directory containing a [`ConductorConfig`],
@@ -52,11 +19,16 @@ impl ConductorConfigCli {
 /// The root directory and inner directory
 /// (where this sandbox will be created) can be overridden.
 /// For example `my_root_dir/this_sandbox_dir/`
-pub fn generate(path: PathBuf, in_process_lair: bool) -> anyhow::Result<ConfigRootPath> {
-    let (dir, con_url) = generate_directory(path, in_process_lair)?;
+pub fn generate(
+    network: Option<KitsuneP2pConfig>,
+    root: Option<PathBuf>,
+    directory: Option<PathBuf>,
+    in_process_lair: bool,
+) -> anyhow::Result<ConfigRootPath> {
+    let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url)?;
-    config.network = KitsuneP2pConfig::mem();
+    config.network = network.unwrap_or_else(KitsuneP2pConfig::mem);
     random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config);
     msg!("Config {:?}", config);
@@ -76,19 +48,46 @@ pub fn generate(path: PathBuf, in_process_lair: bool) -> anyhow::Result<ConfigRo
     Ok(dir)
 }
 
+/// Generate a new sandbox from a full config.
+pub fn generate_with_config(
+    config: Option<ConductorConfig>,
+    root: Option<PathBuf>,
+    directory: Option<PathBuf>,
+) -> anyhow::Result<ConfigRootPath> {
+    let (dir, con_url) = generate_directory(root, directory, true)?;
+    let config = match config {
+        Some(config) => config,
+        None => {
+            let mut config = create_config(dir.clone(), con_url.clone())?;
+            config.keystore = KeystoreConfig::LairServer {
+                connection_url: con_url.expect(
+                    "Lair should have been initialised but did not get a connection URL for it",
+                ),
+            };
+            config
+        }
+    };
+    write_config(dir.clone(), &config);
+    Ok(dir)
+}
+
 /// Generate a new directory structure for a sandbox.
 pub fn generate_directory(
-    path: PathBuf,
-    in_process_lair: bool,
+    root: Option<PathBuf>,
+    directory: Option<PathBuf>,
+    initialise_lair: bool,
 ) -> anyhow::Result<(ConfigRootPath, Option<url2::Url2>)> {
     let passphrase = holochain_util::pw::pw_get()?;
 
-    std::fs::create_dir_all(&path)?;
+    let mut dir = root.unwrap_or_else(std::env::temp_dir);
+    let directory = directory.unwrap_or_else(|| nanoid::nanoid!().into());
+    dir.push(directory);
+    std::fs::create_dir(&dir)?;
 
-    let config_root_path = ConfigRootPath::from(path);
+    let config_root_path = ConfigRootPath::from(dir);
     let keystore_path = KeystorePath::try_from(config_root_path.is_also_data_root_path())?;
 
-    let con_url = if in_process_lair {
+    let con_url = if initialise_lair {
         Some(init_lair(&keystore_path, passphrase)?)
     } else {
         None
@@ -102,16 +101,19 @@ pub(crate) fn init_lair(
     passphrase: sodoken::BufRead,
 ) -> anyhow::Result<url2::Url2> {
     match init_lair_inner(dir, passphrase) {
-        Ok(url) => Ok(url),
         Err(err) => Err(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Failed to execute 'lair-keystore init': {:?}", err),
         )
         .into()),
+        Ok(url) => Ok(url),
     }
 }
 
-fn init_lair_inner(dir: &KeystorePath, passphrase: sodoken::BufRead) -> anyhow::Result<url2::Url2> {
+pub(crate) fn init_lair_inner(
+    dir: &KeystorePath,
+    passphrase: sodoken::BufRead,
+) -> anyhow::Result<url2::Url2> {
     let mut cmd = std::process::Command::new("lair-keystore");
 
     cmd.args(["init", "--piped"])
@@ -142,25 +144,4 @@ fn init_lair_inner(dir: &KeystorePath, passphrase: sodoken::BufRead) -> anyhow::
     let conf: Conf = serde_yaml::from_slice(&conf)?;
 
     Ok(conf.connection_url)
-}
-
-fn random_admin_port(config: &mut ConductorConfig) {
-    match config.admin_interfaces.as_mut().and_then(|i| i.first_mut()) {
-        Some(AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket { port, .. },
-        }) => {
-            if *port != 0 {
-                *port = 0;
-            }
-        }
-        None => {
-            let port = 0;
-            config.admin_interfaces = Some(vec![AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket {
-                    port,
-                    allowed_origins: AllowedOrigins::Any,
-                },
-            }]);
-        }
-    }
 }
