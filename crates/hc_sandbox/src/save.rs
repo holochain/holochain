@@ -68,6 +68,12 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
             std::fs::remove_file(&hc_dir)
                 .with_context(|| format!("Failed to remove .hc file at {}", hc_dir.display()))?;
         }
+        hc_dir.pop();
+        hc_dir.push(".hc_auth");
+        if hc_dir.exists() {
+            std::fs::remove_file(&hc_dir)
+                .with_context(|| format!("Failed to remove .hc_auth file at {}", hc_dir.display()))?;
+        }
     }
     Ok(())
 }

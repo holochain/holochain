@@ -81,7 +81,11 @@ pub async fn zome_call_auth(
     zome_call_auth: ZomeCallAuth,
     admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
+    println!("Creating zome call authorization");
+
     let admin_port = admin_port_from_connect_args(zome_call_auth.connect_args, admin_port).await?;
+
+    println!("Connecting to conductor on port: {}", admin_port);
 
     let app_client = AppClient::try_new(admin_port, zome_call_auth.app_id.clone()).await?;
     let app_info = app_client.request(AppRequest::AppInfo).await?;
@@ -103,10 +107,14 @@ pub async fn zome_call_auth(
     let mut client = CmdRunner::try_new(admin_port).await?;
 
     holochain_util::pw::pw_set_piped(zome_call_auth.piped);
-    println!("Enter new passphrase to authorize zome calls: ");
+    if !zome_call_auth.piped {
+        println!("Enter new passphrase to authorize zome calls: ");
+    }
     let passphrase = holochain_util::pw::pw_get().context("Failed to get passphrase")?;
 
     let (auth, key) = generate_signing_credentials(passphrase)?;
+
+    println!("Prepared authorization for zome calls");
 
     let signing_agent_key = AgentPubKey::from_raw_32(key.verifying_key().as_bytes().to_vec());
 
