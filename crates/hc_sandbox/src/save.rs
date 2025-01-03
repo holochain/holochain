@@ -57,14 +57,18 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
             if entry.file_type()?.is_file() {
                 if let Some(s) = entry.file_name().to_str() {
                     if s.starts_with(".hc_live_") {
-                        std::fs::remove_file(entry.path())?;
+                        if let Err(e) = std::fs::remove_file(entry.path()) {
+                            tracing::error!("Failed to remove {} because {:?}", entry.path().display(), e);
+                        }
                     }
                 }
             }
         }
         hc_dir.push(".hc");
         if hc_dir.exists() {
-            std::fs::remove_file(hc_dir)?;
+            if let Err(e) = std::fs::remove_file(&hc_dir) {
+                tracing::error!("Failed to remove {} because {:?}", hc_dir.display(), e);
+            }
         }
     }
     Ok(())
