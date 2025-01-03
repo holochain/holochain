@@ -366,7 +366,7 @@ impl TestCase {
         let dna_hash = dna_file.dna_hash().clone();
         let ribosome = RealRibosome::new(
             dna_file.clone(),
-            Arc::new(RwLock::new(ModuleCache::new(None))),
+            Some(Arc::new(RwLock::new(ModuleCache::new(None)))),
         )
         .await
         .unwrap();
