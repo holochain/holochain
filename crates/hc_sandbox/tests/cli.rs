@@ -664,7 +664,8 @@ async fn shutdown_sandbox(child: Child) {
             windows::Win32::System::Console::GenerateConsoleCtrlEvent(
                 windows::Win32::System::Console::CTRL_C_EVENT,
                 0,
-            ).unwrap();
+            )
+            .unwrap();
         }
     }
 }
