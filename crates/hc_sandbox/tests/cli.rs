@@ -344,7 +344,7 @@ async fn generate_sandbox_with_roles_settings_override() {
     match app_info {
         AppResponse::AppInfo(Some(info)) => {
             let roles = info.manifest.app_roles();
-            assert!(roles.len() == 3);
+            assert_eq!(3, roles.len());
 
             //- Test that the modifiers for role 1 and role 2 have been overridden properly
             let role1 = roles
@@ -592,6 +592,8 @@ async fn authorize_zome_call_credentials() {
     let mut cmd = get_sandbox_command();
     let mut child = cmd
         .arg("zome-call-auth")
+        .arg("--running")
+        .arg(launch_info.admin_port.to_string())
         .arg("--piped")
         .arg("test-app")
         .kill_on_drop(true)
@@ -664,6 +666,8 @@ async fn call_zome_function() {
     let mut cmd = get_sandbox_command();
     let mut child = cmd
         .arg("zome-call-auth")
+        .arg("--running")
+        .arg(launch_info.admin_port.to_string())
         .arg("--piped")
         .arg("test-app")
         .kill_on_drop(true)
@@ -684,12 +688,12 @@ async fn call_zome_function() {
     let exit_code = child.wait().await.unwrap();
     assert!(exit_code.success(), "Failed with exit code {:?}", exit_code);
 
-    println!("Auth done, ready to call");
-
     // Make the call
     let mut cmd = get_sandbox_command();
     let mut child = cmd
         .arg("zome-call")
+        .arg("--running")
+        .arg(launch_info.admin_port.to_string())
         .arg("--piped")
         .arg("test-app")
         .arg(dna_hash.to_string())
