@@ -1,10 +1,10 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
-use holochain_cli_sandbox::config::read_config;
 use holochain_conductor_api::conductor::ConductorConfig;
 #[cfg(feature = "unstable-dpki")]
 use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
+use holochain_conductor_config::config::read_config;
 use holochain_types::app::InstalledAppId;
 use holochain_types::prelude::{SerializedBytes, SerializedBytesError, Timestamp, YamlProperties};
 use holochain_websocket::{
