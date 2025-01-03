@@ -658,8 +658,7 @@ async fn shutdown_sandbox(mut child: Child) {
     {
         // This kills the process and will not give the sandbox a chance to shut down cleanly.
         // That means the Holochain process will be left behind.
-        let exit_code = child.kill().await.expect("Failed to kill child process");
-        assert!(exit_code.success());
+        child.kill().await.expect("Failed to kill child process");
     }
 }
 
