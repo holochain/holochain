@@ -192,7 +192,7 @@ impl From<LinkTag> for SerializedBytes {
     }
 }
 
-/// Creates a `LinkTag` from `SerializedBytes` (Infallible)
+/// Convert `SerializedBytes` into a `LinkTag` (Infallible)
 impl From<SerializedBytes> for LinkTag {
     fn from(sb: SerializedBytes) -> Self {
         Self::new(sb.bytes().clone())
