@@ -208,6 +208,7 @@ mod test {
         pub latitude: f64,
         pub longitude: f64,
     }
+
     #[test]
     fn link_tag_roundtrip() {
         let location = Data {
