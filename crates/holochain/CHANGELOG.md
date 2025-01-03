@@ -14,6 +14,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Update `holochain_wasmer_host`, remove temporary fork of wasmer and update wasmer to 5.x.
 - Disable wasmer module caching when using the feature flag `wasmer_wamr`, as caching is not relevevant when wasms are interpreted.
 
+## 0.5.0-dev.12
+
+## 0.5.0-dev.11
+
+- Prevent duplicate calls to `init`. Previously, calling `init` directly would result in 2 calls to `init` if the zome had not been initialised yet and 1 call if the zome had been initialised. Now, calling `init` directly will result in 1 call by the conductor to initialise the zome and all subsequent calls to `init` will return `InitCallbackResult::Pass`. This both fixes surprising behavior and allows `init` to be called directly to initialise a zome if desired.
+
 ## 0.5.0-dev.10
 
 ## 0.5.0-dev.9
