@@ -654,7 +654,20 @@ async fn shutdown_sandbox(mut child: Child) {
         assert!(exit_code.success());
     }
 
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        let pid = child.id().expect("Failed to get PID");
+        unsafe {
+            windows::Win32::System::Console::AttachConsole(pid);
+            windows::Win32::System::Console::SetConsoleCtrlHandler(None, true);
+            windows::Win32::System::Console::GenerateConsoleCtrlEvent(
+                windows::Win32::System::Console::CTRL_C_EVENT,
+                0,
+            );
+        }
+    }
+
+    #[cfg(all(not(unix), not(windows)))]
     {
         // This kills the process and will not give the sandbox a chance to shut down cleanly.
         // That means the Holochain process will be left behind.
