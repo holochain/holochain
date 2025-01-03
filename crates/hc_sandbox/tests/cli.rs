@@ -647,7 +647,8 @@ async fn shutdown_sandbox(mut child: Child) {
         use nix::unistd::Pid;
 
         let pid = child.id().expect("Failed to get PID");
-        nix::sys::signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT).expect("Failed to send SIGINT");
+        nix::sys::signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT)
+            .expect("Failed to send SIGINT");
 
         let exit_code = child.wait().await.unwrap();
         assert!(exit_code.success());
