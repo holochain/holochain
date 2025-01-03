@@ -640,12 +640,13 @@ async fn get_created_conductor_config(process: &mut Child) -> ConductorConfig {
     panic!("getting created conductor config failed");
 }
 
-async fn shutdown_sandbox(mut child: Child) {
+async fn shutdown_sandbox(child: Child) {
     #[cfg(unix)]
     {
         use nix::sys::signal::Signal;
         use nix::unistd::Pid;
 
+        let mut child = child;
         let pid = child.id().expect("Failed to get PID");
         nix::sys::signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT)
             .expect("Failed to send SIGINT");
@@ -658,20 +659,13 @@ async fn shutdown_sandbox(mut child: Child) {
     {
         let pid = child.id().expect("Failed to get PID");
         unsafe {
-            windows::Win32::System::Console::AttachConsole(pid);
-            windows::Win32::System::Console::SetConsoleCtrlHandler(None, true);
+            windows::Win32::System::Console::AttachConsole(pid).unwrap();
+            windows::Win32::System::Console::SetConsoleCtrlHandler(None, true).unwrap();
             windows::Win32::System::Console::GenerateConsoleCtrlEvent(
                 windows::Win32::System::Console::CTRL_C_EVENT,
                 0,
-            );
+            ).unwrap();
         }
-    }
-
-    #[cfg(all(not(unix), not(windows)))]
-    {
-        // This kills the process and will not give the sandbox a chance to shut down cleanly.
-        // That means the Holochain process will be left behind.
-        child.kill().await.expect("Failed to kill child process");
     }
 }
 
