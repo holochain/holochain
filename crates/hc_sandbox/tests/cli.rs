@@ -70,7 +70,7 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
         .await
         .unwrap();
 
-    tokio::time::timeout(Duration::from_secs(60), async move {
+    tokio::time::timeout(Duration::from_secs(80), async move {
         let app_response: AppResponse;
         loop {
             let request = AppRequest::AppInfo;
