@@ -1,3 +1,76 @@
+//! ## Making zome calls with the `hc sandbox zome-call` command
+//!
+//! To get started, you need a running conductor with an app installed. This example uses a sandbox
+//! conductor with a single app.
+//!
+//! ```shell
+//! hc sandbox generate --run=0 ./my-app.happ --app-id my-app
+//! ```
+//!
+//! Enter a passphrase for the conductor when prompted. This passphrase is used to protect the Lair
+//! keystore and an encryption key for Holochain data is derived from it.
+//!
+//! Now you have a running conductor, switch to a new shell and `cd` to the same directory that
+//! you started the sandbox in. You should find a `.hc` file in this directory.
+//!
+//! Next we need to authorize zome calls for the app. Do this by running the following command,
+//! providing the installed app id of the app you want to authorize zome calls for.
+//!
+//! ```shell
+//! hc sandbox zome-call-auth my-app
+//! ```
+//!
+//! You will be prompted for another passphrase. This is NOT the same as the conductor passphrase
+//! you were prompted for above. This passphrase is used to derive a signing key for zome calls.
+//! For testing, it is your choice whether to use the same passphrase. However, it is important to
+//! understand that this passphrase is used to create signing keys that are valid when used
+//! remotely. Using a simple or easily guessable passphrase here could allow somebody to make zome
+//! calls as you, over the internet. They would need to know more than the passphrase to do this,
+//! but it is recommended to use a strong passphrase.
+//!
+//! After entering a passphrase you should see a message logged for each cell in your app that zome
+//! calls have been authorized for it. You are now ready to make a zome call.
+//!
+//! To make a zome call, you need a DNA hash, zome name, function name, and a payload. You can
+//! get the DNA hash for a cell by running the following command:
+//!
+//! ```shell
+//! hc sandbox list-apps
+//! ```
+//!
+//! Look for your app, and then look for a DNA hash that looks something like
+//! `DnaHash(uhC0kIlrhnyl83p3E7PGwhNA3qx6who2f1W873C1xFQI_3SxnrR-A)`. It's the inner part that you
+//! need to provide, which is the base64 encoded DNA hash.
+//!
+//! Now let's make a zome call:
+//!
+//! ```shell
+//! hc sandbox zome-call my-app uhC0kIlrhnyl83p3E7PGwhNA3qx6who2f1W873C1xFQI_3SxnrR-A my-zome my-function '{"my": "payload"}'
+//! ```
+//!
+//! You will be prompted for your password again. This is used in combination with the `.hc_auth`
+//! file to re-generate your signing keys and to sign the zome call.
+//!
+//! Notice that the payload is provided as JSON. This is deserialized into a general data structure
+//! that can accept any valid JSON. It is then converted to msgpack which is what the conductor
+//! expects. The reverse is done with the zome call response. The msgpack is decoded into a general
+//! data structure and then serialized back to JSON for output. You should see the result of your
+//! zome call printed in your shell.
+//!
+//! There is a special case for calling a cell's `init` function. This hook does not require a
+//! signed payload because it always runs as the agent that installed the DNA. This means that you
+//! can skip the `zome-call-auth` step if you just want to initialise a cell.
+//!
+//! An existing conductor can be used with the `--running` or `--force-admin-ports` flags to the sandbox.
+//! The force admin ports flag has a higher priority than the `--running` flag. Otherwise, the `.hc` file
+//! in the current directory is used to find the admin port.
+//!
+//! These commands can also be used for headless operation by piping the passphrase in with the
+//! `--piped` flag. Note that the `--piped` flag is part of the `zome-call-auth` and `zome-call`
+//! commands and is not the same as the `--piped` global flag for the sandbox that allows you to
+//! pipe the conductor passphrase. These flags aren't used together because the zome call commands
+//! do not need the conductor passphrase.
+
 use crate::cmds::Existing;
 use crate::ports::get_admin_ports;
 use crate::CmdRunner;
@@ -81,11 +154,7 @@ pub async fn zome_call_auth(
     zome_call_auth: ZomeCallAuth,
     admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
-    println!("Creating zome call authorization");
-
     let admin_port = admin_port_from_connect_args(zome_call_auth.connect_args, admin_port).await?;
-
-    println!("Connecting to conductor on port: {}", admin_port);
 
     let app_client = AppClient::try_new(admin_port, zome_call_auth.app_id.clone()).await?;
     let app_info = app_client.request(AppRequest::AppInfo).await?;
@@ -108,13 +177,11 @@ pub async fn zome_call_auth(
 
     holochain_util::pw::pw_set_piped(zome_call_auth.piped);
     if !zome_call_auth.piped {
-        println!("Enter new passphrase to authorize zome calls: ");
+        msg!("Enter new passphrase to authorize zome calls: ");
     }
     let passphrase = holochain_util::pw::pw_get().context("Failed to get passphrase")?;
 
     let (auth, key) = generate_signing_credentials(passphrase)?;
-
-    println!("Prepared authorization for zome calls");
 
     let signing_agent_key = AgentPubKey::from_raw_32(key.verifying_key().as_bytes().to_vec());
 
@@ -135,7 +202,7 @@ pub async fn zome_call_auth(
             )))
             .await?;
 
-        println!("Authorized zome calls for cell: {:?}", cell_id);
+        msg!("Authorized zome calls for cell: {:?}", cell_id);
     }
 
     Ok(())
@@ -178,7 +245,7 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
 
     holochain_util::pw::pw_set_piped(zome_call.piped);
     if !zome_call.piped {
-        println!("Enter passphrase to authorize zome calls: ");
+        msg!("Enter passphrase to authorize zome calls: ");
     }
     let passphrase = holochain_util::pw::pw_get().context("Failed to get passphrase")?;
 
