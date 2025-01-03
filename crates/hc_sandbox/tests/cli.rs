@@ -659,7 +659,7 @@ async fn shutdown_sandbox(child: Child) {
     {
         let pid = child.id().expect("Failed to get PID");
         unsafe {
-            windows::Win32::System::Console::AttachConsole(pid).unwrap();
+            windows::Win32::System::Console::AttachConsole(pid).ok();
             windows::Win32::System::Console::SetConsoleCtrlHandler(None, true).unwrap();
             windows::Win32::System::Console::GenerateConsoleCtrlEvent(
                 windows::Win32::System::Console::CTRL_C_EVENT,
