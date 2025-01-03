@@ -24,7 +24,6 @@ impl LinkType {
     pub fn new(u: u8) -> Self {
         Self(u)
     }
-
     pub fn into_inner(self) -> u8 {
         self.0
     }
@@ -203,7 +202,7 @@ impl From<SerializedBytes> for LinkTag {
 mod test {
     use super::*;
 
-    #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+    #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
     pub struct Data {
         pub latitude: f64,
         pub longitude: f64,
@@ -219,6 +218,6 @@ mod test {
         let tag = LinkTag::from(sb);
         let back_to_sb: SerializedBytes = tag.into();
         let back_to_location: Data = back_to_sb.try_into().unwrap();
-        assert_eq!(location.latitude, back_to_location.latitude);
+        assert_eq!(location, back_to_location);
     }
 }
