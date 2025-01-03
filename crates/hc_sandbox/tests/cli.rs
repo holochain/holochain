@@ -607,7 +607,7 @@ async fn authorize_zome_call_credentials() {
         .stdin
         .take()
         .unwrap()
-        .write(b"test-phrase\n")
+        .write_all(b"test-phrase\n")
         .await
         .unwrap();
 
@@ -681,7 +681,7 @@ async fn call_zome_function() {
         .stdin
         .take()
         .unwrap()
-        .write(b"test-phrase\n")
+        .write_all(b"test-phrase\n")
         .await
         .unwrap();
 
@@ -710,7 +710,7 @@ async fn call_zome_function() {
         .stdin
         .take()
         .unwrap()
-        .write(b"test-phrase\n")
+        .write_all(b"test-phrase\n")
         .await
         .unwrap();
 
