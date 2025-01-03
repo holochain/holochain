@@ -185,7 +185,7 @@ impl TryInto<String> for LinkTag {
     }
 }
 
-/// convert `LinkTag` into `SerializedBytes` (Infallible)
+/// Convert a `LinkTag` into `SerializedBytes` (Infallible)
 impl From<LinkTag> for SerializedBytes {
     fn from(tag: LinkTag) -> SerializedBytes {
         SerializedBytes::from(UnsafeBytes::from(tag.0))
