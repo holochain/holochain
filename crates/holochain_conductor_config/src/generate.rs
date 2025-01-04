@@ -25,25 +25,12 @@ pub fn generate(
     directory: Option<PathBuf>,
     in_process_lair: bool,
 ) -> anyhow::Result<ConfigRootPath> {
-    let (dir, con_url) = generate_directory(root, directory, !in_process_lair)?;
+    let (dir, con_url) = generate_directory(root, directory, in_process_lair)?;
 
     let mut config = create_config(dir.clone(), con_url)?;
     config.network = network.unwrap_or_else(KitsuneP2pConfig::mem);
     random_admin_port(&mut config);
-    let path = write_config(dir.clone(), &config);
-    msg!("Config {:?}", config);
-    msg!(
-        "Created directory at: {} {} It has also been saved to a file called `.hc` in your current working directory.",
-        ansi_term::Style::new()
-            .bold()
-            .underline()
-            .on(ansi_term::Color::Fixed(254))
-            .fg(ansi_term::Color::Fixed(4))
-            .paint(dir.display().to_string()),
-        ansi_term::Style::new()
-            .bold()
-            .paint("Keep this path to rerun the same sandbox.")
-    );
+    let path = write_config(dir.clone(), &config)?;
     msg!("Created config at {}", path.display());
     Ok(dir)
 }
@@ -67,7 +54,7 @@ pub fn generate_with_config(
             config
         }
     };
-    write_config(dir.clone(), &config);
+    write_config(dir.clone(), &config)?;
     Ok(dir)
 }
 
@@ -75,7 +62,7 @@ pub fn generate_with_config(
 pub fn generate_directory(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
-    initialise_lair: bool,
+    in_process_lair: bool,
 ) -> anyhow::Result<(ConfigRootPath, Option<url2::Url2>)> {
     let passphrase = holochain_util::pw::pw_get()?;
 
@@ -87,11 +74,13 @@ pub fn generate_directory(
     let config_root_path = ConfigRootPath::from(dir);
     let keystore_path = KeystorePath::try_from(config_root_path.is_also_data_root_path())?;
 
-    let con_url = if initialise_lair {
+    let con_url = if !in_process_lair {
         Some(init_lair(&keystore_path, passphrase)?)
     } else {
         None
     };
+
+    msg!("Connection URL? {:?}", con_url);
 
     Ok((config_root_path, con_url))
 }

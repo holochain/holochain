@@ -15,7 +15,7 @@ pub fn force_admin_port(config_root_path: ConfigRootPath, port: u16) -> anyhow::
     let mut config =
         read_config(config_root_path.clone())?.expect("Failed to find config to force admin port");
     set_admin_port(&mut config, port);
-    write_config(config_root_path, &config);
+    write_config(config_root_path, &config)?;
     Ok(())
 }
 
