@@ -577,8 +577,8 @@ async fn authorize_zome_call_credentials() {
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
-    let hc_admin = input_piped_password(&mut cmd).await;
-    let launch_info = get_launch_info(hc_admin).await;
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
 
     // Wait for the app to be available
     get_app_info(
@@ -639,8 +639,8 @@ async fn call_zome_function() {
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
-    let hc_admin = input_piped_password(&mut cmd).await;
-    let launch_info = get_launch_info(hc_admin).await;
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
 
     println!("Got launch info: {:?}", launch_info);
 
