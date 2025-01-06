@@ -647,13 +647,12 @@ async fn get_created_conductor_config(process: &mut Child) -> ConductorConfig {
     panic!("getting created conductor config failed");
 }
 
-async fn shutdown_sandbox(child: Child) {
+async fn shutdown_sandbox(mut child: Child) {
     #[cfg(unix)]
     {
         use nix::sys::signal::Signal;
         use nix::unistd::Pid;
 
-        let mut child = child;
         let pid = child.id().expect("Failed to get PID");
         nix::sys::signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT)
             .expect("Failed to send SIGINT");
@@ -662,18 +661,11 @@ async fn shutdown_sandbox(child: Child) {
         assert!(exit_code.success());
     }
 
-    #[cfg(windows)]
+    #[cfg(not(unix))]
     {
-        let pid = child.id().expect("Failed to get PID");
-        unsafe {
-            windows::Win32::System::Console::AttachConsole(pid).ok();
-            windows::Win32::System::Console::SetConsoleCtrlHandler(None, true).unwrap();
-            windows::Win32::System::Console::GenerateConsoleCtrlEvent(
-                windows::Win32::System::Console::CTRL_C_EVENT,
-                0,
-            )
-            .unwrap();
-        }
+        // Best effort to shut down for platforms that don't support sending signals in a
+        // simple way.
+        child.kill().await.unwrap();
     }
 }
 
