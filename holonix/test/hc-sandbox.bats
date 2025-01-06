@@ -20,7 +20,7 @@ teardown() {
 @test "expected hc-sandbox to clean, create, and run a sandbox" {
   set -uEeo pipefail
 
-  echo pass | hc-sandbox --piped create -n1
+  echo pass | hc-sandbox --piped generate -n1
   (echo pass | hc-sandbox --piped run 0) &
 
   declare result
