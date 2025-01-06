@@ -34,7 +34,7 @@ holochain_chc = { version = "^0.2.0-dev.9", path = "../holochain_chc", optional 
 holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.5.0-dev.9", features = [
   "sqlite",
 ] }
-holochain_types = { path = "../holochain_types", version = "^0.5.0-dev.12", features = [
+holochain_types = { path = "../holochain_types", version = "^0.5.0-dev.9", features = [
   "sqlite",
 ] }
 holochain_conductor_config = { path = "../holochain_conductor_config", version = "^0.5.0-dev.1" }
