@@ -215,12 +215,6 @@ impl Default for Create {
             root: None,
             directories: Vec::with_capacity(0),
             in_process_lair: false,
-            #[cfg(feature = "unstable-dpki")]
-            no_dpki: false,
-            #[cfg(feature = "unstable-dpki")]
-            dpki_network_seed: None,
-            #[cfg(feature = "chc")]
-            chc_url: None,
         }
     }
 }
