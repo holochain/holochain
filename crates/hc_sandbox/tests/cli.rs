@@ -193,9 +193,9 @@ async fn generate_sandbox_and_connect() {
 
     println!("@@ {cmd:?}");
 
-    let hc_admin = input_piped_password(&mut cmd).await;
+    let mut hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(hc_admin).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
 
     // - Connect to the app interface and wait for the app to show up in AppInfo
     get_app_info(
@@ -204,6 +204,8 @@ async fn generate_sandbox_and_connect() {
         *launch_info.app_ports.first().expect("No app ports found"),
     )
     .await;
+
+    shutdown_sandbox(hc_admin).await;
 }
 
 /// Generates a new sandbox with a single app deployed and tries to list DNA
@@ -229,9 +231,9 @@ async fn generate_sandbox_and_call_list_dna() {
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
-    let hc_admin = input_piped_password(&mut cmd).await;
+    let mut hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(hc_admin).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -245,6 +247,8 @@ async fn generate_sandbox_and_call_list_dna() {
 
     let exit_code = hc_call.wait().await.unwrap();
     assert!(exit_code.success());
+
+    shutdown_sandbox(hc_admin).await;
 }
 
 /// Generates a new sandbox with a single app deployed with membrane_proof_deferred
@@ -271,9 +275,9 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
-    let hc_admin = input_piped_password(&mut cmd).await;
+    let mut hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(hc_admin).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -287,6 +291,8 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
 
     let exit_code = hc_call.wait().await.unwrap();
     assert!(exit_code.success());
+
+    shutdown_sandbox(hc_admin).await;
 }
 
 /// Generates a new sandbox with roles settings overridden by a yaml file passed via
@@ -318,9 +324,9 @@ async fn generate_sandbox_with_roles_settings_override() {
 
     println!("@@ {cmd:?}");
 
-    let hc_admin = input_piped_password(&mut cmd).await;
+    let mut hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(hc_admin).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
 
     // - Make a call to list app info to the port
     let app_info = get_app_info(
@@ -408,6 +414,8 @@ async fn generate_sandbox_with_roles_settings_override() {
         }
         _ => panic!("AppResponse is of the wrong type"),
     }
+
+    shutdown_sandbox(hc_admin).await;
 }
 
 include!(concat!(env!("OUT_DIR"), "/target.rs"));
@@ -440,13 +448,24 @@ fn get_sandbox_command() -> Command {
     Command::new(get_target("hc-sandbox"))
 }
 
-async fn get_launch_info(mut child: Child) -> LaunchInfo {
+async fn get_launch_info(child: &mut Child) -> LaunchInfo {
     let stdout = child.stdout.take().unwrap();
     let mut lines = BufReader::new(stdout).lines();
+
     while let Ok(Some(line)) = lines.next_line().await {
-        println!("@@@@@-{line}-@@@@@");
+        println!("@@@-{line}-@@@");
         if let Some(index) = line.find("#!0") {
             let launch_info_str = &line[index + 3..].trim();
+
+            // On windows, this task stays alive and holds the stdout pipe open
+            // so that the tests don't finish.
+            #[cfg(not(windows))]
+            tokio::task::spawn(async move {
+                while let Ok(Some(line)) = lines.next_line().await {
+                    println!("@@@-{line}-@@@");
+                }
+            });
+
             return serde_json::from_str::<LaunchInfo>(launch_info_str).unwrap();
         }
     }
@@ -458,6 +477,28 @@ async fn input_piped_password(cmd: &mut Command) -> Child {
     let mut child_stdin = child_process.stdin.take().unwrap();
     child_stdin.write_all(b"test-phrase\n").await.unwrap();
     child_process
+}
+
+async fn shutdown_sandbox(mut child: Child) {
+    #[cfg(unix)]
+    {
+        use nix::sys::signal::Signal;
+        use nix::unistd::Pid;
+
+        let pid = child.id().expect("Failed to get PID");
+        nix::sys::signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT)
+            .expect("Failed to send SIGINT");
+
+        let exit_code = child.wait().await.unwrap();
+        assert!(exit_code.success());
+    }
+
+    #[cfg(not(unix))]
+    {
+        // Best effort to shut down for platforms that don't support sending signals in a
+        // simple way.
+        child.kill().await.unwrap();
+    }
 }
 
 struct WsPoll(tokio::task::JoinHandle<()>);

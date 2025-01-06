@@ -162,7 +162,10 @@ impl HcSandbox {
                     let structured = self.structured.clone();
 
                     let result = tokio::select! {
-                        result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
+                        result = tokio::signal::ctrl_c() => {
+                            msg!("Received Ctrl-C, shutting down");
+                            result.map_err(anyhow::Error::from)
+                        }
                         result = run_n(&holochain_path, paths, ports, force_admin_ports, structured) => result,
                     };
                     crate::save::release_ports(std::env::current_dir()?).await?;
@@ -179,7 +182,10 @@ impl HcSandbox {
                 let force_admin_ports = self.force_admin_ports.clone();
 
                 let result = tokio::select! {
-                    result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
+                    result = tokio::signal::ctrl_c() => {
+                        msg!("Received Ctrl-C, shutting down");
+                        result.map_err(anyhow::Error::from)
+                    }
                     result = run_n(&holochain_path, paths.into_iter().map(ConfigRootPath::from).collect(), ports, force_admin_ports, self.structured) => result,
                 };
                 crate::save::release_ports(std::env::current_dir()?).await?;
