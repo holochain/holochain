@@ -930,6 +930,106 @@ async fn check_app_entry_def_test() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn app_validation_workflow_correctly_sets_state_and_status() {
+    holochain_trace::test_run();
+
+    let entry_def = EntryDef::default_from_id("entry_def_id");
+    let zomes = SweetInlineZomes::new(vec![entry_def], 0)
+        .integrity_function("validate", |_, _: Op| Ok(ValidateCallbackResult::Valid));
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let dna_hash = dna_file.dna_hash().clone();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id().clone();
+
+    let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
+        conductor
+            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
+            .unwrap(),
+        conductor.get_dht_db(&dna_hash).unwrap(),
+        conductor.get_dht_db_cache(&dna_hash).unwrap(),
+        conductor.get_cache_db(&cell_id).await.unwrap(),
+        conductor.keystore(),
+        Arc::new(dna_file.dna_def().clone()),
+    ));
+
+    // Check there are no ops to app validate as genesis entries should have already been validated
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
+
+    // Create op to validate
+    let mut create = fixt!(Create);
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: Default::default(),
+    });
+    let dht_create_op = ChainOp::StoreEntry(
+        fixt!(Signature),
+        NewEntryAction::Create(create),
+        fixt!(Entry),
+    );
+    let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+
+    // Insert op to validate in DHT DB and mark ready for app validation
+    app_validation_workspace.dht_db.test_write(move |txn| {
+        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
+        put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
+    });
+
+    // Check op is now counted as op to validate
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 1);
+
+    // Run validation workflow
+    let outcome_summary = app_validation_workflow_inner(
+        Arc::new(dna_hash.clone()),
+        app_validation_workspace.clone(),
+        conductor.raw_handle(),
+        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        conductor
+            .get_or_create_space(&dna_hash)
+            .unwrap()
+            .dht_query_cache,
+    )
+    .await
+    .unwrap();
+
+    // Check the outcome of the validation flow is as expected
+    assert_matches!(
+        outcome_summary,
+        OutcomeSummary {
+            ops_to_validate: 1,
+            validated: 1,
+            accepted: 1,
+            rejected: 0,
+            warranted: 0,
+            missing: 0,
+            failed: empty_set,
+        } if empty_set == HashSet::<DhtOpHash>::new()
+    );
+
+    // There should be no more ops to validate
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
+}
+
 /// Three agent test.
 /// Alice is bypassing validation.
 /// Bob and Carol are running a DNA with validation that will reject any new action authored.
