@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_sandbox"
-version = "0.5.0-dev.9"
+version = "0.5.0-dev.12"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_sandbox"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
@@ -30,11 +30,11 @@ chrono = { version = "0.4.22", default-features = false, features = [
 ] }
 clap = { version = "4.0", features = ["derive", "env"] }
 futures = "0.3"
-holochain_chc = { version = "^0.2.0-dev.9", path = "../holochain_chc", optional = true }
-holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.5.0-dev.9", features = [
+holochain_chc = { version = "^0.2.0-dev.12", path = "../holochain_chc", optional = true }
+holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.5.0-dev.12", features = [
   "sqlite",
 ] }
-holochain_types = { path = "../holochain_types", version = "^0.5.0-dev.9", features = [
+holochain_types = { path = "../holochain_types", version = "^0.5.0-dev.12", features = [
   "sqlite",
 ] }
 holochain_conductor_config = { path = "../holochain_conductor_config", version = "^0.5.0-dev.1" }

@@ -2,7 +2,7 @@
   inputs =
     {
       holochain = {
-        url = "github:holochain/holochain/holochain-0.5.0-dev.10";
+        url = "github:holochain/holochain/holochain-0.4.0-rc.2";
         flake = false;
       };
 
@@ -13,18 +13,19 @@
 
       # holochain_cli_launch
       launcher = {
-        url = "github:holochain/hc-launch/holochain-weekly";
+        url = "github:holochain/hc-launch/holochain-0.4";
         flake = false;
       };
 
       # holochain_scaffolding_cli
       scaffolding = {
-        url = "github:holochain/scaffolding/holochain-weekly";
+        url = "github:holochain/scaffolding/holochain-0.4";
         flake = false;
       };
     };
 
   outputs = { ... }: {
-    rustVersion = "1.83.0";
+    stub = true;
+    rustVersion = "1.80.1";
   };
 }

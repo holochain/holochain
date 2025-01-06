@@ -44,7 +44,7 @@ static-clippy-unstable:
 
 # ensure we can build the docs
 static-doc:
-	$(F) cargo doc
+	RUSTDOCFLAGS=-Dwarnings cargo doc
 
 # build all targets
 # this not only builds the test binaries for usage by `test-workspace`,
