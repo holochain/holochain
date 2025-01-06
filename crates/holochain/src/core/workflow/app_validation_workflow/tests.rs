@@ -993,6 +993,11 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             .len();
     assert_eq!(ops_to_validate, 1);
 
+    // Check that genesis ops are currently validated and integrated
+    app_validation_workspace
+        .dht_db
+        .test_read(|txn| assert_eq!(num_valid(txn), 7));
+
     // Run validation workflow
     let outcome_summary = app_validation_workflow_inner(
         Arc::new(dna_hash.clone()),
@@ -1028,6 +1033,11 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             .unwrap()
             .len();
     assert_eq!(ops_to_validate, 0);
+
+    // Check that the new op is validated and integrated
+    app_validation_workspace
+        .dht_db
+        .test_read(|txn| assert_eq!(num_valid(txn), 8));
 }
 
 /// Three agent test.
