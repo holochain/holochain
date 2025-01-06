@@ -2,10 +2,7 @@
 
 use std::path::PathBuf;
 
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::conductor::paths::KeystorePath;
-use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_api::config::conductor::KeystoreConfig;
+use holochain_conductor_api::conductor::paths::{ConfigRootPath, KeystorePath};
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use crate::config::create_config;
@@ -32,29 +29,6 @@ pub fn generate(
     random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config)?;
     msg!("Created config at {}", path.display());
-    Ok(dir)
-}
-
-/// Generate a new sandbox from a full config.
-pub fn generate_with_config(
-    config: Option<ConductorConfig>,
-    root: Option<PathBuf>,
-    directory: Option<PathBuf>,
-) -> anyhow::Result<ConfigRootPath> {
-    let (dir, con_url) = generate_directory(root, directory, true)?;
-    let config = match config {
-        Some(config) => config,
-        None => {
-            let mut config = create_config(dir.clone(), con_url.clone())?;
-            config.keystore = KeystoreConfig::LairServer {
-                connection_url: con_url.expect(
-                    "Lair should have been initialised but did not get a connection URL for it",
-                ),
-            };
-            config
-        }
-    };
-    write_config(dir.clone(), &config)?;
     Ok(dir)
 }
 

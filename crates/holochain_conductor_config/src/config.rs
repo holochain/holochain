@@ -1,10 +1,8 @@
 //! Helpers for creating, reading and writing [`ConductorConfig`]s.
 
 use anyhow::Context;
-use holochain_conductor_api::conductor::paths::ConfigFilePath;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::config::conductor::ConductorConfig;
-use holochain_conductor_api::config::conductor::KeystoreConfig;
+use holochain_conductor_api::conductor::paths::{ConfigFilePath, ConfigRootPath};
+use holochain_conductor_api::config::conductor::{ConductorConfig, KeystoreConfig};
 
 /// Create a new default [`ConductorConfig`] with data_root_path path,
 /// keystore, and database all in the same directory.

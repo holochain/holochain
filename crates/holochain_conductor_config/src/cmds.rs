@@ -1,6 +1,5 @@
 use clap::Parser;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
-use kitsune_p2p_types::config::TransportConfig;
+use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
 use url2::Url2;
 
 #[derive(Debug, Parser, Clone)]
