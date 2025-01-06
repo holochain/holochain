@@ -20,6 +20,10 @@ macro_rules! msg {
 
 #[derive(Debug, Parser, Clone)]
 pub struct ConductorConfigCli {
+    /// Collect the lair passphrase by reading stdin to the end.
+    #[arg(short, long)]
+    piped: bool,
+
     #[command(subcommand)]
     command: ConductorConfigCmd,
 }
@@ -58,6 +62,7 @@ impl ConductorConfigCli {
                 directrory,
                 in_process_lair,
             } => {
+                holochain_util::pw::pw_set_piped(self.piped);
                 msg!("Creating configurations");
                 let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
                 let path = crate::generate::generate(network, root, directrory, in_process_lair)?;

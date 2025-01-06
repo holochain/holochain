@@ -14,6 +14,10 @@ edition = "2021"
 license = "Apache-2.0"
 description = "Provides utilities for generating holochain conductor configuration."
 
+[[bin]]
+name = "hc-conductor-config"
+path = "../holochain_conductor_config/src/bin/main.rs"
+
 # reminder - do not use workspace deps
 [dependencies]
 anyhow = "1.0"
@@ -36,6 +40,9 @@ serde_yaml = "0.9"
 sodoken = "=0.0.11"
 tokio = { version = "1.36.0", features = ["full"] }
 url2 = "0.0.6"
+
+[dev-dependencies]
+tempfile = "3.15"
 
 [lints]
 workspace = true
