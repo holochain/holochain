@@ -588,11 +588,15 @@ fn get_sandbox_command() -> Command {
 async fn get_launch_info(child: &mut Child) -> LaunchInfo {
     let stdout = child.stdout.take().unwrap();
     let mut lines = BufReader::new(stdout).lines();
+
     while let Ok(Some(line)) = lines.next_line().await {
         println!("@@@-{line}-@@@");
         if let Some(index) = line.find("#!0") {
             let launch_info_str = &line[index + 3..].trim();
 
+            // On windows, this task stays alive and holds the stdout pipe open
+            // so that the tests don't finish.
+            #[cfg(not(windows))]
             tokio::task::spawn(async move {
                 while let Ok(Some(line)) = lines.next_line().await {
                     println!("@@@-{line}-@@@");
@@ -628,6 +632,9 @@ async fn get_created_conductor_config(process: &mut Child) -> ConductorConfig {
                 .unwrap()
                 .unwrap();
 
+            // On windows, this task stays alive and holds the stdout pipe open
+            // so that the tests don't finish.
+            #[cfg(not(windows))]
             tokio::task::spawn(async move {
                 while let Ok(Some(line)) = lines.next_line().await {
                     println!("@@@-{line}-@@@");
