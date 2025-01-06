@@ -1,4 +1,4 @@
-//! Helpers for generating new directories and [`ConductorConfig`].
+//! Helpers for generating new directories and `ConductorConfig`.
 
 use std::path::PathBuf;
 
@@ -11,11 +11,9 @@ use crate::msg;
 use crate::ports::random_admin_port;
 
 /// Generate configurations
-/// This creates a directory containing a [`ConductorConfig`],
+/// This creates a directory containing a `ConductorConfig`,
 /// a keystore, and a database.
 /// The root directory and inner directory
-/// (where this sandbox will be created) can be overridden.
-/// For example `my_root_dir/this_sandbox_dir/`
 pub fn generate(
     network: Option<KitsuneP2pConfig>,
     root: Option<PathBuf>,
