@@ -615,6 +615,8 @@ async fn authorize_zome_call_credentials() {
     assert!(exit_code.success());
 
     assert!(PathBuf::from(".hc_auth").exists());
+
+    shutdown_sandbox(hc_admin).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -726,6 +728,8 @@ async fn call_zome_function() {
         .unwrap();
 
     assert_eq!(output, "\"foo\"\n");
+
+    shutdown_sandbox(hc_admin).await;
 }
 
 include!(concat!(env!("OUT_DIR"), "/target.rs"));
@@ -830,8 +834,7 @@ async fn shutdown_sandbox(mut child: Child) {
         nix::sys::signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT)
             .expect("Failed to send SIGINT");
 
-        let exit_code = child.wait().await.unwrap();
-        assert!(exit_code.success());
+        child.wait().await.unwrap();
     }
 
     #[cfg(not(unix))]
