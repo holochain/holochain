@@ -266,8 +266,15 @@ pub struct Conductor {
 
     pub(crate) running_services: RwShare<ConductorServices>,
 
-    /// File system and in-memory cache for wasmer modules.
-    // Used in ribosomes but kept here as a single instance.
+    /// Cache for wasmer modules, both on disk and in memory.
+    ///
+    /// This cache serves as a central storage location for wasmer modules,
+    /// shared across all ribosomes. The cache is optional and can be disabled by
+    /// setting it to `None`.
+    ///
+    /// Note: When using the `wasmer_wamr` feature, it's recommended to disable
+    /// this cache since modules are interpreted at runtime rather than compiled,
+    /// making caching unnecessary.
     pub(crate) wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
 
     app_auth_token_store: RwShare<AppAuthTokenStore>,
