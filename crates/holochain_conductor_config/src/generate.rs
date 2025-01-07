@@ -12,8 +12,7 @@ use crate::ports::random_admin_port;
 
 /// Generate configurations
 /// This creates a directory containing a `ConductorConfig`,
-/// a keystore, and a database.
-/// The root directory and inner directory
+/// a keystore, and a database root directory.
 pub fn generate(
     network: Option<KitsuneP2pConfig>,
     root: Option<PathBuf>,
