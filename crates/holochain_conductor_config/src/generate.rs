@@ -8,7 +8,7 @@ use kitsune_p2p_types::config::KitsuneP2pConfig;
 use crate::config::create_config;
 use crate::config::write_config;
 use crate::msg;
-use crate::ports::random_admin_port;
+use crate::ports::set_random_admin_port;
 
 /// Generate configurations
 /// This creates a directory containing a `ConductorConfig`,
@@ -23,7 +23,7 @@ pub fn generate(
 
     let mut config = create_config(dir.clone(), con_url)?;
     config.network = network.unwrap_or_else(KitsuneP2pConfig::mem);
-    random_admin_port(&mut config);
+    set_random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config)?;
     msg!("Created config at {}", path.display());
     Ok(dir)

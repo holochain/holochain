@@ -7,7 +7,7 @@ use holochain_types::websocket::AllowedOrigins;
 
 use crate::msg;
 
-pub fn random_admin_port(config: &mut ConductorConfig) {
+pub fn set_random_admin_port(config: &mut ConductorConfig) {
     match config.admin_interfaces.as_mut().and_then(|i| i.first_mut()) {
         Some(AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket { port, .. },
