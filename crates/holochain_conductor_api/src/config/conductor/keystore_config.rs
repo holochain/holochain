@@ -32,7 +32,7 @@ pub enum KeystoreConfig {
         /// "lair-keystore-config.yaml" file.
         /// If not specified, will default to the ConductorConfig
         /// `[environment_path]/ks`.
-        #[schemars(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         lair_root: Option<KeystorePath>,
     },
 }

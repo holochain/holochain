@@ -63,8 +63,7 @@
     "keystore": {
       "description": "Define how Holochain conductor will connect to a keystore.",
       "default": {
-        "type": "lair_server_in_proc",
-        "lair_root": null
+        "type": "lair_server_in_proc"
       },
       "allOf": [
         {

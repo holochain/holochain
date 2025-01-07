@@ -1,3 +1,5 @@
+//! Custom schema representations for serializing third-party types in JSON Schema format.
+
 use schemars::{
     gen::SchemaGenerator,
     schema::{InstanceType, Schema, SchemaObject},
