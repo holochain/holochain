@@ -4,13 +4,13 @@
 //! to / from a `.hc` file.
 //! This is very much WIP and subject to change.
 
+use crate::config;
+use anyhow::Context;
+use holochain_conductor_api::conductor::paths::ConfigFilePath;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::OnceLock;
-
-use crate::config;
-use holochain_conductor_api::conductor::paths::ConfigFilePath;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
 
 /// Save all sandboxes to the `.hc` file in the `hc_dir` directory.
 pub fn save(mut hc_dir: PathBuf, paths: Vec<ConfigRootPath>) -> anyhow::Result<()> {
@@ -57,14 +57,16 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
             if entry.file_type()?.is_file() {
                 if let Some(s) = entry.file_name().to_str() {
                     if s.starts_with(".hc_live_") {
-                        std::fs::remove_file(entry.path())?;
+                        std::fs::remove_file(entry.path())
+                            .with_context(|| format!("Failed to remove live lock at {}", s))?;
                     }
                 }
             }
         }
         hc_dir.push(".hc");
         if hc_dir.exists() {
-            std::fs::remove_file(hc_dir)?;
+            std::fs::remove_file(&hc_dir)
+                .with_context(|| format!("Failed to remove .hc file at {}", hc_dir.display()))?;
         }
     }
     Ok(())
