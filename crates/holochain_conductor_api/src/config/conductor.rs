@@ -56,10 +56,6 @@
 use crate::conductor::process::ERROR_CODE;
 use holochain_types::prelude::DbSyncStrategy;
 use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
-use schemars::gen::SchemaGenerator;
-use schemars::schema::InstanceType;
-use schemars::schema::Schema;
-use schemars::schema::SchemaObject;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -137,7 +133,7 @@ pub struct ConductorConfig {
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
     /// If you don't know what this means, leave this setting alone (as `None`)
-    #[serde(default)]
+    #[schemars(default, schema_with = "holochain_util::jsonschema::url2_schema")]
     #[cfg(feature = "chc")]
     pub chc_url: Option<url2::Url2>,
 
@@ -292,15 +288,6 @@ impl Default for ConductorTuningParams {
             min_publish_interval: None,
         }
     }
-}
-
-// custom schema for Url2
-pub(crate) fn url2_schema(_: &mut SchemaGenerator) -> Schema {
-    Schema::Object(SchemaObject {
-        instance_type: Some(InstanceType::String.into()),
-        format: Some("uri".to_string()),
-        ..Default::default()
-    })
 }
 
 #[cfg(test)]

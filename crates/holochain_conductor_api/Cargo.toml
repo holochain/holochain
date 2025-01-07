@@ -21,6 +21,9 @@ holochain_state_types = { version = "^0.5.0-dev.6", path = "../holochain_state_t
 holochain_serialized_bytes = "=0.0.55"
 holochain_types = { version = "^0.5.0-dev.12", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.5.0-dev.10", path = "../holochain_zome_types" }
+holochain_util = { version = "^0.5.0-dev.0", path = "../holochain_util", features = [
+  "jsonschema",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tracing = "0.1.26"

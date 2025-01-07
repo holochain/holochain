@@ -2,11 +2,7 @@
 #![allow(missing_docs)]
 
 use crate::tx_utils::TxUrl;
-use schemars::{
-    gen::SchemaGenerator,
-    schema::{InstanceType, Schema, SchemaObject},
-    JsonSchema,
-};
+use schemars::JsonSchema;
 use url2::Url2;
 
 /// Fifteen minutes
@@ -410,7 +406,7 @@ pub struct KitsuneP2pConfig {
     pub transport_pool: Vec<TransportConfig>,
 
     /// The service used for peers to discover each before they are peers.
-    #[schemars(schema_with = "url2_schema")]
+    #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub bootstrap_service: Option<Url2>,
 
     /// Network tuning parameters. These are managed loosely,
@@ -508,13 +504,4 @@ pub enum TransportConfig {
     /// A transport that uses the local memory transport protocol
     /// (this is mainly for testing)
     Mem {},
-}
-
-// Custom Url2 schema
-fn url2_schema(_: &mut SchemaGenerator) -> Schema {
-    Schema::Object(SchemaObject {
-        instance_type: Some(InstanceType::String.into()),
-        format: Some("uri".to_string()),
-        ..Default::default()
-    })
 }
