@@ -109,7 +109,7 @@ fn pipe_password_to_process(cmd: &mut Command, password: &str) -> Result<Child, 
 fn test_config_files_are_generated() {
     let ctx = TestContext::new();
     let mut cli_process = ctx
-        .run_create_config_command("test-phrase", &[])
+        .run_create_config_command("test-phrase", &["--in-process-lair"])
         .expect("Failed to run create command");
 
     let config_path = ctx.get_config_root_path(&mut cli_process);
@@ -120,15 +120,9 @@ fn test_config_files_are_generated() {
     );
 
     let conductor_config = config_path.join("conductor-config.yaml");
-    let keystore_config = config_path.join("ks").join("lair-keystore-config.yaml");
     assert!(
         conductor_config.exists(),
         "conductor-config.yaml not found at {:?}",
         conductor_config
-    );
-    assert!(
-        keystore_config.exists(),
-        "lair-keystore-config.yaml not found at {:?}",
-        keystore_config
     );
 }
