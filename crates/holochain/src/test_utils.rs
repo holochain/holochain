@@ -850,6 +850,21 @@ async fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
     .unwrap()
 }
 
+/// Get count of ops that have been successfully validated and integrated
+pub async fn get_valid_and_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
+    db.read_async(move |txn| -> DatabaseResult<usize> {
+        Ok(txn.query_row(
+            "SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
+            named_params!{
+                ":status": ValidationStatus::Valid,
+            },
+            |row| row.get(0),
+        )?)
+    })
+    .await
+    .unwrap()
+}
+
 /// Get all [`DhtOps`](holochain_types::prelude::DhtOp) integrated by this node
 pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp> {
     db.read_async(move |txn| -> StateQueryResult<Vec<DhtOp>> {

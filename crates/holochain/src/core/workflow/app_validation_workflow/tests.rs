@@ -9,7 +9,8 @@ use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
 use crate::test_utils::{
-    host_fn_caller::*, new_invocation, new_zome_call_params, wait_for_integration,
+    get_valid_and_integrated_count, host_fn_caller::*, new_invocation, new_zome_call_params,
+    wait_for_integration,
 };
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
@@ -994,9 +995,10 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     assert_eq!(ops_to_validate, 1);
 
     // Check that genesis ops are currently validated and integrated
-    app_validation_workspace
-        .dht_db
-        .test_read(|txn| assert_eq!(num_valid(txn), 7));
+    assert_eq!(
+        get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
+        7
+    );
 
     // Run validation workflow
     let outcome_summary = app_validation_workflow_inner(
@@ -1035,9 +1037,10 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
     assert_eq!(ops_to_validate, 0);
 
     // Check that the new op is validated and integrated
-    app_validation_workspace
-        .dht_db
-        .test_read(|txn| assert_eq!(num_valid(txn), 8));
+    assert_eq!(
+        get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
+        8
+    );
 }
 
 /// Three agent test.
@@ -1335,16 +1338,6 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     .unwrap()
 }
 
-fn num_valid(txn: &Transaction) -> usize {
-    txn
-    .query_row("SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
-            named_params!{
-                ":status": ValidationStatus::Valid,
-            },
-            |row| row.get(0))
-            .unwrap()
-}
-
 async fn run_test(
     alice_cell_id: CellId,
     bob_cell_id: CellId,
@@ -1382,12 +1375,14 @@ async fn run_test(
             let limbo = show_limbo(txn);
             assert!(limbo_is_empty(txn), "{:?}", limbo);
 
-            assert_eq!(num_valid(txn), expected_count);
-
             Ok(())
         })
         .await
         .unwrap();
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count
+    );
 
     let (invalid_action_hash, invalid_entry_hash) =
         commit_invalid(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
@@ -1417,14 +1412,17 @@ async fn run_test(
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
-                // Expect having one invalid op for the store entry.
-                assert_eq!(num_valid(txn), expected_count - 1);
 
                 Ok(())
             }
         })
         .await
         .unwrap();
+    // Expect having one invalid op for the store entry.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - 1
+    );
 
     let zome_call_params =
         new_zome_call_params(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
@@ -1456,14 +1454,17 @@ async fn run_test(
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
-                // Expect having one invalid op for the store entry.
-                assert_eq!(num_valid(txn), expected_count - 1);
 
                 Ok(())
             }
         })
         .await
         .unwrap();
+    // Expect having one invalid op for the store entry.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - 1
+    );
 
     let invocation = new_invocation(
         &bob_cell_id,
@@ -1507,14 +1508,17 @@ async fn run_test(
                     &check_invalid_entry_hash
                 ));
                 assert!(expected_invalid_link(txn, &check_invalid_link_hash));
-                // Expect having two invalid ops for the two store entries.
-                assert_eq!(num_valid(txn), expected_count - 2);
 
                 Ok(())
             }
         })
         .await
         .unwrap();
+    // Expect having two invalid ops for the two store entries.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - 2
+    );
 
     let invocation = new_invocation(
         &bob_cell_id,
@@ -1556,14 +1560,17 @@ async fn run_test(
                     &check_invalid_entry_hash
                 ));
                 assert!(expected_invalid_link(txn, &check_invalid_link_hash));
-                // Expect having two invalid ops for the two store entries.
-                assert_eq!(num_valid(txn), expected_count - 2);
 
                 Ok(())
             }
         })
         .await
         .unwrap();
+    // Expect having two invalid ops for the two store entries.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - 2
+    );
 
     let invocation = new_invocation(
         &bob_cell_id,
@@ -1608,14 +1615,17 @@ async fn run_test(
                 ));
                 assert!(expected_invalid_link(txn, &check_invalid_link_hash));
                 assert!(expected_invalid_remove_link(txn, &invalid_remove_hash));
-                // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
-                assert_eq!(num_valid(txn), expected_count - (3 + 1));
 
                 Ok(())
             }
         })
         .await
         .unwrap();
+    // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - (3 + 1)
+    );
     expected_count
 }
 
@@ -1659,13 +1669,16 @@ async fn run_test_entry_def_id(
                 &invalid_action_hash,
                 &invalid_entry_hash
             ));
-            // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
-            assert_eq!(num_valid(txn), expected_count - 5);
 
             Ok(())
         })
         .await
         .unwrap();
+    // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - 5
+    );
 }
 
 // Need to "hack holochain" because otherwise the invalid
