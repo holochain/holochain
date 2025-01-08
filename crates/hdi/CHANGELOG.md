@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Update `holochain_wasmer_guest`, remove temporary fork of wasmer and update wasmer to 5.x.
 
+## 0.6.0-dev.9
+
 ## 0.6.0-dev.8
 
 ## 0.6.0-dev.7
