@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update `holochain_wasmer_host`, remove temporary fork of wasmer and update wasmer to 5.x.
+- Disable wasmer module caching when using the feature flag `wasmer_wamr`, as caching is not relevevant when wasms are interpreted.
+
 ## 0.4.0
 
 ## 0.4.0-rc.2

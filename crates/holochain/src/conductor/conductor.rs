@@ -48,6 +48,7 @@ use futures::future;
 use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
+#[cfg(feature = "wasmer_sys")]
 use holochain_wasmer_host::module::ModuleCache;
 use itertools::Itertools;
 use rusqlite::Transaction;
@@ -260,9 +261,16 @@ pub struct Conductor {
 
     pub(crate) running_services: RwShare<ConductorServices>,
 
-    /// File system and in-memory cache for wasmer modules.
-    // Used in ribosomes but kept here as a single instance.
-    pub(crate) wasmer_module_cache: Arc<ModuleCacheLock>,
+    /// Cache for wasmer modules, both on disk and in memory.
+    ///
+    /// This cache serves as a central storage location for wasmer modules,
+    /// shared across all ribosomes. The cache is optional and can be disabled by
+    /// setting it to `None`.
+    ///
+    /// Note: When using the `wasmer_wamr` feature, it's recommended to disable
+    /// this cache since modules are interpreted at runtime rather than compiled,
+    /// making caching unnecessary.
+    pub(crate) wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
 
     app_auth_token_store: RwShare<AppAuthTokenStore>,
 
@@ -324,9 +332,12 @@ mod startup_shutdown_impls {
                 holochain_p2p,
                 post_commit,
                 running_services: RwShare::new(ConductorServices::default()),
-                wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
+                #[cfg(feature = "wasmer_sys")]
+                wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(
                     maybe_data_root_path.map(|p| p.join(WASM_CACHE)),
-                ))),
+                )))),
+                #[cfg(feature = "wasmer_wamr")]
+                wasmer_module_cache: None,
                 app_auth_token_store: RwShare::default(),
                 app_broadcast: AppBroadcast::default(),
             }
@@ -688,8 +699,13 @@ mod dna_impls {
             // try to join all the tasks and return the list of dna files
             let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
                 let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
+
+                #[cfg(feature = "wasmer_sys")]
                 let ribosome =
                     RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
+                #[cfg(feature = "wasmer_wamr")]
+                let ribosome = RealRibosome::new(dna_file, None).await?;
+
                 ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
             });
             let dnas = futures::future::try_join_all(wasms).await?;
