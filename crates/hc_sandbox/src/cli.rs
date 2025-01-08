@@ -98,7 +98,7 @@ pub enum HcSandboxSubcommand {
     /// Make a call to a conductor's admin interface.
     Call(crate::calls::Call),
 
-    /// Authorize credentials for making zome calls.
+    /// Create and authorize credentials for making zome calls.
     ZomeCallAuth(crate::zome_call::ZomeCallAuth),
 
     /// Make a call to a zome function on a running app.

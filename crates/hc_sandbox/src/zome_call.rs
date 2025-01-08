@@ -35,7 +35,7 @@
 //! get the DNA hash for a cell by running the following command:
 //!
 //! ```shell
-//! hc sandbox list-apps
+//! hc sandbox call list-apps
 //! ```
 //!
 //! Look for your app, and then look for a DNA hash that looks something like
@@ -181,7 +181,7 @@ pub async fn zome_call_auth(
     }
     let passphrase = holochain_util::pw::pw_get().context("Failed to get passphrase")?;
 
-    let (auth, key) = generate_signing_credentials(passphrase)?;
+    let (auth, key) = generate_signing_credentials(passphrase).await?;
 
     let signing_agent_key = AgentPubKey::from_raw_32(key.verifying_key().as_bytes().to_vec());
 
@@ -249,7 +249,7 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
     }
     let passphrase = holochain_util::pw::pw_get().context("Failed to get passphrase")?;
 
-    let (auth, key) = generate_signing_credentials(passphrase)?;
+    let (auth, key) = generate_signing_credentials(passphrase).await?;
 
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now())
         .map_err(|e| anyhow::anyhow!("Failed to generate nonce: {:?}", e))?;
@@ -289,33 +289,31 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
     Ok(())
 }
 
-fn generate_signing_credentials(
+async fn generate_signing_credentials(
     passphrase: BufRead,
 ) -> anyhow::Result<(Auth, ed25519_dalek::SigningKey)> {
-    if unsafe { libsodium_sys::sodium_init() } < 0 {
-        anyhow::bail!("Failed to initialize libsodium");
-    }
+    let auth = load_or_create_auth().await?;
 
-    let auth = load_or_create_auth()?;
+    let salt =
+        sodoken::BufReadSized::<{ sodoken::hash::argon2id::SALTBYTES }>::from(auth.salt.as_ref());
 
-    let mut out = [0u8; 32];
-    if unsafe {
+    let hash = <sodoken::BufWriteSized<32>>::new_no_lock();
+    {
         let read_guard = passphrase.read_lock();
-        libsodium_sys::crypto_pwhash(
-            out.as_mut_ptr(),
-            out.len() as u64,
-            std::ffi::CString::new(read_guard.as_ref())?.into_raw(),
-            read_guard.len() as u64,
-            auth.salt.as_ptr(),
-            libsodium_sys::crypto_pwhash_OPSLIMIT_INTERACTIVE as u64,
-            libsodium_sys::crypto_pwhash_MEMLIMIT_INTERACTIVE as usize,
-            libsodium_sys::crypto_pwhash_ALG_DEFAULT as i32,
-        ) != 0
-    } {
-        anyhow::bail!("Failed to derive key from password");
+        sodoken::hash::argon2id::hash(
+            hash.clone(),
+            read_guard.to_vec(),
+            salt,
+            sodoken::hash::argon2id::OPSLIMIT_INTERACTIVE,
+            sodoken::hash::argon2id::MEMLIMIT_INTERACTIVE,
+        )
+        .await?;
     }
 
-    Ok((auth, ed25519_dalek::SigningKey::from_bytes(&out)))
+    Ok((
+        auth,
+        ed25519_dalek::SigningKey::from_bytes(hash.try_unwrap().unwrap().as_ref().try_into()?),
+    ))
 }
 
 async fn admin_port_from_connect_args(
@@ -485,21 +483,18 @@ struct Auth {
     cap_secret: CapSecret,
 }
 
-fn create_auth() -> anyhow::Result<Auth> {
-    use rand::RngCore;
+async fn create_auth() -> anyhow::Result<Auth> {
+    let salt = <sodoken::BufWriteSized<{ sodoken::hash::argon2id::SALTBYTES }>>::new_no_lock();
+    sodoken::random::bytes_buf(salt.clone()).await?;
+    let salt = salt.to_read_sized();
 
-    let mut salt = [0u8; libsodium_sys::crypto_pwhash_scryptsalsa208sha256_SALTBYTES as usize];
-    unsafe {
-        libsodium_sys::randombytes_buf(salt.as_mut_ptr() as *mut std::ffi::c_void, salt.len());
-    }
-
-    let mut csprng = rand::rngs::OsRng;
-    let mut cap_secret = [0; CAP_SECRET_BYTES];
-    csprng.fill_bytes(&mut cap_secret);
+    let cap_secret = <sodoken::BufWriteSized<CAP_SECRET_BYTES>>::new_no_lock();
+    sodoken::random::bytes_buf(cap_secret.clone()).await?;
+    let cap_secret = cap_secret.to_read_sized();
 
     let auth = Auth {
-        salt: salt.to_vec(),
-        cap_secret: CapSecret::try_from(cap_secret.to_vec())?,
+        salt: salt.read_lock().as_ref().to_vec(),
+        cap_secret: CapSecret::try_from(cap_secret.read_lock().as_ref().to_vec())?,
     };
     std::fs::write(".hc_auth", serde_json::to_vec(&auth)?)
         .context("Failed to write .hc_auth file")?;
@@ -507,10 +502,10 @@ fn create_auth() -> anyhow::Result<Auth> {
     Ok(auth)
 }
 
-fn load_or_create_auth() -> anyhow::Result<Auth> {
+async fn load_or_create_auth() -> anyhow::Result<Auth> {
     if let Ok(content) = std::fs::read(".hc_auth") {
         Ok(serde_json::from_slice(&content)?)
     } else {
-        create_auth()
+        create_auth().await
     }
 }
