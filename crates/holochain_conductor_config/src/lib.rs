@@ -1,4 +1,3 @@
-pub mod cmds;
 pub mod config;
 pub mod generate;
 pub mod ports;
