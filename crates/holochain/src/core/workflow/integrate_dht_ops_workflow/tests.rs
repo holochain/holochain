@@ -392,6 +392,21 @@ fn register_store_record(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 #[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_store_entry(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let op: DhtOp = ChainOp::StoreEntry(
+        a.signature.clone(),
+        a.original_action.clone(),
+        a.original_entry.clone(),
+    )
+    .into();
+    let pre_state = vec![Db::IntQueue(op.clone())];
+    // StoreEntry op types are integrated as part of the app_validation_workflow and not the
+    // integrate_dht_ops_workflow
+    let expect = vec![Db::IntQueue(op.clone())];
+    (pre_state, expect, "store entry")
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     a.link_add.action_seq = 5;
     let dep: DhtOp =
@@ -548,6 +563,7 @@ async fn test_ops_state() {
 
     let tests = [
         register_store_record,
+        register_store_entry,
         register_agent_activity,
         register_replaced_by_for_entry,
         register_updated_record,
