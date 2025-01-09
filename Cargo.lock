@@ -3012,18 +3012,14 @@ version = "0.5.0-dev.0"
 dependencies = [
  "ansi_term",
  "anyhow",
- "clap 4.5.25",
  "holochain_conductor_api",
  "holochain_types",
  "holochain_util",
  "kitsune_p2p_types",
  "nanoid",
  "serde",
- "serde_json",
  "serde_yaml",
  "sodoken 0.0.11",
- "tempfile",
- "tokio",
  "url2",
 ]
 
