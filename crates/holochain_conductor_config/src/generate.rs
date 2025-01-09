@@ -35,8 +35,6 @@ pub fn generate_directory(
     directory: Option<PathBuf>,
     in_process_lair: bool,
 ) -> anyhow::Result<(ConfigRootPath, Option<url2::Url2>)> {
-    let passphrase = holochain_util::pw::pw_get()?;
-
     let mut dir = root.unwrap_or_else(std::env::temp_dir);
     let directory = directory.unwrap_or_else(|| nanoid::nanoid!().into());
     dir.push(directory);
@@ -46,6 +44,7 @@ pub fn generate_directory(
     let keystore_path = KeystorePath::try_from(config_root_path.is_also_data_root_path())?;
 
     let con_url = if !in_process_lair {
+        let passphrase = holochain_util::pw::pw_get()?;
         Some(init_lair(&keystore_path, passphrase)?)
     } else {
         None
