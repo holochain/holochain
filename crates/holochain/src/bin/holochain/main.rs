@@ -84,14 +84,9 @@ async fn async_main() {
     }
 
     if opt.create_config {
-        holochain_conductor_config::generate::generate(
-            None,
-            None,
-            Some(Path::new("conductor-config").to_owned()),
-            true,
-        )
-        .inspect_err(|e| tracing::error!("Failed to generate configurations: {}", e))
-        .unwrap();
+        holochain_conductor_config::generate::generate(None, None, None, true)
+            .inspect_err(|e| tracing::error!("Failed to generate configurations: {}", e))
+            .unwrap();
         return;
     }
 
