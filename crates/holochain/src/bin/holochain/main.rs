@@ -90,7 +90,8 @@ async fn async_main() {
             Some(Path::new("conductor-config").to_owned()),
             true,
         )
-        .expect("Failed to generate configurations");
+        .inspect_err(|e| tracing::error!("Failed to generate configurations: {}", e))
+        .unwrap();
         return;
     }
 
