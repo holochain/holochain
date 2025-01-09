@@ -14,13 +14,13 @@ description = "Provides utilities for generating holochain conductor configurati
 [dependencies]
 anyhow = "1.0"
 ansi_term = "0.12"
-holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.5.0-dev.13", features = [
+holochain_conductor_api = { version = "^0.5.0-dev.13", path = "../holochain_conductor_api", features = [
   "sqlite",
 ] }
-holochain_types = { path = "../holochain_types", version = "^0.5.0-dev.13", features = [
+holochain_types = { version = "^0.5.0-dev.13", path = "../holochain_types", features = [
   "sqlite",
 ] }
-holochain_util = { version = "^0.5.0-dev.0", path = "../holochain_util", features = [
+holochain_util = { version = "^0.5.0-dev.0", path = "../holochain_util", default-features = false, features = [
   "pw",
 ] }
 kitsune_p2p_types = { version = "^0.5.0-dev.6", path = "../kitsune_p2p/types" }
