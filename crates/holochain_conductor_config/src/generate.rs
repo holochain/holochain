@@ -19,9 +19,21 @@ pub fn generate(
     directory: Option<PathBuf>,
     in_process_lair: bool,
 ) -> anyhow::Result<ConfigRootPath> {
-    let (dir, con_url) = generate_directory(root, directory, in_process_lair)?;
+    let dir = generate_config_directory(root, directory)?;
 
-    let mut config = create_config(dir.clone(), con_url)?;
+    let lair_connection_url = if !in_process_lair {
+        let config_root_path = ConfigRootPath::from(dir.clone());
+        let keystore_path = KeystorePath::try_from(config_root_path.is_also_data_root_path())?;
+        let passphrase = holochain_util::pw::pw_get()?;
+        let conn_url = init_lair(&keystore_path, passphrase)?;
+
+        msg!("Connection URL? {:?}", conn_url);
+        Some(conn_url)
+    } else {
+        None
+    };
+
+    let mut config = create_config(dir.clone(), lair_connection_url)?;
     config.network = network.unwrap_or_else(KitsuneP2pConfig::mem);
     set_random_admin_port(&mut config);
     let path = write_config(dir.clone(), &config)?;
@@ -30,39 +42,26 @@ pub fn generate(
 }
 
 /// Generate a new directory structure for configurations
-pub fn generate_directory(
+pub fn generate_config_directory(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
-    in_process_lair: bool,
-) -> anyhow::Result<(ConfigRootPath, Option<url2::Url2>)> {
+) -> anyhow::Result<ConfigRootPath> {
     let mut dir = root.unwrap_or_else(std::env::temp_dir);
     let directory = directory.unwrap_or_else(|| nanoid::nanoid!().into());
     dir.push(directory);
     std::fs::create_dir(&dir)?;
 
-    let config_root_path = ConfigRootPath::from(dir);
-    let keystore_path = KeystorePath::try_from(config_root_path.is_also_data_root_path())?;
-
-    let con_url = if !in_process_lair {
-        let passphrase = holochain_util::pw::pw_get()?;
-        Some(init_lair(&keystore_path, passphrase)?)
-    } else {
-        None
-    };
-
-    msg!("Connection URL? {:?}", con_url);
-
-    Ok((config_root_path, con_url))
+    Ok(dir.into())
 }
 
 pub fn init_lair(dir: &KeystorePath, passphrase: sodoken::BufRead) -> anyhow::Result<url2::Url2> {
     match init_lair_inner(dir, passphrase) {
+        Ok(url) => Ok(url),
         Err(err) => Err(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Failed to execute 'lair-keystore init': {:?}", err),
         )
         .into()),
-        Ok(url) => Ok(url),
     }
 }
 
