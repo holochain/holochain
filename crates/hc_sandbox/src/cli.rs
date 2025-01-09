@@ -98,6 +98,12 @@ pub enum HcSandboxSubcommand {
     /// Make a call to a conductor's admin interface.
     Call(crate::calls::Call),
 
+    /// Create and authorize credentials for making zome calls.
+    ZomeCallAuth(crate::zome_call::ZomeCallAuth),
+
+    /// Make a call to a zome function on a running app.
+    ZomeCall(crate::zome_call::ZomeCall),
+
     /// List sandboxes found in `$(pwd)/.hc`.
     List {
         /// Show more verbose information.
@@ -203,7 +209,13 @@ impl HcSandbox {
                 )
                 .await?
             }
-            // HcSandboxSubcommand::Task => todo!("Running custom tasks is coming soon"),
+            HcSandboxSubcommand::ZomeCallAuth(auth) => {
+                crate::zome_call::zome_call_auth(auth, self.force_admin_ports.first().cloned())
+                    .await?
+            }
+            HcSandboxSubcommand::ZomeCall(call) => {
+                crate::zome_call::zome_call(call, self.force_admin_ports.first().cloned()).await?
+            }
             HcSandboxSubcommand::List { verbose } => {
                 crate::save::list(std::env::current_dir()?, verbose)?
             }
