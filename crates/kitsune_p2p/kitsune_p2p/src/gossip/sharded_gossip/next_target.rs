@@ -100,11 +100,7 @@ fn next_remote_node(
     metrics: &MetricsSync,
     tuning_params: KitsuneP2pTuningParams,
 ) -> Option<Node> {
-    use rand::prelude::*;
-    let mut rng = thread_rng();
-
     // Sort the nodes by longest time since we last successfully gossiped with them.
-    // Randomly break ties between nodes we haven't successfully gossiped with.
     // Note the smaller an Instant the longer it is in the past.
     remote_nodes.sort_unstable_by(|a, b| {
         match (
@@ -117,14 +113,8 @@ fn next_remote_node(
             (Some(_), None) => Ordering::Greater,
             // Put b behind a that hasn't been gossiped with.
             (None, Some(_)) => Ordering::Less,
-            // Randomly break ties.
-            (None, None) => {
-                if rng.gen() {
-                    Ordering::Less
-                } else {
-                    Ordering::Greater
-                }
-            }
+            // Don't break ties
+            (None, None) => Ordering::Equal,
         }
     });
 
@@ -318,48 +308,6 @@ mod tests {
 
         // - Expect the last node to be chosen because it was never gossiped with.
         assert_eq!(r, remote_nodes.last().cloned());
-    }
-
-    #[test]
-    /// Test we break ties between never talked
-    /// to nodes by randomly choosing one.
-    fn randomly_break_ties() {
-        // - Create 100 remote nodes.
-        let mut remote_nodes = create_remote_nodes(100);
-
-        let metrics = MetricsSync::default();
-
-        // - Pop the last two nodes off the list.
-        let last = remote_nodes.pop().unwrap();
-        let second_last = remote_nodes.pop().unwrap();
-
-        // - Record successful initiate rounds for the rest of the nodes.
-        for node in remote_nodes.iter() {
-            metrics
-                .write()
-                .record_initiate(&node.agent_info_list, GossipModuleType::ShardedRecent);
-            metrics
-                .write()
-                .record_success(&node.agent_info_list, GossipModuleType::ShardedRecent);
-        }
-
-        // - Push the last two nodes back into the remote nodes.
-        remote_nodes.push(second_last.clone());
-        remote_nodes.push(last.clone());
-
-        // - Check we don't always get the same node.
-        let mut chose_last = false;
-        let mut chose_second_last = false;
-        for _ in 0..100 {
-            let r =
-                next_remote_node(remote_nodes.clone(), &metrics, tuning_params_no_delay()).unwrap();
-            if r == last {
-                chose_last = true;
-            } else if r == second_last {
-                chose_second_last = true;
-            }
-        }
-        assert!(chose_last && chose_second_last);
     }
 
     /// Test that given N remote nodes we never choose a current round.
