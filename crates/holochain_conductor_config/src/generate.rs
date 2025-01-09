@@ -22,8 +22,7 @@ pub fn generate(
     let dir = generate_config_directory(root, directory)?;
 
     let lair_connection_url = if !in_process_lair {
-        let config_root_path = ConfigRootPath::from(dir.clone());
-        let keystore_path = KeystorePath::try_from(config_root_path.is_also_data_root_path())?;
+        let keystore_path = KeystorePath::try_from(dir.is_also_data_root_path())?;
         let passphrase = holochain_util::pw::pw_get()?;
         let conn_url = init_lair(&keystore_path, passphrase)?;
 
