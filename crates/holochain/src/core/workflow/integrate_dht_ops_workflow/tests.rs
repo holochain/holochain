@@ -375,6 +375,22 @@ async fn clear_dbs(env: DbWrite<DbKindDht>) {
 // The following show an op or ops that you want to test
 // with a desired pre-state that you want the database in
 // and the expected state of the database after the workflow is run
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_store_record(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let op: DhtOp = ChainOp::StoreRecord(
+        a.signature.clone(),
+        a.original_action.clone().into(),
+        a.original_entry.clone().into(),
+    )
+    .into();
+    let pre_state = vec![Db::IntQueue(op.clone())];
+    // StoreRecord op types are integrated as part of the app_validation_workflow and not the
+    // integrate_dht_ops_workflow
+    let expect = vec![Db::IntQueue(op.clone())];
+    (pre_state, expect, "store record")
+}
+
 #[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     a.link_add.action_seq = 5;
@@ -531,6 +547,7 @@ async fn test_ops_state() {
     let env = test_db.to_db();
 
     let tests = [
+        register_store_record,
         register_agent_activity,
         register_replaced_by_for_entry,
         register_updated_record,
