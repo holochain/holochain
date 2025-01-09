@@ -3240,7 +3240,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_config"
-version = "0.5.0-dev.1"
+version = "0.5.0-dev.0"
 dependencies = [
  "ansi_term",
  "anyhow",
