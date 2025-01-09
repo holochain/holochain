@@ -14,10 +14,6 @@ edition = "2021"
 license = "Apache-2.0"
 description = "Provides utilities for generating holochain conductor configuration."
 
-[[bin]]
-name = "hc-conductor-config"
-path = "../holochain_conductor_config/src/bin/main.rs"
-
 # reminder - do not use workspace deps
 [dependencies]
 anyhow = "1.0"
