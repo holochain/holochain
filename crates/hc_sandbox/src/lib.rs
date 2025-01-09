@@ -49,6 +49,7 @@ pub use cli::HcSandbox;
 use holochain_trace::Output;
 
 mod ports;
+mod zome_call;
 
 /// An active connection to a running conductor.
 pub struct CmdRunner {

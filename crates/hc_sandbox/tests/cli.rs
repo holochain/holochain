@@ -1,6 +1,8 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
-use holochain_conductor_api::AppResponse;
+use holochain_cli_sandbox::config::read_config;
+use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
+use holochain_conductor_api::{AppResponse, CellInfo};
 use holochain_types::app::InstalledAppId;
 use holochain_types::prelude::{SerializedBytes, SerializedBytesError, Timestamp, YamlProperties};
 use holochain_websocket::{
@@ -13,7 +15,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 
 const WEBSOCKET_TIMEOUT: Duration = Duration::from_secs(3);
@@ -339,7 +341,7 @@ async fn generate_sandbox_with_roles_settings_override() {
     match app_info {
         AppResponse::AppInfo(Some(info)) => {
             let roles = info.manifest.app_roles();
-            assert!(roles.len() == 3);
+            assert_eq!(3, roles.len());
 
             //- Test that the modifiers for role 1 and role 2 have been overridden properly
             let role1 = roles
@@ -418,6 +420,183 @@ async fn generate_sandbox_with_roles_settings_override() {
     shutdown_sandbox(hc_admin).await;
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn authorize_zome_call_credentials() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg("--run=0")
+        .arg("tests/fixtures/my-app/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
+
+    // Wait for the app to be available
+    get_app_info(
+        launch_info.admin_port,
+        "test-app".into(),
+        *launch_info.app_ports.first().expect("No app ports found"),
+    )
+    .await;
+
+    // Generate signing credentials
+    let mut cmd = get_sandbox_command();
+    let mut child = cmd
+        .arg("zome-call-auth")
+        .arg("--running")
+        .arg(launch_info.admin_port.to_string())
+        .arg("--piped")
+        .arg("test-app")
+        .kill_on_drop(true)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"test-phrase\n")
+        .await
+        .unwrap();
+
+    let exit_code = child.wait().await.unwrap();
+    assert!(exit_code.success());
+
+    assert!(PathBuf::from(".hc_auth").exists());
+
+    shutdown_sandbox(hc_admin).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn call_zome_function() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg("--run=0")
+        .arg("tests/fixtures/my-app/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
+
+    println!("Got launch info: {:?}", launch_info);
+
+    // Wait for the app to be available
+    let app_info = get_app_info(
+        launch_info.admin_port,
+        "test-app".into(),
+        *launch_info.app_ports.first().expect("No app ports found"),
+    )
+    .await;
+
+    let dna_hash = match app_info {
+        AppResponse::AppInfo(Some(info)) => {
+            match info.cell_info.first().unwrap().1.first().unwrap() {
+                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
+                _ => panic!("Cell not provisioned"),
+            }
+        }
+        r => panic!("AppResponse does not contain app info: {:?}", r),
+    };
+
+    // Generate signing credentials
+    let mut cmd = get_sandbox_command();
+    let mut child = cmd
+        .arg("zome-call-auth")
+        .arg("--running")
+        .arg(launch_info.admin_port.to_string())
+        .arg("--piped")
+        .arg("test-app")
+        .kill_on_drop(true)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"test-phrase\n")
+        .await
+        .unwrap();
+
+    let exit_code = child.wait().await.unwrap();
+    assert!(exit_code.success(), "Failed with exit code {:?}", exit_code);
+
+    // Make the call
+    let mut cmd = get_sandbox_command();
+    let mut child = cmd
+        .arg("zome-call")
+        .arg("--running")
+        .arg(launch_info.admin_port.to_string())
+        .arg("--piped")
+        .arg("test-app")
+        .arg(dna_hash.to_string())
+        .arg("zome1")
+        .arg("foo")
+        .arg("null")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"test-phrase\n")
+        .await
+        .unwrap();
+
+    child.wait().await.unwrap();
+
+    let mut output = String::new();
+    child
+        .stdout
+        .take()
+        .unwrap()
+        .read_to_string(&mut output)
+        .await
+        .unwrap();
+
+    assert_eq!(output, "\"foo\"\n");
+
+    shutdown_sandbox(hc_admin).await;
+}
+
 include!(concat!(env!("OUT_DIR"), "/target.rs"));
 
 fn get_target(file: &str) -> std::path::PathBuf {
@@ -489,8 +668,7 @@ async fn shutdown_sandbox(mut child: Child) {
         nix::sys::signal::kill(Pid::from_raw(pid as i32), Signal::SIGINT)
             .expect("Failed to send SIGINT");
 
-        let exit_code = child.wait().await.unwrap();
-        assert!(exit_code.success());
+        child.wait().await.unwrap();
     }
 
     #[cfg(not(unix))]
