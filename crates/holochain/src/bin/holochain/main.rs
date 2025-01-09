@@ -11,7 +11,6 @@ use holochain_trace::Output;
 use holochain_util::tokio_helper;
 #[cfg(unix)]
 use sd_notify::{notify, NotifyState};
-use std::path::Path;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::*;
