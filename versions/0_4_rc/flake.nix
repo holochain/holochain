@@ -25,6 +25,6 @@
     };
 
   outputs = { ... }: {
-    rustVersion = "1.80.1";
+    rustVersion = "1.81.0";
   };
 }
