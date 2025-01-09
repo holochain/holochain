@@ -33,10 +33,6 @@ pub struct Network {
 pub enum NetworkType {
     /// A transport that uses the local memory transport protocol.
     Mem,
-    // /// A transport that uses the QUIC protocol.
-    // Quic(Quic),
-    // /// A transport that uses the MDNS protocol.
-    // Mdns,
     /// A transport that uses the WebRTC protocol.
     #[command(name = "webrtc")]
     WebRTC {
