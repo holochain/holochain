@@ -1,9 +1,11 @@
 use holochain::sweettest::SweetConductor;
 use holochain::sweettest::SweetDnaFile;
+use holochain::sweettest::SweetRendezvous;
 use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
+use holochain_keystore::MetaLairClient;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
@@ -36,7 +38,6 @@ async fn lair_in_proc_sql_pool_factory_restart() {
         &*&config.database_salt,
     );
 
-    // start the ipc keystore
     let keystore = InProcKeystore::new(config, store_factory, passphrase)
         .await
         .unwrap();
@@ -60,7 +61,17 @@ async fn lair_in_proc_sql_pool_factory_restart() {
         ..Default::default()
     };
 
-    let mut conductor = SweetConductor::from_config(conductor_config).await;
+    let lair_client = keystore.new_client().await.unwrap();
+
+    let meta_lair_client = MetaLairClient::from_client(lair_client).await.unwrap();
+
+    let mut conductor = SweetConductor::create_with_defaults(
+        conductor_config,
+        Some(meta_lair_client),
+        None::<Arc<dyn SweetRendezvous>>,
+    )
+    .await;
+
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
 
     let app = conductor.setup_app("app", [&dna_file]).await.unwrap();

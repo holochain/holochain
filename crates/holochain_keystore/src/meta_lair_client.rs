@@ -141,6 +141,87 @@ impl MetaLairClient {
         Ok(MetaLairClient(inner, c_check_send))
     }
 
+    /// Create a MetaLairClient from a LairClient
+    pub async fn from_client(client: LairClient) -> LairResult<Self> {
+        let inner = Arc::new(Mutex::new(client));
+
+        let (c_check_send, mut c_check_recv) = tokio::sync::mpsc::unbounded_channel();
+        // initial check
+        let _ = c_check_send.send(());
+
+        // setup timeout for connection check
+        {
+            let c_check_send = c_check_send.clone();
+            tokio::task::spawn(async move {
+                loop {
+                    tokio::time::sleep(TIME_CHECK_FREQ).await;
+                    if c_check_send.send(()).is_err() {
+                        break;
+                    }
+                }
+            });
+        }
+
+        // setup the connection check logic
+        {
+            let inner = inner.clone();
+            let stub_tag: Arc<str> = CON_CHECK_STUB_TAG.to_string().into();
+            tokio::task::spawn(async move {
+                use tokio::sync::mpsc::error::TryRecvError;
+                'top_loop: while c_check_recv.recv().await.is_some() {
+                    'drain_queue: loop {
+                        match c_check_recv.try_recv() {
+                            Ok(_) => (),
+                            Err(TryRecvError::Empty) => break 'drain_queue,
+                            Err(TryRecvError::Disconnected) => break 'top_loop,
+                        }
+                    }
+
+                    let client = inner.lock().clone();
+
+                    // optimistic check - most often the stub will be there
+                    if client.get_entry(stub_tag.clone()).await.is_ok() {
+                        continue;
+                    }
+
+                    // on the first run of a new install we need to create
+                    let _ = client.new_seed(stub_tag.clone(), None, false).await;
+
+                    // then we can exit early again
+                    if client.get_entry(stub_tag.clone()).await.is_ok() {
+                        continue;
+                    }
+
+                    // we couldn't fetch the stub, enter our reconnect loop
+                    let mut backoff_ms = RECON_INIT_MS;
+                    'reconnect: loop {
+                        'drain_queue2: loop {
+                            match c_check_recv.try_recv() {
+                                Ok(_) => (),
+                                Err(TryRecvError::Empty) => break 'drain_queue2,
+                                Err(TryRecvError::Disconnected) => break 'top_loop,
+                            }
+                        }
+
+                        backoff_ms *= 2;
+                        if backoff_ms >= RECON_MAX_MS {
+                            backoff_ms = RECON_MAX_MS;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
+
+                        *inner.lock() = client;
+
+                        tracing::info!("lair reconnect success");
+
+                        break 'reconnect;
+                    }
+                }
+            });
+        }
+
+        Ok(MetaLairClient(inner, c_check_send))
+    }
+
     /// Get the raw underlying lair client instance.
     pub fn lair_client(&self) -> LairClient {
         self.0.lock().clone()
