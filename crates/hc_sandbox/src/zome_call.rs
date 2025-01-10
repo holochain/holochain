@@ -79,14 +79,9 @@ use clap::Parser;
 use ed25519_dalek::Signer;
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse, CellInfo,
-    IssueAppAuthenticationTokenPayload, ZomeCallParamsSigned,
+    IssueAppAuthenticationTokenPayload,
 };
-use holochain_types::prelude::{
-    AgentPubKey, CapAccess, CapSecret, DnaHashB64, ExternIO, FunctionName,
-    GrantZomeCallCapabilityPayload, GrantedFunctions, InstalledAppId, SerializedBytes,
-    SerializedBytesError, Signature, Timestamp, ZomeCallCapGrant, ZomeCallParams, ZomeName,
-    CAP_SECRET_BYTES,
-};
+use holochain_types::prelude::{AgentPubKey, CapAccess, CapSecret, DnaHashB64, ExternIO, FunctionName, GrantZomeCallCapabilityPayload, GrantedFunctions, InstalledAppId, SerializedBytes, SerializedBytesError, Signature, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned, ZomeName, CAP_SECRET_BYTES};
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketReceiver};
 use serde::{Deserialize, Serialize};
@@ -254,7 +249,7 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now())
         .map_err(|e| anyhow::anyhow!("Failed to generate nonce: {:?}", e))?;
 
-    let params = ZomeCallParams {
+    let params = ZomeCallUnsigned {
         provenance: AgentPubKey::from_raw_32(key.verifying_key().as_bytes().to_vec()),
         cell_id: cell_ids.first().unwrap().clone(),
         zome_name: ZomeName::from(zome_call.zome_name.clone()),
@@ -266,13 +261,19 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
         nonce,
         expires_at,
     };
-    let (payload, hash) = params.serialize_and_hash()?;
-
-    let sig = key.try_sign(&hash)?;
+    let data_to_sign = params.data_to_sign()?;
+    let sig = key.try_sign(&data_to_sign)?;
 
     let response = client
-        .request(AppRequest::CallZome(Box::new(ZomeCallParamsSigned {
-            bytes: ExternIO::from(payload),
+        .request(AppRequest::CallZome(Box::new(holochain_conductor_api::ZomeCall {
+            cell_id: params.cell_id,
+            zome_name: params.zome_name,
+            fn_name: params.fn_name,
+            payload: params.payload,
+            cap_secret: params.cap_secret,
+            provenance: params.provenance,
+            nonce: params.nonce,
+            expires_at: params.expires_at,
             signature: Signature::try_from(sig.to_vec())?,
         })))
         .await?;
