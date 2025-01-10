@@ -107,7 +107,11 @@ mod test {
     use crate::config::read_config;
 
     use anyhow::Context;
-    use holochain_conductor_api::conductor::KeystoreConfig;
+    use holochain_conductor_api::{
+        conductor::{ConductorConfig, DpkiConfig, KeystoreConfig},
+        AdminInterfaceConfig, InterfaceDriver,
+    };
+    use holochain_types::{db::DbSyncStrategy, websocket::AllowedOrigins};
     use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams, TransportConfig};
     use tempfile::tempdir;
 
@@ -126,14 +130,31 @@ mod test {
         assert!(config_file.exists());
         assert!(config_file.is_file());
 
-        let config = read_config(config_root)
+        let config = read_config(config_root.clone())
             .context("Failed to read config")?
             .expect("Config file does not exist in config root");
-        assert_eq!(config.network, KitsuneP2pConfig::mem());
-        assert!(matches!(
-            config.keystore,
-            KeystoreConfig::LairServerInProc { .. }
-        ));
+
+        let expected_config = ConductorConfig {
+            tracing_override: None,
+            data_root_path: Some(config_root.is_also_data_root_path()),
+            device_seed_lair_tag: None,
+            danger_generate_throwaway_device_seed: false,
+            network: KitsuneP2pConfig::mem(),
+            dpki: DpkiConfig::default(),
+            keystore: KeystoreConfig::LairServerInProc {
+                lair_root: Some(config_root.join("ks").into()),
+            },
+            admin_interfaces: Some(vec![AdminInterfaceConfig {
+                driver: InterfaceDriver::Websocket {
+                    port: 0,
+                    allowed_origins: AllowedOrigins::Any,
+                },
+            }]),
+            db_sync_strategy: DbSyncStrategy::default(),
+            ..Default::default()
+        };
+
+        assert_eq!(config, expected_config);
 
         Ok(())
     }
@@ -156,13 +177,38 @@ mod test {
 
         let config_root = generate(Some(network_config.clone()), root, directory, true, 0)?;
 
+        assert!(config_root.as_path().exists());
+        assert!(config_root.as_path().is_dir());
+
         let config_file = config_root.as_path().join("conductor-config.yaml");
         assert!(config_file.exists());
+        assert!(config_file.is_file());
 
-        let config = read_config(config_root)
+        let config = read_config(config_root.clone())
             .context("Failed to read config")?
             .expect("Config file does not exist in config root");
-        assert_eq!(config.network, network_config);
+
+        let expected_config = ConductorConfig {
+            tracing_override: None,
+            data_root_path: Some(config_root.is_also_data_root_path()),
+            device_seed_lair_tag: None,
+            danger_generate_throwaway_device_seed: false,
+            network: network_config,
+            dpki: DpkiConfig::default(),
+            keystore: KeystoreConfig::LairServerInProc {
+                lair_root: Some(config_root.join("ks").into()),
+            },
+            admin_interfaces: Some(vec![AdminInterfaceConfig {
+                driver: InterfaceDriver::Websocket {
+                    port: 0,
+                    allowed_origins: AllowedOrigins::Any,
+                },
+            }]),
+            db_sync_strategy: DbSyncStrategy::default(),
+            ..Default::default()
+        };
+
+        assert_eq!(config, expected_config);
 
         Ok(())
     }
