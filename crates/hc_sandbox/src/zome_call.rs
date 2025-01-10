@@ -81,7 +81,12 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse, CellInfo,
     IssueAppAuthenticationTokenPayload,
 };
-use holochain_types::prelude::{AgentPubKey, CapAccess, CapSecret, DnaHashB64, ExternIO, FunctionName, GrantZomeCallCapabilityPayload, GrantedFunctions, InstalledAppId, SerializedBytes, SerializedBytesError, Signature, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned, ZomeName, CAP_SECRET_BYTES};
+use holochain_types::prelude::{
+    AgentPubKey, CapAccess, CapSecret, DnaHashB64, ExternIO, FunctionName,
+    GrantZomeCallCapabilityPayload, GrantedFunctions, InstalledAppId, SerializedBytes,
+    SerializedBytesError, Signature, Timestamp, ZomeCallCapGrant, ZomeCallUnsigned, ZomeName,
+    CAP_SECRET_BYTES,
+};
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketReceiver};
 use serde::{Deserialize, Serialize};
@@ -265,17 +270,19 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
     let sig = key.try_sign(&data_to_sign)?;
 
     let response = client
-        .request(AppRequest::CallZome(Box::new(holochain_conductor_api::ZomeCall {
-            cell_id: params.cell_id,
-            zome_name: params.zome_name,
-            fn_name: params.fn_name,
-            payload: params.payload,
-            cap_secret: params.cap_secret,
-            provenance: params.provenance,
-            nonce: params.nonce,
-            expires_at: params.expires_at,
-            signature: Signature::try_from(sig.to_vec())?,
-        })))
+        .request(AppRequest::CallZome(Box::new(
+            holochain_conductor_api::ZomeCall {
+                cell_id: params.cell_id,
+                zome_name: params.zome_name,
+                fn_name: params.fn_name,
+                payload: params.payload,
+                cap_secret: params.cap_secret,
+                provenance: params.provenance,
+                nonce: params.nonce,
+                expires_at: params.expires_at,
+                signature: Signature::try_from(sig.to_vec())?,
+            },
+        )))
         .await?;
 
     match response {
