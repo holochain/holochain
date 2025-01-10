@@ -9,7 +9,8 @@ use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
 use crate::test_utils::{
-    host_fn_caller::*, new_invocation, new_zome_call_params, wait_for_integration,
+    get_valid_and_integrated_count, host_fn_caller::*, new_invocation, new_zome_call_params,
+    wait_for_integration,
 };
 use ::fixt::fixt;
 use arbitrary::Arbitrary;
@@ -930,6 +931,118 @@ async fn check_app_entry_def_test() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn app_validation_workflow_correctly_sets_state_and_status() {
+    holochain_trace::test_run();
+
+    let entry_def = EntryDef::default_from_id("entry_def_id");
+    let zomes = SweetInlineZomes::new(vec![entry_def], 0)
+        .integrity_function("validate", |_, _: Op| Ok(ValidateCallbackResult::Valid));
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
+    let dna_hash = dna_file.dna_hash().clone();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id().clone();
+
+    let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
+        conductor
+            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
+            .unwrap(),
+        conductor.get_dht_db(&dna_hash).unwrap(),
+        conductor.get_dht_db_cache(&dna_hash).unwrap(),
+        conductor.get_cache_db(&cell_id).await.unwrap(),
+        conductor.keystore(),
+        Arc::new(dna_file.dna_def().clone()),
+    ));
+
+    // Check there are no ops to app validate as genesis entries should have already been validated
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
+
+    // Create op to validate
+    let mut create = fixt!(Create);
+    create.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: Default::default(),
+    });
+    let dht_create_op = ChainOp::StoreEntry(
+        fixt!(Signature),
+        NewEntryAction::Create(create),
+        fixt!(Entry),
+    );
+    let dht_create_op_hash = DhtOpHash::with_data_sync(&dht_create_op);
+    let dht_create_op_hashed = DhtOpHashed::from_content_sync(dht_create_op);
+
+    // Insert op to validate in DHT DB and mark ready for app validation
+    app_validation_workspace.dht_db.test_write(move |txn| {
+        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
+        put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
+    });
+
+    // Check op is now counted as op to validate
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 1);
+
+    // Check that genesis ops are currently validated and integrated
+    assert_eq!(
+        get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
+        7
+    );
+
+    // Run validation workflow
+    let outcome_summary = app_validation_workflow_inner(
+        Arc::new(dna_hash.clone()),
+        app_validation_workspace.clone(),
+        conductor.raw_handle(),
+        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        conductor
+            .get_or_create_space(&dna_hash)
+            .unwrap()
+            .dht_query_cache,
+    )
+    .await
+    .unwrap();
+
+    // Check the outcome of the validation flow is as expected
+    assert_matches!(
+        outcome_summary,
+        OutcomeSummary {
+            ops_to_validate: 1,
+            validated: 1,
+            accepted: 1,
+            rejected: 0,
+            warranted: 0,
+            missing: 0,
+            failed: empty_set,
+        } if empty_set == HashSet::<DhtOpHash>::new()
+    );
+
+    // There should be no more ops to validate
+    let ops_to_validate =
+        validation_query::get_ops_to_app_validate(&app_validation_workspace.dht_db)
+            .await
+            .unwrap()
+            .len();
+    assert_eq!(ops_to_validate, 0);
+
+    // Check that the new op is validated and integrated
+    assert_eq!(
+        get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
+        8
+    );
+}
+
 /// Three agent test.
 /// Alice is bypassing validation.
 /// Bob and Carol are running a DNA with validation that will reject any new action authored.
@@ -1225,16 +1338,6 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
     .unwrap()
 }
 
-fn num_valid(txn: &Transaction) -> usize {
-    txn
-    .query_row("SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
-            named_params!{
-                ":status": ValidationStatus::Valid,
-            },
-            |row| row.get(0))
-            .unwrap()
-}
-
 async fn run_test(
     alice_cell_id: CellId,
     bob_cell_id: CellId,
@@ -1272,12 +1375,14 @@ async fn run_test(
             let limbo = show_limbo(txn);
             assert!(limbo_is_empty(txn), "{:?}", limbo);
 
-            assert_eq!(num_valid(txn), expected_count);
-
             Ok(())
         })
         .await
         .unwrap();
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count
+    );
 
     let (invalid_action_hash, invalid_entry_hash) =
         commit_invalid(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
@@ -1307,14 +1412,17 @@ async fn run_test(
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
-                // Expect having one invalid op for the store entry.
-                assert_eq!(num_valid(txn), expected_count - 1);
 
                 Ok(())
             }
         })
         .await
         .unwrap();
+    // Expect having one invalid op for the store entry.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - 1
+    );
 
     let zome_call_params =
         new_zome_call_params(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
@@ -1346,14 +1454,17 @@ async fn run_test(
                     &check_invalid_action_hash,
                     &check_invalid_entry_hash
                 ));
-                // Expect having one invalid op for the store entry.
-                assert_eq!(num_valid(txn), expected_count - 1);
 
                 Ok(())
             }
         })
         .await
         .unwrap();
+    // Expect having one invalid op for the store entry.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - 1
+    );
 
     let invocation = new_invocation(
         &bob_cell_id,
@@ -1397,14 +1508,17 @@ async fn run_test(
                     &check_invalid_entry_hash
                 ));
                 assert!(expected_invalid_link(txn, &check_invalid_link_hash));
-                // Expect having two invalid ops for the two store entries.
-                assert_eq!(num_valid(txn), expected_count - 2);
 
                 Ok(())
             }
         })
         .await
         .unwrap();
+    // Expect having two invalid ops for the two store entries.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - 2
+    );
 
     let invocation = new_invocation(
         &bob_cell_id,
@@ -1446,14 +1560,17 @@ async fn run_test(
                     &check_invalid_entry_hash
                 ));
                 assert!(expected_invalid_link(txn, &check_invalid_link_hash));
-                // Expect having two invalid ops for the two store entries.
-                assert_eq!(num_valid(txn), expected_count - 2);
 
                 Ok(())
             }
         })
         .await
         .unwrap();
+    // Expect having two invalid ops for the two store entries.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - 2
+    );
 
     let invocation = new_invocation(
         &bob_cell_id,
@@ -1498,14 +1615,17 @@ async fn run_test(
                 ));
                 assert!(expected_invalid_link(txn, &check_invalid_link_hash));
                 assert!(expected_invalid_remove_link(txn, &invalid_remove_hash));
-                // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
-                assert_eq!(num_valid(txn), expected_count - (3 + 1));
 
                 Ok(())
             }
         })
         .await
         .unwrap();
+    // 3 invalid ops above plus 1 extra invalid ops that `remove_invalid_link` commits.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - (3 + 1)
+    );
     expected_count
 }
 
@@ -1549,13 +1669,16 @@ async fn run_test_entry_def_id(
                 &invalid_action_hash,
                 &invalid_entry_hash
             ));
-            // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
-            assert_eq!(num_valid(txn), expected_count - 5);
 
             Ok(())
         })
         .await
         .unwrap();
+    // Expect having two invalid ops for the two store entries plus the 3 from the previous test.
+    assert_eq!(
+        get_valid_and_integrated_count(&alice_db).await,
+        expected_count - 5
+    );
 }
 
 // Need to "hack holochain" because otherwise the invalid
