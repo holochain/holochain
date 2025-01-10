@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.5.0-dev.10"
+version = "0.5.0-dev.11"
 description = "Holochain zome types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -17,7 +17,7 @@ kitsune_p2p_block = { version = "^0.5.0-dev.2", path = "../kitsune_p2p/block" }
 holo_hash = { version = "^0.5.0-dev.4", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_integrity_types = { version = "^0.5.0-dev.6", path = "../holochain_integrity_types", features = [
+holochain_integrity_types = { version = "^0.5.0-dev.7", path = "../holochain_integrity_types", features = [
   "tracing",
 ] }
 holochain_nonce = { version = "^0.5.0-dev.0", path = "../holochain_nonce" }
@@ -28,7 +28,7 @@ serde_yaml = { version = "0.9", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
-holochain_wasmer_common = "=0.0.96"
+holochain_wasmer_common = "=0.0.97"
 derive_more = "0.99"
 
 # fixturator dependencies

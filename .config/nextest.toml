@@ -1,3 +1,6 @@
+[test-groups]
+holochain-process = { max-threads = 1 }
+
 [profile.default]
 
 # "retries" defines the number of times a test should be retried. If set to a
@@ -22,6 +25,10 @@ failure-output = "immediate-final"
 fail-fast = false
 
 test-threads = 2
+
+[[profile.default.overrides]]
+filter = 'package(holochain_cli_sandbox)'
+test-group = 'holochain-process'
 
 [profile.ci.junit]
 path = "junit.xml"

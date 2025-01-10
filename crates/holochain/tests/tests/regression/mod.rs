@@ -1,10 +1,14 @@
 use holo_hash::ActionHash;
+#[cfg(not(feature = "wasmer_wamr"))]
 use holochain::conductor::conductor::WASM_CACHE;
 use holochain::sweettest::*;
 use holochain_wasm_test_utils::TestWasm;
 
-// make sure the wasm cache at least creates files
+// Make sure the wasm cache at least creates files.
+// This is not run with the `wasmer_wamr` feature flag,
+// as the cache is not used.
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(not(feature = "wasmer_wamr"))]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
     let mut conductor =

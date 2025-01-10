@@ -68,16 +68,16 @@ pub async fn run(
         launch_info.app_ports.push(port);
     }
 
+    crate::save::lock_live(std::env::current_dir()?, &sandbox_path, admin_port).await?;
+    msg!("Connected successfully to a running holochain");
+
     msg!(
         "Conductor launched #!{} {}",
         conductor_index,
         serde_json::to_string(&launch_info)?
     );
 
-    crate::save::lock_live(std::env::current_dir()?, &sandbox_path, admin_port).await?;
-    msg!("Connected successfully to a running holochain");
     let e = format!("Failed to run holochain at {}", sandbox_path.display());
-
     holochain.wait().await.expect(&e);
     if let Some(mut lair) = lair {
         let _ = lair.kill().await;
