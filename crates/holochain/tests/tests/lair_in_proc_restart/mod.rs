@@ -15,8 +15,6 @@ use lair_keystore_api::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-const ADMIN_PORT: u16 = 12909;
-
 /// Written for https://github.com/holochain/lair/issues/120 to verify
 /// that InProcKeystore still works after conductor restart
 #[tokio::test(flavor = "multi_thread")]
@@ -48,13 +46,6 @@ async fn lair_in_proc_sql_pool_factory_restart() {
 
     // set up conductor config to use the started keystore
     let conductor_config = ConductorConfig {
-        admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket {
-                port: ADMIN_PORT,
-                allowed_origins: AllowedOrigins::Any,
-            },
-        }]),
-        data_root_path: None,
         keystore: KeystoreConfig::LairServerInProc {
             lair_root: Some(PathBuf::from(tmp.path()).into()),
         },
