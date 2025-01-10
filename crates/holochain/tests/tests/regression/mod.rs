@@ -1,4 +1,5 @@
 use holo_hash::ActionHash;
+#[cfg(not(feature = "wasmer_wamr"))]
 use holochain::conductor::conductor::WASM_CACHE;
 use holochain::conductor::config::ConductorConfig;
 use holochain::sweettest::*;
@@ -8,8 +9,11 @@ use kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 use std::sync::Arc;
 
-// make sure the wasm cache at least creates files
+// Make sure the wasm cache at least creates files.
+// This is not run with the `wasmer_wamr` feature flag,
+// as the cache is not used.
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(not(feature = "wasmer_wamr"))]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
     let mut conductor =
