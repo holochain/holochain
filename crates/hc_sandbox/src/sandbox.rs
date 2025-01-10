@@ -33,8 +33,13 @@ pub async fn default_with_network(
         ..
     } = create;
     let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
-    let config_path =
-        holochain_conductor_config::generate::generate(network, root, directory, in_process_lair)?;
+    let config_path = holochain_conductor_config::generate::generate(
+        network,
+        root,
+        directory,
+        in_process_lair,
+        0,
+    )?;
     let conductor = run_async(holochain_path, config_path.clone(), None, structured).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
     let install_bundle = InstallApp {

@@ -18,6 +18,7 @@ pub fn generate(
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
     in_process_lair: bool,
+    admin_port: u16,
 ) -> anyhow::Result<ConfigRootPath> {
     let dir = generate_config_directory(root, directory)?;
 
@@ -34,7 +35,7 @@ pub fn generate(
 
     let mut config = create_config(dir.clone(), lair_connection_url)?;
     config.network = network.unwrap_or_else(KitsuneP2pConfig::mem);
-    set_admin_port(&mut config, 0);
+    set_admin_port(&mut config, admin_port);
     let path = write_config(dir.clone(), &config)?;
     msg!("Created config at {}", path.display());
     Ok(dir)
@@ -111,12 +112,12 @@ mod test {
     use tempfile::tempdir;
 
     #[test]
-    fn test_generate_creates_config_file() -> anyhow::Result<()> {
+    fn test_generate_creates_default_config_file() -> anyhow::Result<()> {
         let temp_dir = tempdir()?;
         let root = Some(temp_dir.path().to_path_buf());
         let directory = Some("test-config".into());
 
-        let config_root = generate(None, root, directory, true)?;
+        let config_root = generate(None, root, directory, true, 0)?;
 
         assert!(config_root.as_path().exists());
         assert!(config_root.as_path().is_dir());
@@ -127,7 +128,7 @@ mod test {
 
         let config = read_config(config_root)
             .context("Failed to read config")?
-            .expect("Failed to read config");
+            .expect("Config file does not exist in config root");
         assert_eq!(config.network, KitsuneP2pConfig::mem());
         assert!(matches!(
             config.keystore,
@@ -153,14 +154,14 @@ mod test {
             tracing_scope: None,
         };
 
-        let config_root = generate(Some(network_config.clone()), root, directory, true)?;
+        let config_root = generate(Some(network_config.clone()), root, directory, true, 0)?;
 
         let config_file = config_root.as_path().join("conductor-config.yaml");
         assert!(config_file.exists());
 
         let config = read_config(config_root)
             .context("Failed to read config")?
-            .unwrap();
+            .expect("Config file does not exist in config root");
         assert_eq!(config.network, network_config);
 
         Ok(())
