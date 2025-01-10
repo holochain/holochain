@@ -385,9 +385,7 @@ fn register_store_record(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     )
     .into();
     let pre_state = vec![Db::IntQueue(op.clone())];
-    // StoreRecord op types are integrated as part of the app_validation_workflow and not the
-    // integrate_dht_ops_workflow
-    let expect = vec![Db::IntQueue(op.clone())];
+    let expect = vec![Db::Integrated(op.clone())];
     (pre_state, expect, "store record")
 }
 

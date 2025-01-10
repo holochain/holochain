@@ -17,6 +17,9 @@ pub mod sql_cell {
     pub const UPDATE_INTEGRATE_DEP_CREATE_LINK: &str =
         include_str!("sql/cell/update_dep_create_link.sql");
 
+    pub const UPDATE_INTEGRATE_STORE_RECORD: &str =
+        include_str!("sql/cell/update_store_record.sql");
+
     pub const SELECT_VALID_AGENT_PUB_KEY: &str =
         include_str!("sql/cell/select_valid_agent_pub_key.sql");
 
