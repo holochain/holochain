@@ -7,10 +7,6 @@ use holochain_types::websocket::AllowedOrigins;
 
 use crate::msg;
 
-pub fn set_random_admin_port(config: &mut ConductorConfig) {
-    set_admin_port(config, 0);
-}
-
 pub fn set_admin_port(config: &mut ConductorConfig, port: u16) {
     let p = port;
     let port = AdminInterfaceConfig {
