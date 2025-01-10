@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use holochain::prelude::*;
 use holochain::sweettest::*;
+use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_from_init_across_cells() {
@@ -66,4 +67,35 @@ async fn call_init_from_init_across_cells() {
         .await;
 
     assert_eq!(inits.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn call_init_directly_only_calls_once() {
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::InitSingle]).await;
+    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+
+    let zome = app.cells()[0].zome(TestWasm::InitSingle);
+    let callback_result = conductor
+        .call_fallible::<_, InitCallbackResult>(&zome, "init", ())
+        .await
+        .unwrap();
+
+    assert!(
+        matches!(callback_result, InitCallbackResult::Pass),
+        "Wanted Pass but was: {:?}",
+        callback_result
+    );
+
+    let callback_result = conductor
+        .call::<_, InitCallbackResult>(&zome, "init", ())
+        .await;
+
+    assert!(
+        matches!(callback_result, InitCallbackResult::Pass),
+        "Wanted Pass but was: {:?}",
+        callback_result
+    );
 }

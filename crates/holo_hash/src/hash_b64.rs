@@ -36,6 +36,13 @@ impl<T: HashType> HoloHashB64<T> {
     }
 }
 
+impl<T: HashType> std::str::FromStr for HoloHashB64<T> {
+    type Err = HoloHashError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        HoloHashB64::from_b64_str(s)
+    }
+}
+
 impl<T: HashType> serde::Serialize for HoloHashB64<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
