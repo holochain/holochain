@@ -14,6 +14,79 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250110.163416
+
+## [hcterm-0.4.1-rc.0](crates/hcterm/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_cli-0.4.1-rc.0](crates/holochain_cli/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain-0.4.1-rc.0](crates/holochain/CHANGELOG.md#0.4.1-rc.0)
+
+- Add two new commands to the `hc sandbox` for authenticating and making zome calls to a running conductor. See the sandbox documentation for usage instructions. \#4587
+- Update `holochain_wasmer_host`, remove temporary fork of wasmer and update wasmer to 5.x.
+- Disable wasmer module caching when using the feature flag `wasmer_wamr`, as caching is not relevevant when wasms are interpreted.
+- Upgrade to Rust 1.81, from 1.80.1
+
+## [holochain\_cli\_bundle-0.4.1-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.4.1-rc.0)
+
+- Update `holochain_wasmer_host`, remove temporary fork of wasmer and update wasmer to 5.x.
+
+## [holochain\_cli\_sandbox-0.4.1-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_cascade-0.4.1-rc.0](crates/holochain_cascade/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_conductor\_api-0.4.1-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_conductor\_services-0.3.1-rc.0](crates/holochain_conductor_services/CHANGELOG.md#0.3.1-rc.0)
+
+## [holochain\_test\_wasm\_common-0.4.1-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.4.1-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_websocket-0.4.1-rc.0](crates/holochain_websocket/CHANGELOG.md#0.4.1-rc.0)
+
+## [hc\_deepkey\_sdk-0.7.1-rc.0](crates/hc_deepkey_sdk/CHANGELOG.md#0.7.1-rc.0)
+
+## [holochain\_state-0.4.1-rc.0](crates/holochain_state/CHANGELOG.md#0.4.1-rc.0)
+
+## [hc\_deepkey\_types-0.8.1-rc.0](crates/hc_deepkey_types/CHANGELOG.md#0.8.1-rc.0)
+
+## [hdk-0.4.1-rc.0](crates/hdk/CHANGELOG.md#0.4.1-rc.0)
+
+- Update `holochain_wasmer_guest`.
+
+## [holochain\_p2p-0.4.1-rc.0](crates/holochain_p2p/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_state\_types-0.4.1-rc.0](crates/holochain_state_types/CHANGELOG.md#0.4.1-rc.0)
+
+## [hc\_sleuth-0.4.1-rc.0](crates/hc_sleuth/CHANGELOG.md#0.4.1-rc.0)
+
+## [hdi-0.5.1-rc.0](crates/hdi/CHANGELOG.md#0.5.1-rc.0)
+
+- Update `holochain_wasmer_guest`, remove temporary fork of wasmer and update wasmer to 5.x.
+
+## [holochain\_chc-0.1.1-rc.0](crates/holochain_chc/CHANGELOG.md#0.1.1-rc.0)
+
+## [hdk\_derive-0.4.1-rc.0](crates/hdk_derive/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_types-0.4.1-rc.0](crates/holochain_types/CHANGELOG.md#0.4.1-rc.0)
+
+## [kitsune\_p2p-0.4.1-rc.0](crates/kitsune_p2p/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_keystore-0.4.1-rc.0](crates/holochain_keystore/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_sqlite-0.4.1-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.4.1-rc.0)
+
+## [holochain\_zome\_types-0.4.1-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.4.1-rc.0)
+
+- Update `holochain_wasmer_common`.
+
+## [holochain\_integrity\_types-0.4.1-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.4.1-rc.0)
+
+## [holo\_hash-0.4.1-rc.0](crates/holo_hash/CHANGELOG.md#0.4.1-rc.0)
+
+- Update `holochain_wasmer_common`.
+
 # 20241217.174806
 
 ## [hc\_service\_check-0.1.0](crates/hc_service_check/CHANGELOG.md#0.1.0)
