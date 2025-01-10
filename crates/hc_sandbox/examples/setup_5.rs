@@ -40,6 +40,7 @@ async fn main() -> anyhow::Result<()> {
             None,
             None,
             false,
+            0,
         )?;
 
         // Create a command runner to run admin commands.
