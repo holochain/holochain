@@ -53,7 +53,7 @@ struct Opt {
     )]
     build_info: bool,
 
-    #[structopt(long, help = "Create customizable conductor configurations.")]
+    #[structopt(long, help = "Create default conductor configuration.")]
     create_config: bool,
 
     /// WARNING!! DANGER!! This exposes your database decryption secrets!
