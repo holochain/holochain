@@ -656,7 +656,7 @@ async fn call_zome_function() {
 
     let dna_hash = match app_info {
         AppResponse::AppInfo(Some(info)) => {
-            match info.cell_info.iter().nth(0).unwrap().1.first().unwrap() {
+            match info.cell_info.iter().next().unwrap().1.first().unwrap() {
                 CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
                 _ => panic!("Cell not provisioned"),
             }
