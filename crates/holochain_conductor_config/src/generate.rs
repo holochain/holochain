@@ -99,3 +99,70 @@ pub(crate) fn init_lair_inner(
 
     Ok(conf.connection_url)
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::config::read_config;
+
+    use anyhow::Context;
+    use holochain_conductor_api::conductor::KeystoreConfig;
+    use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams, TransportConfig};
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_generate_creates_config_file() -> anyhow::Result<()> {
+        let temp_dir = tempdir()?;
+        let root = Some(temp_dir.path().to_path_buf());
+        let directory = Some("test-config".into());
+
+        let config_root = generate(None, root, directory, true)?;
+
+        assert!(config_root.as_path().exists());
+        assert!(config_root.as_path().is_dir());
+
+        let config_file = config_root.as_path().join("conductor-config.yaml");
+        assert!(config_file.exists());
+        assert!(config_file.is_file());
+
+        let config = read_config(config_root)
+            .context("Failed to read config")?
+            .expect("Failed to read config");
+        assert_eq!(config.network, KitsuneP2pConfig::mem());
+        assert!(matches!(
+            config.keystore,
+            KeystoreConfig::LairServerInProc { .. }
+        ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_generate_with_custom_network() -> anyhow::Result<()> {
+        let temp_dir = tempdir()?;
+        let root = Some(temp_dir.path().to_path_buf());
+        let directory = Some("test-config".into());
+
+        let network_config = KitsuneP2pConfig {
+            transport_pool: vec![TransportConfig::WebRTC {
+                signal_url: "wss://signal.holo.host".to_string(),
+                webrtc_config: None,
+            }],
+            bootstrap_service: Some(url2::url2!("https://bootstrap.holo.host")),
+            tuning_params: KitsuneP2pTuningParams::default(),
+            tracing_scope: None,
+        };
+
+        let config_root = generate(Some(network_config.clone()), root, directory, true)?;
+
+        let config_file = config_root.as_path().join("conductor-config.yaml");
+        assert!(config_file.exists());
+
+        let config = read_config(config_root)
+            .context("Failed to read config")?
+            .unwrap();
+        assert_eq!(config.network, network_config);
+
+        Ok(())
+    }
+}

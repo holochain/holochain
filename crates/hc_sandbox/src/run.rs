@@ -12,7 +12,6 @@ use holochain_conductor_config::config::create_config;
 use holochain_conductor_config::config::read_config;
 use holochain_conductor_config::config::write_config;
 use holochain_conductor_config::ports::set_admin_port;
-use holochain_conductor_config::ports::set_random_admin_port;
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
 use tokio::io::AsyncBufReadExt;
@@ -117,7 +116,7 @@ pub async fn run_async(
         Some(port) => {
             set_admin_port(&mut config, port);
         }
-        None => set_random_admin_port(&mut config),
+        None => set_admin_port(&mut config, 0),
     }
     let _config_file_path = write_config(config_root_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
