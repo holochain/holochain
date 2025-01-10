@@ -108,10 +108,10 @@ mod test {
 
     use anyhow::Context;
     use holochain_conductor_api::{
-        conductor::{ConductorConfig, DpkiConfig, KeystoreConfig},
+        conductor::{paths::KEYSTORE_DIRECTORY, ConductorConfig, KeystoreConfig},
         AdminInterfaceConfig, InterfaceDriver,
     };
-    use holochain_types::{db::DbSyncStrategy, websocket::AllowedOrigins};
+    use holochain_types::websocket::AllowedOrigins;
     use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams, TransportConfig};
     use tempfile::tempdir;
 
@@ -135,14 +135,10 @@ mod test {
             .expect("Config file does not exist in config root");
 
         let expected_config = ConductorConfig {
-            tracing_override: None,
             data_root_path: Some(config_root.is_also_data_root_path()),
-            device_seed_lair_tag: None,
-            danger_generate_throwaway_device_seed: false,
             network: KitsuneP2pConfig::mem(),
-            dpki: DpkiConfig::default(),
             keystore: KeystoreConfig::LairServerInProc {
-                lair_root: Some(config_root.join("ks").into()),
+                lair_root: Some(config_root.join(KEYSTORE_DIRECTORY).into()),
             },
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
@@ -150,7 +146,6 @@ mod test {
                     allowed_origins: AllowedOrigins::Any,
                 },
             }]),
-            db_sync_strategy: DbSyncStrategy::default(),
             ..Default::default()
         };
 
@@ -189,14 +184,10 @@ mod test {
             .expect("Config file does not exist in config root");
 
         let expected_config = ConductorConfig {
-            tracing_override: None,
             data_root_path: Some(config_root.is_also_data_root_path()),
-            device_seed_lair_tag: None,
-            danger_generate_throwaway_device_seed: false,
             network: network_config,
-            dpki: DpkiConfig::default(),
             keystore: KeystoreConfig::LairServerInProc {
-                lair_root: Some(config_root.join("ks").into()),
+                lair_root: Some(config_root.join(KEYSTORE_DIRECTORY).into()),
             },
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
@@ -204,7 +195,6 @@ mod test {
                     allowed_origins: AllowedOrigins::Any,
                 },
             }]),
-            db_sync_strategy: DbSyncStrategy::default(),
             ..Default::default()
         };
 
