@@ -1034,10 +1034,10 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             .len();
     assert_eq!(ops_to_validate, 0);
 
-    // Check that the new op is validated and integrated
+    // Check that the new op is not integrated yet
     assert_eq!(
         get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
-        8
+        7
     );
 }
 

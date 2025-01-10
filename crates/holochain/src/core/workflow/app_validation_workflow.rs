@@ -225,7 +225,6 @@ async fn app_validation_workflow_inner(
     // Validate ops sequentially
     for sorted_dht_op in sorted_dht_ops.into_iter() {
         let (dht_op, dht_op_hash) = sorted_dht_op.into_inner();
-        let deps = dht_op.sys_validation_dependencies();
 
         let chain_op = match dht_op {
             DhtOp::ChainOp(chain_op) => chain_op,
@@ -237,13 +236,8 @@ async fn app_validation_workflow_inner(
         let dht_op_lite = chain_op.to_lite();
 
         // If this is agent activity, track it for the cache.
-        let activity = matches!(op_type, ChainOpType::RegisterAgentActivity).then(|| {
-            (
-                action.author().clone(),
-                action.action_seq(),
-                deps.is_empty(),
-            )
-        });
+        let activity = matches!(op_type, ChainOpType::RegisterAgentActivity)
+            .then(|| (action.author().clone(), action.action_seq()));
 
         // Validate this op
         let validation_outcome = match chain_op_to_op(*chain_op.clone(), cascade.clone()).await {
@@ -305,14 +299,7 @@ async fn app_validation_workflow_inner(
                     .write_async(move|txn| match outcome {
                         Outcome::Accepted => {
                             accepted_ops.fetch_add(1, Ordering::SeqCst);
-
-
-                            if deps.is_empty() {
-
-                                put_integrated(txn, &dht_op_hash, ValidationStatus::Valid)
-                            } else {
-                                put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Valid)
-                            }
+                            put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Valid)
                         }
                         Outcome::AwaitingDeps(_) => {
                             awaiting_ops.fetch_add(1, Ordering::SeqCst);
@@ -324,14 +311,8 @@ async fn app_validation_workflow_inner(
                         }
                         Outcome::Rejected(_) => {
                             rejected_ops.fetch_add(1, Ordering::SeqCst);
-
                             tracing::info!("Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}");
-
-                            if deps.is_empty() {
-                                put_integrated(txn, &dht_op_hash, ValidationStatus::Rejected)
-                            } else {
-                                put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Rejected)
-                            }
+                            put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Rejected)
                         }
                     })
                     .await;
@@ -363,18 +344,10 @@ async fn app_validation_workflow_inner(
 
     // Once the database transaction is committed, add agent activity to the cache
     // that is ready for integration.
-    for (author, seq, has_no_dependency) in agent_activity {
-        // Any activity with no dependency is integrated in this workflow.
-        // TODO: This will no longer be true when [#1212](https://github.com/holochain/holochain/pull/1212) lands.
-        if has_no_dependency {
-            dht_query_cache
-                .set_activity_to_integrated(&author, Some(seq))
-                .await?;
-        } else {
-            dht_query_cache
-                .set_activity_ready_to_integrate(&author, Some(seq))
-                .await?;
-        }
+    for (author, seq) in agent_activity {
+        dht_query_cache
+            .set_activity_ready_to_integrate(&author, Some(seq))
+            .await?;
     }
 
     let accepted_ops = accepted_ops.load(Ordering::SeqCst);
@@ -916,25 +889,5 @@ pub fn put_integration_limbo(
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash, status)?;
     set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
-    Ok(())
-}
-
-pub fn put_integrated(
-    txn: &mut Txn<DbKindDht>,
-    hash: &DhtOpHash,
-    status: ValidationStatus,
-) -> WorkflowResult<()> {
-    set_validation_status(txn, hash, status)?;
-    // This set the validation stage to pending which is correct when
-    // it's integrated.
-    set_validation_stage(txn, hash, ValidationStage::Pending)?;
-    set_when_integrated(txn, hash, Timestamp::now())?;
-
-    // If the op is rejected then force a receipt to be processed because the
-    // receipt is a warrant, so of course the author won't want it to be
-    // produced.
-    if matches!(status, ValidationStatus::Rejected) {
-        set_require_receipt(txn, hash, true)?;
-    }
     Ok(())
 }
