@@ -52,6 +52,13 @@ pub async fn integrate_dht_ops_workflow(
                 })?;
             total += changed;
             let changed = txn
+                .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_STORE_ENTRY)?
+                .execute(named_params! {
+                    ":when_integrated": time,
+                    ":store_entry": ChainOpType::StoreEntry,
+                })?;
+            total += changed;
+            let changed = txn
                 .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_ENTRY)?
                 .execute(named_params! {
                     ":when_integrated": time,

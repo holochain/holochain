@@ -19,6 +19,7 @@ pub mod sql_cell {
 
     pub const UPDATE_INTEGRATE_STORE_RECORD: &str =
         include_str!("sql/cell/update_store_record.sql");
+    pub const UPDATE_INTEGRATE_STORE_ENTRY: &str = include_str!("sql/cell/update_store_entry.sql");
 
     pub const SELECT_VALID_AGENT_PUB_KEY: &str =
         include_str!("sql/cell/select_valid_agent_pub_key.sql");
