@@ -51,6 +51,7 @@ holochain_zome_types = { version = "^0.5.0-dev.11", path = "../holochain_zome_ty
 holochain_nonce = { version = "^0.5.0-dev.0", path = "../holochain_nonce" }
 holochain_secure_primitive = { version = "^0.5.0-dev.0", path = "../holochain_secure_primitive" }
 holochain_conductor_services = { version = "^0.4.0-dev.13", path = "../holochain_conductor_services" }
+holochain_conductor_config = { version = "^0.5.0-dev.0", path = "../holochain_conductor_config" }
 human-panic = "2.0"
 itertools = { version = "0.12" }
 kitsune_p2p = { version = "^0.5.0-dev.8", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
