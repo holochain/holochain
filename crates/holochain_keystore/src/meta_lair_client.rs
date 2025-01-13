@@ -191,30 +191,6 @@ impl MetaLairClient {
                     if client.get_entry(stub_tag.clone()).await.is_ok() {
                         continue;
                     }
-
-                    // we couldn't fetch the stub, enter our reconnect loop
-                    let mut backoff_ms = RECON_INIT_MS;
-                    'reconnect: loop {
-                        'drain_queue2: loop {
-                            match c_check_recv.try_recv() {
-                                Ok(_) => (),
-                                Err(TryRecvError::Empty) => break 'drain_queue2,
-                                Err(TryRecvError::Disconnected) => break 'top_loop,
-                            }
-                        }
-
-                        backoff_ms *= 2;
-                        if backoff_ms >= RECON_MAX_MS {
-                            backoff_ms = RECON_MAX_MS;
-                        }
-                        tokio::time::sleep(std::time::Duration::from_millis(backoff_ms)).await;
-
-                        *inner.lock() = client;
-
-                        tracing::info!("lair reconnect success");
-
-                        break 'reconnect;
-                    }
                 }
             });
         }
