@@ -216,26 +216,6 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
                     )
                 }
             }
-            ("migrate_agent_open" | "migrate_agent_close", Some(return_type)) => {
-                const MIGRATE_AGENT_CALLBACK_RESULT: &str = "MigrateAgentCallbackResult";
-
-                if is_infallible && return_type != MIGRATE_AGENT_CALLBACK_RESULT {
-                    abort!(
-                        ty.span(),
-                        "{} must return `{}`",
-                        fn_name,
-                        MIGRATE_AGENT_CALLBACK_RESULT
-                    );
-                } else if !is_infallible && !is_callback_result(ty, MIGRATE_AGENT_CALLBACK_RESULT) {
-                    abort!(
-                        ty.span(),
-                        "{} must return {}<{}>",
-                        fn_name,
-                        EXTERN_RESULT,
-                        MIGRATE_AGENT_CALLBACK_RESULT
-                    )
-                }
-            }
             (_, Some(return_type)) => {
                 if is_infallible && return_type == EXTERN_RESULT {
                     abort!(
