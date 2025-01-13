@@ -30,7 +30,7 @@ pub type InstalledAppId = String;
 
 /// The source of the DNA to be installed, either as binary data, or from a path
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum DnaSource {
     /// register the dna loaded from a bundle file on disk
     Path(PathBuf),
@@ -42,7 +42,7 @@ pub enum DnaSource {
 
 /// The source of coordinators to be installed, either as binary data, or from a path
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CoordinatorSource {
     /// Coordinators loaded from a bundle file on disk
     Path(PathBuf),
@@ -200,7 +200,7 @@ pub type RoleSettingsMap = HashMap<RoleName, RoleSettings>;
 
 /// Settings for a Role that may be passed on installation of an app
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum RoleSettings {
     /// If the role has the UseExisting strategy defined in the app manifest
     /// the cell id to use needs to be specified here.
@@ -233,7 +233,7 @@ impl Default for RoleSettings {
 
 /// The possible locations of an AppBundle
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppBundleSource {
     /// The actual serialized bytes of a bundle
     Bundle(AppBundle),

@@ -307,7 +307,7 @@ impl ZomeCallParamsSigned {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CellInfo {
     /// Cells provisioned at app installation as defined in the bundle.
     Provisioned(ProvisionedCell),

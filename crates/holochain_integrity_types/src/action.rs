@@ -38,7 +38,7 @@ pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-#[serde(tag = "type")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum Action {
     // The first action in a chain (for the DNA) doesn't have a previous action
     Dna(Dna),
@@ -607,6 +607,7 @@ pub struct DeleteLink {
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum MigrationTarget {
     /// Represents a DNA migration, and contains the new or previous DNA hash.
     Dna(DnaHash),
@@ -780,6 +781,7 @@ pub struct DeleteAction {
 /// referencing. Useful for examining Actions without needing to fetch the
 /// corresponding Entries.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)

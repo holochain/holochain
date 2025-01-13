@@ -40,7 +40,7 @@ pub struct ClonedCell {
 
 /// Ways of specifying a clone cell in the context of an app.
 #[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
-#[serde(untagged)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CloneCellId {
     /// Clone id consisting of role name and clone index.
     CloneId(CloneId),

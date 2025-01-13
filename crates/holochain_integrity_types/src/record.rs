@@ -62,6 +62,7 @@ impl ActionSequenceAndHash for Record {
 /// Represents the different ways the entry_address reference within an action
 /// can be interpreted
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)

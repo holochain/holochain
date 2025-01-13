@@ -126,6 +126,7 @@ impl CapGrant {
 
 /// Represents access requirements for capability grants.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
@@ -198,6 +199,7 @@ pub type GrantedFunction = (ZomeName, FunctionName);
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum GrantedFunctions {
     /// grant all zomes all functions
     All,

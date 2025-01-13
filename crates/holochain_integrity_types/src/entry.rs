@@ -89,7 +89,7 @@ impl From<EntryHashed> for Entry {
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-#[serde(tag = "entry_type", content = "entry")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum Entry {
     /// The `Agent` system entry, the third entry of every source chain,
     /// which grants authoring capability for this agent.

@@ -605,6 +605,7 @@ impl ExternalApiWireError {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 /// Filter for [`AdminRequest::ListApps`].
 ///
 /// App Status is a combination of two pieces of independent state:
