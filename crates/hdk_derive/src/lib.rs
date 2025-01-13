@@ -1,14 +1,18 @@
 #![crate_type = "proc-macro"]
 #![allow(clippy::manual_unwrap_or_default)] // Fixing requires a `darling` upgrade
 
-use proc_macro::Span;
 use proc_macro::TokenStream;
+use proc_macro_error::abort;
+use proc_macro_error::abort_call_site;
 use proc_macro_error::proc_macro_error;
 use quote::TokenStreamExt;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::parse::Result;
 use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
+use util::get_return_type_ident;
+use util::is_callback_result;
 
 mod dna_properties;
 mod entry_helper;
@@ -144,14 +148,119 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // extern mapping is only valid for functions
     let mut item_fn = syn::parse_macro_input!(item as syn::ItemFn);
 
+    let fn_name = item_fn.sig.ident.to_string();
+    let is_infallible = attrs.to_string() == "infallible";
+
+    // Check return type
+    if let syn::ReturnType::Type(_, ref ty) = item_fn.sig.output {
+        const EXTERN_RESULT: &str = "ExternResult";
+
+        match (fn_name.as_str(), get_return_type_ident(ty)) {
+            ("validate" | "genesis_self_check", Some(return_type)) => {
+                const VALIDATE_CALLBACK_RESULT: &str = "ValidateCallbackResult";
+
+                if is_infallible && return_type != VALIDATE_CALLBACK_RESULT {
+                    abort!(
+                        ty.span(),
+                        "{} must return `{}`",
+                        fn_name,
+                        VALIDATE_CALLBACK_RESULT
+                    );
+                } else if !is_infallible && !is_callback_result(ty, VALIDATE_CALLBACK_RESULT) {
+                    abort!(
+                        ty.span(),
+                        "{} must return `{}<{}>`",
+                        fn_name,
+                        EXTERN_RESULT,
+                        VALIDATE_CALLBACK_RESULT
+                    )
+                }
+            }
+            ("init", Some(return_type)) => {
+                const INIT_CALLBACK_RESULT: &str = "InitCallbackResult";
+
+                if is_infallible && return_type != INIT_CALLBACK_RESULT {
+                    abort!(
+                        ty.span(),
+                        "{} must return `{}`",
+                        fn_name,
+                        INIT_CALLBACK_RESULT
+                    )
+                } else if !is_infallible && !is_callback_result(ty, INIT_CALLBACK_RESULT) {
+                    abort!(
+                        ty.span(),
+                        "{} must return {}<{}>",
+                        fn_name,
+                        EXTERN_RESULT,
+                        INIT_CALLBACK_RESULT
+                    )
+                }
+            }
+            ("entry_defs", Some(return_type)) => {
+                const ENTRY_DEFS_CALLBACK_RESULT: &str = "EntryDefsCallbackResult";
+
+                if is_infallible && return_type != ENTRY_DEFS_CALLBACK_RESULT {
+                    abort!(
+                        ty.span(),
+                        "{} must return `{}`",
+                        fn_name,
+                        ENTRY_DEFS_CALLBACK_RESULT
+                    );
+                } else if !is_infallible && !is_callback_result(ty, ENTRY_DEFS_CALLBACK_RESULT) {
+                    abort!(
+                        ty.span(),
+                        "{} must return {}<{}>",
+                        fn_name,
+                        EXTERN_RESULT,
+                        ENTRY_DEFS_CALLBACK_RESULT
+                    )
+                }
+            }
+            ("migrate_agent_open" | "migrate_agent_close", Some(return_type)) => {
+                const MIGRATE_AGENT_CALLBACK_RESULT: &str = "MigrateAgentCallbackResult";
+
+                if is_infallible && return_type != MIGRATE_AGENT_CALLBACK_RESULT {
+                    abort!(
+                        ty.span(),
+                        "{} must return `{}`",
+                        fn_name,
+                        MIGRATE_AGENT_CALLBACK_RESULT
+                    );
+                } else if !is_infallible && !is_callback_result(ty, MIGRATE_AGENT_CALLBACK_RESULT) {
+                    abort!(
+                        ty.span(),
+                        "{} must return {}<{}>",
+                        fn_name,
+                        EXTERN_RESULT,
+                        MIGRATE_AGENT_CALLBACK_RESULT
+                    )
+                }
+            }
+            (_, Some(return_type)) => {
+                if is_infallible && return_type == EXTERN_RESULT {
+                    abort!(
+                        ty.span(),
+                        "infallible functions should return the inner type directly";
+                        help = "consider removing the `{}` wrapper and return the inner type instead", EXTERN_RESULT
+                    );
+                } else if !is_infallible && return_type != EXTERN_RESULT {
+                    let type_str = quote::quote!(#ty).to_string();
+                    abort!(
+                        ty.span(),
+                        "functions marked with #[hdk_extern] must return {}<T>", EXTERN_RESULT;
+                        help = "change the return type to `{}<{}>` or mark the function as infallible if it cannot fail", EXTERN_RESULT, type_str
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+
     // extract the ident of the fn
     // this will be exposed as the external facing extern
     let external_fn_ident = item_fn.sig.ident.clone();
     if item_fn.sig.inputs.len() > 1 {
-        proc_macro_error::abort!(
-            Span::call_site(),
-            "hdk_extern functions must take a single parameter or none"
-        );
+        abort_call_site!("hdk_extern functions must take a single parameter or none");
     }
     let input_type = if let Some(syn::FnArg::Typed(pat_type)) = item_fn.sig.inputs.first() {
         pat_type.ty.clone()
@@ -178,7 +287,7 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     let internal_fn_ident = external_fn_ident.clone();
 
-    if attrs.to_string() == "infallible" {
+    if is_infallible {
         (quote::quote! {
             map_extern_infallible!(#external_fn_ident, #internal_fn_ident, #input_type, #output_type);
             #item_fn
