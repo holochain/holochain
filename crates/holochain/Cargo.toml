@@ -148,6 +148,7 @@ criterion = { version = "0.5", features = ["async_tokio"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 indoc = "2.0"
 isotest = "0"
+lair_keystore = "0.5.3"
 maplit = "1"
 pretty_assertions = "1.4"
 regex = "1.5"
