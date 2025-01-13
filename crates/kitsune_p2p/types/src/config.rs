@@ -2,6 +2,7 @@
 #![allow(missing_docs)]
 
 use crate::tx_utils::TxUrl;
+use schemars::JsonSchema;
 use url2::Url2;
 
 /// Fifteen minutes
@@ -26,7 +27,7 @@ pub mod tuning_params_struct {
             /// warning for tuning params that are removed, but still specified in
             /// configs.
             #[non_exhaustive]
-            #[derive(Clone, Debug, PartialEq)]
+            #[derive(Clone, Debug, PartialEq, schemars::JsonSchema)]
             pub struct KitsuneP2pTuningParams {
                 $(
                     $(#[doc = $doc])*
@@ -399,12 +400,13 @@ pub mod tuning_params_struct {
 pub type KitsuneP2pTuningParams = std::sync::Arc<tuning_params_struct::KitsuneP2pTuningParams>;
 
 /// Configure the kitsune actor.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, JsonSchema)]
 pub struct KitsuneP2pConfig {
     /// List of sub-transports to be included in this pool
     pub transport_pool: Vec<TransportConfig>,
 
     /// The service used for peers to discover each before they are peers.
+    #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub bootstrap_service: Option<Url2>,
 
     /// Network tuning parameters. These are managed loosely,
@@ -486,7 +488,7 @@ impl KitsuneP2pConfig {
 }
 
 /// Configure the network bindings for underlying kitsune transports.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TransportConfig {
     /// Configure to use Tx5 WebRTC for kitsune networking.

@@ -1,24 +1,17 @@
 //! Helpers for creating, reading and writing [`ConductorConfig`]s.
 
-use holochain_conductor_api::conductor::paths::ConfigFilePath;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::conductor::DpkiConfig;
-use holochain_conductor_api::config::conductor::ConductorConfig;
-use holochain_conductor_api::config::conductor::KeystoreConfig;
+use anyhow::Context;
+use holochain_conductor_api::conductor::paths::{ConfigFilePath, ConfigRootPath};
+use holochain_conductor_api::config::conductor::{ConductorConfig, KeystoreConfig};
 
 /// Create a new default [`ConductorConfig`] with data_root_path path,
 /// keystore, and database all in the same directory.
-/// DPKI is disabled.
 pub fn create_config(
     config_root_path: ConfigRootPath,
     con_url: Option<url2::Url2>,
 ) -> anyhow::Result<ConductorConfig> {
     let mut conductor_config = ConductorConfig {
         data_root_path: Some(config_root_path.is_also_data_root_path()),
-        #[cfg(not(feature = "unstable-dpki"))]
-        dpki: DpkiConfig::disabled(),
-        #[cfg(feature = "unstable-dpki")]
-        dpki: DpkiConfig::testing(),
         ..Default::default()
     };
     match con_url {
@@ -37,14 +30,17 @@ pub fn create_config(
 }
 
 /// Write [`ConductorConfig`] to the file [`CONDUCTOR_CONFIG`](`holochain_conductor_api::config::conductor::paths::CONDUCTOR_CONFIG`) in the provided path.
-pub fn write_config(config_root_path: ConfigRootPath, config: &ConductorConfig) -> ConfigFilePath {
+pub fn write_config(
+    config_root_path: ConfigRootPath,
+    config: &ConductorConfig,
+) -> anyhow::Result<ConfigFilePath> {
     let config_file_path: ConfigFilePath = config_root_path.into();
     std::fs::write(
         config_file_path.as_ref(),
         serde_yaml::to_string(&config).unwrap(),
     )
-    .unwrap();
-    config_file_path
+    .context("Failed to write config")?;
+    Ok(config_file_path)
 }
 
 /// Read the [`ConductorConfig`] from the file [`CONDUCTOR_CONFIG`](`holochain_conductor_api::config::conductor::paths::CONDUCTOR_CONFIG`) in the provided path.

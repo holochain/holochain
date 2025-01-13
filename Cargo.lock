@@ -1754,6 +1754,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
+name = "dyn-clone"
+version = "1.0.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d6ef0072f8a535281e4876be788938b528e9a1d43900b82c2569af7da799125"
+
+[[package]]
 name = "ed25519"
 version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2748,6 +2754,7 @@ dependencies = [
  "holochain_cascade",
  "holochain_chc",
  "holochain_conductor_api",
+ "holochain_conductor_config",
  "holochain_conductor_services",
  "holochain_deepkey_dna",
  "holochain_keystore",
@@ -2798,6 +2805,7 @@ dependencies = [
  "reqwest 0.12.12",
  "rusqlite",
  "sbd-server",
+ "schemars",
  "sd-notify",
  "serde",
  "serde_bytes",
@@ -2956,6 +2964,7 @@ dependencies = [
  "futures",
  "holochain_chc",
  "holochain_conductor_api",
+ "holochain_conductor_config",
  "holochain_nonce",
  "holochain_p2p",
  "holochain_trace",
@@ -2987,6 +2996,7 @@ dependencies = [
  "holochain_state_types",
  "holochain_trace",
  "holochain_types",
+ "holochain_util",
  "holochain_zome_types",
  "indexmap 2.7.0",
  "kitsune_p2p",
@@ -2995,12 +3005,31 @@ dependencies = [
  "matches",
  "pretty_assertions",
  "rmp-serde",
+ "schemars",
  "serde",
  "serde_json",
  "serde_yaml",
  "shrinkwraprs",
  "thiserror 1.0.69",
  "tracing",
+ "url2",
+]
+
+[[package]]
+name = "holochain_conductor_config"
+version = "0.5.0-dev.0"
+dependencies = [
+ "ansi_term",
+ "anyhow",
+ "holochain_conductor_api",
+ "holochain_types",
+ "holochain_util",
+ "kitsune_p2p_types",
+ "nanoid",
+ "serde",
+ "serde_yaml",
+ "sodoken 0.0.11",
+ "tempfile",
  "url2",
 ]
 
@@ -3075,6 +3104,7 @@ dependencies = [
  "nanoid",
  "one_err",
  "parking_lot 0.12.3",
+ "schemars",
  "serde",
  "serde_bytes",
  "serde_yaml",
@@ -3215,6 +3245,7 @@ dependencies = [
  "rmp-serde",
  "rusqlite",
  "scheduled-thread-pool",
+ "schemars",
  "serde",
  "serde_json",
  "shrinkwraprs",
@@ -3354,6 +3385,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "rusqlite",
+ "schemars",
  "serde",
  "serde_bytes",
  "serde_derive",
@@ -3381,6 +3413,7 @@ dependencies = [
  "futures",
  "once_cell",
  "rpassword",
+ "schemars",
  "sodoken 0.0.11",
  "tokio",
  "tracing",
@@ -4486,6 +4519,7 @@ dependencies = [
  "futures",
  "ghost_actor",
  "holochain_trace",
+ "holochain_util",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
@@ -4500,6 +4534,7 @@ dependencies = [
  "proptest-derive 0.5.1",
  "rmp-serde",
  "rustls 0.21.12",
+ "schemars",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -6844,6 +6879,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "schemars"
+version = "0.8.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09c024468a378b7e36765cd36702b7a90cc3cba11654f6685c8f233408e89e92"
+dependencies = [
+ "dyn-clone",
+ "schemars_derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "schemars_derive"
+version = "0.8.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1eee588578aff73f856ab961cd2f79e36bc45d7ded33a7562adba4667aecc0e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_derive_internals",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6961,6 +7020,17 @@ name = "serde_derive"
 version = "1.0.203"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "500cbc0ebeb6f46627f50f3f5811ccf6bf00643be300b4c3eabc0ef55dc5b5ba"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
+name = "serde_derive_internals"
+version = "0.29.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
 dependencies = [
  "proc-macro2",
  "quote",
