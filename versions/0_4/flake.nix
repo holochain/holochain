@@ -2,7 +2,7 @@
   inputs =
     {
       holochain = {
-        url = "github:holochain/holochain/holochain-0.4.0-rc.2";
+        url = "github:holochain/holochain/holochain-0.4.1-rc.0";
         flake = false;
       };
 
@@ -26,6 +26,6 @@
 
   outputs = { ... }: {
     stub = true;
-    rustVersion = "1.80.1";
+    rustVersion = "1.81.0";
   };
 }
