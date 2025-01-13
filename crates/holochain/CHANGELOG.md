@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add two new commands to the `hc sandbox` for authenticating and making zome calls to a running conductor. See the sandbox documentation for usage instructions. #4587
 - Update `holochain_wasmer_host`, remove temporary fork of wasmer and update wasmer to 5.x.
 - Disable wasmer module caching when using the feature flag `wasmer_wamr`, as caching is not relevevant when wasms are interpreted.
+- Add a `--create-config` flag to handle config generation
 
 ## 0.5.0-dev.13
 

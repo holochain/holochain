@@ -53,6 +53,9 @@ struct Opt {
     )]
     build_info: bool,
 
+    #[structopt(long, help = "Create default conductor configuration.")]
+    create_config: bool,
+
     /// WARNING!! DANGER!! This exposes your database decryption secrets!
     /// Print the database decryption secrets to stderr.
     /// With these PRAGMA commands, you'll be able to run sqlcipher
@@ -76,6 +79,13 @@ async fn async_main() {
 
     if opt.build_info {
         println!("{}", option_env!("BUILD_INFO").unwrap_or("{}"));
+        return;
+    }
+
+    if opt.create_config {
+        holochain_conductor_config::generate::generate(None, None, None, true, 0)
+            .inspect_err(|e| tracing::error!("Failed to generate configurations: {}", e))
+            .unwrap();
         return;
     }
 
@@ -196,7 +206,10 @@ fn display_friendly_missing_config_message(maybe_config_root_path: Option<&Confi
 
         {path}
 
-    but this file doesn't exist. Please create a YAML config file at this path.
+    but this file doesn't exist. Please create a YAML config file at this path or run the following 
+    command to generate starter configurations.
+
+        holochain --create-config
             ",
             path = config_root_path.display(),
         );

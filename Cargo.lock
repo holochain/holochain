@@ -2748,6 +2748,7 @@ dependencies = [
  "holochain_cascade",
  "holochain_chc",
  "holochain_conductor_api",
+ "holochain_conductor_config",
  "holochain_conductor_services",
  "holochain_deepkey_dna",
  "holochain_keystore",
@@ -2956,6 +2957,7 @@ dependencies = [
  "futures",
  "holochain_chc",
  "holochain_conductor_api",
+ "holochain_conductor_config",
  "holochain_nonce",
  "holochain_p2p",
  "holochain_trace",
@@ -3001,6 +3003,24 @@ dependencies = [
  "shrinkwraprs",
  "thiserror 1.0.69",
  "tracing",
+ "url2",
+]
+
+[[package]]
+name = "holochain_conductor_config"
+version = "0.5.0-dev.0"
+dependencies = [
+ "ansi_term",
+ "anyhow",
+ "holochain_conductor_api",
+ "holochain_types",
+ "holochain_util",
+ "kitsune_p2p_types",
+ "nanoid",
+ "serde",
+ "serde_yaml",
+ "sodoken 0.0.11",
+ "tempfile",
  "url2",
 ]
 

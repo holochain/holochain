@@ -42,8 +42,6 @@ pub mod calls;
 pub mod cli;
 #[doc(hidden)]
 pub mod cmds;
-pub mod config;
-pub mod generate;
 pub mod run;
 pub mod sandbox;
 pub mod save;
