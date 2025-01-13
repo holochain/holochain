@@ -35,6 +35,7 @@ tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
 shrinkwraprs = "0.3"
 derive_more = "0.99"
+schemars = "0.8.21"
 
 [dev-dependencies]
 assert_cmd = "2.0.4"

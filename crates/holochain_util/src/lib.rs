@@ -14,4 +14,7 @@ pub mod time;
 
 pub mod hex;
 
+#[cfg(feature = "jsonschema")]
+pub mod jsonschema;
+
 pub use ::colored;

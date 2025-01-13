@@ -39,6 +39,9 @@ struct Opt {
     )]
     config_path: Option<PathBuf>,
 
+    #[structopt(long, help = "Print out the conductor config's json schema")]
+    config_schema: bool,
+
     /// Instead of the normal "interactive" method of passphrase
     /// retrieval, read the passphrase from stdin. Be careful
     /// how you make use of this, as it could be less secure,
@@ -79,6 +82,13 @@ async fn async_main() {
 
     if opt.build_info {
         println!("{}", option_env!("BUILD_INFO").unwrap_or("{}"));
+        return;
+    }
+
+    if opt.config_schema {
+        let schema = schemars::schema_for!(ConductorConfig);
+        let schema_string = serde_json::to_string_pretty(&schema).unwrap();
+        println!("{}", schema_string);
         return;
     }
 
