@@ -1,9 +1,10 @@
 use holochain_types::websocket::AllowedOrigins;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
 /// Information neeeded to spawn an admin interface
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 pub struct AdminInterfaceConfig {
     /// By what means the interface will be exposed.
     /// Currently the only option is a local websocket running on a configurable port.

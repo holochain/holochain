@@ -56,6 +56,7 @@
 use crate::conductor::process::ERROR_CODE;
 use holochain_types::prelude::DbSyncStrategy;
 use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
+use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -83,7 +84,7 @@ use crate::config::conductor::paths::DataRootPath;
 
 // TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default, JsonSchema)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -132,7 +133,7 @@ pub struct ConductorConfig {
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
     /// If you don't know what this means, leave this setting alone (as `None`)
-    #[serde(default)]
+    #[schemars(default, schema_with = "holochain_util::jsonschema::url2_schema")]
     #[cfg(feature = "chc")]
     pub chc_url: Option<url2::Url2>,
 
@@ -211,7 +212,7 @@ impl ConductorConfig {
 }
 
 /// Tuning parameters to adjust the behaviour of the conductor.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
 pub struct ConductorTuningParams {
     /// The delay between retries of sys validation when there are missing dependencies waiting to be found on the DHT.
     ///

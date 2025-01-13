@@ -30,28 +30,17 @@ pub async fn default_with_network(
         network,
         root,
         in_process_lair,
-        #[cfg(feature = "unstable-dpki")]
-        no_dpki,
-        #[cfg(feature = "unstable-dpki")]
-        dpki_network_seed,
-        #[cfg(feature = "chc")]
-        chc_url,
         ..
     } = create;
     let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
-    let path = crate::generate::generate(
+    let config_path = holochain_conductor_config::generate::generate(
         network,
         root,
         directory,
         in_process_lair,
-        #[cfg(feature = "unstable-dpki")]
-        no_dpki,
-        #[cfg(feature = "unstable-dpki")]
-        dpki_network_seed,
-        #[cfg(feature = "chc")]
-        chc_url,
+        0,
     )?;
-    let conductor = run_async(holochain_path, path.clone(), None, structured).await?;
+    let conductor = run_async(holochain_path, config_path.clone(), None, structured).await?;
     let mut cmd = CmdRunner::new(conductor.0).await;
     let install_bundle = InstallApp {
         app_id: Some(app_id),
@@ -61,7 +50,7 @@ pub async fn default_with_network(
         roles_settings,
     };
     crate::calls::install_app_bundle(&mut cmd, install_bundle).await?;
-    Ok(path)
+    Ok(config_path)
 }
 
 /// Same as [`default_with_network`] but creates _n_ copies

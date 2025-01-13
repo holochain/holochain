@@ -1,6 +1,7 @@
 //! Common types for WebSocket connections.
 
 use itertools::Itertools;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -8,7 +9,7 @@ use std::collections::HashSet;
 /// Anywhere other than a browser can set the `Origin` header to any value, so this is only relevant for browser connections.
 ///
 /// See [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin) for more information.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, JsonSchema)]
 pub enum AllowedOrigins {
     /// Allow access from any origin.
     Any,
