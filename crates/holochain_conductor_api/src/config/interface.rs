@@ -20,7 +20,7 @@ pub struct AdminInterfaceConfig {
 ///
 /// [`ConductorConfig`]: crate::conductor::ConductorConfig
 /// [`ConductorState`]: https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum InterfaceDriver {
     /// An interface implemented via websockets
