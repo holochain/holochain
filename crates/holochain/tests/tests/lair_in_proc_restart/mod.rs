@@ -3,10 +3,7 @@ use holochain::sweettest::SweetDnaFile;
 use holochain::sweettest::SweetRendezvous;
 use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
-use holochain_conductor_api::AdminInterfaceConfig;
-use holochain_conductor_api::InterfaceDriver;
 use holochain_keystore::MetaLairClient;
-use holochain_types::websocket::AllowedOrigins;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::dependencies::*;
@@ -33,7 +30,7 @@ async fn lair_in_proc_sql_pool_factory_restart() {
 
     let store_factory = lair_keystore::create_sql_pool_factory(
         tmp.path().join("store_file"),
-        &*&config.database_salt,
+        &config.database_salt,
     );
 
     let keystore = InProcKeystore::new(config, store_factory, passphrase)
