@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Change all enums that are exposed via the conductor API to be serialized with `tag = "type"` and `content = "value"` #4616
 - Remove support for x86_64-darwin in Holonix. This is becoming hard to support in this version of Holonix. If you are
   relying on support for a mac with an Intel chip then please migrate to the new [Holonix](https://github.com/holochain/holonix?tab=readme-ov-file#holonix) 
 - Add two new commands to the `hc sandbox` for authenticating and making zome calls to a running conductor. See the sandbox documentation for usage instructions. #4587
