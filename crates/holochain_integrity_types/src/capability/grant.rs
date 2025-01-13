@@ -16,6 +16,7 @@ use std::collections::BTreeSet;
 ///
 /// See `.is_valid()`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
 pub enum CapGrant {
     /// Grants the capability of calling every extern to the calling agent, provided the calling
@@ -195,11 +196,11 @@ pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum GrantedFunctions {
     /// grant all zomes all functions
     All,

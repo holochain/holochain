@@ -946,7 +946,7 @@ impl InstalledAppCommon {
 ///
 /// The combinations of these basic states give rise to the unified App Status.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppStatus {
     /// The app is enabled and running normally.
     Running,
@@ -1147,7 +1147,7 @@ impl From<StoppedAppReason> for AppStatus {
 /// The reason for an app being in a Paused state.
 /// NB: there is no way to manually pause an app.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum PausedAppReason {
     /// The pause was due to a RECOVERABLE error
     Error(String),

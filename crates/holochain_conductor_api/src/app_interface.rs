@@ -14,7 +14,7 @@ use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
 ///
 /// Returns an [`AppResponse::Error`] with a reason why the request failed.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppRequest {
     /// Get info about the app that you are connected to, including info about each cell installed
     /// by this app.
@@ -214,7 +214,7 @@ pub enum AppRequest {
 
 /// Represents the possible responses to an [`AppRequest`].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppResponse {
     /// Can occur in response to any [`AppRequest`].
     ///
@@ -503,7 +503,7 @@ pub struct RevokeAgentKeyPayload {
 
 /// A flat, slightly more API-friendly representation of [`AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppInfoStatus {
     Paused { reason: PausedAppReason },
     Disabled { reason: DisabledAppReason },

@@ -20,7 +20,7 @@ use crate::{AppInfo, FullStateDump, RevokeAgentKeyPayload, StorageInfo};
 // and the enum variant on a key `type`, e.g.
 // `{ type: 'enable_app', data: { installed_app_id: 'test_app' } }`
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AdminRequest {
     /// Set up and register one or more new admin interfaces
     /// as specified by a list of configurations.
@@ -413,7 +413,7 @@ pub enum AdminRequest {
 /// `{ type: 'app_interface_attached', data: { port: 4000 } }`
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(test, derive(Clone))]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AdminResponse {
     /// Can occur in response to any [`AdminRequest`].
     ///
@@ -570,7 +570,7 @@ pub type CompatibleCells = BTreeSet<(InstalledAppId, BTreeSet<CellId>)>;
 /// This intends to be application developer facing
 /// so it should be readable and relevant
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum ExternalApiWireError {
     // TODO: B-01506 Constrain these errors so they are relevant to
     // application developers and what they would need

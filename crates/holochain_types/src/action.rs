@@ -17,6 +17,7 @@ use holochain_zome_types::op::EntryCreationAction;
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
 )]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
