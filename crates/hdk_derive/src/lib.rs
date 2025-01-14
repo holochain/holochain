@@ -156,7 +156,6 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
         const EXTERN_RESULT: &str = "ExternResult";
         const VALIDATE_CALLBACK_RESULT: &str = "ValidateCallbackResult";
         const INIT_CALLBACK_RESULT: &str = "InitCallbackResult";
-        const ENTRY_DEFS_CALLBACK_RESULT: &str = "EntryDefsCallbackResult";
 
         match (fn_name.as_str(), get_return_type_ident(ty)) {
             ("validate" | "genesis_self_check", Some(return_type)) => {
@@ -196,26 +195,6 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
                         fn_name,
                         EXTERN_RESULT,
                         INIT_CALLBACK_RESULT
-                    );
-                }
-            }
-            ("entry_defs", Some(return_type)) => {
-                if is_infallible && return_type != ENTRY_DEFS_CALLBACK_RESULT {
-                    abort!(
-                        ty.span(),
-                        "`{}` must return `{}`",
-                        fn_name,
-                        ENTRY_DEFS_CALLBACK_RESULT
-                    );
-                } else if !is_infallible
-                    && !is_extern_result_callback_result(ty, ENTRY_DEFS_CALLBACK_RESULT)
-                {
-                    abort!(
-                        ty.span(),
-                        "`{}` must return `{}<{}>`",
-                        fn_name,
-                        EXTERN_RESULT,
-                        ENTRY_DEFS_CALLBACK_RESULT
                     );
                 }
             }
