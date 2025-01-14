@@ -154,80 +154,78 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
     // Check return type
     if let syn::ReturnType::Type(_, ref ty) = item_fn.sig.output {
         const EXTERN_RESULT: &str = "ExternResult";
+        const VALIDATE_CALLBACK_RESULT: &str = "ValidateCallbackResult";
+        const INIT_CALLBACK_RESULT: &str = "InitCallbackResult";
+        const ENTRY_DEFS_CALLBACK_RESULT: &str = "EntryDefsCallbackResult";
 
         match (fn_name.as_str(), get_return_type_ident(ty)) {
             ("validate" | "genesis_self_check", Some(return_type)) => {
-                const VALIDATE_CALLBACK_RESULT: &str = "ValidateCallbackResult";
-
                 if is_infallible && return_type != VALIDATE_CALLBACK_RESULT {
                     abort!(
                         ty.span(),
-                        "{} must return `{}`",
+                        "`{}` must return `{}`",
                         fn_name,
                         VALIDATE_CALLBACK_RESULT
                     );
                 } else if !is_infallible && !is_callback_result(ty, VALIDATE_CALLBACK_RESULT) {
                     abort!(
                         ty.span(),
-                        "{} must return `{}<{}>`",
+                        "`{}` must return `{}<{}>`",
                         fn_name,
                         EXTERN_RESULT,
                         VALIDATE_CALLBACK_RESULT
-                    )
+                    );
                 }
             }
             ("init", Some(return_type)) => {
-                const INIT_CALLBACK_RESULT: &str = "InitCallbackResult";
-
                 if is_infallible && return_type != INIT_CALLBACK_RESULT {
                     abort!(
                         ty.span(),
-                        "{} must return `{}`",
+                        "`{}` must return `{}`",
                         fn_name,
                         INIT_CALLBACK_RESULT
-                    )
+                    );
                 } else if !is_infallible && !is_callback_result(ty, INIT_CALLBACK_RESULT) {
                     abort!(
                         ty.span(),
-                        "{} must return {}<{}>",
+                        "`{}` must return `{}<{}>`",
                         fn_name,
                         EXTERN_RESULT,
                         INIT_CALLBACK_RESULT
-                    )
+                    );
                 }
             }
             ("entry_defs", Some(return_type)) => {
-                const ENTRY_DEFS_CALLBACK_RESULT: &str = "EntryDefsCallbackResult";
-
                 if is_infallible && return_type != ENTRY_DEFS_CALLBACK_RESULT {
                     abort!(
                         ty.span(),
-                        "{} must return `{}`",
+                        "`{}` must return `{}`",
                         fn_name,
                         ENTRY_DEFS_CALLBACK_RESULT
                     );
                 } else if !is_infallible && !is_callback_result(ty, ENTRY_DEFS_CALLBACK_RESULT) {
                     abort!(
                         ty.span(),
-                        "{} must return {}<{}>",
+                        "`{}` must return `{}<{}>`",
                         fn_name,
                         EXTERN_RESULT,
                         ENTRY_DEFS_CALLBACK_RESULT
-                    )
+                    );
                 }
             }
             (_, Some(return_type)) => {
+                let type_str = quote::quote!(#ty).to_string();
+
                 if is_infallible && return_type == EXTERN_RESULT {
                     abort!(
                         ty.span(),
                         "infallible functions should return the inner type directly";
-                        help = "consider removing the `{}` wrapper and return the inner type instead", EXTERN_RESULT
+                        help = "consider removing the `{}<{}>` wrapper and return the inner type `{}` instead", EXTERN_RESULT, type_str, type_str
                     );
                 } else if !is_infallible && return_type != EXTERN_RESULT {
-                    let type_str = quote::quote!(#ty).to_string();
                     abort!(
                         ty.span(),
-                        "functions marked with #[hdk_extern] must return {}<T>", EXTERN_RESULT;
+                        "functions marked with #[hdk_extern] must return `{}<T>`", EXTERN_RESULT;
                         help = "change the return type to `{}<{}>` or mark the function as infallible if it cannot fail", EXTERN_RESULT, type_str
                     );
                 }

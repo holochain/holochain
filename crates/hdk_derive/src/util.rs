@@ -82,11 +82,11 @@ pub fn is_callback_result(ty: &syn::Type, callback_result: &str) -> bool {
         if let Some(segment) = type_path.path.segments.last() {
             if segment.ident == "ExternResult" {
                 if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                    if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
-                        if let syn::Type::Path(inner_path) = inner_ty {
-                            if let Some(inner_segment) = inner_path.path.segments.last() {
-                                return inner_segment.ident == callback_result;
-                            }
+                    if let Some(syn::GenericArgument::Type(syn::Type::Path(inner_path))) =
+                        args.args.first()
+                    {
+                        if let Some(inner_segment) = inner_path.path.segments.last() {
+                            return inner_segment.ident == callback_result;
                         }
                     }
                 }
