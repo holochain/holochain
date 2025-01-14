@@ -213,6 +213,25 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
                     );
                 }
             }
+            ("post_commit", r) => {
+                let type_str = quote::quote!(#ty).to_string();
+
+                if r.is_some() && is_infallible {
+                    abort!(
+                        ty.span(),
+                        "`{}` must not have a return type", fn_name;
+                        help = "remove the `{}` return type", type_str
+                    );
+                } else if !is_callback_result(ty, "()") {
+                    abort!(
+                        ty.span(),
+                        "`{}` must return `{}<{}>`",
+                        fn_name,
+                        EXTERN_RESULT,
+                        "()"
+                    );
+                }
+            }
             (_, Some(return_type)) => {
                 let type_str = quote::quote!(#ty).to_string();
 

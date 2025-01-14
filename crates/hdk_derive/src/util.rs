@@ -82,6 +82,12 @@ pub fn is_callback_result(ty: &syn::Type, callback_result: &str) -> bool {
         if let Some(segment) = type_path.path.segments.last() {
             if segment.ident == "ExternResult" {
                 if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                    // check if T in `_Result<T>` is a unit type
+                    if let Some(syn::GenericArgument::Type(syn::Type::Tuple(t))) = args.args.first()
+                    {
+                        return t.elems.is_empty() && callback_result == "()";
+                    }
+                    // check if T in `_Result<T>` ident matches callback_result
                     if let Some(syn::GenericArgument::Type(syn::Type::Path(inner_path))) =
                         args.args.first()
                     {
