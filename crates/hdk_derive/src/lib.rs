@@ -12,7 +12,7 @@ use syn::parse::Result;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use util::get_return_type_ident;
-use util::is_callback_result;
+use util::is_extern_result_callback_result;
 
 mod dna_properties;
 mod entry_helper;
@@ -167,7 +167,9 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
                         fn_name,
                         VALIDATE_CALLBACK_RESULT
                     );
-                } else if !is_infallible && !is_callback_result(ty, VALIDATE_CALLBACK_RESULT) {
+                } else if !is_infallible
+                    && !is_extern_result_callback_result(ty, VALIDATE_CALLBACK_RESULT)
+                {
                     abort!(
                         ty.span(),
                         "`{}` must return `{}<{}>`",
@@ -185,7 +187,9 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
                         fn_name,
                         INIT_CALLBACK_RESULT
                     );
-                } else if !is_infallible && !is_callback_result(ty, INIT_CALLBACK_RESULT) {
+                } else if !is_infallible
+                    && !is_extern_result_callback_result(ty, INIT_CALLBACK_RESULT)
+                {
                     abort!(
                         ty.span(),
                         "`{}` must return `{}<{}>`",
@@ -203,7 +207,9 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
                         fn_name,
                         ENTRY_DEFS_CALLBACK_RESULT
                     );
-                } else if !is_infallible && !is_callback_result(ty, ENTRY_DEFS_CALLBACK_RESULT) {
+                } else if !is_infallible
+                    && !is_extern_result_callback_result(ty, ENTRY_DEFS_CALLBACK_RESULT)
+                {
                     abort!(
                         ty.span(),
                         "`{}` must return `{}<{}>`",
@@ -222,7 +228,7 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
                         "`{}` must not have a return type", fn_name;
                         help = "remove the `{}` return type", type_str
                     );
-                } else if !is_callback_result(ty, "()") {
+                } else if !is_extern_result_callback_result(ty, "()") {
                     abort!(
                         ty.span(),
                         "`{}` must return `{}<{}>`",

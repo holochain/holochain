@@ -77,7 +77,7 @@ pub fn get_return_type_ident(ty: &syn::Type) -> Option<syn::Ident> {
     None
 }
 
-pub fn is_callback_result(ty: &syn::Type, callback_result: &str) -> bool {
+pub fn is_extern_result_callback_result(ty: &syn::Type, callback_result: &str) -> bool {
     if let syn::Type::Path(type_path) = ty {
         if let Some(segment) = type_path.path.segments.last() {
             if segment.ident == "ExternResult" {
