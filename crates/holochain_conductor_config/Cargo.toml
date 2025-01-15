@@ -1,6 +1,7 @@
 [package]
 name = "holochain_conductor_config"
 version = "0.5.0-dev.0"
+description = "Provides utilities for generating holochain conductor configuration."
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_conductor_config"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
@@ -8,7 +9,6 @@ keywords = ["holochain", "holo"]
 categories = ["development-tools::build-utils", "config"]
 edition = "2021"
 license = "Apache-2.0"
-description = "Provides utilities for generating holochain conductor configuration."
 
 # reminder - do not use workspace deps
 [dependencies]
