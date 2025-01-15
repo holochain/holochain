@@ -14,6 +14,104 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250115.130248
+
+## [hc\_service\_check-0.2.0-dev.8](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.8)
+
+## [hcterm-0.5.0-dev.14](crates/hcterm/CHANGELOG.md#0.5.0-dev.14)
+
+## [holochain\_cli-0.5.0-dev.14](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.14)
+
+## [holochain-0.5.0-dev.14](crates/holochain/CHANGELOG.md#0.5.0-dev.14)
+
+- Remove support for x86\_64-darwin in Holonix. This is becoming hard to support in this version of Holonix. If you are relying on support for a mac with an Intel chip then please migrate to the new [Holonix](https://github.com/holochain/holonix?tab=readme-ov-file#holonix)
+- Add two new commands to the `hc sandbox` for authenticating and making zome calls to a running conductor. See the sandbox documentation for usage instructions. \#4587
+- Update `holochain_wasmer_host`, remove temporary fork of wasmer and update wasmer to 5.x.
+- Disable wasmer module caching when using the feature flag `wasmer_wamr`, as caching is not relevevant when wasms are interpreted.
+- Add a `--create-config` flag to handle config generation
+- Add a `--config-schema` flag to `holochain` that prints out a json schema for the conductor config.
+
+## [holochain\_cli\_bundle-0.5.0-dev.14](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.14)
+
+- Update `holochain_wasmer_host`, remove temporary fork of wasmer and update wasmer to 5.x.
+
+## [holochain\_cli\_run\_local\_services-0.5.0-dev.8](crates/holochain_cli_run_local_services/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.14](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.14)
+
+- **BREAKING** : Config generation moved from `hc sandbox create` to holochain. Use `holochain --create-config` to generate conductor configurations
+- Moved config generation code to a new crate `holochain_conductor_config`.
+
+## [holochain\_cascade-0.5.0-dev.14](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.14)
+
+## [holochain\_conductor\_config-0.5.0-dev.1](crates/holochain_conductor_config/CHANGELOG.md#0.5.0-dev.1)
+
+## [holochain\_conductor\_services-0.4.0-dev.14](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.14)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.13](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.13)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.14](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.14)
+
+## [holochain\_websocket-0.5.0-dev.14](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.14)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.13](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.13)
+
+## [holochain\_conductor\_api-0.5.0-dev.14](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.14)
+
+## [holochain\_state-0.5.0-dev.14](crates/holochain_state/CHANGELOG.md#0.5.0-dev.14)
+
+## [hc\_deepkey\_types-0.9.0-dev.10](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.10)
+
+## [hdk-0.5.0-dev.13](crates/hdk/CHANGELOG.md#0.5.0-dev.13)
+
+- Update `holochain_wasmer_guest`.
+
+## [holochain\_p2p-0.5.0-dev.14](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.14)
+
+## [holochain\_state\_types-0.5.0-dev.8](crates/holochain_state_types/CHANGELOG.md#0.5.0-dev.8)
+
+## [hdi-0.6.0-dev.10](crates/hdi/CHANGELOG.md#0.6.0-dev.10)
+
+- Update `holochain_wasmer_guest`, remove temporary fork of wasmer and update wasmer to 5.x.
+
+## [holochain\_chc-0.2.0-dev.14](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.14)
+
+## [kitsune\_p2p-0.5.0-dev.9](crates/kitsune_p2p/CHANGELOG.md#0.5.0-dev.9)
+
+## [hdk\_derive-0.5.0-dev.9](crates/hdk_derive/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_types-0.5.0-dev.14](crates/holochain_types/CHANGELOG.md#0.5.0-dev.14)
+
+## [kitsune\_p2p\_bootstrap\_client-0.5.0-dev.7](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.5.0-dev.7)
+
+## [kitsune\_p2p\_fetch-0.5.0-dev.7](crates/kitsune_p2p_fetch/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_keystore-0.5.0-dev.13](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.13)
+
+## [holochain\_sqlite-0.5.0-dev.13](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.13)
+
+## [kitsune\_p2p\_bootstrap-0.4.0-dev.7](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.4.0-dev.7)
+
+## [mr\_bundle-0.5.0-dev.2](crates/mr_bundle/CHANGELOG.md#0.5.0-dev.2)
+
+## [holochain\_zome\_types-0.5.0-dev.12](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.12)
+
+- Update `holochain_wasmer_common`.
+
+## [kitsune\_p2p\_types-0.5.0-dev.7](crates/kitsune_p2p_types/CHANGELOG.md#0.5.0-dev.7)
+
+## [holochain\_integrity\_types-0.5.0-dev.8](crates/holochain_integrity_types/CHANGELOG.md#0.5.0-dev.8)
+
+## [kitsune\_p2p\_block-0.5.0-dev.3](crates/kitsune_p2p_block/CHANGELOG.md#0.5.0-dev.3)
+
+## [holo\_hash-0.5.0-dev.5](crates/holo_hash/CHANGELOG.md#0.5.0-dev.5)
+
+- Update `holochain_wasmer_common`.
+
+## [kitsune\_p2p\_bin\_data-0.5.0-dev.3](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.5.0-dev.3)
+
+## [holochain\_util-0.5.0-dev.1](crates/holochain_util/CHANGELOG.md#0.5.0-dev.1)
+
 # 20250108.004547
 
 ## [hcterm-0.5.0-dev.13](crates/hcterm/CHANGELOG.md#0.5.0-dev.13)
