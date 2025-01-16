@@ -33,5 +33,12 @@ url2 = "0.0.6"
 [dev-dependencies]
 tempfile = "3.15"
 
+[features]
+default = []
+
+unstable-dpki = ["holochain_conductor_api/unstable-dpki"]
+
+chc = ["holochain_conductor_api/chc"]
+
 [lints]
 workspace = true
