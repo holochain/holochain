@@ -57,9 +57,10 @@ use super::{InstalledCell, ModifiersMap};
 /// which manifest version to deserialize to.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 pub enum AppManifest {
+    #[serde(rename = "1")]
     V1(AppManifestV1),
 }
 

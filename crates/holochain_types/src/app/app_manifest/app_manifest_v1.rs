@@ -144,7 +144,8 @@ pub type DnaLocation = mr_bundle::Location;
 
 /// Rules to determine if and how a Cell will be created for this Dna
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+#[serde(tag = "strategy")]
 #[cfg_attr(
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
