@@ -74,7 +74,6 @@ pub async fn integrate_dht_ops_workflow(
                 .execute(named_params! {
                     ":when_integrated": time,
                     ":create_link": ChainOpType::RegisterAddLink,
-                    ":store_entry": ChainOpType::StoreEntry,
                 })?;
             total += changed;
             let changed = txn

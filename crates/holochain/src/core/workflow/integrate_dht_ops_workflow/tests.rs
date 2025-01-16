@@ -516,6 +516,14 @@ fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 #[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_create_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let op: DhtOp = ChainOp::RegisterAddLink(a.signature.clone(), a.link_add.clone()).into();
+    let pre_state = vec![Db::IntQueue(op.clone())];
+    let expect = vec![Db::Integrated(op.clone())];
+    (pre_state, expect, "register link create")
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
@@ -565,6 +573,7 @@ async fn test_ops_state() {
         register_updated_record,
         register_deleted_by,
         register_deleted_action_by,
+        register_create_link,
         register_delete_link,
         register_delete_link_missing_base,
     ];
