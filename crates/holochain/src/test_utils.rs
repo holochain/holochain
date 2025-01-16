@@ -675,36 +675,48 @@ where
     )
     .unwrap();
 
-    let c = *not_consistent
-        .first()
-        .expect("At least one node must not have reached consistency");
-    let integrated = integrated.remove(c);
-
-    let (unintegrated, unpublished) = diff_ops(published.iter(), integrated.iter());
-    let diff = diff_report(unintegrated, unpublished);
-
-    #[allow(clippy::comparison_chain)]
-    if integrated.len() > published.len() {
-        Err(format!("{report}\nnum integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test. Consistency may not be complete. Report:\n\n{header}\n{diff}", integrated.len(), published.len()).into())
-    } else if integrated.len() < published.len() {
-        let db = cells[c].2.as_ref().expect("DhtDb must be provided");
-        let integration_dump = integration_dump(*db).await.unwrap();
-
-        Err(format!(
-"{}\nConsistency not achieved after {:?}. Expected {} ops, but only {} integrated. Report:\n\n{}\n{}\n\n{:?}",
-report,
-        timeout,
-        published.len(),
-        integrated.len(),
-        header,
-        diff,
-        integration_dump,
-
-
-        ).into())
-    } else {
-        unreachable!()
+    if not_consistent.is_empty() {
+        unreachable!("At least one node must not have reached consistency");
     }
+
+    for c in &not_consistent {
+        let integrated = integrated[*c].clone();
+
+        eprintln!("Agent {} is not consistent", cells[*c].0);
+
+        let (unintegrated, unpublished) = diff_ops(published.iter(), integrated.iter());
+        let diff = diff_report(unintegrated, unpublished);
+
+        #[allow(clippy::comparison_chain)]
+        if integrated.len() > published.len() {
+            eprintln!(
+                "{report}\nnum integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test. Consistency may not be complete. Report:\n\n{header}\n{diff}",
+                integrated.len(),
+                published.len()
+            );
+        } else if integrated.len() < published.len() {
+            let db = cells[*c].2.as_ref().expect("DhtDb must be provided");
+            let integration_dump = integration_dump(*db).await.unwrap();
+
+            eprintln!(
+                "{}\nConsistency not achieved after {:?}. Expected {} ops, but only {} integrated. Report:\n\n{}\n{}\n\n{:?}",
+                report,
+                timeout,
+                published.len(),
+                integrated.len(),
+                header,
+                diff,
+                integration_dump
+            );
+        } else {
+            unreachable!()
+        }
+    }
+
+    Err(ConsistencyError(format!(
+        "{} agents were inconsistent",
+        not_consistent.len()
+    )))
 }
 
 const CONSISTENCY_DELAY_LOW: Duration = Duration::from_millis(100);
