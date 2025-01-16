@@ -68,9 +68,7 @@ pub async fn integrate_dht_ops_workflow(
                 })?;
             total += changed;
             let changed = txn
-                .prepare_cached(
-                    holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_ENTRY_BASIS,
-                )?
+                .prepare_cached(holochain_sqlite::sql::sql_cell::SET_ADD_LINK_OPS_TO_INTEGRATED)?
                 .execute(named_params! {
                     ":when_integrated": time,
                     ":create_link": ChainOpType::RegisterAddLink,

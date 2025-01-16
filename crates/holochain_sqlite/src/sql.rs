@@ -12,8 +12,8 @@ pub mod sql_cell {
         include_str!("sql/cell/update_dep_store_record.sql");
     pub const UPDATE_INTEGRATE_DEP_STORE_ENTRY: &str =
         include_str!("sql/cell/update_dep_store_entry.sql");
-    pub const UPDATE_INTEGRATE_DEP_STORE_ENTRY_BASIS: &str =
-        include_str!("sql/cell/update_dep_store_entry_basis.sql");
+    pub const SET_ADD_LINK_OPS_TO_INTEGRATED: &str =
+        include_str!("sql/cell/set_add_link_ops_to_integrated.sql");
     pub const UPDATE_INTEGRATE_DEP_CREATE_LINK: &str =
         include_str!("sql/cell/update_dep_create_link.sql");
 
