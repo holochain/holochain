@@ -529,7 +529,8 @@ pub struct InitZomesComplete {
     pub prev_action: ActionHash,
 }
 
-/// Declares that a metadata Link should be made between two EntryHashes
+/// Declares that a metadata Link should be made between two hashes of anything; could be data or
+/// an op or anything that can be hashed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
 pub struct CreateLink<W = RateWeight> {
     pub author: AgentPubKey,
