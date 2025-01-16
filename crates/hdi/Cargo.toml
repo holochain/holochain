@@ -35,7 +35,6 @@ getrandom = { version = "0.2", features = ["custom"] }
 [dev-dependencies]
 fixt = { path = "../fixt" }
 test-case = "3.3"
-arbitrary = { version = "1.0", features = ["derive"] }
 subtle-encoding = "0.5"
 
 [lints]

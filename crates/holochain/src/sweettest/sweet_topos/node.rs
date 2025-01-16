@@ -1,6 +1,5 @@
 use super::network::NetworkTopologyConductor;
 use crate::sweettest::SweetAgents;
-use arbitrary::Arbitrary;
 use holo_hash::HasHash;
 use holochain_types::prelude::AgentPubKey;
 use holochain_types::prelude::DnaFile;
@@ -10,7 +9,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 /// A node in a network topology. Represents a conductor.
-#[derive(Arbitrary, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct NetworkTopologyNode {
     id: [u8; 32],
     agents: HashMap<DnaFile, HashSet<AgentPubKey>>,

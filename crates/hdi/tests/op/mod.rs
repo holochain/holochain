@@ -1,6 +1,4 @@
 use super::set_zome_types;
-use arbitrary::Arbitrary;
-use arbitrary::Unstructured;
 use hdi::prelude::*;
 use hdi::test_utils::short_hand::*;
 use test_case::test_case;

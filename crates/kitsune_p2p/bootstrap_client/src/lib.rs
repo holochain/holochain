@@ -207,7 +207,6 @@ pub async fn proxy_list(url: Url2, net: BootstrapNet) -> BootstrapClientResult<V
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use arbitrary::Arbitrary;
     use ed25519_dalek::{Signer, SigningKey};
     use kitsune_p2p_bin_data::fixt::*;
     use kitsune_p2p_bin_data::KitsuneAgent;

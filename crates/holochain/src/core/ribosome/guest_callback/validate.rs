@@ -134,7 +134,6 @@ mod test {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::ValidateHostAccessFixturator;
     use ::fixt::prelude::*;
-    use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
     use holochain_types::prelude::*;
     use holochain_zome_types::op::Op;
@@ -240,7 +239,6 @@ mod slow_tests {
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
     use ::fixt::prelude::*;
-    use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
     use assert2::{assert, let_assert};
     use holochain_state::source_chain::SourceChainError;

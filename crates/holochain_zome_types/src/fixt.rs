@@ -9,8 +9,7 @@ use rand::Rng;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::time::Duration;
-
-pub use holo_hash::fixt::*;
+use holo_hash::fixt::*;
 
 fixturator!(
     ExternIO;

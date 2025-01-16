@@ -15,7 +15,6 @@ use super::{Region, RegionCoords, RegionData, RegionDataConstraints};
 #[derive(
     Debug, Clone, PartialEq, Eq, derive_more::Constructor, serde::Serialize, serde::Deserialize,
 )]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct RegionCoordSetLtcs {
     pub(super) times: TelescopingTimes,
     pub(super) arq_set: ArqSet,
@@ -110,7 +109,6 @@ impl RegionCoordSetLtcs {
 /// correspond to the generated coordinates.
 #[derive(Clone, serde::Serialize, serde::Deserialize, Derivative)]
 #[derivative(PartialEq, Eq)]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct RegionSetLtcs<D: RegionDataConstraints = RegionData> {
     /// The generator for the coordinates
     pub coords: RegionCoordSetLtcs,

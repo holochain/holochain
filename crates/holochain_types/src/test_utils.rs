@@ -11,9 +11,6 @@ pub use holochain_zome_types::test_utils::*;
 #[warn(missing_docs)]
 pub mod chain;
 
-mod generate_records;
-pub use generate_records::*;
-
 #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
 struct FakeProperties {
     test: String,

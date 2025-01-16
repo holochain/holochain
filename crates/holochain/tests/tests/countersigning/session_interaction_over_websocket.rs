@@ -26,8 +26,6 @@ use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
 use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
-
-use arbitrary::Arbitrary;
 use ed25519_dalek::SigningKey;
 use matches::assert_matches;
 use rand::rngs::OsRng;

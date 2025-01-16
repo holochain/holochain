@@ -252,7 +252,6 @@ impl WitnessingWorkspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arbitrary::Arbitrary;
 
     /// Test that a session of 5 actions is complete when the expiry time is in the future and all
     /// required actions are present.

@@ -26,7 +26,6 @@ use std::sync::Arc;
 /// A Holochain Zome. Includes the ZomeDef as well as the name of the Zome.
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Zome<T: Send + Sync = ZomeDef> {
     pub name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
@@ -147,7 +146,6 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 // TODO: move to `holochain_types`
 
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
@@ -329,27 +327,6 @@ impl From<ZomeDef> for IntegrityZomeDef {
 impl From<ZomeDef> for CoordinatorZomeDef {
     fn from(z: ZomeDef) -> Self {
         Self(z)
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for ZomeDef {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self::Wasm(WasmZome::arbitrary(u)?))
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for IntegrityZomeDef {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for CoordinatorZomeDef {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
     }
 }
 

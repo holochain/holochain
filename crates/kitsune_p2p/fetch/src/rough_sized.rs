@@ -12,10 +12,6 @@ const GRAN: usize = 4096;
 
 /// Roughly track an approximate integer value.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct RoughInt(i16);
 
 impl std::fmt::Debug for RoughInt {
@@ -72,7 +68,6 @@ pub type OpHashSized = RoughSized<KOpHash>;
     derive_more::Constructor,
     derive_more::Deref,
 )]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct RoughSized<T> {
     /// The data to be sized
     #[deref]

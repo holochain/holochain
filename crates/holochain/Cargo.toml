@@ -99,7 +99,6 @@ wasmer-middlewares = { version = "5.0.2", optional = true, default-features = fa
 
 # Dependencies for test_utils / other optional deps
 fixt = { version = "^0.5.0-dev.0", path = "../fixt", optional = true }
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 diff = { version = "0.1", optional = true }
 hdk = { version = "^0.5.0-dev.13", path = "../hdk", optional = true }
@@ -220,7 +219,6 @@ test_utils = [
   "holochain_p2p/mock_network",
   "kitsune_p2p_bin_data/fixt",
   "kitsune_p2p_types/fixt",
-  "arbitrary",
   "matches",
   "holochain_test_wasm_common",
   "holochain_wasm_test_utils",

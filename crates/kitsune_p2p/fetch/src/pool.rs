@@ -443,7 +443,6 @@ mod tests {
     use crate::backoff::BACKOFF_RETRY_COUNT;
     use crate::test_utils::*;
     use crate::TransferMethod;
-    use arbitrary::Arbitrary;
     use arbitrary::Unstructured;
     use kitsune_p2p_types::fetch_pool::GossipType;
     use pretty_assertions::assert_eq;

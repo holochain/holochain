@@ -2448,7 +2448,6 @@ dependencies = [
 name = "hc_deepkey_sdk"
 version = "0.8.0-dev.13"
 dependencies = [
- "arbitrary",
  "hc_deepkey_types",
  "hdk",
  "serde",
@@ -2459,7 +2458,6 @@ dependencies = [
 name = "hc_deepkey_types"
 version = "0.9.0-dev.10"
 dependencies = [
- "arbitrary",
  "hdi",
  "holo_hash",
  "holochain_integrity_types",
@@ -2554,7 +2552,6 @@ dependencies = [
 name = "hdi"
 version = "0.6.0-dev.10"
 dependencies = [
- "arbitrary",
  "fixt",
  "getrandom 0.2.15",
  "hdk_derive",
@@ -2697,7 +2694,6 @@ dependencies = [
 name = "holo_hash"
 version = "0.5.0-dev.5"
 dependencies = [
- "arbitrary",
  "base64 0.22.1",
  "blake2b_simd",
  "derive_more",
@@ -2725,7 +2721,6 @@ name = "holochain"
 version = "0.5.0-dev.14"
 dependencies = [
  "anyhow",
- "arbitrary",
  "assert2",
  "assert_cmd",
  "async-once-cell",
@@ -3039,7 +3034,6 @@ name = "holochain_conductor_services"
 version = "0.4.0-dev.14"
 dependencies = [
  "anyhow",
- "arbitrary",
  "async-trait",
  "derive_more",
  "futures",
@@ -3068,7 +3062,6 @@ checksum = "be0aa773b74c40ef5e4e02f414d8cbfc4e92520a93511055a3fbccc12d2dd045"
 name = "holochain_integrity_types"
 version = "0.5.0-dev.8"
 dependencies = [
- "arbitrary",
  "derive_builder",
  "holo_hash",
  "holochain_integrity_types",
@@ -3264,7 +3257,6 @@ name = "holochain_state"
 version = "0.5.0-dev.14"
 dependencies = [
  "anyhow",
- "arbitrary",
  "async-recursion",
  "base64 0.22.1",
  "chrono",
@@ -3346,7 +3338,6 @@ name = "holochain_types"
 version = "0.5.0-dev.14"
 dependencies = [
  "anyhow",
- "arbitrary",
  "async-trait",
  "automap",
  "backtrace",
@@ -3499,7 +3490,6 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.5.0-dev.12"
 dependencies = [
- "arbitrary",
  "contrafact",
  "derive_builder",
  "derive_more",
@@ -4287,7 +4277,6 @@ dependencies = [
 name = "kitsune_p2p"
 version = "0.5.0-dev.9"
 dependencies = [
- "arbitrary",
  "arrayref",
  "base64 0.22.1",
  "blake2b_simd",
@@ -4341,7 +4330,6 @@ dependencies = [
 name = "kitsune_p2p_bin_data"
 version = "0.5.0-dev.3"
 dependencies = [
- "arbitrary",
  "base64 0.22.1",
  "derive_more",
  "fixt",
@@ -4389,7 +4377,6 @@ dependencies = [
 name = "kitsune_p2p_bootstrap_client"
 version = "0.5.0-dev.7"
 dependencies = [
- "arbitrary",
  "ed25519-dalek",
  "fixt",
  "kitsune_p2p_bin_data",
@@ -4408,7 +4395,6 @@ dependencies = [
 name = "kitsune_p2p_dht"
 version = "0.5.0-dev.1"
 dependencies = [
- "arbitrary",
  "colored",
  "derivative",
  "derive_more",
@@ -4436,7 +4422,6 @@ dependencies = [
 name = "kitsune_p2p_dht_arc"
 version = "0.5.0-dev.1"
 dependencies = [
- "arbitrary",
  "derive_more",
  "gcollections",
  "holochain_trace",
@@ -4458,7 +4443,6 @@ dependencies = [
 name = "kitsune_p2p_fetch"
 version = "0.5.0-dev.7"
 dependencies = [
- "arbitrary",
  "backon",
  "derive_more",
  "holochain_serialized_bytes",
@@ -4496,7 +4480,6 @@ dependencies = [
 name = "kitsune_p2p_timestamp"
 version = "0.5.0-dev.0"
 dependencies = [
- "arbitrary",
  "chrono",
  "holochain_serialized_bytes",
  "once_cell",
@@ -4512,7 +4495,6 @@ dependencies = [
 name = "kitsune_p2p_types"
 version = "0.5.0-dev.7"
 dependencies = [
- "arbitrary",
  "base64 0.22.1",
  "criterion",
  "derive_more",
@@ -4971,7 +4953,6 @@ name = "mr_bundle"
 version = "0.5.0-dev.2"
 dependencies = [
  "anyhow",
- "arbitrary",
  "derive_more",
  "flate2",
  "futures",

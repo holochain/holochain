@@ -64,11 +64,9 @@ macro_rules! make_kitsune_bin_type {
                 serde::Serialize,
                 serde::Deserialize,
             )]
-            #[cfg_attr(feature = "fuzzing", derive($crate::dependencies::proptest_derive::Arbitrary))]
             #[shrinkwrap(mutable)]
             pub struct $name(
                 #[serde(with = "serde_bytes")]
-                #[cfg_attr(feature = "fuzzing", proptest(strategy = "proptest::collection::vec(0u8..128, 36)"))]
                 pub Vec<u8>);
 
             impl KitsuneBinType for $name {
@@ -115,22 +113,6 @@ macro_rules! make_kitsune_bin_type {
                     self.0.as_slice()
                 }
             }
-
-            #[cfg(feature = "fuzzing")]
-            impl<'a> arbitrary::Arbitrary<'a> for $name {
-                fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-                    // FIXME: there is no way to calculate location bytes right now,
-                    //        so we're producing arbitrary bytes in a way that the location
-                    //        DOES NOT match the hash. This needs to change, but we can go
-                    //        forward with this for now.
-                    let mut buf = [0; 36];
-                    buf[..]
-                        .copy_from_slice(u.bytes(36)?);
-
-                    Ok(Self::new(buf.to_vec()))
-                }
-            }
-
         )*
     };
 }
@@ -165,10 +147,6 @@ These metadata "Operations" each also have unique OpHashes."#,
 
 /// The op data with its location
 #[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 #[repr(transparent)]
 #[serde(transparent)]
 pub struct KitsuneOpData(
@@ -221,10 +199,6 @@ pub type KOp = std::sync::Arc<KitsuneOpData>;
     serde::Deserialize,
     serde::Serialize,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 #[shrinkwrap(mutable)]
 pub struct KitsuneSignature(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
@@ -250,7 +224,6 @@ impl std::fmt::Debug for KitsuneSignature {
     serde::Serialize,
     serde::Deserialize,
 )]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct NodeCert(std::sync::Arc<[u8; 32]>);
 
 impl std::fmt::Debug for NodeCert {

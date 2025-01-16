@@ -53,10 +53,6 @@ pub const KITSUNE_PROTOCOL_VERSION: u16 = 0;
 /// Supports +/- `chrono::Duration` directly.  There is no `Timestamp::now()` method, since this is not
 /// supported by WASM; however, `holochain_types` provides a `Timestamp::now()` method.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 #[cfg_attr(not(feature = "chrono"), derive(Debug))]
 pub struct Timestamp(
     /// Microseconds from UNIX Epoch, positive or negative

@@ -1,10 +1,8 @@
 #![allow(clippy::field_reassign_with_default)]
-use arbitrary::Arbitrary;
-use arbitrary::Unstructured;
-use holochain_zome_types::prelude::NOISE;
 use test_case::test_case;
-
+use fixt::*;
 use super::*;
+use holo_hash::fixt::*;
 
 #[test_case(1)]
 #[test_case(2)]
@@ -22,6 +20,7 @@ fn prev_is_empty_new_is_zero_check_empty(n: u32) {
     // (a) -> (n)
     assert!(prev_is_empty_new_is_zero(Some(&prev_bounds), &new_bounds));
 }
+
 #[test]
 fn prev_is_empty_new_is_zero_check_zero() {
     let prev_bounds = ActivityBounds::default();
@@ -85,11 +84,10 @@ fn integrated_is_consecutive_check_finds_gaps(s: u32, e: u32) {
 fn can_accept_ready_in_random_order() {
     use rand::prelude::*;
     let mut activity = HashMap::new();
-    let mut u = Unstructured::new(&NOISE);
     let mut rand = rand::thread_rng();
     let mut sequence: Vec<_> = (0..10).collect();
     sequence.shuffle(&mut rand);
-    let author = AgentPubKey::arbitrary(&mut u).unwrap();
+    let author = fixt!(AgentPubKey);
 
     let mut new_bounds = ActivityBounds::default();
     let mut spent = Vec::with_capacity(sequence.len());

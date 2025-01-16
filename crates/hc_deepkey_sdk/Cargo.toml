@@ -18,7 +18,5 @@ hdk = { version = "^0.5.0-dev.13", path = "../hdk" }
 serde = "1"
 serde_bytes = "0.11"
 
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
-
 [features]
-fuzzing = ["arbitrary", "hc_deepkey_types/fuzzing", "hdk/fuzzing"]
+fuzzing = ["hc_deepkey_types/fuzzing", "hdk/fuzzing"]

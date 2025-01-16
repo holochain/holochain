@@ -674,7 +674,6 @@ mod test {
     use super::check_countersigning_preflight_response_signature;
     use crate::core::sys_validate::error::SysValidationError;
     use crate::core::ValidationOutcome;
-    use arbitrary::Arbitrary;
     use fixt::fixt;
     use fixt::Predictable;
     use hdk::prelude::AgentPubKeyFixturator;

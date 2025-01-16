@@ -9,7 +9,6 @@ use std::collections::BTreeSet;
 use crate::fixt::AgentPubKeyFixturator;
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 use ::fixt::fixt;
-use arbitrary::Arbitrary;
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]

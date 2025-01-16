@@ -13,7 +13,6 @@ use crate::test_utils::{
     wait_for_integration,
 };
 use ::fixt::fixt;
-use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
 use hdk::prelude::*;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};

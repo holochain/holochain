@@ -31,15 +31,13 @@ holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util", feature
   "time",
 ] }
 
-arbitrary = { version = "1.0", optional = true }
-
 [dev-dependencies]
 hdk = { version = "^0.5.0-dev.13", path = "../hdk" }
 
 [features]
 test_utils = ["fuzzing"]
 
-fuzzing = ["arbitrary", "hc_deepkey_sdk/fuzzing"]
+fuzzing = ["hc_deepkey_sdk/fuzzing"]
 
 [lints]
 workspace = true

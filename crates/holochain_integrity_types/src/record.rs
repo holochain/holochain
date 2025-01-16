@@ -21,10 +21,6 @@ use holochain_serialized_bytes::prelude::*;
 /// a chain record containing the signed action along with the
 /// entry if the action type has one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct Record<A = SignedActionHashed> {
     /// The signed action for this record
     pub signed_action: A,
@@ -62,10 +58,6 @@ impl ActionSequenceAndHash for Record {
 /// Represents the different ways the entry_address reference within an action
 /// can be interpreted
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub enum RecordEntry<E: Borrow<Entry> = Entry> {
     /// The Action has an entry_address reference, and the Entry is accessible.
     Present(E),
@@ -460,20 +452,5 @@ impl TryFrom<Record> for DeleteLink {
             .0
             .into_content()
             .try_into()
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl<'a, T> arbitrary::Arbitrary<'a> for SignedHashed<T>
-where
-    T: HashableContent,
-    T: arbitrary::Arbitrary<'a>,
-    <T as holo_hash::HashableContent>::HashType: holo_hash::PrimitiveHashType,
-{
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self {
-            hashed: HoloHashed::<T>::arbitrary(u)?,
-            signature: Signature::arbitrary(u)?,
-        })
     }
 }
