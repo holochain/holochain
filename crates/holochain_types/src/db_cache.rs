@@ -184,13 +184,13 @@ impl DhtDbQueryCache {
                     let ready_to_integrate = bounds.ready_to_integrate?;
 
                     // The start of the range will be one more then the last integrated item or
-                    // if there is nothing integrated then the start will be also the ready_to_integrate.
+                    // if there is nothing integrated then the start will be `0`.
                     // This is why we use an inclusive range.
                     let start = bounds
                         .integrated
                         .and_then(|i| i.checked_add(1))
                         .filter(|i_prime| *i_prime <= ready_to_integrate)
-                        .unwrap_or(ready_to_integrate);
+                        .unwrap_or_default();
                     Some((agent.clone(), start..=ready_to_integrate))
                 })
                 .collect()
