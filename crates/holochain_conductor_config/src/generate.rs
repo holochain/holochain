@@ -147,7 +147,19 @@ mod test {
         let root = Some(temp_dir.path().to_path_buf());
         let directory = Some("test-config".into());
 
-        let config_root = generate(None, root, directory, true, 0)?;
+        let config_root = generate(
+            None,
+            root,
+            directory,
+            true,
+            0,
+            #[cfg(feature = "unstable-dpki")]
+            true,
+            #[cfg(feature = "unstable-dpki")]
+            None,
+            #[cfg(feature = "chc")]
+            None,
+        )?;
 
         assert!(config_root.as_path().exists());
         assert!(config_root.as_path().is_dir());
@@ -196,7 +208,19 @@ mod test {
             tracing_scope: None,
         };
 
-        let config_root = generate(Some(network_config.clone()), root, directory, true, 0)?;
+        let config_root = generate(
+            Some(network_config.clone()),
+            root,
+            directory,
+            true,
+            0,
+            #[cfg(feature = "unstable-dpki")]
+            true,
+            #[cfg(feature = "unstable-dpki")]
+            None,
+            #[cfg(feature = "chc")]
+            None,
+        )?;
 
         assert!(config_root.as_path().exists());
         assert!(config_root.as_path().is_dir());
