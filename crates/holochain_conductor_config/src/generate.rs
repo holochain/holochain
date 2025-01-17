@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 
 use holochain_conductor_api::conductor::paths::{ConfigRootPath, KeystorePath};
+#[cfg(feature = "unstable-dpki")]
+use holochain_conductor_api::conductor::DpkiConfig;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use crate::config::create_config;
