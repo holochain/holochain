@@ -15,6 +15,7 @@ use crate::ports::set_admin_port;
 /// Generate configurations
 /// This creates a directory containing a `ConductorConfig`,
 /// a keystore, and a database root directory.
+#[allow(clippy::too_many_arguments)]
 pub fn generate(
     network: Option<KitsuneP2pConfig>,
     root: Option<PathBuf>,
