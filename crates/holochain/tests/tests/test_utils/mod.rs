@@ -8,6 +8,7 @@ use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::FullStateDump;
 use holochain_websocket::WebsocketSender;
 use holochain_websocket::{WebsocketReceiver, WebsocketResult};
+use ::fixt::*;
 
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
@@ -162,8 +163,7 @@ pub async fn grant_zome_call_capability(
     let mut assignees = BTreeSet::new();
     assignees.insert(signing_key.clone());
 
-    let mut buf = arbitrary::Unstructured::new(&[]);
-    let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
+    let cap_secret = fixt!(CapSecret);
 
     let request = AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
         cell_id: cell_id.clone(),

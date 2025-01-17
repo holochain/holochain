@@ -34,7 +34,6 @@ use crate::sweettest::SweetAgents;
 use crate::sweettest::SweetConductor;
 use crate::test_utils::fake_genesis_for_agent;
 use ::fixt::prelude::*;
-use arbitrary::Unstructured;
 use contrafact::Fact;
 use error::SysValidationError;
 
@@ -51,10 +50,6 @@ use holochain_state::prelude::test_cache_db;
 use holochain_state::prelude::test_dht_db;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::test_utils::chain::{TestChainHash, TestChainItem};
-use holochain_types::test_utils::rebuild_record;
-use holochain_types::test_utils::sign_record;
-use holochain_types::test_utils::valid_arbitrary_chain;
-use holochain_zome_types::facts::ActionRefMut;
 use holochain_zome_types::Action;
 use matches::assert_matches;
 use std::time::Duration;
@@ -236,21 +231,6 @@ async fn assert_valid_action(keystore: &MetaLairClient, action: Action) {
     if result.is_err() {
         dbg!(&deps, &record);
         result.unwrap();
-    }
-}
-
-/// Mismatched signatures are rejected
-#[tokio::test(flavor = "multi_thread")]
-async fn test_record_with_cascade() {
-    let mut g = random_generator();
-
-    let keystore = holochain_keystore::test_keystore();
-    for _ in 0..100 {
-        let op =
-            holochain_types::facts::valid_chain_op(keystore.clone(), fake_agent_pubkey_1(), false)
-                .build(&mut g);
-        let action = op.action().clone();
-        assert_valid_action(&keystore, action).await;
     }
 }
 
@@ -733,9 +713,9 @@ async fn incoming_ops_filters_private_entry() {
     assert_eq!(num_entries, 0);
 }
 
-#[test]
 /// Test that a given sequence of actions constitutes a valid chain wrt
 /// its backlinks
+#[test]
 fn valid_chain_test() {
     isotest::isotest!(TestChainItem, TestChainHash => |iso_a, iso_h| {
         // Create a valid chain.

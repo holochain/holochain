@@ -97,17 +97,15 @@ impl From<HashMap<NodeCert, RoundState>> for RoundStateMap {
 mod tests {
     use crate::gossip::sharded_gossip::state_map::RoundStateMap;
     use crate::gossip::sharded_gossip::{NodeCert, RoundState};
-    use crate::NOISE;
-    use arbitrary::{Arbitrary, Unstructured};
     use kitsune_p2p_types::dht::arq::ArqSet;
     use std::collections::HashSet;
     use std::sync::Arc;
     use std::time::Duration;
+    use rand::Rng;
 
     #[test]
     fn hold_round_state() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key) = test_round_state_map_with_single_key();
         assert!(state_map.round_exists(&key));
 
         let state = state_map.get(&key);
@@ -117,8 +115,7 @@ mod tests {
 
     #[test]
     fn remove_round_state() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key) = test_round_state_map_with_single_key();
         assert!(state_map.round_exists(&key));
 
         let removed = state_map.remove(&key);
@@ -129,8 +126,7 @@ mod tests {
 
     #[test]
     fn modify_round_state() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key) = test_round_state_map_with_single_key();
 
         {
             let state = state_map.get_mut(&key).unwrap();
@@ -145,8 +141,7 @@ mod tests {
 
     #[test]
     fn round_state_times_out_after_round_timeout() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key) = test_round_state_map_with_single_key();
 
         {
             // We must use a zero timeout here, unlike the other tests which just set the last_touch in the past,
@@ -162,8 +157,7 @@ mod tests {
 
     #[test]
     fn round_state_mut_times_out_after_round_timeout() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key) = test_round_state_map_with_single_key();
 
         {
             // We must use a zero timeout here, unlike the other tests which just set the last_touch in the past,
@@ -179,8 +173,7 @@ mod tests {
 
     #[test]
     fn round_state_does_not_time_out_if_fetched() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key) = test_round_state_map_with_single_key();
 
         {
             let state = state_map.get_mut(&key).unwrap();
@@ -202,8 +195,7 @@ mod tests {
 
     #[test]
     fn round_state_mut_does_not_time_out_if_fetched() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key) = test_round_state_map_with_single_key();
 
         {
             let state = state_map.get_mut(&key).unwrap();
@@ -225,11 +217,10 @@ mod tests {
 
     #[test]
     fn get_current_rounds_from_round_state() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key_1) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key_1) = test_round_state_map_with_single_key();
 
-        let key_2 = insert_new_state(&mut state_map, &mut u);
-        let key_3 = insert_new_state(&mut state_map, &mut u);
+        let key_2 = insert_new_state(&mut state_map);
+        let key_3 = insert_new_state(&mut state_map);
 
         assert_eq!(3, state_map.current_rounds().len());
 
@@ -251,8 +242,7 @@ mod tests {
 
     #[test]
     fn expired_rounds_can_only_be_fetched_from_round_state_once() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key) = test_round_state_map_with_single_key();
 
         {
             let state = state_map.get_mut(&key).unwrap();
@@ -268,8 +258,7 @@ mod tests {
 
     #[test]
     fn round_state_removed_if_finished_on_get_mut() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key) = test_round_state_map_with_single_key();
 
         {
             let state = state_map.get_mut(&key).unwrap();
@@ -284,8 +273,7 @@ mod tests {
 
     #[test]
     fn round_state_removed_if_finished_on_get() {
-        let mut u = Unstructured::new(&NOISE);
-        let (mut state_map, key) = test_round_state_map_with_single_key(&mut u);
+        let (mut state_map, key) = test_round_state_map_with_single_key();
 
         {
             let state = state_map.get_mut(&key).unwrap();
@@ -298,9 +286,9 @@ mod tests {
         assert!(state.is_none());
     }
 
-    fn test_round_state_map_with_single_key(u: &mut Unstructured) -> (RoundStateMap, NodeCert) {
+    fn test_round_state_map_with_single_key() -> (RoundStateMap, NodeCert) {
         let mut state_map = RoundStateMap::default();
-        let key = insert_new_state(&mut state_map, u);
+        let key = insert_new_state(&mut state_map);
 
         (state_map, key)
     }
@@ -314,8 +302,10 @@ mod tests {
         )
     }
 
-    fn insert_new_state(state_map: &mut RoundStateMap, u: &mut Unstructured) -> NodeCert {
-        let key = NodeCert::arbitrary(u).unwrap();
+    fn insert_new_state(state_map: &mut RoundStateMap) -> NodeCert {
+        let mut cert = vec![0; 32];
+        rand::thread_rng().fill(&mut cert[..]);
+        let key = NodeCert::from(Arc::new(cert.try_into().unwrap()));
         state_map.insert(key.clone(), test_round_state());
 
         key

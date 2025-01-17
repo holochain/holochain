@@ -145,14 +145,12 @@ clap = "4.0"
 contrafact = "0.2.0-rc.1"
 criterion = { version = "0.5", features = ["async_tokio"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
-indoc = "2.0"
 isotest = "0"
 lair_keystore = "0.5.3"
 maplit = "1"
 pretty_assertions = "1.4"
 regex = "1.5"
 reqwest = "0.12"
-serial_test = "3.0"
 test-case = "3.3"
 tokio-tungstenite = "0.21"
 tx5 = "0.1.5-beta"
@@ -227,6 +225,7 @@ test_utils = [
   "tx5-go-pion-turn",
   "async-once-cell",
   "get_if_addrs",
+  "holo_hash/fixturators",
 ]
 
 fuzzing = []

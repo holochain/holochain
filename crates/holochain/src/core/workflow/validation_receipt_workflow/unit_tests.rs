@@ -1,6 +1,6 @@
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
-use crate::prelude::AgentPubKeyFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use crate::prelude::CreateFixturator;
 use crate::prelude::DhtOpHashed;
 use crate::prelude::SignatureFixturator;

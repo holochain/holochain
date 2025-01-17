@@ -1,3 +1,5 @@
+use holo_hash::fixt::EntryHashFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use super::*;
 use crate::here;
 use crate::prelude::mutations_helpers::insert_valid_integrated_op;

@@ -122,16 +122,6 @@ impl<T: PartialEq> PartialEq for RoughSized<T> {
 
 impl<T: Eq> Eq for RoughSized<T> {}
 
-#[cfg(feature = "fuzzing")]
-impl<'a, T: arbitrary::Arbitrary<'a>> arbitrary::Arbitrary<'a> for RoughSized<T> {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self {
-            data: arbitrary::Arbitrary::arbitrary(u)?,
-            size: arbitrary::Arbitrary::arbitrary(u)?,
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

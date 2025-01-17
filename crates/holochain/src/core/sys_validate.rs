@@ -671,21 +671,44 @@ fn make_register_agent_activity(record: Record) -> ChainOp {
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
     use super::check_countersigning_preflight_response_signature;
     use crate::core::sys_validate::error::SysValidationError;
     use crate::core::ValidationOutcome;
     use fixt::fixt;
-    use fixt::Predictable;
-    use hdk::prelude::AgentPubKeyFixturator;
+    use hdk::prelude::{PreflightBytes, Signature};
     use holochain_keystore::AgentPubKeyExt;
     use holochain_zome_types::countersigning::PreflightResponse;
     use matches::assert_matches;
+    use holochain_types::prelude::PreflightRequest;
+    use holochain_zome_types::prelude::CreateBase;
+    use kitsune_p2p::dependencies::kitsune_p2p_timestamp;
+    use crate::prelude::{ActionBase, CounterSigningAgentState, CounterSigningSessionTimes};
+    use kitsune_p2p_timestamp::Timestamp;
+    use crate::prelude::{EntryTypeFixturator};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_check_countersigning_preflight_response_signature() {
         let keystore = holochain_keystore::test_keystore();
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut preflight_response = PreflightResponse::arbitrary(&mut u).unwrap();
+
+        let agent_1 = keystore.new_sign_keypair_random().await.unwrap();
+        let agent_2 = keystore.new_sign_keypair_random().await.unwrap();
+
+        let request = PreflightRequest::try_new(
+            fixt!(AppEntryHash),
+            vec![(agent_1, vec![]), (agent_2, vec![])],
+            vec![],
+            0,
+            false,
+            CounterSigningSessionTimes::try_new(Timestamp::now(), Timestamp::now() + Duration::from_secs(30)).unwrap(),
+            ActionBase::Create(CreateBase::new(fixt!(EntryType))),
+            PreflightBytes(vec![1, 2, 3])
+        ).unwrap();
+
+        let agent_state = vec![CounterSigningAgentState::new(0, fixt!(ActionHash), 100), CounterSigningAgentState::new(1, fixt!(ActionHash), 50)];
+
+        let preflight_response = PreflightResponse::try_new(request.clone(), agent_state.clone(), Signature(vec![0; 64])).unwrap();
+
         assert_matches!(
             check_countersigning_preflight_response_signature(&preflight_response).await,
             Err(SysValidationError::ValidationOutcome(
@@ -693,25 +716,9 @@ mod test {
             ))
         );
 
-        let alice = fixt!(AgentPubKey, Predictable);
-        let bob = fixt!(AgentPubKey, Predictable, 1);
-
-        preflight_response
-            .request_mut()
-            .signing_agents
-            .push((alice.clone(), vec![]));
-        preflight_response
-            .request_mut()
-            .signing_agents
-            .push((bob, vec![]));
-
-        *preflight_response.signature_mut() = alice
-            .sign_raw(
-                &keystore,
-                preflight_response.encode_for_signature().unwrap().into(),
-            )
-            .await
-            .unwrap();
+        let sig_data = PreflightResponse::encode_fields_for_signature(&request, &agent_state).unwrap();
+        let signature = agent_1.sign_raw(&keystore, sig_data.into()).await.unwrap();
+        let preflight_response = PreflightResponse::try_new(request, agent_state, signature).unwrap();
 
         check_countersigning_preflight_response_signature(&preflight_response)
             .await

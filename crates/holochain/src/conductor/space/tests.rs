@@ -1,21 +1,16 @@
 use std::sync::Arc;
 use std::time::Duration;
-
-use arbitrary::*;
-use contrafact::Fact;
 use holo_hash::HasHash;
 use holochain_cascade::test_utils::fill_db;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::test_keystore;
 use holochain_p2p::dht::prelude::*;
-use holochain_types::facts::valid_chain_op;
 use holochain_types::prelude::*;
 use kitsune_p2p_types::dht::ArqStrat;
 use rand::Rng;
-
 use crate::conductor::kitsune_host_impl::query_region_set;
-
 use super::Spaces;
+use ::fixt::*;
 
 /// Test that `fetch_op_regions` returns regions which correctly describe
 /// the set of ops in the database, and that `fetch_ops_by_region` returns the
@@ -30,8 +25,6 @@ async fn test_region_queries() {
     const NUM_OPS: usize = 100;
 
     // let _g = holochain_trace::test_run();
-
-    let mut g = random_generator();
 
     let temp_dir = tempfile::TempDir::new().unwrap();
     let data_root_path = temp_dir.path().to_path_buf().into();
@@ -49,7 +42,17 @@ async fn test_region_queries() {
     let keystore = test_keystore();
     let agent = keystore.new_sign_keypair_random().await.unwrap();
 
-    let mut dna_def = DnaDef::arbitrary(&mut g).unwrap();
+    let mut dna_def = DnaDef {
+        name: "test-dna".to_string(),
+        modifiers: DnaModifiers {
+            network_seed: "".to_string(),
+            origin_time: Timestamp::now(),
+            ..Default::default()
+        },
+        integrity_zomes: vec![],
+        coordinator_zomes: vec![],
+        ..Default::default()
+    };
     let q_us = TimeDimension::standard().quantum as u64;
     let tq = Duration::from_micros(q_us);
     let tq5 = Duration::from_micros(q_us * 5);
@@ -67,7 +70,7 @@ async fn test_region_queries() {
 
     // Builds an arbitrary valid op at the given timestamp
     let mut arbitrary_valid_chain_op = |timestamp: Timestamp| -> ChainOp {
-        let mut op = ChainOp::arbitrary(&mut g).unwrap();
+        let mut op = ChainOp::RegisterAddLink(Signature(vec![1; 64].try_into().unwrap()), fixt!(CreateLink));
         *op.author_mut() = agent.clone();
         let mut fact = valid_chain_op(keystore.clone(), agent.clone(), true);
         op = fact.satisfy(&mut g, op).unwrap();

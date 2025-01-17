@@ -1,4 +1,3 @@
-use crate::fixt::*;
 use crate::prelude::*;
 use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;

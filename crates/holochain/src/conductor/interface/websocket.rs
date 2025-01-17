@@ -483,7 +483,8 @@ pub use crate::test_utils::setup_app_in_new_conductor;
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+use super::*;
     use crate::conductor::api::error::ExternalApiWireError;
     use crate::conductor::api::AdminInterfaceApi;
     use crate::conductor::api::AdminRequest;

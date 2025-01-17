@@ -1,6 +1,6 @@
 #![allow(clippy::field_reassign_with_default)]
 use test_case::test_case;
-use fixt::*;
+use ::fixt::*;
 use super::*;
 use holo_hash::fixt::*;
 

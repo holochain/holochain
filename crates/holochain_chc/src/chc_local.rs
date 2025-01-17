@@ -105,21 +105,19 @@ impl ChainHeadCoordinatorExt for ChcLocal {
 mod tests {
 
     use super::*;
-    use holochain_types::test_utils::valid_arbitrary_chain;
     use ChainHeadCoordinatorExt;
-
+    use holochain_types::test_utils::valid_arbitrary_chain;
     use pretty_assertions::assert_eq;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_add_records_local() {
-        let mut g = random_generator();
         let keystore = holochain_keystore::test_keystore();
         let agent = fake_agent_pubkey_1();
         let chc = Arc::new(ChcLocal::new(keystore.clone(), agent.clone()));
 
         assert_eq!(chc.clone().head().await.unwrap(), None);
 
-        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
+        let chain = valid_arbitrary_chain(&keystore, agent, 20).await;
         let hash = |i: usize| chain[i].action_address().clone();
 
         let t0 = &chain[0..3];

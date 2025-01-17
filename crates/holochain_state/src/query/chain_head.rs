@@ -94,7 +94,9 @@ impl Query for ChainHeadQuery {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use holo_hash::fixt::DhtOpHashFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use super::*;
     use crate::mutations::{insert_action, insert_op_lite};
     use ::fixt::prelude::*;
     use holochain_sqlite::schema::SCHEMA_CELL;

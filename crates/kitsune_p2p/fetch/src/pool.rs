@@ -443,10 +443,9 @@ mod tests {
     use crate::backoff::BACKOFF_RETRY_COUNT;
     use crate::test_utils::*;
     use crate::TransferMethod;
-    use arbitrary::Unstructured;
     use kitsune_p2p_types::fetch_pool::GossipType;
     use pretty_assertions::assert_eq;
-    use rand::RngCore;
+    use rand::{Rng, RngCore};
     use std::collections::HashSet;
     use std::{sync::Arc, time::Duration};
 
@@ -469,8 +468,8 @@ mod tests {
         }
     }
 
-    fn arbitrary_test_sources(u: &mut Unstructured, count: usize) -> Vec<FetchSource> {
-        test_sources(std::iter::repeat_with(|| u8::arbitrary(u).unwrap()).take(count))
+    fn create_test_sources(count: usize) -> Vec<FetchSource> {
+        test_sources(std::iter::repeat_with(|| rand::thread_rng().gen()).take(count))
     }
 
     #[test]
@@ -712,25 +711,20 @@ mod tests {
             }
         }
 
-        // Prepare random inputs
-        let mut noise = [0; 1_000];
-        rand::thread_rng().fill_bytes(&mut noise);
-        let mut u = Unstructured::new(&noise);
-
         // Create a fetch pool to test
         let fetch_pool = FetchPool::new(Arc::new(TestFetchConfig {}));
 
         // Some sources will be unavailable for blocks of time
         let unavailable_sources: HashSet<FetchSource> =
-            arbitrary_test_sources(&mut u, 10).into_iter().collect();
+            create_test_sources(10).into_iter().collect();
 
         // Add one item that will never send
         fetch_pool.push(FetchPoolPush {
             key: test_key_op(220),
-            space: test_space(u8::arbitrary(&mut u).unwrap()),
+            space: test_space(rand::thread_rng().gen()),
             source: unavailable_sources.iter().last().cloned().unwrap(),
             size: None, // Not important for this test
-            context: test_ctx(u32::arbitrary(&mut u).unwrap()),
+            context: test_ctx(rand::thread_rng().next_u32()),
             transfer_method: TransferMethod::Gossip(GossipType::Recent),
         });
 
@@ -740,10 +734,10 @@ mod tests {
             for _ in 0..5 {
                 fetch_pool.push(FetchPoolPush {
                     key: test_key_op(i),
-                    space: test_space(u8::arbitrary(&mut u).unwrap()),
-                    source: test_source(u8::arbitrary(&mut u).unwrap()),
+                    space: test_space(rand::thread_rng().gen()),
+                    source: test_source(rand::thread_rng().gen()),
                     size: None, // Not important for this test
-                    context: test_ctx(u32::arbitrary(&mut u).unwrap()),
+                    context: test_ctx(rand::thread_rng().next_u32()),
                     transfer_method: TransferMethod::Gossip(GossipType::Recent),
                 });
             }

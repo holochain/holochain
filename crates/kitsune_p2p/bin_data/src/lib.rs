@@ -120,16 +120,6 @@ macro_rules! make_kitsune_bin_type {
 // #[derive(Debug)]
 // pub struct BT(Vec<u8>);
 
-// #[cfg(feature = "fuzzing")]
-// impl proptest::arbitrary::Arbitrary for BT {
-//     type Parameters = ();
-//     type Strategy = proptest::collection::VecStrategy<proptest::num::u8::Any>;
-
-//     fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
-//         todo!()
-//     }
-// }
-
 make_kitsune_bin_type! {
     "Distinguish multiple categories of communication within the same network module.",
     KitsuneSpace,

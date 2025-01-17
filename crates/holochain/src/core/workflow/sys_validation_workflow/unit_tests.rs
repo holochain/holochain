@@ -6,7 +6,7 @@ use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use crate::prelude::AgentPubKeyFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use crate::prelude::AgentValidationPkgFixturator;
 use crate::prelude::CreateFixturator;
 use crate::prelude::SignatureFixturator;

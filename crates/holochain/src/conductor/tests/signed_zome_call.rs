@@ -24,8 +24,7 @@ async fn signed_zome_call() {
     let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
 
     // compute a cap access secret
-    let mut buf = arbitrary::Unstructured::new(&[]);
-    let cap_access_secret = CapSecret::arbitrary(&mut buf).unwrap();
+    let cap_access_secret = fixt!(CapSecret);
 
     // set up functions to grant access to
     let mut functions = BTreeSet::new();
@@ -159,8 +158,7 @@ async fn signed_zome_call_wildcard() {
     let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
 
     // compute a cap access secret
-    let mut buf = arbitrary::Unstructured::new(&[]);
-    let cap_access_secret = CapSecret::arbitrary(&mut buf).unwrap();
+    let cap_access_secret = fixt!(CapSecret);
 
     // set up functions to grant access to
     let granted_functions = GrantedFunctions::All;

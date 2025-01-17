@@ -384,18 +384,36 @@ roles:
 
     #[tokio::test]
     async fn manifest_v1_set_network_seed() {
-        let mut manifest = fixt!(AppManifestV1);
+        let mut manifest = AppManifestV1 {
+            name: "test".to_string(),
+            description: None,
+            roles: vec![],
+            allow_deferred_memproofs: false,
+        };
         manifest.roles = vec![
-            AppRoleManifest::arbitrary(&mut u).unwrap(),
-            AppRoleManifest::arbitrary(&mut u).unwrap(),
-            // AppRoleManifest::arbitrary(&mut u).unwrap(),
-            // AppRoleManifest::arbitrary(&mut u).unwrap(),
+            AppRoleManifest {
+                name: "test-role-1".to_string(),
+                provisioning: None,
+                dna: AppRoleDnaManifest {
+                    location: None,
+                    modifiers: DnaModifiersOpt::none(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                }
+            },
+            AppRoleManifest {
+                name: "test-role-2".to_string(),
+                provisioning: None,
+                dna: AppRoleDnaManifest {
+                    location: None,
+                    modifiers: DnaModifiersOpt::none(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                }
+            },
         ];
         manifest.roles[0].provisioning = Some(CellProvisioning::Create { deferred: false });
         manifest.roles[1].provisioning = Some(CellProvisioning::Create { deferred: false });
-        // manifest.roles[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
-        // manifest.roles[3].provisioning =
-        //     Some(CellProvisioning::CreateIfNotExists { deferred: false });
 
         let network_seed = NetworkSeed::from("blabla");
         manifest.set_network_seed(network_seed.clone());
@@ -409,15 +427,5 @@ roles:
             manifest.roles[1].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
-        // assert_eq!(
-        //     manifest.roles[3].dna.modifiers.network_seed.as_ref(),
-        //     Some(&network_seed)
-        // );
-
-        // // - The others do not.
-        // assert_ne!(
-        //     manifest.roles[2].dna.modifiers.network_seed.as_ref(),
-        //     Some(&network_seed)
-        // );
     }
 }

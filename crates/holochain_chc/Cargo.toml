@@ -28,6 +28,7 @@ tracing = "0.1"
 url = "2.4"
 
 holochain_serialized_bytes = { version = "=0.0.55", optional = true }
+holo_hash = { version = "^0.5.0-dev.5", path = "../holo_hash", optional = true }
 reqwest = { version = "0.12", features = [
   "json",
   "native-tls-vendored",
@@ -47,7 +48,7 @@ workspace = true
 [features]
 default = ["http"]
 
-test_utils = ["holochain_types/test_utils"]
+test_utils = ["holochain_types/test_utils", "holo_hash/test_utils"]
 
 http = ["holochain_serialized_bytes", "reqwest"]
 

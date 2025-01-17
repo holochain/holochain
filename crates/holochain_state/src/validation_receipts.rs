@@ -181,7 +181,8 @@ fn query_validation_receipts<P: Params>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+use super::*;
     use crate::mutations::set_when_integrated;
     use crate::prelude::*;
     use ::fixt::prelude::*;

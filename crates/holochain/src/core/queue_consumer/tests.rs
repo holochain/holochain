@@ -1,9 +1,9 @@
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
-
 use super::*;
 use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_state::mutations;
 use holochain_state::prelude::StateMutationResult;
+use ::fixt::*;
 
 #[tokio::test]
 async fn test_trigger_receiver_waits_for_sender() {
@@ -221,8 +221,7 @@ async fn test_concurrency() {
 
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
-    let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-    let kind = DbKindAuthored(Arc::new(CellId::arbitrary(&mut u).unwrap()));
+    let kind = DbKindAuthored(Arc::new(fixt!(CellId)));
     let tmpdir = tempfile::Builder::new()
         .prefix("holochain-test-environments")
         .tempdir()

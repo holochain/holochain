@@ -633,21 +633,47 @@ impl CounterSigningSessionData {
 
 #[cfg(test)]
 mod test {
-    use crate::CounterSigningAgentState;
+    use holo_hash::fixt::ActionHashFixturator;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::fixt::EntryHashFixturator;
+    use std::time::Duration;
+    use crate::{ActionBase, AppEntryDef, CounterSigningAgentState, CreateBase, EntryType, EntryVisibility, PreflightBytes};
     use crate::CounterSigningSessionData;
     use crate::Signature;
-    use holo_hash::AgentPubKey;
-
+    use kitsune_p2p_timestamp::Timestamp;
     use super::CounterSigningError;
     use super::CounterSigningSessionTimes;
     use super::PreflightRequest;
     use super::SESSION_ACTION_TIME_OFFSET;
     use crate::Role;
+    use fixt::*;
+
+    fn test_preflight_request() -> PreflightRequest {
+        let mut request = PreflightRequest::try_new(
+            fixt!(EntryHash),
+            vec![(fixt!(AgentPubKey), vec![]), (fixt!(AgentPubKey), vec![])],
+            vec![],
+            0,
+            false,
+            CounterSigningSessionTimes::try_new(Timestamp::now(), (Timestamp::now() + Duration::from_secs(30)).unwrap()).unwrap(),
+            ActionBase::Create(CreateBase::new(EntryType::App(AppEntryDef {
+                entry_index: 0.into(),
+                zome_index: 0.into(),
+                visibility: EntryVisibility::Public
+            }))),
+            PreflightBytes(vec![]),
+        ).unwrap();
+        request.signing_agents.clear();
+
+        request
+    }
 
     #[test]
     fn test_check_countersigning_session_times() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut session_times = CounterSigningSessionTimes::arbitrary(&mut u).unwrap();
+        let mut session_times = CounterSigningSessionTimes {
+            start: Timestamp(0),
+            end: Timestamp(0)
+        };
 
         // Zero start and end won't pass.
         assert!(matches!(
@@ -686,16 +712,13 @@ mod test {
 
     #[test]
     fn test_check_countersigning_preflight_request_optional_agents() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+        let mut preflight_request = test_preflight_request();
 
         // Empty optional agents is a pass.
         preflight_request.check_agents_optional().unwrap();
 
         // Adding a single agent with a minimum of zero is a fail.
-        let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
-        let mut uk = arbitrary::Unstructured::new(&data);
-        let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
+        let alice = fixt!(AgentPubKey);
 
         preflight_request
             .optional_signing_agents
@@ -745,16 +768,13 @@ mod test {
 
     #[test]
     fn test_check_countersigning_preflight_request_enzyme() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+        let mut preflight_request = test_preflight_request();
 
         // Non enzymatic with no signers is always pass.
         preflight_request.check_enzyme().unwrap();
 
-        let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
-        let mut uk = arbitrary::Unstructured::new(&data);
-        let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
-        let bob = AgentPubKey::arbitrary(&mut uk).unwrap();
+        let alice = fixt!(AgentPubKey);
+        let bob = fixt!(AgentPubKey);
 
         // Non enzymatic with signers and no optional signers is a pass.
         preflight_request
@@ -795,8 +815,7 @@ mod test {
 
     #[test]
     fn test_check_countersigning_preflight_request_agents_len() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+        let mut preflight_request = test_preflight_request();
 
         // Empty is a fail.
         assert!(matches!(
@@ -805,7 +824,7 @@ mod test {
         ));
 
         // One signer is a fail.
-        let alice = AgentPubKey::arbitrary(&mut u).unwrap();
+        let alice = fixt!(AgentPubKey);
         preflight_request
             .signing_agents
             .push((alice.clone(), vec![]));
@@ -816,7 +835,7 @@ mod test {
         ));
 
         // Two signers is a pass.
-        let bob = AgentPubKey::arbitrary(&mut u).unwrap();
+        let bob = fixt!(AgentPubKey);
         preflight_request.signing_agents.push((bob.clone(), vec![]));
 
         preflight_request.check_agents_len().unwrap();
@@ -824,13 +843,10 @@ mod test {
 
     #[test]
     fn test_check_countersigning_preflight_request_agents_dupes() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+        let mut preflight_request = test_preflight_request();
 
-        let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
-        let mut uk = arbitrary::Unstructured::new(&data);
-        let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
-        let bob = AgentPubKey::arbitrary(&mut uk).unwrap();
+        let alice = fixt!(AgentPubKey);
+        let bob = fixt!(AgentPubKey);
 
         preflight_request.check_agents_dupes().unwrap();
 
@@ -854,11 +870,14 @@ mod test {
 
     #[test]
     pub fn test_check_countersigning_session_data_responses_indexes() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut session_data = CounterSigningSessionData::arbitrary(&mut u).unwrap();
+        let mut session_data = CounterSigningSessionData::try_new(
+            test_preflight_request(),
+            vec![],
+            vec![],
+        ).unwrap();
 
-        let alice = AgentPubKey::arbitrary(&mut u).unwrap();
-        let bob = AgentPubKey::arbitrary(&mut u).unwrap();
+        let alice = fixt!(AgentPubKey);
+        let bob = fixt!(AgentPubKey);
 
         // When everything is empty the indexes line up by default.
         session_data.check_responses_indexes().unwrap();
@@ -882,10 +901,10 @@ mod test {
             .signing_agents
             .push((bob.clone(), vec![]));
 
-        let alice_state = CounterSigningAgentState::arbitrary(&mut u).unwrap();
-        let alice_signature = Signature::arbitrary(&mut u).unwrap();
-        let mut bob_state = CounterSigningAgentState::arbitrary(&mut u).unwrap();
-        let bob_signature = Signature::arbitrary(&mut u).unwrap();
+        let alice_state = CounterSigningAgentState::new(0, fixt!(ActionHash), 0);
+        let alice_signature = Signature(vec![0; 64].try_into().unwrap());
+        let mut bob_state = CounterSigningAgentState::new(0, fixt!(ActionHash), 0);
+        let bob_signature = Signature(vec![1; 64].try_into().unwrap());
 
         (*session_data.responses_mut()).push((alice_state, alice_signature));
         (*session_data.responses_mut()).push((bob_state.clone(), bob_signature.clone()));
@@ -896,7 +915,7 @@ mod test {
                 _,
                 _
             ))
-        ));
+        ), "But got: {:?}", session_data.check_responses_indexes());
 
         *bob_state.agent_index_mut() = 1;
         (*session_data.responses_mut()).pop();

@@ -2772,7 +2772,6 @@ dependencies = [
  "hostname",
  "human-panic",
  "indexmap 2.7.1",
- "indoc",
  "isotest",
  "itertools 0.12.1",
  "kitsune_p2p",
@@ -2807,7 +2806,6 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_yaml",
- "serial_test",
  "shrinkwraprs",
  "sodoken 0.0.11",
  "structopt",
@@ -2875,6 +2873,7 @@ dependencies = [
  "fixt",
  "futures",
  "getrandom 0.2.15",
+ "holo_hash",
  "holochain_chc",
  "holochain_keystore",
  "holochain_nonce",
@@ -3063,6 +3062,7 @@ name = "holochain_integrity_types"
 version = "0.5.0-dev.8"
 dependencies = [
  "derive_builder",
+ "fixt",
  "holo_hash",
  "holochain_integrity_types",
  "holochain_secure_primitive",
@@ -6834,15 +6834,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "scc"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28e1c91382686d21b5ac7959341fcb9780fa7c03773646995a87c950fa7be640"
-dependencies = [
- "sdd",
-]
-
-[[package]]
 name = "schannel"
 version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6920,12 +6911,6 @@ checksum = "b943eadf71d8b69e661330cb0e2656e31040acf21ee7708e2c238a0ec6af2bf4"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "sdd"
-version = "3.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "478f121bb72bbf63c52c93011ea1791dca40140dfe13f8336c4c5ac952c33aa9"
 
 [[package]]
 name = "security-framework"
@@ -7097,31 +7082,6 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
-]
-
-[[package]]
-name = "serial_test"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b258109f244e1d6891bf1053a55d63a5cd4f8f4c30cf9a1280989f80e7a1fa9"
-dependencies = [
- "futures",
- "log",
- "once_cell",
- "parking_lot 0.12.3",
- "scc",
- "serial_test_derive",
-]
-
-[[package]]
-name = "serial_test_derive"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d69265a08751de7844521fd15003ae0a888e035773ba05695c5c759a6f89eef"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
 ]
 
 [[package]]
