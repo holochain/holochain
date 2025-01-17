@@ -36,9 +36,9 @@ tempfile = "3.15"
 [features]
 default = []
 
-unstable-dpki = []
+unstable-dpki = ["holochain_conductor_api/unstable-dpki"]
 
-chc = []
+chc = ["holochain_conductor_api/chc"]
 
 [lints]
 workspace = true
