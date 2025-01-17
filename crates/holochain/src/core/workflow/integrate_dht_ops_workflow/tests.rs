@@ -403,6 +403,15 @@ fn register_store_entry(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 #[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_dna(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let mut new_action = fixt!(Dna);
+    let op: DhtOp = ChainOp::RegisterAgentActivity(a.signature.clone(), new_action.into()).into();
+    let pre_state = vec![Db::IntQueue(op.clone())];
+    let expect = vec![Db::Integrated(op.clone())];
+    (pre_state, expect, "register agent activity for dna action")
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_agent_activity_create_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     a.link_add.action_seq = 5;
     let dep: DhtOp =
@@ -572,6 +581,7 @@ async fn test_ops_state() {
     let tests = [
         register_store_record,
         register_store_entry,
+        register_agent_activity_dna,
         register_agent_activity_create_link,
         register_replaced_by_for_entry,
         register_updated_record,
