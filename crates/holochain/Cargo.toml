@@ -299,10 +299,19 @@ wasmer_sys = [
 wasmer_wamr = ["wasmer/wamr", "holochain_wasmer_host/wasmer_wamr"]
 
 # Enable chain head coordination
-chc = ["bytes", "reqwest", "holochain_conductor_api/chc", "holochain_chc/http"]
+chc = [
+  "bytes",
+  "reqwest",
+  "holochain_conductor_api/chc",
+  "holochain_conductor_config/chc",
+  "holochain_chc/http",
+]
 
 # Enable unstable DPKI feature.
-unstable-dpki = ["holochain_conductor_api/unstable-dpki"]
+unstable-dpki = [
+  "holochain_conductor_api/unstable-dpki",
+  "holochain_conductor_config/unstable-dpki",
+]
 
 # Enables unstable warrants feature.
 unstable-warrants = [

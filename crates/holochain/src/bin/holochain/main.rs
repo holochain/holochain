@@ -93,9 +93,21 @@ async fn async_main() {
     }
 
     if opt.create_config {
-        holochain_conductor_config::generate::generate(None, None, None, true, 0)
-            .inspect_err(|e| tracing::error!("Failed to generate configurations: {}", e))
-            .unwrap();
+        holochain_conductor_config::generate::generate(
+            None,
+            None,
+            None,
+            true,
+            0,
+            #[cfg(feature = "unstable-dpki")]
+            true,
+            #[cfg(feature = "unstable-dpki")]
+            None,
+            #[cfg(feature = "chc")]
+            None,
+        )
+        .inspect_err(|e| tracing::error!("Failed to generate configurations: {}", e))
+        .unwrap();
         return;
     }
 
