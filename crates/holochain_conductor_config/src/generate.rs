@@ -157,7 +157,7 @@ mod test {
             true,
             0,
             #[cfg(feature = "unstable-dpki")]
-            true,
+            false,
             #[cfg(feature = "unstable-dpki")]
             None,
             #[cfg(feature = "chc")]
@@ -218,7 +218,7 @@ mod test {
             true,
             0,
             #[cfg(feature = "unstable-dpki")]
-            true,
+            false,
             #[cfg(feature = "unstable-dpki")]
             None,
             #[cfg(feature = "chc")]
