@@ -37,11 +37,12 @@ impl CallbackResult for ValidateCallbackResult {
             WasmErrorInner::Host(_)
             | WasmErrorInner::HostShortCircuit(_)
             | WasmErrorInner::ModuleBuild(_)
+            | WasmErrorInner::ModuleSerialize(_)
+            | WasmErrorInner::ModuleDeserialize(_)
             | WasmErrorInner::CallError(_)
             | WasmErrorInner::PointerMap
             | WasmErrorInner::ErrorWhileError
-            | WasmErrorInner::Memory
-            | WasmErrorInner::UninitializedSerializedModuleCache => Err(wasm_error),
+            | WasmErrorInner::Memory => Err(wasm_error),
         }
     }
 }
