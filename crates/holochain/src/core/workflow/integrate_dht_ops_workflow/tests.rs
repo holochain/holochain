@@ -437,6 +437,30 @@ fn register_agent_activity_create_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'
 }
 
 #[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_delete_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(a.signature.clone(), a.link_remove.clone().into()).into();
+    let mut new_action = a.link_remove.clone();
+    let new_op: DhtOp =
+        ChainOp::RegisterAgentActivity(a.signature.clone(), new_action.clone().into()).into();
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::MetaActivity(a.link_remove.clone().into()),
+        Db::Integrated(new_op.clone()),
+        Db::MetaActivity(new_action.clone().into()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for delete link action",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = ChainOp::StoreRecord(
         a.signature.clone(),
@@ -583,6 +607,7 @@ async fn test_ops_state() {
         register_store_entry,
         register_agent_activity_dna,
         register_agent_activity_create_link,
+        register_agent_activity_delete_link,
         register_replaced_by_for_entry,
         register_updated_record,
         register_deleted_by,
