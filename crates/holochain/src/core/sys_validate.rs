@@ -712,7 +712,7 @@ mod test {
         )
         .unwrap();
 
-        let agent_state = vec![
+        let agent_state = [
             CounterSigningAgentState::new(0, fixt!(ActionHash), 100),
             CounterSigningAgentState::new(1, fixt!(ActionHash), 50),
         ];
