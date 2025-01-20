@@ -2554,6 +2554,7 @@ version = "0.6.0-dev.10"
 dependencies = [
  "fixt",
  "getrandom 0.2.15",
+ "hdi",
  "hdk_derive",
  "holo_hash",
  "holochain_integrity_types",

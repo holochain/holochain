@@ -162,8 +162,6 @@ fn op_errors(op: Op) -> WasmErrorInner {
 #[test_case(FlatOp::RegisterDeleteLink { action: dl(ah(0)), original_action: cl(0, 2), base_address: eh(0).into(), target_address: eh(1).into(), tag: ().into(), link_type: LinkTypes::C })]
 fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
     set_zome_types(&[(0, 3)], &[(0, 3)]);
-    let data = vec![0u8; 2000];
-    let mut ud = Unstructured::new(&data);
     let o = match op.clone() {
         FlatOp::StoreRecord(OpRecord::Dna { action, .. }) => {
             let d = Action::Dna(action);
@@ -224,7 +222,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
                 record: Record {
                     signed_action: SignedHashed {
                         hashed: ActionHashed::from_content_sync(c),
-                        signature: Signature::arbitrary(&mut ud).unwrap(),
+                        signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
                     },
                     entry: RecordEntry::NA,
                 },
@@ -236,7 +234,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
                 record: Record {
                     signed_action: SignedHashed {
                         hashed: ActionHashed::from_content_sync(c),
-                        signature: Signature::arbitrary(&mut ud).unwrap(),
+                        signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
                     },
                     entry: RecordEntry::NA,
                 },
@@ -299,7 +297,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
         FlatOp::RegisterCreateLink { action, .. } => Op::RegisterCreateLink(RegisterCreateLink {
             create_link: SignedHashed {
                 hashed: HoloHashed::from_content_sync(action),
-                signature: Signature::arbitrary(&mut ud).unwrap(),
+                signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
             },
         }),
         FlatOp::RegisterDeleteLink {
@@ -309,7 +307,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
         } => Op::RegisterDeleteLink(RegisterDeleteLink {
             delete_link: SignedHashed {
                 hashed: HoloHashed::from_content_sync(action),
-                signature: Signature::arbitrary(&mut ud).unwrap(),
+                signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
             },
             create_link: original_action,
         }),
@@ -321,7 +319,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
                     hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
+                    signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
                 },
                 new_entry: Some(entry),
             })
@@ -333,7 +331,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
                     hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
+                    signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
                 },
                 new_entry: Some(entry),
             })
@@ -342,7 +340,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
                     hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
+                    signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
                 },
                 new_entry: None,
             })
@@ -353,7 +351,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
         }) => Op::RegisterUpdate(RegisterUpdate {
             update: SignedHashed {
                 hashed: HoloHashed::from_content_sync(action),
-                signature: Signature::arbitrary(&mut ud).unwrap(),
+                signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
             },
             new_entry: None,
         }),
@@ -361,7 +359,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
             Op::RegisterUpdate(RegisterUpdate {
                 update: SignedHashed {
                     hashed: HoloHashed::from_content_sync(action),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
+                    signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
                 },
                 new_entry: None,
             })
@@ -369,7 +367,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
         FlatOp::RegisterDelete(OpDelete { action }) => Op::RegisterDelete(RegisterDelete {
             delete: SignedHashed {
                 hashed: HoloHashed::from_content_sync(action),
-                signature: Signature::arbitrary(&mut ud).unwrap(),
+                signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
             },
         }),
         FlatOp::RegisterAgentActivity(activity) => {
@@ -403,7 +401,7 @@ fn op_flattened(op: FlatOp<EntryTypes, LinkTypes>) {
                 cached_entry: None,
                 action: SignedHashed {
                     hashed: HoloHashed::from_content_sync(r),
-                    signature: Signature::arbitrary(&mut ud).unwrap(),
+                    signature: Signature(vec![82; SIGNATURE_BYTES].try_into().unwrap()),
                 },
             };
             Op::RegisterAgentActivity(r)
