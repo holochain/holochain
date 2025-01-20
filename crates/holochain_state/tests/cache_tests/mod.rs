@@ -1,6 +1,7 @@
+use ::fixt::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
-use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::DhtOpHashFixturator;
+use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::*;
 use holochain_sqlite::prelude::*;
@@ -8,12 +9,8 @@ use holochain_state::mutations;
 use holochain_state::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use ::fixt::*;
 
-fn insert_action_and_op(
-    txn: &mut Txn<DbKindDht>,
-    action: &Action,
-) -> DhtOpHash {
+fn insert_action_and_op(txn: &mut Txn<DbKindDht>, action: &Action) -> DhtOpHash {
     let timestamp = Timestamp::now();
     let op_order = OpOrder::new(ChainOpType::RegisterAgentActivity, timestamp);
     let basis_hash: OpBasis = fixt!(EntryHash).into();
@@ -37,20 +34,12 @@ fn insert_action_and_op(
     op_hash
 }
 
-fn set_integrated(
-    db: &DbWrite<DbKindDht>,
-    op_hash: DhtOpHash,
-) {
+fn set_integrated(db: &DbWrite<DbKindDht>, op_hash: DhtOpHash) {
     db.test_write({
         let op_hash = op_hash.clone();
         move |txn| {
             mutations::set_validation_stage(txn, &op_hash, ValidationStage::Pending).unwrap();
-            mutations::set_when_integrated(
-                txn,
-                &op_hash,
-                Timestamp::now(),
-            )
-            .unwrap();
+            mutations::set_when_integrated(txn, &op_hash, Timestamp::now()).unwrap();
         }
     });
 }
@@ -238,8 +227,7 @@ async fn cache_init_catches_gaps() {
     let to_integrate = cache.get_activity_to_integrate().await.unwrap();
     assert_eq!(to_integrate.len(), 0);
 
-    op_hashes
-        .push(db.test_write(move |txn| insert_action_and_op(txn, &missing_action)));
+    op_hashes.push(db.test_write(move |txn| insert_action_and_op(txn, &missing_action)));
 
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| {
@@ -360,14 +348,9 @@ async fn cache_set_integrated() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cache_set_all_integrated() {
-    let test_activity: Vec<_> = std::iter::repeat_with(|| {
-        (
-            Arc::new(fixt!(AgentPubKey)),
-            0..=100,
-        )
-    })
-    .take(1000)
-    .collect();
+    let test_activity: Vec<_> = std::iter::repeat_with(|| (Arc::new(fixt!(AgentPubKey)), 0..=100))
+        .take(1000)
+        .collect();
     let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
     let cache = DhtDbQueryCache::new(db.clone().into());
     cache

@@ -1,11 +1,11 @@
+use super::OpBasis;
 use crate::prelude::*;
 use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::*;
 use holochain_trace;
-use tracing::*;
 use holochain_types::prelude::fixt::*;
-use super::OpBasis;
+use tracing::*;
 
 struct RecordTest {
     entry_type: EntryType,

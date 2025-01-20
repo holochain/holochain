@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use ::fixt::*;
 use anyhow::Result;
 use ed25519_dalek::{Signer, SigningKey};
 use holochain::conductor::ConductorHandle;
@@ -8,7 +9,6 @@ use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::FullStateDump;
 use holochain_websocket::WebsocketSender;
 use holochain_websocket::{WebsocketReceiver, WebsocketResult};
-use ::fixt::*;
 
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor

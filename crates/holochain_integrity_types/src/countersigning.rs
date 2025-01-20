@@ -633,20 +633,23 @@ impl CounterSigningSessionData {
 
 #[cfg(test)]
 mod test {
-    use holo_hash::fixt::ActionHashFixturator;
-    use holo_hash::fixt::AgentPubKeyFixturator;
-    use holo_hash::fixt::EntryHashFixturator;
-    use std::time::Duration;
-    use crate::{ActionBase, AppEntryDef, CounterSigningAgentState, CreateBase, EntryType, EntryVisibility, PreflightBytes};
-    use crate::CounterSigningSessionData;
-    use crate::Signature;
-    use kitsune_p2p_timestamp::Timestamp;
     use super::CounterSigningError;
     use super::CounterSigningSessionTimes;
     use super::PreflightRequest;
     use super::SESSION_ACTION_TIME_OFFSET;
+    use crate::CounterSigningSessionData;
     use crate::Role;
+    use crate::Signature;
+    use crate::{
+        ActionBase, AppEntryDef, CounterSigningAgentState, CreateBase, EntryType, EntryVisibility,
+        PreflightBytes,
+    };
     use fixt::*;
+    use holo_hash::fixt::ActionHashFixturator;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::fixt::EntryHashFixturator;
+    use kitsune_p2p_timestamp::Timestamp;
+    use std::time::Duration;
 
     fn test_preflight_request() -> PreflightRequest {
         let mut request = PreflightRequest::try_new(
@@ -655,14 +658,19 @@ mod test {
             vec![],
             0,
             false,
-            CounterSigningSessionTimes::try_new(Timestamp::now(), (Timestamp::now() + Duration::from_secs(30)).unwrap()).unwrap(),
+            CounterSigningSessionTimes::try_new(
+                Timestamp::now(),
+                (Timestamp::now() + Duration::from_secs(30)).unwrap(),
+            )
+            .unwrap(),
             ActionBase::Create(CreateBase::new(EntryType::App(AppEntryDef {
                 entry_index: 0.into(),
                 zome_index: 0.into(),
-                visibility: EntryVisibility::Public
+                visibility: EntryVisibility::Public,
             }))),
             PreflightBytes(vec![]),
-        ).unwrap();
+        )
+        .unwrap();
         request.signing_agents.clear();
 
         request
@@ -672,7 +680,7 @@ mod test {
     fn test_check_countersigning_session_times() {
         let mut session_times = CounterSigningSessionTimes {
             start: Timestamp(0),
-            end: Timestamp(0)
+            end: Timestamp(0),
         };
 
         // Zero start and end won't pass.
@@ -870,11 +878,8 @@ mod test {
 
     #[test]
     pub fn test_check_countersigning_session_data_responses_indexes() {
-        let mut session_data = CounterSigningSessionData::try_new(
-            test_preflight_request(),
-            vec![],
-            vec![],
-        ).unwrap();
+        let mut session_data =
+            CounterSigningSessionData::try_new(test_preflight_request(), vec![], vec![]).unwrap();
 
         let alice = fixt!(AgentPubKey);
         let bob = fixt!(AgentPubKey);
@@ -909,13 +914,17 @@ mod test {
         (*session_data.responses_mut()).push((alice_state, alice_signature));
         (*session_data.responses_mut()).push((bob_state.clone(), bob_signature.clone()));
 
-        assert!(matches!(
-            session_data.check_responses_indexes(),
-            Err(CounterSigningError::CounterSigningSessionResponsesOrder(
-                _,
-                _
-            ))
-        ), "But got: {:?}", session_data.check_responses_indexes());
+        assert!(
+            matches!(
+                session_data.check_responses_indexes(),
+                Err(CounterSigningError::CounterSigningSessionResponsesOrder(
+                    _,
+                    _
+                ))
+            ),
+            "But got: {:?}",
+            session_data.check_responses_indexes()
+        );
 
         *bob_state.agent_index_mut() = 1;
         (*session_data.responses_mut()).pop();

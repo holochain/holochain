@@ -110,9 +110,6 @@ pub mod wasm_test {
     use crate::fixt::*;
     use crate::sweettest::*;
     use ::fixt::prelude::*;
-    use contrafact::facts;
-    use contrafact::Fact;
-    use contrafact::Generator;
     use hdk::prelude::*;
     use holo_hash::AnyDhtHash;
     use holo_hash::EntryHash;

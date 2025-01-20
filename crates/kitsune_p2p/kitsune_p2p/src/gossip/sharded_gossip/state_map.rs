@@ -98,10 +98,10 @@ mod tests {
     use crate::gossip::sharded_gossip::state_map::RoundStateMap;
     use crate::gossip::sharded_gossip::{NodeCert, RoundState};
     use kitsune_p2p_types::dht::arq::ArqSet;
+    use rand::Rng;
     use std::collections::HashSet;
     use std::sync::Arc;
     use std::time::Duration;
-    use rand::Rng;
 
     #[test]
     fn hold_round_state() {

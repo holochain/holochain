@@ -1,9 +1,9 @@
 //! Implements TestChainItem, a type used with isotest
 
-use std::ops::Range;
 use ::fixt::prelude::*;
 use holo_hash::*;
 use holochain_zome_types::prelude::*;
+use std::ops::Range;
 
 use crate::prelude::ChainItem;
 

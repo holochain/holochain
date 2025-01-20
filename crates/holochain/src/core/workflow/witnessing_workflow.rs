@@ -253,6 +253,8 @@ impl WitnessingWorkspace {
 mod tests {
     use super::*;
     use ::fixt::*;
+    use holo_hash::fixt::DhtOpHashFixturator;
+    use holo_hash::fixt::EntryHashFixturator;
 
     /// Test that a session of 5 actions is complete when the expiry time is in the future and all
     /// required actions are present.
@@ -263,7 +265,10 @@ mod tests {
         // - Create the ops.
         let data = || {
             let op_hash = fixt!(DhtOpHash);
-            let op = ChainOp::RegisterAddLink(Signature(vec![1; 64].try_into().unwrap()), fixt!(CreateLink));
+            let op = ChainOp::RegisterAddLink(
+                Signature(vec![1; 64].try_into().unwrap()),
+                fixt!(CreateLink),
+            );
             let action = op.action();
             (op_hash, op, action)
         };
@@ -313,7 +318,10 @@ mod tests {
 
         // - Create an op for a session that has expired in the past.
         let op_hash = fixt!(DhtOpHash);
-        let op = ChainOp::RegisterAddLink(Signature(vec![1; 64].try_into().unwrap()), fixt!(CreateLink));
+        let op = ChainOp::RegisterAddLink(
+            Signature(vec![1; 64].try_into().unwrap()),
+            fixt!(CreateLink),
+        );
         let action = op.action();
         let entry_hash = fixt!(EntryHash);
         let action_hash = ActionHash::with_data_sync(&action);

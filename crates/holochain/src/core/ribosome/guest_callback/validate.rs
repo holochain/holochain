@@ -184,16 +184,34 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_zomes() {
-        let mut u = Unstructured::new(&NOISE);
-        let validate_invocation = ValidateInvocation::arbitrary(&mut u).unwrap();
+        let validate_invocation = ValidateInvocation::new(
+            ZomesToInvoke::All,
+            &Op::RegisterAgentActivity(RegisterAgentActivity {
+                action: SignedActionHashed::new_unchecked(
+                    Action::CreateLink(fixt!(CreateLink)),
+                    fixt!(Signature),
+                ),
+                cached_entry: None,
+            }),
+        )
+        .unwrap();
         let zomes_to_invoke = validate_invocation.zomes_to_invoke.clone();
         assert_eq!(zomes_to_invoke, validate_invocation.zomes(),);
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_fn_components() {
-        let mut u = Unstructured::new(&NOISE);
-        let validate_invocation = ValidateInvocation::arbitrary(&mut u).unwrap();
+        let validate_invocation = ValidateInvocation::new(
+            ZomesToInvoke::All,
+            &Op::RegisterAgentActivity(RegisterAgentActivity {
+                action: SignedActionHashed::new_unchecked(
+                    Action::CreateLink(fixt!(CreateLink)),
+                    fixt!(Signature),
+                ),
+                cached_entry: None,
+            }),
+        )
+        .unwrap();
 
         let mut expected = vec!["validate"];
         for fn_component in validate_invocation.fn_components() {
@@ -203,10 +221,14 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn validate_invocation_host_input() {
-        let mut u = Unstructured::new(&NOISE);
-        let op = Op::arbitrary(&mut u).unwrap();
-        let validate_invocation =
-            ValidateInvocation::new(ZomesToInvoke::arbitrary(&mut u).unwrap(), &op).unwrap();
+        let op = Op::RegisterAgentActivity(RegisterAgentActivity {
+            action: SignedActionHashed::new_unchecked(
+                Action::CreateLink(fixt!(CreateLink)),
+                fixt!(Signature),
+            ),
+            cached_entry: None,
+        });
+        let validate_invocation = ValidateInvocation::new(ZomesToInvoke::All, &op).unwrap();
 
         let host_input = validate_invocation.clone().host_input().unwrap();
 
@@ -237,13 +259,21 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
-        let mut u = Unstructured::new(&NOISE);
-        let mut validate_invocation = ValidateInvocation::arbitrary(&mut u).unwrap();
+        let validate_invocation = ValidateInvocation::new(
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::Foo).erase_type()),
+            &Op::RegisterAgentActivity(RegisterAgentActivity {
+                action: SignedActionHashed::new_unchecked(
+                    Action::CreateLink(fixt!(CreateLink)),
+                    fixt!(Signature),
+                ),
+                cached_entry: None,
+            }),
+        )
+        .unwrap();
+
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
-        validate_invocation.zomes_to_invoke =
-            ZomesToInvoke::One(IntegrityZome::from(TestWasm::Foo).erase_type());
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -254,13 +284,21 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_valid() {
-        let mut u = Unstructured::new(&NOISE);
-        let mut validate_invocation = ValidateInvocation::arbitrary(&mut u).unwrap();
+        let validate_invocation = ValidateInvocation::new(
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateValid).erase_type()),
+            &Op::RegisterAgentActivity(RegisterAgentActivity {
+                action: SignedActionHashed::new_unchecked(
+                    Action::CreateLink(fixt!(CreateLink)),
+                    fixt!(Signature),
+                ),
+                cached_entry: None,
+            }),
+        )
+        .unwrap();
+
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateValid]))
             .next()
             .unwrap();
-        validate_invocation.zomes_to_invoke =
-            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateValid).erase_type());
 
         let result = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -271,13 +309,21 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_invalid_return() {
-        let mut u = Unstructured::new(&NOISE);
-        let mut validate_invocation = ValidateInvocation::arbitrary(&mut u).unwrap();
+        let validate_invocation = ValidateInvocation::new(
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidReturn).erase_type()),
+            &Op::RegisterAgentActivity(RegisterAgentActivity {
+                action: SignedActionHashed::new_unchecked(
+                    Action::CreateLink(fixt!(CreateLink)),
+                    fixt!(Signature),
+                ),
+                cached_entry: None,
+            }),
+        )
+        .unwrap();
+
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalidReturn]))
             .next()
             .unwrap();
-        validate_invocation.zomes_to_invoke =
-            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidReturn).erase_type());
 
         let err = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -312,13 +358,21 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_invalid_params() {
-        let mut u = Unstructured::new(&NOISE);
-        let mut validate_invocation = ValidateInvocation::arbitrary(&mut u).unwrap();
+        let validate_invocation = ValidateInvocation::new(
+            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidParams).erase_type()),
+            &Op::RegisterAgentActivity(RegisterAgentActivity {
+                action: SignedActionHashed::new_unchecked(
+                    Action::CreateLink(fixt!(CreateLink)),
+                    fixt!(Signature),
+                ),
+                cached_entry: None,
+            }),
+        )
+        .unwrap();
+
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalidParams]))
             .next()
             .unwrap();
-        validate_invocation.zomes_to_invoke =
-            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidParams).erase_type());
 
         let err = ribosome
             .run_validate(fixt!(ValidateHostAccess), validate_invocation)
@@ -351,23 +405,27 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_multi() {
-        let mut u = Unstructured::new(&NOISE);
-
         let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalid]))
             .next()
             .unwrap();
 
-        let agent = AgentPubKey::arbitrary(&mut u).unwrap();
-        let entry = Entry::Agent(agent);
-        let mut action = Create::arbitrary(&mut u).unwrap();
-        action.entry_type = EntryType::AgentPubKey;
-        action.entry_hash = EntryHash::with_data_sync(&entry);
+        let agent = fixt!(AgentPubKey);
+        let entry = Entry::Agent(agent.clone());
+        let action = Create {
+            author: agent.clone(),
+            timestamp: Timestamp::now(),
+            action_seq: 8,
+            prev_action: fixt!(ActionHash),
+            entry_type: EntryType::AgentPubKey,
+            entry_hash: EntryHash::with_data_sync(&entry),
+            weight: EntryRateWeight::default(),
+        };
 
         let op = Op::StoreRecord(StoreRecord {
             record: Record::new(
                 SignedActionHashed::with_presigned(
                     ActionHashed::from_content_sync(action),
-                    Signature::arbitrary(&mut u).unwrap(),
+                    Signature(vec![7; SIGNATURE_BYTES].try_into().unwrap()),
                 ),
                 Some(entry),
             ),

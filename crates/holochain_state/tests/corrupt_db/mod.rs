@@ -1,10 +1,10 @@
+use ::fixt::*;
 use holo_hash::fixt::DnaHashFixturator;
-use std::{path::Path, sync::Arc};
 use holochain_sqlite::prelude::DatabaseError;
 use holochain_sqlite::rusqlite::Connection;
 use holochain_state::prelude::{mutations_helpers, *};
+use std::{path::Path, sync::Arc};
 use tempfile::TempDir;
-use ::fixt::*;
 
 #[tokio::test(flavor = "multi_thread")]
 /// Checks a corrupt cache will be wiped on load.

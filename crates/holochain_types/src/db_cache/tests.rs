@@ -1,8 +1,8 @@
 #![allow(clippy::field_reassign_with_default)]
-use test_case::test_case;
-use ::fixt::*;
 use super::*;
+use ::fixt::*;
 use holo_hash::fixt::*;
+use test_case::test_case;
 
 #[test_case(1)]
 #[test_case(2)]

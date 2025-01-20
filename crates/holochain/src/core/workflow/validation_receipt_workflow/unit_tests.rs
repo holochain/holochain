@@ -1,6 +1,5 @@
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
-use holo_hash::fixt::AgentPubKeyFixturator;
 use crate::prelude::CreateFixturator;
 use crate::prelude::DhtOpHashed;
 use crate::prelude::SignatureFixturator;
@@ -8,6 +7,7 @@ use ::fixt::fixt;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use hdk::prelude::Action;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::HasHash;
 use holo_hash::{AgentPubKey, DhtOpHash};

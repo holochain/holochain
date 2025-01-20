@@ -212,15 +212,15 @@ mod tests {
     use kitsune_p2p_bin_data::KitsuneAgent;
     use kitsune_p2p_bin_data::KitsuneBinType;
     use kitsune_p2p_bin_data::KitsuneSignature;
+    use kitsune_p2p_types::dht::prelude::SpaceOffset;
     use kitsune_p2p_types::dht::Arq;
+    use kitsune_p2p_types::dht_arc::DhtLocation;
     use kitsune_p2p_types::fixt::*;
     use rand::rngs::OsRng;
     use std::convert::TryInto;
     use std::net::SocketAddr;
     use std::sync::Arc;
     use tokio::task::AbortHandle;
-    use kitsune_p2p_types::dht::prelude::SpaceOffset;
-    use kitsune_p2p_types::dht_arc::DhtLocation;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_bootstrap() {

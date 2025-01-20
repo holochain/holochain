@@ -1,7 +1,7 @@
+use super::*;
+use crate::spawn::MockKitsuneP2pEventHandler;
 use futures::FutureExt;
 use rand::Rng;
-use crate::spawn::MockKitsuneP2pEventHandler;
-use super::*;
 
 mod bloom;
 mod common;

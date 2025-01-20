@@ -1,9 +1,12 @@
-use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 use super::*;
+use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
+use ::fixt::*;
+use holo_hash::fixt::ActionHashFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::EntryHashFixturator;
 use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_state::mutations;
 use holochain_state::prelude::StateMutationResult;
-use ::fixt::*;
 
 #[tokio::test]
 async fn test_trigger_receiver_waits_for_sender() {
@@ -227,9 +230,21 @@ async fn publish_loop() {
         .tempdir()
         .unwrap();
     let db = DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database");
-    let action = Action::arbitrary(&mut u).unwrap();
+    let action = Action::Create(Create {
+        author: fixt!(AgentPubKey),
+        timestamp: Timestamp::now(),
+        action_seq: 5,
+        prev_action: fixt!(ActionHash),
+        entry_type: EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
+        entry_hash: fixt!(EntryHash),
+        weight: EntryRateWeight::default(),
+    });
     let author = action.author().clone();
-    let signature = Signature::arbitrary(&mut u).unwrap();
+    let signature = Signature(vec![3; SIGNATURE_BYTES].try_into().unwrap());
     let op = ChainOp::RegisterAgentActivity(signature, action);
     let op = DhtOpHashed::from_content_sync(op);
     let op_hash = op.to_hash();

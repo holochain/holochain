@@ -105,9 +105,9 @@ impl ChainHeadCoordinatorExt for ChcLocal {
 mod tests {
 
     use super::*;
-    use ChainHeadCoordinatorExt;
     use holochain_types::test_utils::valid_arbitrary_chain;
     use pretty_assertions::assert_eq;
+    use ChainHeadCoordinatorExt;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_add_records_local() {

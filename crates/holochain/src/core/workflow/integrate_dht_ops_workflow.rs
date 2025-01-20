@@ -8,8 +8,6 @@ use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 
 #[cfg(test)]
-mod query_tests;
-#[cfg(test)]
 mod tests;
 
 #[cfg_attr(

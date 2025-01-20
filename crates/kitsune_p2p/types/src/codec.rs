@@ -234,14 +234,7 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    #[derive(
-        Clone,
-        Debug,
-        PartialEq,
-        Eq,
-        serde::Serialize,
-        serde::Deserialize,
-    )]
+    #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
     pub struct Sub(pub Vec<u8>);
 
     write_codec_enum! {

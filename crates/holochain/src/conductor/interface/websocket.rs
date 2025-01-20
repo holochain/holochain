@@ -483,8 +483,7 @@ pub use crate::test_utils::setup_app_in_new_conductor;
 
 #[cfg(test)]
 mod test {
-    use holo_hash::fixt::AgentPubKeyFixturator;
-use super::*;
+    use super::*;
     use crate::conductor::api::error::ExternalApiWireError;
     use crate::conductor::api::AdminInterfaceApi;
     use crate::conductor::api::AdminRequest;
@@ -502,6 +501,7 @@ use super::*;
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_conductor_api::conductor::ConductorConfig;
     use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_conductor_api::*;

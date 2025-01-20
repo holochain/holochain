@@ -1,4 +1,5 @@
 use ::fixt::prelude::*;
+use holo_hash::fixt::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
@@ -7,7 +8,6 @@ use holochain_types::dht_op::ChainOp;
 use holochain_types::dht_op::ChainOpHashed;
 use holochain_types::prelude::NewEntryAction;
 use holochain_zome_types::prelude::*;
-use holo_hash::fixt::*;
 
 /// A collection of fixtures used to create scenarios for testing the Cascade
 #[derive(Debug, Clone)]

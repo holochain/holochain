@@ -283,8 +283,8 @@ pub mod tests {
     use crate::app::app_manifest::AppManifest;
     use crate::prelude::*;
     use ::fixt::prelude::*;
-    use std::path::PathBuf;
     use holo_hash::fixt::*;
+    use std::path::PathBuf;
 
     #[derive(serde::Serialize, serde::Deserialize)]
     struct Props {
@@ -399,7 +399,7 @@ roles:
                     modifiers: DnaModifiersOpt::none(),
                     installed_hash: None,
                     clone_limit: 0,
-                }
+                },
             },
             AppRoleManifest {
                 name: "test-role-2".to_string(),
@@ -409,7 +409,7 @@ roles:
                     modifiers: DnaModifiersOpt::none(),
                     installed_hash: None,
                     clone_limit: 0,
-                }
+                },
             },
         ];
         manifest.roles[0].provisioning = Some(CellProvisioning::Create { deferred: false });
