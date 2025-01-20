@@ -410,12 +410,12 @@ impl LinkQuery {
 #[cfg(test)]
 #[cfg(feature = "fixturators")]
 mod tests {
-    use holo_hash::fixt::EntryHashFixturator;
-use super::ChainQueryFilter;
+    use super::ChainQueryFilter;
     use crate::action::EntryType;
     use crate::fixt::AppEntryDefFixturator;
     use crate::prelude::*;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::EntryHashFixturator;
     use holo_hash::HasHash;
 
     /// Create three Actions with various properties.
