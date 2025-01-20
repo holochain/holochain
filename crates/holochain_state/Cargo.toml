@@ -70,6 +70,7 @@ matches = "0.1.8"
 pretty_assertions = "1.4"
 
 tempfile = "3.3"
+test-case = "3.3.1"
 
 [lints]
 workspace = true
