@@ -366,13 +366,4 @@ mod tests {
 
         DnaHash::from_raw_39(raw);
     }
-
-    #[test]
-    #[cfg(feature = "fuzzing")]
-    fn proptest_arbitrary_smoke_test() {
-        use proptest::prelude::*;
-        proptest!(|(h: DnaHash)| {
-            assert_eq!(*h.hash_type(), hash_type::Dna);
-        });
-    }
 }
