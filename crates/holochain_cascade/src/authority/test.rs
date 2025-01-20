@@ -1,14 +1,14 @@
 use super::*;
 use crate::test_utils::*;
+#[cfg(feature = "unstable-warrants")]
+use holo_hash::fixt::ActionHashFixturator;
+#[cfg(feature = "unstable-warrants")]
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain_p2p::actor;
 use holochain_p2p::event::GetRequest;
 use holochain_state::prelude::test_dht_db;
 #[cfg(feature = "unstable-warrants")]
 use {crate::authority::handle_get_agent_activity, holochain_types::activity::ChainItems};
-#[cfg(feature = "unstable-warrants")]
-use holo_hash::fixt::ActionHashFixturator;
-#[cfg(feature = "unstable-warrants")]
-use holo_hash::fixt::AgentPubKeyFixturator;
 
 fn options() -> holochain_p2p::event::GetOptions {
     holochain_p2p::event::GetOptions {
