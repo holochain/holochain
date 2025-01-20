@@ -2353,14 +2353,20 @@ mod tests {
         let json = serde_json::to_string_pretty(&json)?;
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(parsed["records"][0]["action"]["type"], "Dna");
+        assert_eq!(parsed["records"][0]["action"]["type"], String::from("dna"));
         assert_eq!(parsed["records"][0]["entry"], serde_json::Value::Null);
 
-        assert_eq!(parsed["records"][2]["action"]["type"], "Create");
-        assert_eq!(parsed["records"][2]["action"]["entry_type"], "AgentPubKey");
-        assert_eq!(parsed["records"][2]["entry"]["entry_type"], "Agent");
+        assert_eq!(
+            parsed["records"][2]["action"]["type"],
+            String::from("create")
+        );
+        assert_eq!(
+            parsed["records"][2]["action"]["value"]["entry_type"]["type"],
+            String::from("agent_pub_key")
+        );
+        assert_eq!(parsed["records"][2]["entry"]["type"], String::from("agent"));
         assert_ne!(
-            parsed["records"][2]["entry"]["entry"],
+            parsed["records"][2]["entry"]["value"],
             serde_json::Value::Null
         );
 
