@@ -2,18 +2,20 @@
 //!
 //! Tests run the Holochain binary and communicate over websockets.
 
-use std::cmp::Ordering;
-use std::collections::BTreeSet;
-use std::path::PathBuf;
-use std::time::Duration;
-
+use crate::tests::test_utils::{
+    attach_app_interface, call_zome_fn, call_zome_fn_fallible, check_timeout, create_config,
+    register_and_install_dna, start_holochain_with_lair, start_local_services, write_config,
+    SupervisedChild,
+};
 use ed25519_dalek::SigningKey;
 use hdk::prelude::{CapAccess, GrantZomeCallCapabilityPayload, GrantedFunctions, ZomeCallCapGrant};
 use hdk::prelude::{
     CapSecret, CellId, FunctionName, PreflightRequest, PreflightRequestAcceptance, Role,
 };
 use holo_hash::{ActionHash, AgentPubKey};
-use holochain::prelude::{CountersigningSessionState, DhtOp, Signal, SystemSignal};
+use holochain::prelude::{
+    CountersigningSessionState, DhtOp, Signal, SystemSignal, CAP_SECRET_BYTES,
+};
 use holochain::sweettest::{authenticate_app_ws_client, websocket_client_by_port, WsPollRecv};
 use holochain::{
     conductor::{api::error::ConductorApiError, error::ConductorError},
@@ -30,14 +32,12 @@ use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
 use matches::assert_matches;
 use rand::rngs::OsRng;
 use serde::{de::DeserializeOwned, Serialize};
+use std::cmp::Ordering;
+use std::collections::BTreeSet;
+use std::path::PathBuf;
+use std::time::Duration;
 use tempfile::TempDir;
 use url2::Url2;
-
-use crate::tests::test_utils::{
-    attach_app_interface, call_zome_fn, call_zome_fn_fallible, check_timeout, create_config,
-    register_and_install_dna, start_holochain_with_lair, start_local_services, write_config,
-    SupervisedChild,
-};
 
 const APP_ID: &str = "test";
 
@@ -649,8 +649,7 @@ impl Agent {
         // Grant zome call capability for agent.
         let functions = GrantedFunctions::All;
 
-        let mut buf = arbitrary::Unstructured::new(&[]);
-        let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
+        let cap_secret = CapSecret::try_from(vec![7; CAP_SECRET_BYTES].as_slice()).unwrap();
 
         let mut assignees = BTreeSet::new();
         assignees.insert(signing_key.clone());

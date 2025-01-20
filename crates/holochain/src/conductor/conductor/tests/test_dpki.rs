@@ -1,21 +1,30 @@
+use super::*;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
-use arbitrary::{Arbitrary, Unstructured};
+use holo_hash::fixt::ActionHashFixturator;
 use holochain_types::{deepkey_roundtrip_backward, deepkey_roundtrip_forward};
 use parking_lot::Mutex;
-
-use super::*;
 
 /// Instead of reading KeyState from a Deepkey DNA's chain, we store the KeyState
 /// of each agent in a hashmap.
 type DpkiKeyState = Arc<Mutex<HashMap<AgentPubKey, KeyState>>>;
 
-fn make_mock_dpki_impl(u: &mut Unstructured<'_>, state: DpkiKeyState) -> DpkiImpl {
+fn make_mock_dpki_impl(state: DpkiKeyState) -> DpkiImpl {
     let mut dpki = MockDpkiState::new();
 
     let fake_register_key_output = (
-        ActionHash::arbitrary(u).unwrap(),
-        KeyRegistration::arbitrary(u).unwrap(),
-        KeyMeta::arbitrary(u).unwrap(),
+        fixt!(ActionHash),
+        KeyRegistration::Create(KeyGeneration {
+            new_key: fixt!(AgentPubKey),
+            new_key_signing_of_author: fixt!(Signature),
+        }),
+        KeyMeta {
+            app_binding_addr: fixt!(ActionHash),
+            key_index: 200,
+            key_registration_addr: fixt!(ActionHash),
+            key_anchor_addr: fixt!(ActionHash),
+            derivation_seed: None,
+            derivation_bytes: None,
+        },
     );
 
     dpki.expect_key_state().returning({
@@ -59,7 +68,6 @@ fn make_mock_dpki_impl(u: &mut Unstructured<'_>, state: DpkiKeyState) -> DpkiImp
 }
 
 async fn make_dpki_conductor_builder(
-    u: &mut Unstructured<'_>,
     config: ConductorConfig,
     state: DpkiKeyState,
 ) -> ConductorBuilder {
@@ -72,7 +80,7 @@ async fn make_dpki_conductor_builder(
         .await
         .unwrap();
 
-    let dpki = make_mock_dpki_impl(u, state);
+    let dpki = make_mock_dpki_impl(state);
     let mut builder = Conductor::builder()
         .with_keystore(keystore)
         .config(config)
@@ -104,8 +112,6 @@ async fn get_key_state(conductor: &SweetConductor, agent: &AgentPubKey) -> KeySt
 async fn mock_dpki_validation_limbo() {
     holochain_trace::test_run();
 
-    let mut u = unstructured_noise();
-
     let states = std::iter::repeat_with(|| Arc::new(Mutex::new(HashMap::new())))
         .take(2)
         .collect::<Vec<_>>();
@@ -118,12 +124,12 @@ async fn mock_dpki_validation_limbo() {
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()).await,
+            make_dpki_conductor_builder(config.clone(), states[0].clone()).await,
             rendezvous.clone(),
         )
         .await,
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()).await,
+            make_dpki_conductor_builder(config.clone(), states[1].clone()).await,
             rendezvous.clone(),
         )
         .await,
@@ -216,8 +222,6 @@ async fn mock_dpki_validation_limbo() {
 async fn mock_dpki_invalid_key_state() {
     holochain_trace::test_run();
 
-    let mut u = unstructured_noise();
-
     let states = std::iter::repeat_with(|| Arc::new(Mutex::new(HashMap::new())))
         .take(2)
         .collect::<Vec<_>>();
@@ -230,12 +234,12 @@ async fn mock_dpki_invalid_key_state() {
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()).await,
+            make_dpki_conductor_builder(config.clone(), states[0].clone()).await,
             rendezvous.clone(),
         )
         .await,
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()).await,
+            make_dpki_conductor_builder(config.clone(), states[1].clone()).await,
             rendezvous.clone(),
         )
         .await,
@@ -302,8 +306,6 @@ async fn mock_dpki_invalid_key_state() {
 async fn mock_dpki_preflight_check() {
     holochain_trace::test_run();
 
-    let mut u = unstructured_noise();
-
     let states = std::iter::repeat_with(|| Arc::new(Mutex::new(HashMap::new())))
         .take(2)
         .collect::<Vec<_>>();
@@ -316,12 +318,12 @@ async fn mock_dpki_preflight_check() {
 
     let mut conductors = SweetConductorBatch::new(vec![
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[0].clone()).await,
+            make_dpki_conductor_builder(config.clone(), states[0].clone()).await,
             rendezvous.clone(),
         )
         .await,
         SweetConductor::from_builder_rendezvous(
-            make_dpki_conductor_builder(&mut u, config.clone(), states[1].clone()).await,
+            make_dpki_conductor_builder(config.clone(), states[1].clone()).await,
             rendezvous.clone(),
         )
         .await,
