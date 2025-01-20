@@ -46,11 +46,7 @@ workspace = true
 default = ["serialization", "holochain-wasmer"]
 full = ["fixturators", "hashing", "encoding", "sqlite"]
 
-fuzzing = [
-  "proptest",
-  "proptest-derive",
-  "holochain_serialized_bytes?/fuzzing",
-]
+fuzzing = ["proptest", "proptest-derive", "holochain_serialized_bytes?/fuzzing"]
 
 fixturators = ["fixt", "rand", "hashing", "encoding"]
 hashing = ["futures", "must_future", "dep:blake2b_simd", "serialization"]
