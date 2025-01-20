@@ -93,7 +93,7 @@ impl Display for Action {
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq, Hash)]
-#[serde(tag = "type")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 /// This allows action types to be serialized to bytes without requiring
 /// an owned value. This produces the same bytes as if they were
 /// serialized with the [`Action`] type.
