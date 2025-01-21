@@ -140,6 +140,7 @@ mod tests {
     use super::*;
     use crate::test_utils::fill_db;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn agent_activity_query() {

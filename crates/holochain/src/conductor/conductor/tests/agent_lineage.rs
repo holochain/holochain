@@ -1,15 +1,14 @@
 use crate::conductor::CellError;
-use hdk::prelude::AgentPubKeyFixturator;
-use holo_hash::{ActionHash, AgentPubKey};
-use holochain_state::prelude::SourceChainError;
-use holochain_wasm_test_utils::TestWasm;
-use matches::assert_matches;
-
 use crate::core::workflow::WorkflowError;
 use crate::{
     conductor::api::error::ConductorApiError,
     sweettest::{SweetConductor, SweetConductorConfig, SweetDnaFile},
 };
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::{ActionHash, AgentPubKey};
+use holochain_state::prelude::SourceChainError;
+use holochain_wasm_test_utils::TestWasm;
+use matches::assert_matches;
 
 #[cfg(feature = "unstable-functions")]
 #[tokio::test(flavor = "multi_thread")]

@@ -126,6 +126,7 @@ mod test {
     use crate::core::ribosome::ZomesToInvoke;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
+    use holo_hash::fixt::ActionHashVecFixturator;
     use holochain_types::prelude::*;
 
     #[tokio::test(flavor = "multi_thread")]

@@ -57,7 +57,6 @@ contrafact = { version = "0.2.0-rc.1", optional = true }
 holochain_state = { path = ".", features = ["test_utils", "sqlite"] }
 
 anyhow = "1.0"
-arbitrary = "1.0"
 fixt = { path = "../fixt" }
 kitsune_p2p_timestamp = { version = "^0.5.0-dev.0", path = "../kitsune_p2p/timestamp", features = [
   "full",

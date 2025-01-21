@@ -1,8 +1,7 @@
-use futures::FutureExt;
-
-use crate::{spawn::MockKitsuneP2pEventHandler, NOISE};
-
 use super::*;
+use crate::spawn::MockKitsuneP2pEventHandler;
+use futures::FutureExt;
+use rand::Rng;
 
 mod bloom;
 mod common;
@@ -16,9 +15,9 @@ impl ShardedGossipLocal {
         host: HostApiLegacy,
         inner: ShardedGossipLocalState,
     ) -> Self {
-        use arbitrary::Arbitrary;
-        let mut u = arbitrary::Unstructured::new(&NOISE);
-        let space = KitsuneSpace::arbitrary(&mut u).unwrap();
+        let mut space = vec![0; 36];
+        rand::thread_rng().fill(&mut space[..]);
+        let space = KitsuneSpace::new(space);
         let space = Arc::new(space);
         let fetch_pool = FetchPool::new_bitwise_or();
 

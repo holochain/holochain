@@ -18,10 +18,6 @@ use holochain_zome_types::prelude::*;
     derive_more::From,
     derive_more::Deref,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct WarrantOp(SignedWarrant);
 
 impl WarrantOp {

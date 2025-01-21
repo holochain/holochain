@@ -5,6 +5,7 @@ use crate::prelude::*;
 use ::fixt::prelude::*;
 use chrono::Utc;
 use hdk::prelude::Action;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::AgentPubKey;
 use holo_hash::HasHash;

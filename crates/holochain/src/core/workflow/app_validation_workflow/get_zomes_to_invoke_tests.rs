@@ -7,6 +7,7 @@ use crate::core::workflow::app_validation_workflow::{
 use crate::fixt::MetaLairClientFixturator;
 use crate::sweettest::{SweetDnaFile, SweetInlineZomes};
 use fixt::fixt;
+use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator, EntryHashFixturator};
 use holo_hash::{HasHash, HashableContentExtSync};
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
@@ -16,9 +17,8 @@ use holochain_types::dht_op::{ChainOp, DhtOpHashed};
 use holochain_types::rate_limit::{EntryRateWeight, RateWeight};
 use holochain_zome_types::action::{AppEntryDef, Create, Delete, EntryType, Update, ZomeIndex};
 use holochain_zome_types::fixt::{
-    ActionFixturator, ActionHashFixturator, AgentPubKeyFixturator, CreateFixturator,
-    CreateLinkFixturator, DeleteLinkFixturator, EntryFixturator, EntryHashFixturator,
-    SignatureFixturator, UpdateFixturator,
+    ActionFixturator, CreateFixturator, CreateLinkFixturator, DeleteLinkFixturator,
+    EntryFixturator, SignatureFixturator, UpdateFixturator,
 };
 use holochain_zome_types::op::{
     EntryCreationAction, Op, RegisterAgentActivity, RegisterCreateLink, RegisterDelete,

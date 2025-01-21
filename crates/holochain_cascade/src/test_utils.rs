@@ -29,6 +29,7 @@ use ValidationStatus;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;
+use holochain_types::test_utils::ActionRefMut;
 use holochain_types::validation_receipt::ValidationReceiptBundle;
 pub use record_test_data::*;
 

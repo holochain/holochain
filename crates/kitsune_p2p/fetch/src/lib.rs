@@ -24,10 +24,6 @@ pub use source::FetchSource;
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Deserialize, serde::Serialize,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 #[serde(tag = "type", content = "key", rename_all = "camelCase")]
 pub enum FetchKey {
     /// Fetch via op hash.
@@ -67,10 +63,6 @@ pub struct FetchPoolPush {
     derive_more::Display,
     serde::Serialize,
     serde::Deserialize,
-)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub enum TransferMethod {
     /// Transfer by publishing
@@ -115,9 +107,5 @@ impl rusqlite::types::FromSql for TransferMethod {
     serde::Deserialize,
     derive_more::Deref,
     derive_more::From,
-)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub struct FetchContext(pub u32);

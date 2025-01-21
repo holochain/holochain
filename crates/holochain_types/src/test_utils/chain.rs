@@ -1,14 +1,9 @@
 //! Implements TestChainItem, a type used with isotest
 
-// for isotest, TODO add to isotest macro itself
-#![allow(non_snake_case)]
-
-use std::ops::Range;
-
-use arbitrary::Arbitrary;
-use arbitrary::Unstructured;
+use ::fixt::prelude::*;
 use holo_hash::*;
 use holochain_zome_types::prelude::*;
+use std::ops::Range;
 
 use crate::prelude::ChainItem;
 
@@ -219,19 +214,19 @@ pub fn gap_chain(ranges: &[Range<u32>]) -> Vec<TestChainItem> {
 ///
 /// The SignedActionHashed will not be valid in any sense other than the
 /// fields relevant to ChainItem.
-pub fn chain_item_to_action(u: &mut Unstructured, i: &impl ChainItem) -> SignedActionHashed {
+pub fn chain_item_to_action(i: &impl ChainItem) -> SignedActionHashed {
     let action_seq = i.seq();
     let prev_action = i.prev_hash().cloned().map(Into::into);
     let hash: ActionHash = i.get_hash().clone().into();
-    let mut action = SignedActionHashed::arbitrary(u).unwrap();
+    let mut action = fixt!(SignedActionHashed);
     match (action_seq, prev_action) {
         (_, None) => {
-            let dna = Dna::arbitrary(u).unwrap();
+            let dna = fixt!(Dna);
             action.hashed.content = Action::Dna(dna);
             action.hashed.hash = hash;
         }
         (action_seq, Some(prev_action)) => {
-            let mut create = Create::arbitrary(u).unwrap();
+            let mut create = fixt!(Create);
             create.action_seq = action_seq;
             create.prev_action = prev_action;
             action.hashed.content = Action::Create(create);
@@ -243,52 +238,15 @@ pub fn chain_item_to_action(u: &mut Unstructured, i: &impl ChainItem) -> SignedA
 
 /// Produce a sequence of AgentActivity ops from a Vec of ChainItems
 pub fn chain_to_ops(chain: Vec<impl ChainItem>) -> Vec<RegisterAgentActivity> {
-    let mut u = Unstructured::new(&holochain_zome_types::prelude::NOISE);
     chain
         .into_iter()
         .map(|i| {
-            let mut op = RegisterAgentActivity::arbitrary(&mut u).unwrap();
-            op.action = chain_item_to_action(&mut u, &i);
+            let mut op = RegisterAgentActivity {
+                action: fixt!(SignedActionHashed),
+                cached_entry: None,
+            };
+            op.action = chain_item_to_action(&i);
             op
         })
         .collect()
-}
-
-isotest::iso! {
-    TestChainItem => |i| {
-        let mut u = Unstructured::new(&holochain_zome_types::prelude::NOISE);
-        chain_item_to_action(&mut u, &i)
-    },
-    SignedActionHashed => |a| {
-        TestChainItem {
-            seq: a.seq(),
-            hash: TestChainHash::test(a.get_hash()),
-            prev: a.prev_hash().map(TestChainHash::test),
-        }
-    },
-    test_cases: [
-        TestChainItem {
-            seq: 0,
-            hash: 0.into(),
-            prev: None,
-        },
-        TestChainItem {
-            seq: 0,
-            hash: 0.into(),
-            prev: Some(0.into()),
-        },
-        TestChainItem {
-            seq: 1,
-            hash: 1.into(),
-            prev: Some(1.into()),
-        },
-        // This value has no equivalent representation as an Action,
-        // since a Dna Action cannot specify a seq number other than 0.
-        // TestChainItem {
-        //     seq: 1,
-        //     hash: 1.into(),
-        //     prev: None,
-        // },
-    ],
-    real_cases: [::fixt::fixt!(SignedActionHashed)]
 }

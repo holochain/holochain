@@ -46,7 +46,6 @@ nanoid = { version = "0.4", optional = true }
 shrinkwraprs = { version = "0.3", optional = true }
 
 # fuzzing
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 
@@ -96,7 +95,6 @@ fixturators = [
 properties = ["serde_yaml"]
 
 fuzzing = [
-  "arbitrary",
   "contrafact",
   "proptest",
   "proptest-derive",
@@ -110,6 +108,7 @@ fuzzing = [
 
 test_utils = [
   "fuzzing",
+  "fixturators",
   "once_cell",
   "kitsune_p2p_block/sqlite",
   "holo_hash/hashing",

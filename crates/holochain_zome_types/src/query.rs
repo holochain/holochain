@@ -415,6 +415,7 @@ mod tests {
     use crate::fixt::AppEntryDefFixturator;
     use crate::prelude::*;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::EntryHashFixturator;
     use holo_hash::HasHash;
 
     /// Create three Actions with various properties.

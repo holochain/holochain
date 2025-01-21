@@ -1305,12 +1305,11 @@ mod tests {
     use super::RunningApp;
     use crate::prelude::*;
     use ::fixt::prelude::*;
-    use arbitrary::Arbitrary;
+    use holo_hash::fixt::*;
     use std::collections::HashSet;
 
     #[test]
     fn illegal_role_name_is_rejected() {
-        let mut u = unstructured_noise();
         let result = InstalledAppCommon::new(
             "test_app",
             fixt!(AgentPubKey),
@@ -1318,7 +1317,12 @@ mod tests {
                 CLONE_ID_DELIMITER.into(),
                 AppRolePrimary::new(fixt!(DnaHash), false, 0).into(),
             )],
-            AppManifest::arbitrary(&mut u).unwrap(),
+            AppManifest::V1(AppManifestV1 {
+                name: "test_app".to_string(),
+                description: None,
+                roles: vec![],
+                allow_deferred_memproofs: false,
+            }),
             Timestamp::now(),
         );
         assert!(result.is_err())
@@ -1332,7 +1336,12 @@ mod tests {
         let role1 = AppRolePrimary::new(base_dna_hash, false, clone_limit).into();
         let agent = fixt!(AgentPubKey);
         let role_name: RoleName = "role_name".into();
-        let manifest = AppManifest::arbitrary(&mut unstructured_noise()).unwrap();
+        let manifest = AppManifest::V1(AppManifestV1 {
+            name: "test_app".to_string(),
+            description: None,
+            roles: vec![],
+            allow_deferred_memproofs: false,
+        });
         let mut app: RunningApp = InstalledAppCommon::new(
             "app",
             agent.clone(),
