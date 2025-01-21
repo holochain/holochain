@@ -74,7 +74,7 @@ unstable-dpki = [
 ]
 
 chc = [
-  "holochain_chc",
+  "dep:holochain_chc",
   "holochain_conductor_api/chc",
   "holochain_conductor_config/chc",
 ]
