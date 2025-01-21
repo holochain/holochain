@@ -95,7 +95,7 @@ async fn async_main() {
     if opt.create_config {
         holochain_conductor_config::generate::generate(
             None,
-            None,
+            std::env::current_dir().ok(),
             None,
             true,
             0,
