@@ -99,7 +99,6 @@ wasmer-middlewares = { version = "5.0.2", optional = true, default-features = fa
 
 # Dependencies for test_utils / other optional deps
 fixt = { version = "^0.5.0-dev.0", path = "../fixt", optional = true }
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 diff = { version = "0.1", optional = true }
 hdk = { version = "^0.5.0-dev.13", path = "../hdk", optional = true }
@@ -146,14 +145,12 @@ clap = "4.0"
 contrafact = "0.2.0-rc.1"
 criterion = { version = "0.5", features = ["async_tokio"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
-indoc = "2.0"
 isotest = "0"
 lair_keystore = "0.5.3"
 maplit = "1"
 pretty_assertions = "1.4"
 regex = "1.5"
 reqwest = "0.12"
-serial_test = "3.0"
 test-case = "3.3"
 tokio-tungstenite = "0.21"
 tx5 = "0.1.5-beta"
@@ -220,7 +217,6 @@ test_utils = [
   "holochain_p2p/mock_network",
   "kitsune_p2p_bin_data/fixt",
   "kitsune_p2p_types/fixt",
-  "arbitrary",
   "matches",
   "holochain_test_wasm_common",
   "holochain_wasm_test_utils",
@@ -229,6 +225,7 @@ test_utils = [
   "tx5-go-pion-turn",
   "async-once-cell",
   "get_if_addrs",
+  "holo_hash/fixturators",
 ]
 
 fuzzing = []

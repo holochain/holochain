@@ -20,10 +20,6 @@ use crate::signature::Signed;
     derive_more::From,
     derive_more::Deref,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary,)
-)]
 pub struct Warrant {
     /// The self-proving part of the warrant containing evidence of bad behavior
     #[deref]
@@ -71,10 +67,6 @@ impl HashableContent for Warrant {
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary,)
-)]
 pub enum WarrantProof {
     /// Signifies evidence of a breach of chain integrity
     ChainIntegrity(ChainIntegrityWarrant),
@@ -92,10 +84,6 @@ pub enum WarrantProof {
     PartialEq,
     Hash,
     derive_more::From,
-)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary,)
 )]
 pub enum WarrantType {
     // NOTE: the values here cannot overlap with ActionType,
@@ -122,10 +110,6 @@ impl rusqlite::ToSql for WarrantType {
 
 /// A warrant which is sent to AgentActivity authorities
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub enum ChainIntegrityWarrant {
     /// Something invalid was authored on a chain.
     /// When we receive this warrant, we fetch the Action and validate it
@@ -183,10 +167,6 @@ impl WarrantProof {
 /// Not necessary but nice to have
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
-)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub enum ValidationType {
     /// Sys validation

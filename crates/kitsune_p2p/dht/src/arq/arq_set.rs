@@ -23,7 +23,6 @@ use super::{Arq, ArqStart};
     serde::Serialize,
     serde::Deserialize,
 )]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct ArqSet<S: ArqStart = SpaceOffset> {
     #[into_iterator]
     #[deref]

@@ -501,6 +501,7 @@ mod test {
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
     use crate::test_utils::install_app_in_conductor;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_conductor_api::conductor::ConductorConfig;
     use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_conductor_api::*;

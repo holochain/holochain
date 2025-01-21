@@ -207,13 +207,14 @@ pub async fn proxy_list(url: Url2, net: BootstrapNet) -> BootstrapClientResult<V
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use arbitrary::Arbitrary;
     use ed25519_dalek::{Signer, SigningKey};
     use kitsune_p2p_bin_data::fixt::*;
     use kitsune_p2p_bin_data::KitsuneAgent;
     use kitsune_p2p_bin_data::KitsuneBinType;
     use kitsune_p2p_bin_data::KitsuneSignature;
+    use kitsune_p2p_types::dht::prelude::SpaceOffset;
     use kitsune_p2p_types::dht::Arq;
+    use kitsune_p2p_types::dht_arc::DhtLocation;
     use kitsune_p2p_types::fixt::*;
     use rand::rngs::OsRng;
     use std::convert::TryInto;
@@ -224,7 +225,6 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_bootstrap() {
         let (addr, abort_handle) = start_bootstrap().await;
-        let mut u = arbitrary::Unstructured::new(&[0; 1024]);
 
         let keypair = create_test_keypair();
         let space = fixt!(KitsuneSpace);
@@ -240,7 +240,7 @@ mod tests {
         let agent_info_signed = AgentInfoSigned::sign(
             Arc::new(space),
             Arc::new(agent),
-            Arq::arbitrary(&mut u).unwrap(),
+            Arq::new(8, DhtLocation::new(0), SpaceOffset(0)),
             urls,
             signed_at_ms,
             expires_at_ms,
@@ -316,7 +316,6 @@ mod tests {
     // thread 'spawn::actor::bootstrap::tests::test_random' panicked at 'dispatch dropped without returning error', /rustc/d3fb005a39e62501b8b0b356166e515ae24e2e54/src/libstd/macros.rs:13:23
     async fn test_random() {
         let (addr, abort_handle) = start_bootstrap().await;
-        let mut u = arbitrary::Unstructured::new(&[0; 1024]);
 
         let space = fixt!(KitsuneSpace, Unpredictable);
         let now = now(Some(url2::url2!("http://{:?}", addr)), BootstrapNet::Tx5)
@@ -334,7 +333,7 @@ mod tests {
             let agent_info_signed = AgentInfoSigned::sign(
                 Arc::new(space.clone()),
                 Arc::new(kitsune_agent.clone()),
-                Arq::arbitrary(&mut u).unwrap(),
+                Arq::new(0, DhtLocation::new(0), SpaceOffset(0)),
                 fixt!(UrlList),
                 signed_at_ms,
                 expires_at_ms,

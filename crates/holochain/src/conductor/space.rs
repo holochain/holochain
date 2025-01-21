@@ -54,9 +54,6 @@ use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
 
-#[cfg(test)]
-mod tests;
-
 #[derive(Clone)]
 /// This is the set of all current
 /// [`DnaHash`] spaces for all cells

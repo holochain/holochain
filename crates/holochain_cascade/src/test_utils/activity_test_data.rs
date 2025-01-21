@@ -1,4 +1,5 @@
 use ::fixt::prelude::*;
+use holo_hash::fixt::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;

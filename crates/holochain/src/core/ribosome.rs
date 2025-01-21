@@ -300,7 +300,6 @@ impl FnComponents {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(test, derive(arbitrary::Arbitrary))]
 pub enum ZomesToInvoke {
     /// All the integrity zomes.
     AllIntegrity,

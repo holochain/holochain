@@ -23,10 +23,6 @@ pub struct FetchPoolInfo {
     serde::Serialize,
     serde::Deserialize,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub enum GossipType {
     /// The Recent gossip type is aimed at rapidly syncing the most recent
     /// data. It runs frequently and expects frequent diffs at each round.

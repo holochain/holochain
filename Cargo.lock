@@ -2448,7 +2448,6 @@ dependencies = [
 name = "hc_deepkey_sdk"
 version = "0.8.0-dev.13"
 dependencies = [
- "arbitrary",
  "hc_deepkey_types",
  "hdk",
  "serde",
@@ -2459,7 +2458,6 @@ dependencies = [
 name = "hc_deepkey_types"
 version = "0.9.0-dev.10"
 dependencies = [
- "arbitrary",
  "hdi",
  "holo_hash",
  "holochain_integrity_types",
@@ -2554,9 +2552,9 @@ dependencies = [
 name = "hdi"
 version = "0.6.0-dev.10"
 dependencies = [
- "arbitrary",
  "fixt",
  "getrandom 0.2.15",
+ "hdi",
  "hdk_derive",
  "holo_hash",
  "holochain_integrity_types",
@@ -2697,7 +2695,6 @@ dependencies = [
 name = "holo_hash"
 version = "0.5.0-dev.5"
 dependencies = [
- "arbitrary",
  "base64 0.22.1",
  "blake2b_simd",
  "derive_more",
@@ -2725,7 +2722,6 @@ name = "holochain"
 version = "0.5.0-dev.14"
 dependencies = [
  "anyhow",
- "arbitrary",
  "assert2",
  "assert_cmd",
  "async-once-cell",
@@ -2777,7 +2773,6 @@ dependencies = [
  "hostname",
  "human-panic",
  "indexmap 2.7.1",
- "indoc",
  "isotest",
  "itertools 0.12.1",
  "kitsune_p2p",
@@ -2812,7 +2807,6 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_yaml",
- "serial_test",
  "shrinkwraprs",
  "sodoken 0.0.11",
  "structopt",
@@ -2880,6 +2874,7 @@ dependencies = [
  "fixt",
  "futures",
  "getrandom 0.2.15",
+ "holo_hash",
  "holochain_chc",
  "holochain_keystore",
  "holochain_nonce",
@@ -3039,7 +3034,6 @@ name = "holochain_conductor_services"
 version = "0.4.0-dev.14"
 dependencies = [
  "anyhow",
- "arbitrary",
  "async-trait",
  "derive_more",
  "futures",
@@ -3068,8 +3062,8 @@ checksum = "be0aa773b74c40ef5e4e02f414d8cbfc4e92520a93511055a3fbccc12d2dd045"
 name = "holochain_integrity_types"
 version = "0.5.0-dev.8"
 dependencies = [
- "arbitrary",
  "derive_builder",
+ "fixt",
  "holo_hash",
  "holochain_integrity_types",
  "holochain_secure_primitive",
@@ -3264,7 +3258,6 @@ name = "holochain_state"
 version = "0.5.0-dev.14"
 dependencies = [
  "anyhow",
- "arbitrary",
  "async-recursion",
  "base64 0.22.1",
  "chrono",
@@ -3346,7 +3339,6 @@ name = "holochain_types"
 version = "0.5.0-dev.14"
 dependencies = [
  "anyhow",
- "arbitrary",
  "async-trait",
  "automap",
  "backtrace",
@@ -3499,7 +3491,6 @@ dependencies = [
 name = "holochain_zome_types"
 version = "0.5.0-dev.12"
 dependencies = [
- "arbitrary",
  "contrafact",
  "derive_builder",
  "derive_more",
@@ -4287,7 +4278,6 @@ dependencies = [
 name = "kitsune_p2p"
 version = "0.5.0-dev.9"
 dependencies = [
- "arbitrary",
  "arrayref",
  "base64 0.22.1",
  "blake2b_simd",
@@ -4341,7 +4331,6 @@ dependencies = [
 name = "kitsune_p2p_bin_data"
 version = "0.5.0-dev.3"
 dependencies = [
- "arbitrary",
  "base64 0.22.1",
  "derive_more",
  "fixt",
@@ -4389,7 +4378,6 @@ dependencies = [
 name = "kitsune_p2p_bootstrap_client"
 version = "0.5.0-dev.7"
 dependencies = [
- "arbitrary",
  "ed25519-dalek",
  "fixt",
  "kitsune_p2p_bin_data",
@@ -4408,7 +4396,6 @@ dependencies = [
 name = "kitsune_p2p_dht"
 version = "0.5.0-dev.1"
 dependencies = [
- "arbitrary",
  "colored",
  "derivative",
  "derive_more",
@@ -4436,7 +4423,6 @@ dependencies = [
 name = "kitsune_p2p_dht_arc"
 version = "0.5.0-dev.1"
 dependencies = [
- "arbitrary",
  "derive_more",
  "gcollections",
  "holochain_trace",
@@ -4458,7 +4444,6 @@ dependencies = [
 name = "kitsune_p2p_fetch"
 version = "0.5.0-dev.7"
 dependencies = [
- "arbitrary",
  "backon",
  "derive_more",
  "holochain_serialized_bytes",
@@ -4496,7 +4481,6 @@ dependencies = [
 name = "kitsune_p2p_timestamp"
 version = "0.5.0-dev.0"
 dependencies = [
- "arbitrary",
  "chrono",
  "holochain_serialized_bytes",
  "once_cell",
@@ -4512,7 +4496,6 @@ dependencies = [
 name = "kitsune_p2p_types"
 version = "0.5.0-dev.7"
 dependencies = [
- "arbitrary",
  "base64 0.22.1",
  "criterion",
  "derive_more",
@@ -4971,7 +4954,6 @@ name = "mr_bundle"
 version = "0.5.0-dev.2"
 dependencies = [
  "anyhow",
- "arbitrary",
  "derive_more",
  "flate2",
  "futures",
@@ -6853,15 +6835,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "scc"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28e1c91382686d21b5ac7959341fcb9780fa7c03773646995a87c950fa7be640"
-dependencies = [
- "sdd",
-]
-
-[[package]]
 name = "schannel"
 version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6939,12 +6912,6 @@ checksum = "b943eadf71d8b69e661330cb0e2656e31040acf21ee7708e2c238a0ec6af2bf4"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "sdd"
-version = "3.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "478f121bb72bbf63c52c93011ea1791dca40140dfe13f8336c4c5ac952c33aa9"
 
 [[package]]
 name = "security-framework"
@@ -7116,31 +7083,6 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
-]
-
-[[package]]
-name = "serial_test"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b258109f244e1d6891bf1053a55d63a5cd4f8f4c30cf9a1280989f80e7a1fa9"
-dependencies = [
- "futures",
- "log",
- "once_cell",
- "parking_lot 0.12.3",
- "scc",
- "serial_test_derive",
-]
-
-[[package]]
-name = "serial_test_derive"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d69265a08751de7844521fd15003ae0a888e035773ba05695c5c759a6f89eef"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
 ]
 
 [[package]]

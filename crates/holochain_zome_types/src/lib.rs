@@ -81,9 +81,6 @@ pub mod test_utils;
 #[cfg(all(any(test, feature = "test_utils"), feature = "fuzzing"))]
 pub mod entropy;
 
-#[cfg(feature = "fuzzing")]
-pub mod facts;
-
 pub use action::Action;
 pub use entry::Entry;
 

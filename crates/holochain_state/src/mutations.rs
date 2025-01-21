@@ -1094,14 +1094,12 @@ pub fn remove_countersigning_session(
 #[cfg(feature = "unstable-warrants")]
 #[cfg(test)]
 mod tests {
-    use ::fixt::fixt;
-    use std::sync::Arc;
-
-    use holochain_types::prelude::*;
-
-    use crate::prelude::{CascadeTxnWrapper, Store};
-
     use super::insert_op_authored;
+    use crate::prelude::{CascadeTxnWrapper, Store};
+    use ::fixt::fixt;
+    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
+    use holochain_types::prelude::*;
+    use std::sync::Arc;
 
     #[test]
     fn can_write_and_read_warrants() {

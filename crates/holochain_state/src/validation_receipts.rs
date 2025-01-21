@@ -185,6 +185,7 @@ mod tests {
     use crate::mutations::set_when_integrated;
     use crate::prelude::*;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::{HasHash, HoloHashOf};
     use holochain_keystore::{test_keystore, MetaLairClient};
     use std::collections::HashSet;

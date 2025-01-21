@@ -24,10 +24,6 @@ use std::collections::HashMap;
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
@@ -54,10 +50,6 @@ pub struct AppManifestV1 {
 /// potential runtime clones.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct AppRoleManifest {
     /// The ID which will be used to refer to:
     /// - this role,
@@ -87,10 +79,6 @@ impl AppRoleManifest {
 /// The DNA portion of an app role
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct AppRoleDnaManifest {
     /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
     /// use a local relative path that corresponds with the bundle structure.
@@ -146,10 +134,6 @@ pub type DnaLocation = mr_bundle::Location;
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "strategy")]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 #[allow(missing_docs)]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
@@ -299,10 +283,8 @@ pub mod tests {
     use crate::app::app_manifest::AppManifest;
     use crate::prelude::*;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::*;
     use std::path::PathBuf;
-
-    #[cfg(feature = "fuzzing")]
-    use arbitrary::Arbitrary;
 
     #[derive(serde::Serialize, serde::Deserialize)]
     struct Props {
@@ -402,19 +384,36 @@ roles:
 
     #[tokio::test]
     async fn manifest_v1_set_network_seed() {
-        let mut u = arbitrary::Unstructured::new(&[0]);
-        let mut manifest = AppManifestV1::arbitrary(&mut u).unwrap();
+        let mut manifest = AppManifestV1 {
+            name: "test".to_string(),
+            description: None,
+            roles: vec![],
+            allow_deferred_memproofs: false,
+        };
         manifest.roles = vec![
-            AppRoleManifest::arbitrary(&mut u).unwrap(),
-            AppRoleManifest::arbitrary(&mut u).unwrap(),
-            // AppRoleManifest::arbitrary(&mut u).unwrap(),
-            // AppRoleManifest::arbitrary(&mut u).unwrap(),
+            AppRoleManifest {
+                name: "test-role-1".to_string(),
+                provisioning: None,
+                dna: AppRoleDnaManifest {
+                    location: None,
+                    modifiers: DnaModifiersOpt::none(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                },
+            },
+            AppRoleManifest {
+                name: "test-role-2".to_string(),
+                provisioning: None,
+                dna: AppRoleDnaManifest {
+                    location: None,
+                    modifiers: DnaModifiersOpt::none(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                },
+            },
         ];
         manifest.roles[0].provisioning = Some(CellProvisioning::Create { deferred: false });
         manifest.roles[1].provisioning = Some(CellProvisioning::Create { deferred: false });
-        // manifest.roles[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
-        // manifest.roles[3].provisioning =
-        //     Some(CellProvisioning::CreateIfNotExists { deferred: false });
 
         let network_seed = NetworkSeed::from("blabla");
         manifest.set_network_seed(network_seed.clone());
@@ -428,15 +427,5 @@ roles:
             manifest.roles[1].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
-        // assert_eq!(
-        //     manifest.roles[3].dna.modifiers.network_seed.as_ref(),
-        //     Some(&network_seed)
-        // );
-
-        // // - The others do not.
-        // assert_ne!(
-        //     manifest.roles[2].dna.modifiers.network_seed.as_ref(),
-        //     Some(&network_seed)
-        // );
     }
 }

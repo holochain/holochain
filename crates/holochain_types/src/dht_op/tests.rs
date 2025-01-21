@@ -1,23 +1,11 @@
-use crate::fixt::AgentValidationPkgFixturator;
-use crate::fixt::CloseChainFixturator;
-use crate::fixt::CreateFixturator;
-use crate::fixt::CreateLinkFixturator;
-use crate::fixt::DeleteLinkFixturator;
-use crate::fixt::DnaFixturator;
-use crate::fixt::EntryFixturator;
-use crate::fixt::EntryHashFixturator;
-use crate::fixt::EntryTypeFixturator;
-use crate::fixt::InitZomesCompleteFixturator;
-use crate::fixt::OpenChainFixturator;
-use crate::fixt::UpdateFixturator;
+use super::OpBasis;
 use crate::prelude::*;
 use ::fixt::prelude::*;
 use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::*;
 use holochain_trace;
+use holochain_types::prelude::fixt::*;
 use tracing::*;
-
-use super::OpBasis;
 
 struct RecordTest {
     entry_type: EntryType,
