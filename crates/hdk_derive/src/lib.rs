@@ -290,6 +290,22 @@ pub fn hdk_entry_helper(attrs: TokenStream, code: TokenStream) -> TokenStream {
     entry_helper::build(attrs, code)
 }
 
+/// Helper for decoding DNA Properties into a struct.
+///
+/// # Implements
+/// - [`holochain_integrity_types::TryFromDnaProperties`]
+///
+/// # Examples
+/// ```ignore
+/// #[dna_properties]
+/// pub struct MyDnaProperties {
+///     pub progenitor: String,
+///     pub max_length: u16,
+/// }
+///
+/// let my_props = MyDnaProperties::try_from_dna_properties()?;
+/// println!("The progenitor is {}", my_props.progenitor);
+/// ```
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn dna_properties(attrs: TokenStream, code: TokenStream) -> TokenStream {
