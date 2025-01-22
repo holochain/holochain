@@ -2,8 +2,17 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2025-01-17: v0.4.1-rc.1
+
+*Failure*
+- 3 nodes started a new network, peer discovery succeeded on Node A and Node B within 5 minutes. Node C could only see Node A, and no other nodes could see Node C. Logs from Node A indicated that Ops were failing to be integrated due to missing dependencies.
+- Sending signals succeeded with 100 % reliability from Node A to Node B, with 50 % reliability from B to A. Node C sent signals with 100% reliability to Node A.
+- Entries created by Node A and Node B were received by each other, mostly instantly. Entries created by Node C were not seen by any peers. Entries created by Node A and Node B were not seen by Node C.
+- Receiving entries that were created in the absence of a node showed the same pattern.
+
 ## 2024-12-17: v0.4.0-rc.2
 
+*Success*
 - 3 nodes started a new network, peer discovery succeeded on all nodes within 5 minutes.
 - Sending signals to peers succeeded with 100 % reliability.
 - Entries created by everyone were received by all peers, mostly instantly. Sometimes it took 60 seconds for the remaining entries to appear.
