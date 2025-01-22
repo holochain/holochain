@@ -412,6 +412,54 @@ fn register_agent_activity_dna(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static s
 }
 
 #[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_agent_validation_pkg(
+    mut a: TestData,
+) -> (Vec<Db>, Vec<Db>, &'static str) {
+    // Previous op to depend on
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.author = a.original_action.author().clone();
+    prev_create_action.action_seq = 10;
+    prev_create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    let previous_action = Action::Create(prev_create_action.clone());
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
+    let previous_op_hash = DhtOpHash::with_data_sync(&previous_op);
+    let previous_op_hashed = DhtOpHashed::from_content_sync(previous_op.clone());
+
+    // Op to integrate, to go in the dht database
+    let mut agent_validation_pkg_action = fixt!(AgentValidationPkg);
+    agent_validation_pkg_action.author = previous_action.author().clone();
+    agent_validation_pkg_action.action_seq = previous_action.action_seq() + 1;
+    agent_validation_pkg_action.prev_action = previous_action.to_hash();
+    agent_validation_pkg_action.timestamp = Timestamp::now();
+    let new_dht_op: DhtOp = ChainOp::RegisterAgentActivity(
+        fixt!(Signature),
+        Action::AgentValidationPkg(agent_validation_pkg_action),
+    )
+    .into();
+    let new_dht_op_hash = DhtOpHash::with_data_sync(&new_dht_op);
+    let new_dht_op_hashed = DhtOpHashed::from_content_sync(new_dht_op.clone());
+
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_dht_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::Integrated(new_dht_op.clone()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for agent validation pkg",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_agent_activity_create_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     a.link_add.action_seq = 5;
     let dep: DhtOp =
@@ -606,6 +654,7 @@ async fn test_ops_state() {
         register_store_record,
         register_store_entry,
         register_agent_activity_dna,
+        register_agent_activity_agent_validation_pkg,
         register_agent_activity_create_link,
         register_agent_activity_delete_link,
         register_replaced_by_for_entry,
