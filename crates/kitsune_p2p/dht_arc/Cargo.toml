@@ -1,6 +1,6 @@
 [package]
 name = "kitsune_p2p_dht_arc"
-version = "0.5.0-dev.1"
+version = "0.5.0-dev.2"
 description = "Kitsune P2p Dht Arc Utils"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -21,7 +21,7 @@ serde = { version = "1.0", features = ["derive"] }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
 rusqlite = { version = "0.32.1", optional = true }
-kitsune_p2p_timestamp = { version = "^0.5.0-dev.0", path = "../timestamp", optional = true }
+kitsune_p2p_timestamp = { version = "^0.5.0-dev.1", path = "../timestamp", optional = true }
 
 [dev-dependencies]
 maplit = "1"
