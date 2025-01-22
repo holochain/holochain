@@ -460,6 +460,54 @@ fn register_agent_activity_agent_validation_pkg(
 }
 
 #[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_init_zomes_complete(
+    mut a: TestData,
+) -> (Vec<Db>, Vec<Db>, &'static str) {
+    // Previous op to depend on
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.author = a.original_action.author().clone();
+    prev_create_action.action_seq = 10;
+    prev_create_action.entry_type = EntryType::App(AppEntryDef {
+        entry_index: 0.into(),
+        zome_index: 0.into(),
+        visibility: EntryVisibility::Public,
+    });
+    let previous_action = Action::Create(prev_create_action.clone());
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
+    let previous_op_hash = DhtOpHash::with_data_sync(&previous_op);
+    let previous_op_hashed = DhtOpHashed::from_content_sync(previous_op.clone());
+
+    // Op to integrate
+    let mut init_zomes_action = fixt!(InitZomesComplete);
+    init_zomes_action.author = previous_action.author().clone();
+    init_zomes_action.action_seq = previous_action.action_seq() + 1;
+    init_zomes_action.prev_action = previous_action.to_hash();
+    init_zomes_action.timestamp = Timestamp::now();
+    let new_dht_op: DhtOp = ChainOp::RegisterAgentActivity(
+        fixt!(Signature),
+        Action::InitZomesComplete(init_zomes_action),
+    )
+    .into();
+    let new_dht_op_hash = DhtOpHash::with_data_sync(&new_dht_op);
+    let new_dht_op_hashed = DhtOpHashed::from_content_sync(new_dht_op.clone());
+
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_dht_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::Integrated(new_dht_op.clone()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for init zomes complete action",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_agent_activity_create_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     a.link_add.action_seq = 5;
     let dep: DhtOp =
@@ -655,6 +703,7 @@ async fn test_ops_state() {
         register_store_entry,
         register_agent_activity_dna,
         register_agent_activity_agent_validation_pkg,
+        register_agent_activity_init_zomes_complete,
         register_agent_activity_create_link,
         register_agent_activity_delete_link,
         register_replaced_by_for_entry,
