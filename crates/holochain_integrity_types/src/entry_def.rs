@@ -98,7 +98,6 @@ pub struct EntryDefs(pub Vec<EntryDef>);
     feature = "fuzzing",
     derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum EntryVisibility {
     Public,
     Private,
