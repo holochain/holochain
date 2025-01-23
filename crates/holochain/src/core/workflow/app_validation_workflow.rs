@@ -218,7 +218,7 @@ async fn app_validation_workflow_inner(
     let rejected_ops = Arc::new(AtomicUsize::new(0));
     let warranted_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
-    let mut agent_activity = vec![];
+    let mut agent_activity_ops = vec![];
     #[cfg(feature = "unstable-warrants")]
     let mut warrant_op_hashes = vec![];
 
@@ -259,7 +259,7 @@ async fn app_validation_workflow_inner(
                 if let Some(agent_activity_op) = agent_activity_op {
                     // If the activity is accepted or rejected then it's ready to integrate.
                     if matches!(&outcome, Outcome::Accepted | Outcome::Rejected(_)) {
-                        agent_activity.push(agent_activity_op);
+                        agent_activity_ops.push(agent_activity_op);
                     }
                 }
                 if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
@@ -344,7 +344,7 @@ async fn app_validation_workflow_inner(
 
     // Once the database transaction is committed, add agent activity to the cache
     // that is ready for integration.
-    for (author, seq) in agent_activity {
+    for (author, seq) in agent_activity_ops {
         dht_query_cache
             .set_activity_ready_to_integrate(&author, Some(seq))
             .await?;
