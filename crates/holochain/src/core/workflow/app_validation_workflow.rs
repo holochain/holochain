@@ -236,7 +236,7 @@ async fn app_validation_workflow_inner(
         let dht_op_lite = chain_op.to_lite();
 
         // If this is agent activity, track it for the cache.
-        let activity = matches!(op_type, ChainOpType::RegisterAgentActivity)
+        let agent_activity_op = matches!(op_type, ChainOpType::RegisterAgentActivity)
             .then(|| (action.author().clone(), action.action_seq()));
 
         // Validate this op
@@ -256,10 +256,10 @@ async fn app_validation_workflow_inner(
         match validation_outcome {
             Ok(outcome) => {
                 // Collect all agent activity.
-                if let Some(activity) = activity {
+                if let Some(agent_activity_op) = agent_activity_op {
                     // If the activity is accepted or rejected then it's ready to integrate.
                     if matches!(&outcome, Outcome::Accepted | Outcome::Rejected(_)) {
-                        agent_activity.push(activity);
+                        agent_activity.push(agent_activity_op);
                     }
                 }
                 if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
