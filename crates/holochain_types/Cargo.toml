@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.5.0-dev.14"
+version = "0.5.0-dev.15"
 description = "Holochain common types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -25,30 +25,29 @@ chrono = { version = "0.4", default-features = false, features = [
 ] }
 derive_builder = "0.20"
 derive_more = "0.99"
-fixt = { path = "../fixt", version = "^0.5.0-dev.0" }
 flate2 = "1.0.14"
 futures = "0.3"
 getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
-holo_hash = { version = "^0.5.0-dev.5", path = "../holo_hash", features = [
+holo_hash = { version = "^0.5.0-dev.6", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_keystore = { version = "^0.5.0-dev.13", path = "../holochain_keystore" }
-holochain_nonce = { version = "^0.5.0-dev.0", path = "../holochain_nonce" }
+holochain_keystore = { version = "^0.5.0-dev.14", path = "../holochain_keystore" }
+holochain_nonce = { version = "^0.5.0-dev.1", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.5.0-dev.13" }
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.5.0-dev.14" }
 holochain_trace = { version = "^0.5.0-dev.1", path = "../holochain_trace" }
 holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util", features = [
   "backtrace",
 ] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.0-dev.12", features = [
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.0-dev.13", features = [
   "full",
 ] }
 itertools = { version = "0.12" }
-kitsune_p2p_dht = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/dht" }
+kitsune_p2p_dht = { version = "^0.5.0-dev.2", path = "../kitsune_p2p/dht" }
 mr_bundle = { path = "../mr_bundle", features = [
   "packing",
-], version = "^0.5.0-dev.2" }
+], version = "^0.5.0-dev.3" }
 must_future = "0.1.1"
 nanoid = "0.4"
 parking_lot = "0.12"
@@ -71,7 +70,7 @@ tracing = "0.1.26"
 indexmap = { version = "2.6.0", features = ["serde"] }
 schemars = "0.8.21"
 
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
+fixt = { path = "../fixt", version = "^0.5.0-dev.0", optional = true }
 isotest = { version = "0", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
@@ -82,7 +81,6 @@ contrafact = { version = "0.2.0-rc.1", optional = true }
 [dev-dependencies]
 holochain_types = { path = ".", features = ["test_utils", "fuzzing"] }
 
-arbitrary = "1.0"
 isotest = { version = "0" }
 maplit = "1"
 matches = "0.1"
@@ -97,7 +95,7 @@ workspace = true
 [features]
 default = []
 
-fixturators = ["holochain_zome_types/fixturators"]
+fixturators = ["dep:fixt", "holochain_zome_types/fixturators"]
 
 test_utils = [
   "fixturators",
@@ -108,7 +106,6 @@ test_utils = [
 ]
 
 fuzzing = [
-  "arbitrary",
   "contrafact",
   "proptest",
   "proptest-derive",

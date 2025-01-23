@@ -18,17 +18,7 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 // The PartialEq impl by subtle *should* be compatible with default Hash impl
 #[allow(clippy::derived_hash_with_manual_eq)]
 #[derive(Clone, Copy, Hash, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 pub struct CapSecret(CapSecretBytes);
-
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for CapSecret {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let mut buf = [0; CAP_SECRET_BYTES];
-        u.fill_buffer(&mut buf)?;
-        Ok(CapSecret(buf))
-    }
-}
 
 // Capability secrets are not cryptographic secrets.
 // They aren't used in any cryptographic algorithm.

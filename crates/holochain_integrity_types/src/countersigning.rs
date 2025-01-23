@@ -28,10 +28,6 @@ mod error;
 
 /// Every countersigning session must complete a full set of actions between the start and end times to be valid.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct CounterSigningSessionTimes {
     /// The earliest allowable time for countersigning session responses to be valid.
     pub start: Timestamp,
@@ -88,19 +84,11 @@ impl CounterSigningSessionTimes {
 
 /// Every preflight request can have optional arbitrary bytes that can be agreed to.
 #[derive(Clone, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct PreflightBytes(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 /// Agents can have a role specific to each countersigning session.
 /// The role is app defined and opaque to the subconscious.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct Role(pub u8);
 
 impl Role {
@@ -117,10 +105,6 @@ pub type CounterSigningAgents = Vec<(AgentPubKey, Vec<Role>)>;
 /// Each agent signs this data as part of their PreflightResponse.
 /// Every preflight must be identical and signed by every agent for a session to be valid.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct PreflightRequest {
     /// The hash of the app entry, as if it were not countersigned.
     /// The final entry hash will include the countersigning session.
@@ -269,10 +253,6 @@ impl PreflightRequest {
 /// Every agent must send back a preflight response.
 /// All the preflight response data is signed by each agent and included in the session data.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct PreflightResponse {
     /// The request this is a response to.
     pub request: PreflightRequest,
@@ -369,10 +349,6 @@ pub enum PreflightRequestAcceptance {
 /// Every countersigning agent must sign against their chain state.
 /// The chain must be frozen until each agent decides to sign or exit the session.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct CounterSigningAgentState {
     /// The index of the agent in the preflight request agent vector.
     agent_index: u8,
@@ -430,10 +406,6 @@ impl CounterSigningAgentState {
 /// Does NOT hold any agent specific information.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub enum ActionBase {
     /// Mirrors Action::Create.
     Create(CreateBase),
@@ -447,10 +419,6 @@ pub enum ActionBase {
 
 /// Base data for Create actions.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct CreateBase {
     entry_type: EntryType,
 }
@@ -464,10 +432,6 @@ impl CreateBase {
 
 /// Base data for Update actions.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct UpdateBase {
     /// The original action being updated.
     pub original_action_address: ActionHash,
@@ -513,10 +477,6 @@ impl Action {
 
 /// All the data required for a countersigning session.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct CounterSigningSessionData {
     /// The preflight request that was agreed upon by all parties for the session.
     pub preflight_request: PreflightRequest,
@@ -674,22 +634,55 @@ impl CounterSigningSessionData {
 
 #[cfg(test)]
 mod test {
-    use crate::CounterSigningAgentState;
-    use crate::CounterSigningSessionData;
-    use crate::Signature;
-    use holo_hash::AgentPubKey;
-
     use super::CounterSigningError;
     use super::CounterSigningSessionTimes;
     use super::PreflightRequest;
     use super::SESSION_ACTION_TIME_OFFSET;
+    use crate::CounterSigningSessionData;
     use crate::Role;
-    use arbitrary::Arbitrary;
+    use crate::Signature;
+    use crate::{
+        ActionBase, AppEntryDef, CounterSigningAgentState, CreateBase, EntryType, EntryVisibility,
+        PreflightBytes,
+    };
+    use fixt::*;
+    use holo_hash::fixt::ActionHashFixturator;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::fixt::EntryHashFixturator;
+    use kitsune_p2p_timestamp::Timestamp;
+    use std::time::Duration;
+
+    fn test_preflight_request() -> PreflightRequest {
+        let mut request = PreflightRequest::try_new(
+            fixt!(EntryHash),
+            vec![(fixt!(AgentPubKey), vec![]), (fixt!(AgentPubKey), vec![])],
+            vec![],
+            0,
+            false,
+            CounterSigningSessionTimes::try_new(
+                Timestamp::now(),
+                (Timestamp::now() + Duration::from_secs(30)).unwrap(),
+            )
+            .unwrap(),
+            ActionBase::Create(CreateBase::new(EntryType::App(AppEntryDef {
+                entry_index: 0.into(),
+                zome_index: 0.into(),
+                visibility: EntryVisibility::Public,
+            }))),
+            PreflightBytes(vec![]),
+        )
+        .unwrap();
+        request.signing_agents.clear();
+
+        request
+    }
 
     #[test]
     fn test_check_countersigning_session_times() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut session_times = CounterSigningSessionTimes::arbitrary(&mut u).unwrap();
+        let mut session_times = CounterSigningSessionTimes {
+            start: Timestamp(0),
+            end: Timestamp(0),
+        };
 
         // Zero start and end won't pass.
         assert!(matches!(
@@ -728,16 +721,13 @@ mod test {
 
     #[test]
     fn test_check_countersigning_preflight_request_optional_agents() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+        let mut preflight_request = test_preflight_request();
 
         // Empty optional agents is a pass.
         preflight_request.check_agents_optional().unwrap();
 
         // Adding a single agent with a minimum of zero is a fail.
-        let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
-        let mut uk = arbitrary::Unstructured::new(&data);
-        let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
+        let alice = fixt!(AgentPubKey);
 
         preflight_request
             .optional_signing_agents
@@ -787,16 +777,13 @@ mod test {
 
     #[test]
     fn test_check_countersigning_preflight_request_enzyme() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+        let mut preflight_request = test_preflight_request();
 
         // Non enzymatic with no signers is always pass.
         preflight_request.check_enzyme().unwrap();
 
-        let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
-        let mut uk = arbitrary::Unstructured::new(&data);
-        let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
-        let bob = AgentPubKey::arbitrary(&mut uk).unwrap();
+        let alice = fixt!(AgentPubKey);
+        let bob = fixt!(AgentPubKey);
 
         // Non enzymatic with signers and no optional signers is a pass.
         preflight_request
@@ -837,8 +824,7 @@ mod test {
 
     #[test]
     fn test_check_countersigning_preflight_request_agents_len() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+        let mut preflight_request = test_preflight_request();
 
         // Empty is a fail.
         assert!(matches!(
@@ -847,7 +833,7 @@ mod test {
         ));
 
         // One signer is a fail.
-        let alice = AgentPubKey::arbitrary(&mut u).unwrap();
+        let alice = fixt!(AgentPubKey);
         preflight_request
             .signing_agents
             .push((alice.clone(), vec![]));
@@ -858,7 +844,7 @@ mod test {
         ));
 
         // Two signers is a pass.
-        let bob = AgentPubKey::arbitrary(&mut u).unwrap();
+        let bob = fixt!(AgentPubKey);
         preflight_request.signing_agents.push((bob.clone(), vec![]));
 
         preflight_request.check_agents_len().unwrap();
@@ -866,13 +852,10 @@ mod test {
 
     #[test]
     fn test_check_countersigning_preflight_request_agents_dupes() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut preflight_request = PreflightRequest::arbitrary(&mut u).unwrap();
+        let mut preflight_request = test_preflight_request();
 
-        let data: Vec<_> = (0u8..255).cycle().take(100000).collect();
-        let mut uk = arbitrary::Unstructured::new(&data);
-        let alice = AgentPubKey::arbitrary(&mut uk).unwrap();
-        let bob = AgentPubKey::arbitrary(&mut uk).unwrap();
+        let alice = fixt!(AgentPubKey);
+        let bob = fixt!(AgentPubKey);
 
         preflight_request.check_agents_dupes().unwrap();
 
@@ -896,11 +879,11 @@ mod test {
 
     #[test]
     pub fn test_check_countersigning_session_data_responses_indexes() {
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut session_data = CounterSigningSessionData::arbitrary(&mut u).unwrap();
+        let mut session_data =
+            CounterSigningSessionData::try_new(test_preflight_request(), vec![], vec![]).unwrap();
 
-        let alice = AgentPubKey::arbitrary(&mut u).unwrap();
-        let bob = AgentPubKey::arbitrary(&mut u).unwrap();
+        let alice = fixt!(AgentPubKey);
+        let bob = fixt!(AgentPubKey);
 
         // When everything is empty the indexes line up by default.
         session_data.check_responses_indexes().unwrap();
@@ -924,21 +907,25 @@ mod test {
             .signing_agents
             .push((bob.clone(), vec![]));
 
-        let alice_state = CounterSigningAgentState::arbitrary(&mut u).unwrap();
-        let alice_signature = Signature::arbitrary(&mut u).unwrap();
-        let mut bob_state = CounterSigningAgentState::arbitrary(&mut u).unwrap();
-        let bob_signature = Signature::arbitrary(&mut u).unwrap();
+        let alice_state = CounterSigningAgentState::new(0, fixt!(ActionHash), 0);
+        let alice_signature = Signature(vec![0; 64].try_into().unwrap());
+        let mut bob_state = CounterSigningAgentState::new(0, fixt!(ActionHash), 0);
+        let bob_signature = Signature(vec![1; 64].try_into().unwrap());
 
         (*session_data.responses_mut()).push((alice_state, alice_signature));
         (*session_data.responses_mut()).push((bob_state.clone(), bob_signature.clone()));
 
-        assert!(matches!(
-            session_data.check_responses_indexes(),
-            Err(CounterSigningError::CounterSigningSessionResponsesOrder(
-                _,
-                _
-            ))
-        ));
+        assert!(
+            matches!(
+                session_data.check_responses_indexes(),
+                Err(CounterSigningError::CounterSigningSessionResponsesOrder(
+                    _,
+                    _
+                ))
+            ),
+            "But got: {:?}",
+            session_data.check_responses_indexes()
+        );
 
         *bob_state.agent_index_mut() = 1;
         (*session_data.responses_mut()).pop();

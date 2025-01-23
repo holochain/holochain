@@ -12,16 +12,8 @@ use holochain_serialized_bytes::prelude::*;
 
 /// ZomeName as a String.
 #[derive(Clone, Debug, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[repr(transparent)]
 pub struct ZomeName(pub Cow<'static, str>);
-
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for ZomeName {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self(String::arbitrary(u)?.into()))
-    }
-}
 
 impl ZomeName {
     /// Create an unknown zome name.
@@ -56,10 +48,6 @@ impl From<String> for ZomeName {
 /// A single function name.
 #[repr(transparent)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct FunctionName(pub String);
 
 impl FunctionName {

@@ -31,10 +31,6 @@ mod tests;
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub enum DhtOp {
     /// An op representing storage of some record information.
     ChainOp(Box<ChainOp>),
@@ -45,10 +41,6 @@ pub enum DhtOp {
 /// A unit of DHT gossip concerning source chain data.
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
-)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub enum ChainOp {
     #[display(fmt = "StoreRecord")]

@@ -145,6 +145,8 @@ mod tests {
     use crate::test_utils::TestNetwork;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::fixt::DnaHashFixturator;
     use holochain_conductor_api::conductor::ConductorTuningParams;
     use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;

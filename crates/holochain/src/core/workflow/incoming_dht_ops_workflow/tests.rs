@@ -1,4 +1,5 @@
 use crate::conductor::space::TestSpace;
+use holo_hash::fixt::DnaHashFixturator;
 
 use super::*;
 use ::fixt::prelude::*;

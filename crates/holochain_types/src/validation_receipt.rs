@@ -21,7 +21,6 @@ use std::vec::IntoIter;
     serde::Deserialize,
     SerializedBytes,
 )]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct ValidationReceipt {
     /// the op this validation receipt is for.
     pub dht_op_hash: DhtOpHash,
@@ -93,7 +92,6 @@ where
     serde::Deserialize,
     SerializedBytes,
 )]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct SignedValidationReceipt {
     /// the content of the validation receipt.
     pub receipt: ValidationReceipt,

@@ -14,6 +14,102 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250122.005106
+
+## [hc\_service\_check-0.2.0-dev.9](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.9)
+
+## [hcterm-0.5.0-dev.15](crates/hcterm/CHANGELOG.md#0.5.0-dev.15)
+
+## [holochain\_cli-0.5.0-dev.15](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.15)
+
+## [holochain-0.5.0-dev.15](crates/holochain/CHANGELOG.md#0.5.0-dev.15)
+
+- Update `holochain_wasmer_common`.
+
+## [holochain\_cli\_bundle-0.5.0-dev.15](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.15)
+
+- Update `holochain_wasmer_host`
+
+## [holochain\_cli\_run\_local\_services-0.5.0-dev.9](crates/holochain_cli_run_local_services/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.15](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.15)
+
+## [holochain\_cascade-0.5.0-dev.15](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.15)
+
+## [holochain\_conductor\_config-0.5.0-dev.2](crates/holochain_conductor_config/CHANGELOG.md#0.5.0-dev.2)
+
+## [holochain\_conductor\_services-0.4.0-dev.15](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.15)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.14](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.14)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.15](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.15)
+
+## [holochain\_websocket-0.5.0-dev.15](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.15)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.14](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain\_conductor\_api-0.5.0-dev.15](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.15)
+
+## [holochain\_state-0.5.0-dev.15](crates/holochain_state/CHANGELOG.md#0.5.0-dev.15)
+
+## [hc\_deepkey\_types-0.9.0-dev.11](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.11)
+
+## [hdk-0.5.0-dev.14](crates/hdk/CHANGELOG.md#0.5.0-dev.14)
+
+- Update `holochain_wasmer_guest`.
+
+## [holochain\_p2p-0.5.0-dev.15](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.15)
+
+## [holochain\_state\_types-0.5.0-dev.9](crates/holochain_state_types/CHANGELOG.md#0.5.0-dev.9)
+
+## [hdi-0.6.0-dev.11](crates/hdi/CHANGELOG.md#0.6.0-dev.11)
+
+- Update `holochain_wasmer_guest`
+
+## [holochain\_chc-0.2.0-dev.15](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.15)
+
+## [kitsune\_p2p-0.5.0-dev.10](crates/kitsune_p2p/CHANGELOG.md#0.5.0-dev.10)
+
+## [hdk\_derive-0.5.0-dev.10](crates/hdk_derive/CHANGELOG.md#0.5.0-dev.10)
+
+## [holochain\_types-0.5.0-dev.15](crates/holochain_types/CHANGELOG.md#0.5.0-dev.15)
+
+## [kitsune\_p2p\_bootstrap\_client-0.5.0-dev.8](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.5.0-dev.8)
+
+## [kitsune\_p2p\_fetch-0.5.0-dev.8](crates/kitsune_p2p_fetch/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_keystore-0.5.0-dev.14](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.14)
+
+## [holochain\_sqlite-0.5.0-dev.14](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.14)
+
+## [kitsune\_p2p\_bootstrap-0.4.0-dev.8](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.4.0-dev.8)
+
+## [mr\_bundle-0.5.0-dev.3](crates/mr_bundle/CHANGELOG.md#0.5.0-dev.3)
+
+## [holochain\_zome\_types-0.5.0-dev.13](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.13)
+
+- Update `holochain_wasmer_common`.
+
+## [kitsune\_p2p\_types-0.5.0-dev.8](crates/kitsune_p2p_types/CHANGELOG.md#0.5.0-dev.8)
+
+## [holochain\_integrity\_types-0.5.0-dev.9](crates/holochain_integrity_types/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_nonce-0.5.0-dev.1](crates/holochain_nonce/CHANGELOG.md#0.5.0-dev.1)
+
+## [kitsune\_p2p\_block-0.5.0-dev.4](crates/kitsune_p2p_block/CHANGELOG.md#0.5.0-dev.4)
+
+## [kitsune\_p2p\_dht-0.5.0-dev.2](crates/kitsune_p2p_dht/CHANGELOG.md#0.5.0-dev.2)
+
+## [holo\_hash-0.5.0-dev.6](crates/holo_hash/CHANGELOG.md#0.5.0-dev.6)
+
+- Update `holochain_wasmer_common`.
+
+## [kitsune\_p2p\_bin\_data-0.5.0-dev.4](crates/kitsune_p2p_bin_data/CHANGELOG.md#0.5.0-dev.4)
+
+## [kitsune\_p2p\_dht\_arc-0.5.0-dev.2](crates/kitsune_p2p_dht_arc/CHANGELOG.md#0.5.0-dev.2)
+
+## [kitsune\_p2p\_timestamp-0.5.0-dev.1](crates/kitsune_p2p_timestamp/CHANGELOG.md#0.5.0-dev.1)
+
 # 20250115.130248
 
 ## [hc\_service\_check-0.2.0-dev.8](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.8)

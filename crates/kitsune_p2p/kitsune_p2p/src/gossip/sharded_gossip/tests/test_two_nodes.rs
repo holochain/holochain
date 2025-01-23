@@ -1,15 +1,12 @@
 use super::common::*;
 use super::*;
-use crate::NOISE;
-use arbitrary::Arbitrary;
 use itertools::Itertools;
 
 #[tokio::test(flavor = "multi_thread")]
 /// Runs through a happy path gossip round between two agents.
 async fn sharded_sanity_test() {
     // - Setup players and data.
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let bob_cert = NodeCert::arbitrary(&mut u).unwrap();
+    let bob_cert = NodeCert::from(Arc::new(vec![1; 32].try_into().unwrap()));
 
     let agents = agents_with_infos(2).await;
     let all_agents: Vec<AgentInfoSigned> = agents.iter().map(|x| x.1.clone()).collect();
@@ -142,8 +139,7 @@ async fn sharded_sanity_test() {
 /// This tests that sending missing ops that isn't
 /// marked as finished does not finish the round.
 async fn partial_missing_doesnt_finish() {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = NodeCert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::from(Arc::new(vec![1; 32].try_into().unwrap()));
 
     // - Set bob up with a current round that expects one
     // response to a sent bloom.
@@ -202,8 +198,7 @@ async fn partial_missing_doesnt_finish() {
 /// This test checks that a missing ops message that is
 /// marked as finished does finish the round.
 async fn missing_ops_finishes() {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = NodeCert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::from(Arc::new(vec![1; 32].try_into().unwrap()));
 
     // - Set bob up the same as the test above.
     let bob = setup_standard_player(
@@ -262,8 +257,7 @@ async fn missing_ops_finishes() {
 /// marked as finished doesn't finish the round when
 /// the player is still awaiting incoming blooms.
 async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = NodeCert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::from(Arc::new(vec![1; 32].try_into().unwrap()));
 
     // - Set bob up awaiting incoming blooms and one response.
     let bob = setup_standard_player(
@@ -321,8 +315,7 @@ async fn missing_ops_doesnt_finish_awaiting_bloom_responses() {
 /// This test checks that a ops bloom message does
 /// finish the round when there are no outstanding response.
 async fn bloom_response_finishes() {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = NodeCert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::from(Arc::new(vec![1; 32].try_into().unwrap()));
 
     // - Set bob up with a current round that expects no responses
     // and has not received all blooms.
@@ -381,8 +374,7 @@ async fn bloom_response_finishes() {
 /// This test checks that an ops bloom message doesn't
 /// finish the round when their are outstanding responses.
 async fn bloom_response_doesnt_finish_outstanding_incoming() {
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let cert = NodeCert::arbitrary(&mut u).unwrap();
+    let cert = NodeCert::from(Arc::new(vec![1; 32].try_into().unwrap()));
 
     // - Set bob up with a current round that expects one response
     // and has not received all blooms.
@@ -442,9 +434,8 @@ async fn bloom_response_doesnt_finish_outstanding_incoming() {
 /// still finish.
 async fn no_data_still_finishes() {
     // - Set up two players with no data.
-    let mut u = arbitrary::Unstructured::new(&NOISE);
-    let alice_cert = NodeCert::arbitrary(&mut u).unwrap();
-    let bob_cert = NodeCert::arbitrary(&mut u).unwrap();
+    let alice_cert = NodeCert::from(Arc::new(vec![1; 32].try_into().unwrap()));
+    let bob_cert = NodeCert::from(Arc::new(vec![2; 32].try_into().unwrap()));
 
     let agents = agents_with_infos(2).await;
     let all_agents = agents.iter().map(|(_, info)| info.clone()).collect_vec();

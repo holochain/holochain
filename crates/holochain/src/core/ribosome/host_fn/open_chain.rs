@@ -57,7 +57,8 @@ pub fn open_chain(
 
 #[cfg(test)]
 mod tests {
-    use super::open_chain;
+    use holo_hash::fixt::ActionHashFixturator;
+use super::open_chain;
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::fixt::{CallContextFixturator, RealRibosomeFixturator};
     use ::fixt::prelude::*;

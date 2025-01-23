@@ -1429,6 +1429,8 @@ impl From<SourceChain> for SourceChainRead {
 
 #[cfg(test)]
 mod tests {
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::fixt::DnaHashFixturator;
     use std::collections::BTreeSet;
 
     use super::*;

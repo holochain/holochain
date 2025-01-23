@@ -9,10 +9,6 @@ use holochain_serialized_bytes::prelude::*;
 /// opposed to the actual DNA code. These modifiers are included in the DNA
 /// hash computation.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 pub struct DnaModifiers {
     /// The network seed of a DNA is included in the computation of the DNA hash.
@@ -65,10 +61,6 @@ const fn standard_quantum_time() -> Duration {
 
 /// [`DnaModifiers`] options of which all are optional.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct DnaModifiersOpt<P = SerializedBytes> {
     /// see [`DnaModifiers`]
     pub network_seed: Option<NetworkSeed>,

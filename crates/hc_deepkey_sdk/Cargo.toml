@@ -1,6 +1,6 @@
 [package]
 name = "hc_deepkey_sdk"
-version = "0.8.0-dev.13"
+version = "0.8.0-dev.14"
 authors = ["Matthew Brisebois <matthew.brisebois@holo.host>"]
 edition = "2021"
 license = "Apache-2.0"
@@ -11,14 +11,12 @@ readme = "README.md"
 
 
 [dependencies]
-hc_deepkey_types = { version = "^0.9.0-dev.10", path = "../hc_deepkey_types" }
+hc_deepkey_types = { version = "^0.9.0-dev.11", path = "../hc_deepkey_types" }
 
 # TODO: remove path designation to allow this crate to trail behind the current monorepo version
-hdk = { version = "^0.5.0-dev.13", path = "../hdk" }
+hdk = { version = "^0.5.0-dev.14", path = "../hdk" }
 serde = "1"
 serde_bytes = "0.11"
 
-arbitrary = { version = "1.0", features = ["derive"], optional = true }
-
 [features]
-fuzzing = ["arbitrary", "hc_deepkey_types/fuzzing", "hdk/fuzzing"]
+fuzzing = ["hc_deepkey_types/fuzzing", "hdk/fuzzing"]

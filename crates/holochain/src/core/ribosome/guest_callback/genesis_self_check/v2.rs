@@ -82,6 +82,7 @@ impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResultV2 {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub(crate) mod slow_tests {
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use std::sync::Arc;
 
     use super::GenesisSelfCheckInvocationV2;

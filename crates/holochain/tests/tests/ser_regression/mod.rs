@@ -1,6 +1,7 @@
 use ::fixt::prelude::*;
 use hdk::prelude::*;
 
+use hdk::prelude::fixt::*;
 use holochain::conductor::api::AppInterfaceApi;
 use holochain::conductor::api::AppRequest;
 use holochain::conductor::api::AppResponse;

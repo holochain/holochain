@@ -119,6 +119,7 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
 #[cfg(test)]
 mod tests {
     use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
     use holochain_conductor_api::conductor::ConductorTuningParams;
