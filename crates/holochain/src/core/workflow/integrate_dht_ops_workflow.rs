@@ -92,6 +92,15 @@ pub async fn integrate_dht_ops_workflow(
 
                 })?;
             total += changed;
+            let changed = txn
+                .prepare_cached(
+                    holochain_sqlite::sql::sql_cell::SET_CHAIN_INTEGRITY_WARRANT_OPS_TO_INTEGRATED,
+                )?
+                .execute(named_params! {
+                    ":when_integrated": time,
+                    ":chain_integrity_warrant": WarrantOpType::ChainIntegrityWarrant,
+                })?;
+            total += changed;
             WorkflowResult::Ok((total, activity_to_integrate))
         })
         .await?;

@@ -16,6 +16,8 @@ pub mod sql_cell {
         include_str!("sql/cell/set_add_link_ops_to_integrated.sql");
     pub const SET_DELETE_LINK_OPS_TO_INTEGRATED: &str =
         include_str!("sql/cell/set_delete_link_ops_to_integrated.sql");
+    pub const SET_CHAIN_INTEGRITY_WARRANT_OPS_TO_INTEGRATED: &str =
+        include_str!("sql/cell/set_chain_integrity_warrant_ops_to_integrated.sql");
 
     pub const UPDATE_INTEGRATE_STORE_RECORD: &str =
         include_str!("sql/cell/update_store_record.sql");
