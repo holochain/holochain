@@ -185,7 +185,8 @@ impl DhtDbQueryCache {
 
                     // The start of the range will be one more then the last integrated item or
                     // if there is nothing integrated then the start will be `0`.
-                    // This is why we use an inclusive range.
+                    // We use an inclusive range in case there is only one item to be integrated
+                    // and so the start and end indices are the same.
                     let start = bounds
                         .integrated
                         .and_then(|i| i.checked_add(1))
