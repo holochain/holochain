@@ -1206,6 +1206,36 @@ mod test {
         conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
+    #[tokio::test(flavor = "multi_thread")]
+    async fn dump_conductor_state() {
+        holochain_trace::test_run();
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![("zomey".into(), TestWasm::Foo.into())],
+        );
+        let agent_pubkey = fake_agent_pubkey_1();
+
+        let (_tmpdir, conductor_handle) =
+            setup_admin_fake_cells(agent_pubkey, vec![(dna, None)]).await;
+        let conductor_handle = activate(conductor_handle).await;
+
+        // Allow agents time to join
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+        // Get state
+        let expected = conductor_handle.dump_conductor_state().await.unwrap();
+
+        let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
+        let respond = move |response: AdminResponse| {
+            assert_matches!(response, AdminResponse::ConductorStateDumped(s) if s == expected);
+        };
+        test_handle_incoming_admin_message(AdminRequest::DumpConductorState, respond, admin_api)
+            .await
+            .unwrap();
+        conductor_handle.shutdown().await.unwrap().unwrap();
+    }
+
     async fn make_dna(network_seed: &str, zomes: Vec<TestWasm>) -> DnaFile {
         DnaFile::new(
             DnaDef {
