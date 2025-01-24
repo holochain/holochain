@@ -72,23 +72,12 @@ pub async fn authored_ops_to_dht_db_without_check(
         })
         .await?;
     for op in activity {
-        let deps = op.sys_validation_dependencies();
-
-        if deps.is_empty() {
-            let _ = dht_db_cache
-                .set_activity_to_integrated(
-                    &op.author(),
-                    op.as_chain_op().map(|op| op.action().action_seq()),
-                )
-                .await;
-        } else {
-            dht_db_cache
-                .set_activity_ready_to_integrate(
-                    &op.author(),
-                    op.as_chain_op().map(|op| op.action().action_seq()),
-                )
-                .await?;
-        }
+        dht_db_cache
+            .set_activity_ready_to_integrate(
+                &op.author(),
+                op.as_chain_op().map(|op| op.action().action_seq()),
+            )
+            .await?;
     }
     Ok(())
 }
@@ -105,7 +94,6 @@ fn insert_locally_validated_op(
     let op = filter_private_entry(op)?;
     let hash = op.as_hash();
 
-    let deps = op.sys_validation_dependencies();
     let op_type = op.get_type();
 
     // Insert the op.
@@ -113,15 +101,7 @@ fn insert_locally_validated_op(
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 
-    // If this op has no dependencies or is a warrant, we can mark it integrated immediately.
-    if deps.is_empty() || matches!(op_type, DhtOpType::Warrant(_)) {
-        // This set the validation stage to pending which is correct when
-        // it's integrated.
-        set_validation_stage(txn, hash, ValidationStage::Pending)?;
-        set_when_integrated(txn, hash, holochain_zome_types::prelude::Timestamp::now())?;
-    } else {
-        set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
-    }
+    set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
 
     // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
     if matches!(

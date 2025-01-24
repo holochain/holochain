@@ -45,6 +45,20 @@ pub async fn integrate_dht_ops_workflow(
                 }
             }
             let changed = txn
+                .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_STORE_RECORD)?
+                .execute(named_params! {
+                    ":when_integrated": time,
+                    ":store_record": ChainOpType::StoreRecord,
+                })?;
+            total += changed;
+            let changed = txn
+                .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_STORE_ENTRY)?
+                .execute(named_params! {
+                    ":when_integrated": time,
+                    ":store_entry": ChainOpType::StoreEntry,
+                })?;
+            total += changed;
+            let changed = txn
                 .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_ENTRY)?
                 .execute(named_params! {
                     ":when_integrated": time,
@@ -54,13 +68,10 @@ pub async fn integrate_dht_ops_workflow(
                 })?;
             total += changed;
             let changed = txn
-                .prepare_cached(
-                    holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_ENTRY_BASIS,
-                )?
+                .prepare_cached(holochain_sqlite::sql::sql_cell::SET_ADD_LINK_OPS_TO_INTEGRATED)?
                 .execute(named_params! {
                     ":when_integrated": time,
                     ":create_link": ChainOpType::RegisterAddLink,
-                    ":store_entry": ChainOpType::StoreEntry,
                 })?;
             total += changed;
             let changed = txn
@@ -73,12 +84,21 @@ pub async fn integrate_dht_ops_workflow(
                 })?;
             total += changed;
             let changed = txn
-                .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_CREATE_LINK)?
+                .prepare_cached(holochain_sqlite::sql::sql_cell::SET_DELETE_LINK_OPS_TO_INTEGRATED)?
                 .execute(named_params! {
                     ":when_integrated": time,
                     ":create_link": ChainOpType::RegisterAddLink,
                     ":delete_link": ChainOpType::RegisterRemoveLink,
 
+                })?;
+            total += changed;
+            let changed = txn
+                .prepare_cached(
+                    holochain_sqlite::sql::sql_cell::SET_CHAIN_INTEGRITY_WARRANT_OPS_TO_INTEGRATED,
+                )?
+                .execute(named_params! {
+                    ":when_integrated": time,
+                    ":chain_integrity_warrant": WarrantOpType::ChainIntegrityWarrant,
                 })?;
             total += changed;
             WorkflowResult::Ok((total, activity_to_integrate))

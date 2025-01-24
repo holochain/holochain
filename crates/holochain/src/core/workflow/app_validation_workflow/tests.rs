@@ -9,8 +9,8 @@ use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
 use crate::test_utils::{
-    get_valid_and_integrated_count, host_fn_caller::*, new_invocation, new_zome_call_params,
-    wait_for_integration,
+    get_valid_and_integrated_count, get_valid_and_not_integrated_count, host_fn_caller::*,
+    new_invocation, new_zome_call_params, wait_for_integration,
 };
 use ::fixt::fixt;
 use hdk::hdi::test_utils::set_zome_types;
@@ -1034,10 +1034,16 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             .len();
     assert_eq!(ops_to_validate, 0);
 
-    // Check that the new op is validated and integrated
+    // The op should be marked as valid but not integrated.
+    assert_eq!(
+        get_valid_and_not_integrated_count(&app_validation_workspace.dht_db).await,
+        1
+    );
+
+    // Check that the new op is not integrated yet
     assert_eq!(
         get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
-        8
+        7
     );
 }
 
