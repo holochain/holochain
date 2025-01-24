@@ -508,7 +508,7 @@ checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
 
 [[package]]
 name = "hdi"
-version = "0.5.1-rc.1"
+version = "0.5.1-rc.2"
 dependencies = [
  "getrandom",
  "hdk_derive",
@@ -524,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.4.1-rc.1"
+version = "0.4.1-rc.2"
 dependencies = [
  "getrandom",
  "hdi",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.4.1-rc.1"
+version = "0.4.1-rc.2"
 dependencies = [
  "darling 0.14.4",
  "heck 0.5.0",
@@ -660,7 +660,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.4.1-rc.1"
+version = "0.4.1-rc.2"
 dependencies = [
  "hdk",
  "serde",
