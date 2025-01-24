@@ -2363,12 +2363,12 @@ mod tests {
             String::from("create")
         );
         assert_eq!(
-            parsed["records"][2]["action"]["value"]["entry_type"]["type"],
-            String::from("agent_pub_key")
+            parsed["records"][2]["action"]["value"]["entry_type"],
+            "AgentPubKey"
         );
-        assert_eq!(parsed["records"][2]["entry"]["type"], String::from("agent"));
+        assert_eq!(parsed["records"][2]["entry"]["entry_type"], "Agent");
         assert_ne!(
-            parsed["records"][2]["entry"]["value"],
+            parsed["records"][2]["entry"]["entry"],
             serde_json::Value::Null
         );
 

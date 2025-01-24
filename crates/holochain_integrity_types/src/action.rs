@@ -716,7 +716,6 @@ pub struct DeleteAction {
 /// referencing. Useful for examining Actions without needing to fetch the
 /// corresponding Entries.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum EntryType {
     /// An AgentPubKey
     AgentPubKey,
