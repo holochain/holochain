@@ -405,7 +405,6 @@ impl CounterSigningAgentState {
 /// Enum to mirror Action for all the shared data required to build session actions.
 /// Does NOT hold any agent specific information.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum ActionBase {
     /// Mirrors Action::Create.
     Create(CreateBase),

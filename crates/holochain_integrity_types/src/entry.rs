@@ -85,7 +85,7 @@ impl From<EntryHashed> for Entry {
 
 /// Structure holding the entry portion of a chain record.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, SerializedBytes)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[serde(tag = "entry_type", content = "entry")]
 pub enum Entry {
     /// The `Agent` system entry, the third entry of every source chain,
     /// which grants authoring capability for this agent.
