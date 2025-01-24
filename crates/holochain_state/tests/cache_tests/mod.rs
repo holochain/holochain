@@ -1,3 +1,4 @@
+use ::fixt::fixt;
 use arbitrary::Arbitrary;
 use arbitrary::Unstructured;
 use holo_hash::*;
@@ -6,8 +7,11 @@ use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::mutations;
 use holochain_state::prelude::*;
 use parking_lot::Mutex;
+use pretty_assertions::assert_eq;
 use std::collections::HashMap;
+use std::ops::RangeInclusive;
 use std::sync::Arc;
+use test_case::test_case;
 
 fn insert_action_and_op(txn: &mut Transaction, u: &mut Unstructured, action: &Action) -> DhtOpHash {
     let timestamp = Timestamp::arbitrary(u).unwrap();
@@ -406,4 +410,70 @@ async fn check_none_integrated_with_awaiting_deps() {
     .await;
     let to_integrate = cache.get_activity_to_integrate().await.unwrap();
     assert!(to_integrate.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn no_activities_to_integrate_when_nothing_waiting() {
+    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let cache = DhtDbQueryCache::new(db.clone().into());
+
+    let to_integrate = cache.get_activity_to_integrate().await.unwrap();
+
+    assert!(to_integrate.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn no_activities_to_integrate_when_everything_already_integrated() {
+    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let cache = DhtDbQueryCache::new(db.clone().into());
+    let agent_key = Arc::new(fixt!(AgentPubKey));
+
+    // Set some actions to be integrated
+    for i in 0..10 {
+        cache
+            .set_activity_to_integrated(&agent_key, Some(i))
+            .await
+            .unwrap();
+    }
+
+    let to_integrate = cache.get_activity_to_integrate().await.unwrap();
+
+    assert!(to_integrate.is_empty());
+}
+
+#[test_case(0, 1, 0..=0 ; "only first action at index 0")]
+#[test_case(0, 8, 0..=7 ; "starting from index 0")]
+#[test_case(13, 8, 13..=20 ; "starting from later index")]
+#[test_case(20, 1, 20..=20 ; "more integrated actions than ready to integrate ones")]
+#[tokio::test(flavor = "multi_thread")]
+// Pass expected as parameter so can use `pretty_assertions::assert_eq`
+async fn range_of_activities_to_integrate_for_single_agent(
+    start: u32,
+    action_count: u32,
+    expected_range: RangeInclusive<u32>,
+) {
+    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let cache = DhtDbQueryCache::new(db.clone().into());
+    let agent_key = Arc::new(fixt!(AgentPubKey));
+
+    // Set previous actions to integrated
+    for i in 0..start {
+        cache
+            .set_activity_to_integrated(&agent_key, Some(i))
+            .await
+            .unwrap();
+    }
+
+    for i in start..start + action_count {
+        cache
+            .set_activity_ready_to_integrate(&agent_key, Some(i))
+            .await
+            .unwrap();
+    }
+
+    let to_integrate = cache.get_activity_to_integrate().await.unwrap();
+
+    assert_eq!(to_integrate.len(), 1);
+    assert_eq!(to_integrate[0].0, agent_key);
+    assert_eq!(to_integrate[0].1, expected_range);
 }
