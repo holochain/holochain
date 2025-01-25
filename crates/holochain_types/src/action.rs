@@ -18,7 +18,6 @@ use holochain_zome_types::op::EntryCreationAction;
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
 )]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 /// A action of one of the two types that create a new entry.
 pub enum NewEntryAction {
     /// A action which simply creates a new entry

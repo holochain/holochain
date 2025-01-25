@@ -860,7 +860,7 @@ mod test {
                         current_number_of_peers: 1,
                         arc_size: 1.0,
                         total_network_peers: 1,
-                        bytes_since_last_time_queried: 1891,
+                        bytes_since_last_time_queried: 1838,
                         completed_rounds_since_last_time_queried: 0,
                     }]
                 )
