@@ -3291,6 +3291,7 @@ dependencies = [
  "serde_json",
  "shrinkwraprs",
  "tempfile",
+ "test-case",
  "thiserror 1.0.69",
  "tokio",
  "tracing",

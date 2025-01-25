@@ -41,6 +41,12 @@ async fn main() -> anyhow::Result<()> {
             None,
             false,
             0,
+            #[cfg(feature = "unstable-dpki")]
+            false,
+            #[cfg(feature = "unstable-dpki")]
+            None,
+            #[cfg(feature = "chc")]
+            None,
         )?;
 
         // Create a command runner to run admin commands.

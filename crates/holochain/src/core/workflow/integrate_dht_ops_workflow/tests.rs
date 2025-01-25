@@ -385,9 +385,7 @@ fn register_store_record(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     )
     .into();
     let pre_state = vec![Db::IntQueue(op.clone())];
-    // StoreRecord op types are integrated as part of the app_validation_workflow and not the
-    // integrate_dht_ops_workflow
-    let expect = vec![Db::IntQueue(op.clone())];
+    let expect = vec![Db::Integrated(op.clone())];
     (pre_state, expect, "store record")
 }
 
@@ -400,31 +398,296 @@ fn register_store_entry(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     )
     .into();
     let pre_state = vec![Db::IntQueue(op.clone())];
-    // StoreEntry op types are integrated as part of the app_validation_workflow and not the
-    // integrate_dht_ops_workflow
-    let expect = vec![Db::IntQueue(op.clone())];
+    let expect = vec![Db::Integrated(op.clone())];
     (pre_state, expect, "store entry")
 }
 
 #[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_agent_activity(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_agent_activity_dna(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let mut new_action = fixt!(Dna);
+    let op: DhtOp = ChainOp::RegisterAgentActivity(a.signature.clone(), new_action.into()).into();
+    let pre_state = vec![Db::IntQueue(op.clone())];
+    let expect = vec![Db::Integrated(op.clone())];
+    (pre_state, expect, "register agent activity for dna action")
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_agent_validation_pkg(
+    mut a: TestData,
+) -> (Vec<Db>, Vec<Db>, &'static str) {
+    // Previous op to depend on
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.action_seq = 10;
+    let previous_action = Action::Create(prev_create_action.clone());
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
+
+    // Op to integrate, to go in the dht database
+    let mut agent_validation_pkg_action = fixt!(AgentValidationPkg);
+    agent_validation_pkg_action.author = previous_action.author().clone();
+    agent_validation_pkg_action.action_seq = previous_action.action_seq() + 1;
+    let new_dht_op: DhtOp = ChainOp::RegisterAgentActivity(
+        fixt!(Signature),
+        Action::AgentValidationPkg(agent_validation_pkg_action),
+    )
+    .into();
+
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_dht_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::Integrated(new_dht_op.clone()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for agent validation pkg",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_init_zomes_complete(
+    mut a: TestData,
+) -> (Vec<Db>, Vec<Db>, &'static str) {
+    // Previous op to depend on
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.action_seq = 10;
+    let previous_action = Action::Create(prev_create_action.clone());
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
+
+    // Op to integrate
+    let mut init_zomes_action = fixt!(InitZomesComplete);
+    init_zomes_action.author = previous_action.author().clone();
+    init_zomes_action.action_seq = previous_action.action_seq() + 1;
+    let new_dht_op: DhtOp = ChainOp::RegisterAgentActivity(
+        fixt!(Signature),
+        Action::InitZomesComplete(init_zomes_action),
+    )
+    .into();
+
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_dht_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::Integrated(new_dht_op.clone()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for init zomes complete action",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_create_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     a.link_add.action_seq = 5;
-    let dep: DhtOp =
+    let previous_op: DhtOp =
         ChainOp::RegisterAgentActivity(a.signature.clone(), a.link_add.clone().into()).into();
-    let hash = ActionHash::with_data_sync(&Action::CreateLink(a.link_add.clone()));
     let mut new_action = a.link_add.clone();
-    new_action.prev_action = hash;
     new_action.action_seq += 1;
     let op: DhtOp =
         ChainOp::RegisterAgentActivity(a.signature.clone(), new_action.clone().into()).into();
-    let pre_state = vec![Db::Integrated(dep.clone()), Db::IntQueue(op.clone())];
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(op.clone()),
+    ];
     let expect = vec![
-        Db::Integrated(dep.clone()),
+        Db::Integrated(previous_op.clone()),
         Db::MetaActivity(a.link_add.clone().into()),
         Db::Integrated(op.clone()),
         Db::MetaActivity(new_action.clone().into()),
     ];
-    (pre_state, expect, "register agent activity")
+    (
+        pre_state,
+        expect,
+        "register agent activity for create link action",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_delete_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(a.signature.clone(), a.link_remove.clone().into()).into();
+    let mut new_action = a.link_remove.clone();
+    let new_op: DhtOp =
+        ChainOp::RegisterAgentActivity(a.signature.clone(), new_action.clone().into()).into();
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::MetaActivity(a.link_remove.clone().into()),
+        Db::Integrated(new_op.clone()),
+        Db::MetaActivity(new_action.clone().into()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for delete link action",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_close_chain(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    // Previous op to depend on
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.action_seq = 10;
+    let previous_action = Action::Create(prev_create_action.clone());
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
+
+    // Op to integrate
+    let mut close_chain_action = fixt!(CloseChain);
+    close_chain_action.author = previous_action.author().clone();
+    close_chain_action.action_seq = previous_action.action_seq() + 1;
+    let new_dht_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::CloseChain(close_chain_action))
+            .into();
+
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_dht_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::Integrated(new_dht_op.clone()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for close chain action",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_open_chain(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    // Previous op to depend on
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.action_seq = 10;
+    let previous_action = Action::Create(prev_create_action.clone());
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
+
+    // Op to integrate
+    let mut open_chain_action = fixt!(OpenChain);
+    open_chain_action.author = previous_action.author().clone();
+    open_chain_action.action_seq = previous_action.action_seq() + 1;
+    let new_dht_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::OpenChain(open_chain_action))
+            .into();
+
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_dht_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::Integrated(new_dht_op.clone()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for open chain action",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_create(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    // Previous op to depend on
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.action_seq = 10;
+    let previous_action = Action::Create(prev_create_action.clone());
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
+
+    // Op to integrate
+    let mut create_action = fixt!(Create);
+    create_action.author = previous_action.author().clone();
+    create_action.action_seq = previous_action.action_seq() + 1;
+    let new_dht_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(create_action)).into();
+
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_dht_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::Integrated(new_dht_op.clone()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for create action",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_update(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    // Previous op to depend on
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.action_seq = 10;
+    let previous_action = Action::Create(prev_create_action.clone());
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
+
+    // Op to integrate
+    let mut update_action = fixt!(Update);
+    update_action.author = previous_action.author().clone();
+    update_action.action_seq = previous_action.action_seq() + 1;
+    let new_dht_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Update(update_action)).into();
+
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_dht_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::Integrated(new_dht_op.clone()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for update action",
+    )
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_agent_activity_delete(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    // Previous op to depend on
+    let mut prev_create_action = fixt!(Create);
+    prev_create_action.action_seq = 10;
+    let previous_action = Action::Create(prev_create_action.clone());
+    let previous_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Create(prev_create_action)).into();
+
+    // Op to integrate
+    let mut delete_action = fixt!(Delete);
+    delete_action.author = previous_action.author().clone();
+    delete_action.action_seq = previous_action.action_seq() + 1;
+    let new_dht_op: DhtOp =
+        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Delete(delete_action)).into();
+
+    let pre_state = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::IntQueue(new_dht_op.clone()),
+    ];
+    let expect = vec![
+        Db::Integrated(previous_op.clone()),
+        Db::Integrated(new_dht_op.clone()),
+    ];
+    (
+        pre_state,
+        expect,
+        "register agent activity for delete action",
+    )
 }
 
 #[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
@@ -520,6 +783,14 @@ fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
 }
 
 #[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+fn register_create_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+    let op: DhtOp = ChainOp::RegisterAddLink(a.signature.clone(), a.link_add.clone()).into();
+    let pre_state = vec![Db::IntQueue(op.clone())];
+    let expect = vec![Db::Integrated(op.clone())];
+    (pre_state, expect, "register link create")
+}
+
+#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
 fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
@@ -564,11 +835,21 @@ async fn test_ops_state() {
     let tests = [
         register_store_record,
         register_store_entry,
-        register_agent_activity,
+        register_agent_activity_dna,
+        register_agent_activity_agent_validation_pkg,
+        register_agent_activity_init_zomes_complete,
+        register_agent_activity_create_link,
+        register_agent_activity_delete_link,
+        register_agent_activity_close_chain,
+        register_agent_activity_open_chain,
+        register_agent_activity_create,
+        register_agent_activity_update,
+        register_agent_activity_delete,
         register_replaced_by_for_entry,
         register_updated_record,
         register_deleted_by,
         register_deleted_action_by,
+        register_create_link,
         register_delete_link,
         register_delete_link_missing_base,
     ];

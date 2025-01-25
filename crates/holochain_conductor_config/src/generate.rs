@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 
 use holochain_conductor_api::conductor::paths::{ConfigRootPath, KeystorePath};
+#[cfg(feature = "unstable-dpki")]
+use holochain_conductor_api::conductor::DpkiConfig;
 use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use crate::config::create_config;
@@ -13,12 +15,16 @@ use crate::ports::set_admin_port;
 /// Generate configurations
 /// This creates a directory containing a `ConductorConfig`,
 /// a keystore, and a database root directory.
+#[allow(clippy::too_many_arguments)]
 pub fn generate(
     network: Option<KitsuneP2pConfig>,
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
     in_process_lair: bool,
     admin_port: u16,
+    #[cfg(feature = "unstable-dpki")] no_dpki: bool,
+    #[cfg(feature = "unstable-dpki")] dpki_network_seed: Option<String>,
+    #[cfg(feature = "chc")] chc_url: Option<url2::Url2>,
 ) -> anyhow::Result<ConfigRootPath> {
     let dir = generate_config_directory(root, directory)?;
 
@@ -35,8 +41,31 @@ pub fn generate(
 
     let mut config = create_config(dir.clone(), lair_connection_url)?;
     config.network = network.unwrap_or_else(KitsuneP2pConfig::mem);
+    #[cfg(feature = "chc")]
+    {
+        config.chc_url = chc_url;
+    }
+    #[cfg(feature = "unstable-dpki")]
+    if no_dpki {
+        config.dpki = DpkiConfig::disabled();
+    } else if let Some(network_seed) = dpki_network_seed {
+        config.dpki.network_seed = network_seed;
+    }
     set_admin_port(&mut config, admin_port);
     let path = write_config(dir.clone(), &config)?;
+    msg!("Config {:?}", config);
+    msg!(
+        "Created directory at: {} {} It has also been saved to a file called `.hc` in your current working directory.",
+        ansi_term::Style::new()
+            .bold()
+            .underline()
+            .on(ansi_term::Color::Fixed(254))
+            .fg(ansi_term::Color::Fixed(4))
+            .paint(dir.display().to_string()),
+        ansi_term::Style::new()
+            .bold()
+            .paint("Keep this path to rerun the same sandbox.")
+    );
     msg!("Created config at {}", path.display());
     Ok(dir)
 }
@@ -121,7 +150,19 @@ mod test {
         let root = Some(temp_dir.path().to_path_buf());
         let directory = Some("test-config".into());
 
-        let config_root = generate(None, root, directory, true, 0)?;
+        let config_root = generate(
+            None,
+            root,
+            directory,
+            true,
+            0,
+            #[cfg(feature = "unstable-dpki")]
+            false,
+            #[cfg(feature = "unstable-dpki")]
+            None,
+            #[cfg(feature = "chc")]
+            None,
+        )?;
 
         assert!(config_root.as_path().exists());
         assert!(config_root.as_path().is_dir());
@@ -170,7 +211,19 @@ mod test {
             tracing_scope: None,
         };
 
-        let config_root = generate(Some(network_config.clone()), root, directory, true, 0)?;
+        let config_root = generate(
+            Some(network_config.clone()),
+            root,
+            directory,
+            true,
+            0,
+            #[cfg(feature = "unstable-dpki")]
+            false,
+            #[cfg(feature = "unstable-dpki")]
+            None,
+            #[cfg(feature = "chc")]
+            None,
+        )?;
 
         assert!(config_root.as_path().exists());
         assert!(config_root.as_path().is_dir());

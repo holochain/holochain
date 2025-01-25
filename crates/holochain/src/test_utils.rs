@@ -675,36 +675,48 @@ where
     )
     .unwrap();
 
-    let c = *not_consistent
-        .first()
-        .expect("At least one node must not have reached consistency");
-    let integrated = integrated.remove(c);
-
-    let (unintegrated, unpublished) = diff_ops(published.iter(), integrated.iter());
-    let diff = diff_report(unintegrated, unpublished);
-
-    #[allow(clippy::comparison_chain)]
-    if integrated.len() > published.len() {
-        Err(format!("{report}\nnum integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test. Consistency may not be complete. Report:\n\n{header}\n{diff}", integrated.len(), published.len()).into())
-    } else if integrated.len() < published.len() {
-        let db = cells[c].2.as_ref().expect("DhtDb must be provided");
-        let integration_dump = integration_dump(*db).await.unwrap();
-
-        Err(format!(
-"{}\nConsistency not achieved after {:?}. Expected {} ops, but only {} integrated. Report:\n\n{}\n{}\n\n{:?}",
-report,
-        timeout,
-        published.len(),
-        integrated.len(),
-        header,
-        diff,
-        integration_dump,
-
-
-        ).into())
-    } else {
-        unreachable!()
+    if not_consistent.is_empty() {
+        unreachable!("At least one node must not have reached consistency");
     }
+
+    for c in &not_consistent {
+        let integrated = integrated[*c].clone();
+
+        eprintln!("Agent {} is not consistent", cells[*c].0);
+
+        let (unintegrated, unpublished) = diff_ops(published.iter(), integrated.iter());
+        let diff = diff_report(unintegrated, unpublished);
+
+        #[allow(clippy::comparison_chain)]
+        if integrated.len() > published.len() {
+            eprintln!(
+                "{report}\nnum integrated ops ({}) > num published ops ({}), meaning you may not be accounting for all nodes in this test. Consistency may not be complete. Report:\n\n{header}\n{diff}",
+                integrated.len(),
+                published.len()
+            );
+        } else if integrated.len() < published.len() {
+            let db = cells[*c].2.as_ref().expect("DhtDb must be provided");
+            let integration_dump = integration_dump(*db).await.unwrap();
+
+            eprintln!(
+                "{}\nConsistency not achieved after {:?}. Expected {} ops, but only {} integrated. Report:\n\n{}\n{}\n\n{:?}",
+                report,
+                timeout,
+                published.len(),
+                integrated.len(),
+                header,
+                diff,
+                integration_dump
+            );
+        } else {
+            unreachable!()
+        }
+    }
+
+    Err(ConsistencyError(format!(
+        "{} agents were inconsistent",
+        not_consistent.len()
+    )))
 }
 
 const CONSISTENCY_DELAY_LOW: Duration = Duration::from_millis(100);
@@ -843,6 +855,21 @@ async fn get_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
         Ok(txn.query_row(
             "SELECT COUNT(hash) FROM DhtOp WHERE DhtOp.when_integrated IS NOT NULL",
             [],
+            |row| row.get(0),
+        )?)
+    })
+    .await
+    .unwrap()
+}
+
+/// Get count of ops that have been successfully validated but not integrated
+pub async fn get_valid_and_not_integrated_count<Db: ReadAccess<DbKindDht>>(db: &Db) -> usize {
+    db.read_async(move |txn| -> DatabaseResult<usize> {
+        Ok(txn.query_row(
+            "SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NULL AND validation_status = :status",
+            named_params!{
+                ":status": ValidationStatus::Valid,
+            },
             |row| row.get(0),
         )?)
     })
