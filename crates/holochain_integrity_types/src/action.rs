@@ -34,7 +34,7 @@ pub const POST_GENESIS_SEQ_THRESHOLD: u32 = 3;
 /// functions.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[serde(tag = "type")]
 pub enum Action {
     // The first action in a chain (for the DNA) doesn't have a previous action
     Dna(Dna),
