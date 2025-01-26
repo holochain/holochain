@@ -2983,8 +2983,9 @@ mod misc_impls {
                         cell_id.agent_pubkey().clone(),
                     )?
                     .into(), //authored_db.into(),
-                    self.get_dht_db(cell_id.dna_hash())?.into(),
-                    self.get_dht_db_cache(cell_id.dna_hash())?.into(),
+                    self.get_or_create_dht_db(cell_id.dna_hash())?.into(),
+                    self.get_or_create_space(cell_id.dna_hash())?
+                        .dht_query_cache,
                     self.keystore().clone(),
                     cell_id.agent_pubkey().clone(),
                 )
@@ -3055,7 +3056,7 @@ mod misc_impls {
                 }
                 hash_map.insert(cell_id.clone(), cap_grants);
             }
-            return Ok(AppCapGrantInfo(hash_map));
+            Ok(AppCapGrantInfo(hash_map))
         }
 
         /// Create a JSON dump of the cell's state

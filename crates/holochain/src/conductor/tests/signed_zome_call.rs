@@ -297,13 +297,13 @@ async fn cap_grant_info_call() {
 
     //host call delete of cap grant
     let host_caller = HostFnCaller::create(cell_id, &conductor.raw_handle(), &dna).await;
-    let deletehash = host_caller
+    let _deletehash = host_caller
         .delete_entry(DeleteInput {
             deletes_action_hash: grant_action_hash.clone(),
             chain_top_ordering: Default::default(),
         })
         .await;
-    // println!("deletehash: {:?}\n", deletehash);
+    // println!("deletehash: {:?}\n", _deletehash);
 
     let cap_info = conductor.capability_grant_info(&cell_set).await.unwrap();
 
