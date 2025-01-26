@@ -6,7 +6,7 @@ use crate::Entry;
 use holochain_serialized_bytes::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[serde(tag = "type", content = "content")]
 /// Return type for get_details calls.
 /// ActionHash returns a Record.
 /// EntryHash returns an Entry.
