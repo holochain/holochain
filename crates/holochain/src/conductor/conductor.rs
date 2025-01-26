@@ -82,7 +82,7 @@ use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 pub use holochain_types::share;
-use holochain_zome_types::prelude::{ClonedCell, Signature, Timestamp};
+use holochain_zome_types::prelude::{AppCapGrantInfo, ClonedCell, Signature, Timestamp};
 use kitsune_p2p::agent_store::AgentInfoSigned;
 
 use crate::conductor::cell::Cell;
@@ -2911,9 +2911,8 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
-    use std::sync::atomic::Ordering;
-
     use holochain_zome_types::action::builder;
+    use std::sync::atomic::Ordering;
 
     use super::*;
 
@@ -2961,6 +2960,102 @@ mod misc_impls {
             source_chain.flush(cell.holochain_p2p_dna()).await?;
 
             Ok(action_hash)
+        }
+
+        /// Get capability grant info for a set of App cells including revoked capabality grants
+        pub async fn capability_grant_info(
+            &self,
+            cell_set: &HashSet<CellId>,
+        ) -> ConductorApiResult<AppCapGrantInfo> {
+            let mut hash_map: HashMap<CellId, Vec<CapGrantInfo>> = HashMap::new();
+            let grant_query: ChainQueryFilter = ChainQueryFilter::new()
+                .include_entries(true)
+                .entry_type(EntryType::CapGrant);
+            let delete_query: ChainQueryFilter = ChainQueryFilter::new()
+                .include_entries(true)
+                .action_type(ActionType::Delete);
+
+            for cell_id in cell_set.iter() {
+                // create a source chain read to query for the cap grant
+                let chain = SourceChainRead::new(
+                    self.get_or_create_authored_db(
+                        cell_id.dna_hash(),
+                        cell_id.agent_pubkey().clone(),
+                    )?
+                    .into(), //authored_db.into(),
+                    self.get_dht_db(cell_id.dna_hash())?.into(),
+                    self.get_dht_db_cache(cell_id.dna_hash())?.into(),
+                    self.keystore().clone(),
+                    cell_id.agent_pubkey().clone(),
+                )
+                .await?;
+
+                // query for the cap grant and delete actions (capability revokes)
+                let grant_list = chain.query(grant_query.clone()).await?;
+                if grant_list.is_empty() {
+                    continue;
+                }
+                let delete_action_hash_map: HashMap<ActionHash, Timestamp> = chain
+                    .query(delete_query.clone())
+                    .await?
+                    .iter()
+                    .filter_map(|record| {
+                        if let Action::Delete(delete) = record.action() {
+                            Some((delete.deletes_address.clone(), delete.timestamp))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<HashMap<ActionHash, Timestamp>>();
+
+                tracing::info!("cap grant revocation list: {:?}", delete_action_hash_map);
+
+                let cap_access_secret: CapSecret = [1; 64].into();
+                let mut cap_grants: Vec<CapGrantInfo> = vec![];
+                for grant_record in grant_list {
+                    let zome_cap_grant = match grant_record.entry.to_grant_option() {
+                        // zero out a cap access secret
+                        Some(zome_cap_grant) => match zome_cap_grant.access {
+                            CapAccess::Assigned {
+                                secret: _,
+                                assignees,
+                            } => ZomeCallCapGrant {
+                                access: CapAccess::Assigned {
+                                    secret: cap_access_secret,
+                                    assignees,
+                                },
+                                ..zome_cap_grant
+                            },
+                            CapAccess::Transferable { secret: _ } => ZomeCallCapGrant {
+                                access: CapAccess::Transferable {
+                                    secret: cap_access_secret,
+                                },
+                                ..zome_cap_grant
+                            },
+                            _ => zome_cap_grant,
+                        },
+                        _ => continue,
+                    };
+                    let cap_action_hash = grant_record.action_hash().clone();
+                    let mut revoke_time: Option<Timestamp> = None;
+                    //set revoke time if delete action exists
+                    if delete_action_hash_map.contains_key(&cap_action_hash) {
+                        revoke_time = match delete_action_hash_map.get(&cap_action_hash) {
+                            Some(time) => Some(*time),
+                            None => continue,
+                        };
+                    }
+                    let cell_grant_info = CapGrantInfo {
+                        cap_grant: zome_cap_grant,
+                        action_hash: cap_action_hash,
+                        created_at: grant_record.action().timestamp(),
+                        revoked_at: revoke_time,
+                    };
+                    cap_grants.push(cell_grant_info);
+                }
+                hash_map.insert(cell_id.clone(), cap_grants);
+            }
+            return Ok(AppCapGrantInfo(hash_map));
         }
 
         /// Create a JSON dump of the cell's state

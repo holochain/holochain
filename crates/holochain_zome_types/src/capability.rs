@@ -24,6 +24,8 @@
 //! information needed to refer to the capability as well as the secret needed
 //! to send to the Grantor.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::prelude::*;
@@ -41,4 +43,26 @@ pub struct GrantZomeCallCapabilityPayload {
     /// Specifies the capability, consisting of zomes and functions to allow
     /// signing for as well as access level, secret and assignees.
     pub cap_grant: ZomeCallCapGrant,
+}
+
+/// A mapping of cell IDs to their capability grant information.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AppCapGrantInfo(pub HashMap<CellId, Vec<CapGrantInfo>>);
+
+/// A collection of capability grant information for a cell.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CellCapGrantInfo(Vec<CapGrantInfo>);
+
+/// Information about a capability grant.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CapGrantInfo {
+    /// Specifies the capability, consisting of zomes and functions to allow
+    /// signing for as well as access level, secret and assignees.
+    pub cap_grant: ZomeCallCapGrant,
+    /// The action hash of the grant.
+    pub action_hash: ActionHash,
+    /// Time the capability grant was created.
+    pub created_at: Timestamp,
+    /// Timestamp of capability revocation if revoked.
+    pub revoked_at: Option<Timestamp>,
 }
