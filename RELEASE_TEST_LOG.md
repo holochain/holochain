@@ -2,6 +2,12 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2025-01-27: v0.4.1-rc.2
+
+*Success*
+- Day 1: Started with 6 nodes and ran through all test steps successfully. All peer discovery and op syncing was 
+  happening within expected timeframes. All steps were completed within a 30 minute call.
+
 ## 2025-01-17: v0.4.1-rc.1
 
 *Failure*
