@@ -2966,6 +2966,7 @@ mod misc_impls {
         pub async fn capability_grant_info(
             &self,
             cell_set: &HashSet<CellId>,
+            include_revoked: bool,
         ) -> ConductorApiResult<AppCapGrantInfo> {
             let mut hash_map: HashMap<CellId, Vec<CapGrantInfo>> = HashMap::new();
             let grant_query: ChainQueryFilter = ChainQueryFilter::new()
@@ -2982,7 +2983,7 @@ mod misc_impls {
                         cell_id.dna_hash(),
                         cell_id.agent_pubkey().clone(),
                     )?
-                    .into(), //authored_db.into(),
+                    .into(),
                     self.get_or_create_dht_db(cell_id.dna_hash())?.into(),
                     self.get_or_create_space(cell_id.dna_hash())?
                         .dht_query_cache,
@@ -2993,48 +2994,34 @@ mod misc_impls {
 
                 // query for the cap grant and delete actions (capability revokes)
                 let grant_list = chain.query(grant_query.clone()).await?;
+                // No cap grants for this cell
                 if grant_list.is_empty() {
                     continue;
                 }
-                let delete_action_hash_map: HashMap<ActionHash, Timestamp> = chain
-                    .query(delete_query.clone())
-                    .await?
-                    .iter()
-                    .filter_map(|record| {
-                        if let Action::Delete(delete) = record.action() {
-                            Some((delete.deletes_address.clone(), delete.timestamp))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<HashMap<ActionHash, Timestamp>>();
+                let mut delete_action_hash_map: HashMap<ActionHash, Timestamp> = HashMap::new();
+                if include_revoked {
+                    delete_action_hash_map = chain
+                        .query(delete_query.clone())
+                        .await?
+                        .iter()
+                        .filter_map(|record| {
+                            if let Action::Delete(delete) = record.action() {
+                                Some((delete.deletes_address.clone(), delete.timestamp))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<HashMap<ActionHash, Timestamp>>();
 
-                tracing::info!("cap grant revocation list: {:?}", delete_action_hash_map);
-
-                let cap_access_secret: CapSecret = [1; 64].into();
+                    tracing::info!("cap grant revocation list: {:?}", delete_action_hash_map);
+                }
+                // create a list of CapGrantInfo structs for each cell
                 let mut cap_grants: Vec<CapGrantInfo> = vec![];
                 for grant_record in grant_list {
                     let zome_cap_grant = match grant_record.entry.to_grant_option() {
-                        // zero out a cap access secret
-                        Some(zome_cap_grant) => match zome_cap_grant.access {
-                            CapAccess::Assigned {
-                                secret: _,
-                                assignees,
-                            } => ZomeCallCapGrant {
-                                access: CapAccess::Assigned {
-                                    secret: cap_access_secret,
-                                    assignees,
-                                },
-                                ..zome_cap_grant
-                            },
-                            CapAccess::Transferable { secret: _ } => ZomeCallCapGrant {
-                                access: CapAccess::Transferable {
-                                    secret: cap_access_secret,
-                                },
-                                ..zome_cap_grant
-                            },
-                            _ => zome_cap_grant,
-                        },
+                        Some(zome_cap_grant) => {
+                            DesensitizedZomeCallCapGrant::from(zome_cap_grant.clone())
+                        }
                         _ => continue,
                     };
                     let cap_action_hash = grant_record.action_hash().clone();

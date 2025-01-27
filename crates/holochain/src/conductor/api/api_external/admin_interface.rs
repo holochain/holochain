@@ -316,16 +316,19 @@ impl AdminInterfaceApi {
                 Ok(AdminResponse::ZomeCallCapabilityGranted)
             }
 
-            CapabilityGrantInfo(installed_app_id) => {
+            ListCapabilityGrants {
+                installed_app_id,
+                include_revoked,
+            } => {
                 let state = self.conductor_handle.clone().get_state().await?;
                 let app = state.get_app(&installed_app_id)?;
-                let app_cells: HashSet<CellId> = app.required_cells().collect(); //.all(|id| cell_ids.contains(&id)).collect();
+                let app_cells: HashSet<CellId> = app.required_cells().collect();
                 let cap_info = self
                     .conductor_handle
                     .clone()
-                    .capability_grant_info(&app_cells)
+                    .capability_grant_info(&app_cells, include_revoked)
                     .await?;
-                Ok(AdminResponse::ZomeCallCapabilityGrantInfo(cap_info))
+                Ok(AdminResponse::CapabilityGrantsInfo(cap_info))
             }
 
             DeleteCloneCell(payload) => {

@@ -49,16 +49,12 @@ pub struct GrantZomeCallCapabilityPayload {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AppCapGrantInfo(pub HashMap<CellId, Vec<CapGrantInfo>>);
 
-/// A collection of capability grant information for a cell.
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CellCapGrantInfo(Vec<CapGrantInfo>);
-
 /// Information about a capability grant.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CapGrantInfo {
     /// Specifies the capability, consisting of zomes and functions to allow
     /// signing for as well as access level, secret and assignees.
-    pub cap_grant: ZomeCallCapGrant,
+    pub cap_grant: DesensitizedZomeCallCapGrant,
     /// The action hash of the grant.
     pub action_hash: ActionHash,
     /// Time the capability grant was created.

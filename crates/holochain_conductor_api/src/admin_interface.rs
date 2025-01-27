@@ -378,8 +378,11 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::ZomeCallCapabilityGrantInfo`]
-    CapabilityGrantInfo(InstalledAppId),
+    /// [`AdminResponse::CapabilityGrantsInfo`]
+    ListCapabilityGrants {
+        installed_app_id: String,
+        include_revoked: bool,
+    },
 
     /// Delete a clone cell that was previously disabled.
     ///
@@ -555,8 +558,8 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
     ZomeCallCapabilityGranted,
 
-    /// The successful response to an [`AdminRequest::CapabilityGrantInfo`].
-    ZomeCallCapabilityGrantInfo(AppCapGrantInfo),
+    /// The successful response to an [`AdminRequest::ListCapabilityGrants`].
+    CapabilityGrantsInfo(AppCapGrantInfo),
 
     /// The successful response to an [`AdminRequest::DeleteCloneCell`].
     CloneCellDeleted,

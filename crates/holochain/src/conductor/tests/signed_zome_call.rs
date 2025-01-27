@@ -256,7 +256,7 @@ async fn cap_grant_info_call() {
     let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
 
     // compute a cap access secret
-    let cap_access_secret: CapSecret = [1; 64].into();
+    let cap_access_secret: CapSecret = [0; 64].into();
 
     // set up functions to grant access to
     let mut functions = BTreeSet::new();
@@ -285,15 +285,15 @@ async fn cap_grant_info_call() {
         .await
         .unwrap();
 
-    // println!("grant_action_hash: {:?}\n", grant_action_hash);
+    println!("grant_action_hash: {:?}\n", grant_action_hash);
 
     let mut cell_set = HashSet::new();
     cell_set.insert(cell_id.clone());
 
-    //get the grant info
-    let cap_info = conductor.capability_grant_info(&cell_set).await;
+    //get the grant info, not including revoked grants
+    let cap_info = conductor.capability_grant_info(&cell_set, false).await;
     assert!(cap_info.is_ok());
-    // println!("{:?}", cap_info);
+    println!("{:?}", cap_info);
 
     //host call delete of cap grant
     let host_caller = HostFnCaller::create(cell_id, &conductor.raw_handle(), &dna).await;
@@ -303,11 +303,15 @@ async fn cap_grant_info_call() {
             chain_top_ordering: Default::default(),
         })
         .await;
-    // println!("deletehash: {:?}\n", _deletehash);
+    println!("deletehash: {:?}\n", _deletehash);
 
-    let cap_info = conductor.capability_grant_info(&cell_set).await.unwrap();
+    //get the grant info, including revoked grants
+    let cap_info = conductor
+        .capability_grant_info(&cell_set, true)
+        .await
+        .unwrap();
 
-    // println!("after delete: {:?}\n", cap_info);
+    println!("after delete: {:?}\n", cap_info);
     let cap_cell_info = cap_info.0.get(cell_id).unwrap().get(1).unwrap();
     assert_eq!(cap_cell_info.action_hash.clone(), grant_action_hash);
     assert!(cap_cell_info.revoked_at.is_some());
