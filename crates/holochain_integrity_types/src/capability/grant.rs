@@ -16,7 +16,6 @@ use std::collections::BTreeSet;
 ///
 /// See `.is_valid()`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
 pub enum CapGrant {
     /// Grants the capability of calling every extern to the calling agent, provided the calling

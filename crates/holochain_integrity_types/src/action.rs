@@ -571,7 +571,6 @@ pub struct DeleteLink {
 /// When used in CloseChain, this contains the new DNA hash or Agent key.
 /// When used in OpenChain, this contains the previous DNA hash or Agent key.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum MigrationTarget {
     /// Represents a DNA migration, and contains the new or previous DNA hash.
     Dna(DnaHash),

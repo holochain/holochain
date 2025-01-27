@@ -370,9 +370,8 @@ mod tests {
     admin_interfaces:
       - driver:
           type: websocket
-          value:
-            port: 1234
-            allowed_origins: "*"
+          port: 1234
+          allowed_origins: "*"
 
     network:
       bootstrap_service: https://bootstrap-staging.holo.host
@@ -471,9 +470,8 @@ mod tests {
     admin_interfaces:
       - driver:
           type: websocket
-          value:
-            port: 1234
-            allowed_origins: "*"
+          port: 1234
+          allowed_origins: "*"
 
     network:
       bootstrap_service: https://bootstrap-staging.holo.host
