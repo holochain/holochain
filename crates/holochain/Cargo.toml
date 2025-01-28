@@ -191,9 +191,12 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = ["sqlite-encrypted", "tx5", "metrics_influxive", "wasmer_sys_dev"]
-
-prod = ["sqlite-encrypted", "tx5", "wasmer_sys_prod"]
+default = [
+  "sqlite-encrypted",
+  "tx5",
+  "metrics_influxive",
+  "wasmer_sys_cranelift",
+]
 
 tx5 = ["tx5-go-pion-turn"]
 
@@ -288,25 +291,27 @@ sqlite = [
 # Extremely verbose wasm memory read/write logging
 wasmer_debug_memory = ["holochain_wasmer_host/debug_memory"]
 
-# Enable wasm compiler
-# Incompatible with "wasmer_wamr"
 wasmer_sys = [
   "dep:wasmer-middlewares",
   "wasmer/default",
   "holochain_wasmer_host/wasmer_sys_dev",
 ]
 
-wasmer_sys_dev = [
-  "wasmer_sys",
-  "holochain_wasmer_host/wasmer_sys_dev",
-]
-wasmer_sys_prod = [
-  "wasmer_sys",
+# Enable wasm cranelift compiler
+# Incompatible with "wasmer_wamr"
+wasmer_sys_cranelift = ["wasmer_sys", "holochain_wasmer_host/wasmer_sys_dev"]
+
+# Enable wasm LLVM compiler
+# Incompatible with "wasmer_wamr"
+wasmer_sys_llvm = [
+  "dep:wasmer-middlewares",
+  "wasmer/sys",
+  "wasmer/wat",
   "holochain_wasmer_host/wasmer_sys_prod",
 ]
 
 # Enable wasm interpreter (experimental)
-# Incompatible with "wasmer_sys"
+# Incompatible with "wasmer_sys_cranelift" and "wasmer_sys_llvm"
 wasmer_wamr = ["wasmer/wamr", "holochain_wasmer_host/wasmer_wamr"]
 
 # Enable chain head coordination
