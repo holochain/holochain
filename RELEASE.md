@@ -26,12 +26,13 @@
     - Create a new node and wait for it to synchronize.
 - If smoke test passes, full release of the release candidate version is approved.
 - If stress test fails, fix and update and release a new rc version and perform smoke test again.
-- Once smoke test passes, and full version is released, bump versions in downstream components and re-publish happs, and initiate full testing. This includes the demo apps Talking Stickies and Kando.
 
 ## Full release test
 
-- After release of full version, test again as before with the release candidate and also start another smoke test.
-- Once testing passes and persistent DHT is functional for the given time period and no bugs have been reported, elevate release to "recommended" status.
+- Once smoke test passes, and full version is released, bump versions in downstream components and re-publish happs, 
+  and initiate full testing. This includes the demo apps Talking Stickies and Kando.
+- Once testing passes and persistent DHT is functional for the given time period and no bugs have been reported, 
+ elevate release to "recommended" status.
 
 ## Happy Path estimates:
 
