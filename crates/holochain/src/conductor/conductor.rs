@@ -3024,10 +3024,9 @@ mod misc_impls {
                         if !include_revoked {
                             continue;
                         }
-                        revoke_time = match delete_action_hash_map.get(&cap_action_hash) {
-                            Some(time) => Some(time.to_owned()),
-                            None => None,
-                        };
+                        revoke_time = delete_action_hash_map
+                            .get(&cap_action_hash)
+                            .map(|time| time.to_owned())
                     }
                     let zome_cap_grant = match grant_record.entry.to_grant_option() {
                         Some(zome_cap_grant) => {
