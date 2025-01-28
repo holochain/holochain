@@ -64,8 +64,6 @@ pub struct DesensitizedZomeCallCapGrant {
     pub access: CapAccessInfo,
     /// Set of functions to which this capability grants ZomeCall access
     pub functions: GrantedFunctions,
-    // @todo the payloads to curry to the functions
-    // pub curry_payloads: CurryPayloads,
 }
 
 impl From<ZomeCallCapGrant> for DesensitizedZomeCallCapGrant {
