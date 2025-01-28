@@ -2998,48 +2998,51 @@ mod misc_impls {
                 if grant_list.is_empty() {
                     continue;
                 }
-                let mut delete_action_hash_map: HashMap<ActionHash, Timestamp> = HashMap::new();
-                if include_revoked {
-                    delete_action_hash_map = chain
-                        .query(delete_query.clone())
-                        .await?
-                        .iter()
-                        .filter_map(|record| {
-                            if let Action::Delete(delete) = record.action() {
-                                Some((delete.deletes_address.clone(), delete.timestamp))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<HashMap<ActionHash, Timestamp>>();
+                let delete_action_hash_map: HashMap<ActionHash, Timestamp> = chain
+                    .query(delete_query.clone())
+                    .await?
+                    .iter()
+                    .filter_map(|record| {
+                        if let Action::Delete(delete) = record.action() {
+                            Some((delete.deletes_address.clone(), delete.timestamp))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<HashMap<ActionHash, Timestamp>>();
 
-                    tracing::info!("cap grant revocation list: {:?}", delete_action_hash_map);
-                }
+                tracing::info!("cap grant revocation list: {:?}", delete_action_hash_map);
+
                 // create a list of CapGrantInfo structs for each cell
                 let mut cap_grants: Vec<CapGrantInfo> = vec![];
                 for grant_record in grant_list {
+                    let cap_action_hash = grant_record.action_hash().clone();
+                    let mut revoke_time: Option<Timestamp> = None;
+                    // set revoke time if delete action exists
+                    if delete_action_hash_map.contains_key(&cap_action_hash) {
+                        // skip grant info if include_revoked is false
+                        if !include_revoked {
+                            continue;
+                        }
+                        revoke_time = match delete_action_hash_map.get(&cap_action_hash) {
+                            Some(time) => Some(time.to_owned()),
+                            None => None,
+                        };
+                    }
                     let zome_cap_grant = match grant_record.entry.to_grant_option() {
                         Some(zome_cap_grant) => {
                             DesensitizedZomeCallCapGrant::from(zome_cap_grant.clone())
                         }
-                        _ => continue,
+                        None => continue,
                     };
-                    let cap_action_hash = grant_record.action_hash().clone();
-                    let mut revoke_time: Option<Timestamp> = None;
-                    //set revoke time if delete action exists
-                    if delete_action_hash_map.contains_key(&cap_action_hash) {
-                        revoke_time = match delete_action_hash_map.get(&cap_action_hash) {
-                            Some(time) => Some(*time),
-                            None => continue,
-                        };
-                    }
-                    let cell_grant_info = CapGrantInfo {
+
+                    let zome_grant_info = CapGrantInfo {
                         cap_grant: zome_cap_grant,
                         action_hash: cap_action_hash,
                         created_at: grant_record.action().timestamp(),
                         revoked_at: revoke_time,
                     };
-                    cap_grants.push(cell_grant_info);
+                    cap_grants.push(zome_grant_info);
                 }
                 hash_map.insert(cell_id.clone(), cap_grants);
             }

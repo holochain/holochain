@@ -1,3 +1,6 @@
+use crate::fixt::AgentPubKeyFixturator;
+use crate::sweettest::{SweetConductor, SweetDnaFile};
+use ::fixt::fixt;
 use holochain_nonce::fresh_nonce;
 use holochain_nonce::Nonce256Bits;
 use holochain_state::source_chain::SourceChainRead;
@@ -5,10 +8,6 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::*;
 use matches::assert_matches;
 use std::collections::BTreeSet;
-
-use crate::fixt::AgentPubKeyFixturator;
-use crate::sweettest::{SweetConductor, SweetDnaFile};
-use ::fixt::fixt;
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
@@ -241,9 +240,8 @@ async fn signed_zome_call_wildcard() {
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "test_utils")]
 async fn cap_grant_info_call() {
-    use std::collections::HashSet;
-
     use crate::test_utils::host_fn_caller::HostFnCaller;
+    use std::collections::HashSet;
 
     let zome = TestWasm::Create;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
@@ -276,7 +274,7 @@ async fn cap_grant_info_call() {
         },
     };
 
-    // request authorization of signing key for agent's own cell should succeed
+    // create a new cap grant entry
     let grant_action_hash = conductor
         .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
             cell_id: cell_id.clone(),
@@ -285,17 +283,17 @@ async fn cap_grant_info_call() {
         .await
         .unwrap();
 
-    println!("grant_action_hash: {:?}\n", grant_action_hash);
+    // println!("grant_action_hash: {:?}\n", grant_action_hash);
 
     let mut cell_set = HashSet::new();
     cell_set.insert(cell_id.clone());
 
-    //get the grant info, not including revoked grants
+    // get the grant info, not including revoked grants
     let cap_info = conductor.capability_grant_info(&cell_set, false).await;
     assert!(cap_info.is_ok());
-    println!("{:?}", cap_info);
+    // println!("{:?}\n", cap_info);
 
-    //host call delete of cap grant
+    // host call delete of cap grant
     let host_caller = HostFnCaller::create(cell_id, &conductor.raw_handle(), &dna).await;
     let _deletehash = host_caller
         .delete_entry(DeleteInput {
@@ -303,23 +301,9 @@ async fn cap_grant_info_call() {
             chain_top_ordering: Default::default(),
         })
         .await;
-    println!("deletehash: {:?}\n", _deletehash);
+    // println!("deletehash: {:?}\n", _deletehash);
 
-    //get the grant info, including revoked grants
-    let cap_info = conductor
-        .capability_grant_info(&cell_set, true)
-        .await
-        .unwrap();
-
-    println!("after delete: {:?}\n", cap_info);
-    let cap_cell_info = cap_info.0.get(cell_id).unwrap().get(1).unwrap();
-    assert_eq!(cap_cell_info.action_hash.clone(), grant_action_hash);
-    assert!(cap_cell_info.revoked_at.is_some());
-    assert!(cap_cell_info
-        .created_at
-        .lt(&cap_cell_info.revoked_at.unwrap()));
-
-    // create a source chain read to query for the cap grant
+    // create a source chain read to query for the deleted cap grant
     let authored_db = conductor
         .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
         .unwrap();
@@ -342,11 +326,25 @@ async fn cap_grant_info_call() {
 
     let delete_list = chain.query(delete_query.clone()).await.unwrap();
 
-    //ensure that delete_address is same as cap_grant_address
+    // ensure that delete_address is same as cap_grant_address
     if let Action::Delete(delete) = delete_list[0].action().clone() {
         let delete_action_address = delete.deletes_address.clone();
         assert_eq!(delete_action_address, grant_action_hash);
     } else {
         panic!("Expected delete_address to be the same as the grant address");
     }
+
+    // get the grant info, including revoked grants
+    let cap_info = conductor
+        .capability_grant_info(&cell_set, true)
+        .await
+        .unwrap();
+
+    // println!("after delete: {:?}\n", cap_info);
+    let cap_cell_info = cap_info.0.get(cell_id).unwrap().get(1).unwrap();
+    assert_eq!(cap_cell_info.action_hash.clone(), grant_action_hash);
+    assert!(cap_cell_info.revoked_at.is_some());
+    assert!(cap_cell_info
+        .created_at
+        .lt(&cap_cell_info.revoked_at.unwrap()));
 }
