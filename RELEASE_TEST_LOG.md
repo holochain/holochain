@@ -7,6 +7,11 @@ This file documents results of release tests as described in the [Holochain rele
 *Success*
 - Day 1: Started with 6 nodes and ran through all test steps successfully. All peer discovery and op syncing was 
   happening within expected timeframes. All steps were completed within a 30 minute call.
+- Day 2: All nodes were able to sync the data created after they went offline on day 1. We lost one original node and 
+  had a new node join the testing. So a slight deviation from the test script, but otherwise all checks passed.
+- Bootstrapping and initial gossip seemed to take a while to start syncing data and then after a few minutes, 
+  everything was showing up as expected. Not unusual behavior for Holochain and the main thing is tha data was
+  consistently showing up after a few minutes.
 
 ## 2025-01-17: v0.4.1-rc.1
 
