@@ -1228,6 +1228,17 @@ mod test {
         .await;
         let dna_hash = dna.dna_hash();
 
+        conductor_handle
+            .clone()
+            .add_app_interface(
+                either::Either::Left(12345),
+                AllowedOrigins::Any,
+                Some("test app".into()),
+            )
+            .await
+            .unwrap();
+
+        // Construct expected response
         #[derive(Serialize, Debug)]
         pub struct ConductorSerialized {
             running_cells: Vec<(DnaHashB64, AgentPubKeyB64)>,
@@ -1242,12 +1253,25 @@ mod test {
             state: ConductorState,
         }
 
+        let dpki_cell_id = conductor_handle
+            .running_services()
+            .dpki
+            .map(|dpki| dpki.cell_id.clone());
+        let mut running_cells = vec![];
+        if let Some(cell_id) = dpki_cell_id {
+            running_cells.push((
+                cell_id.dna_hash().clone().into(),
+                cell_id.agent_pubkey().clone().into(),
+            ));
+        }
+        running_cells.push((dna_hash.clone().into(), agent_pubkey.clone().into()));
+
         let expected = ConductorDump {
             conductor: ConductorSerialized {
-                running_cells: vec![(dna_hash.clone().into(), agent_pubkey.clone().into())],
+                running_cells,
                 shutting_down: false,
                 admin_websocket_ports: vec![],
-                app_interfaces: vec![],
+                app_interfaces: vec![AppInterfaceId::new(12345)],
             },
             state: conductor_handle.get_state_from_handle().await.unwrap(),
         };
