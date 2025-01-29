@@ -33,7 +33,7 @@ if ! command -v nix &>/dev/null; then
 fi
 
 echo "Setting up binary cache for all users (requires root access)"
-run_cmd sudo --preserve-env=NIX_CONFIG,PATH "$(which nix)" run nixpkgs/nixos-24.11#cachix -- use holochain-ci -m root-nixconf
+run_cmd sudo --preserve-env=NIX_CONFIG,PATH "$(which nix)" run nixpkgs/nixos-24.11#cachix --extra-experimental-features "nix-command" -- use holochain-ci -m root-nixconf
 echo
 
 echo "Restarting Nix daemon"
@@ -52,7 +52,7 @@ run_cmd mkdir -p ~/.config/nix
 echo
 
 echo "Enabling additional Nix commands and Nix flakes"
-run_cmd bash -c 'echo "experimental-features = nix-command flakes" >>~/.config/nix/nix.conf'
+run_cmd bash -c 'echo "experimental-features = nix-command" >>~/.config/nix/nix.conf'
 echo
 
 echo "Please close this shell and open a new one to start using Nix".
