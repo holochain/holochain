@@ -1228,9 +1228,6 @@ mod test {
         .await;
         let dna_hash = dna.dna_hash();
 
-        // Allow agents time to join
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-
         #[derive(Serialize, Debug)]
         pub struct ConductorSerialized {
             running_cells: Vec<(DnaHashB64, AgentPubKeyB64)>,
