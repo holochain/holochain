@@ -2969,7 +2969,7 @@ mod misc_impls {
             include_revoked: bool,
         ) -> ConductorApiResult<AppCapGrantInfo> {
             let mut hash_map: HashMap<CellId, Vec<CapGrantInfo>> = HashMap::new();
-            let grant_query: ChainQueryFilter = ChainQueryFilter::new()
+            let grant_query = ChainQueryFilter::new()
                 .include_entries(true)
                 .entry_type(EntryType::CapGrant);
             let delete_query: ChainQueryFilter = ChainQueryFilter::new()
