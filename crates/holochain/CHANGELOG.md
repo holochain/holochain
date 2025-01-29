@@ -6,6 +6,7 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- added admin_api capability_grant_info for getting a list of grants valid and revoked from the source chain
 
 ## 0.5.0-dev.16
 
@@ -16,7 +17,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix issue where genesis actions weren’t integrated when others were ready to integrate. When nothing had been integrated yet then we started integration at the value of how many ops were `ready_to_integrate` so if we had other ops that were ready then the range started at them instead of at genesis (index 0).
 - Update `await_consistency` test utility function so that it prints every inconsistent agent when it fails instead of just the first one.
 - Rename the SQL queries that are used to set `RegisterAddLink` and `RegisterRemoveLink` ops to integrated
-- added admin_api capability_grant_info for getting a list of grants valid and revoked from the source chain
 
 ## 0.5.0-dev.15
 
