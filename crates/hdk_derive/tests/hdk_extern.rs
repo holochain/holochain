@@ -1,4 +1,3 @@
-use compiletest_rs;
 use std::fs;
 use std::path::PathBuf;
 
@@ -15,13 +14,10 @@ fn find_deps_dir() -> PathBuf {
 }
 
 fn run_mode(mode: &'static str) {
-    let mut config = compiletest_rs::Config::default();
-    config.mode = mode.parse().expect("Invalid mode");
-    config.src_base = PathBuf::from("tests/fail");
-
     let deps_path = find_deps_dir();
     println!("Found deps directory at: {}", deps_path.display());
 
+    // Find library files
     let hdk_lib = fs::read_dir(&deps_path)
         .unwrap()
         .filter_map(Result::ok)
@@ -39,7 +35,7 @@ fn run_mode(mode: &'static str) {
         })
         .expect("Could not find hdk_derive library");
 
-    config.target_rustcflags = Some(format!(
+    let target_rustcflags = format!(
         "-L dependency={} \
          --extern hdk={} \
          --extern hdk_derive={} \
@@ -47,7 +43,14 @@ fn run_mode(mode: &'static str) {
         deps_path.display(),
         hdk_lib.path().display(),
         hdk_derive_lib.path().display()
-    ));
+    );
+
+    let config = compiletest_rs::Config {
+        mode: mode.parse().expect("Invalid mode"),
+        src_base: PathBuf::from("tests/fail"),
+        target_rustcflags: Some(target_rustcflags),
+        ..Default::default()
+    };
 
     compiletest_rs::run_tests(&config);
 }
