@@ -3019,11 +3019,10 @@ mod misc_impls {
                     let cap_action_hash = grant_record.action_hash().clone();
                     let mut revoke_time: Option<Timestamp> = None;
                     // set revoke time if delete action exists
-                    if delete_action_hash_map.contains_key(&cap_action_hash) {
-                        // skip grant info if include_revoked is false
-                        if !include_revoked {
-                            continue;
-                        }
+                // skip grant info if include_revoked is false
+                     if !include_revoked {
+                        continue;
+                     } else if delete_action_hash_map.contains_key(&cap_action_hash) {
                         revoke_time = delete_action_hash_map
                             .get(&cap_action_hash)
                             .map(|time| time.to_owned())
