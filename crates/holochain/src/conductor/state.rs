@@ -40,6 +40,7 @@ pub struct ConductorServicesState {
 /// References between structs (cell configs pointing to
 /// the agent and DNA to be instantiated) are implemented
 /// via string IDs.
+#[serde_with::serde_as]
 #[derive(Clone, Deserialize, Serialize, Default, Debug, SerializedBytes)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ConductorState {
@@ -62,6 +63,7 @@ pub struct ConductorState {
     pub(crate) conductor_services: ConductorServicesState,
 
     /// List of interfaces any UI can use to access zome functions.
+    #[serde_as(as = "Vec<(_, _)>")]
     #[serde(default)]
     pub(crate) app_interfaces: HashMap<AppInterfaceId, AppInterfaceConfig>,
 }
@@ -211,7 +213,7 @@ impl ConductorState {
     /// Getter for a single app. Returns error if app missing.
     pub fn remove_app(&mut self, id: &InstalledAppId) -> ConductorResult<InstalledApp> {
         self.installed_apps_and_services
-            .remove(id)
+            .swap_remove(id)
             .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))
     }
 
@@ -223,7 +225,7 @@ impl ConductorState {
         }
         let stopped_app = StoppedApp::new_fresh(app);
         self.installed_apps_and_services
-            .insert(stopped_app.clone().into());
+            .insert(stopped_app.id().clone(), stopped_app.clone().into());
         Ok(stopped_app)
     }
 
@@ -237,7 +239,8 @@ impl ConductorState {
             return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
         }
         let app = InstalledApp::new(app, AppStatus::AwaitingMemproofs);
-        self.installed_apps_and_services.insert(app.clone());
+        self.installed_apps_and_services
+            .insert(app.id().clone(), app.clone());
         Ok(app)
     }
 
