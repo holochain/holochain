@@ -106,7 +106,7 @@ mod tests {
                     break;
                 }
 
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
             }
         }).await.expect("Timed out waiting for alice to see both links");
     }
