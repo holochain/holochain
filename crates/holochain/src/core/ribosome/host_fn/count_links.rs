@@ -91,14 +91,24 @@ mod tests {
         let _: ActionHash = conductor.call(&bob, "create_link", ()).await;
 
         // Check that Alice can see her link and Bob's
-        let count: usize = conductor
-            .call(
-                &alice,
-                "get_count",
-                LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])),
-            )
-            .await;
-        assert_eq!(2, count);
+
+        tokio::time::timeout(std::time::Duration::from_secs(10), async move {
+            loop {
+                let count: usize = conductor
+                    .call(
+                        &alice,
+                        "get_count",
+                        LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])),
+                    )
+                    .await;
+
+                if count == 2 {
+                    break;
+                }
+
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        }).await.expect("Timed out waiting for alice to see both links");
     }
 
     #[tokio::test(flavor = "multi_thread")]
