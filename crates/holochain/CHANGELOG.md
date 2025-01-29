@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Update `await_consistency` test utility function so that it prints every inconsistent agent when it fails instead of just the first one.
 - Rename the SQL queries that are used to set `RegisterAddLink` and `RegisterRemoveLink` ops to integrated
 - Add smoke test for `AdminRequest::DumpConductorState`
+- Fix issue where `AdminRequest::DumpConductorState` fails when the conductor has an `AppInterface` attached.
 
 ## 0.5.0-dev.15
 
