@@ -34,12 +34,14 @@ use serde_with::serde_as;
 ///     - name: zome4
 ///       bundled: ../dna2/zomes/zome2.wasm
 ///       dependencies:
-///         - name: zome1
 ///         - name: zome2
 /// ```
 ///
 /// When there's only one integrity zome, it will automatically be a dependency
 /// of the coordinator zomes. It doesn't need to be specified explicitly.
+///
+/// Note that while the `dependencies` field is a list, right now there should
+/// be **at most one item in this list**.
 ///
 /// ```yaml
 /// manifest_version: "1"
@@ -172,9 +174,8 @@ pub struct ZomeManifest {
     #[serde(flatten)]
     pub location: ZomeLocation,
 
-    /// The integrity zomes this zome depends on.
-    /// The order of these must match the order the types
-    /// are used in the zome.
+    /// The integrity zomes this zome depends on, if it's a coordinator zome.
+    /// Currently a coordinator zome should have **at most one dependency**.
     pub dependencies: Option<Vec<ZomeDependency>>,
 
     /// DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
