@@ -223,8 +223,7 @@ pub fn hdk_extern(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 if is_infallible && return_type == EXTERN_RESULT {
                     abort!(
                         ty.span(),
-                        "infallible functions should return the inner type directly";
-                        help = "remove the `{}<{}>` wrapper and return the inner type `{}` instead", EXTERN_RESULT, type_str, type_str
+                        "infallible functions should return the inner type directly"
                     );
                 } else if !is_infallible && return_type != EXTERN_RESULT {
                     abort!(
