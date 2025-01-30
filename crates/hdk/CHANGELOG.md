@@ -7,6 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add `hdk_extern` tests
+
+## 0.5.0-dev.15
+
+## 0.5.0-dev.14
+
+- Update `holochain_wasmer_guest`.
+
+## 0.5.0-dev.13
+
 - Update `holochain_wasmer_guest`.
 
 ## 0.5.0-dev.12

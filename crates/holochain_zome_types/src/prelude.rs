@@ -51,6 +51,3 @@ pub use crate::test_utils::*;
 
 #[cfg(feature = "fuzzing")]
 pub use crate::facts::ActionRefMut;
-
-#[cfg(feature = "fuzzing")]
-pub use crate::entropy::*;
