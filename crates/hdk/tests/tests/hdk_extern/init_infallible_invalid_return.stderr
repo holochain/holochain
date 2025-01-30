@@ -1,0 +1,5 @@
+error: `init` must return `InitCallbackResult`
+ --> tests/tests/hdk_extern/init_infallible_invalid_return.rs:4:14
+  |
+4 | fn init() -> String {
+  |              ^^^^^^

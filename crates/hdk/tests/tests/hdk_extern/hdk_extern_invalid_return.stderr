@@ -1,0 +1,8 @@
+error: functions marked with #[hdk_extern] must return `ExternResult<String>`
+
+         = help: change the return type to `ExternResult<String>` or mark the function as infallible if it cannot fail #[hdk_extern(infallible)]
+
+ --> tests/tests/hdk_extern/hdk_extern_invalid_return.rs:4:17
+  |
+4 | fn zome_fn() -> String {
+  |                 ^^^^^^
