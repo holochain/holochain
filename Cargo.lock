@@ -2806,6 +2806,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "serde_with",
  "serde_yaml",
  "shrinkwraprs",
  "sodoken 0.0.11",

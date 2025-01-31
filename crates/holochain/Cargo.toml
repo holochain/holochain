@@ -75,6 +75,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11.12"
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
 serde_yaml = "0.9"
+serde_with = { version = "3.12.0", features = ["json"] }
 shrinkwraprs = "0.3.0"
 sodoken = "=0.0.11"
 structopt = "0.3.11"

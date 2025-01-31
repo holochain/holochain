@@ -226,7 +226,7 @@ pub(crate) type StopReceiver = task_motel::StopListener;
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
     /// The collection of available, running cells associated with this Conductor
-    running_cells: RwShare<HashMap<CellId, CellItem>>,
+    running_cells: RwShare<IndexMap<CellId, CellItem>>,
 
     /// The config used to create this Conductor
     pub config: Arc<ConductorConfig>,
@@ -324,7 +324,7 @@ mod startup_shutdown_impls {
 
             Self {
                 spaces,
-                running_cells: RwShare::new(HashMap::new()),
+                running_cells: RwShare::new(IndexMap::new()),
                 config,
                 shutting_down: Arc::new(AtomicBool::new(false)),
                 task_manager: TaskManagerClient::new(outcome_sender, tracing_scope),
