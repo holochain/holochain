@@ -174,7 +174,9 @@ pub struct ZomeManifest {
     #[serde(flatten)]
     pub location: ZomeLocation,
 
-    /// The integrity zomes this zome depends on, if it's a coordinator zome.
+    /// The integrity zomes this zome depends on.
+    /// Integrity zomes should have no dependencies; leave this field `null`.
+    /// Coordinator zomes may depend on zero or exactly 1 integrity zome.
     /// Currently a coordinator zome should have **at most one dependency**.
     pub dependencies: Option<Vec<ZomeDependency>>,
 
