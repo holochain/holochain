@@ -7,7 +7,7 @@ role-1:
     origin_time: 1731436443698324
     quantum_time: ~
 role-2:
-  type: Provisioned
+  type: provisioned
   membrane_proof: ~
   modifiers:
     network_seed: another random network seed

@@ -629,7 +629,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"disabled\",\"reason\":\"user\"}",
+            "{\"type\":\"disabled\",\"reason\":{\"type\":\"user\"}}",
         );
     }
 }
