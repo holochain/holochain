@@ -220,31 +220,20 @@ pub mod wasm_test {
             )
             .await;
 
-        // Bob tries to do the same thing but after timeout.
-        tokio::time::sleep(std::time::Duration::from_millis(10500)).await;
-        let bob_result: Result<ActionHash, _> = conductor
-            .call_fallible(
-                &bob,
-                "create_a_countersigned_thing",
-                vec![alice_response.clone(), bob_response.clone()],
-            )
-            .await;
-
-        expect_error_for_write_without_lock(bob_result);
-
-        // @TODO - the following three zome calls all pass but perhaps we do NOT want them to?
-        // @TODO updated: You can no longer get these entries after the session has expired but
-        //       this comment is still relevant during the session, once a commit has been done
-        //       and before the session has timed out.
+        // @TODO - the following three zome must_get_* all pass but perhaps we do NOT want them to?
+        // @TODO updated: You can no longer get these entries after the session has expired and
+        //       been abandoned but this comment is still relevant during the session, once a
+        //       commit has been done and before the session has timed out.
+        //
         // It's not immediately clear what direct requests by hash should do in all cases here.
         //
         // If an author does a must_get during a zome call like we do in this test, should it
-        // be returned (it's in the scratch ready to be flushed so it does atm) even though it
-        // hasn't been countersigned and so may never be included in a source chain?
+        // be returned even though it hasn't been countersigned and so may never be included
+        // in a source chain?
         //
         // Should it be returned in subsequent zome calls by an author who has signed it but it
-        // hasn't been coauthored yet, but the session is still active? (c.f. private entries being visible to author)
-        // What about after the session?
+        // hasn't been coauthored yet, but the session is still active? (c.f. private entries
+        // being visible to author). And what about after the session?
         //
         // What about returned by/for coauthors who do NOT sign during and after the session?
         //
@@ -284,6 +273,18 @@ pub mod wasm_test {
             )
             .await
             .unwrap();
+
+        // Bob tries to commit the session entry as well but after timeout.
+        tokio::time::sleep(std::time::Duration::from_millis(10500)).await;
+        let bob_result: Result<ActionHash, _> = conductor
+            .call_fallible(
+                &bob,
+                "create_a_countersigned_thing",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await;
+
+        expect_error_for_write_without_lock(bob_result);
 
         // At this point Alice's session entry is a liability so can't exist.
         let alice_agent_activity_alice_observed_after: AgentActivity = conductor
