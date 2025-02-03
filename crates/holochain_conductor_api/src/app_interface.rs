@@ -503,7 +503,7 @@ pub struct RevokeAgentKeyPayload {
 
 /// A flat, slightly more API-friendly representation of [`AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum AppInfoStatus {
     Paused { reason: PausedAppReason },
     Disabled { reason: DisabledAppReason },
@@ -614,7 +614,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"disabled\",\"value\":{\"reason\":{\"error\":\"because\"}}}"
+            "{\"type\":\"disabled\",\"reason\":{\"error\":\"because\"}}"
         );
 
         let status: AppInfoStatus =
@@ -622,14 +622,14 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"paused\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}",
+            "{\"type\":\"paused\",\"reason\":{\"error\":\"because\"}}",
         );
 
         let status: AppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"disabled\",\"value\":{\"reason\":\"user\"}}"
+            "{\"type\":\"disabled\",\"reason\":\"user\"}",
         );
     }
 }

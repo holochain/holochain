@@ -86,7 +86,7 @@ pub enum WarrantProof {
     Hash,
     derive_more::From,
 )]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum WarrantType {
     // NOTE: the values here cannot overlap with ActionType,
     // because they occupy the same field in the Action table.
@@ -171,7 +171,7 @@ impl WarrantProof {
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
 )]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum ValidationType {
     /// Sys validation
     Sys,
