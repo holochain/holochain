@@ -1,4 +1,4 @@
-error: functions marked with #[hdk_extern] must return `ExternResult<String>`
+error: functions marked with #[hdk_extern] must return `ExternResult` instead of `String`
 
          = help: change the return type to `ExternResult<String>` or mark the function as infallible if it cannot fail #[hdk_extern(infallible)]
 
