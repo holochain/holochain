@@ -351,7 +351,7 @@ async fn generate_sandbox_with_roles_settings_override() {
                 .clone()
                 .into_iter()
                 .find(|r| r.name == "role-1")
-                .expect("role1 not found in the manifest of the isntalled app.");
+                .expect("role1 not found in the manifest of the installed app.");
 
             assert_eq!(
                 role1.dna.modifiers.network_seed.unwrap(),

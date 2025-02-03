@@ -1155,7 +1155,7 @@ pub enum PausedAppReason {
 
 /// The reason for an app being in a Disabled state.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum DisabledAppReason {
     /// The app is freshly installed, and never started
     NeverStarted,
