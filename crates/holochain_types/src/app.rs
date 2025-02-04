@@ -1298,6 +1298,7 @@ mod tests {
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
+    use serde_json;
     use std::collections::HashSet;
 
     #[test]
@@ -1414,5 +1415,80 @@ mod tests {
         app.delete_clone_cell(&clone_id_0).unwrap();
         // Assert the deleted cell cannot be enabled
         assert!(app.enable_clone_cell(&clone_id_0).is_err());
+    }
+
+    #[test]
+    fn dna_source_serialization() {
+        use serde_json;
+
+        let dna_source: DnaSource = DnaSource::Path("is the goal".into());
+
+        assert_eq!(
+            serde_json::to_string(&dna_source).unwrap(),
+            "{\"type\":\"path\",\"value\":\"is the goal\"}"
+        );
+    }
+
+    #[test]
+    fn coordinator_source_serialization() {
+        let coordinator_source: CoordinatorSource = CoordinatorSource::Path("is the goal".into());
+        assert_eq!(
+            serde_json::to_string(&coordinator_source).unwrap(),
+            "{\"type\":\"path\",\"value\":\"is the goal\"}"
+        );
+    }
+
+    #[test]
+    fn role_settings_serialization() {
+        let role_settings: RoleSettings = RoleSettings::Provisioned {
+            membrane_proof: None,
+            modifiers: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&role_settings).unwrap(),
+            "{\"type\":\"provisioned\",\"membrane_proof\":null,\"modifiers\":null}"
+        );
+    }
+
+    #[test]
+    fn app_bundle_source_serialization() {
+        let app_bundle_source: AppBundleSource = AppBundleSource::Path("is the goal".into());
+        assert_eq!(
+            serde_json::to_string(&app_bundle_source).unwrap(),
+            "{\"type\":\"path\",\"value\":\"is the goal\"}"
+        );
+    }
+
+    #[test]
+    fn app_status_serialization() {
+        let app_status: AppStatus = AppStatus::Running;
+        assert_eq!(
+            serde_json::to_string(&app_status).unwrap(),
+            "{\"type\":\"running\"}"
+        );
+
+        let app_status: AppStatus = AppStatus::Disabled(DisabledAppReason::NeverStarted);
+        assert_eq!(
+            serde_json::to_string(&app_status).unwrap(),
+            "{\"type\":\"disabled\",\"value\":{\"type\":\"never_started\"}}"
+        );
+    }
+
+    #[test]
+    fn paused_app_reason_serialization() {
+        let reason = PausedAppReason::Error("s are here to learn from".into());
+        assert_eq!(
+            serde_json::to_string(&reason).unwrap(),
+            "{\"type\":\"error\",\"value\":\"s are here to learn from\"}"
+        );
+    }
+
+    #[test]
+    fn disabled_app_reason_serialization() {
+        let reason = DisabledAppReason::User;
+        assert_eq!(
+            serde_json::to_string(&reason).unwrap(),
+            "{\"type\":\"user\"q}"
+        );
     }
 }
