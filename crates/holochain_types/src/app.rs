@@ -1488,7 +1488,7 @@ mod tests {
         let reason = DisabledAppReason::User;
         assert_eq!(
             serde_json::to_string(&reason).unwrap(),
-            "{\"type\":\"user\"q}"
+            "{\"type\":\"user\"}"
         );
     }
 }
