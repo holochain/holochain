@@ -370,16 +370,8 @@ impl InstalledApp {
     }
 }
 
-impl automap::AutoMapped for InstalledApp {
-    type Key = InstalledAppId;
-
-    fn key(&self) -> &Self::Key {
-        &self.app.installed_app_id
-    }
-}
-
 /// A map from InstalledAppId -> InstalledApp
-pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
+pub type InstalledAppMap = IndexMap<InstalledAppId, InstalledApp>;
 
 /// An active app
 #[derive(

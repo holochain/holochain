@@ -490,6 +490,7 @@ mod test {
     use crate::conductor::api::AdminResponse;
     use crate::conductor::api::AppInterfaceApi;
     use crate::conductor::conductor::ConductorBuilder;
+    use crate::conductor::state::AppInterfaceId;
     use crate::conductor::state::ConductorState;
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
@@ -1201,6 +1202,87 @@ mod test {
             assert_matches!(response, AdminResponse::StateDumped(s) if s == expected);
         };
         test_handle_incoming_admin_message(msg, respond, admin_api)
+            .await
+            .unwrap();
+        conductor_handle.shutdown().await.unwrap().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn dump_conductor_state() {
+        holochain_trace::test_run();
+        let uuid = Uuid::new_v4();
+        let dna = fake_dna_zomes(
+            &uuid.to_string(),
+            vec![("zomey".into(), TestWasm::Foo.into())],
+        );
+        let agent_pubkey = fake_agent_pubkey_1();
+
+        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+            .next()
+            .unwrap();
+        let (_tmpdir, _, conductor_handle, _agent_key) = setup_app_in_new_conductor(
+            "test app".to_string(),
+            Some(agent_pubkey.clone()),
+            vec![(dna.clone(), None)],
+        )
+        .await;
+        let dna_hash = dna.dna_hash();
+
+        conductor_handle
+            .clone()
+            .add_app_interface(
+                either::Either::Left(12345),
+                AllowedOrigins::Any,
+                Some("test app".into()),
+            )
+            .await
+            .unwrap();
+
+        // Construct expected response
+        #[derive(Serialize, Debug)]
+        pub struct ConductorSerialized {
+            running_cells: Vec<(DnaHashB64, AgentPubKeyB64)>,
+            shutting_down: bool,
+            admin_websocket_ports: Vec<u16>,
+            app_interfaces: Vec<AppInterfaceId>,
+        }
+
+        #[derive(Serialize, Debug)]
+        struct ConductorDump {
+            conductor: ConductorSerialized,
+            state: ConductorState,
+        }
+
+        let dpki_cell_id = conductor_handle
+            .running_services()
+            .dpki
+            .map(|dpki| dpki.cell_id.clone());
+        let mut running_cells = vec![];
+        if let Some(cell_id) = dpki_cell_id {
+            running_cells.push((
+                cell_id.dna_hash().clone().into(),
+                cell_id.agent_pubkey().clone().into(),
+            ));
+        }
+        running_cells.push((dna_hash.clone().into(), agent_pubkey.clone().into()));
+
+        let expected = ConductorDump {
+            conductor: ConductorSerialized {
+                running_cells,
+                shutting_down: false,
+                admin_websocket_ports: vec![],
+                app_interfaces: vec![AppInterfaceId::new(12345)],
+            },
+            state: conductor_handle.get_state_from_handle().await.unwrap(),
+        };
+        let expected_json = serde_json::to_string_pretty(&expected).unwrap();
+
+        // Get state
+        let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
+        let respond = move |response: AdminResponse| {
+            assert_matches!(response, AdminResponse::ConductorStateDumped(s) if s == expected_json);
+        };
+        test_handle_incoming_admin_message(AdminRequest::DumpConductorState, respond, admin_api)
             .await
             .unwrap();
         conductor_handle.shutdown().await.unwrap().unwrap();

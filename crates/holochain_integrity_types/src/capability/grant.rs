@@ -53,6 +53,36 @@ pub struct ZomeCallCapGrant {
     // pub curry_payloads: CurryPayloads,
 }
 
+/// The outbound DTO of a ZomeCall capability grant info request.
+/// CapAccess secrets are omitted, Access types and assignees are provided under CapAccessInfo.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct DesensitizedZomeCallCapGrant {
+    /// A string by which to later query for saved grants.
+    /// This does not need to be unique within a source chain.
+    pub tag: String,
+    /// Specifies who may claim this capability, and by what means omitting secrets
+    pub access: CapAccessInfo,
+    /// Set of functions to which this capability grants ZomeCall access
+    pub functions: GrantedFunctions,
+}
+
+impl From<ZomeCallCapGrant> for DesensitizedZomeCallCapGrant {
+    /// Create a new Desensitized ZomeCall capability grant
+    fn from(zccg: ZomeCallCapGrant) -> Self {
+        DesensitizedZomeCallCapGrant {
+            tag: zccg.tag,
+            access: CapAccessInfo {
+                access_type: zccg.access.as_variant_string().to_string(),
+                assignees: match &zccg.access {
+                    CapAccess::Assigned { assignees, .. } => Some(assignees.clone()),
+                    _ => None,
+                },
+            },
+            functions: zccg.functions,
+        }
+    }
+}
+
 impl ZomeCallCapGrant {
     /// Constructor
     pub fn new(
@@ -180,6 +210,15 @@ impl CapAccess {
             CapAccess::Assigned { .. } => "assigned",
         }
     }
+}
+
+/// Represents access info for capability grants .
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CapAccessInfo {
+    /// The access type.
+    access_type: String,
+    /// Agents who can use this grant.
+    assignees: Option<BTreeSet<AgentPubKey>>,
 }
 
 /// a single zome/function pair

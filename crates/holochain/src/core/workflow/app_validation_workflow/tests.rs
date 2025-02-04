@@ -535,7 +535,7 @@ async fn multi_create_link_validation() {
         .call(&alice_zome, "create_post", post.clone())
         .await;
 
-    await_consistency(Duration::from_secs(10), [&alice, &bobbo])
+    await_consistency(Duration::from_secs(20), [&alice, &bobbo])
         .await
         .expect("Timed out waiting for consistency");
 

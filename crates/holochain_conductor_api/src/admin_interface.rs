@@ -374,6 +374,16 @@ pub enum AdminRequest {
     /// [`AdminResponse::ZomeCallCapabilityGranted`]
     GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
 
+    /// Request capability grant info for all cells in the app.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::CapabilityGrantsInfo`]
+    ListCapabilityGrants {
+        installed_app_id: String,
+        include_revoked: bool,
+    },
+
     /// Delete a clone cell that was previously disabled.
     ///
     /// # Returns
@@ -547,6 +557,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
     ZomeCallCapabilityGranted,
+
+    /// The successful response to an [`AdminRequest::ListCapabilityGrants`].
+    CapabilityGrantsInfo(AppCapGrantInfo),
 
     /// The successful response to an [`AdminRequest::DeleteCloneCell`].
     CloneCellDeleted,
