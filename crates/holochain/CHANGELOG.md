@@ -6,8 +6,11 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- added admin_api capability_grant_info for getting a list of grants valid and revoked from the source chain
 - Change most enums that are exposed via the conductor API to be serialized with `tag = "type"` and `content = "value"` #4616
+
+## 0.5.0-dev.17
+
+- added admin\_api capability\_grant\_info for getting a list of grants valid and revoked from the source chain
 
 ## 0.5.0-dev.16
 
