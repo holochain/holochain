@@ -200,7 +200,7 @@ pub type RoleSettingsMap = HashMap<RoleName, RoleSettings>;
 
 /// Settings for a Role that may be passed on installation of an app
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum RoleSettings {
     /// If the role has the UseExisting strategy defined in the app manifest
     /// the cell id to use needs to be specified here.
