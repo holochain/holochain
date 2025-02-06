@@ -10,6 +10,7 @@ mod validation;
 pub mod workflow;
 
 mod metrics;
+mod share;
 mod sys_validate;
 
 pub use sys_validate::*;

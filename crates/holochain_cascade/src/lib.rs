@@ -56,14 +56,14 @@ use std::sync::Arc;
 use std::time::Instant;
 use tracing::*;
 
-#[cfg(feature = "test_utils")]
-use kitsune_p2p::dependencies::kitsune_p2p_types::{box_fut_plain, tx_utils::ShareOpen};
-
 pub mod authority;
 pub mod error;
 
 mod agent_activity;
 mod metrics;
+
+#[cfg(feature = "test_utils")]
+use futures::FutureExt;
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
@@ -1238,33 +1238,34 @@ impl MockCascade {
             })
             .collect();
 
-        let map0 = ShareOpen::new(map);
+        let map0 = Arc::new(parking_lot::Mutex::new(map));
 
         let map = map0.clone();
         cascade.expect_retrieve().returning(move |hash, _| {
-            box_fut_plain(Ok(map.share_ref(|m| {
-                m.get(&hash).map(|r| (r.clone(), CascadeSource::Local))
-            })))
+            let m = map.lock();
+            let result = m.get(&hash).map(|r| (r.clone(), CascadeSource::Local));
+            async move { Ok(result) }.boxed()
         });
 
         let map = map0.clone();
         cascade.expect_retrieve_action().returning(move |hash, _| {
-            box_fut_plain(Ok(map.share_ref(|m| {
-                m.get(&hash.into())
-                    .map(|r| (r.signed_action().clone(), CascadeSource::Local))
-            })))
+            let m = map.lock();
+            let result = m
+                .get(&hash.into())
+                .map(|r| (r.signed_action().clone(), CascadeSource::Local));
+            async move { Ok(result) }.boxed()
         });
 
         let map = map0;
         cascade.expect_retrieve_entry().returning(move |hash, _| {
-            box_fut_plain(Ok(map.share_ref(|m| {
-                m.get(&hash.into()).map(|r| {
-                    (
-                        EntryHashed::from_content_sync(r.entry().as_option().unwrap().clone()),
-                        CascadeSource::Local,
-                    )
-                })
-            })))
+            let m = map.lock();
+            let result = m.get(&hash.into()).map(|r| {
+                (
+                    EntryHashed::from_content_sync(r.entry().as_option().unwrap().clone()),
+                    CascadeSource::Local,
+                )
+            });
+            async move { Ok(result) }.boxed()
         });
 
         cascade
