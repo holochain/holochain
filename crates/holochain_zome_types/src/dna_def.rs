@@ -252,7 +252,7 @@ impl DnaDef {
         kitsune_p2p_dht::spacetime::Topology {
             space: SpaceDimension::standard(),
             time: TimeDimension::new(self.modifiers.quantum_time),
-            time_origin: self.modifiers.origin_time,
+            time_origin: kitsune_p2p_block::Timestamp::from_micros(self.modifiers.origin_time.0),
             time_cutoff: cutoff,
         }
     }

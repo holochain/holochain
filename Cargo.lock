@@ -2775,6 +2775,7 @@ dependencies = [
  "holochain_sqlite",
  "holochain_state",
  "holochain_test_wasm_common",
+ "holochain_timestamp",
  "holochain_trace",
  "holochain_types",
  "holochain_util",
@@ -2820,6 +2821,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "sha3",
  "shrinkwraprs",
  "sodoken 0.0.11",
  "structopt",
@@ -2829,7 +2831,6 @@ dependencies = [
  "tempfile",
  "test-case",
  "thiserror 1.0.69",
- "tiny-keccak",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
@@ -3081,10 +3082,10 @@ dependencies = [
  "holochain_integrity_types",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
+ "holochain_timestamp",
  "holochain_util",
- "kitsune_p2p_timestamp",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.1",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3147,7 +3148,7 @@ version = "0.5.0-dev.1"
 dependencies = [
  "getrandom 0.2.15",
  "holochain_secure_primitive",
- "kitsune_p2p_timestamp",
+ "holochain_timestamp",
 ]
 
 [[package]]
@@ -3233,13 +3234,13 @@ dependencies = [
  "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_sqlite",
+ "holochain_timestamp",
  "holochain_trace",
  "holochain_util",
  "holochain_zome_types",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
- "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
  "loom",
  "nanoid",
@@ -3293,7 +3294,6 @@ dependencies = [
  "holochain_wasm_test_utils",
  "holochain_zome_types",
  "kitsune_p2p",
- "kitsune_p2p_timestamp",
  "maplit",
  "matches",
  "nanoid",
@@ -3324,6 +3324,16 @@ name = "holochain_test_wasm_common"
 version = "0.5.0-dev.16"
 dependencies = [
  "hdk",
+ "serde",
+]
+
+[[package]]
+name = "holochain_timestamp"
+version = "0.5.0-dev.0"
+dependencies = [
+ "chrono",
+ "holochain_serialized_bytes",
+ "rusqlite",
  "serde",
 ]
 
@@ -3371,6 +3381,7 @@ dependencies = [
  "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_sqlite",
+ "holochain_timestamp",
  "holochain_trace",
  "holochain_types",
  "holochain_util",
@@ -3388,7 +3399,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.1",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3513,17 +3524,17 @@ dependencies = [
  "holochain_integrity_types",
  "holochain_nonce",
  "holochain_serialized_bytes",
+ "holochain_timestamp",
  "holochain_wasmer_common",
  "holochain_zome_types",
  "kitsune_p2p_block",
  "kitsune_p2p_dht",
- "kitsune_p2p_timestamp",
  "matches",
  "nanoid",
  "num_enum",
  "once_cell",
  "proptest",
- "proptest-derive 0.4.0",
+ "proptest-derive 0.5.1",
  "rand 0.8.5",
  "rusqlite",
  "serde",
@@ -4286,6 +4297,15 @@ dependencies = [
  "time",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "keccak"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ecc2af9a1119c51f12a14607e783cb977bde58bc069ff0c3da1095e635d70654"
+dependencies = [
+ "cpufeatures",
 ]
 
 [[package]]
@@ -7131,6 +7151,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha3"
+version = "0.10.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75872d278a8f37ef87fa0ddbda7802605cb18344497949862c0d4dcb291eba60"
+dependencies = [
+ "digest",
+ "keccak",
+]
+
+[[package]]
 name = "sharded-slab"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7832,15 +7862,6 @@ checksum = "2834e6017e3e5e4b9834939793b282bc03b37a3336245fa820e35e233e2a85de"
 dependencies = [
  "num-conv",
  "time-core",
-]
-
-[[package]]
-name = "tiny-keccak"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237"
-dependencies = [
- "crunchy",
 ]
 
 [[package]]

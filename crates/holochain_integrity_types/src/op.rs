@@ -6,7 +6,7 @@ use crate::{
 };
 use holo_hash::{ActionHash, AgentPubKey, EntryHash, HashableContent};
 use holochain_serialized_bytes::prelude::*;
-use kitsune_p2p_timestamp::Timestamp;
+use holochain_timestamp::Timestamp;
 
 /// These are the operations that can be applied to Holochain data.
 /// Every [`Action`] produces a set of operations.

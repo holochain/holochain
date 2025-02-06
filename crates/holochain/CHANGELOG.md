@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 - Change most enums that are exposed via the conductor API to be serialized with `tag = "type"` and `content = "value"` #4616
 
+- Replace `tiny-keccak` with `sha3` due to dependency on problematic `crunchy` crate
+
 ## 0.5.0-dev.17
 
 - added admin\_api capability\_grant\_info for getting a list of grants valid and revoked from the source chain
