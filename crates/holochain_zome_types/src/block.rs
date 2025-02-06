@@ -3,8 +3,8 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holochain_integrity_types::Timestamp;
-use kitsune_p2p_block::NodeSpaceBlockReason;
 use holochain_timestamp::InclusiveTimestampInterval;
+use kitsune_p2p_block::NodeSpaceBlockReason;
 #[cfg(feature = "rusqlite")]
 use rusqlite::types::ToSqlOutput;
 #[cfg(feature = "rusqlite")]
@@ -187,7 +187,8 @@ impl From<kitsune_p2p_block::Block> for Block {
             interval: InclusiveTimestampInterval::try_new(
                 Timestamp::from_micros(kblock.start().0),
                 Timestamp::from_micros(kblock.end().0),
-            ).unwrap(),
+            )
+            .unwrap(),
         }
     }
 }

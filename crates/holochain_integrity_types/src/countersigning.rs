@@ -645,11 +645,11 @@ mod test {
         ActionBase, AppEntryDef, CounterSigningAgentState, CreateBase, EntryType, EntryVisibility,
         PreflightBytes,
     };
-    use holochain_timestamp::Timestamp;
     use fixt::*;
     use holo_hash::fixt::ActionHashFixturator;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::fixt::EntryHashFixturator;
+    use holochain_timestamp::Timestamp;
     use std::time::Duration;
 
     fn test_preflight_request() -> PreflightRequest {

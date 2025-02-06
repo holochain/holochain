@@ -102,7 +102,10 @@ impl KitsuneHost for KitsuneHostImpl {
         timestamp: kitsune_p2p_types::Timestamp,
     ) -> KitsuneHostResult<bool> {
         async move {
-            let result = self.spaces.is_blocked(input.into(), Timestamp::from_micros(timestamp.0)).await;
+            let result = self
+                .spaces
+                .is_blocked(input.into(), Timestamp::from_micros(timestamp.0))
+                .await;
             Ok(result?)
         }
         .boxed()
