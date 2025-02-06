@@ -1,7 +1,6 @@
 use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
-use crate::timestamp::Timestamp;
 use crate::EntryRateWeight;
 use crate::MembraneProof;
 use crate::RateWeight;
@@ -14,6 +13,7 @@ use holo_hash::EntryHash;
 use holo_hash::HashableContent;
 use holo_hash::HoloHashed;
 use holochain_serialized_bytes::prelude::*;
+use holochain_timestamp::Timestamp;
 use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;

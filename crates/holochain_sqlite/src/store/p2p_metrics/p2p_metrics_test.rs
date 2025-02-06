@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSpace};
-use kitsune_p2p_timestamp::Timestamp;
 use kitsune_p2p_types::metrics::{MetricRecord, MetricRecordKind};
 use rand::Rng;
 use std::sync::Arc;
@@ -38,24 +37,24 @@ async fn test_p2p_metric_store_sanity() {
             MetricRecord {
                 kind: MetricRecordKind::ReachabilityQuotient,
                 agent: Some(rand_agent()),
-                recorded_at_utc: Timestamp::MIN,
-                expires_at_utc: Timestamp::MAX,
+                recorded_at_utc: kitsune_p2p_types::Timestamp::MIN,
+                expires_at_utc: kitsune_p2p_types::Timestamp::MAX,
                 data: serde_json::json!(42.42),
             },
             // -- latency micros -- //
             MetricRecord {
                 kind: MetricRecordKind::LatencyMicros,
                 agent: Some(rand_agent()),
-                recorded_at_utc: Timestamp::MIN,
-                expires_at_utc: Timestamp::MAX,
+                recorded_at_utc: kitsune_p2p_types::Timestamp::MIN,
+                expires_at_utc: kitsune_p2p_types::Timestamp::MAX,
                 data: serde_json::json!(42.42),
             },
             // -- agg extrap cov -- //
             MetricRecord {
                 kind: MetricRecordKind::AggExtrapCov,
                 agent: None,
-                recorded_at_utc: Timestamp::MIN,
-                expires_at_utc: Timestamp::MAX,
+                recorded_at_utc: kitsune_p2p_types::Timestamp::MIN,
+                expires_at_utc: kitsune_p2p_types::Timestamp::MAX,
                 data: serde_json::json!(42.42),
             },
         ])

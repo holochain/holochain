@@ -22,7 +22,7 @@ serde_bytes = "0.11"
 
 # Just the bare minimum timestamp with no extra features.
 # TODO: This needs to point to a published version of this crate and be pinned.
-kitsune_p2p_timestamp = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/timestamp", default-features = false }
+holochain_timestamp = { version = "^0.5.0-dev.0", path = "../timestamp", default-features = false }
 
 # TODO: Figure out how to remove these dependencies.
 subtle = "2"
@@ -49,21 +49,20 @@ default = []
 
 hashing = ["holo_hash/hashing"]
 
-full = ["default", "hashing", "subtle-encoding", "kitsune_p2p_timestamp/full"]
+full = ["default", "hashing", "subtle-encoding", "holochain_timestamp/now"]
 
 full-dna-def = ["derive_builder"]
 
 fuzzing = [
   "proptest",
   "proptest-derive",
-  "kitsune_p2p_timestamp/fuzzing",
   "holochain_serialized_bytes/fuzzing",
   "holo_hash/fuzzing",
 ]
 
 test_utils = [
   "full",
-  "kitsune_p2p_timestamp/now",
+  "holochain_timestamp/now",
   "holo_hash/hashing",
   "holo_hash/test_utils",
 ]

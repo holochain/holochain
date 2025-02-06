@@ -8,6 +8,7 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::SerializedBytesError;
+use holochain_timestamp::Timestamp;
 
 /// The timestamps on actions for a session use this offset relative to the session start time.
 /// This makes it easier for agents to accept a preflight request with actions that are after their current chain top, after network latency.
@@ -648,7 +649,7 @@ mod test {
     use holo_hash::fixt::ActionHashFixturator;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::fixt::EntryHashFixturator;
-    use kitsune_p2p_timestamp::Timestamp;
+    use holochain_timestamp::Timestamp;
     use std::time::Duration;
 
     fn test_preflight_request() -> PreflightRequest {

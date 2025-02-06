@@ -32,7 +32,7 @@ pub mod prelude;
 pub mod rate_limit;
 pub mod record;
 pub mod signature;
-pub use kitsune_p2p_timestamp as timestamp;
+pub use holochain_timestamp as timestamp;
 #[allow(missing_docs)]
 pub mod validate;
 #[allow(missing_docs)]

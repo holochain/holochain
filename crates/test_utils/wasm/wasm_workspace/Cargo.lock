@@ -647,8 +647,8 @@ dependencies = [
  "holo_hash",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
+ "holochain_timestamp",
  "holochain_util",
- "kitsune_p2p_timestamp",
  "serde",
  "serde_bytes",
  "subtle",
@@ -670,7 +670,7 @@ version = "0.5.0-dev.1"
 dependencies = [
  "getrandom",
  "holochain_secure_primitive",
- "kitsune_p2p_timestamp",
+ "holochain_timestamp",
 ]
 
 [[package]]
@@ -712,6 +712,14 @@ name = "holochain_test_wasm_common"
 version = "0.5.0-dev.16"
 dependencies = [
  "hdk",
+ "serde",
+]
+
+[[package]]
+name = "holochain_timestamp"
+version = "0.5.0-dev.0"
+dependencies = [
+ "chrono",
  "serde",
 ]
 
@@ -762,10 +770,10 @@ dependencies = [
  "holochain_integrity_types",
  "holochain_nonce",
  "holochain_serialized_bytes",
+ "holochain_timestamp",
  "holochain_wasmer_common",
  "kitsune_p2p_block",
  "kitsune_p2p_dht",
- "kitsune_p2p_timestamp",
  "nanoid",
  "rand",
  "serde",

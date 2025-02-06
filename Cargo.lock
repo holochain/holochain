@@ -2775,6 +2775,7 @@ dependencies = [
  "holochain_sqlite",
  "holochain_state",
  "holochain_test_wasm_common",
+ "holochain_timestamp",
  "holochain_trace",
  "holochain_types",
  "holochain_util",
@@ -3081,8 +3082,8 @@ dependencies = [
  "holochain_integrity_types",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
+ "holochain_timestamp",
  "holochain_util",
- "kitsune_p2p_timestamp",
  "proptest",
  "proptest-derive 0.5.1",
  "serde",
@@ -3147,7 +3148,7 @@ version = "0.5.0-dev.1"
 dependencies = [
  "getrandom 0.2.15",
  "holochain_secure_primitive",
- "kitsune_p2p_timestamp",
+ "holochain_timestamp",
 ]
 
 [[package]]
@@ -3233,13 +3234,13 @@ dependencies = [
  "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_sqlite",
+ "holochain_timestamp",
  "holochain_trace",
  "holochain_util",
  "holochain_zome_types",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_dht",
  "kitsune_p2p_dht_arc",
- "kitsune_p2p_timestamp",
  "kitsune_p2p_types",
  "loom",
  "nanoid",
@@ -3293,7 +3294,6 @@ dependencies = [
  "holochain_wasm_test_utils",
  "holochain_zome_types",
  "kitsune_p2p",
- "kitsune_p2p_timestamp",
  "maplit",
  "matches",
  "nanoid",
@@ -3324,6 +3324,16 @@ name = "holochain_test_wasm_common"
 version = "0.5.0-dev.16"
 dependencies = [
  "hdk",
+ "serde",
+]
+
+[[package]]
+name = "holochain_timestamp"
+version = "0.5.0-dev.0"
+dependencies = [
+ "chrono",
+ "holochain_serialized_bytes",
+ "rusqlite",
  "serde",
 ]
 
@@ -3371,6 +3381,7 @@ dependencies = [
  "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_sqlite",
+ "holochain_timestamp",
  "holochain_trace",
  "holochain_types",
  "holochain_util",
@@ -3513,11 +3524,11 @@ dependencies = [
  "holochain_integrity_types",
  "holochain_nonce",
  "holochain_serialized_bytes",
+ "holochain_timestamp",
  "holochain_wasmer_common",
  "holochain_zome_types",
  "kitsune_p2p_block",
  "kitsune_p2p_dht",
- "kitsune_p2p_timestamp",
  "matches",
  "nanoid",
  "num_enum",

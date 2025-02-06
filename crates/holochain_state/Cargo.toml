@@ -58,9 +58,6 @@ holochain_state = { path = ".", features = ["test_utils", "sqlite"] }
 
 anyhow = "1.0"
 fixt = { path = "../fixt" }
-kitsune_p2p_timestamp = { version = "^0.5.0-dev.1", path = "../kitsune_p2p/timestamp", features = [
-  "full",
-] }
 holochain_wasm_test_utils = { path = "../test_utils/wasm", features = [
   "build",
 ] }
