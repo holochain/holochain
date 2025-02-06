@@ -7,7 +7,7 @@ homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_timestamp"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "p2p", "dht", "networking"]
-categories = ["network-programming"]
+categories = ["date-and-time"]
 edition = "2021"
 
 # reminder - do not use workspace deps
