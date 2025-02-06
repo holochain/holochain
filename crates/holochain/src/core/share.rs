@@ -8,9 +8,9 @@ pub enum ShareError {
     /// This object is closed, calls on it are invalid.
     #[error("This object is closed, calls on it are invalid.")]
     Closed,
-    // /// An error ocurred in a closure that accessing the Share state
-    // #[error(transparent)]
-    // ClosureFailed(Box<dyn std::error::Error + Send + Sync>),
+    /// An error ocurred in a closure that accessing the Share state
+    #[error(transparent)]
+    ClosureFailed(Box<dyn std::error::Error + Send + Sync>),
 }
 
 /// Synchronized droppable share-lock around internal state date.

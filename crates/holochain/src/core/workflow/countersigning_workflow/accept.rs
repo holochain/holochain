@@ -6,7 +6,6 @@ use crate::prelude::{PreflightRequest, PreflightRequestAcceptance, PreflightResp
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_keystore::MetaLairClient;
 use holochain_zome_types::cell::CellId;
-use kitsune_p2p_types::KitsuneError;
 
 /// Accept a countersigning session.
 ///
@@ -80,7 +79,7 @@ pub async fn accept_countersigning_request(
     // session request in the workspace.
     let put_accepted_result = workspace.unwrap().inner.share_mut(|inner, _| {
         if inner.session.is_some() {
-            return Err(KitsuneError::other("Session already exists"));
+            return Err(ShareError::ClosureFailed("Session already exists"));
         }
 
         tracing::debug!(
