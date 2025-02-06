@@ -63,9 +63,6 @@ mod agent_activity;
 mod metrics;
 
 #[cfg(feature = "test_utils")]
-use futures::FutureExt;
-
-#[cfg(feature = "test_utils")]
 pub mod test_utils;
 
 /// Get an item from an option
@@ -1244,7 +1241,7 @@ impl MockCascade {
         cascade.expect_retrieve().returning(move |hash, _| {
             let m = map.lock();
             let result = m.get(&hash).map(|r| (r.clone(), CascadeSource::Local));
-            async move { Ok(result) }.boxed()
+            Box::pin(async move { Ok(result) })
         });
 
         let map = map0.clone();
@@ -1253,7 +1250,7 @@ impl MockCascade {
             let result = m
                 .get(&hash.into())
                 .map(|r| (r.signed_action().clone(), CascadeSource::Local));
-            async move { Ok(result) }.boxed()
+            Box::pin(async move { Ok(result) })
         });
 
         let map = map0;
@@ -1265,7 +1262,7 @@ impl MockCascade {
                     CascadeSource::Local,
                 )
             });
-            async move { Ok(result) }.boxed()
+            Box::pin(async move { Ok(result) })
         });
 
         cascade
