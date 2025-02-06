@@ -4,11 +4,11 @@ use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_w
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::{TriggerSender, WorkComplete};
 use crate::core::ribosome::weigh_placeholder;
+use crate::core::share::Share;
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
-use kitsune_p2p_types::tx_utils::Share;
 use std::collections::HashMap;
 
 /// A cheaply cloneable, thread-safe and in-memory store for

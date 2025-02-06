@@ -2872,6 +2872,7 @@ dependencies = [
  "matches",
  "mockall",
  "opentelemetry_api",
+ "parking_lot 0.12.3",
  "pretty_assertions",
  "test-case",
  "thiserror 1.0.69",

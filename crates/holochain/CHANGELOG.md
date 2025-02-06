@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.5.0-dev.17
 
 - added admin\_api capability\_grant\_info for getting a list of grants valid and revoked from the source chain
+- create an independent `Share` type in the holochain crate in order to not depend on the one from kitsune_p2p
 
 ## 0.5.0-dev.16
 
