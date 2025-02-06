@@ -3,7 +3,7 @@
 use holo_hash::*;
 use holochain_integrity_types::Signature;
 pub use holochain_serialized_bytes::prelude::*;
-use kitsune_p2p_timestamp::Timestamp;
+use holochain_timestamp::Timestamp;
 
 use crate::signature::Signed;
 

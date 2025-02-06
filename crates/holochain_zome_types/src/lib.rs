@@ -55,7 +55,7 @@ pub mod request;
 pub mod schedule;
 pub mod signal;
 pub mod signature;
-pub use kitsune_p2p_timestamp as timestamp;
+pub use holochain_timestamp as timestamp;
 pub mod trace;
 #[allow(missing_docs)]
 pub mod validate;
@@ -77,9 +77,6 @@ pub mod fixt;
 
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
-
-#[cfg(all(any(test, feature = "test_utils"), feature = "fuzzing"))]
-pub mod entropy;
 
 pub use action::Action;
 pub use entry::Entry;

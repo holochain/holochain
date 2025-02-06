@@ -684,8 +684,7 @@ mod test {
     use holochain_types::prelude::PreflightRequest;
     use holochain_zome_types::countersigning::PreflightResponse;
     use holochain_zome_types::prelude::CreateBase;
-    use kitsune_p2p::dependencies::kitsune_p2p_timestamp;
-    use kitsune_p2p_timestamp::Timestamp;
+    use holochain_timestamp::Timestamp;
     use matches::assert_matches;
     use std::time::Duration;
 

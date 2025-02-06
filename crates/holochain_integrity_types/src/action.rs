@@ -1,7 +1,6 @@
 use crate::entry_def::EntryVisibility;
 use crate::link::LinkTag;
 use crate::link::LinkType;
-use crate::timestamp::Timestamp;
 use crate::EntryRateWeight;
 use crate::MembraneProof;
 use crate::RateWeight;
@@ -17,6 +16,7 @@ use holochain_serialized_bytes::prelude::*;
 use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+use holochain_timestamp::Timestamp;
 
 pub mod builder;
 pub mod conversions;

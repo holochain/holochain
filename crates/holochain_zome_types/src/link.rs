@@ -4,7 +4,7 @@ use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::link::*;
-use kitsune_p2p_timestamp::Timestamp;
+use holochain_timestamp::Timestamp;
 
 #[derive(
     Debug,
