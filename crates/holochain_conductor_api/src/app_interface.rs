@@ -614,7 +614,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"disabled\",\"reason\":{\"type\":\"error\",\"value\":\"because\"}}"
+            "{\"type\":\"disabled\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}"
         );
 
         let status: AppInfoStatus =
@@ -622,14 +622,14 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"paused\",\"reason\":{\"type\":\"error\",\"value\":\"because\"}}",
+            "{\"type\":\"paused\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}",
         );
 
         let status: AppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"disabled\",\"reason\":{\"type\":\"user\"}}",
+            "{\"type\":\"disabled\",\"value\":{\"reason\":{\"type\":\"user\"}}}",
         );
     }
 }

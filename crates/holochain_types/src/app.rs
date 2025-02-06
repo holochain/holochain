@@ -197,6 +197,8 @@ pub type ModifiersMap = HashMap<RoleName, DnaModifiersOpt<YamlProperties>>;
 pub type ExistingCellsMap = HashMap<RoleName, CellId>;
 /// Alias
 pub type RoleSettingsMap = HashMap<RoleName, RoleSettings>;
+/// Alias
+pub type RoleSettingsMapYaml = HashMap<RoleName, RoleSettingsYaml>;
 
 /// Settings for a Role that may be passed on installation of an app
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -229,6 +231,45 @@ impl Default for RoleSettings {
             modifiers: None,
         }
     }
+}
+
+impl From<RoleSettingsYaml> for RoleSettings {
+    fn from(role_settings: RoleSettingsYaml) -> Self {
+        match role_settings {
+            RoleSettingsYaml::Provisioned {
+                membrane_proof,
+                modifiers,
+            } => Self::Provisioned {
+                membrane_proof,
+                modifiers,
+            },
+            RoleSettingsYaml::UseExisting { cell_id } => Self::UseExisting { cell_id },
+        }
+    }
+}
+
+/// A version of RoleSettings that serializes to YAML without the content attribute
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RoleSettingsYaml {
+    /// If the role has the UseExisting strategy defined in the app manifest
+    /// the cell id to use needs to be specified here.
+    UseExisting {
+        /// Existing cell id to use
+        cell_id: CellId,
+    },
+    /// Optional settings for a normally provisioned cell
+    Provisioned {
+        /// When the app being installed has the `allow_deferred_memproofs` manifest flag set,
+        /// passing `None` for this field for all roles in the app will allow the app to enter
+        /// the "deferred membrane proofs" state, so that memproofs can be provided later.
+        /// If `Some` is used here, whatever memproofs are
+        /// provided will be used, and the app will be installed as normal.
+        membrane_proof: Option<MembraneProof>,
+        /// Overwrites the dna modifiers from the dna manifest. Only
+        /// modifier fields for which `Some(T)` is provided will be overwritten.
+        modifiers: Option<DnaModifiersOpt<YamlProperties>>,
+    },
 }
 
 /// The possible locations of an AppBundle
@@ -1446,7 +1487,7 @@ mod tests {
         };
         assert_eq!(
             serde_json::to_string(&role_settings).unwrap(),
-            "{\"type\":\"provisioned\",\"membrane_proof\":null,\"modifiers\":null}"
+            "{\"type\":\"provisioned\",\"value\":{\"membrane_proof\":null,\"modifiers\":null}}"
         );
     }
 
