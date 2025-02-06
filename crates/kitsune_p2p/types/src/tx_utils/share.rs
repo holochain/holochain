@@ -1,15 +1,5 @@
 use crate::*;
 
-/// Error related to remote communication.
-#[derive(Clone, Debug)]
-pub struct ShareError(String);
-
-impl std::fmt::Display for ShareError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
 /// Synchronized droppable share-lock around internal state date.
 pub struct Share<T: 'static + Send>(Arc<parking_lot::Mutex<Option<T>>>);
 
