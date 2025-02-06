@@ -9,6 +9,7 @@ pub enum ShareError {
     #[error("This object is closed, calls on it are invalid.")]
     Closed,
     /// An error ocurred in a closure that accessing the Share state
+    #[cfg(feature = "unstable-countersigning")]
     #[error(transparent)]
     ClosureFailed(Box<dyn std::error::Error + Send + Sync>),
 }
