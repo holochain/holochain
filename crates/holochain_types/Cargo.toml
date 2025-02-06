@@ -43,6 +43,7 @@ holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util", feature
 holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.0-dev.15", features = [
   "full",
 ] }
+holochain_timestamp = { version = "0.5.0-dev.0", path = "../timestamp" }
 itertools = { version = "0.12" }
 kitsune_p2p_dht = { version = "^0.5.0-dev.2", path = "../kitsune_p2p/dht" }
 mr_bundle = { path = "../mr_bundle", features = [

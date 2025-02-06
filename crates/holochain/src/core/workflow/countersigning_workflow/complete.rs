@@ -11,9 +11,9 @@ use holochain_sqlite::error::DatabaseResult;
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::mutations;
 use holochain_state::prelude::*;
+use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::ChainOp;
 use holochain_zome_types::prelude::SignedAction;
-use kitsune_p2p_types::dht::prelude::Timestamp;
 use rusqlite::{named_params, Transaction};
 use std::sync::Arc;
 

@@ -3381,6 +3381,7 @@ dependencies = [
  "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_sqlite",
+ "holochain_timestamp",
  "holochain_trace",
  "holochain_types",
  "holochain_util",
