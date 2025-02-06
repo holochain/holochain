@@ -36,5 +36,8 @@ default = ["now"]
 
 now = ["dep:chrono"]
 
-sqlite-encrypted = ["dep:rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl"]
+sqlite-encrypted = [
+  "dep:rusqlite",
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+]
 sqlite = ["dep:rusqlite", "rusqlite/bundled"]
