@@ -142,15 +142,15 @@ impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
         self.dht_basis().get_loc()
     }
 
-    fn timestamp(&self) -> Timestamp {
-        self.timestamp()
+    fn timestamp(&self) -> kitsune_p2p_dht::Timestamp {
+        kitsune_p2p_dht::Timestamp::from_micros(self.timestamp().0)
     }
 
     fn region_data(&self) -> RegionData {
         unimplemented!()
     }
 
-    fn bound(_timestamp: Timestamp, _loc: kitsune_p2p_dht::Loc) -> Self {
+    fn bound(_timestamp: kitsune_p2p_dht::Timestamp, _loc: kitsune_p2p_dht::Loc) -> Self {
         unimplemented!()
     }
 }

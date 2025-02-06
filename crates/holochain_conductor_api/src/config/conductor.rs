@@ -117,7 +117,7 @@ pub struct ConductorConfig {
 
     /// DPKI config for this conductor. This setting must not change once the conductor has been
     /// started for the first time.
-    ///  
+    ///
     /// If `dna_path` is present, the DNA file at this path will be used to install the DPKI service upon first conductor startup.
     /// If not present, the Deepkey DNA specified by the `holochain_deepkey_dna` crate and built into Holochain, will be used instead.
     #[serde(default)]
@@ -556,7 +556,7 @@ mod tests {
     keystore_path: /path/to/keystore
     network:
       transport_pool:
-        - type: mem    
+        - type: mem
     keystore:
       type: lair_server
       connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"

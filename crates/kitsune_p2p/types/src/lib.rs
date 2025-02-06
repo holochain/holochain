@@ -217,6 +217,8 @@ pub mod tls;
 pub use kitsune_p2p_bin_data as bin_types;
 pub mod tx_utils;
 
+pub use kitsune_p2p_timestamp::Timestamp;
+
 #[cfg(feature = "fixt")]
 pub mod fixt;
 

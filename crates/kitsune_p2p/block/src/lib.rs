@@ -1,6 +1,7 @@
 use kitsune_p2p_timestamp::InclusiveTimestampInterval;
-use kitsune_p2p_timestamp::Timestamp;
 use std::sync::Arc;
+
+pub use kitsune_p2p_timestamp::Timestamp;
 
 #[derive(Clone)]
 pub enum AgentSpaceBlockReason {

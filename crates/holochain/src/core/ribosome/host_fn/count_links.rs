@@ -57,8 +57,10 @@ pub fn count_links<'a>(
 #[cfg(feature = "slow_tests")]
 mod tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::sweettest::{SweetConductorHandle, SweetZome};
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
+    use tokio::time::error::Elapsed;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn count_links() {
@@ -91,24 +93,9 @@ mod tests {
         let _: ActionHash = conductor.call(&bob, "create_link", ()).await;
 
         // Check that Alice can see her link and Bob's
-
-        tokio::time::timeout(std::time::Duration::from_secs(10), async move {
-            loop {
-                let count: usize = conductor
-                    .call(
-                        &alice,
-                        "get_count",
-                        LinkQuery::new(base.clone(), LinkTypeFilter::Dependencies(vec![ZomeIndex(0)])),
-                    )
-                    .await;
-
-                if count == 2 {
-                    break;
-                }
-
-                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            }
-        }).await.expect("Timed out waiting for alice to see both links");
+        wait_for_link_count(conductor.sweet_handle(), &alice, base, 2)
+            .await
+            .expect("Timed out waiting for agent to see both links");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -142,17 +129,9 @@ mod tests {
         let _: ActionHash = conductor.call(&bob, "create_link", ()).await;
 
         // Check that Alice can count her link and Bob's
-        let count: usize = conductor
-            .call(
-                &alice,
-                "get_count",
-                LinkQuery::new(
-                    base.clone(),
-                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
-                ),
-            )
-            .await;
-        assert_eq!(2, count);
+        wait_for_link_count(conductor.sweet_handle(), &alice, base.clone(), 2)
+            .await
+            .expect("Timed out waiting for alice to see both links");
 
         // Only count Alice's links
         let count: usize = conductor
@@ -213,17 +192,12 @@ mod tests {
         let _: ActionHash = conductor.call(&bob, "create_link", ()).await;
 
         // Check that Alice can count her link and Bob's
-        let count: usize = conductor
-            .call(
-                &alice,
-                "get_count",
-                LinkQuery::new(
-                    base.clone(),
-                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
-                ),
-            )
-            .await;
-        assert_eq!(2, count);
+        wait_for_link_count(
+            conductor.sweet_handle(),
+            &alice,
+            base.clone(),
+            2,
+        ).await.expect("Timed out waiting for alice to see both links");
 
         // Get links created before the mid-time (only Alice's)
         let count: usize = conductor
@@ -249,5 +223,34 @@ mod tests {
             )
             .await;
         assert_eq!(1, count);
+    }
+
+    async fn wait_for_link_count(
+        conductor: SweetConductorHandle,
+        zome: &SweetZome,
+        base: AnyLinkableHash,
+        count: usize,
+    ) -> Result<(), Elapsed> {
+        tokio::time::timeout(std::time::Duration::from_secs(10), async move {
+            loop {
+                let current_count: usize = conductor
+                    .call(
+                        zome,
+                        "get_count",
+                        LinkQuery::new(
+                            base.clone(),
+                            LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
+                        ),
+                    )
+                    .await;
+
+                if current_count == count {
+                    break;
+                }
+
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+        })
+            .await
     }
 }

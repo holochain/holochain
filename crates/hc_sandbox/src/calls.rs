@@ -5,6 +5,7 @@
 //! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
 //! but if you want more control use [`CmdRunner::command`].
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -19,6 +20,7 @@ use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
 use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
 use holochain_types::app::AppManifest;
 use holochain_types::app::RoleSettingsMap;
+use holochain_types::app::RoleSettingsMapYaml;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
@@ -553,7 +555,12 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
     let roles_settings = match roles_settings {
         Some(path) => {
             let yaml_string = std::fs::read_to_string(path)?;
-            Some(serde_yaml::from_str::<RoleSettingsMap>(&yaml_string)?)
+            let roles_settings_yaml = serde_yaml::from_str::<RoleSettingsMapYaml>(&yaml_string)?;
+            let mut roles_settings: RoleSettingsMap = HashMap::new();
+            for (k, v) in roles_settings_yaml.into_iter() {
+                roles_settings.insert(k, v.into());
+            }
+            Some(roles_settings)
         }
         None => None,
     };

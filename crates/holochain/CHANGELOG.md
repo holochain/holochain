@@ -6,6 +6,9 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Change most enums that are exposed via the conductor API to be serialized with `tag = "type"` and `content = "value"` #4616
+
+- Replace `tiny-keccak` with `sha3` due to dependency on problematic `crunchy` crate
 
 ## 0.5.0-dev.17
 

@@ -80,7 +80,7 @@ mod tests {
     #[ignore = "flaky: somehow in CI, the DB thread acquisition consistently times out"]
     async fn query_region_set_diff_size() {
         let db = test_dht_db();
-        let topo = Topology::standard(Timestamp::now(), Duration::ZERO);
+        let topo = Topology::standard(kitsune_p2p_types::Timestamp::now(), Duration::ZERO);
         let strat = ArqStrat::default();
         let arq_set = Arc::new(ArqSet::full_std());
 
@@ -99,7 +99,7 @@ mod tests {
             ));
             let sig = ::fixt::fixt!(Signature);
             let mut create = ::fixt::fixt!(Create);
-            create.timestamp = Timestamp::now();
+            create.timestamp = holochain_timestamp::Timestamp::now();
             let action = NewEntryAction::Create(create);
             DhtOpHashed::from_content_sync(ChainOp::StoreEntry(sig, action, entry))
         };

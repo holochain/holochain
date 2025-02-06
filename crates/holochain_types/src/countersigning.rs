@@ -1,12 +1,12 @@
 //! Types related to countersigning sessions.
 
 use holo_hash::{AgentPubKey, EntryHash};
+use holochain_timestamp::Timestamp;
 use holochain_zome_types::{
     cell::CellId,
     prelude::PreflightRequest,
     record::{SignedAction, SignedActionHashed},
 };
-use kitsune_p2p_dht::op::Timestamp;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

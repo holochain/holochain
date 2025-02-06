@@ -544,7 +544,11 @@ impl Spaces {
                             [end],
                             |row| row.get(0),
                         )?;
-                        DatabaseResult::Ok(Some((hashes, start..=end)))
+                        DatabaseResult::Ok(Some((
+                            hashes,
+                            kitsune_p2p_types::Timestamp::from_micros(start.0)
+                                ..=kitsune_p2p_types::Timestamp::from_micros(end.0),
+                        )))
                     }
                     None => Ok(None),
                 }
