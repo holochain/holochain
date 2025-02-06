@@ -80,7 +80,7 @@ pub async fn accept_countersigning_request(
     // session request in the workspace.
     let put_accepted_result = workspace.unwrap().inner.share_mut(|inner, _| {
         if inner.session.is_some() {
-            return Err(ShareError::ClosureFailed("Session already exists"));
+            return Err(ShareError::ClosureFailed("Session already exists".into()));
         }
 
         tracing::debug!(
