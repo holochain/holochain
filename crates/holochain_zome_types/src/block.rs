@@ -184,7 +184,6 @@ impl From<kitsune_p2p_block::Block> for Block {
     fn from(kblock: kitsune_p2p_block::Block) -> Self {
         Self {
             target: kblock.clone().into_target().into(),
-            // TODO converting between kitsune_p2p_ti
             interval: InclusiveTimestampInterval::try_new(
                 Timestamp::from_micros(kblock.start().0),
                 Timestamp::from_micros(kblock.end().0),
