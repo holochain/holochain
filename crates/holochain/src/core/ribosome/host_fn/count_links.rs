@@ -235,7 +235,7 @@ mod tests {
             loop {
                 let current_count: usize = conductor
                     .call(
-                        &zome,
+                        zome,
                         "get_count",
                         LinkQuery::new(
                             base.clone(),
