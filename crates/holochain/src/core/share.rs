@@ -63,7 +63,7 @@ impl<T: 'static + Send> Share<T> {
     {
         let t = self.0.lock();
         if t.is_none() {
-            return Err(ShareError::Closed.into());
+            return Err(ShareError::Closed);
         }
         f(t.as_ref().unwrap())
     }
@@ -78,7 +78,7 @@ impl<T: 'static + Send> Share<T> {
     {
         let mut t = self.0.lock();
         if t.is_none() {
-            return Err(ShareError::Closed.into());
+            return Err(ShareError::Closed);
         }
         let mut close = false;
         let r = f(t.as_mut().unwrap(), &mut close);
