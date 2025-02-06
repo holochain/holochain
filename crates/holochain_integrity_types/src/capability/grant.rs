@@ -152,6 +152,7 @@ impl CapGrant {
 
 /// Represents access requirements for capability grants.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CapAccess {
     /// No restriction: callable by anyone.
     Unrestricted,
@@ -225,6 +226,7 @@ pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum GrantedFunctions {
     /// grant all zomes all functions
     All,

@@ -14,10 +14,10 @@ use derive_more::From;
 use holo_hash::EntryHash;
 use holochain_zome_types::op::EntryCreationAction;
 
-/// A action of one of the two types that create a new entry.
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
 )]
+/// A action of one of the two types that create a new entry.
 pub enum NewEntryAction {
     /// A action which simply creates a new entry
     Create(Create),
