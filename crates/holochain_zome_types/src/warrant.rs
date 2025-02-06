@@ -67,7 +67,6 @@ impl HashableContent for Warrant {
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
 )]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum WarrantProof {
     /// Signifies evidence of a breach of chain integrity
     ChainIntegrity(ChainIntegrityWarrant),
@@ -86,7 +85,6 @@ pub enum WarrantProof {
     Hash,
     derive_more::From,
 )]
-#[serde(rename_all = "snake_case")]
 pub enum WarrantType {
     // NOTE: the values here cannot overlap with ActionType,
     // because they occupy the same field in the Action table.
@@ -112,7 +110,6 @@ impl rusqlite::ToSql for WarrantType {
 
 /// A warrant which is sent to AgentActivity authorities
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum ChainIntegrityWarrant {
     /// Something invalid was authored on a chain.
     /// When we receive this warrant, we fetch the Action and validate it
@@ -171,7 +168,6 @@ impl WarrantProof {
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
 )]
-#[serde(rename_all = "snake_case")]
 pub enum ValidationType {
     /// Sys validation
     Sys,
