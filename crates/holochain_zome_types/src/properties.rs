@@ -41,22 +41,3 @@ impl Default for YamlProperties {
         Self::empty()
     }
 }
-
-/// Not a great implementation: always returns null
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for YamlProperties {
-    fn arbitrary(_: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(serde_yaml::Value::Null.into())
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl proptest::arbitrary::Arbitrary for YamlProperties {
-    type Parameters = ();
-    type Strategy = proptest::strategy::BoxedStrategy<Self>;
-
-    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-        use proptest::strategy::{Just, Strategy};
-        Just(YamlProperties(serde_yaml::Value::Null)).boxed()
-    }
-}

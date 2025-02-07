@@ -11,6 +11,7 @@ use crate::{
     sweettest::{SweetDnaFile, SweetInlineZomes},
 };
 use fixt::fixt;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
 use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
 use holochain_sqlite::exports::FallibleIterator;
@@ -26,7 +27,7 @@ use holochain_zome_types::{
     chain::{ChainFilter, ChainFilters, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
     entry::MustGetActionInput,
-    fixt::{AgentPubKeyFixturator, CreateFixturator, DeleteFixturator, SignatureFixturator},
+    fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator},
     judged::Judged,
     op::{Op, RegisterAgentActivity, RegisterDelete},
     record::{SignedActionHashed, SignedHashed},

@@ -22,10 +22,6 @@ use std::num::Wrapping;
     derive_more::Deref,
     derive_more::Display,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct DhtLocation(pub Wrapping<u32>);
 
 impl DhtLocation {

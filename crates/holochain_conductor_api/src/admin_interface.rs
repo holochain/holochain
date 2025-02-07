@@ -20,7 +20,7 @@ use crate::{AppInfo, FullStateDump, RevokeAgentKeyPayload, StorageInfo};
 // and the enum variant on a key `type`, e.g.
 // `{ type: 'enable_app', data: { installed_app_id: 'test_app' } }`
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AdminRequest {
     /// Set up and register one or more new admin interfaces
     /// as specified by a list of configurations.
@@ -374,6 +374,16 @@ pub enum AdminRequest {
     /// [`AdminResponse::ZomeCallCapabilityGranted`]
     GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
 
+    /// Request capability grant info for all cells in the app.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::CapabilityGrantsInfo`]
+    ListCapabilityGrants {
+        installed_app_id: String,
+        include_revoked: bool,
+    },
+
     /// Delete a clone cell that was previously disabled.
     ///
     /// # Returns
@@ -413,7 +423,7 @@ pub enum AdminRequest {
 /// `{ type: 'app_interface_attached', data: { port: 4000 } }`
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[cfg_attr(test, derive(Clone))]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AdminResponse {
     /// Can occur in response to any [`AdminRequest`].
     ///
@@ -548,6 +558,9 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
     ZomeCallCapabilityGranted,
 
+    /// The successful response to an [`AdminRequest::ListCapabilityGrants`].
+    CapabilityGrantsInfo(AppCapGrantInfo),
+
     /// The successful response to an [`AdminRequest::DeleteCloneCell`].
     CloneCellDeleted,
 
@@ -570,7 +583,7 @@ pub type CompatibleCells = BTreeSet<(InstalledAppId, BTreeSet<CellId>)>;
 /// This intends to be application developer facing
 /// so it should be readable and relevant
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum ExternalApiWireError {
     // TODO: B-01506 Constrain these errors so they are relevant to
     // application developers and what they would need
@@ -605,6 +618,7 @@ impl ExternalApiWireError {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+#[serde(rename_all = "snake_case")]
 /// Filter for [`AdminRequest::ListApps`].
 ///
 /// App Status is a combination of two pieces of independent state:
@@ -741,12 +755,12 @@ mod tests {
             serialized_request,
             vec![
                 130, 164, 116, 121, 112, 101, 171, 100, 105, 115, 97, 98, 108, 101, 95, 97, 112,
-                112, 164, 100, 97, 116, 97, 129, 176, 105, 110, 115, 116, 97, 108, 108, 101, 100,
-                95, 97, 112, 112, 95, 105, 100, 167, 115, 111, 109, 101, 95, 105, 100
+                112, 165, 118, 97, 108, 117, 101, 129, 176, 105, 110, 115, 116, 97, 108, 108, 101,
+                100, 95, 97, 112, 112, 95, 105, 100, 167, 115, 111, 109, 101, 95, 105, 100
             ]
         );
 
-        let json_expected = r#"{"type":"disable_app","data":{"installed_app_id":"some_id"}}"#;
+        let json_expected = r#"{"type":"disable_app","value":{"installed_app_id":"some_id"}}"#;
         let mut deserializer = Deserializer::new(&*serialized_request);
         let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
         let json_actual = serde_json::to_string(&json_value).unwrap();
@@ -761,15 +775,15 @@ mod tests {
         assert_eq!(
             serialized_response,
             vec![
-                130, 164, 116, 121, 112, 101, 165, 101, 114, 114, 111, 114, 164, 100, 97, 116, 97,
-                130, 164, 116, 121, 112, 101, 174, 114, 105, 98, 111, 115, 111, 109, 101, 95, 101,
-                114, 114, 111, 114, 164, 100, 97, 116, 97, 170, 101, 114, 114, 111, 114, 95, 116,
-                101, 120, 116
+                130, 164, 116, 121, 112, 101, 165, 101, 114, 114, 111, 114, 165, 118, 97, 108, 117,
+                101, 130, 164, 116, 121, 112, 101, 174, 114, 105, 98, 111, 115, 111, 109, 101, 95,
+                101, 114, 114, 111, 114, 165, 118, 97, 108, 117, 101, 170, 101, 114, 114, 111, 114,
+                95, 116, 101, 120, 116
             ]
         );
 
         let json_expected =
-            r#"{"type":"error","data":{"type":"ribosome_error","data":"error_text"}}"#;
+            r#"{"type":"error","value":{"type":"ribosome_error","value":"error_text"}}"#;
         let mut deserializer = Deserializer::new(&*serialized_response);
         let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
         let json_actual = serde_json::to_string(&json_value).unwrap();

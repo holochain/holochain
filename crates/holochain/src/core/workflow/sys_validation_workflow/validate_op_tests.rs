@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use super::retrieve_previous_actions_for_ops;
 use super::validation_deps::SysValDeps;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
@@ -11,9 +8,15 @@ use crate::prelude::*;
 use ::fixt::prelude::*;
 use futures::FutureExt;
 use hdk::prelude::Dna as HdkDna;
+use holo_hash::fixt::ActionHashFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::DnaHashFixturator;
+use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 use holochain_serialized_bytes::prelude::SerializedBytes;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {

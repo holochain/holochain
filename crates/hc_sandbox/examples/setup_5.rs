@@ -35,11 +35,12 @@ async fn main() -> anyhow::Result<()> {
         let app_id = app_id.clone();
 
         // Create a conductor config with the network.
-        let path = hc_sandbox::generate::generate(
+        let path = holochain_conductor_config::generate::generate(
             Some(network.clone()),
             None,
             None,
             false,
+            0,
             #[cfg(feature = "unstable-dpki")]
             false,
             #[cfg(feature = "unstable-dpki")]

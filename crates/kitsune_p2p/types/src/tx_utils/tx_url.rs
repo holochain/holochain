@@ -95,28 +95,3 @@ impl TryFrom<&str> for TxUrl {
         })?)))
     }
 }
-
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for TxUrl {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        // XXX: not the best implementation, it doesn't exercise other protocols
-        let s = String::arbitrary(u)?;
-        Ok(TxUrl::from_str_panicking(&format!("http://{s}")))
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl proptest::arbitrary::Arbitrary for TxUrl {
-    type Parameters = ();
-    type Strategy = proptest::strategy::BoxedStrategy<TxUrl>;
-
-    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-        use proptest::strategy::Strategy;
-
-        // XXX: not the best implementation, it doesn't exercise other protocols
-        proptest::string::string_regex(r"http://\w+")
-            .unwrap()
-            .prop_map(|s| TxUrl::from_str_panicking(&s))
-            .boxed()
-    }
-}

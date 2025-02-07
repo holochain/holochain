@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Add `hdk_extern` tests
 
+## 0.5.0-dev.16
+
 ## 0.5.0-dev.15
 
 ## 0.5.0-dev.14

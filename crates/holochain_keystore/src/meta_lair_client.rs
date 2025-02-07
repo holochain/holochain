@@ -141,6 +141,13 @@ impl MetaLairClient {
         Ok(MetaLairClient(inner, c_check_send))
     }
 
+    /// Create a MetaLairClient from a LairClient
+    pub async fn from_client(client: LairClient) -> LairResult<Self> {
+        let inner = Arc::new(Mutex::new(client));
+        let (c_check_send, _) = tokio::sync::mpsc::unbounded_channel();
+        Ok(MetaLairClient(inner, c_check_send))
+    }
+
     /// Get the raw underlying lair client instance.
     pub fn lair_client(&self) -> LairClient {
         self.0.lock().clone()

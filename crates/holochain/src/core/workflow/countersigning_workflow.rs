@@ -1,11 +1,12 @@
 //! Countersigning workflow to maintain countersigning session state.
 
+use crate::core::share::Share;
 use holochain_p2p::{
     event::CountersigningSessionNegotiationMessage, HolochainP2pDna, HolochainP2pDnaT,
 };
 use holochain_state::prelude::*;
-use kitsune_p2p_types::tx_utils::Share;
 use std::time::Duration;
+
 #[cfg(feature = "unstable-countersigning")]
 use {
     super::error::WorkflowResult,

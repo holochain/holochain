@@ -53,6 +53,7 @@ pub async fn witness_nonce(
 #[cfg(test)]
 pub mod test {
     use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_nonce::fresh_nonce;
     use holochain_zome_types::prelude::*;
 

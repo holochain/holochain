@@ -34,7 +34,6 @@ async fn test_new_lair_conductor_integration() {
             .unwrap(),
     );
 
-    // start the ipc keystore
     let keystore = IpcKeystoreServer::new(config, create_mem_store_factory(), passphrase)
         .await
         .unwrap();

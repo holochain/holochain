@@ -4,11 +4,11 @@ use super::{error::WorkflowResult, incoming_dht_ops_workflow::incoming_dht_ops_w
 use crate::conductor::space::Space;
 use crate::core::queue_consumer::{TriggerSender, WorkComplete};
 use crate::core::ribosome::weigh_placeholder;
+use crate::core::share::Share;
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
-use kitsune_p2p_types::tx_utils::Share;
 use std::collections::HashMap;
 
 /// A cheaply cloneable, thread-safe and in-memory store for
@@ -252,28 +252,32 @@ impl WitnessingWorkspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arbitrary::Arbitrary;
+    use ::fixt::*;
+    use holo_hash::fixt::DhtOpHashFixturator;
+    use holo_hash::fixt::EntryHashFixturator;
 
     /// Test that a session of 5 actions is complete when the expiry time is in the future and all
     /// required actions are present.
     #[test]
     fn gets_complete_sessions() {
-        let mut u = arbitrary::Unstructured::new(&NOISE);
         let workspace = WitnessingWorkspace::new();
 
         // - Create the ops.
-        let data = |u: &mut arbitrary::Unstructured| {
-            let op_hash = DhtOpHash::arbitrary(u).unwrap();
-            let op = ChainOp::arbitrary(u).unwrap();
+        let data = || {
+            let op_hash = fixt!(DhtOpHash);
+            let op = ChainOp::RegisterAddLink(
+                Signature(vec![1; 64].try_into().unwrap()),
+                fixt!(CreateLink),
+            );
             let action = op.action();
             (op_hash, op, action)
         };
-        let entry_hash = EntryHash::arbitrary(&mut u).unwrap();
+        let entry_hash = fixt!(EntryHash);
         let mut op_hashes = Vec::new();
         let mut ops = Vec::new();
         let mut required_actions = Vec::new();
         for _ in 0..5 {
-            let (op_hash, op, action) = data(&mut u);
+            let (op_hash, op, action) = data();
             let action_hash = ActionHash::with_data_sync(&action);
             op_hashes.push(op_hash);
             ops.push(op);
@@ -310,14 +314,16 @@ mod tests {
     /// Test that expired sessions are removed.
     #[test]
     fn expired_sessions_removed() {
-        let mut u = arbitrary::Unstructured::new(&NOISE);
         let workspace = WitnessingWorkspace::new();
 
         // - Create an op for a session that has expired in the past.
-        let op_hash = DhtOpHash::arbitrary(&mut u).unwrap();
-        let op = ChainOp::arbitrary(&mut u).unwrap();
+        let op_hash = fixt!(DhtOpHash);
+        let op = ChainOp::RegisterAddLink(
+            Signature(vec![1; 64].try_into().unwrap()),
+            fixt!(CreateLink),
+        );
         let action = op.action();
-        let entry_hash = EntryHash::arbitrary(&mut u).unwrap();
+        let entry_hash = fixt!(EntryHash);
         let action_hash = ActionHash::with_data_sync(&action);
         let expires = (Timestamp::now() - std::time::Duration::from_secs(60 * 60)).unwrap();
 

@@ -240,11 +240,12 @@ impl HcSandbox {
                 );
                 for i in 0..num_sandboxes {
                     let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
-                    let path = crate::generate::generate(
+                    let path = holochain_conductor_config::generate::generate(
                         network,
                         root.clone(),
                         directories.get(i).cloned(),
                         in_process_lair,
+                        0,
                         #[cfg(feature = "unstable-dpki")]
                         no_dpki,
                         #[cfg(feature = "unstable-dpki")]

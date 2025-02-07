@@ -54,9 +54,6 @@ use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
 
-#[cfg(test)]
-mod tests;
-
 #[derive(Clone)]
 /// This is the set of all current
 /// [`DnaHash`] spaces for all cells
@@ -547,7 +544,11 @@ impl Spaces {
                             [end],
                             |row| row.get(0),
                         )?;
-                        DatabaseResult::Ok(Some((hashes, start..=end)))
+                        DatabaseResult::Ok(Some((
+                            hashes,
+                            kitsune_p2p_types::Timestamp::from_micros(start.0)
+                                ..=kitsune_p2p_types::Timestamp::from_micros(end.0),
+                        )))
                     }
                     None => Ok(None),
                 }

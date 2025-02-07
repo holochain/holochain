@@ -73,10 +73,6 @@ impl AgentKey {
     serde::Serialize,
     serde::Deserialize,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct RegionHash(pub Hash32);
 
 impl RegionHash {

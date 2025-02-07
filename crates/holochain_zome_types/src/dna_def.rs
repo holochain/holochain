@@ -29,7 +29,6 @@ pub type CoordinatorZomes = Vec<(ZomeName, CoordinatorZomeDef)>;
 /// Hence, this type can basically be thought of as a fully validated, normalized
 /// `DnaManifest`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 #[cfg_attr(feature = "full-dna-def", builder(public))]
 pub struct DnaDef {
@@ -253,7 +252,7 @@ impl DnaDef {
         kitsune_p2p_dht::spacetime::Topology {
             space: SpaceDimension::standard(),
             time: TimeDimension::new(self.modifiers.quantum_time),
-            time_origin: self.modifiers.origin_time,
+            time_origin: kitsune_p2p_block::Timestamp::from_micros(self.modifiers.origin_time.0),
             time_cutoff: cutoff,
         }
     }

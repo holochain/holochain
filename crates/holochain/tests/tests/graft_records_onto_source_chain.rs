@@ -3,6 +3,7 @@
 
 use ::fixt::prelude::*;
 use hdk::prelude::*;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::conductor::api::error::ConductorApiError;
 use holochain::sweettest::{
     DynSweetRendezvous, SweetConductor, SweetConductorConfig, SweetDnaFile, SweetInlineZomes,

@@ -9,13 +9,14 @@ use crate::core::workflow::sys_validation_workflow::validation_query;
 use crate::core::{SysValidationError, ValidationOutcome};
 use crate::sweettest::*;
 use crate::test_utils::{
-    get_valid_and_integrated_count, host_fn_caller::*, new_invocation, new_zome_call_params,
-    wait_for_integration,
+    get_valid_and_integrated_count, get_valid_and_not_integrated_count, host_fn_caller::*,
+    new_invocation, new_zome_call_params, wait_for_integration,
 };
 use ::fixt::fixt;
-use arbitrary::Arbitrary;
 use hdk::hdi::test_utils::set_zome_types;
 use hdk::prelude::*;
+use holo_hash::fixt::ActionHashFixturator;
+use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_p2p::actor::HolochainP2pRefToDna;
@@ -534,7 +535,7 @@ async fn multi_create_link_validation() {
         .call(&alice_zome, "create_post", post.clone())
         .await;
 
-    await_consistency(Duration::from_secs(10), [&alice, &bobbo])
+    await_consistency(Duration::from_secs(20), [&alice, &bobbo])
         .await
         .expect("Timed out waiting for consistency");
 
@@ -844,7 +845,6 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
 /// Check the AppEntryDef is valid for the zome and the EntryDefId and ZomeIndex are in range.
 #[tokio::test(flavor = "multi_thread")]
 async fn check_app_entry_def_test() {
-    let mut u = unstructured_noise();
     holochain_trace::test_run();
     let TestWasmPair::<DnaWasm> {
         integrity,
@@ -870,8 +870,6 @@ async fn check_app_entry_def_test() {
     )
     .await;
     let dna_hash = dna_file.dna_hash().to_owned().clone();
-    let mut entry_def = EntryDef::arbitrary(&mut u).unwrap();
-    entry_def.visibility = EntryVisibility::Public;
 
     let db_dir = test_db_dir();
     let data_root_dir: DataRootPath = db_dir.path().to_path_buf().into();
@@ -1036,10 +1034,16 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             .len();
     assert_eq!(ops_to_validate, 0);
 
-    // Check that the new op is validated and integrated
+    // The op should be marked as valid but not integrated.
+    assert_eq!(
+        get_valid_and_not_integrated_count(&app_validation_workspace.dht_db).await,
+        1
+    );
+
+    // Check that the new op is not integrated yet
     assert_eq!(
         get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
-        8
+        7
     );
 }
 

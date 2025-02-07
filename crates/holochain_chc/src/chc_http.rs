@@ -185,6 +185,7 @@ fn extract_string(e: reqwest::Error) -> ChcError {
 mod tests {
 
     use super::*;
+    use holo_hash::fixt::*;
     use holochain_types::test_utils::valid_arbitrary_chain;
     use pretty_assertions::assert_eq;
 
@@ -201,9 +202,7 @@ mod tests {
             &cell_id,
         ));
 
-        let mut g = random_generator();
-
-        let chain = valid_arbitrary_chain(&mut g, keystore, agent, 20).await;
+        let chain = valid_arbitrary_chain(&keystore, agent, 20).await;
 
         let t0 = &chain[0..3];
         let t1 = &chain[3..6];

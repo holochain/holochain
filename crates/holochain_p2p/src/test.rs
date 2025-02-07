@@ -215,19 +215,20 @@ fixturator!(
 
 #[cfg(test)]
 mod tests {
+    use crate::HolochainP2pSender;
     use crate::*;
     use ::fixt::prelude::*;
     use futures::future::FutureExt;
     use ghost_actor::GhostControlSender;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::fixt::DhtOpHashFixturator;
     use holochain_keystore::test_keystore;
+    use holochain_types::prelude::*;
     use kitsune_p2p::dht::prelude::Topology;
     use kitsune_p2p::dht::{ArqStrat, PeerView, PeerViewQ};
-    use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken::sign;
-
-    use crate::HolochainP2pSender;
-    use holochain_types::prelude::*;
     use kitsune_p2p::*;
     use kitsune_p2p_types::config::KitsuneP2pConfig;
+    use kitsune_p2p_types::dependencies::lair_keystore_api::dependencies::sodoken::sign;
     use kitsune_p2p_types::tls::TlsConfig;
     use std::sync::Mutex;
 

@@ -8,7 +8,6 @@
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct WebAppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
@@ -23,7 +22,6 @@ pub struct WebAppManifestV1 {
 /// Web UI .zip file that should be associated with the happ
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct WebUI {
     /// Where to find this UI.
     ///
@@ -36,7 +34,6 @@ pub struct WebUI {
 /// Location of the happ bundle to bind with the Web UI
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct AppManifestLocation {
     /// Where to find the happ for this web-happ.
     ///

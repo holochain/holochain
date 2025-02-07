@@ -97,6 +97,8 @@ mod tests {
     use super::*;
     use crate::mutations::{insert_action, insert_op_lite};
     use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::fixt::DhtOpHashFixturator;
     use holochain_sqlite::schema::SCHEMA_CELL;
     use holochain_types::dht_op::DhtOpLite;
     use holochain_types::dht_op::OpOrder;

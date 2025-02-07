@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_api"
-version = "0.5.0-dev.13"
+version = "0.5.0-dev.17"
 description = "Message types for Holochain admin and app interface protocols"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -12,30 +12,34 @@ edition = "2021"
 [dependencies]
 cfg-if = "1.0"
 derive_more = "0.99"
-kitsune_p2p_types = { version = "^0.5.0-dev.6", path = "../kitsune_p2p/types" }
-kitsune_p2p_bin_data = { version = "^0.5.0-dev.2", path = "../kitsune_p2p/bin_data" }
-holo_hash = { version = "^0.5.0-dev.4", path = "../holo_hash", features = [
+kitsune_p2p_types = { version = "^0.5.0-dev.8", path = "../kitsune_p2p/types" }
+kitsune_p2p_bin_data = { version = "^0.5.0-dev.4", path = "../kitsune_p2p/bin_data" }
+holo_hash = { version = "^0.5.0-dev.6", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_state_types = { version = "^0.5.0-dev.7", path = "../holochain_state_types" }
+holochain_state_types = { version = "^0.5.0-dev.11", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_types = { version = "^0.5.0-dev.13", path = "../holochain_types" }
-holochain_zome_types = { version = "^0.5.0-dev.11", path = "../holochain_zome_types" }
+holochain_types = { version = "^0.5.0-dev.17", path = "../holochain_types" }
+holochain_zome_types = { version = "^0.5.0-dev.15", path = "../holochain_zome_types" }
+holochain_util = { version = "^0.5.0-dev.1", default-features = false, path = "../holochain_util", features = [
+  "jsonschema",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tracing = "0.1.26"
 thiserror = "1.0.22"
 url2 = "0.0.6"
-holochain_keystore = { version = "^0.5.0-dev.12", path = "../holochain_keystore" }
+holochain_keystore = { version = "^0.5.0-dev.16", path = "../holochain_keystore" }
 shrinkwraprs = "0.3.0"
 indexmap = { version = "2.6.0", features = ["serde"] }
+schemars = "0.8.21"
 
 [dev-dependencies]
 serde_json = "1.0"
 rmp-serde = "1.3"
 matches = { version = "0.1.8" }
 holochain_trace = { version = "^0.5.0-dev.1", path = "../holochain_trace" }
-kitsune_p2p = { version = "^0.5.0-dev.8", path = "../kitsune_p2p/kitsune_p2p" }
+kitsune_p2p = { version = "^0.5.0-dev.10", path = "../kitsune_p2p/kitsune_p2p" }
 pretty_assertions = "1.4"
 
 

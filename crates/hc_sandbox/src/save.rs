@@ -4,13 +4,11 @@
 //! to / from a `.hc` file.
 //! This is very much WIP and subject to change.
 
-use crate::config;
-use anyhow::Context;
-use holochain_conductor_api::conductor::paths::ConfigFilePath;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+
+use anyhow::Context;
+use holochain_conductor_api::conductor::paths::{ConfigFilePath, ConfigRootPath};
 
 /// Save all sandboxes to the `.hc` file in the `hc_dir` directory.
 pub fn save(mut hc_dir: PathBuf, paths: Vec<ConfigRootPath>) -> anyhow::Result<()> {
@@ -106,7 +104,9 @@ pub fn list(hc_dir: PathBuf, verbose: bool) -> anyhow::Result<()> {
             let r = match verbose {
                 false => format!("{}{}: {}\n", out, i, path.display()),
                 true => {
-                    let config = config::read_config(ConfigRootPath::from(path.clone()))?;
+                    let config = holochain_conductor_config::config::read_config(
+                        ConfigRootPath::from(path.clone()),
+                    )?;
                     format!(
                         "{}{}: {}\nConductor Config:\n{:?}\n",
                         out,

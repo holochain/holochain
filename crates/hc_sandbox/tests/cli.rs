@@ -1,10 +1,10 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
-use holochain_cli_sandbox::config::read_config;
 use holochain_conductor_api::conductor::ConductorConfig;
 #[cfg(feature = "unstable-dpki")]
 use holochain_conductor_api::conductor::DpkiConfig;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
 use holochain_conductor_api::{AppResponse, CellInfo};
+use holochain_conductor_config::config::read_config;
 use holochain_types::app::InstalledAppId;
 use holochain_types::prelude::{SerializedBytes, SerializedBytesError, Timestamp, YamlProperties};
 use holochain_websocket::{
@@ -351,7 +351,7 @@ async fn generate_sandbox_with_roles_settings_override() {
                 .clone()
                 .into_iter()
                 .find(|r| r.name == "role-1")
-                .expect("role1 not found in the manifest of the isntalled app.");
+                .expect("role1 not found in the manifest of the installed app.");
 
             assert_eq!(
                 role1.dna.modifiers.network_seed.unwrap(),
@@ -559,7 +559,6 @@ async fn create_sandbox_with_custom_dpki_network_seed() {
 async fn authorize_zome_call_credentials() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
-
     holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")

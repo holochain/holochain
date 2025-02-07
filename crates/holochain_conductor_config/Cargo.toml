@@ -1,0 +1,44 @@
+[package]
+name = "holochain_conductor_config"
+version = "0.5.0-dev.4"
+description = "Provides utilities for generating holochain conductor configuration."
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_conductor_config"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "holo"]
+categories = ["development-tools::build-utils", "config"]
+edition = "2021"
+license = "Apache-2.0"
+
+# reminder - do not use workspace deps
+[dependencies]
+anyhow = "1.0"
+ansi_term = "0.12"
+holochain_conductor_api = { version = "^0.5.0-dev.17", path = "../holochain_conductor_api", features = [
+  "sqlite",
+] }
+holochain_types = { version = "^0.5.0-dev.17", path = "../holochain_types", features = [
+  "sqlite",
+] }
+holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util", default-features = false, features = [
+  "pw",
+] }
+kitsune_p2p_types = { version = "^0.5.0-dev.8", path = "../kitsune_p2p/types" }
+nanoid = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+sodoken = "=0.0.11"
+url2 = "0.0.6"
+
+[dev-dependencies]
+tempfile = "3.15"
+
+[features]
+default = []
+
+unstable-dpki = ["holochain_conductor_api/unstable-dpki"]
+
+chc = ["holochain_conductor_api/chc"]
+
+[lints]
+workspace = true

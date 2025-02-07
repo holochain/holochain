@@ -14,7 +14,7 @@ use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
 ///
 /// Returns an [`AppResponse::Error`] with a reason why the request failed.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppRequest {
     /// Get info about the app that you are connected to, including info about each cell installed
     /// by this app.
@@ -214,7 +214,7 @@ pub enum AppRequest {
 
 /// Represents the possible responses to an [`AppRequest`].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppResponse {
     /// Can occur in response to any [`AppRequest`].
     ///
@@ -307,7 +307,7 @@ impl ZomeCallParamsSigned {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CellInfo {
     /// Cells provisioned at app installation as defined in the bundle.
     Provisioned(ProvisionedCell),
@@ -503,7 +503,7 @@ pub struct RevokeAgentKeyPayload {
 
 /// A flat, slightly more API-friendly representation of [`AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppInfoStatus {
     Paused { reason: PausedAppReason },
     Disabled { reason: DisabledAppReason },
@@ -590,14 +590,14 @@ mod tests {
             serialized_response,
             vec![
                 130, 164, 116, 121, 112, 101, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109, 95,
-                104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 164, 100, 97,
-                116, 97, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111, 115,
-                116, 95, 102, 110, 95, 50
+                104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 165, 118, 97,
+                108, 117, 101, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111,
+                115, 116, 95, 102, 110, 95, 50
             ]
         );
 
         let json_expected =
-            r#"{"type":"list_wasm_host_functions","data":["host_fn_1","host_fn_2"]}"#;
+            r#"{"type":"list_wasm_host_functions","value":["host_fn_1","host_fn_2"]}"#;
         let mut deserializer = Deserializer::new(&*serialized_response);
         let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
         let json_actual = serde_json::to_string(&json_value).unwrap();
@@ -614,7 +614,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}"
+            "{\"type\":\"disabled\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}"
         );
 
         let status: AppInfoStatus =
@@ -622,14 +622,14 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
+            "{\"type\":\"paused\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}",
         );
 
         let status: AppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"disabled\":{\"reason\":\"user\"}}"
+            "{\"type\":\"disabled\",\"value\":{\"reason\":{\"type\":\"user\"}}}",
         );
     }
 }

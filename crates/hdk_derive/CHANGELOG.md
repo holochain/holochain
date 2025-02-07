@@ -1,6 +1,7 @@
 ---
 default_semver_increment_mode: !pre_minor dev
 ---
+
 # Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -8,6 +9,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## \[Unreleased\]
 
 - `#[hdk_extern]` validates the annotated function's return type
+
+## 0.5.0-dev.12
+
+## 0.5.0-dev.11
+
+## 0.5.0-dev.10
+
+## 0.5.0-dev.9
 
 ## 0.5.0-dev.8
 
