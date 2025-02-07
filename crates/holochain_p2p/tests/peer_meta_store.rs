@@ -19,7 +19,6 @@ async fn peer_meta_crd() {
 
     store
         .put(
-            SpaceId::from(Bytes::from_static("test".as_bytes())),
             peer_url.clone(),
             key.clone(),
             Bytes::from_static("test".as_bytes()),
@@ -28,35 +27,14 @@ async fn peer_meta_crd() {
         .await
         .unwrap();
 
-    let value = store
-        .get(
-            SpaceId::from(Bytes::from_static("test".as_bytes())),
-            peer_url.clone(),
-            key.clone(),
-        )
-        .await
-        .unwrap();
+    let value = store.get(peer_url.clone(), key.clone()).await.unwrap();
 
     assert!(value.is_some());
     assert_eq!(Bytes::from_static("test".as_bytes()), value.unwrap());
 
-    store
-        .delete(
-            SpaceId::from(Bytes::from_static("test".as_bytes())),
-            peer_url.clone(),
-            key.clone(),
-        )
-        .await
-        .unwrap();
+    store.delete(peer_url.clone(), key.clone()).await.unwrap();
 
-    let value = store
-        .get(
-            SpaceId::from(Bytes::from_static("test".as_bytes())),
-            peer_url,
-            key,
-        )
-        .await
-        .unwrap();
+    let value = store.get(peer_url, key).await.unwrap();
 
     assert!(value.is_none());
 }
@@ -76,7 +54,6 @@ async fn prune_on_create() {
 
         store
             .put(
-                SpaceId::from(Bytes::from_static("test".as_bytes())),
                 peer_url,
                 key,
                 Bytes::from_static("test".as_bytes()),

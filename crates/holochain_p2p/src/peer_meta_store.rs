@@ -6,7 +6,7 @@ use holochain_sqlite::prelude::DbKindPeerMetaStore;
 use holochain_sqlite::rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef};
 use holochain_sqlite::rusqlite::{named_params, ToSql};
 use holochain_sqlite::sql::sql_peer_meta_store;
-use kitsune2_api::{K2Error, K2Result, PeerMetaStore, SpaceId, Timestamp, Url};
+use kitsune2_api::{K2Error, K2Result, PeerMetaStore, Timestamp, Url};
 
 /// Holochain implementation of a Kitsune2 [PeerMetaStore].
 #[derive(Debug)]
@@ -48,7 +48,6 @@ impl HolochainPeerMetaStore {
 impl PeerMetaStore for HolochainPeerMetaStore {
     fn put(
         &self,
-        _space: SpaceId,
         peer: Url,
         key: String,
         value: Bytes,
@@ -75,12 +74,7 @@ impl PeerMetaStore for HolochainPeerMetaStore {
         })
     }
 
-    fn get(
-        &self,
-        _space: SpaceId,
-        peer: Url,
-        key: String,
-    ) -> BoxFuture<'_, K2Result<Option<Bytes>>> {
+    fn get(&self, peer: Url, key: String) -> BoxFuture<'_, K2Result<Option<Bytes>>> {
         let db = self.db.clone();
 
         Box::pin(async move {
@@ -105,7 +99,7 @@ impl PeerMetaStore for HolochainPeerMetaStore {
         })
     }
 
-    fn delete(&self, _space: SpaceId, peer: Url, key: String) -> BoxFuture<'_, K2Result<()>> {
+    fn delete(&self, peer: Url, key: String) -> BoxFuture<'_, K2Result<()>> {
         let db = self.db.clone();
 
         Box::pin(async move {
