@@ -78,9 +78,6 @@ pub mod fixt;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 
-#[cfg(feature = "fuzzing")]
-pub mod facts;
-
 pub use action::Action;
 pub use entry::Entry;
 
