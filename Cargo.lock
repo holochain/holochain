@@ -4327,6 +4327,8 @@ dependencies = [
 [[package]]
 name = "kitsune2_api"
 version = "0.0.1-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9be45793ae8abe651a61e0f3a489568652a6caa7054d911440d09b51d4dd984e"
 dependencies = [
  "base64 0.22.1",
  "bytes",
