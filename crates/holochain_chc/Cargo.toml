@@ -31,7 +31,7 @@ holochain_serialized_bytes = { version = "=0.0.55", optional = true }
 holo_hash = { version = "^0.5.0-dev.6", path = "../holo_hash", optional = true }
 reqwest = { version = "0.12", features = [
   "json",
-  "native-tls-vendored",
+  "rustls-tls",
 ], optional = true }
 
 

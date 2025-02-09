@@ -138,7 +138,7 @@ impl ChcHttp {
                     cell_id.agent_pubkey()
                 ))
                 .expect("invalid URL"),
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder().use_rustls_tls().build().unwrap(),
         };
         Self {
             client,
