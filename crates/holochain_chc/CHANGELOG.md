@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Use `rustls-tls` instead of `native-tls-vendored` in reqwest due to compatibility issue with Android platform
+
 ## 0.2.0-dev.17
 
 ## 0.2.0-dev.16

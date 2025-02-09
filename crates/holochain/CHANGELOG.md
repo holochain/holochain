@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Change most enums that are exposed via the conductor API to be serialized with `tag = "type"` and `content = "value"` #4616
 
 - Replace `tiny-keccak` with `sha3` due to dependency on problematic `crunchy` crate
+- Use `rustls-tls` instead of `native-tls-vendored` in reqwest due to compatibility issue with Android platform
 
 ## 0.5.0-dev.17
 
