@@ -5,7 +5,7 @@
 //! Serialization of enums exposed on the conductor API in most cases follow the following
 //! convention:
 //!
-//! 1. enums with **only unit-like variants** have their variant names converted to `snake_case`
+//! 1. Enums with **only unit-like variants** have their variant names converted to `snake_case`
 //! using the `#[serde(rename_all = "snake_case")]` attribute.
 //!
 //! For example:
@@ -21,13 +21,13 @@
 //! }
 //! ```
 //!
-//! would lead to the following associated typescript type
+//! would lead to the following associated TypeScript type
 //!
 //! ```
 //! type AppStatusFilter = "enabled" | "disabled" | "running" | "stopped" | "paused";
 //! ```
 //!
-//! 2. enums that **include tuple-like and/or struct-like variants** are serialized using
+//! 2. Enums that **include tuple-like and/or struct-like variants** are serialized using
 //! the `#[serde(tag = "type", content = "value", rename_all = "snake_case")]` attributes.
 //!
 //! For example:
@@ -44,7 +44,7 @@
 //! }
 //! ```
 //!
-//! would lead to the following associated typescript type
+//! would lead to the following associated TypeScript type
 //!
 //! ```
 //! type Signal =
