@@ -1,4 +1,4 @@
-//! @todo move all this out to the serialized bytes crate
+// @todo move all this out to the serialized bytes crate
 use crate::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 use rand::seq::SliceRandom;

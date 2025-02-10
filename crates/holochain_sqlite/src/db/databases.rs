@@ -29,9 +29,9 @@ pub(super) static DATABASE_HANDLES: Lazy<Databases> = Lazy::new(|| {
         eprintln!("FATAL PANIC {:#?}", panic_info);
         // invoke the original handler
         orig_handler(panic_info);
-        // // Abort the process
-        // // TODO - we need a better solution than this, but if there is
-        // // no better solution, we can uncomment the following line:
+        // Abort the process
+        // TODO - we need a better solution than this, but if there is
+        //  no better solution, we can uncomment the following line:
         // std::process::abort();
     }));
 

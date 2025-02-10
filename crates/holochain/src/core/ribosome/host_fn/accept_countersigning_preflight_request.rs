@@ -1009,11 +1009,11 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "flaky"]
-    /// TODO: this test and the following one (`enzymatic_session_success_forced_init`) form a pair.
-    /// The latter includes a "fix" to the test to remove the flakiness, but the flakiness itself is a problem
-    /// that we need to address.
-    /// The flakiness is described in https://github.com/holochain/holochain/pull/3046. When that is resolved,
-    /// this test can be unignored, and the companion test can be removed.
+    // TODO: this test and the following one (`enzymatic_session_success_forced_init`) form a pair.
+    // The latter includes a "fix" to the test to remove the flakiness, but the flakiness itself is a problem
+    // that we need to address.
+    // The flakiness is described in https://github.com/holochain/holochain/pull/3046. When that is resolved,
+    // this test can be unignored, and the companion test can be removed.
     async fn enzymatic_session_success_flaky() {
         enzymatic_session_success(false).await
     }
