@@ -21,6 +21,7 @@ use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
 use holochain_types::app::AppManifest;
 use holochain_types::app::RoleSettingsMap;
 use holochain_types::app::RoleSettingsMapYaml;
+use holochain_types::prelude::AppCapGrantInfo;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::Timestamp;
@@ -86,6 +87,7 @@ pub enum AdminRequestCli {
     DumpConductorState,
     DumpNetworkMetrics(DumpNetworkMetrics),
     DumpNetworkStats,
+    ListCapabilityGrants(ListCapGrants),
     /// Calls AdminRequest::AddAgentInfo.
     /// _Unimplemented_.
     AddAgents,
@@ -242,6 +244,15 @@ pub struct DumpNetworkMetrics {
     /// The DNA hash of the app network to dump.
     #[arg(value_parser = parse_dna_hash)]
     pub dna: Option<DnaHash>,
+}
+
+/// Arguments for listing capability grants info.
+#[derive(Debug, Args, Clone)]
+pub struct ListCapGrants {
+    /// app id to filter by
+    pub install_app_id: String,
+    /// include revoked grants
+    pub include_revoked: bool,
 }
 
 /// Calls AdminRequest::RequestAgentInfo
@@ -422,6 +433,11 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             let stats = dump_network_stats(cmd).await?;
             // Print without other text so it can be piped
             println!("{}", stats);
+        }
+        AdminRequestCli::ListCapabilityGrants(args) => {
+            let info = list_capability_grants(cmd, args).await?;
+            // Print without other text so it can be piped
+            println!("{:?}", info);
         }
         AdminRequestCli::AddAgents => todo!("Adding agent info via CLI is coming soon"),
         AdminRequestCli::ListAgents(args) => {
@@ -730,6 +746,23 @@ async fn dump_network_metrics(
 async fn dump_network_stats(cmd: &mut CmdRunner) -> anyhow::Result<String> {
     let resp = cmd.command(AdminRequest::DumpNetworkStats).await?;
     Ok(expect_match!(resp => AdminResponse::NetworkStatsDumped, "Failed to dump network stats"))
+}
+
+/// Calls [`AdminRequest::ListCapabilityGrants`] and lists the cap grant info.
+async fn list_capability_grants(
+    cmd: &mut CmdRunner,
+    args: ListCapGrants,
+) -> anyhow::Result<AppCapGrantInfo> {
+    let (installed_app_id, include_revoked) = (args.install_app_id, args.include_revoked);
+    let resp = cmd
+        .command(AdminRequest::ListCapabilityGrants {
+            installed_app_id,
+            include_revoked,
+        })
+        .await?;
+    Ok(
+        expect_match!(resp => AdminResponse::CapabilityGrantsInfo, "Failed to list capability grants"),
+    )
 }
 
 /// Calls [`AdminRequest::AddAgentInfo`] with and adds the list of agent info.
