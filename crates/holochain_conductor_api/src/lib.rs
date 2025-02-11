@@ -23,6 +23,12 @@
 //! Notably the app interface allows calling functions exposed by the hApps'
 //! modules, called DNAs. To discover a particular hApp's structure, its app
 //! info can be requested.
+//!
+//! Additional information can be found in the [docs module][`crate::docs`].
+//!
+
+#[cfg(doc)]
+pub mod docs;
 
 mod admin_interface;
 mod app_interface;
