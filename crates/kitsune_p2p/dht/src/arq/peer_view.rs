@@ -59,9 +59,9 @@ impl PeerViewQ {
     }
 
     /// The actual coverage of all arcs in this view.
-    /// TODO: this only makes sense when the view contains all agents in the DHT.
-    ///       So, it's more useful for testing. Probably want to tease out some
-    ///       concept of a test DHT from this.
+    // TODO: this only makes sense when the view contains all agents in the DHT.
+    //       So, it's more useful for testing. Probably want to tease out some
+    //       concept of a test DHT from this.
     pub fn actual_coverage(&self) -> f64 {
         actual_coverage(&self.topo, self.peers.iter())
     }
@@ -75,8 +75,8 @@ impl PeerViewQ {
     /// These two are complected together simply for efficiency's sake, to
     /// minimize computation
     ///
-    /// TODO: this probably will be rewritten when PeerView is rewritten to
-    /// have the filter baked in.
+    // TODO: this probably will be rewritten when PeerView is rewritten to
+    // have the filter baked in.
     pub fn extrapolated_coverage_and_filtered_count(&self, filter: &Arq) -> (f64, usize) {
         let filter = filter.to_dht_arc(self.topo.space);
         if filter.is_empty() {
@@ -229,7 +229,7 @@ impl PeerViewQ {
     ///
     /// More detail on these assumptions here:
     /// <https://hackmd.io/@hololtd/r1IAIbr5Y/https%3A%2F%2Fhackmd.io%2FK_fkBj6XQO2rCUZRRL9n2g>
-    /// TODO: make the above link to something publicly available, preferably in the repo
+    // TODO: make the above link to something publicly available, preferably in the repo
     pub fn update_arq_with_stats(&self, arq: &mut Arq) -> UpdateArqStats {
         let topo = &self.topo;
         let (cov, num_peers) = self.extrapolated_coverage_and_filtered_count(arq);

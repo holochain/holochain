@@ -14,7 +14,7 @@ pub type CapSecretBytes = [u8; CAP_SECRET_BYTES];
 /// the grantor to allow access to others. The grantor can optionally further restrict usage of the
 /// secret to specific agents.
 ///
-/// @todo enforce that secrets are unique across all grants in a chain.
+// @todo enforce that secrets are unique across all grants in a chain.
 // The PartialEq impl by subtle *should* be compatible with default Hash impl
 #[allow(clippy::derived_hash_with_manual_eq)]
 #[derive(Clone, Copy, Hash, SerializedBytes)]

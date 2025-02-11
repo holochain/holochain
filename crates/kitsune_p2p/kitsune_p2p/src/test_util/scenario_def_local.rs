@@ -19,7 +19,7 @@ use std::sync::Arc;
 /// A bit of a historical note: this type was created before `ScenarioDef`, and
 /// if it were the other way around, perhaps this type wouldn't exist. But it's
 /// still nice how concise it is.
-/// TODO: can this somehow be unified with `ScenarioDef`?
+// TODO: can this somehow be unified with `ScenarioDef`?
 pub struct LocalScenarioDef {
     /// Total number of op hashes to be generated
     pub total_ops: usize,

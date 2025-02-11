@@ -31,35 +31,35 @@ use crate::prelude::*;
 /// guarantee that it is seeing the same time as the rust host, so this enables stricter validation
 /// logic.
 ///
-/// @todo
-/// Sys times aren't the final word on secure times, for another option it may be best to use the
-/// roughtime protocol which redundantly fetches cryptographically signed times from multiple
-/// different servers and cross-references them.
-/// There is a POC for this but it's not in core yet (requires at least UDP calls from the host).
-/// Note that the **redundant fetching** and **cross-referencing** parts are critical, even though
-/// they add a lot of complexity to the protocol. Failure to do this brought down the ETH2.0
-/// Medalla testnet due to a single roughtime server from cloudflare being 24 hours off.
-/// Note also that roughtime, or any other "secure timestamping" option requires the agent to be
-/// online at the time of generating times, which runs counter to the requirement that holochain
-/// support "agent centric, offline first" behaviour, but may be acceptable or even a neccessary
-/// evil for specific application logic.
-/// The other challenge with roughtime is list management to track the list of valid servers over
-/// time, which might rely on agents providing snapshots of links to public keys (i.e. representing
-/// the roughtime ecosystem itself in a happ).
-///
-/// See <https://blog.cloudflare.com/roughtime/>
-///
-/// @todo
-/// Another option is to use proof of work style constructions to roughly throttle the speed that
-/// things can be done without relying on absolute times, or even that users experience the same
-/// throttling due to differences in CPU/GPU performance on the POW algorithm.
-/// See <https://zkga.me/> uses this as a game mechanic
-///
-/// @todo
-/// Other p2p type time syncing algorithms that allow peers to adjust their clock offsets to agree
-/// on the current time within relatively tight accuracy/precision up-front in a relatively trusted
-/// environment e.g. a chess game between friends with time moves that balances security/trust and
-/// flaky networking, etc.
+// @todo
+// Sys times aren't the final word on secure times, for another option it may be best to use the
+// roughtime protocol which redundantly fetches cryptographically signed times from multiple
+// different servers and cross-references them.
+// There is a POC for this but it's not in core yet (requires at least UDP calls from the host).
+// Note that the **redundant fetching** and **cross-referencing** parts are critical, even though
+// they add a lot of complexity to the protocol. Failure to do this brought down the ETH2.0
+// Medalla testnet due to a single roughtime server from cloudflare being 24 hours off.
+// Note also that roughtime, or any other "secure timestamping" option requires the agent to be
+// online at the time of generating times, which runs counter to the requirement that holochain
+// support "agent centric, offline first" behaviour, but may be acceptable or even a neccessary
+// evil for specific application logic.
+// The other challenge with roughtime is list management to track the list of valid servers over
+// time, which might rely on agents providing snapshots of links to public keys (i.e. representing
+// the roughtime ecosystem itself in a happ).
+//
+// See <https://blog.cloudflare.com/roughtime/>
+//
+// @todo
+// Another option is to use proof of work style constructions to roughly throttle the speed that
+// things can be done without relying on absolute times, or even that users experience the same
+// throttling due to differences in CPU/GPU performance on the POW algorithm.
+// See <https://zkga.me/> uses this as a game mechanic
+//
+// @todo
+// Other p2p type time syncing algorithms that allow peers to adjust their clock offsets to agree
+// on the current time within relatively tight accuracy/precision up-front in a relatively trusted
+// environment e.g. a chess game between friends with time moves that balances security/trust and
+// flaky networking, etc.
 pub fn sys_time() -> ExternResult<Timestamp> {
     HDK.with(|h| h.borrow().sys_time(()))
 }

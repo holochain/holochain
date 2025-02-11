@@ -19,7 +19,7 @@ pub type ShardDepth = u32;
 /// At the moment sharding only works well for data that is reliably longer than width/depth.
 /// For example, sharding the username foo with width 4 doesn't make sense.
 /// There is no magic padding or extending of the provided data to make up undersized shards.
-/// @todo stretch short shards out in a nice balanced way (append some bytes from the hash?)
+// @todo stretch short shards out in a nice balanced way (append some bytes from the hash?)
 pub struct ShardStrategy(ShardWidth, ShardDepth);
 
 /// impl [ `ShardStrategy` ] as an immutable/read-only thingy.

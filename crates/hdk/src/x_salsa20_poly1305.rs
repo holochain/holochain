@@ -74,7 +74,7 @@ pub fn x_salsa20_poly1305_shared_secret_ingest(
 ///  - Secretbox is designed for 'small' data, break large data into chunks with unique nonces.
 ///  - Secretbox is NOT quantum resistant.
 ///
-/// @todo shift all the secret handling into lair so that we only work with opaque key references.
+// @todo shift all the secret handling into lair so that we only work with opaque key references.
 ///
 /// If you want to hide data:
 ///  - Consider using capability tokens and/or dedicated DHT networks to control access.

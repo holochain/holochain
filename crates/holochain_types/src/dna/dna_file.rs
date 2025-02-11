@@ -48,10 +48,10 @@ impl From<WasmMapSerialized> for WasmMap {
 /// That function has been superseded by `DnaBundle`, but we use this type
 /// widely, so there is simply a way to convert from `DnaBundle` to `DnaFile`.
 ///
-/// TODO: Once we remove the `InstallApp` command which accepts a `DnaFile`,
-///       we should remove the Serialize impl on this type, and perhaps rename
-///       to indicate that this is simply a validated, fully-formed DnaBundle
-///       (i.e. all Wasms are bundled and immediately available, not remote.)
+// TODO: Once we remove the `InstallApp` command which accepts a `DnaFile`,
+//       we should remove the Serialize impl on this type, and perhaps rename
+//       to indicate that this is simply a validated, fully-formed DnaBundle
+//       (i.e. all Wasms are bundled and immediately available, not remote.)
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes, Hash)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct DnaFile {
