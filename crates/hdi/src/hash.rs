@@ -173,7 +173,7 @@ use crate::prelude::*;
 /// layer, so we want to re-use that as much as possible.
 /// The action hash can be extracted from the Record as `record.action_hashed().as_hash()`.
 ///
-/// @todo is there any use-case that can't be satisfied by the `action_hashed` approach?
+// @todo is there any use-case that can't be satisfied by the `action_hashed` approach?
 ///
 /// Anything that is annotated with #[hdk_entry_helper] implements this so is compatible automatically.
 ///
@@ -233,7 +233,7 @@ pub fn hash_blake2b(input: Vec<u8>, output_len: u8) -> ExternResult<Vec<u8>> {
     }
 }
 
-/// @todo - not implemented on the host
+// @todo - not implemented on the host
 pub fn hash_sha256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     match HDI.with(|h| h.borrow().hash(HashInput::Sha256(input)))? {
         HashOutput::Sha256(hash) => Ok(hash.as_ref().to_vec()),
@@ -241,7 +241,7 @@ pub fn hash_sha256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     }
 }
 
-/// @todo - not implemented on the host
+// @todo - not implemented on the host
 pub fn hash_sha512(input: Vec<u8>) -> ExternResult<Vec<u8>> {
     match HDI.with(|h| h.borrow().hash(HashInput::Sha512(input)))? {
         HashOutput::Sha512(hash) => Ok(hash.as_ref().to_vec()),

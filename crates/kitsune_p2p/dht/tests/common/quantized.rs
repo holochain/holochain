@@ -57,8 +57,8 @@ where
 }
 
 /// Run iterations until there is no movement of any arc
-/// TODO: this may be unreasonable, and we may need to just ensure that arcs
-/// settle down into a reasonable level of oscillation
+// TODO: this may be unreasonable, and we may need to just ensure that arcs
+// settle down into a reasonable level of oscillation
 pub fn seek_convergence<F>(peers: Peers, step: F) -> Run
 where
     F: Fn(Peers) -> (Peers, EpochStats),
