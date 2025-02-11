@@ -5,8 +5,6 @@
 //! - Any action other than DNA cannot be at seq 0
 //! - The DNA action can only be validated if the chain is empty,
 //!     and its timestamp must not be less than the origin time
-//!     (this "if chain not empty" thing is a bit weird,
-//!     TODO refactor to not look in the db)
 //! - Timestamps must increase monotonically
 //! - Sequence numbers must increment by 1 for each new action
 //! - Entry type in the action matches the entry variant
@@ -18,14 +16,16 @@
 //! - Check that StoreEntry never contains a private entry type
 //! - Test that a given sequence of actions constitutes a valid chain w.r.t. its backlinks
 //!
-//! TO TEST:
-//! - Create and Update Agent can only be preceded by AgentValidationPkg
-//! - Author must match the entry hash of the most recent Create/Update Agent
-//! - Genesis must be correct:
-//!     - Explicitly check action seqs 0, 1, and 2.
-//! - There can only be one InitZomesCompleted
-//! - All backlinks are in-chain (prev action, etc.)
-//!
+// TODO Add tests for:
+// - Create and Update Agent can only be preceded by AgentValidationPkg
+// - Author must match the entry hash of the most recent Create/Update Agent
+// - Genesis must be correct:
+//     - Explicitly check action seqs 0, 1, and 2.
+// - There can only be one InitZomesCompleted
+// - All backlinks are in-chain (prev action, etc.)
+//
+// TODO This "The DNA action can only be validated if the chain is empty" thing is a bit weird,
+//  refactor to not look in the db
 
 use super::*;
 use crate::conductor::space::TestSpaces;

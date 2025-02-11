@@ -669,14 +669,14 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     /// values without needing to make holochain a dependency.
     async fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError>;
 
-    /// @todo list out all the available callbacks and maybe cache them somewhere
+    // @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
         unimplemented!()
         // pseudocode
         // self.instance().exports().filter(|e| e.is_callback())
     }
 
-    /// @todo list out all the available zome functions and maybe cache them somewhere
+    // @todo list out all the available zome functions and maybe cache them somewhere
     fn list_zome_fns(&self) {
         unimplemented!()
         // pseudocode

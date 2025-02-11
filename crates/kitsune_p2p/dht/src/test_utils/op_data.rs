@@ -4,7 +4,7 @@ use kitsune_p2p_timestamp::Timestamp;
 
 use crate::{hash::OpHash, prelude::OpRegion, region::RegionData, Loc};
 
-/// TODO: mark this as for testing only.
+// TODO: mark this as for testing only.
 /// This is indeed the type that Holochain provides.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct OpData {

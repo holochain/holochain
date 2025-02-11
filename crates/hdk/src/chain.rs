@@ -22,12 +22,12 @@ pub fn get_agent_activity(
 ///
 /// Given an action and entry type, returns an [ `Vec<Record>` ]
 ///
-/// @todo document this better with examples after we make query do all the things we want.
-/// @todo implement cap grant/claim usage in terms of query
-/// @todo have ability to hash-bound query other agent's chains based on agent activity
-/// @todo tie query into validation so we track dependencies e.g. validation packages
-/// @todo decide which direction we want to iterate in (paramaterise query?)
-/// @todo more expresivity generally?
+// @todo document this better with examples after we make query do all the things we want.
+// @todo implement cap grant/claim usage in terms of query
+// @todo have ability to hash-bound query other agent's chains based on agent activity
+// @todo tie query into validation so we track dependencies e.g. validation packages
+// @todo decide which direction we want to iterate in (paramaterise query?)
+// @todo more expresivity generally?
 pub fn query(filter: ChainQueryFilter) -> ExternResult<Vec<Record>> {
     HDK.with(|h| h.borrow().query(filter))
 }
