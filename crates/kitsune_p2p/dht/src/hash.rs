@@ -1,6 +1,5 @@
 //! Simple hash types.
-//!
-//! TODO: unify with hashes from `kitsune_p2p_types::bin_types`
+// TODO: unify with hashes from `kitsune_p2p_types::bin_types`
 
 /// 32 bytes
 pub type Hash32 = [u8; 32];

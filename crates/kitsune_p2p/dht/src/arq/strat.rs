@@ -67,7 +67,10 @@ pub struct ArqStrat {
     /// Note that this parameter does not guarantee that any agent's arq
     /// will have a power +/- this diff from our power, but we may decide to
     /// choose not to gossip with agents whose power falls outside the range
-    /// defined by this diff. TODO: do this.
+    /// defined by this diff.
+    ///
+    // TODO do not to gossip with agents whose power falls outside the range
+    // defined by this diff
     pub max_power_diff: u8,
 
     /// If at any time the number of peers seen by a node is less than the
@@ -85,7 +88,7 @@ pub struct ArqStrat {
     /// greater than this threshold, then we might do something different when
     /// it comes to our decision to requantize. For now, just print a warning.
     ///
-    /// TODO: this can probably be expressed in terms of `max_power_diff`.
+    // TODO: this can probably be expressed in terms of `max_power_diff`.
     pub power_std_dev_threshold: f64,
 
     /// Settings to override the global arc settings, for instance to mandate
