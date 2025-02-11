@@ -47,6 +47,8 @@ tokio-stream = "0.1"
 tx5 = { version = "=0.1.5-beta" }
 url2 = "0.0.6"
 
+kitsune2_api = "0.0.1-alpha.1"
+
 # fuzzing
 contrafact = { version = "0.2.0-rc.1", optional = true }
 proptest = { version = "1", optional = true }

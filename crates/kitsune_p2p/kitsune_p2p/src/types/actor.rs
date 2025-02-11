@@ -164,5 +164,8 @@ ghost_actor::ghost_chan! {
 
         /// Get data for diagnostics
         fn get_diagnostics(space: KSpace) -> KitsuneDiagnostics;
+
+        /// Get the storage arcs for the agents currently in this space
+        fn storage_arcs(space: KSpace) -> Vec<kitsune2_api::DhtArc>;
     }
 }

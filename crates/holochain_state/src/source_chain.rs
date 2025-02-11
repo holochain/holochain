@@ -16,7 +16,6 @@ use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holochain_chc::*;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::SELECT_VALID_AGENT_PUB_KEY;
@@ -24,6 +23,7 @@ use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_state_types::SourceChainDumpRecord;
 use holochain_types::sql::AsSql;
+use kitsune2_api::DhtArc;
 
 use crate::prelude::*;
 use crate::source_chain;
@@ -239,7 +239,8 @@ impl SourceChain {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, network)))]
     pub async fn flush(
         &self,
-        network: &(dyn HolochainP2pDnaT + Send + Sync),
+        storage_arcs: Vec<DhtArc>,
+        chc: Option<ChcImpl>,
     ) -> SourceChainResult<Vec<SignedActionHashed>> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
@@ -327,7 +328,7 @@ impl SourceChain {
                 .await?;
 
             // Sync with CHC, if CHC is present
-            if let Some(chc) = network.chc() {
+            if let Some(chc) = chc.clone() {
                 // Skip the CHC sync if this is a countersigning session.
                 // If the session times out, we might roll the chain back to the previous head, and so
                 // we don't want the record to exist remotely.
@@ -427,7 +428,7 @@ impl SourceChain {
                             scratch.add_entry(entry, ChainTopOrdering::Relaxed);
                         }
                     })?;
-                    child_chain.flush(network).await
+                    child_chain.flush(storage_arcs, chc).await
                 } else {
                     Err(SourceChainError::HeadMoved(
                         actions,
@@ -441,7 +442,7 @@ impl SourceChain {
                 drop(permit);
 
                 authored_ops_to_dht_db(
-                    network,
+                    storage_arcs,
                     ops_to_integrate,
                     self.vault.clone().into(),
                     self.dht_db.clone(),
@@ -1437,7 +1438,6 @@ mod tests {
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holochain_keystore::test_keystore;
-    use holochain_p2p::MockHolochainP2pDnaT;
     use matches::assert_matches;
 
     use crate::source_chain::SourceChainResult;
@@ -1451,9 +1451,6 @@ mod tests {
         let db = test_db.to_db();
         let alice = fixt!(AgentPubKey, Predictable, 0);
 
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
 
         source_chain::genesis(
@@ -1466,8 +1463,7 @@ mod tests {
             None,
             None,
         )
-        .await
-        .unwrap();
+        .await?;
         let chain_1 = SourceChain::new(
             db.clone(),
             dht_db.to_db(),
@@ -1505,7 +1501,8 @@ mod tests {
             .await?;
 
         let author = Arc::new(alice);
-        chain_1.flush(&mock).await?;
+        let storage_arcs = vec![DhtArc::Empty];
+        chain_1.flush(storage_arcs.clone(), None).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
             .write_async(move |txn| chain_head_db_nonempty(txn, author_1))
@@ -1514,7 +1511,7 @@ mod tests {
         assert_eq!(seq, 3);
 
         assert!(matches!(
-            chain_2.flush(&mock).await,
+            chain_2.flush(storage_arcs.clone(), None).await,
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
         let author_2 = Arc::clone(&author);
@@ -1524,7 +1521,7 @@ mod tests {
             .seq;
         assert_eq!(seq, 3);
 
-        chain_3.flush(&mock).await?;
+        chain_3.flush(storage_arcs, None).await?;
         let author_3 = Arc::clone(&author);
         let seq = db
             .write_async(move |txn| chain_head_db_nonempty(txn, author_3))
@@ -1543,9 +1540,6 @@ mod tests {
         let db = test_db.to_db();
         let alice = fixt!(AgentPubKey, Predictable, 0);
 
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
 
         source_chain::genesis(
@@ -1624,7 +1618,8 @@ mod tests {
             .unwrap();
 
         let author = Arc::new(alice);
-        chain_1.flush(&mock).await?;
+        let storage_arcs = vec![DhtArc::Empty];
+        chain_1.flush(storage_arcs.clone(), None).await?;
         let author_1 = Arc::clone(&author);
         let seq = db
             .write_async(move |txn| chain_head_db_nonempty(txn, author_1))
@@ -1633,11 +1628,11 @@ mod tests {
         assert_eq!(seq, 3);
 
         assert!(matches!(
-            chain_2.flush(&mock).await,
+            chain_2.flush(storage_arcs.clone(), None).await,
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
 
-        chain_3.flush(&mock).await?;
+        chain_3.flush(storage_arcs, None).await?;
         let author_2 = Arc::clone(&author);
         let head = db
             .write_async(move |txn| chain_head_db_nonempty(txn, author_2.clone()))
@@ -1680,11 +1675,6 @@ mod tests {
         let dht_db_cache = DhtDbQueryCache::new(dht_db.clone().into());
         let keystore = test_keystore();
         let agent_key = keystore.new_sign_keypair_random().await.unwrap();
-        let mut mock_network = MockHolochainP2pDnaT::new();
-        mock_network
-            .expect_authority_for_hash()
-            .returning(|_| Ok(false));
-        mock_network.expect_chc().return_const(None);
 
         source_chain::genesis(
             authored_db.clone(),
@@ -1705,7 +1695,7 @@ mod tests {
             .unwrap();
         let result = chain.delete_valid_agent_pub_key().await;
         assert!(result.is_ok());
-        chain.flush(&mock_network).await.unwrap();
+        chain.flush(vec![DhtArc::Empty], None).await.unwrap();
 
         // Valid agent pub key has been deleted. Repeating the operation should fail now as no valid
         // pub key can be found.
@@ -1724,9 +1714,6 @@ mod tests {
         // create transferable cap grant
         #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
         let secret_access = CapAccess::from(secret.unwrap());
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
@@ -1778,6 +1765,8 @@ mod tests {
             None
         );
 
+        let storage_arcs = vec![DhtArc::Empty];
+
         // write cap grant to alice's source chain
         let (original_action_address, original_entry_address) = {
             let (entry, entry_hash) =
@@ -1789,7 +1778,8 @@ mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-            chain.flush(&mock).await.unwrap();
+
+            chain.flush(storage_arcs.clone(), None).await.unwrap();
             (action, entry_hash)
         };
 
@@ -1853,7 +1843,7 @@ mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-            chain.flush(&mock).await.unwrap();
+            chain.flush(storage_arcs.clone(), None).await.unwrap();
 
             (action, entry_hash)
         };
@@ -1955,7 +1945,7 @@ mod tests {
             chain
                 .put_weightless(action_builder, None, ChainTopOrdering::default())
                 .await?;
-            chain.flush(&mock).await.unwrap();
+            chain.flush(storage_arcs.clone(), None).await.unwrap();
         }
 
         // alice should get her author cap grant as always, independent of
@@ -2012,7 +2002,7 @@ mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-            chain.flush(&mock).await.unwrap();
+            chain.flush(storage_arcs.clone(), None).await.unwrap();
             (action, entry_hash)
         };
 
@@ -2086,7 +2076,7 @@ mod tests {
             chain
                 .put_weightless(action_builder, None, ChainTopOrdering::default())
                 .await?;
-            chain.flush(&mock).await.unwrap();
+            chain.flush(storage_arcs.clone(), None).await.unwrap();
         }
 
         // bob must not get unrestricted cap grant any longer
@@ -2157,7 +2147,7 @@ mod tests {
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
-            chain.flush(&mock).await.unwrap();
+            chain.flush(storage_arcs, None).await.unwrap();
         }
 
         let actual_cap_grant = chain
@@ -2220,9 +2210,6 @@ mod tests {
         let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
@@ -2278,7 +2265,7 @@ mod tests {
             .put_weightless(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
-        source_chain.flush(&mock).await.unwrap();
+        source_chain.flush(vec![DhtArc::Empty], None).await.unwrap();
 
         vault
             .read_async({
@@ -2596,10 +2583,7 @@ mod tests {
             .await;
         assert!(result.is_ok());
 
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
-        chain.flush(&mock).await.unwrap();
+        chain.flush(vec![DhtArc::Empty], None).await.unwrap();
 
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();

@@ -1,19 +1,18 @@
+use crate::{prelude::*, query::get_public_op_from_db};
 use holo_hash::{AnyLinkableHash, DhtOpHash, HasHash};
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::{
     db_cache::DhtDbQueryCache,
     dht_op::{ChainOpType, DhtOp, DhtOpHashed},
     prelude::*,
 };
-
-use crate::{prelude::*, query::get_public_op_from_db};
+use kitsune2_api::DhtArc;
 
 /// Insert any authored ops that have been locally validated
 /// into the dht database awaiting integration.
 /// This checks if ops are within the storage arc
 /// of any local agents.
 pub async fn authored_ops_to_dht_db(
-    network: &(dyn HolochainP2pDnaT + Send + Sync),
+    storage_arcs: Vec<DhtArc>,
     hashes: Vec<(DhtOpHash, AnyLinkableHash)>,
     authored_db: DbRead<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
@@ -23,7 +22,10 @@ pub async fn authored_ops_to_dht_db(
     let mut should_hold_hashes = Vec::new();
 
     for (op_hash, basis) in hashes {
-        if network.authority_for_hash(basis).await? {
+        if storage_arcs
+            .iter()
+            .any(|arc| arc.contains(basis.get_loc().as_u32()))
+        {
             should_hold_hashes.push(op_hash);
         }
     }

@@ -155,6 +155,9 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     /// New data has been integrated and is ready for gossiping.
     async fn new_integrated_data(&self) -> actor::HolochainP2pResult<()>;
 
+    /// Get the storage arcs of the agents currently in this space.
+    async fn storage_arcs(&self) -> actor::HolochainP2pResult<Vec<kitsune2_api::DhtArc>>;
+
     /// Access to the specified CHC
     fn chc(&self) -> Option<ChcImpl>;
 }
@@ -373,11 +376,16 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .await
     }
 
+    async fn storage_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>> {
+        self.sender.storage_arcs((*self.dna_hash).clone()).await
+    }
+
     fn chc(&self) -> Option<ChcImpl> {
         self.chc.clone()
     }
 }
 
+use crate::actor::HolochainP2pResult;
 pub use kitsune_p2p::dht;
 pub use kitsune_p2p::dht_arc;
 
