@@ -2791,6 +2791,7 @@ dependencies = [
  "indexmap 2.7.1",
  "isotest",
  "itertools 0.12.1",
+ "kitsune2_api",
  "kitsune_p2p",
  "kitsune_p2p_bin_data",
  "kitsune_p2p_block",
