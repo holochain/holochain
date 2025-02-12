@@ -64,6 +64,7 @@ fn db_kind_name(kind: DbKind) -> String {
         DbKind::Wasm => "wasm",
         DbKind::P2pAgentStore(_) => "p2p_agent_store",
         DbKind::P2pMetrics(_) => "p2p_metrics",
+        DbKind::PeerMetaStore(_) => "peer_meta_store",
         #[cfg(feature = "test_utils")]
         DbKind::Test(_) => "test",
     }

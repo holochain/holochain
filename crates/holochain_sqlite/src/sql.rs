@@ -94,3 +94,13 @@ pub(crate) mod sql_p2p_metrics {
 }
 
 pub(crate) mod sql_wasm {}
+
+pub mod sql_peer_meta_store {
+    pub const PRUNE: &str = include_str!("sql/peer_meta_store/prune.sql");
+
+    pub const INSERT: &str = include_str!("sql/peer_meta_store/insert.sql");
+
+    pub const GET: &str = include_str!("sql/peer_meta_store/get.sql");
+
+    pub const DELETE: &str = include_str!("sql/peer_meta_store/delete.sql");
+}
