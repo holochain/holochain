@@ -753,7 +753,7 @@ async fn list_capability_grants(
     cmd: &mut CmdRunner,
     args: ListCapGrants,
 ) -> anyhow::Result<AppCapGrantInfo> {
-    let (installed_app_id, include_revoked) = (args.install_app_id, args.include_revoked);
+    let (installed_app_id, include_revoked) = (args.installed_app_id, args.include_revoked);
     let resp = cmd
         .command(AdminRequest::ListCapabilityGrants {
             installed_app_id,
