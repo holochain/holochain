@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 /// The number of random agent infos we want to collect from the bootstrap service when we want to
 /// populate an empty local space.
-/// @todo expose this to network config.
+// @todo expose this to network config.
 const RANDOM_LIMIT_DEFAULT: u32 = 16;
 
 /// Struct to be encoded for the `random` op.
