@@ -250,7 +250,7 @@ pub struct DumpNetworkMetrics {
 #[derive(Debug, Args, Clone)]
 pub struct ListCapGrants {
     /// app id to filter by
-    pub install_app_id: String,
+    pub installed_app_id: String,
     /// include revoked grants
     pub include_revoked: bool,
 }
