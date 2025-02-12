@@ -119,6 +119,15 @@ async fn validate_op_with_dependency_held_in_cache() {
         .await
         .unwrap();
 
+    #[cfg(feature = "unstable-warrants")]
+    {
+        let mut network = MockHolochainP2pDnaT::default();
+        network
+            .expect_storage_arcs()
+            .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+        test_case.with_network_behaviour(network);
+    }
+
     test_case.run().await;
 
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
