@@ -26,6 +26,9 @@ pub enum DbKind {
     /// Metrics for peers on p2p network (one per space).
     #[display(fmt = "metrics-{:?}", "_0")]
     P2pMetrics(Arc<KitsuneSpace>),
+    /// Metadata about peers, for tracking local state and observations about peers.
+    #[display(fmt = "peer-meta-{:?}", "_0")]
+    PeerMetaStore(Arc<kitsune2_api::SpaceId>),
     #[cfg(feature = "test_utils")]
     Test(String),
 }
@@ -78,6 +81,10 @@ pub struct DbKindP2pAgents(pub Arc<KitsuneSpace>);
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Metrics for peers on p2p network (one per space).
 pub struct DbKindP2pMetrics(pub Arc<KitsuneSpace>);
+
+/// Database kind for [DbKind::PeerMetaStore]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+pub struct DbKindPeerMetaStore(pub Arc<kitsune2_api::SpaceId>);
 
 impl DbKindT for DbKindAuthored {
     fn kind(&self) -> DbKind {
@@ -205,6 +212,20 @@ impl DbKindT for DbKindP2pMetrics {
 
     fn filename_inner(&self) -> PathBuf {
         ["p2p", &format!("metrics-{}", self.0)].iter().collect()
+    }
+
+    fn if_corrupt_wipe(&self) -> bool {
+        true
+    }
+}
+
+impl DbKindT for DbKindPeerMetaStore {
+    fn kind(&self) -> DbKind {
+        DbKind::PeerMetaStore(self.0.clone())
+    }
+
+    fn filename_inner(&self) -> PathBuf {
+        ["p2p", &format!("peer-meta-{}", self.0)].iter().collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {

@@ -28,16 +28,21 @@ kitsune_p2p_types = { version = "^0.5.0-dev.9", path = "../kitsune_p2p/types" }
 holochain_nonce = { version = "^0.5.0-dev.2", path = "../holochain_nonce" }
 mockall = "0.11.3"
 holochain_trace = { version = "^0.5.0-dev.1", path = "../holochain_trace" }
-rand = "0.8.5"
 serde = { version = "1.0", features = ["derive"] }
-serde_bytes = "0.11"
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = ["full"] }
 tokio-stream = "0.1"
 
+kitsune2_api = "0.0.1-alpha.1"
+bytes = "1.10"
+holochain_sqlite = { version = "0.5.0-dev.16", path = "../holochain_sqlite" }
+
 [dev-dependencies]
 holochain_p2p = { path = ".", features = ["test_utils"] }
+holochain_sqlite = { version = "0.5.0-dev.16", path = "../holochain_sqlite", features = [
+  "test_utils",
+] }
 
 [lints]
 workspace = true
