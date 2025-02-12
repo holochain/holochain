@@ -50,7 +50,9 @@ async fn validate_op_with_no_dependency() {
     #[cfg(feature = "unstable-warrants")]
     {
         let mut network = MockHolochainP2pDnaT::default();
-        network.expect_storage_arcs().return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+        network
+            .expect_storage_arcs()
+            .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
         test_case.actual_network = Some(network);
     }
 
@@ -170,12 +172,16 @@ async fn validate_op_with_dependency_not_held() {
         .expect_get()
         .return_once(move |_, _| Ok(vec![response]));
 
-    network.expect_storage_arcs().return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+    network
+        .expect_storage_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
 
     test_case.with_network_behaviour(network).run().await;
 
     let mut network = MockHolochainP2pDnaT::default();
-    network.expect_storage_arcs().return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+    network
+        .expect_storage_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
 
     test_case.with_network_behaviour(network).run().await;
     test_case.check_trigger_and_rerun().await;
@@ -230,7 +236,9 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
         .return_once(move |_, _| Ok(vec![response]));
 
     #[cfg(feature = "unstable-warrants")]
-    network.expect_storage_arcs().return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+    network
+        .expect_storage_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
 
     test_case.with_network_behaviour(network).run().await;
 
