@@ -7,6 +7,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::fixt::ActionFixturator;
+use kitsune2_api::DhtArc;
 use kitsune_p2p::dht::Arq;
 struct StubNetwork;
 
@@ -173,6 +174,10 @@ impl HolochainP2pHandler for StubNetwork {
         &mut self,
         dna_hash: DnaHash,
     ) -> HolochainP2pHandlerResult<kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics> {
+        Err("stub".into())
+    }
+
+    fn handle_storage_arcs(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<Vec<DhtArc>> {
         Err("stub".into())
     }
 }

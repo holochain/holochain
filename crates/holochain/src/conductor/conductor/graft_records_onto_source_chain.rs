@@ -111,7 +111,10 @@ impl Conductor {
         // Only integrated if a cell is installed.
         if self.running_cell_ids().contains(&cell_id) {
             holochain_state::integrate::authored_ops_to_dht_db(
-                &network,
+                network
+                    .storage_arcs()
+                    .await
+                    .map_err(ConductorApiError::other)?,
                 ops_to_integrate,
                 space
                     .get_or_create_authored_db(cell_id.agent_pubkey().clone())?

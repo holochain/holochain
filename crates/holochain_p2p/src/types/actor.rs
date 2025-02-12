@@ -369,6 +369,9 @@ ghost_actor::ghost_chan! {
 
         /// Get struct for diagnostic data
         fn get_diagnostics(dna_hash: DnaHash) -> KitsuneDiagnostics;
+
+        /// Get the storage arcs of the agents currently in this space.
+        fn storage_arcs(dna_hash: DnaHash) -> Vec<kitsune2_api::DhtArc>;
     }
 }
 

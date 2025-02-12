@@ -2957,7 +2957,15 @@ mod misc_impls {
                 .await?;
 
             let cell = self.cell_by_id(&cell_id).await?;
-            source_chain.flush(cell.holochain_p2p_dna()).await?;
+            source_chain
+                .flush(
+                    cell.holochain_p2p_dna()
+                        .storage_arcs()
+                        .await
+                        .map_err(ConductorApiError::other)?,
+                    cell.holochain_p2p_dna().chc(),
+                )
+                .await?;
 
             Ok(action_hash)
         }
