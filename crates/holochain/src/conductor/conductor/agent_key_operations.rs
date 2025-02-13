@@ -142,7 +142,15 @@ impl Conductor {
                 let network = conductor
                     .holochain_p2p
                     .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(&cell_id));
-                source_chain.flush(&network).await?;
+                source_chain
+                    .flush(
+                        network
+                            .storage_arcs()
+                            .await
+                            .map_err(ConductorApiError::other)?,
+                        network.chc(),
+                    )
+                    .await?;
 
                 Ok::<_, ConductorApiError>(())
             }

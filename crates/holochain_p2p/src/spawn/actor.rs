@@ -19,6 +19,7 @@ use crate::types::AgentPubKeyExt;
 use ghost_actor::dependencies::tracing;
 use ghost_actor::dependencies::tracing_futures::Instrument;
 
+use kitsune2_api::DhtArc;
 use kitsune_p2p::actor::KitsuneP2pSender;
 use kitsune_p2p::agent_store::AgentInfoSigned;
 use kitsune_p2p_types::bootstrap::AgentInfoPut;
@@ -1672,6 +1673,20 @@ impl HolochainP2pHandler for HolochainP2pActor {
         Ok(async move {
             kitsune_p2p
                 .get_diagnostics(space)
+                .await
+                .map_err(HolochainP2pError::other)
+        }
+        .boxed()
+        .into())
+    }
+
+    fn handle_storage_arcs(&mut self, dna_hash: DnaHash) -> HolochainP2pHandlerResult<Vec<DhtArc>> {
+        let space = dna_hash.into_kitsune();
+        let kitsune_p2p = self.kitsune_p2p.clone();
+
+        Ok(async move {
+            kitsune_p2p
+                .storage_arcs(space)
                 .await
                 .map_err(HolochainP2pError::other)
         }

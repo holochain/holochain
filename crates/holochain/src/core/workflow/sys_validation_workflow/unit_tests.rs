@@ -47,6 +47,15 @@ async fn validate_op_with_no_dependency() {
 
     let mut test_case = TestCase::new().await;
 
+    #[cfg(feature = "unstable-warrants")]
+    {
+        let mut network = MockHolochainP2pDnaT::default();
+        network
+            .expect_storage_arcs()
+            .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+        test_case.actual_network = Some(network);
+    }
+
     let dna_action = HdkDna {
         author: fixt!(AgentPubKey),
         timestamp: Timestamp::now(),
@@ -110,6 +119,15 @@ async fn validate_op_with_dependency_held_in_cache() {
         .await
         .unwrap();
 
+    #[cfg(feature = "unstable-warrants")]
+    {
+        let mut network = MockHolochainP2pDnaT::default();
+        network
+            .expect_storage_arcs()
+            .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+        test_case.with_network_behaviour(network);
+    }
+
     test_case.run().await;
 
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
@@ -155,7 +173,7 @@ async fn validate_op_with_dependency_not_held() {
         .await
         .unwrap();
 
-    let mut network = MockHolochainP2pDnaT::new();
+    let mut network = MockHolochainP2pDnaT::default();
     let mut ops: WireRecordOps = WireRecordOps::new();
     ops.action = Some(Judged::valid(previous_action.clone().into()));
     let response = WireOps::Record(ops);
@@ -163,12 +181,24 @@ async fn validate_op_with_dependency_not_held() {
         .expect_get()
         .return_once(move |_, _| Ok(vec![response]));
 
+    network
+        .expect_storage_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+
     test_case.with_network_behaviour(network).run().await;
 
+    let mut network = MockHolochainP2pDnaT::default();
+    network
+        .expect_storage_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+
+    test_case.with_network_behaviour(network).run().await;
     test_case.check_trigger_and_rerun().await;
 
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
     assert!(ops_to_app_validate.contains(&op_hash));
+
+    println!("Starting expectation");
 
     test_case.expect_app_validation_triggered().await;
 }
@@ -214,6 +244,11 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
         .expect_get()
         .return_once(move |_, _| Ok(vec![response]));
 
+    #[cfg(feature = "unstable-warrants")]
+    network
+        .expect_storage_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+
     test_case.with_network_behaviour(network).run().await;
 
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
@@ -228,8 +263,8 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
 
     let mut network = MockHolochainP2pDnaT::new();
     network
-        .expect_authority_for_hash()
-        .return_once(move |_| Ok(true));
+        .expect_storage_arcs()
+        .return_once(move || Ok(vec![kitsune2_api::DhtArc::FULL]));
 
     let mut test_case = TestCase::new().await;
     test_case.with_network_behaviour(network);
@@ -373,6 +408,7 @@ impl TestCase {
             std::time::Duration::from_secs(10),
         );
 
+        println!("Running with network: {:?}", self.actual_network);
         let actual_network = self.actual_network.take().unwrap_or_default();
 
         sys_validation_workflow(
@@ -397,6 +433,8 @@ impl TestCase {
         .await
         .unwrap()
         .unwrap();
+
+        println!("Got a trigger, running once");
 
         self.run().await
     }
