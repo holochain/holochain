@@ -1232,7 +1232,7 @@ pub fn put_raw(
     }
     insert_action(txn, &shh)?;
     for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp, None)?;
+        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp, 0, None)?;
     }
     Ok(ops_to_integrate)
 }
