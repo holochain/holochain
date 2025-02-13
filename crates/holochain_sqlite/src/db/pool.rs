@@ -127,6 +127,8 @@ pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) 
 
     add_custom_functions(conn)?;
 
+    vtab::array::load_module(conn)?;
+
     Ok(())
 }
 

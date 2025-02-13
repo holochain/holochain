@@ -3174,6 +3174,8 @@ dependencies = [
  "holochain_p2p",
  "holochain_serialized_bytes",
  "holochain_sqlite",
+ "holochain_state",
+ "holochain_timestamp",
  "holochain_trace",
  "holochain_types",
  "holochain_zome_types",
