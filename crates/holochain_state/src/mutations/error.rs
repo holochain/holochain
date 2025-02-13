@@ -20,8 +20,6 @@ pub enum StateMutationError {
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
     #[error(transparent)]
     ScheduleError(#[from] holochain_zome_types::schedule::ScheduleError),
-    #[error(transparent)]
-    HolochainP2pError(#[from] holochain_p2p::HolochainP2pError),
     #[error("Authors of actions must all be the same when inserting to the source chain")]
     AuthorsMustMatch,
     #[error("Cannot remove a fully published countersigning session")]

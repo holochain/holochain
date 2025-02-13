@@ -1235,6 +1235,30 @@ impl KitsuneP2pHandler for Space {
         };
         Ok(async move { Ok(diagnostics) }.boxed().into())
     }
+
+    fn handle_storage_arcs(
+        &mut self,
+        _space: KSpace,
+    ) -> KitsuneP2pHandlerResult<Vec<kitsune2_api::DhtArc>> {
+        let arcs = self
+            .agent_arqs
+            .values()
+            .map(|arq| {
+                let arc = arq.to_dht_arc_std();
+
+                if arc.is_empty() {
+                    kitsune2_api::DhtArc::Empty
+                } else if arc.is_full() {
+                    kitsune2_api::DhtArc::FULL
+                } else {
+                    let start = arc.start_loc().0 .0;
+                    kitsune2_api::DhtArc::Arc(start, start.wrapping_add(arc.length() as u32))
+                }
+            })
+            .collect();
+
+        Ok(async move { Ok(arcs) }.boxed().into())
+    }
 }
 
 pub(crate) struct PendingDelegate {

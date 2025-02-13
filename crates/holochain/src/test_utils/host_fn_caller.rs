@@ -21,7 +21,7 @@ use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
@@ -283,7 +283,14 @@ impl HostFnCaller {
         let output = host_fn::create::create(ribosome, call_context, input).unwrap();
 
         // Write
-        workspace.source_chain().flush(&self.network).await.unwrap();
+        workspace
+            .source_chain()
+            .flush(
+                self.network.storage_arcs().await.unwrap(),
+                self.network.chc(),
+            )
+            .await
+            .unwrap();
 
         output
     }
@@ -300,7 +307,14 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace.source_chain().flush(&self.network).await.unwrap();
+        workspace
+            .source_chain()
+            .flush(
+                self.network.storage_arcs().await.unwrap(),
+                self.network.chc(),
+            )
+            .await
+            .unwrap();
 
         output
     }
@@ -320,7 +334,14 @@ impl HostFnCaller {
         let output = { host_fn::update::update(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace.source_chain().flush(&self.network).await.unwrap();
+        workspace
+            .source_chain()
+            .flush(
+                self.network.storage_arcs().await.unwrap(),
+                self.network.chc(),
+            )
+            .await
+            .unwrap();
 
         output
     }
@@ -361,7 +382,14 @@ impl HostFnCaller {
         let output = { host_fn::create_link::create_link(ribosome, call_context, input).unwrap() };
 
         // Write
-        workspace.source_chain().flush(&self.network).await.unwrap();
+        workspace
+            .source_chain()
+            .flush(
+                self.network.storage_arcs().await.unwrap(),
+                self.network.chc(),
+            )
+            .await
+            .unwrap();
 
         output
     }
@@ -378,7 +406,14 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace.source_chain().flush(&self.network).await.unwrap();
+        workspace
+            .source_chain()
+            .flush(
+                self.network.storage_arcs().await.unwrap(),
+                self.network.chc(),
+            )
+            .await
+            .unwrap();
 
         output
     }
@@ -404,7 +439,14 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace.source_chain().flush(&self.network).await.unwrap();
+        workspace
+            .source_chain()
+            .flush(
+                self.network.storage_arcs().await.unwrap(),
+                self.network.chc(),
+            )
+            .await
+            .unwrap();
 
         output
     }
@@ -430,7 +472,14 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace.source_chain().flush(&self.network).await.unwrap();
+        workspace
+            .source_chain()
+            .flush(
+                self.network.storage_arcs().await.unwrap(),
+                self.network.chc(),
+            )
+            .await
+            .unwrap();
 
         output.into()
     }
@@ -458,7 +507,14 @@ impl HostFnCaller {
         };
 
         // Write
-        workspace.source_chain().flush(&self.network).await.unwrap();
+        workspace
+            .source_chain()
+            .flush(
+                self.network.storage_arcs().await.unwrap(),
+                self.network.chc(),
+            )
+            .await
+            .unwrap();
         unwrap_to!(output.unwrap() => ZomeCallResponse::Ok).to_owned()
     }
 }

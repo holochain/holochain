@@ -29,6 +29,7 @@ use ValidationStatus;
 
 pub use activity_test_data::*;
 pub use entry_test_data::*;
+use holochain_p2p::actor::HolochainP2pResult;
 use holochain_types::test_utils::ActionRefMut;
 use holochain_types::validation_receipt::ValidationReceiptBundle;
 pub use record_test_data::*;
@@ -256,6 +257,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _zome_call_payload: ExternIO,
         _from_signature: Signature,
     ) -> actor::HolochainP2pResult<holochain_serialized_bytes::SerializedBytes> {
+        todo!()
+    }
+
+    async fn storage_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>> {
         todo!()
     }
 

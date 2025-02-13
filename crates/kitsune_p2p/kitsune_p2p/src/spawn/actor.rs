@@ -940,6 +940,22 @@ impl KitsuneP2pHandler for KitsuneP2pActor {
         .boxed()
         .into())
     }
+
+    fn handle_storage_arcs(
+        &mut self,
+        space: KSpace,
+    ) -> KitsuneP2pHandlerResult<Vec<kitsune2_api::DhtArc>> {
+        let space_sender = match self.spaces.get(&space) {
+            None => return Err(KitsuneP2pError::RoutingSpaceError(space)),
+            Some(space) => space.get(),
+        };
+        Ok(async move {
+            let (space_sender, _) = space_sender.await;
+            space_sender.storage_arcs(space).await
+        }
+        .boxed()
+        .into())
+    }
 }
 
 #[cfg(any(test, feature = "test_utils"))]

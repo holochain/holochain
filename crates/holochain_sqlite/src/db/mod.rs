@@ -17,7 +17,7 @@ pub use guard::PTxnGuard;
 pub use key::DbKey;
 pub use kind::{
     DbKind, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindOp, DbKindP2pAgents,
-    DbKindP2pMetrics, DbKindT, DbKindWasm,
+    DbKindP2pMetrics, DbKindPeerMetaStore, DbKindT, DbKindWasm,
 };
 pub use pool::{DbSyncLevel, DbSyncStrategy, PoolConfig};
 
