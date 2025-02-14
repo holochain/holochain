@@ -247,6 +247,7 @@ pub fn insert_op_lite(
 }
 
 /// Insert a [`DhtOpLite`] into the database.
+#[allow(clippy::too_many_arguments)]
 pub fn insert_op_lite_when(
     txn: &mut Transaction,
     op_lite: &DhtOpLite,
