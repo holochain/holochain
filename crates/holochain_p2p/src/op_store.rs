@@ -1,6 +1,8 @@
+use crate::event::{HolochainP2pEvent, HolochainP2pEventSender};
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use holo_hash::DhtOpHash;
+use ghost_actor::GhostSender;
+use holo_hash::{DhtOpHash, DnaHash};
 use holochain_serialized_bytes::prelude::decode;
 use holochain_sqlite::db::{DbKindDht, DbWrite};
 use holochain_sqlite::rusqlite::types::Value;
@@ -12,24 +14,41 @@ use holochain_types::dht_op::DhtOpHashed;
 use holochain_types::prelude::DhtOp;
 use kitsune2_api::*;
 use std::collections::HashSet;
+use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 
 /// Holochain implementation of the Kitsune2 [OpStore].
-#[derive(Debug)]
 pub struct HolochainOpStore {
     db: DbWrite<DbKindDht>,
+    dna_hash: DnaHash,
+    sender: GhostSender<HolochainP2pEvent>,
+}
+
+impl Debug for HolochainOpStore {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HolochainOpStore")
+            .field("db", &self.db)
+            .finish()
+    }
 }
 
 impl HolochainOpStore {
     /// Create a new [HolochainOpStore].
-    pub fn new(db: DbWrite<DbKindDht>) -> HolochainOpStore {
-        Self { db }
+    pub fn new(
+        db: DbWrite<DbKindDht>,
+        dna_hash: DnaHash,
+        sender: GhostSender<HolochainP2pEvent>,
+    ) -> HolochainOpStore {
+        Self {
+            db,
+            dna_hash,
+            sender,
+        }
     }
 }
 
 impl OpStore for HolochainOpStore {
     fn process_incoming_ops(&self, op_list: Vec<Bytes>) -> BoxFut<'_, K2Result<Vec<OpId>>> {
-        let db = self.db.clone();
         Box::pin(async move {
             let dht_ops = op_list
                 .into_iter()
@@ -39,26 +58,28 @@ impl OpStore for HolochainOpStore {
                     Ok((
                         op.len() as u32,
                         decode::<_, DhtOp>(op.as_ref())
-                            .map(DhtOpHashed::from_content_sync)
                             .map_err(|e| K2Error::other_src("Could not decode op", e))?,
                     ))
                 })
-                .collect::<K2Result<Vec<(u32, DhtOpHashed)>>>()?;
+                .collect::<K2Result<Vec<(u32, DhtOp)>>>()?;
 
             let ids = dht_ops
                 .iter()
-                .map(|(_, op)| OpId::from(Bytes::copy_from_slice(&op.hash.get_raw_36())))
+                .map(|(_, op)| {
+                    let op_hashed = DhtOpHashed::from_content_sync(op.clone());
+                    OpId::from(Bytes::copy_from_slice(&op_hashed.hash.get_raw_36()))
+                })
                 .collect();
 
-            db.write_async(move |txn| -> StateMutationResult<()> {
-                for (size, op) in &dht_ops {
-                    holochain_state::prelude::insert_op_dht(txn, op, *size, None)?;
-                }
-
-                Ok(())
-            })
-            .await
-            .map_err(|e| K2Error::other_src("Failed to insert op", e))?;
+            self.sender
+                .publish(
+                    self.dna_hash.clone(),
+                    false,
+                    false,
+                    dht_ops.into_iter().map(|(_, op)| op).collect(),
+                )
+                .await
+                .map_err(|e| K2Error::other_src("Failed to publish incoming ops", e))?;
 
             Ok(ids)
         })

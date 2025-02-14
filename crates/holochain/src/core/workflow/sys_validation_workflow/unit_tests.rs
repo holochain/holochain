@@ -384,7 +384,7 @@ impl TestCase {
         let test_op_hash = op.as_hash().clone();
         db.write_async({
             move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_untyped(txn, &op)?;
+                holochain_state::mutations::insert_op_untyped(txn, &op, 0)?;
                 Ok(())
             }
         })

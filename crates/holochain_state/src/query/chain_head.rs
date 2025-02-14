@@ -163,6 +163,7 @@ mod tests {
                 &fixt!(DhtOpHash),
                 &op_order,
                 &action.action().timestamp(),
+                0,
                 None,
             )
             .unwrap();

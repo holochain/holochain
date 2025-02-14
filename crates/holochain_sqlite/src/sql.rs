@@ -70,7 +70,8 @@ pub mod sql_cell {
 pub mod sql_dht {
     pub const OP_HASHES_IN_TIME_SLICE: &str = include_str!("sql/dht/op_hashes_in_time_slice.sql");
 
-    pub const OP_HASHES_SINCE_TIME_BATCH: &str = include_str!("sql/dht/op_hashes_since_time_batch.sql");
+    pub const OP_HASHES_SINCE_TIME_BATCH: &str =
+        include_str!("sql/dht/op_hashes_since_time_batch.sql");
 
     pub const OPS_BY_ID: &str = include_str!("sql/dht/ops_by_id.sql");
 }
