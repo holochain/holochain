@@ -1,0 +1,5 @@
+error: `validate` must return `ExternResult<ValidateCallbackResult>`
+ --> tests/tests/hdk_extern/validate_invalid_return.rs:4:18
+  |
+4 | fn validate() -> String {
+  |                  ^^^^^^
