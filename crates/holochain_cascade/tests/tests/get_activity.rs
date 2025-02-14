@@ -380,7 +380,7 @@ async fn get_activity_with_warrants() {
     dht.test_write({
         let op = DhtOp::from(warrant.clone()).into_hashed();
         move |txn| {
-            insert_op_dht(txn, &op, None).unwrap();
+            insert_op_dht(txn, &op, 0, None).unwrap();
         }
     });
 

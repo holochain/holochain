@@ -98,8 +98,20 @@ fn insert_locally_validated_op(
 
     let op_type = op.get_type();
 
+    let serialized_size = std::cmp::min(
+        op.as_content()
+            .as_chain_op()
+            .and_then(|op| {
+                holochain_serialized_bytes::encode(&op)
+                    .map(|e| e.len())
+                    .ok()
+            })
+            .unwrap_or_default(),
+        u32::MAX as usize,
+    );
+
     // Insert the op.
-    insert_op_dht(txn, &op, None)?;
+    insert_op_dht(txn, &op, serialized_size as u32, None)?;
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 

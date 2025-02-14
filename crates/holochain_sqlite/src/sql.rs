@@ -67,6 +67,15 @@ pub mod sql_cell {
     }
 }
 
+pub mod sql_dht {
+    pub const OP_HASHES_IN_TIME_SLICE: &str = include_str!("sql/dht/op_hashes_in_time_slice.sql");
+
+    pub const OP_HASHES_SINCE_TIME_BATCH: &str =
+        include_str!("sql/dht/op_hashes_since_time_batch.sql");
+
+    pub const OPS_BY_ID: &str = include_str!("sql/dht/ops_by_id.sql");
+}
+
 pub mod sql_conductor {
     pub(crate) const SELECT_NONCE: &str = include_str!("sql/conductor/nonce_already_seen.sql");
     pub const DELETE_EXPIRED_NONCE: &str = include_str!("sql/conductor/delete_expired_nonce.sql");
