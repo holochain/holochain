@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Prevent “TODO” comments from being rendered in cargo docs.
 
+- Add `hdk_extern` tests
+
 ## 0.5.0-dev.16
 
 ## 0.5.0-dev.15
