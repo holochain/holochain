@@ -122,10 +122,6 @@ pub struct DeleteCloneCellPayload {
 pub struct InstallAppPayload {
     /// Where to obtain the AppBundle, which contains the app manifest and DNA bundles
     /// to be installed. This is the main payload of app installation.
-    ///
-    /// Since this field uses `#[serde(flatten)]`, when using other serialized data formats
-    /// like JSON or YAML, this field will actually show up as one of the variants of
-    /// `AppBundleSource` (e.g. `bundle` or `path`), rather than as a `source` field.
     pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
