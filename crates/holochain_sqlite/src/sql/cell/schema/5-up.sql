@@ -16,3 +16,11 @@ set
     where
       Action.hash = DhtOp.action_hash
   );
+
+CREATE TABLE SliceHash (
+  arc_start INTEGER NOT NULL,
+  arc_end INTEGER NOT NULL,
+  slice_index INTEGER NOT NULL,
+  hash BLOB NOT NULL,
+  PRIMARY KEY (arc_start, arc_end, slice_index) ON CONFLICT REPLACE
+);

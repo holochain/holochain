@@ -1,6 +1,8 @@
 SELECT
   hash,
-  serialized_size
+  authored_timestamp,
+  serialized_size,
+  rowid
 FROM
   DhtOp
 WHERE
@@ -21,11 +23,10 @@ WHERE
         OR storage_center_loc >= :storage_start_loc
       )
     )
-  ) -- op timestamp is within temporal bounds
-  AND (
-    authored_timestamp >= :timestamp_min
-    AND authored_timestamp < :timestamp_max
-  ) -- ops are integrated, i.e. not in limbo
-  AND when_integrated IS NOT NULL
+  )
+  -- op integrated is after the start time
+  AND when_integrated >= :timestamp_min
 ORDER BY
-  authored_timestamp ASC
+  when_integrated ASC
+LIMIT
+  :limit
