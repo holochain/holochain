@@ -30,6 +30,7 @@ fn insert_action_and_op(txn: &mut Txn<DbKindDht>, action: &Action) -> DhtOpHash 
         &op_hash,
         &op_order,
         &timestamp,
+        0,
         None,
     )
     .unwrap();

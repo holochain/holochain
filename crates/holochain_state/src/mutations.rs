@@ -133,7 +133,11 @@ pub fn todo_no_cache_transfer_data() -> Option<(AgentPubKey, TransferMethod, Tim
 /// Insert a [DhtOp] into any Op database.
 /// The type is not checked, and transfer data is not set.
 #[cfg(feature = "test_utils")]
-pub fn insert_op_untyped(txn: &mut Transaction, op: &DhtOpHashed, serialized_size: u32) -> StateMutationResult<()> {
+pub fn insert_op_untyped(
+    txn: &mut Transaction,
+    op: &DhtOpHashed,
+    serialized_size: u32,
+) -> StateMutationResult<()> {
     insert_op_when(txn, op, serialized_size, None, Timestamp::now())
 }
 
