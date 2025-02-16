@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.5.0-dev.11
+
+- Prevent “TODO” comments from being rendered in cargo docs.
+
 ## 0.5.0-dev.10
 
 ## 0.5.0-dev.9

@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Add implementation of Kitsune2 PeerMetaStore.
+
+## 0.5.0-dev.18
+
 ## 0.5.0-dev.17
 
 ## 0.5.0-dev.16

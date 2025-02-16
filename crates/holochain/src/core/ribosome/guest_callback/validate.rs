@@ -250,12 +250,15 @@ mod slow_tests {
     use crate::core::workflow::WorkflowError;
     use crate::fixt::curve::Zomes;
     use crate::fixt::*;
+    use crate::sweettest::{SweetConductor, SweetDnaFile};
     use ::fixt::prelude::*;
     use assert2::{assert, let_assert};
     use holochain_state::source_chain::SourceChainError;
+    use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::op::Op;
+    use std::sync::Arc;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_unimplemented() {
@@ -309,51 +312,45 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_validate_implemented_invalid_return() {
-        let validate_invocation = ValidateInvocation::new(
-            ZomesToInvoke::One(IntegrityZome::from(TestWasm::ValidateInvalidReturn).erase_type()),
-            &Op::RegisterAgentActivity(RegisterAgentActivity {
-                action: SignedActionHashed::new_unchecked(
-                    Action::CreateLink(fixt!(CreateLink)),
-                    fixt!(Signature),
-                ),
-                cached_entry: None,
-            }),
+        let unit_entry_def = EntryDef::default_from_id("unit");
+        let zome = InlineZomeSet::new_unique_single(
+            "integrity",
+            "coordinator",
+            vec![unit_entry_def.clone()],
+            0,
         )
-        .unwrap();
+        .function("integrity", "validate", |_api, _op: Op| Ok(42usize))
+        .function("coordinator", "create", move |api, ()| {
+            let entry = Entry::app(().try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        });
 
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::ValidateInvalidReturn]))
-            .next()
-            .unwrap();
-
-        let err = ribosome
-            .run_validate(fixt!(ValidateHostAccess), validate_invocation)
-            .await
-            .unwrap_err();
-
-        let_assert!(RibosomeError::CallbackInvalidReturnType(err_msg) = err);
-        assert!(err_msg.starts_with("invalid value: integer `42`"));
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_adding_entry_when_validate_implemented_invalid_return() {
-        holochain_trace::test_run();
-        let RibosomeTestFixture {
-            conductor, alice, ..
-        } = RibosomeTestFixture::new(TestWasm::ValidateInvalidReturn).await;
+        let dnas = [SweetDnaFile::unique_from_inline_zomes(zome).await.0];
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app = conductor.setup_app("app", &dnas).await.unwrap();
+        let conductor = Arc::new(conductor);
+        let (cell,) = app.into_tuple();
 
         let err = conductor
-            .call_fallible::<_, Record>(&alice, "create_entry_to_validate", ())
+            .call_fallible::<_, ()>(&cell.zome("coordinator"), "create", ())
             .await
             .unwrap_err();
 
         let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
+
         let_assert!(
             WorkflowError::SourceChainError(SourceChainError::Other(other_err)) = *workflow_err
         );
-        // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
+
         assert!(other_err
             .to_string()
-            .starts_with("The callback has an invalid return type: invalid value: integer `42`"));
+            .contains("invalid value: integer `42`"));
     }
 
     #[tokio::test(flavor = "multi_thread")]

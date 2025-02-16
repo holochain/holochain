@@ -334,7 +334,7 @@ async fn app_validation_workflow_inner(
     // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
     #[cfg(feature = "unstable-warrants")]
     holochain_state::integrate::authored_ops_to_dht_db(
-        network,
+        network.storage_arcs().await?,
         warrant_op_hashes,
         workspace.authored_db.clone().into(),
         workspace.dht_db.clone(),

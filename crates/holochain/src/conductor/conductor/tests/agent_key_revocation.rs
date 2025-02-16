@@ -12,6 +12,15 @@ use holochain_zome_types::record::Record;
 use matches::assert_matches;
 use rusqlite::Row;
 
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::{conductor::ConductorError, CellError};
+use crate::core::workflow::WorkflowError;
+use crate::core::ValidationOutcome;
+use crate::sweettest::{
+    await_consistency, SweetConductor, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
+    SweetZome,
+};
+use holochain_p2p::HolochainP2pDnaT;
 #[cfg(feature = "unstable-dpki")]
 use {
     crate::core::SysValidationError,
@@ -22,15 +31,6 @@ use {
     holochain_zome_types::timestamp::Timestamp,
     holochain_zome_types::validate::ValidationStatus,
     rusqlite::named_params,
-};
-
-use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::{conductor::ConductorError, CellError};
-use crate::core::workflow::WorkflowError;
-use crate::core::ValidationOutcome;
-use crate::sweettest::{
-    await_consistency, SweetConductor, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
-    SweetZome,
 };
 
 use super::SweetApp;
@@ -305,12 +305,11 @@ mod single_conductor {
         .await
         .unwrap();
         source_chain_1.delete_valid_agent_pub_key().await.unwrap();
+        let network = conductor
+            .holochain_p2p()
+            .to_dna(cell_id_1.dna_hash().clone(), conductor.get_chc(&cell_id_1));
         source_chain_1
-            .flush(
-                &conductor
-                    .holochain_p2p()
-                    .to_dna(cell_id_1.dna_hash().clone(), conductor.get_chc(&cell_id_1)),
-            )
+            .flush(network.storage_arcs().await.unwrap(), network.chc())
             .await
             .unwrap();
 
@@ -402,12 +401,11 @@ mod single_conductor {
         .await
         .unwrap();
         source_chain_1.delete_valid_agent_pub_key().await.unwrap();
+        let network = conductor
+            .holochain_p2p()
+            .to_dna(cell_id_1.dna_hash().clone(), conductor.get_chc(&cell_id_1));
         source_chain_1
-            .flush(
-                &conductor
-                    .holochain_p2p()
-                    .to_dna(cell_id_1.dna_hash().clone(), conductor.get_chc(&cell_id_1)),
-            )
+            .flush(network.storage_arcs().await.unwrap(), network.chc())
             .await
             .unwrap();
 
@@ -974,12 +972,11 @@ async fn delete_agent_key_from_source_chain(
     cell_id: &CellId,
 ) {
     source_chain.delete_valid_agent_pub_key().await.unwrap();
+    let network = conductor
+        .holochain_p2p()
+        .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(cell_id));
     source_chain
-        .flush(
-            &conductor
-                .holochain_p2p()
-                .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(cell_id)),
-        )
+        .flush(network.storage_arcs().await.unwrap(), network.chc())
         .await
         .unwrap();
     conductor
