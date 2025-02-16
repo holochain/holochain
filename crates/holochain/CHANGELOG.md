@@ -14,6 +14,7 @@ an oversight of #4616.
 
 - Change most enums that are exposed via the conductor API to be serialized with `tag = "type"` and `content = "value"` \#4616
 - Replace `tiny-keccak` with `sha3` due to dependency on problematic `crunchy` crate
+- Use `rustls-tls` instead of `native-tls-vendored` in reqwest due to compatibility issue with Android platform
 - Prevent “TODO” comments from being rendered in cargo docs.
 
 ## 0.5.0-dev.17
