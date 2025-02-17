@@ -16,7 +16,6 @@ async-trait = "0.1"
 derive_more = "0.99"
 fixt = { path = "../fixt", version = "^0.5.0-dev.1" }
 futures = "0.3"
-ghost_actor = "0.3.0-alpha.6"
 holo_hash = { version = "^0.5.0-dev.7", path = "../holo_hash" }
 holochain_chc = { version = "^0.2.0-dev.18", path = "../holochain_chc" }
 holochain_keystore = { version = "^0.5.0-dev.17", path = "../holochain_keystore" }
@@ -51,7 +50,6 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "holochain_zome_types/fixturators",
   "holochain_types/test_utils",
-  "ghost_actor/test_utils",
 ]
 
 mock_network = ["test_utils"]
