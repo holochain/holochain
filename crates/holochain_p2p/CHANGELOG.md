@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Add implementation of Kitsune2 LocalAgent and Signer, backed by Lair Keystore.
 - Add implementation of Kitsune2 PeerMetaStore.
 
 ## 0.5.0-dev.18
