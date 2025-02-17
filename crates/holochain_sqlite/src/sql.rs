@@ -79,20 +79,6 @@ pub mod sql_conductor {
         include_str!("sql/conductor/select_valid_unrestricted_cap_grant.sql");
 }
 
-pub(crate) mod sql_p2p_agent_store {
-    pub(crate) const INSERT: &str = include_str!("sql/p2p_agent_store/insert.sql");
-    pub(crate) const SELECT_ALL: &str = include_str!("sql/p2p_agent_store/select_all.sql");
-    pub(crate) const DELETE: &str = include_str!("sql/p2p_agent_store/delete.sql");
-    pub(crate) const EXTRAPOLATED_COVERAGE: &str =
-        include_str!("sql/p2p_agent_store/extrapolated_coverage.sql");
-    pub(crate) const PRUNE: &str = include_str!("sql/p2p_agent_store/prune.sql");
-}
-
-pub(crate) mod sql_p2p_metrics {
-    pub(crate) const INSERT: &str = include_str!("sql/p2p_metrics/insert.sql");
-    pub(crate) const PRUNE: &str = include_str!("sql/p2p_metrics/prune.sql");
-}
-
 pub(crate) mod sql_wasm {}
 
 pub mod sql_peer_meta_store {

@@ -208,9 +208,6 @@ impl AppManifestV1 {
                 if let Some(props) = modifier_opts.properties.clone() {
                     role.dna.modifiers.properties = Some(props);
                 }
-                if let Some(quantum_time) = modifier_opts.quantum_time {
-                    role.dna.modifiers.quantum_time = Some(quantum_time);
-                }
             }
         }
         Ok(())
@@ -330,7 +327,6 @@ pub mod tests {
             properties: Some(app_manifest_properties_fixture()),
             network_seed: Some("network_seed".into()),
             origin_time: None,
-            quantum_time: None,
         };
         let installed_hash = fixt!(DnaHash);
         let manifest = app_manifest_fixture(location, installed_hash.clone(), modifiers).await;

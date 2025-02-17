@@ -12,9 +12,6 @@ use crate::zome::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
 
-#[cfg(feature = "full-dna-def")]
-use kitsune_p2p_dht::spacetime::*;
-
 /// Ordered list of integrity zomes in this DNA.
 pub type IntegrityZomes = Vec<(ZomeName, IntegrityZomeDef)>;
 
@@ -246,16 +243,6 @@ impl DnaDef {
         clone.modifiers = clone.modifiers.update(modifiers);
         clone
     }
-
-    /// Get the topology to use for kitsune gossip
-    pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
-        kitsune_p2p_dht::spacetime::Topology {
-            space: SpaceDimension::standard(),
-            time: TimeDimension::new(self.modifiers.quantum_time),
-            time_origin: kitsune_p2p_block::Timestamp::from_micros(self.modifiers.origin_time.0),
-            time_cutoff: cutoff,
-        }
-    }
 }
 
 /// Get a random network seed
@@ -310,7 +297,6 @@ mod tests {
 
     use super::*;
     use holochain_serialized_bytes::prelude::*;
-    use kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME;
 
     #[test]
     fn test_update_modifiers() {
@@ -324,21 +310,18 @@ mod tests {
             network_seed: "seed".into(),
             properties: ().try_into().unwrap(),
             origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            quantum_time: STANDARD_QUANTUM_TIME,
         };
 
         let opt = DnaModifiersOpt {
             network_seed: None,
             properties: Some(props.clone()),
             origin_time: Some(now),
-            quantum_time: Some(core::time::Duration::from_secs(60)),
         };
 
         let expected = DnaModifiers {
             network_seed: "seed".into(),
             properties: props.clone(),
             origin_time: now,
-            quantum_time: core::time::Duration::from_secs(60),
         };
 
         assert_eq!(mods.update(opt), expected);
