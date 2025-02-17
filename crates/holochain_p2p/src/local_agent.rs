@@ -22,7 +22,7 @@ pub struct HolochainP2pLocalAgent {
     /// The [AgentId] derived from the [AgentPubKey], as the 32-byte key and 4-byte location.
     agent_id: AgentId,
     /// A [MetaLairClient] to allow this agent to sign messages.
-    client: MetaLairClient,
+    keystore_client: MetaLairClient,
     /// The inner state that can be modified during the lifecycle of the agent
     inner: Mutex<LocalAgentInner>,
 }
@@ -34,7 +34,7 @@ impl HolochainP2pLocalAgent {
         Self {
             agent,
             agent_id,
-            client,
+            keystore_client: client,
             inner: Mutex::new(LocalAgentInner {
                 callback: None,
                 storage_arc: DhtArc::Empty,
@@ -60,7 +60,7 @@ impl Signer for HolochainP2pLocalAgent {
     ) -> BoxFut<'a, K2Result<Bytes>> {
         Box::pin(async move {
             let out = self
-                .client
+                .keystore_client
                 .sign(self.agent.clone(), message.into())
                 .await
                 .map_err(|e| K2Error::other_src("Failed to sign message", e))?;
