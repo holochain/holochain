@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - develop-*
+      - feat/integrate-k2
 
 concurrency:
   group: test-${{ github.workflow }}-${{ github.ref || github.run_id }}
