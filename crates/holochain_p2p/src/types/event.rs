@@ -109,7 +109,7 @@ pub enum CountersigningSessionNegotiationMessage {
 }
 
 /// Handle requests made by remote peers.
-pub trait HcP2pHandler {
+pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
     /// A remote node is attempting to make a remote call on us.
     fn call_remote(
         &self,
@@ -117,7 +117,7 @@ pub trait HcP2pHandler {
         to_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
-    ) -> BoxFut<'_, HcP2pResult<SerializedBytes>>;
+    ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>>;
 
     /// A remote node is publishing data in a range we claim to be holding.
     fn publish(
@@ -126,7 +126,7 @@ pub trait HcP2pHandler {
         request_validation_receipt: bool,
         countersigning_session: bool,
         ops: Vec<holochain_types::dht_op::DhtOp>,
-    ) -> BoxFut<'_, HcP2pResult<()>>;
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// A remote node is requesting entry data from us.
     fn get(
@@ -135,7 +135,7 @@ pub trait HcP2pHandler {
         to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: GetOptions,
-    ) -> BoxFut<'_, HcP2pResult<WireOps>>;
+    ) -> BoxFut<'_, HolochainP2pResult<WireOps>>;
 
     /// A remote node is requesting metadata from us.
     fn get_meta(
@@ -144,7 +144,7 @@ pub trait HcP2pHandler {
         to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: GetMetaOptions,
-    ) -> BoxFut<'_, HcP2pResult<MetadataSet>>;
+    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>>;
 
     /// A remote node is requesting link data from us.
     fn get_links(
@@ -153,7 +153,7 @@ pub trait HcP2pHandler {
         to_agent: AgentPubKey,
         link_key: WireLinkKey,
         options: GetLinksOptions,
-    ) -> BoxFut<'_, HcP2pResult<WireLinkOps>>;
+    ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>>;
 
     /// A remote node is requesting a link count from us.
     fn count_links(
@@ -161,7 +161,7 @@ pub trait HcP2pHandler {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         query: WireLinkQuery,
-    ) -> BoxFut<'_, HcP2pResult<CountLinksResponse>>;
+    ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>>;
 
     /// A remote node is requesting agent activity from us.
     fn get_agent_activity(
@@ -171,7 +171,7 @@ pub trait HcP2pHandler {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> BoxFut<'_, HcP2pResult<AgentActivityResponse>>;
+    ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>>;
 
     /// A remote node is requesting agent activity from us.
     fn must_get_agent_activity(
@@ -180,7 +180,7 @@ pub trait HcP2pHandler {
         to_agent: AgentPubKey,
         author: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
-    ) -> BoxFut<'_, HcP2pResult<MustGetAgentActivityResponse>>;
+    ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>>;
 
     /// A remote node has sent us a validation receipt.
     fn validation_receipts_received(
@@ -188,7 +188,7 @@ pub trait HcP2pHandler {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HcP2pResult<()>>;
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Messages between agents that drive a countersigning session.
     fn countersigning_session_negotiation(
@@ -196,5 +196,8 @@ pub trait HcP2pHandler {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         message: CountersigningSessionNegotiationMessage,
-    ) -> BoxFut<'_, HcP2pResult<()>>;
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 }
+
+/// Trait-object HcP2pHandler.
+pub type DynHcP2pHandler = Arc<dyn HcP2pHandler>;

@@ -31,7 +31,7 @@ pub enum HolochainP2pError {
 }
 
 /// Holochain p2p result type.
-pub type HcP2pResult<T> = std::result::Result<T, HolochainP2pError>;
+pub type HolochainP2pResult<T> = std::result::Result<T, HolochainP2pError>;
 
 impl HolochainP2pError {
     /// promote a custom error type to a TransportError

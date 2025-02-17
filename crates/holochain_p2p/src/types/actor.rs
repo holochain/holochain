@@ -3,59 +3,8 @@
 
 use crate::event::GetRequest;
 use crate::*;
-use holochain_chc::ChcImpl;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
-use kitsune_p2p::gossip::sharded_gossip::KitsuneDiagnostics;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
-
-/// Holochain-specific FetchContext extension trait.
-pub trait FetchContextExt {
-    /// Applies the "request_validation_receipt" flag *if* the param is true
-    /// otherwise, leaves the flag unchanged.
-    fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self;
-
-    /// Returns true if the "request_validation_receipt" flag is set.
-    fn has_request_validation_receipt(&self) -> bool;
-
-    /// Applies the "countersigning_session" flag *if* the param is true
-    /// otherwise, leaves the flag unchanged.
-    fn with_countersigning_session(&self, countersigning_session: bool) -> Self;
-
-    /// Returns true if the "countersigning_session" flag is set.
-    fn has_countersigning_session(&self) -> bool;
-}
-
-const FLAG_REQ_VAL_RCPT: u32 = 1 << 0;
-const FLAG_CNTR_SSN: u32 = 1 << 1;
-
-impl FetchContextExt for FetchContext {
-    fn with_request_validation_receipt(&self, request_validation_receipt: bool) -> Self {
-        if request_validation_receipt {
-            FetchContext(self.0 | FLAG_REQ_VAL_RCPT)
-        } else {
-            *self
-        }
-    }
-
-    fn has_request_validation_receipt(&self) -> bool {
-        self.0 & FLAG_REQ_VAL_RCPT > 0
-    }
-
-    fn with_countersigning_session(&self, countersigning_session: bool) -> Self {
-        if countersigning_session {
-            FetchContext(self.0 | FLAG_CNTR_SSN)
-        } else {
-            *self
-        }
-    }
-
-    fn has_countersigning_session(&self) -> bool {
-        self.0 & FLAG_CNTR_SSN > 0
-    }
-}
 
 #[derive(Clone, Debug)]
 /// Get options help control how the get is processed at various levels.
@@ -252,21 +201,22 @@ impl Default for GetActivityOptions {
     }
 }
 
-type MaybeDnaHash = Option<DnaHash>;
-
 /// Trait defining the main holochain_p2p interface.
-pub trait HcP2p {
+pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     fn join(
         &self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
         maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arq: Option<crate::dht::Arq>,
-    ) -> BoxFut<'_, HcP2pResult<()>>;
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
-    fn leave(&self, dna_hash: DnaHash, agent_pub_key: AgentPubKey) -> BoxFut<'_, HcP2pResult<()>>;
+    fn leave(
+        &self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
     fn call_remote(
@@ -275,7 +225,7 @@ pub trait HcP2p {
         to_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
-    ) -> BoxFut<'_, HcP2pResult<SerializedBytes>>;
+    ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
     /// This is a fire-and-forget operation, a best effort will be made
@@ -285,7 +235,7 @@ pub trait HcP2p {
         &self,
         dna_hash: DnaHash,
         to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
-    ) -> BoxFut<'_, HcP2pResult<()>>;
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Publish data to the correct neighborhood.
     fn publish(
@@ -295,10 +245,10 @@ pub trait HcP2p {
         countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
         source: AgentPubKey,
-        op_hash_list: Vec<OpHashSized>,
+        op_hash_list: Vec<DhtOpHash>,
         timeout_ms: Option<u64>,
         reflect_ops: Option<Vec<DhtOp>>,
-    ) -> BoxFut<'_, HcP2pResult<()>>;
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Publish a countersigning op.
     fn publish_countersign(
@@ -307,7 +257,7 @@ pub trait HcP2p {
         flag: bool,
         basis_hash: holo_hash::OpBasis,
         op: DhtOp,
-    ) -> BoxFut<'_, HcP2pResult<()>>;
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Get an entry from the DHT.
     fn get(
@@ -315,7 +265,7 @@ pub trait HcP2p {
         dna_hash: DnaHash,
         dht_hash: holo_hash::AnyDhtHash,
         options: GetOptions,
-    ) -> BoxFut<'_, HcP2pResult<Vec<WireOps>>>;
+    ) -> BoxFut<'_, HolochainP2pResult<Vec<WireOps>>>;
 
     /// Get metadata from the DHT.
     fn get_meta(
@@ -323,7 +273,7 @@ pub trait HcP2p {
         dna_hash: DnaHash,
         dht_hash: holo_hash::AnyDhtHash,
         options: GetMetaOptions,
-    ) -> BoxFut<'_, HcP2pResult<Vec<MetadataSet>>>;
+    ) -> BoxFut<'_, HolochainP2pResult<Vec<MetadataSet>>>;
 
     /// Get links from the DHT.
     fn get_links(
@@ -331,14 +281,14 @@ pub trait HcP2p {
         dna_hash: DnaHash,
         link_key: WireLinkKey,
         options: GetLinksOptions,
-    ) -> BoxFut<'_, HcP2pResult<Vec<WireLinkOps>>>;
+    ) -> BoxFut<'_, HolochainP2pResult<Vec<WireLinkOps>>>;
 
     /// Get a count of links from the DHT.
     fn count_links(
         &self,
         dna_hash: DnaHash,
         query: WireLinkQuery,
-    ) -> BoxFut<'_, HcP2pResult<CountLinksResponse>>;
+    ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>>;
 
     /// Get agent activity from the DHT.
     fn get_agent_activity(
@@ -347,7 +297,7 @@ pub trait HcP2p {
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: GetActivityOptions,
-    ) -> BoxFut<'_, HcP2pResult<Vec<AgentActivityResponse>>>;
+    ) -> BoxFut<'_, HolochainP2pResult<Vec<AgentActivityResponse>>>;
 
     /// A remote node is requesting agent activity from us.
     fn must_get_agent_activity(
@@ -355,7 +305,7 @@ pub trait HcP2p {
         dna_hash: DnaHash,
         author: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
-    ) -> BoxFut<'_, HcP2pResult<Vec<MustGetAgentActivityResponse>>>;
+    ) -> BoxFut<'_, HolochainP2pResult<Vec<MustGetAgentActivityResponse>>>;
 
     /// Send a validation receipt to a remote node.
     fn send_validation_receipts(
@@ -363,17 +313,17 @@ pub trait HcP2p {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HcP2pResult<()>>;
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// New data has been integrated and is ready for gossiping.
-    fn new_integrated_data(&self, dna_hash: DnaHash) -> BoxFut<'_, HcP2pResult<()>>;
+    fn new_integrated_data(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Check if any local agent in this space is an authority for a hash.
     fn authority_for_hash(
         &self,
         dna_hash: DnaHash,
         basis: OpBasis,
-    ) -> BoxFut<'_, HcP2pResult<bool>>;
+    ) -> BoxFut<'_, HolochainP2pResult<bool>>;
 
     /// Messages between agents negotiation a countersigning session.
     fn countersigning_session_negotiation(
@@ -381,18 +331,26 @@ pub trait HcP2p {
         dna_hash: DnaHash,
         agents: Vec<AgentPubKey>,
         message: event::CountersigningSessionNegotiationMessage,
-    ) -> BoxFut<'_, HcP2pResult<()>>;
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Dump network metrics.
-    fn dump_network_metrics(&self, dna_hash: MaybeDnaHash) -> BoxFut<'_, HcP2pResult<String>>;
+    fn dump_network_metrics(
+        &self,
+        dna_hash: Option<DnaHash>,
+    ) -> BoxFut<'_, HolochainP2pResult<String>>;
 
     /// Dump network stats.
-    fn dump_network_stats(&self) -> BoxFut<'_, HcP2pResult<String>>;
+    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<String>>;
 
-    /// Get struct for diagnostic data
-    fn get_diagnostics(&self, dna_hash: DnaHash) -> BoxFut<'_, HcP2pResult<KitsuneDiagnostics>>;
+    // /// Get struct for diagnostic data
+    // fn get_diagnostics(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<KitsuneDiagnostics>>;
 
     /// Get the storage arcs of the agents currently in this space.
-    fn storage_arcs(&self, dna_hash: DnaHash)
-        -> BoxFut<'_, HcP2pResult<Vec<kitsune2_api::DhtArc>>>;
+    fn storage_arcs(
+        &self,
+        dna_hash: DnaHash,
+    ) -> BoxFut<'_, HolochainP2pResult<Vec<kitsune2_api::DhtArc>>>;
 }
+
+/// Trait-object HcP2p
+pub type DynHcP2p = Arc<dyn HcP2p>;
