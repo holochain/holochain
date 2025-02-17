@@ -31,6 +31,9 @@ pub use kitsune_p2p;
 mod peer_meta_store;
 pub use peer_meta_store::*;
 
+mod local_agent;
+pub use local_agent::*;
+
 #[automock]
 #[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
