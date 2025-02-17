@@ -471,13 +471,14 @@ async fn count_slice_hashes() {
         .slice_hash_count(DhtArc::Arc(0, 100))
         .await
         .unwrap();
-    assert_eq!(2, count);
+    // The "count" is the highest stored slice index, not the literal count
+    assert_eq!(6, count);
 
     let count = op_store
         .slice_hash_count(DhtArc::Arc(0, 101))
         .await
         .unwrap();
-    assert_eq!(1, count);
+    assert_eq!(5, count);
 }
 
 #[tokio::test]
@@ -538,7 +539,7 @@ async fn overwrite_slice_hashes() {
         .slice_hash_count(DhtArc::Arc(0, 100))
         .await
         .unwrap();
-    assert_eq!(1, count);
+    assert_eq!(5, count);
 
     let hash = op_store
         .retrieve_slice_hash(DhtArc::Arc(0, 100), 5)

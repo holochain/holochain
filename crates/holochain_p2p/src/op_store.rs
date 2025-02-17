@@ -207,6 +207,11 @@ impl OpStore for HolochainOpStore {
                                 ":storage_start_loc": arc_start,
                                 ":storage_end_loc": arc_end,
                                 ":timestamp_min": latest_timestamp.as_micros(),
+                                // Fetch ops in batches of 500. This lets us observe the `limit_bytes`
+                                // without going to the database too many times.
+                                // Because the timestamp being queried is the integration timestamp,
+                                // it shouldn't be possible for >500 ops authored at the same time
+                                // to prevent this loop from proceeding.
                                 ":limit": 500,
                             }) {
                                 Ok(rows) => rows,
@@ -300,7 +305,7 @@ impl OpStore for HolochainOpStore {
             let out = db
                 .read_async(move |txn| -> StateMutationResult<u64> {
                     let mut stmt = txn.prepare(
-                        r#"SELECT COUNT(*) FROM SliceHash
+                        r#"SELECT MAX(slice_index) FROM SliceHash
                     WHERE arc_start = :arc_start AND arc_end = :arc_end"#,
                     )?;
 
