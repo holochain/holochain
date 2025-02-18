@@ -62,10 +62,7 @@ sqlite-encrypted = [
   "holo_hash/sqlite-encrypted",
   "holochain_keystore/sqlite-encrypted",
 ]
-sqlite = [
-  "holo_hash/sqlite",
-  "holochain_keystore/sqlite",
-]
+sqlite = ["holo_hash/sqlite", "holochain_keystore/sqlite"]
 
 # Enables tracing instrumentation 
 # (we experience segfaults in some tests if there is too much instrumentation)

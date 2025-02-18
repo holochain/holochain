@@ -8,7 +8,6 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
     - name: zome1
@@ -30,7 +29,6 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
     - name: zome1
@@ -58,7 +56,6 @@ manifest_version: "1"
 name: test_dna
 integrity: 
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes: ~
 coordinator:
@@ -81,7 +78,6 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
     - name: zome1
@@ -108,7 +104,6 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
     - name: zome1
@@ -148,7 +143,6 @@ coordinator:
   # Should be indented left once, this is actually nested under `coordinator`
   integrity:
     network_seed: blablabla
-    origin_time: 2022-02-11T23:29:00.789576Z
     properties: ~
     zomes:
       - name: zome1
@@ -174,7 +168,6 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   not_a_real_field: ~
   zomes:
@@ -225,7 +218,6 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
     - name: zome1
