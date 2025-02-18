@@ -22,10 +22,7 @@ pub async fn authored_ops_to_dht_db(
     let mut should_hold_hashes = Vec::new();
 
     for (op_hash, basis) in hashes {
-        if storage_arcs
-            .iter()
-            .any(|arc| arc.contains(basis.get_loc().as_u32()))
-        {
+        if storage_arcs.iter().any(|arc| arc.contains(basis.get_loc())) {
             should_hold_hashes.push(op_hash);
         }
     }

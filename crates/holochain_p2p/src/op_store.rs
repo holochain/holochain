@@ -1,7 +1,5 @@
-use crate::event::{HolochainP2pEvent, HolochainP2pEventSender};
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use ghost_actor::GhostSender;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_serialized_bytes::prelude::decode;
 use holochain_sqlite::db::{DbKindDht, DbWrite};
@@ -21,7 +19,7 @@ use std::rc::Rc;
 pub struct HolochainOpStore {
     db: DbWrite<DbKindDht>,
     dna_hash: DnaHash,
-    sender: GhostSender<HolochainP2pEvent>,
+    sender: crate::event::DynHcP2pHandler,
 }
 
 impl Debug for HolochainOpStore {
@@ -37,7 +35,7 @@ impl HolochainOpStore {
     pub fn new(
         db: DbWrite<DbKindDht>,
         dna_hash: DnaHash,
-        sender: GhostSender<HolochainP2pEvent>,
+        sender: crate::event::DynHcP2pHandler,
     ) -> HolochainOpStore {
         Self {
             db,

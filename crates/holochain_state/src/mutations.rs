@@ -8,18 +8,83 @@ use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_nonce::Nonce256Bits;
 use holochain_sqlite::prelude::DatabaseResult;
+use holochain_sqlite::rusqlite;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::*;
 use holochain_types::sql::AsSql;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 use std::str::FromStr;
 
 pub use error::*;
 
 mod error;
+
+/// Gossip has two distinct variants which share a lot of similarities but
+/// are fundamentally different and serve different purposes
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub enum GossipType {
+    /// The Recent gossip type is aimed at rapidly syncing the most recent
+    /// data. It runs frequently and expects frequent diffs at each round.
+    Recent,
+    /// The Historical gossip type is aimed at comprehensively syncing the
+    /// entire common history of two nodes, filling in gaps in the historical
+    /// data. It runs less frequently, and expects diffs to be infrequent
+    /// at each round.
+    Historical,
+}
+
+/// The possible methods of transferring op hashes
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub enum TransferMethod {
+    /// Transfer by publishing
+    Publish,
+    /// Transfer by gossiping
+    Gossip(GossipType),
+}
+
+impl rusqlite::ToSql for TransferMethod {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        let stage = match self {
+            TransferMethod::Publish => 1,
+            TransferMethod::Gossip(GossipType::Recent) => 2,
+            TransferMethod::Gossip(GossipType::Historical) => 3,
+        };
+        Ok(rusqlite::types::ToSqlOutput::Owned(stage.into()))
+    }
+}
+
+impl rusqlite::types::FromSql for TransferMethod {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        i32::column_result(value).and_then(|int| match int {
+            1 => Ok(TransferMethod::Publish),
+            2 => Ok(TransferMethod::Gossip(GossipType::Recent)),
+            3 => Ok(TransferMethod::Gossip(GossipType::Historical)),
+            _ => Err(rusqlite::types::FromSqlError::InvalidType),
+        })
+    }
+}
 
 #[macro_export]
 macro_rules! sql_insert {

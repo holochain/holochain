@@ -8,9 +8,7 @@ use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_cell_id;
-use kitsune_p2p::KitsuneSpace;
 use shrinkwraprs::Shrinkwrap;
-use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -64,15 +62,6 @@ mod tests {
             })
             .await
             .unwrap();
-
-        super::test_p2p_agents_db()
-            .db
-            .read_async(move |txn| -> DatabaseResult<()> {
-                _dbg_db_schema("p2p_agents", txn);
-                Ok(())
-            })
-            .await
-            .unwrap();
     }
 }
 
@@ -122,16 +111,6 @@ pub fn test_conductor_db() -> TestDb<DbKindConductor> {
 /// Create a [`TestDb`] of [DbKindWasm], backed by a temp directory.
 pub fn test_wasm_db() -> TestDb<DbKindWasm> {
     test_db(DbKindWasm)
-}
-
-/// Create a [`TestDb`] of [`DbKindP2pAgents`], backed by a temp directory.
-pub fn test_p2p_agents_db() -> TestDb<DbKindP2pAgents> {
-    test_db(DbKindP2pAgents(Arc::new(KitsuneSpace(vec![0; 36]))))
-}
-
-/// Create a [`TestDb`] of [DbKindP2pMetrics], backed by a temp directory.
-pub fn test_p2p_metrics_db() -> TestDb<DbKindP2pMetrics> {
-    test_db(DbKindP2pMetrics(Arc::new(KitsuneSpace(vec![0; 36]))))
 }
 
 fn test_db<Kind: DbKindT>(kind: Kind) -> TestDb<Kind> {
@@ -244,10 +223,6 @@ pub struct TestDbs {
     conductor: DbWrite<DbKindConductor>,
     /// A test wasm environment
     wasm: DbWrite<DbKindWasm>,
-    /// A test p2p environment
-    p2p: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pAgents>>>>,
-    /// A test p2p environment
-    p2p_metrics: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>>,
     /// The shared root temp dir for these environments
     dir: TestDir,
     /// The keystore sender for these environments
@@ -313,13 +288,9 @@ impl TestDbs {
     pub fn with_keystore(tempdir: TempDir, keystore: MetaLairClient) -> Self {
         let conductor = DbWrite::test(tempdir.path(), DbKindConductor).unwrap();
         let wasm = DbWrite::test(tempdir.path(), DbKindWasm).unwrap();
-        let p2p = Arc::new(parking_lot::Mutex::new(HashMap::new()));
-        let p2p_metrics = Arc::new(parking_lot::Mutex::new(HashMap::new()));
         Self {
             conductor,
             wasm,
-            p2p,
-            p2p_metrics,
             dir: TestDir::new(tempdir),
             keystore,
         }
@@ -336,18 +307,6 @@ impl TestDbs {
 
     pub fn wasm(&self) -> DbWrite<DbKindWasm> {
         self.wasm.clone()
-    }
-
-    pub fn p2p(
-        &self,
-    ) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pAgents>>>> {
-        self.p2p.clone()
-    }
-
-    pub fn p2p_metrics(
-        &self,
-    ) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>> {
-        self.p2p_metrics.clone()
     }
 
     /// Get the root path for these environments

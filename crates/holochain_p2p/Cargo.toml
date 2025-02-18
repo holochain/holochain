@@ -16,7 +16,6 @@ async-trait = "0.1"
 derive_more = "0.99"
 fixt = { path = "../fixt", version = "^0.5.0-dev.1" }
 futures = "0.3"
-ghost_actor = "0.3.0-alpha.6"
 holo_hash = { version = "^0.5.0-dev.7", path = "../holo_hash" }
 holochain_chc = { version = "^0.2.0-dev.18", path = "../holochain_chc" }
 holochain_keystore = { version = "^0.5.0-dev.17", path = "../holochain_keystore" }
@@ -33,7 +32,7 @@ tokio = { version = "1.27", features = ["full"] }
 tokio-stream = "0.1"
 tracing = "0.1"
 
-kitsune2_api = "0.0.1-alpha.1"
+kitsune2_api = "0.0.1-alpha2"
 bytes = "1.10"
 holochain_sqlite = { version = "0.5.0-dev.16", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.5.3"
@@ -56,7 +55,6 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "holochain_zome_types/fixturators",
   "holochain_types/test_utils",
-  "ghost_actor/test_utils",
 ]
 
 mock_network = ["test_utils"]

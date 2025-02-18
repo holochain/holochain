@@ -2730,7 +2730,6 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
- "ghost_actor",
  "holo_hash",
  "holochain_chc",
  "holochain_keystore",
@@ -3860,9 +3859,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_api"
-version = "0.0.1-alpha.1"
+version = "0.0.1-alpha2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9be45793ae8abe651a61e0f3a489568652a6caa7054d911440d09b51d4dd984e"
+checksum = "aa17afa723a78b8d3c2d27621e13e6cdb10ff7fbad005f38b9b1e45946d63e73"
 dependencies = [
  "base64 0.22.1",
  "bytes",
