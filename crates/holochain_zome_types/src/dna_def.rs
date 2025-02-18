@@ -36,8 +36,8 @@ pub struct DnaDef {
     )]
     pub name: String,
 
-    /// Modifiers of this DNA - the network seed, properties and origin time - as
-    /// opposed to the actual DNA code. The modifiers are included in the DNA hash
+    /// Modifiers of this DNA - the network seed, properties - as opposed to
+    /// the actual DNA code. The modifiers are included in the DNA hash
     /// computation.
     pub modifiers: DnaModifiers,
 
@@ -236,7 +236,7 @@ impl DnaDef {
         clone
     }
 
-    /// Change the DNA modifiers -- the network seed, properties and origin time -- while
+    /// Change the DNA modifiers -- the network seed, properties -- while
     /// leaving the actual DNA code intact.
     pub fn update_modifiers(&self, modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
@@ -305,23 +305,19 @@ mod tests {
 
         let props = SerializedBytes::try_from(Props(42)).unwrap();
 
-        let now = Timestamp::now();
         let mods = DnaModifiers {
             network_seed: "seed".into(),
             properties: ().try_into().unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
         };
 
         let opt = DnaModifiersOpt {
             network_seed: None,
             properties: Some(props.clone()),
-            origin_time: Some(now),
         };
 
         let expected = DnaModifiers {
             network_seed: "seed".into(),
             properties: props.clone(),
-            origin_time: now,
         };
 
         assert_eq!(mods.update(opt), expected);

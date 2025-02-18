@@ -19,7 +19,6 @@ use serde_with::serde_as;
 /// integrity:
 ///   network_seed: 00000000-0000-0000-0000-000000000000
 ///   properties: ~
-///   origin_time: 2022-02-11T23:05:19.470323Z
 ///   zomes:
 ///     - name: zome1
 ///       bundled: ../dna1/zomes/zome1.wasm
@@ -49,7 +48,6 @@ use serde_with::serde_as;
 /// integrity:
 ///   network_seed: 00000000-0000-0000-0000-000000000000
 ///   properties: ~
-///   origin_time: 2022-02-11T23:05:19.470323Z
 ///   zomes:
 ///     - name: zome1
 ///       bundled: ../dna1/zomes/zome1.wasm
@@ -140,11 +138,6 @@ pub struct IntegrityManifest {
 
     /// Any arbitrary application properties can be included in this object.
     pub properties: Option<YamlProperties>,
-
-    /// The time used to denote the origin of the network, used to calculate
-    /// time windows during gossip.
-    /// All Action timestamps must come after this time.
-    pub origin_time: HumanTimestamp,
 
     /// An array of zomes associated with your DNA.
     /// The order is significant: it determines initialization order.

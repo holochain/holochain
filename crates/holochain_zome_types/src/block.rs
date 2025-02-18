@@ -25,8 +25,8 @@ mod kitsune_p2p_block {
     pub enum NodeBlockReason {
         /// The node did some bad cryptography.
         BadCrypto,
-        /// DOS attack.
-        DOS,
+        /// Dos attack.
+        DoS,
     }
 
     /// Reason for a Node/Space Block.
@@ -39,8 +39,8 @@ mod kitsune_p2p_block {
     /// Reason for an Ip Block.
     #[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
     pub enum IpBlockReason {
-        /// Classic DOS.
-        DOS,
+        /// Classic DoS.
+        DoS,
     }
 
     /// kitsune2::Url returns a peer id as a &str

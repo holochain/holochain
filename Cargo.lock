@@ -2730,6 +2730,7 @@ dependencies = [
  "derive_more",
  "fixt",
  "futures",
+ "ghost_actor",
  "holo_hash",
  "holochain_chc",
  "holochain_keystore",

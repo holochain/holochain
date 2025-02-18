@@ -54,8 +54,5 @@ encoding = ["dep:base64", "dep:blake2b_simd", "dep:derive_more", "dep:sha2"]
 test_utils = ["fixturators"]
 holochain-wasmer = ["holochain_wasmer_common"]
 
-sqlite-encrypted = [
-  "rusqlite",
-  "rusqlite/bundled-sqlcipher-vendored-openssl",
-]
+sqlite-encrypted = ["rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl"]
 sqlite = ["rusqlite", "rusqlite/bundled"]
