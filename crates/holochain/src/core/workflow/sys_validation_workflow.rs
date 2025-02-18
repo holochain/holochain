@@ -49,6 +49,7 @@
 //! - Checks that the timestamp of the current action is greater than the timestamp of the previous action.
 //! - Checks that the sequence number of the current action is exactly 1 more than the sequence number of the previous action.
 //! - Checks that every [`Action::Create`] or [`Action::Update`] of an `AgentPubKey` is preceded by an [`Action::AgentValidationPkg`].
+//! - Runs the store entry checks if there is an entry present on the record.
 //!
 //! ##### Store entry checks
 //!
