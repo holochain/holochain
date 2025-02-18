@@ -46,7 +46,6 @@ holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util", feature
   "pw",
 ] }
 holochain_nonce = { version = "^0.5.0-dev.2", path = "../holochain_nonce" }
-kitsune_p2p_types = { version = "^0.5.0-dev.9", path = "../kitsune_p2p/types" }
 nanoid = "0.4"
 holochain_trace = { version = "^0.5.0-dev.1", path = "../holochain_trace" }
 serde = { version = "1.0", features = ["derive"] }

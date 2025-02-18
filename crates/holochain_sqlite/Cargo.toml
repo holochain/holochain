@@ -24,13 +24,7 @@ holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util", feature
 ], optional = true }
 holochain_zome_types = { version = "^0.5.0-dev.16", path = "../holochain_zome_types" }
 holochain_nonce = { version = "^0.5.0-dev.2", path = "../holochain_nonce" }
-kitsune_p2p_bin_data = { version = "^0.5.0-dev.5", path = "../kitsune_p2p/bin_data" }
-kitsune_p2p_dht_arc = { version = "^0.5.0-dev.2", path = "../kitsune_p2p/dht_arc" }
-kitsune_p2p_dht = { version = "^0.5.0-dev.3", path = "../kitsune_p2p/dht", features = [
-  "test_utils",
-] }
 holochain_timestamp = { version = "^0.5.0-dev.1", path = "../timestamp" }
-kitsune_p2p_types = { version = "^0.5.0-dev.9", path = "../kitsune_p2p/types", optional = true }
 nanoid = "0.4"
 once_cell = "1.4.1"
 num_cpus = "1.13.0"
@@ -94,7 +88,7 @@ holochain_sqlite = { path = ".", default-features = false, features = [
 workspace = true
 
 [features]
-default = ["sqlite", "kitsune_p2p_types", "holochain_util"]
+default = ["sqlite", "holochain_util"]
 
 test_utils = []
 
@@ -106,9 +100,6 @@ sqlite-encrypted = [
   "r2d2_sqlite/bundled-sqlcipher-vendored-openssl",
   "holo_hash/sqlite-encrypted",
   "holochain_zome_types/sqlite-encrypted",
-  "kitsune_p2p_bin_data/sqlite-encrypted",
-  "kitsune_p2p_types/sqlite-encrypted",
-  "kitsune_p2p_dht_arc/sqlite-encrypted",
   "holochain_timestamp/sqlite-encrypted",
 ]
 
@@ -118,9 +109,6 @@ sqlite = [
   "r2d2_sqlite/bundled",
   "holo_hash/sqlite",
   "holochain_zome_types/sqlite",
-  "kitsune_p2p_bin_data/sqlite",
-  "kitsune_p2p_dht_arc/sqlite",
-  "kitsune_p2p_types/sqlite",
   "holochain_timestamp/sqlite",
 ]
 

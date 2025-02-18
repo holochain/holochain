@@ -1,7 +1,6 @@
 use assert_cmd::cargo::CommandCargoExt;
 use holochain_keystore::lair_keystore::*;
 use holochain_keystore::MetaLairClient;
-use kitsune_p2p_types::dependencies::url2;
 use std::io::BufRead;
 use std::sync::Arc;
 

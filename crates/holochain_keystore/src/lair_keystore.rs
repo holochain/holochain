@@ -1,8 +1,8 @@
 //! Keystore backed by lair_keystore_api.
 
 use crate::*;
+use ::lair_keystore::dependencies::lair_keystore_api;
 use ::lair_keystore::server::StandaloneServer;
-use kitsune_p2p_types::dependencies::{lair_keystore_api, url2};
 use lair_keystore_api::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;

@@ -1,12 +1,10 @@
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_sqlite::db::{
-    DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindP2pAgents, DbKindP2pMetrics,
-    DbKindT, DbWrite,
+    DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindT, DbWrite,
 };
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::{DbKindPeerMetaStore, DbKindWasm};
 use holochain_zome_types::cell::CellId;
-use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
 use std::sync::Arc;
 use walkdir::WalkDir;
 
@@ -32,14 +30,6 @@ async fn check_schema_migrations_execute() {
 
     let wasm = DbWrite::test_in_mem(DbKindWasm).unwrap();
     check_migrations_run(wasm, "./src/sql/wasm/schema").await;
-
-    let p2p_metrics =
-        DbWrite::test_in_mem(DbKindP2pMetrics(Arc::new(KitsuneSpace::new(vec![1; 36])))).unwrap();
-    check_migrations_run(p2p_metrics, "./src/sql/p2p_metrics/schema").await;
-
-    let p2p_agents =
-        DbWrite::test_in_mem(DbKindP2pAgents(Arc::new(KitsuneSpace::new(vec![1; 36])))).unwrap();
-    check_migrations_run(p2p_agents, "./src/sql/p2p_agent_store/schema").await;
 
     let peer_meta_store = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(
         kitsune2_api::SpaceId::from(bytes::Bytes::from_static("test".as_bytes())),

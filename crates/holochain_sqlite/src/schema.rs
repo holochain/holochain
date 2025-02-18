@@ -52,14 +52,6 @@ pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| Schema {
     migrations: vec![M::initial(include_str!("sql/wasm/schema/0.sql"))],
 });
 
-pub static SCHEMA_P2P_STATE: Lazy<Schema> = Lazy::new(|| Schema {
-    migrations: vec![M::initial(include_str!("sql/p2p_agent_store/schema/0.sql"))],
-});
-
-pub static SCHEMA_P2P_METRICS: Lazy<Schema> = Lazy::new(|| Schema {
-    migrations: vec![M::initial(include_str!("sql/p2p_metrics/schema/0.sql"))],
-});
-
 pub static SCHEMA_PEER_META_STORE: Lazy<Schema> = Lazy::new(|| Schema {
     migrations: vec![M::initial(include_str!("sql/peer_meta_store/schema/0.sql"))],
 });

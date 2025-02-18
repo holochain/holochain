@@ -1,6 +1,5 @@
 use holo_hash::DnaHash;
 use holochain_zome_types::cell::CellId;
-use kitsune_p2p_bin_data::KitsuneSpace;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -20,12 +19,6 @@ pub enum DbKind {
     Conductor,
     /// Specifies the environment used to save wasm
     Wasm,
-    /// State of the p2p network (one per space).
-    #[display(fmt = "agent_store-{:?}", "_0")]
-    P2pAgentStore(Arc<KitsuneSpace>),
-    /// Metrics for peers on p2p network (one per space).
-    #[display(fmt = "metrics-{:?}", "_0")]
-    P2pMetrics(Arc<KitsuneSpace>),
     /// Metadata about peers, for tracking local state and observations about peers.
     #[display(fmt = "peer-meta-{:?}", "_0")]
     PeerMetaStore(Arc<kitsune2_api::SpaceId>),
@@ -73,14 +66,6 @@ pub struct DbKindConductor;
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used to save wasm
 pub struct DbKindWasm;
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
-/// State of the p2p network (one per space).
-pub struct DbKindP2pAgents(pub Arc<KitsuneSpace>);
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
-/// Metrics for peers on p2p network (one per space).
-pub struct DbKindP2pMetrics(pub Arc<KitsuneSpace>);
 
 /// Database kind for [DbKind::PeerMetaStore]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
@@ -188,34 +173,6 @@ impl DbKindT for DbKindWasm {
 
     fn if_corrupt_wipe(&self) -> bool {
         false
-    }
-}
-
-impl DbKindT for DbKindP2pAgents {
-    fn kind(&self) -> DbKind {
-        DbKind::P2pAgentStore(self.0.clone())
-    }
-
-    fn filename_inner(&self) -> PathBuf {
-        ["p2p", &format!("agent_store-{}", self.0)].iter().collect()
-    }
-
-    fn if_corrupt_wipe(&self) -> bool {
-        true
-    }
-}
-
-impl DbKindT for DbKindP2pMetrics {
-    fn kind(&self) -> DbKind {
-        DbKind::P2pMetrics(self.0.clone())
-    }
-
-    fn filename_inner(&self) -> PathBuf {
-        ["p2p", &format!("metrics-{}", self.0)].iter().collect()
-    }
-
-    fn if_corrupt_wipe(&self) -> bool {
-        true
     }
 }
 

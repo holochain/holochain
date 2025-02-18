@@ -24,7 +24,6 @@ fixt = { version = "^0.5.0-dev.1", path = "../fixt", optional = true }
 futures = { version = "0.3", optional = true }
 holochain_serialized_bytes = { version = "=0.0.55", optional = true }
 holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util", default-features = false }
-kitsune_p2p_dht_arc = { version = "^0.5.0-dev.2", path = "../kitsune_p2p/dht_arc" }
 must_future = { version = "0.1", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
@@ -55,9 +54,5 @@ encoding = ["dep:base64", "dep:blake2b_simd", "dep:derive_more", "dep:sha2"]
 test_utils = ["fixturators"]
 holochain-wasmer = ["holochain_wasmer_common"]
 
-sqlite-encrypted = [
-  "rusqlite",
-  "rusqlite/bundled-sqlcipher-vendored-openssl",
-  "kitsune_p2p_dht_arc/sqlite-encrypted",
-]
-sqlite = ["rusqlite", "rusqlite/bundled", "kitsune_p2p_dht_arc/sqlite"]
+sqlite-encrypted = ["rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl"]
+sqlite = ["rusqlite", "rusqlite/bundled"]

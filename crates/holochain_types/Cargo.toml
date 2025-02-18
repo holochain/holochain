@@ -45,7 +45,6 @@ holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.0-dev
 ] }
 holochain_timestamp = { version = "^0.5.0-dev.1", path = "../timestamp" }
 itertools = { version = "0.12" }
-kitsune_p2p_dht = { version = "^0.5.0-dev.3", path = "../kitsune_p2p/dht" }
 mr_bundle = { path = "../mr_bundle", features = [
   "packing",
 ], version = "^0.5.0-dev.3" }
@@ -123,7 +122,6 @@ sqlite-encrypted = [
   "holochain_keystore/sqlite-encrypted",
   "holochain_sqlite/sqlite-encrypted",
   "holochain_zome_types/sqlite-encrypted",
-  "kitsune_p2p_dht/sqlite-encrypted",
 ]
 sqlite = [
   "rusqlite/bundled",
@@ -131,5 +129,4 @@ sqlite = [
   "holochain_keystore/sqlite",
   "holochain_sqlite/sqlite",
   "holochain_zome_types/sqlite",
-  "kitsune_p2p_dht/sqlite",
 ]
