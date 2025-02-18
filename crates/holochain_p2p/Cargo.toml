@@ -31,6 +31,7 @@ serde_json = { version = "1.0.51", features = ["preserve_order"] }
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = ["full"] }
 tokio-stream = "0.1"
+tracing = "0.1"
 
 kitsune2_api = "0.0.1-alpha.1"
 bytes = "1.10"
