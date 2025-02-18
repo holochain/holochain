@@ -273,7 +273,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
 pub async fn fill_db<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
     db.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.to_hash();
-        insert_op_untyped(txn, &op.downcast()).unwrap();
+        insert_op_untyped(txn, &op.downcast(), 0).unwrap();
         set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
         set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
         Ok(())
@@ -286,7 +286,7 @@ pub async fn fill_db<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed
 pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
     db.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.to_hash();
-        insert_op_untyped(txn, &op.downcast()).unwrap();
+        insert_op_untyped(txn, &op.downcast(), 0).unwrap();
         set_validation_status(txn, &hash, ValidationStatus::Rejected).unwrap();
         set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
         Ok(())
@@ -299,7 +299,7 @@ pub async fn fill_db_rejected<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: Chai
 pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: ChainOpHashed) {
     db.write_async(move |txn| -> DatabaseResult<()> {
         let hash = op.to_hash();
-        insert_op_untyped(txn, &op.downcast()).unwrap();
+        insert_op_untyped(txn, &op.downcast(), 0).unwrap();
         set_validation_status(txn, &hash, ValidationStatus::Valid).unwrap();
         Ok(())
     })
@@ -310,7 +310,7 @@ pub async fn fill_db_pending<Db: DbKindT + DbKindOp>(db: &DbWrite<Db>, op: Chain
 /// Insert ops into the authored database
 pub async fn fill_db_as_author(db: &DbWrite<DbKindAuthored>, op: ChainOpHashed) {
     db.write_async(move |txn| -> DatabaseResult<()> {
-        insert_op_untyped(txn, &op.downcast()).unwrap();
+        insert_op_untyped(txn, &op.downcast(), 0).unwrap();
         Ok(())
     })
     .await
@@ -396,6 +396,7 @@ pub fn commit_chain<Kind: DbKindT>(
                     &hash,
                     &OpOrder::new(op_type, timestamp),
                     &timestamp,
+                    0,
                     None,
                 )
                 .unwrap();

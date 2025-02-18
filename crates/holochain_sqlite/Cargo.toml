@@ -59,6 +59,7 @@ rusqlite = { version = "0.32.1", features = [
   "backup",
   "trace",
   "functions", # rust scalar / agg / window functions
+  "array",     # for array support, e.g. "WHERE IN" queries
   #"chrono",      # integration with chrono crate
   #"hooks",       # sqlite notification callbacks
   #"serde_json",  # integration with serde_json crate

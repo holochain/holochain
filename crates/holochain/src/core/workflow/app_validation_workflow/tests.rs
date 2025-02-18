@@ -118,7 +118,7 @@ async fn main_workflow() {
 
     // insert op to validate in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_delete_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
     });
 
@@ -303,9 +303,9 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
 
     // insert create and delete op in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_delete_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
-        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(
             txn,
             &dht_create_op_hashed.hash,
@@ -442,9 +442,9 @@ async fn validate_ops_in_sequence_must_get_action() {
 
     // insert create and delete op in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_delete_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
-        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(
             txn,
             &dht_create_op_hashed.hash,
@@ -607,9 +607,9 @@ async fn handle_error_in_op_validation() {
     // insert both ops in dht db and mark ready for app validation
     let expected_failed_dht_op_hash = dht_create_op_hash.clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
-        insert_op_dht(txn, &dht_store_entry_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_store_entry_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_store_entry_op_hash, ValidationStage::SysValidated).unwrap();
     });
 
@@ -980,7 +980,7 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
 
     // Insert op to validate in DHT DB and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
     });
 

@@ -381,6 +381,9 @@ impl CascadeImpl {
             op_hash,
             &op_order,
             &timestamp,
+            // Using 0 value because this is the cache database and we only need sizes for gossip
+            // in the DHT database.
+            0,
             todo_no_cache_transfer_data(),
         )?;
         if let Some(status) = validation_status {
