@@ -55,10 +55,6 @@ holochain_conductor_config = { version = "^0.5.0-dev.5", path = "../holochain_co
 holochain_timestamp = { version = "^0.5.0-dev.1", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.12" }
-kitsune_p2p = { version = "^0.5.0-dev.11", path = "../kitsune_p2p/kitsune_p2p", default-features = false }
-kitsune_p2p_bin_data = { version = "^0.5.0-dev.5", path = "../kitsune_p2p/bin_data" }
-kitsune_p2p_types = { version = "^0.5.0-dev.9", path = "../kitsune_p2p/types" }
-kitsune_p2p_block = { version = "^0.5.0-dev.5", path = "../kitsune_p2p/block" }
 kitsune2_api = "0.0.1-alpha.1"
 mockall = "0.11.3"
 mr_bundle = { version = "^0.5.0-dev.3", path = "../mr_bundle" }
@@ -108,7 +104,6 @@ hdk = { version = "^0.5.0-dev.17", path = "../hdk", optional = true }
 matches = { version = "0.1.8", optional = true }
 holochain_wasm_test_utils = { version = "^0.5.0-dev.18", path = "../test_utils/wasm", optional = true }
 holochain_test_wasm_common = { version = "^0.5.0-dev.17", path = "../test_utils/wasm_common", optional = true }
-kitsune_p2p_bootstrap = { version = "^0.4.0-dev.9", path = "../kitsune_p2p/bootstrap", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
 sbd-server = { version = "=0.0.8-alpha", optional = true }
 tx5-go-pion-turn = { version = "=0.1.5-beta", optional = true }
@@ -212,14 +207,9 @@ test_utils = [
   "holochain_state/test_utils",
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
-  "kitsune_p2p_types/test_utils",
   "holochain_cascade/test_utils",
   "holochain_conductor_services/test_utils",
-  "kitsune_p2p/test_utils",
-  "kitsune_p2p_bootstrap",
   "holochain_p2p/mock_network",
-  "kitsune_p2p_bin_data/fixt",
-  "kitsune_p2p_types/fixt",
   "matches",
   "holochain_test_wasm_common",
   "holochain_wasm_test_utils",
@@ -257,10 +247,6 @@ sqlite-encrypted = [
   "holochain_state/sqlite-encrypted",
   "holochain_types/sqlite-encrypted",
   "holochain_zome_types/sqlite-encrypted",
-  "kitsune_p2p/sqlite-encrypted",
-  "kitsune_p2p_types/sqlite-encrypted",
-  "kitsune_p2p_block/sqlite-encrypted",
-  "kitsune_p2p_bootstrap/sqlite-encrypted",
 ]
 
 # Compile SQLite from source rather than depending on a library.
@@ -277,10 +263,6 @@ sqlite = [
   "holochain_state/sqlite",
   "holochain_types/sqlite",
   "holochain_zome_types/sqlite",
-  "kitsune_p2p/sqlite",
-  "kitsune_p2p_types/sqlite",
-  "kitsune_p2p_block/sqlite",
-  "kitsune_p2p_bootstrap/sqlite",
 ]
 
 # Extremely verbose wasm memory read/write logging
@@ -322,10 +304,7 @@ unstable-warrants = [
 # Enable sharding for networks. This is currently considered an unstable feature
 # and with the feature disabled you will only be able to configure nodes that have
 # a full or empty arc.
-unstable-sharding = [
-  "kitsune_p2p/unstable-sharding",
-  "kitsune_p2p_types/unstable-sharding",
-]
+unstable-sharding = []
 
 sweettest = ["test_utils", "sqlite"]
 

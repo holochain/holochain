@@ -1,7 +1,5 @@
 //! # DNA Properties Support types
 
-use std::time::Duration;
-
 use crate::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 
@@ -22,18 +20,6 @@ pub struct DnaModifiers {
     /// Any arbitrary application properties can be included in this object.
     #[cfg_attr(feature = "full-dna-def", builder(default = "().try_into().unwrap()"))]
     pub properties: SerializedBytes,
-
-    /// The time used to denote the origin of the network, used to calculate
-    /// time windows during gossip.
-    /// All Action timestamps must come after this time.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "Timestamp::now()"))]
-    pub origin_time: Timestamp,
-
-    /// The smallest unit of time used for gossip time windows.
-    /// You probably don't need to change this.
-    #[cfg_attr(feature = "full-dna-def", builder(default = "standard_quantum_time()"))]
-    #[cfg_attr(feature = "full-dna-def", serde(default = "standard_quantum_time"))]
-    pub quantum_time: Duration,
 }
 
 impl DnaModifiers {
@@ -42,21 +28,8 @@ impl DnaModifiers {
     pub fn update(mut self, modifiers: DnaModifiersOpt) -> DnaModifiers {
         self.network_seed = modifiers.network_seed.unwrap_or(self.network_seed);
         self.properties = modifiers.properties.unwrap_or(self.properties);
-        self.origin_time = modifiers.origin_time.unwrap_or(self.origin_time);
-        self.quantum_time = modifiers.quantum_time.unwrap_or(self.quantum_time);
         self
     }
-}
-
-#[allow(dead_code)]
-const fn standard_quantum_time() -> Duration {
-    // TODO - put this in a common place that is imported
-    //        from both this crate and kitsune_p2p_dht
-    //        we do *not* want kitsune_p2p_dht imported into
-    //        this crate, because that pulls getrandom into
-    //        something that is supposed to be compiled
-    //        into integrity wasms.
-    Duration::from_secs(60 * 5)
 }
 
 /// [`DnaModifiers`] options of which all are optional.
@@ -66,10 +39,6 @@ pub struct DnaModifiersOpt<P = SerializedBytes> {
     pub network_seed: Option<NetworkSeed>,
     /// see [`DnaModifiers`]
     pub properties: Option<P>,
-    /// see [`DnaModifiers`]
-    pub origin_time: Option<Timestamp>,
-    /// see [`DnaModifiers`]
-    pub quantum_time: Option<Duration>,
 }
 
 impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> Default
@@ -86,8 +55,6 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
         Self {
             network_seed: None,
             properties: None,
-            origin_time: None,
-            quantum_time: None,
         }
     }
 
@@ -96,8 +63,6 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
         let Self {
             network_seed,
             properties,
-            origin_time,
-            quantum_time,
         } = self;
         let properties = if let Some(p) = properties {
             Some(p.try_into()?)
@@ -107,8 +72,6 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
         Ok(DnaModifiersOpt {
             network_seed,
             properties,
-            origin_time,
-            quantum_time,
         })
     }
 
@@ -124,21 +87,9 @@ impl<P: TryInto<SerializedBytes, Error = E>, E: Into<SerializedBytesError>> DnaM
         self
     }
 
-    /// Return a modified form with the `origin_time` field set
-    pub fn with_origin_time(mut self, origin_time: Timestamp) -> Self {
-        self.origin_time = Some(origin_time);
-        self
-    }
-
-    /// Return a modified form with the `quantum_time` field set
-    pub fn with_quantum_time(mut self, quantum_time: Duration) -> Self {
-        self.quantum_time = Some(quantum_time);
-        self
-    }
-
     /// Check if at least one of the options is set.
     pub fn has_some_option_set(&self) -> bool {
-        self.network_seed.is_some() || self.properties.is_some() || self.origin_time.is_some()
+        self.network_seed.is_some() || self.properties.is_some()
     }
 }
 

@@ -1,5 +1,4 @@
 use crate::db::key::DbKey;
-use crate::functions::add_custom_functions;
 use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
@@ -124,8 +123,6 @@ pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) 
         DbSyncLevel::Normal => conn.pragma_update(None, "synchronous", "1".to_string())?,
         DbSyncLevel::Off => conn.pragma_update(None, "synchronous", "0".to_string())?,
     }
-
-    add_custom_functions(conn)?;
 
     Ok(())
 }

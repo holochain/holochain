@@ -52,7 +52,7 @@ pub mod crude_mock_keystore;
 
 /// Construct a simple in-memory in-process keystore.
 pub async fn spawn_mem_keystore() -> LairResult<MetaLairClient> {
-    use kitsune_p2p_types::dependencies::lair_keystore_api;
+    use ::lair_keystore::dependencies::lair_keystore_api;
     use lair_keystore_api::prelude::*;
     use std::sync::Arc;
 

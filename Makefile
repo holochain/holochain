@@ -14,7 +14,8 @@ UNSTABLE_FEATURES=chc,unstable-dpki,unstable-sharding,unstable-warrants,unstable
 	static-doc build-workspace-wasmer_sys build-workspace-wasmer_wamr \
 	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
 	build-workspace-wasmer_sys-unstable \
-	test-workspace-wasmer_sys-unstable
+	test-workspace-wasmer_sys-unstable \
+	toml-fix
 
 # default to running everything (first rule)
 default: build-workspace-wasmer_sys \
@@ -34,6 +35,12 @@ static-toml:
 	cargo install taplo-cli@0.9.0
 	$(F) taplo format --check ./*.toml
 	$(F) taplo format --check ./crates/**/*.toml
+
+# fix our toml files
+toml-fix:
+	cargo install taplo-cli@0.9.0
+	$(F) taplo format ./*.toml
+	$(F) taplo format ./crates/**/*.toml
 
 # ensure our chosen style lints are followed
 static-clippy:

@@ -1,12 +1,12 @@
 use holo_hash::AgentPubKey;
 use holochain_zome_types::prelude::*;
-use kitsune_p2p_types::dependencies::{lair_keystore_api, url2};
+use lair_keystore::dependencies::lair_keystore_api;
 use lair_keystore_api::prelude::{X25519PubKey, *};
 use parking_lot::Mutex;
 use std::future::Future;
 use std::sync::Arc;
 
-pub use kitsune_p2p_types::dependencies::lair_keystore_api::LairResult;
+pub use lair_keystore_api::LairResult;
 
 const TIME_CHECK_FREQ: std::time::Duration = std::time::Duration::from_secs(5);
 const CON_CHECK_STUB_TAG: &str = "HC_CON_CHK_STUB";
