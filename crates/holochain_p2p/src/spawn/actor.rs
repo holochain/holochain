@@ -1,6 +1,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::*;
+use std::sync::{Mutex, Weak};
 
 macro_rules! timing_trace {
     ($netaudit:literal, $code:block $($rest:tt)*) => {{
@@ -194,16 +195,58 @@ impl event::HcP2pHandler for WrapEvtSender {
 
 #[derive(Debug)]
 pub(crate) struct HolochainP2pActor {
+    this: Weak<Self>,
     evt_sender: WrapEvtSender,
+    kitsune: Mutex<Option<kitsune2_api::DynKitsune>>,
+}
+
+impl kitsune2_api::SpaceHandler for HolochainP2pActor {}
+
+impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
+    fn create_space(
+        &self,
+        _space: kitsune2_api::SpaceId,
+    ) -> BoxFut<'_, kitsune2_api::K2Result<kitsune2_api::DynSpaceHandler>> {
+        Box::pin(async move {
+            let this: Weak<dyn kitsune2_api::SpaceHandler> = self.this.clone();
+            if let Some(this) = this.upgrade() {
+                Ok(this)
+            } else {
+                Err(kitsune2_api::K2Error::other("instance has been dropped"))
+            }
+        })
+    }
 }
 
 impl HolochainP2pActor {
     /// constructor
     pub async fn create(
-        _handler: event::DynHcP2pHandler,
+        db_peer_meta: DbWrite<DbKindPeerMetaStore>,
+        db_op: DbWrite<DbKindDht>,
+        handler: event::DynHcP2pHandler,
         _compat: NetworkCompatParams,
     ) -> HolochainP2pResult<actor::DynHcP2p> {
-        todo!()
+        let builder = kitsune2_api::Builder {
+            peer_meta_store: Arc::new(HolochainPeerMetaStoreFactory { db: db_peer_meta }),
+            op_store: Arc::new(HolochainOpStoreFactory {
+                db: db_op,
+                handler: handler.clone(),
+            }),
+            ..kitsune2::default_builder()
+        }
+        .with_default_config()?;
+
+        let this = Arc::new_cyclic(|this| Self {
+            this: this.clone(),
+            evt_sender: WrapEvtSender(handler),
+            kitsune: Mutex::new(None),
+        });
+
+        let kitsune = builder.build(this.clone()).await?;
+
+        *this.kitsune.lock().unwrap() = Some(kitsune);
+
+        Ok(this)
         /*
         let mut bytes = vec![];
         kitsune_p2p_types::codec::rmp_encode(&mut bytes, &compat)
@@ -233,23 +276,6 @@ impl HolochainP2pActor {
                 }
             }),
         };
-
-        let (kitsune_p2p, kitsune_p2p_events) = kitsune_p2p::spawn_kitsune_p2p(
-            config.clone(),
-            tls_config,
-            host.clone(),
-            preflight_user_data,
-        )
-        .await?;
-
-        channel_factory.attach_receiver(kitsune_p2p_events).await?;
-
-        Ok(Self {
-            config,
-            evt_sender: WrapEvtSender(evt_sender),
-            kitsune_p2p,
-            host,
-        })
         */
     }
 

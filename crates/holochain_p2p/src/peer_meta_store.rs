@@ -6,7 +6,40 @@ use holochain_sqlite::prelude::DbKindPeerMetaStore;
 use holochain_sqlite::rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef};
 use holochain_sqlite::rusqlite::{named_params, ToSql};
 use holochain_sqlite::sql::sql_peer_meta_store;
-use kitsune2_api::{K2Error, K2Result, PeerMetaStore, Timestamp, Url};
+use kitsune2_api::{BoxFut, K2Error, K2Result, PeerMetaStore, Timestamp, Url};
+use std::sync::Arc;
+
+/// Holochain implementation of the Kitsune2 [OpStoreFactory].
+#[derive(Debug)]
+pub struct HolochainPeerMetaStoreFactory {
+    /// The database connection.
+    pub db: DbWrite<DbKindPeerMetaStore>,
+}
+
+impl kitsune2_api::PeerMetaStoreFactory for HolochainPeerMetaStoreFactory {
+    fn default_config(&self, _config: &mut kitsune2_api::Config) -> kitsune2_api::K2Result<()> {
+        Ok(())
+    }
+
+    fn validate_config(&self, _config: &kitsune2_api::Config) -> kitsune2_api::K2Result<()> {
+        Ok(())
+    }
+
+    fn create(
+        &self,
+        builder: Arc<kitsune2_api::Builder>,
+    ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynPeerMetaStore>> {
+        let db = self.db.clone();
+        Box::pin(async move {
+            let peer_meta_store: kitsune2_api::DynPeerMetaStore =
+                Arc::new(HolochainPeerMetaStore::create(db).await.map_err(|err| {
+                    K2Error::other_src("failed to connect to peer store database", err)
+                })?);
+
+            Ok(peer_meta_store)
+        })
+    }
+}
 
 /// Holochain implementation of a Kitsune2 [PeerMetaStore].
 #[derive(Debug)]

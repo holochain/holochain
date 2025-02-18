@@ -5,6 +5,10 @@ pub type GenericNetwork = Arc<dyn HolochainP2pDnaT>;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum HolochainP2pError {
+    /// K2Error
+    #[error(transparent)]
+    K2Error(#[from] kitsune2_api::K2Error),
+
     /// RoutingDnaError
     #[error("Routing Dna Error: {0}")]
     RoutingDnaError(holo_hash::DnaHash),

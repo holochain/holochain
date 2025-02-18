@@ -32,6 +32,7 @@ tokio = { version = "1.27", features = ["full"] }
 tokio-stream = "0.1"
 tracing = "0.1"
 
+kitsune2 = "0.0.1-alpha2"
 kitsune2_api = "0.0.1-alpha2"
 bytes = "1.10"
 holochain_sqlite = { version = "0.5.0-dev.16", path = "../holochain_sqlite" }
