@@ -124,6 +124,8 @@ pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) 
         DbSyncLevel::Off => conn.pragma_update(None, "synchronous", "0".to_string())?,
     }
 
+    vtab::array::load_module(conn)?;
+
     Ok(())
 }
 

@@ -448,7 +448,14 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
 
     #[cfg(any(test, feature = "test_utils"))]
     pub fn test_in_mem(kind: Kind) -> DatabaseResult<Self> {
-        Self::new(None, kind, PoolConfig::default(), None)
+        Self::new(
+            None,
+            kind,
+            PoolConfig::default(),
+            Some(|sql| {
+                println!("SQL: {}", sql);
+            }),
+        )
     }
 
     #[cfg(all(any(test, feature = "test_utils"), not(loom)))]

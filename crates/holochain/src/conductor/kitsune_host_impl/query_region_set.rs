@@ -121,7 +121,7 @@ mod tests {
 
         db.test_write(move |txn| {
             for op in ops.iter() {
-                insert_op_dht(txn, op, None).unwrap()
+                insert_op_dht(txn, op, 0, None).unwrap()
             }
         });
 

@@ -33,7 +33,6 @@ pub enum DhtOp {
     /// An op representing storage of some record information.
     ChainOp(Box<ChainOp>),
     /// A op representing storage of a claim that a ChainOp was invalid
-    // TODO, new type of op
     WarrantOp(Box<WarrantOp>),
 }
 

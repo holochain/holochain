@@ -34,6 +34,9 @@ pub use peer_meta_store::*;
 mod local_agent;
 pub use local_agent::*;
 
+mod op_store;
+pub use op_store::*;
+
 #[automock]
 #[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
