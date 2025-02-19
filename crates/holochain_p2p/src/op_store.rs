@@ -65,7 +65,7 @@ impl OpStore for HolochainOpStore {
                 .iter()
                 .map(|(_, op)| {
                     let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                    OpId::from(Bytes::copy_from_slice(op_hashed.hash.get_raw_36()))
+                    op_hashed.hash.to_k2_op()
                 })
                 .collect();
 
@@ -116,7 +116,7 @@ impl OpStore for HolochainOpStore {
                         let hash: DhtOpHash = row.get(0)?;
                         let serialized_size: u32 = row.get(1)?;
 
-                        let op_id = OpId::from(Bytes::copy_from_slice(hash.get_raw_36()));
+                        let op_id = hash.to_k2_op();
                         out.push(op_id);
                         out_size += serialized_size;
                     }
@@ -145,12 +145,7 @@ impl OpStore for HolochainOpStore {
                         op_ids
                             .iter()
                             .map(|id| {
-                                // Hashes in the database are the full 39 bytes so we need to
-                                // do a little dance to get the type added to the 36 byte id
-                                let hash = DhtOpHash::from_raw_36_and_type(
-                                    id.as_ref().to_vec(),
-                                    holo_hash::hash_type::DhtOp,
-                                );
+                                let hash = DhtOpHash::from_k2_op(&id);
                                 Value::from(hash.into_inner())
                             })
                             .collect::<Vec<_>>(),
@@ -162,7 +157,7 @@ impl OpStore for HolochainOpStore {
                         let dht_op = holochain_state::query::map_sql_dht_op(false, "type", row)?;
 
                         out.push(MetaOp {
-                            op_id: OpId::from(Bytes::copy_from_slice(hash.get_raw_36())),
+                            op_id: hash.to_k2_op(),
                             op_data: holochain_serialized_bytes::prelude::encode(&dht_op)?.into(),
                         });
                     }
@@ -227,7 +222,7 @@ impl OpStore for HolochainOpStore {
                                     break 'outer;
                                 }
 
-                                let op_id = OpId::from(Bytes::copy_from_slice(hash.get_raw_36()));
+                                let op_id = hash.to_k2_op();
                                 if out.insert(op_id) {
                                     latest_timestamp = timestamp;
                                     used_bytes += serialized_size;
