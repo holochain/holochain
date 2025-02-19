@@ -14,6 +14,77 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250219.004534
+
+## [hc\_service\_check-0.2.0-dev.11](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.11)
+
+## [hcterm-0.5.0-dev.19](crates/hcterm/CHANGELOG.md#0.5.0-dev.19)
+
+## [holochain\_cli-0.5.0-dev.19](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.19)
+
+## [holochain-0.5.0-dev.19](crates/holochain/CHANGELOG.md#0.5.0-dev.19)
+
+- Break dependency from holochain\_state to holochain\_p2p
+- remove `serde(flatten)` attributes from certain enum variants of enums used in admin payloads (\#4719), thereby fixing an oversight of \#4616.
+
+## [holochain\_cli\_bundle-0.5.0-dev.19](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.19)
+
+## [holochain\_cli\_run\_local\_services-0.5.0-dev.11](crates/holochain_cli_run_local_services/CHANGELOG.md#0.5.0-dev.11)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.19](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.19)
+
+- Support for the hc sandbox to use the ‘list capability grants’ feature.
+
+## [holochain\_cascade-0.5.0-dev.19](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.19)
+
+## [holochain\_conductor\_config-0.5.0-dev.6](crates/holochain_conductor_config/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_conductor\_services-0.4.0-dev.19](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.19)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.18](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.18)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.19](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.19)
+
+## [holochain\_websocket-0.5.0-dev.19](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.19)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.18](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.18)
+
+## [holochain\_conductor\_api-0.5.0-dev.19](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.19)
+
+## [holochain\_p2p-0.5.0-dev.19](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.19)
+
+- Add implementation of Kitsune2 PeerMetaStore.
+
+## [holochain\_state-0.5.0-dev.19](crates/holochain_state/CHANGELOG.md#0.5.0-dev.19)
+
+## [hc\_deepkey\_types-0.9.0-dev.15](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.15)
+
+## [hdk-0.5.0-dev.18](crates/hdk/CHANGELOG.md#0.5.0-dev.18)
+
+## [holochain\_chc-0.2.0-dev.19](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.19)
+
+## [kitsune\_p2p-0.5.0-dev.12](crates/kitsune_p2p/CHANGELOG.md#0.5.0-dev.12)
+
+## [hdi-0.6.0-dev.15](crates/hdi/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_types-0.5.0-dev.19](crates/holochain_types/CHANGELOG.md#0.5.0-dev.19)
+
+## [kitsune\_p2p\_bootstrap\_client-0.5.0-dev.10](crates/kitsune_p2p_bootstrap_client/CHANGELOG.md#0.5.0-dev.10)
+
+## [hdk\_derive-0.5.0-dev.14](crates/hdk_derive/CHANGELOG.md#0.5.0-dev.14)
+
+- `#[hdk_extern]` validates the annotated function’s return type
+
+## [holochain\_keystore-0.5.0-dev.18](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.18)
+
+## [holochain\_sqlite-0.5.0-dev.18](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.18)
+
+## [kitsune\_p2p\_bootstrap-0.4.0-dev.10](crates/kitsune_p2p_bootstrap/CHANGELOG.md#0.4.0-dev.10)
+
+## [mr\_bundle-0.5.0-dev.4](crates/mr_bundle/CHANGELOG.md#0.5.0-dev.4)
+
+- Use `rustls-tls` instead of `native-tls-vendored` in reqwest due to compatibility issue with Android platform
+
 # 20250212.005142
 
 ## [hc\_service\_check-0.2.0-dev.10](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.10)
