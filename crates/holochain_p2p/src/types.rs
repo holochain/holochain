@@ -17,10 +17,6 @@ pub enum HolochainP2pError {
     #[error("Routing Agent Error: {0}")]
     RoutingAgentError(holo_hash::AgentPubKey),
 
-    /// SerializedBytesError
-    #[error(transparent)]
-    SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
-
     /// Invalid P2p Message
     #[error("InvalidP2pMessage: {0}")]
     InvalidP2pMessage(String),

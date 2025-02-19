@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 /// Struct for encoding DhtOp as bytes.
 pub struct WireDhtOpData {
     /// The dht op.
@@ -9,18 +9,19 @@ pub struct WireDhtOpData {
 
 impl WireDhtOpData {
     /// Encode as bytes.
-    pub fn encode(self) -> Result<Vec<u8>, SerializedBytesError> {
-        Ok(UnsafeBytes::from(SerializedBytes::try_from(self)?).into())
+    pub fn encode(self) -> Result<bytes::Bytes, HolochainP2pError> {
+        let mut b = bytes::BufMut::writer(bytes::BytesMut::new());
+        rmp_serde::encode::write_named(&mut b, &self).map_err(HolochainP2pError::other)?;
+        Ok(b.into_inner().freeze())
     }
 
     /// Decode from bytes.
-    pub fn decode(data: Vec<u8>) -> Result<Self, SerializedBytesError> {
-        let request: SerializedBytes = UnsafeBytes::from(data).into();
-        request.try_into()
+    pub fn decode(data: &[u8]) -> Result<Self, HolochainP2pError> {
+        rmp_serde::decode::from_slice(data).map_err(HolochainP2pError::other)
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "content")]
 #[allow(missing_docs)]
 pub enum WireMessage {
@@ -70,12 +71,14 @@ pub enum WireMessage {
 
 #[allow(missing_docs)]
 impl WireMessage {
-    pub fn encode(&self) -> Result<Vec<u8>, SerializedBytesError> {
-        holochain_serialized_bytes::encode(&self)
+    pub fn encode(&self) -> Result<bytes::Bytes, HolochainP2pError> {
+        let mut b = bytes::BufMut::writer(bytes::BytesMut::new());
+        rmp_serde::encode::write_named(&mut b, self).map_err(HolochainP2pError::other)?;
+        Ok(b.into_inner().freeze())
     }
 
-    pub fn decode(data: &[u8]) -> Result<Self, SerializedBytesError> {
-        holochain_serialized_bytes::decode(&data)
+    pub fn decode(data: &[u8]) -> Result<Self, HolochainP2pError> {
+        rmp_serde::decode::from_slice(data).map_err(HolochainP2pError::other)
     }
 
     pub fn publish_countersign(flag: bool, op: DhtOp) -> WireMessage {

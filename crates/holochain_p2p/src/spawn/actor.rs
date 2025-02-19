@@ -837,12 +837,49 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn call_remote(
         &self,
-        _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        _zome_call_params_serialized: ExternIO,
-        _signature: Signature,
+        dna_hash: DnaHash,
+        to_agent: AgentPubKey,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
     ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            let kitsune = self.kitsune()?;
+            let space_id = dna_hash.to_k2_space();
+            let space = kitsune.space(space_id.clone()).await?;
+
+            let byte_count = zome_call_params_serialized.0.len();
+
+            let k2_agent = to_agent.to_k2_agent();
+            let no_from_agent = AgentId::from(bytes::Bytes::new());
+
+            let req = crate::wire::WireMessage::call_remote(
+                to_agent,
+                zome_call_params_serialized,
+                signature,
+            )
+            .encode()?;
+
+            timing_trace_out!(
+                async move {
+                    space.send_notify(k2_agent, no_from_agent, req).await?;
+
+                    let (s, r) =
+                        tokio::sync::oneshot::channel::<HolochainP2pResult<SerializedBytes>>();
+
+                    // TODO - RESPONSE TRACKING!!!
+                    drop(s);
+
+                    match r.await {
+                        Err(_) => {
+                            Err(K2Error::other("call_remote response channel dropped").into())
+                        }
+                        Ok(resp) => resp,
+                    }
+                },
+                byte_count,
+                a = "send_call_remote"
+            )
+        })
     }
 
     fn send_remote_signal(
@@ -870,11 +907,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 )])
                 .encode()?;
 
-                all.push(space.send_notify(
-                    k2_agent,
-                    no_from_agent,
-                    bytes::Bytes::copy_from_slice(&req),
-                ));
+                all.push(space.send_notify(k2_agent, no_from_agent, req));
             }
 
             timing_trace_out!(
@@ -1030,39 +1063,6 @@ impl actor::HcP2p for HolochainP2pActor {
      * keeping the original code here, because we will need some
      * of this logic when doing the actual implementations
 
-    /// Dispatch an outgoing remote call.
-    #[cfg_attr(
-        feature = "instrument",
-        tracing::instrument(skip(self), level = "trace")
-    )]
-    fn handle_call_remote(
-        &mut self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        zome_call_params_serialized: ExternIO,
-        signature: Signature,
-    ) -> HolochainP2pHandlerResult<SerializedBytes> {
-        let space = dna_hash.into_kitsune();
-        let to_agent_kitsune = to_agent.clone().into_kitsune();
-
-        let byte_count = zome_call_params_serialized.0.len();
-
-        let req =
-            crate::wire::WireMessage::call_remote(to_agent, zome_call_params_serialized, signature)
-                .encode()?;
-
-        let kitsune_p2p = self.kitsune_p2p.clone();
-        timing_trace_out!(
-            async move {
-                let result: Vec<u8> = kitsune_p2p
-                    .rpc_single(space, to_agent_kitsune, req, None)
-                    .await?;
-                Ok(UnsafeBytes::from(result).into())
-            },
-            byte_count,
-            a = "send_call_remote"
-        )
-    }
 
     #[cfg_attr(
         feature = "instrument",

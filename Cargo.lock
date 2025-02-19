@@ -2860,6 +2860,7 @@ dependencies = [
  "lair_keystore_api",
  "mockall",
  "parking_lot",
+ "rmp-serde",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
