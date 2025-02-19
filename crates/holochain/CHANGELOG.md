@@ -6,9 +6,11 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- Break dependency from holochain_state to holochain_p2p
-- remove `serde(flatten)` attributes from certain enum variants of enums used in admin payloads (#4719), thereby fixing
-an oversight of #4616.
+
+## 0.5.0-dev.19
+
+- Break dependency from holochain\_state to holochain\_p2p
+- remove `serde(flatten)` attributes from certain enum variants of enums used in admin payloads (\#4719), thereby fixing an oversight of \#4616.
 
 ## 0.5.0-dev.18
 
