@@ -30,7 +30,7 @@ pub struct HolochainP2pLocalAgent {
 impl HolochainP2pLocalAgent {
     /// Create a new [HolochainP2pLocalAgent].
     pub fn new(agent: AgentPubKey, initial_target_arc: DhtArc, client: MetaLairClient) -> Self {
-        let agent_id = AgentId::from(Bytes::copy_from_slice(agent.get_raw_36()));
+        let agent_id = agent.to_k2_agent();
         Self {
             agent,
             agent_id,

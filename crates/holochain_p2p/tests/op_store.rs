@@ -176,10 +176,7 @@ async fn process_incoming_ops_and_retrieve() {
         .await
         .unwrap();
 
-    let to_retrieve = vec![
-        OpId::from(Bytes::copy_from_slice(dht_op_1.as_hash().get_raw_36())),
-        OpId::from(Bytes::copy_from_slice(dht_op_2.as_hash().get_raw_36())),
-    ];
+    let to_retrieve = vec![dht_op_1.as_hash().to_k2_op(), dht_op_2.as_hash().to_k2_op()];
 
     // Ops are not integrated, we shouldn't be able to retrieve them
     let retrieved = op_store.retrieve_ops(to_retrieve.clone()).await.unwrap();
