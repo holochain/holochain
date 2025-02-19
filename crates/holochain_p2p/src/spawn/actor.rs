@@ -1,6 +1,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use crate::*;
+use kitsune2_api::*;
 use std::sync::{Mutex, Weak};
 
 macro_rules! timing_trace {
@@ -233,7 +234,7 @@ impl HolochainP2pActor {
         lair_client: holochain_keystore::MetaLairClient,
         _compat: NetworkCompatParams,
     ) -> HolochainP2pResult<actor::DynHcP2p> {
-        let builder = kitsune2_api::Builder {
+        let builder = Builder {
             peer_meta_store: Arc::new(HolochainPeerMetaStoreFactory { db: db_peer_meta }),
             op_store: Arc::new(HolochainOpStoreFactory {
                 db: db_op,
@@ -285,6 +286,13 @@ impl HolochainP2pActor {
             }),
         };
         */
+    }
+
+    fn kitsune(&self) -> K2Result<DynKitsune> {
+        match &*self.kitsune.lock().unwrap() {
+            Some(kitsune) => Ok(kitsune.clone()),
+            None => Err(K2Error::other("uninitialized")),
+        }
     }
 
     /* -----------------
@@ -760,41 +768,36 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
         .into())
     }
 }
+----------------------- */
 
 macro_rules! timing_trace_out {
     ($code:expr, $($rest:tt)*) => {{
         let __start = std::time::Instant::now();
-        let __out = $code;
-        Ok(async move {
-            let __out = __out.await;
-            let __elapsed_s = __start.elapsed().as_secs_f64();
-            match &__out {
-                Ok(_) => {
-                    tracing::trace!(
-                        target: "NETAUDIT",
-                        m = "holochain_p2p",
-                        r = "ok",
-                        elapsed_s = __elapsed_s,
-                        $($rest)*
-                    );
-                }
-                Err(err) => {
-                    tracing::trace!(
-                        target: "NETAUDIT",
-                        m = "holochain_p2p",
-                        ?err,
-                        elapsed_s = __elapsed_s,
-                        $($rest)*
-                    );
-                }
+        let __out = $code.await;
+        let __elapsed_s = __start.elapsed().as_secs_f64();
+        match &__out {
+            Ok(_) => {
+                tracing::trace!(
+                    target: "NETAUDIT",
+                    m = "holochain_p2p",
+                    r = "ok",
+                    elapsed_s = __elapsed_s,
+                    $($rest)*
+                );
             }
-            __out
+            Err(err) => {
+                tracing::trace!(
+                    target: "NETAUDIT",
+                    m = "holochain_p2p",
+                    ?err,
+                    elapsed_s = __elapsed_s,
+                    $($rest)*
+                );
+            }
         }
-        .boxed()
-        .into())
+        __out
     }};
 }
------------------------ */
 
 impl actor::HcP2p for HolochainP2pActor {
     fn join(
@@ -804,21 +807,15 @@ impl actor::HcP2p for HolochainP2pActor {
         _maybe_agent_info: Option<AgentInfoSigned>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            let kitsune = match &*self.kitsune.lock().unwrap() {
-                Some(kitsune) => kitsune.clone(),
-                None => return Err(kitsune2_api::K2Error::other("uninitialized").into()),
-            };
+            let kitsune = self.kitsune()?;
+            let space = kitsune.space(dna_hash.to_k2_space()).await?;
 
-            let local_agent: kitsune2_api::DynLocalAgent = Arc::new(HolochainP2pLocalAgent::new(
+            let local_agent: DynLocalAgent = Arc::new(HolochainP2pLocalAgent::new(
                 agent_pub_key,
-                kitsune2_api::DhtArc::FULL,
+                DhtArc::FULL,
                 self.lair_client.clone(),
             ));
 
-            let space =
-                kitsune2_api::SpaceId::from(bytes::Bytes::copy_from_slice(dna_hash.get_raw_36()));
-
-            let space = kitsune.space(space).await?;
             space.local_agent_join(local_agent).await?;
             Ok(())
         })
@@ -826,10 +823,16 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn leave(
         &self,
-        _dna_hash: DnaHash,
-        _agent_pub_key: AgentPubKey,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            let kitsune = self.kitsune()?;
+            let space = kitsune.space(dna_hash.to_k2_space()).await?;
+
+            space.local_agent_leave(agent_pub_key.to_k2_agent()).await;
+            Ok(())
+        })
     }
 
     fn call_remote(
@@ -844,10 +847,50 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn send_remote_signal(
         &self,
-        _dna_hash: DnaHash,
-        _to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
+        dna_hash: DnaHash,
+        target_payload_list: Vec<(AgentPubKey, ExternIO, Signature)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            let kitsune = self.kitsune()?;
+            let space_id = dna_hash.to_k2_space();
+            let space = kitsune.space(space_id.clone()).await?;
+
+            let byte_count: usize = target_payload_list.iter().map(|(_, p, _)| p.0.len()).sum();
+
+            let mut all = Vec::new();
+
+            for (to_agent, payload, signature) in target_payload_list {
+                let k2_agent = to_agent.to_k2_agent();
+                let no_from_agent = AgentId::from(bytes::Bytes::new());
+
+                let req = crate::wire::WireMessage::call_remote_multi(vec![(
+                    to_agent.clone(),
+                    payload,
+                    signature,
+                )])
+                .encode()?;
+
+                all.push(space.send_notify(
+                    k2_agent,
+                    no_from_agent,
+                    bytes::Bytes::copy_from_slice(&req),
+                ));
+            }
+
+            timing_trace_out!(
+                async move {
+                    for r in futures::future::join_all(all).await {
+                        if let Err(err) = r {
+                            tracing::debug!(?err, "send_remote_signal failed");
+                        }
+                    }
+
+                    Ok(())
+                },
+                byte_count,
+                a = "send_remote_signal"
+            )
+        })
     }
 
     fn publish(
@@ -987,48 +1030,6 @@ impl actor::HcP2p for HolochainP2pActor {
      * keeping the original code here, because we will need some
      * of this logic when doing the actual implementations
 
-    #[cfg_attr(
-        feature = "instrument",
-        tracing::instrument(skip(self), level = "trace")
-    )]
-    fn handle_join(
-        &mut self,
-        dna_hash: DnaHash,
-        agent_pub_key: AgentPubKey,
-        maybe_agent_info: Option<AgentInfoSigned>,
-        initial_arq: Option<Arq>,
-    ) -> HolochainP2pHandlerResult<()> {
-        let space = dna_hash.into_kitsune();
-        let agent = agent_pub_key.into_kitsune();
-
-        let kitsune_p2p = self.kitsune_p2p.clone();
-        Ok(async move {
-            Ok(kitsune_p2p
-                .join(space, agent, maybe_agent_info, initial_arq)
-                .await?)
-        }
-        .boxed()
-        .into())
-    }
-
-    #[cfg_attr(
-        feature = "instrument",
-        tracing::instrument(skip(self), level = "trace")
-    )]
-    fn handle_leave(
-        &mut self,
-        dna_hash: DnaHash,
-        agent_pub_key: AgentPubKey,
-    ) -> HolochainP2pHandlerResult<()> {
-        let space = dna_hash.into_kitsune();
-        let agent = agent_pub_key.into_kitsune();
-
-        let kitsune_p2p = self.kitsune_p2p.clone();
-        Ok(async move { Ok(kitsune_p2p.leave(space, agent).await?) }
-            .boxed()
-            .into())
-    }
-
     /// Dispatch an outgoing remote call.
     #[cfg_attr(
         feature = "instrument",
@@ -1060,43 +1061,6 @@ impl actor::HcP2p for HolochainP2pActor {
             },
             byte_count,
             a = "send_call_remote"
-        )
-    }
-
-    /// Dispatch an outgoing signal.
-    #[cfg_attr(
-        feature = "instrument",
-        tracing::instrument(skip(self), level = "trace")
-    )]
-    fn handle_send_remote_signal(
-        &mut self,
-        dna_hash: DnaHash,
-        to_agent_list: Vec<(AgentPubKey, ExternIO, Signature)>,
-    ) -> HolochainP2pHandlerResult<()> {
-        let byte_count = to_agent_list
-            .first()
-            .map(|to_agent| to_agent.1 .0.len())
-            .unwrap_or_else(|| 0);
-        let space = dna_hash.into_kitsune();
-
-        let req = crate::wire::WireMessage::call_remote_multi(to_agent_list.clone()).encode()?;
-
-        let timeout = self.config.tuning_params.implicit_timeout();
-
-        let to_agents = to_agent_list
-            .iter()
-            .map(|(agent, _zome_call_payload, _signature)| agent.clone().into_kitsune())
-            .collect();
-        let kitsune_p2p = self.kitsune_p2p.clone();
-        timing_trace_out!(
-            async move {
-                kitsune_p2p
-                    .targeted_broadcast(space, to_agents, timeout, req, true)
-                    .await?;
-                Ok(())
-            },
-            byte_count,
-            a = "send_remote_signal"
         )
     }
 
