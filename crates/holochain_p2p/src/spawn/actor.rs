@@ -193,11 +193,17 @@ impl event::HcP2pHandler for WrapEvtSender {
     }
 }
 
-#[derive(Debug)]
 pub(crate) struct HolochainP2pActor {
     this: Weak<Self>,
     evt_sender: WrapEvtSender,
+    lair_client: holochain_keystore::MetaLairClient,
     kitsune: Mutex<Option<kitsune2_api::DynKitsune>>,
+}
+
+impl std::fmt::Debug for HolochainP2pActor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HolochainP2pActor").finish()
+    }
 }
 
 impl kitsune2_api::SpaceHandler for HolochainP2pActor {}
@@ -224,6 +230,7 @@ impl HolochainP2pActor {
         db_peer_meta: DbWrite<DbKindPeerMetaStore>,
         db_op: DbWrite<DbKindDht>,
         handler: event::DynHcP2pHandler,
+        lair_client: holochain_keystore::MetaLairClient,
         _compat: NetworkCompatParams,
     ) -> HolochainP2pResult<actor::DynHcP2p> {
         let builder = kitsune2_api::Builder {
@@ -239,6 +246,7 @@ impl HolochainP2pActor {
         let this = Arc::new_cyclic(|this| Self {
             this: this.clone(),
             evt_sender: WrapEvtSender(handler),
+            lair_client,
             kitsune: Mutex::new(None),
         });
 
@@ -791,11 +799,29 @@ macro_rules! timing_trace_out {
 impl actor::HcP2p for HolochainP2pActor {
     fn join(
         &self,
-        _dna_hash: DnaHash,
-        _agent_pub_key: AgentPubKey,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
         _maybe_agent_info: Option<AgentInfoSigned>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            let kitsune = match &*self.kitsune.lock().unwrap() {
+                Some(kitsune) => kitsune.clone(),
+                None => return Err(kitsune2_api::K2Error::other("uninitialized").into()),
+            };
+
+            let local_agent: kitsune2_api::DynLocalAgent = Arc::new(HolochainP2pLocalAgent::new(
+                agent_pub_key,
+                kitsune2_api::DhtArc::FULL,
+                self.lair_client.clone(),
+            ));
+
+            let space =
+                kitsune2_api::SpaceId::from(bytes::Bytes::copy_from_slice(dna_hash.get_raw_36()));
+
+            let space = kitsune.space(space).await?;
+            space.local_agent_join(local_agent).await?;
+            Ok(())
+        })
     }
 
     fn leave(

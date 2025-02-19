@@ -11,9 +11,10 @@ pub async fn spawn_holochain_p2p(
     db_peer_meta: DbWrite<DbKindPeerMetaStore>,
     db_op: DbWrite<DbKindDht>,
     handler: DynHcP2pHandler,
+    lair_client: holochain_keystore::MetaLairClient,
     compat: NetworkCompatParams,
 ) -> HolochainP2pResult<DynHcP2p> {
-    actor::HolochainP2pActor::create(db_peer_meta, db_op, handler, compat).await
+    actor::HolochainP2pActor::create(db_peer_meta, db_op, handler, lair_client, compat).await
 }
 
 /// Some parameters used as part of a protocol compability check during tx5 preflight
