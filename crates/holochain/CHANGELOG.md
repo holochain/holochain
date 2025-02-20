@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- `get_links` always fetches from the network now when `GetOptions::network()` is passed in. Previously it didn't fetch from network if the requesting agent was an authority for the link base.
+
 ## 0.5.0-dev.19
 
 - Break dependency from holochain\_state to holochain\_p2p
