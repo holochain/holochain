@@ -182,7 +182,7 @@ impl OpStore for HolochainOpStore {
                         op_ids
                             .iter()
                             .map(|id| {
-                                let hash = DhtOpHash::from_k2_op(&id);
+                                let hash = DhtOpHash::from_k2_op(id);
                                 Value::from(hash.into_inner())
                             })
                             .collect::<Vec<_>>(),

@@ -25,6 +25,10 @@ impl WireDhtOpData {
 #[serde(tag = "type", content = "content")]
 #[allow(missing_docs)]
 pub enum WireMessage {
+    ErrorRes {
+        msg_id: u64,
+        error: String,
+    },
     CallRemoteReq {
         msg_id: u64,
         to_agent: AgentPubKey,

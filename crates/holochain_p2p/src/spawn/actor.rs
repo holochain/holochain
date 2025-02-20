@@ -5,8 +5,8 @@ const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 use crate::*;
 use kitsune2_api::*;
-use std::sync::{Mutex, Weak};
 use std::collections::HashMap;
+use std::sync::{Mutex, Weak};
 
 macro_rules! timing_trace {
     ($netaudit:literal, $code:block $($rest:tt)*) => {{
@@ -236,27 +236,27 @@ impl std::fmt::Debug for HolochainP2pActor {
 }
 
 impl kitsune2_api::SpaceHandler for HolochainP2pActor {
-    fn recv_notify(
-        &self,
-        _to_agent: AgentId,
-        _from_agent: AgentId,
-        space: SpaceId,
-        data: bytes::Bytes,
-    ) -> K2Result<()> {
+    fn recv_notify(&self, from_peer: Url, space: SpaceId, data: bytes::Bytes) -> K2Result<()> {
         for msg in crate::wire::WireMessage::decode_batch(&data).map_err(|err| {
             K2Error::other_src("decode incoming holochain_p2p wire message batch", err)
         })? {
             // NOTE: spawning a task here could lead to memory issues
             //       in the case of DoS messaging, consider some kind
             //       of queue or semaphore.
+            let from_peer = from_peer.clone();
+            let space = space.clone();
             let evt_sender = self.evt_sender.clone();
             let kitsune = self.kitsune()?;
             let pending = self.pending.clone();
-            let space = space.clone();
             tokio::task::spawn(async move {
                 use crate::event::HcP2pHandler;
                 use crate::wire::WireMessage::*;
                 match msg {
+                    ErrorRes { msg_id, .. } => {
+                        if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
+                            let _ = resp.send(msg);
+                        }
+                    }
                     CallRemoteReq {
                         msg_id,
                         to_agent,
@@ -264,13 +264,25 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         signature,
                     } => {
                         let dna_hash = DnaHash::from_k2_space(&space);
-                        let _response = evt_sender.call_remote(
-                            dna_hash,
-                            to_agent,
-                            zome_call_params_serialized,
-                            signature,
-                        ).await;
-                        todo!()
+                        let resp = match evt_sender
+                            .call_remote(dna_hash, to_agent, zome_call_params_serialized, signature)
+                            .await
+                        {
+                            Ok(response) => CallRemoteRes { msg_id, response },
+                            Err(err) => ErrorRes {
+                                msg_id,
+                                error: format!("{err:?}"),
+                            },
+                        };
+                        let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
+                        if let Err(err) = kitsune
+                            .space(space)
+                            .await?
+                            .send_notify(from_peer, resp)
+                            .await
+                        {
+                            tracing::debug!(?err, "Error sending call remote response");
+                        }
                     }
                     CallRemoteRes { msg_id, .. } => {
                         if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
@@ -285,14 +297,12 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         let dna_hash = DnaHash::from_k2_space(&space);
                         // remote signals are fire-and-forget
                         // so it's safe to ignore the response
-                        let _response = evt_sender.call_remote(
-                            dna_hash,
-                            to_agent,
-                            zome_call_params_serialized,
-                            signature,
-                        ).await;
+                        let _response = evt_sender
+                            .call_remote(dna_hash, to_agent, zome_call_params_serialized, signature)
+                            .await;
                     }
                 }
+                HolochainP2pResult::Ok(())
             });
         }
         Ok(())
@@ -334,10 +344,12 @@ impl HolochainP2pActor {
         }
         .with_default_config()?;
 
-        let pending = Arc::new_cyclic(|this| Mutex::new(Pending {
-            this: this.clone(),
-            map: HashMap::new(),
-        }));
+        let pending = Arc::new_cyclic(|this| {
+            Mutex::new(Pending {
+                this: this.clone(),
+                map: HashMap::new(),
+            })
+        });
 
         let this = Arc::new_cyclic(|this| Self {
             this: this.clone(),
@@ -945,8 +957,12 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let byte_count = zome_call_params_serialized.0.len();
 
-            let k2_agent = to_agent.to_k2_agent();
-            let no_from_agent = AgentId::from(bytes::Bytes::new());
+            let to_url = space
+                .peer_store()
+                .get(to_agent.to_k2_agent())
+                .await?
+                .and_then(|i| i.url.clone())
+                .ok_or_else(|| HolochainP2pError::other("call_remote: no url for peer"))?;
 
             let (msg_id, req) = crate::wire::WireMessage::call_remote_req(
                 to_agent,
@@ -961,17 +977,21 @@ impl actor::HcP2p for HolochainP2pActor {
                     let (s, r) = tokio::sync::oneshot::channel();
                     self.pending.lock().unwrap().register(msg_id, s);
 
-                    space.send_notify(k2_agent, no_from_agent, req).await?;
+                    space.send_notify(to_url, req).await?;
 
                     match r.await {
-                        Err(_) => {
-                            Err(K2Error::other("call_remote response channel dropped: likely response timeout").into())
-                        }
+                        Err(_) => Err(K2Error::other(
+                            "call_remote response channel dropped: likely response timeout",
+                        )
+                        .into()),
                         Ok(resp) => {
                             if let crate::wire::WireMessage::CallRemoteRes { response, .. } = resp {
                                 Ok(response)
                             } else {
-                                Err(K2Error::other("invalid response message type").into())
+                                Err(K2Error::other(format!(
+                                    "invalid response message type: {resp:?}"
+                                ))
+                                .into())
                             }
                         }
                     }
@@ -997,8 +1017,15 @@ impl actor::HcP2p for HolochainP2pActor {
             let mut all = Vec::new();
 
             for (to_agent, payload, signature) in target_payload_list {
-                let k2_agent = to_agent.to_k2_agent();
-                let no_from_agent = AgentId::from(bytes::Bytes::new());
+                let to_url = match space
+                    .peer_store()
+                    .get(to_agent.to_k2_agent())
+                    .await?
+                    .and_then(|i| i.url.clone())
+                {
+                    Some(to_url) => to_url,
+                    None => continue,
+                };
 
                 let req = crate::wire::WireMessage::remote_signal_evt(
                     to_agent.clone(),
@@ -1008,14 +1035,16 @@ impl actor::HcP2p for HolochainP2pActor {
                 // someday we may support batching
                 let req = crate::wire::WireMessage::encode_batch(&[&req])?;
 
-                all.push(space.send_notify(k2_agent, no_from_agent, req));
+                all.push(space.send_notify(to_url, req));
             }
 
             timing_trace_out!(
                 async move {
-                    for r in futures::future::join_all(all).await {
-                        if let Err(err) = r {
-                            tracing::debug!(?err, "send_remote_signal failed");
+                    if !all.is_empty() {
+                        for r in futures::future::join_all(all).await {
+                            if let Err(err) = r {
+                                tracing::debug!(?err, "send_remote_signal failed");
+                            }
                         }
                     }
 
