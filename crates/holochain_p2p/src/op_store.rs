@@ -36,14 +36,13 @@ impl kitsune2_api::OpStoreFactory for HolochainOpStoreFactory {
 
     fn create(
         &self,
-        builder: Arc<kitsune2_api::Builder>,
+        _builder: Arc<kitsune2_api::Builder>,
         space: kitsune2_api::SpaceId,
     ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynOpStore>> {
         let db = self.db.clone();
         let handler = self.handler.clone();
         Box::pin(async move {
-            let dna_hash =
-                DnaHash::from_raw_36_and_type(space.as_ref().to_vec(), holo_hash::hash_type::Dna);
+            let dna_hash = DnaHash::from_k2_space(&space);
             let op_store: kitsune2_api::DynOpStore =
                 Arc::new(HolochainOpStore::new(db, dna_hash, handler));
 

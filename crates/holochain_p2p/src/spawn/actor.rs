@@ -328,21 +328,25 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
 impl HolochainP2pActor {
     /// constructor
     pub async fn create(
+        config: HolochainP2pConfig,
         db_peer_meta: DbWrite<DbKindPeerMetaStore>,
         db_op: DbWrite<DbKindDht>,
         handler: event::DynHcP2pHandler,
         lair_client: holochain_keystore::MetaLairClient,
-        _compat: NetworkCompatParams,
     ) -> HolochainP2pResult<actor::DynHcP2p> {
-        let builder = Builder {
-            peer_meta_store: Arc::new(HolochainPeerMetaStoreFactory { db: db_peer_meta }),
-            op_store: Arc::new(HolochainOpStoreFactory {
-                db: db_op,
-                handler: handler.clone(),
-            }),
-            ..kitsune2::default_builder()
-        }
-        .with_default_config()?;
+        let mut builder = if config.k2_test_builder {
+            kitsune2_core::default_test_builder()
+        } else {
+            kitsune2::default_builder()
+        };
+
+        builder.peer_meta_store = Arc::new(HolochainPeerMetaStoreFactory { db: db_peer_meta });
+        builder.op_store = Arc::new(HolochainOpStoreFactory {
+            db: db_op,
+            handler: handler.clone(),
+        });
+
+        let builder = builder.with_default_config()?;
 
         let pending = Arc::new_cyclic(|this| {
             Mutex::new(Pending {

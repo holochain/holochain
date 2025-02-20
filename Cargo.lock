@@ -2857,6 +2857,7 @@ dependencies = [
  "holochain_zome_types",
  "kitsune2",
  "kitsune2_api",
+ "kitsune2_core",
  "lair_keystore_api",
  "mockall",
  "parking_lot",

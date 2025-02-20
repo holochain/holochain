@@ -27,7 +27,7 @@ impl kitsune2_api::PeerMetaStoreFactory for HolochainPeerMetaStoreFactory {
 
     fn create(
         &self,
-        builder: Arc<kitsune2_api::Builder>,
+        _builder: Arc<kitsune2_api::Builder>,
     ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynPeerMetaStore>> {
         let db = self.db.clone();
         Box::pin(async move {
