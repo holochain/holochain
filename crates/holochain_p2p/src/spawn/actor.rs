@@ -1,8 +1,12 @@
 #![allow(clippy::too_many_arguments)]
 
+/// Hard-code for now.
+const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
 use crate::*;
 use kitsune2_api::*;
 use std::sync::{Mutex, Weak};
+use std::collections::HashMap;
 
 macro_rules! timing_trace {
     ($netaudit:literal, $code:block $($rest:tt)*) => {{
@@ -194,11 +198,35 @@ impl event::HcP2pHandler for WrapEvtSender {
     }
 }
 
+type Respond = tokio::sync::oneshot::Sender<crate::wire::WireMessage>;
+
+struct Pending {
+    this: Weak<Mutex<Self>>,
+    map: HashMap<u64, Respond>,
+}
+
+impl Pending {
+    fn register(&mut self, msg_id: u64, resp: Respond) {
+        if let Some(this) = self.this.upgrade() {
+            self.map.insert(msg_id, resp);
+            tokio::task::spawn(async move {
+                tokio::time::sleep(TIMEOUT).await;
+                let _ = this.lock().unwrap().respond(msg_id);
+            });
+        }
+    }
+
+    fn respond(&mut self, msg_id: u64) -> Option<Respond> {
+        self.map.remove(&msg_id)
+    }
+}
+
 pub(crate) struct HolochainP2pActor {
     this: Weak<Self>,
     evt_sender: WrapEvtSender,
     lair_client: holochain_keystore::MetaLairClient,
     kitsune: Mutex<Option<kitsune2_api::DynKitsune>>,
+    pending: Arc<Mutex<Pending>>,
 }
 
 impl std::fmt::Debug for HolochainP2pActor {
@@ -207,7 +235,69 @@ impl std::fmt::Debug for HolochainP2pActor {
     }
 }
 
-impl kitsune2_api::SpaceHandler for HolochainP2pActor {}
+impl kitsune2_api::SpaceHandler for HolochainP2pActor {
+    fn recv_notify(
+        &self,
+        _to_agent: AgentId,
+        _from_agent: AgentId,
+        space: SpaceId,
+        data: bytes::Bytes,
+    ) -> K2Result<()> {
+        for msg in crate::wire::WireMessage::decode_batch(&data).map_err(|err| {
+            K2Error::other_src("decode incoming holochain_p2p wire message batch", err)
+        })? {
+            // NOTE: spawning a task here could lead to memory issues
+            //       in the case of DoS messaging, consider some kind
+            //       of queue or semaphore.
+            let evt_sender = self.evt_sender.clone();
+            let kitsune = self.kitsune()?;
+            let pending = self.pending.clone();
+            let space = space.clone();
+            tokio::task::spawn(async move {
+                use crate::event::HcP2pHandler;
+                use crate::wire::WireMessage::*;
+                match msg {
+                    CallRemoteReq {
+                        msg_id,
+                        to_agent,
+                        zome_call_params_serialized,
+                        signature,
+                    } => {
+                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let _response = evt_sender.call_remote(
+                            dna_hash,
+                            to_agent,
+                            zome_call_params_serialized,
+                            signature,
+                        ).await;
+                        todo!()
+                    }
+                    CallRemoteRes { msg_id, .. } => {
+                        if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
+                            let _ = resp.send(msg);
+                        }
+                    }
+                    RemoteSignalEvt {
+                        to_agent,
+                        zome_call_params_serialized,
+                        signature,
+                    } => {
+                        let dna_hash = DnaHash::from_k2_space(&space);
+                        // remote signals are fire-and-forget
+                        // so it's safe to ignore the response
+                        let _response = evt_sender.call_remote(
+                            dna_hash,
+                            to_agent,
+                            zome_call_params_serialized,
+                            signature,
+                        ).await;
+                    }
+                }
+            });
+        }
+        Ok(())
+    }
+}
 
 impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
     fn create_space(
@@ -244,11 +334,17 @@ impl HolochainP2pActor {
         }
         .with_default_config()?;
 
+        let pending = Arc::new_cyclic(|this| Mutex::new(Pending {
+            this: this.clone(),
+            map: HashMap::new(),
+        }));
+
         let this = Arc::new_cyclic(|this| Self {
             this: this.clone(),
             evt_sender: WrapEvtSender(handler),
             lair_client,
             kitsune: Mutex::new(None),
+            pending,
         });
 
         let kitsune = builder.build(this.clone()).await?;
@@ -852,28 +948,32 @@ impl actor::HcP2p for HolochainP2pActor {
             let k2_agent = to_agent.to_k2_agent();
             let no_from_agent = AgentId::from(bytes::Bytes::new());
 
-            let req = crate::wire::WireMessage::call_remote(
+            let (msg_id, req) = crate::wire::WireMessage::call_remote_req(
                 to_agent,
                 zome_call_params_serialized,
                 signature,
-            )
-            .encode()?;
+            );
+            // someday we may support batching
+            let req = crate::wire::WireMessage::encode_batch(&[&req])?;
 
             timing_trace_out!(
                 async move {
+                    let (s, r) = tokio::sync::oneshot::channel();
+                    self.pending.lock().unwrap().register(msg_id, s);
+
                     space.send_notify(k2_agent, no_from_agent, req).await?;
-
-                    let (s, r) =
-                        tokio::sync::oneshot::channel::<HolochainP2pResult<SerializedBytes>>();
-
-                    // TODO - RESPONSE TRACKING!!!
-                    drop(s);
 
                     match r.await {
                         Err(_) => {
-                            Err(K2Error::other("call_remote response channel dropped").into())
+                            Err(K2Error::other("call_remote response channel dropped: likely response timeout").into())
                         }
-                        Ok(resp) => resp,
+                        Ok(resp) => {
+                            if let crate::wire::WireMessage::CallRemoteRes { response, .. } = resp {
+                                Ok(response)
+                            } else {
+                                Err(K2Error::other("invalid response message type").into())
+                            }
+                        }
                     }
                 },
                 byte_count,
@@ -900,12 +1000,13 @@ impl actor::HcP2p for HolochainP2pActor {
                 let k2_agent = to_agent.to_k2_agent();
                 let no_from_agent = AgentId::from(bytes::Bytes::new());
 
-                let req = crate::wire::WireMessage::call_remote_multi(vec![(
+                let req = crate::wire::WireMessage::remote_signal_evt(
                     to_agent.clone(),
                     payload,
                     signature,
-                )])
-                .encode()?;
+                );
+                // someday we may support batching
+                let req = crate::wire::WireMessage::encode_batch(&[&req])?;
 
                 all.push(space.send_notify(k2_agent, no_from_agent, req));
             }
