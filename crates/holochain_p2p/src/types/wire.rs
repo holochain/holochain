@@ -109,7 +109,7 @@ impl WireMessage {
         (
             msg_id,
             Self::CallRemoteReq {
-                msg_id: next_msg_id(),
+                msg_id,
                 to_agent,
                 zome_call_params_serialized,
                 signature,
