@@ -91,29 +91,12 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
-kitsune2_api = { path = "../kitsune2/crates/api" }
-kitsune2_core = { path = "../kitsune2/crates/core" }
+# kitsune2_api = { path = "../kitsune2/crates/api" }
+# kitsune2_core = { path = "../kitsune2/crates/core" }
 # holochain_deepkey_dna = { path = "../deepkey/crates/holochain_deepkey_dna" }
-
 # task-motel = { path = "../task-motel" }
-# proptest = { path = "/home/michael/gitfork/proptest/proptest" }
-# proptest = { git = "https://github.com/maackle/proptest", branch = "arbitrary-pathbuf" }
-
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
-# contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "lambda" }
-# tx5 = { path = "../tx5/crates/tx5" }
-# tx5-core = { path = "../tx5/crates/tx5-core" }
-# tx5-go-pion = { path = "../tx5/crates/tx5-go-pion" }
-# tx5-go-pion-sys = { path = "../tx5/crates/tx5-go-pion-sys" }
-# tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
-# tx5-signal = { path = "../tx5/crates/tx5-signal" }
-# sbd-e2e-crypto-client = { path = "../sbd/rust/sbd-e2e-crypto-client" }
-# sbd-server = { path = "../sbd/rust/sbd-server" }
-# tx5 = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_host = { path = "../holochain-wasmer/crates/host" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }

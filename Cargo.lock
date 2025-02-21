@@ -3984,9 +3984,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2"
-version = "0.0.1-alpha2"
+version = "0.0.1-alpha3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13f44b87c27f01c9ad607bb4224110ddd8aaadc2938a684e76d30397db76a761"
+checksum = "f2701690f171c60968310fde1b24ca72a72a2b97c293d35df4156deb840db220"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -3997,7 +3997,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_api"
-version = "0.0.1-alpha2"
+version = "0.0.1-alpha3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "373fd4780d7ec571aaa49fbf29e0efad5451212c25261a1996ee7bb4e0ce9f96"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4012,7 +4014,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_core"
-version = "0.0.1-alpha2"
+version = "0.0.1-alpha3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cbaca91bceb70bb37807fb9ac77cea85d184d6b62492f23c22e364b5263e6f6"
 dependencies = [
  "backon",
  "bytes",
@@ -4031,9 +4035,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_dht"
-version = "0.0.1-alpha2"
+version = "0.0.1-alpha3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05b8362d49fb4bbe7db02343f288ef52e8351d982dc556f05e1222ea77027332"
+checksum = "d14a67f5ca9cbc602f8a76d36d79457ded2e1737dcbb8540bd30e0079749cd86"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4042,9 +4046,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_gossip"
-version = "0.0.1-alpha2"
+version = "0.0.1-alpha3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78db2d2d1a6ae081ce28fe1ca7b7d1c82dfbb687ccc2da72f223b4aef904d587"
+checksum = "6bbb224a91ab5c988b4d4d88740029ae4a747e7e53cd57fea7f80c4a995a0a52"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4061,9 +4065,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_transport_tx5"
-version = "0.0.1-alpha2"
+version = "0.0.1-alpha3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4da1952cd6cd2c9e6be51a1540eb2ab9b7b01c0cbf6ee3d3ba84e5ed5c736147"
+checksum = "c90ab1a81cedf1689ab24c579bbae7fbce5bb36567127cbb651a7077d164e62e"
 dependencies = [
  "bytes",
  "kitsune2_api",
