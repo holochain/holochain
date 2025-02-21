@@ -111,20 +111,21 @@ pub fn insert_op_dht(
 }
 
 /// Insert a [DhtOp] into the Cache database.
-///
-/// TODO: no transfer data is hooked up for now, but ideally in the future we want:
-/// - an AgentPubKey from the remote node should be included
-/// - perhaps a TransferMethod could include the method used to get the data, e.g. `get` vs `get_links`
-/// - timestamp is probably unnecessary since `when_stored` will suffice
+//
+// TODO: no transfer data is hooked up for now, but ideally in the future we want:
+// - an AgentPubKey from the remote node should be included
+// - perhaps a TransferMethod could include the method used to get the data, e.g. `get` vs `get_links`
+// - timestamp is probably unnecessary since `when_stored` will suffice
 pub fn insert_op_cache(txn: &mut Txn<DbKindCache>, op: &DhtOpHashed) -> StateMutationResult<()> {
     insert_op_when(txn, op, None, Timestamp::now())
 }
 
 /// Marker for the cases where we could include some transfer data, but this is currently
-/// not hooked up. Ideally:
-/// - an AgentPubKey from the remote node should be included
-/// - perhaps a TransferMethod could include the method used to get the data, e.g. `get` vs `get_links`
-/// - timestamp is probably unnecessary since `when_stored` will suffice
+/// not hooked up.
+// Ideally:
+// - an AgentPubKey from the remote node should be included
+// - perhaps a TransferMethod could include the method used to get the data, e.g. `get` vs `get_links`
+// - timestamp is probably unnecessary since `when_stored` will suffice
 pub fn todo_no_cache_transfer_data() -> Option<(AgentPubKey, TransferMethod, Timestamp)> {
     None
 }
