@@ -5,6 +5,10 @@ pub type GenericNetwork = Arc<dyn HolochainP2pDnaT>;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum HolochainP2pError {
+    /// K2Error
+    #[error(transparent)]
+    K2Error(#[from] kitsune2_api::K2Error),
+
     /// RoutingDnaError
     #[error("Routing Dna Error: {0}")]
     RoutingDnaError(holo_hash::DnaHash),
@@ -12,10 +16,6 @@ pub enum HolochainP2pError {
     /// RoutingAgentError
     #[error("Routing Agent Error: {0}")]
     RoutingAgentError(holo_hash::AgentPubKey),
-
-    /// SerializedBytesError
-    #[error(transparent)]
-    SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
 
     /// Invalid P2p Message
     #[error("InvalidP2pMessage: {0}")]
