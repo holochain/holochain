@@ -29,11 +29,10 @@ url = "2.4"
 
 holochain_serialized_bytes = { version = "=0.0.55", optional = true }
 holo_hash = { version = "^0.5.0-dev.7", path = "../holo_hash", optional = true }
-reqwest = { version = "0.12", features = [
+reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
 ], optional = true }
-
 
 [dev-dependencies]
 holochain_chc = { path = ".", features = ["test_utils"] }
