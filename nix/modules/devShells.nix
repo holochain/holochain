@@ -138,6 +138,9 @@
             packages = with pkgs; [
               cargo-nextest
               graph-easy
+              llvm_15 # For running holochain with wasmer_compiler_production
+              libffi
+              libxml2
 
               self'.packages.scripts-cargo-regen-lockfiles
               self'.packages.scripts-cargo-update
@@ -155,6 +158,8 @@
 
               export HC_WASM_CACHE_PATH="$CARGO_TARGET_DIR/.wasm_cache"
               mkdir -p $HC_WASM_CACHE_PATH
+
+              export LLVM_SYS_150_PREFIX="$(which llvm-config | xargs dirname | xargs dirname)"
 
               # Enables the pre-commit hooks
               ${config.pre-commit.installationScript}
