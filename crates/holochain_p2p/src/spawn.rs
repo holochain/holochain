@@ -9,22 +9,52 @@ mod actor;
 /// Conductor will call this on initialization.
 pub async fn spawn_holochain_p2p(
     config: HolochainP2pConfig,
-    db_peer_meta: DbWrite<DbKindPeerMetaStore>,
-    db_op: DbWrite<DbKindDht>,
     handler: DynHcP2pHandler,
     lair_client: holochain_keystore::MetaLairClient,
 ) -> HolochainP2pResult<DynHcP2p> {
-    actor::HolochainP2pActor::create(config, db_peer_meta, db_op, handler, lair_client).await
+    actor::HolochainP2pActor::create(config, handler, lair_client).await
 }
 
+/// Callback function to retrieve a peer meta database handle for a dna hash.
+pub type GetDbPeerMeta = Arc<
+    dyn Fn() -> BoxFut<'static, HolochainP2pResult<DbWrite<DbKindPeerMetaStore>>>
+        + 'static
+        + Send
+        + Sync,
+>;
+
+/// Callback function to retrieve a op store database handle for a dna hash.
+pub type GetDbOpStore = Arc<
+    dyn Fn(DnaHash) -> BoxFut<'static, HolochainP2pResult<DbWrite<DbKindDht>>>
+        + 'static
+        + Send
+        + Sync,
+>;
+
 /// HolochainP2p config struct.
-#[derive(Debug, Default)]
 pub struct HolochainP2pConfig {
+    /// Callback function to retrieve a peer meta database handle for a dna hash.
+    pub get_db_peer_meta: GetDbPeerMeta,
+
+    /// Callback function to retrieve a op store database handle for a dna hash.
+    pub get_db_op_store: GetDbOpStore,
+
     /// If true, will use kitsune core test bootstrap / transport / etc.
     pub k2_test_builder: bool,
 
     /// The compat params to use.
     pub compat: NetworkCompatParams,
+}
+
+impl Default for HolochainP2pConfig {
+    fn default() -> Self {
+        Self {
+            get_db_peer_meta: Arc::new(|| unimplemented!()),
+            get_db_op_store: Arc::new(|_| unimplemented!()),
+            k2_test_builder: false,
+            compat: Default::default(),
+        }
+    }
 }
 
 /// Some parameters used as part of a protocol compability check during tx5 preflight

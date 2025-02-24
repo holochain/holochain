@@ -331,8 +331,6 @@ impl HolochainP2pActor {
     /// constructor
     pub async fn create(
         config: HolochainP2pConfig,
-        db_peer_meta: DbWrite<DbKindPeerMetaStore>,
-        db_op: DbWrite<DbKindDht>,
         handler: event::DynHcP2pHandler,
         lair_client: holochain_keystore::MetaLairClient,
     ) -> HolochainP2pResult<actor::DynHcP2p> {
@@ -342,9 +340,11 @@ impl HolochainP2pActor {
             kitsune2::default_builder()
         };
 
-        builder.peer_meta_store = Arc::new(HolochainPeerMetaStoreFactory { db: db_peer_meta });
+        builder.peer_meta_store = Arc::new(HolochainPeerMetaStoreFactory {
+            getter: config.get_db_peer_meta.clone(),
+        });
         builder.op_store = Arc::new(HolochainOpStoreFactory {
-            db: db_op,
+            getter: config.get_db_op_store.clone(),
             handler: handler.clone(),
         });
 

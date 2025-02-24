@@ -10,10 +10,15 @@ use kitsune2_api::{BoxFut, K2Error, K2Result, PeerMetaStore, Timestamp, Url};
 use std::sync::Arc;
 
 /// Holochain implementation of the Kitsune2 [OpStoreFactory].
-#[derive(Debug)]
 pub struct HolochainPeerMetaStoreFactory {
-    /// The database connection.
-    pub db: DbWrite<DbKindPeerMetaStore>,
+    /// The database connection getter.
+    pub getter: crate::GetDbPeerMeta,
+}
+
+impl std::fmt::Debug for HolochainPeerMetaStoreFactory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HolochainPeerMetaStoreFactory").finish()
+    }
 }
 
 impl kitsune2_api::PeerMetaStoreFactory for HolochainPeerMetaStoreFactory {
@@ -29,8 +34,11 @@ impl kitsune2_api::PeerMetaStoreFactory for HolochainPeerMetaStoreFactory {
         &self,
         _builder: Arc<kitsune2_api::Builder>,
     ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynPeerMetaStore>> {
-        let db = self.db.clone();
+        let getter = self.getter.clone();
         Box::pin(async move {
+            let db = getter().await.map_err(|err| {
+                kitsune2_api::K2Error::other_src("failed to get peer_meta_store db", err)
+            })?;
             let peer_meta_store: kitsune2_api::DynPeerMetaStore =
                 Arc::new(HolochainPeerMetaStore::create(db).await.map_err(|err| {
                     K2Error::other_src("failed to connect to peer store database", err)

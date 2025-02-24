@@ -181,11 +181,17 @@ async fn spawn_test(dna_hash: DnaHash, handler: DynHcP2pHandler) -> (AgentPubKey
 
     let hc = spawn_holochain_p2p(
         HolochainP2pConfig {
+            get_db_peer_meta: Arc::new(move || {
+                let db_peer_meta = db_peer_meta.clone();
+                Box::pin(async move { Ok(db_peer_meta.clone()) })
+            }),
+            get_db_op_store: Arc::new(move |_| {
+                let db_op = db_op.clone();
+                Box::pin(async move { Ok(db_op.clone()) })
+            }),
             k2_test_builder: true,
             ..Default::default()
         },
-        db_peer_meta,
-        db_op,
         handler,
         lair_client,
     )

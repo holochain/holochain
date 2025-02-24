@@ -17,12 +17,17 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 /// Holochain implementation of the Kitsune2 [OpStoreFactory].
-#[derive(Debug)]
 pub struct HolochainOpStoreFactory {
-    /// The database connection.
-    pub db: DbWrite<DbKindDht>,
+    /// The database connection getter.
+    pub getter: crate::GetDbOpStore,
     /// The event handler.
     pub handler: crate::types::event::DynHcP2pHandler,
+}
+
+impl std::fmt::Debug for HolochainOpStoreFactory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HolochainOpStoreFactory").finish()
+    }
 }
 
 impl kitsune2_api::OpStoreFactory for HolochainOpStoreFactory {
@@ -39,10 +44,13 @@ impl kitsune2_api::OpStoreFactory for HolochainOpStoreFactory {
         _builder: Arc<kitsune2_api::Builder>,
         space: kitsune2_api::SpaceId,
     ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynOpStore>> {
-        let db = self.db.clone();
+        let getter = self.getter.clone();
         let handler = self.handler.clone();
         Box::pin(async move {
             let dna_hash = DnaHash::from_k2_space(&space);
+            let db = getter(dna_hash.clone()).await.map_err(|err| {
+                kitsune2_api::K2Error::other_src("failed to get op_store db", err)
+            })?;
             let op_store: kitsune2_api::DynOpStore =
                 Arc::new(HolochainOpStore::new(db, dna_hash, handler));
 
