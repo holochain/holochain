@@ -210,7 +210,7 @@ impl Pending {
         if let Some(this) = self.this.upgrade() {
             self.map.insert(msg_id, resp);
             tokio::task::spawn(async move {
-                tokio::time::sleep(TIMEOUT).await;
+                tokio::time::sleep(REQUEST_TIMEOUT).await;
                 let _ = this.lock().unwrap().respond(msg_id);
             });
         }
@@ -319,7 +319,9 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
             if let Some(this) = this.upgrade() {
                 Ok(this)
             } else {
-                Err(kitsune2_api::K2Error::other("HolochainP2pActor instance has been dropped"))
+                Err(kitsune2_api::K2Error::other(
+                    "HolochainP2pActor instance has been dropped",
+                ))
             }
         })
     }
