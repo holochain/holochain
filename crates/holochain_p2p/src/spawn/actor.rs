@@ -319,7 +319,7 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
             if let Some(this) = this.upgrade() {
                 Ok(this)
             } else {
-                Err(kitsune2_api::K2Error::other("instance has been dropped"))
+                Err(kitsune2_api::K2Error::other("HolochainP2pActor instance has been dropped"))
             }
         })
     }
