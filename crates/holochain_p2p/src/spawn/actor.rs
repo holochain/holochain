@@ -885,17 +885,14 @@ impl kitsune_p2p::event::KitsuneP2pEventHandler for HolochainP2pActor {
 ----------------------- */
 
 macro_rules! timing_trace_out {
-    ($code:expr, $($rest:tt)*) => {{
-        let __start = std::time::Instant::now();
-        let __out = $code.await;
-        let __elapsed_s = __start.elapsed().as_secs_f64();
-        match &__out {
+    ($res:ident, $start:ident, $($rest:tt)*) => {
+        match &$res {
             Ok(_) => {
                 tracing::trace!(
                     target: "NETAUDIT",
                     m = "holochain_p2p",
                     r = "ok",
-                    elapsed_s = __elapsed_s,
+                    elapsed_s = $start.elapsed().as_secs_f64(),
                     $($rest)*
                 );
             }
@@ -904,13 +901,12 @@ macro_rules! timing_trace_out {
                     target: "NETAUDIT",
                     m = "holochain_p2p",
                     ?err,
-                    elapsed_s = __elapsed_s,
+                    elapsed_s = $start.elapsed().as_secs_f64(),
                     $($rest)*
                 );
             }
         }
-        __out
-    }};
+    };
 }
 
 impl actor::HcP2p for HolochainP2pActor {
@@ -978,33 +974,33 @@ impl actor::HcP2p for HolochainP2pActor {
             // someday we may support batching
             let req = crate::wire::WireMessage::encode_batch(&[&req])?;
 
-            timing_trace_out!(
-                async move {
-                    let (s, r) = tokio::sync::oneshot::channel();
-                    self.pending.lock().unwrap().register(msg_id, s);
+            let start = std::time::Instant::now();
 
-                    space.send_notify(to_url, req).await?;
+            let (s, r) = tokio::sync::oneshot::channel();
+            self.pending.lock().unwrap().register(msg_id, s);
 
-                    match r.await {
-                        Err(_) => Err(K2Error::other(
-                            "call_remote response channel dropped: likely response timeout",
+            space.send_notify(to_url, req).await?;
+
+            let out = match r.await {
+                Err(_) => Err(K2Error::other(
+                    "call_remote response channel dropped: likely response timeout",
+                )
+                .into()),
+                Ok(resp) => {
+                    if let crate::wire::WireMessage::CallRemoteRes { response, .. } = resp {
+                        Ok(response)
+                    } else {
+                        Err(
+                            K2Error::other(format!("invalid response message type: {resp:?}"))
+                                .into(),
                         )
-                        .into()),
-                        Ok(resp) => {
-                            if let crate::wire::WireMessage::CallRemoteRes { response, .. } = resp {
-                                Ok(response)
-                            } else {
-                                Err(K2Error::other(format!(
-                                    "invalid response message type: {resp:?}"
-                                ))
-                                .into())
-                            }
-                        }
                     }
-                },
-                byte_count,
-                a = "send_call_remote"
-            )
+                }
+            };
+
+            timing_trace_out!(out, start, byte_count, a = "send_call_remote");
+
+            out
         })
     }
 
@@ -1044,21 +1040,21 @@ impl actor::HcP2p for HolochainP2pActor {
                 all.push(space.send_notify(to_url, req));
             }
 
-            timing_trace_out!(
-                async move {
-                    if !all.is_empty() {
-                        for r in futures::future::join_all(all).await {
-                            if let Err(err) = r {
-                                tracing::debug!(?err, "send_remote_signal failed");
-                            }
-                        }
-                    }
+            let start = std::time::Instant::now();
 
-                    Ok(())
-                },
-                byte_count,
-                a = "send_remote_signal"
-            )
+            if !all.is_empty() {
+                for r in futures::future::join_all(all).await {
+                    if let Err(err) = r {
+                        tracing::debug!(?err, "send_remote_signal failed");
+                    }
+                }
+            }
+
+            let out = Ok(());
+
+            timing_trace_out!(out, start, byte_count, a = "send_remote_signal");
+
+            out
         })
     }
 
