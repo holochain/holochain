@@ -1,7 +1,7 @@
 #![allow(clippy::too_many_arguments)]
 
 /// Hard-code for now.
-const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 use crate::*;
 use kitsune2_api::*;
