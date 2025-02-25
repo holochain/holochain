@@ -54,13 +54,19 @@ pub enum WireMessage {
         msg_id: u64,
         response: WireOps,
     },
+    GetMetaReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: event::GetMetaOptions,
+    },
+    GetMetaRes {
+        msg_id: u64,
+        response: MetadataSet,
+    },
     /*
     ValidationReceipts {
         receipts: ValidationReceiptBundle,
-    },
-    GetMeta {
-        dht_hash: holo_hash::AnyDhtHash,
-        options: event::GetMetaOptions,
     },
     GetLinks {
         link_key: WireLinkKey,
@@ -164,18 +170,34 @@ impl WireMessage {
         Self::GetRes { msg_id, response }
     }
 
+    /// Outgoing "GetMeta" request.
+    pub fn get_meta_req(
+        to_agent: AgentPubKey,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: event::GetMetaOptions,
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::GetMetaReq {
+                msg_id,
+                to_agent,
+                dht_hash,
+                options,
+            },
+        )
+    }
+
+    /// Incoming "GetMeta" response.
+    pub fn get_meta_res(msg_id: u64, response: MetadataSet) -> WireMessage {
+        Self::GetMetaRes { msg_id, response }
+    }
+
     /*
     pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
         Self::ValidationReceipts { receipts }
     }
 
-
-    pub fn get_meta(
-        dht_hash: holo_hash::AnyDhtHash,
-        options: event::GetMetaOptions,
-    ) -> WireMessage {
-        Self::GetMeta { dht_hash, options }
-    }
 
     pub fn get_links(link_key: WireLinkKey, options: event::GetLinksOptions) -> WireMessage {
         Self::GetLinks { link_key, options }
