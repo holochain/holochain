@@ -2842,6 +2842,7 @@ dependencies = [
  "lair_keystore_api",
  "mockall",
  "parking_lot",
+ "rand 0.8.5",
  "rmp-serde",
  "serde",
  "serde_json",

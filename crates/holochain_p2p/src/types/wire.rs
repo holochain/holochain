@@ -44,13 +44,19 @@ pub enum WireMessage {
         zome_call_params_serialized: ExternIO,
         signature: Signature,
     },
+    GetReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: event::GetOptions,
+    },
+    GetRes {
+        msg_id: u64,
+        response: WireOps,
+    },
     /*
     ValidationReceipts {
         receipts: ValidationReceiptBundle,
-    },
-    Get {
-        dht_hash: holo_hash::AnyDhtHash,
-        options: event::GetOptions,
     },
     GetMeta {
         dht_hash: holo_hash::AnyDhtHash,
@@ -135,14 +141,34 @@ impl WireMessage {
         }
     }
 
+    /// Outgoing "Get" request.
+    pub fn get_req(
+        to_agent: AgentPubKey,
+        dht_hash: holo_hash::AnyDhtHash,
+        options: event::GetOptions,
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::GetReq {
+                msg_id,
+                to_agent,
+                dht_hash,
+                options,
+            },
+        )
+    }
+
+    /// Incoming "Get" response.
+    pub fn get_res(msg_id: u64, response: WireOps) -> WireMessage {
+        Self::GetRes { msg_id, response }
+    }
+
     /*
     pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
         Self::ValidationReceipts { receipts }
     }
 
-    pub fn get(dht_hash: holo_hash::AnyDhtHash, options: event::GetOptions) -> WireMessage {
-        Self::Get { dht_hash, options }
-    }
 
     pub fn get_meta(
         dht_hash: holo_hash::AnyDhtHash,
