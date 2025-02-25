@@ -258,7 +258,8 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                     | GetMetaRes { msg_id, .. }
                     | GetLinksRes { msg_id, .. }
                     | CountLinksRes { msg_id, .. }
-                    | GetAgentActivityRes { msg_id, .. } => {
+                    | GetAgentActivityRes { msg_id, .. }
+                    | MustGetAgentActivityRes { msg_id, .. } => {
                         if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
                             let _ = resp.send(msg);
                         }
@@ -430,6 +431,33 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                             .await
                         {
                             tracing::debug!(?err, "Error sending get_agent_activity response");
+                        }
+                    }
+                    MustGetAgentActivityReq {
+                        msg_id,
+                        to_agent,
+                        agent,
+                        filter,
+                    } => {
+                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let resp = match evt_sender
+                            .must_get_agent_activity(dna_hash, to_agent, agent, filter)
+                            .await
+                        {
+                            Ok(response) => MustGetAgentActivityRes { msg_id, response },
+                            Err(err) => ErrorRes {
+                                msg_id,
+                                error: format!("{err:?}"),
+                            },
+                        };
+                        let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
+                        if let Err(err) = kitsune
+                            .space(space)
+                            .await?
+                            .send_notify(from_peer, resp)
+                            .await
+                        {
+                            tracing::debug!(?err, "Error sending must_get_agent_activity response");
                         }
                     }
                 }
@@ -610,27 +638,6 @@ impl HolochainP2pActor {
 
     /* -----------------
      * saving so we can implement similiar stuff later
-
-    /// receiving an incoming must_get_agent_activity request from a remote node
-    fn handle_incoming_must_get_agent_activity(
-        &mut self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        agent: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
-    ) -> kitsune_p2p::actor::KitsuneP2pHandlerResult<Vec<u8>> {
-        let evt_sender = self.evt_sender.clone();
-        Ok(async move {
-            let res = evt_sender
-                .must_get_agent_activity(dna_hash, to_agent, agent, filter)
-                .await;
-            res.and_then(|r| Ok(SerializedBytes::try_from(r)?))
-                .map_err(kitsune_p2p::KitsuneP2pError::from)
-                .map(|res| UnsafeBytes::from(res).into())
-        }
-        .boxed()
-        .into())
-    }
 
     /// receiving an incoming publish from a remote node
     fn handle_incoming_publish(
@@ -1207,11 +1214,47 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn must_get_agent_activity(
         &self,
-        _dna_hash: DnaHash,
-        _author: AgentPubKey,
-        _filter: holochain_zome_types::chain::ChainFilter,
+        dna_hash: DnaHash,
+        author: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<MustGetAgentActivityResponse>>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            let kitsune = self.kitsune()?;
+            let space_id = dna_hash.to_k2_space();
+            let space = kitsune.space(space_id.clone()).await?;
+            let loc = author.get_loc();
+
+            let (to_agent, to_url) = self
+                .get_peer_for_loc("must_get_agent_activity", &space, loc)
+                .await?;
+
+            let (msg_id, req) =
+                crate::wire::WireMessage::must_get_agent_activity_req(to_agent, author, filter);
+
+            let start = std::time::Instant::now();
+
+            let out = self
+                .send_request(
+                    "must_get_agent_activity",
+                    &space,
+                    to_url,
+                    msg_id,
+                    req,
+                    |res| match res {
+                        crate::wire::WireMessage::MustGetAgentActivityRes { response, .. } => {
+                            Ok(vec![response])
+                        }
+                        _ => Err(HolochainP2pError::other(format!(
+                            "invalid response to must_get_agent_activity: {res:?}"
+                        ))),
+                    },
+                )
+                .await;
+
+            timing_trace_out!(out, start, a = "send_must_get_agent_activity");
+
+            out
+        })
     }
 
     fn send_validation_receipts(

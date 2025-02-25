@@ -94,13 +94,19 @@ pub enum WireMessage {
         msg_id: u64,
         response: AgentActivityResponse,
     },
+    MustGetAgentActivityReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    },
+    MustGetAgentActivityRes {
+        msg_id: u64,
+        response: MustGetAgentActivityResponse,
+    },
     /*
     ValidationReceipts {
         receipts: ValidationReceiptBundle,
-    },
-    MustGetAgentActivity {
-        agent: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
     },
     CountersigningSessionNegotiation {
         message: event::CountersigningSessionNegotiationMessage,
@@ -277,20 +283,35 @@ impl WireMessage {
         Self::GetAgentActivityRes { msg_id, response }
     }
 
+    /// Outgoing "MustGetAgentActivity" request.
+    pub fn must_get_agent_activity_req(
+        to_agent: AgentPubKey,
+        agent: AgentPubKey,
+        filter: holochain_zome_types::chain::ChainFilter,
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::MustGetAgentActivityReq {
+                msg_id,
+                to_agent,
+                agent,
+                filter,
+            },
+        )
+    }
+
+    /// Incoming "MustGetAgentActivity" response.
+    pub fn must_get_agent_activity_res(
+        msg_id: u64,
+        response: MustGetAgentActivityResponse,
+    ) -> WireMessage {
+        Self::MustGetAgentActivityRes { msg_id, response }
+    }
+
     /*
     pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
         Self::ValidationReceipts { receipts }
-    }
-
-
-
-
-
-    pub fn must_get_agent_activity(
-        agent: AgentPubKey,
-        filter: holochain_zome_types::chain::ChainFilter,
-    ) -> WireMessage {
-        Self::MustGetAgentActivity { agent, filter }
     }
 
     pub fn countersigning_session_negotiation(

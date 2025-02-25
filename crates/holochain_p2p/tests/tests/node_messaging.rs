@@ -131,7 +131,10 @@ impl HcP2pHandler for Handler {
         _author: AgentPubKey,
         _filter: holochain_zome_types::chain::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            self.0.lock().unwrap().push("get_agent_activity".into());
+            Ok(MustGetAgentActivityResponse::EmptyRange)
+        })
     }
 
     fn validation_receipts_received(
@@ -346,6 +349,35 @@ async fn test_get_agent_activity() {
             order_descending: false,
         },
         holochain_p2p::actor::GetActivityOptions::default(),
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_must_get_agent_activity() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+
+    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+
+    // give some time for the full arcs to propagate
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+
+    // if we get a response at all, the full back-n-forth succeeded
+    hc2.must_get_agent_activity(
+        dna_hash,
+        AgentPubKey::from_raw_36(vec![2; 36]),
+        ChainFilter {
+            chain_top: ActionHash::from_raw_36(vec![3; 36]),
+            filters: ChainFilters::ToGenesis,
+            include_cached_entries: false,
+        },
     )
     .await
     .unwrap();
