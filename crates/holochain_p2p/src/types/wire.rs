@@ -64,13 +64,19 @@ pub enum WireMessage {
         msg_id: u64,
         response: MetadataSet,
     },
+    GetLinksReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
+        link_key: WireLinkKey,
+        options: event::GetLinksOptions,
+    },
+    GetLinksRes {
+        msg_id: u64,
+        response: WireLinkOps,
+    },
     /*
     ValidationReceipts {
         receipts: ValidationReceiptBundle,
-    },
-    GetLinks {
-        link_key: WireLinkKey,
-        options: event::GetLinksOptions,
     },
     CountLinks {
         query: WireLinkQuery,
@@ -193,15 +199,35 @@ impl WireMessage {
         Self::GetMetaRes { msg_id, response }
     }
 
+    /// Outgoing "GetLinks" request.
+    pub fn get_links_req(
+        to_agent: AgentPubKey,
+        link_key: WireLinkKey,
+        options: event::GetLinksOptions,
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::GetLinksReq {
+                msg_id,
+                to_agent,
+                link_key,
+                options,
+            },
+        )
+    }
+
+    /// Incoming "GetLinks" response.
+    pub fn get_links_res(msg_id: u64, response: WireLinkOps) -> WireMessage {
+        Self::GetLinksRes { msg_id, response }
+    }
+
     /*
     pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
         Self::ValidationReceipts { receipts }
     }
 
 
-    pub fn get_links(link_key: WireLinkKey, options: event::GetLinksOptions) -> WireMessage {
-        Self::GetLinks { link_key, options }
-    }
 
     pub fn count_links(query: WireLinkQuery) -> WireMessage {
         Self::CountLinks { query }

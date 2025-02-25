@@ -82,7 +82,13 @@ impl HcP2pHandler for Handler {
         _link_key: WireLinkKey,
         _options: GetLinksOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            self.0.lock().unwrap().push("get_links".into());
+            Ok(WireLinkOps {
+                creates: Vec::new(),
+                deletes: Vec::new(),
+            })
+        })
     }
 
     fn count_links(
@@ -229,6 +235,39 @@ async fn test_get_meta() {
         dna_hash,
         HoloHash::from_raw_36_and_type(vec![1; 36], holo_hash::hash_type::AnyDht::Entry),
         holochain_p2p::actor::GetMetaOptions::default(),
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_links() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+
+    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+
+    // give some time for the full arcs to propagate
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+
+    // if we get a response at all, the full back-n-forth succeeded
+    hc2.get_links(
+        dna_hash,
+        WireLinkKey {
+            base: HoloHash::from_raw_36_and_type(vec![1; 36], holo_hash::hash_type::AnyDht::Entry)
+                .into(),
+            type_query: LinkTypeFilter::Types(Vec::new()),
+            tag: None,
+            after: None,
+            before: None,
+            author: None,
+        },
+        holochain_p2p::actor::GetLinksOptions::default(),
     )
     .await
     .unwrap();
