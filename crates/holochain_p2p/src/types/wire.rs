@@ -74,12 +74,18 @@ pub enum WireMessage {
         msg_id: u64,
         response: WireLinkOps,
     },
+    CountLinksReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
+        query: WireLinkQuery,
+    },
+    CountLinksRes {
+        msg_id: u64,
+        response: CountLinksResponse,
+    },
     /*
     ValidationReceipts {
         receipts: ValidationReceiptBundle,
-    },
-    CountLinks {
-        query: WireLinkQuery,
     },
     GetAgentActivity {
         agent: AgentPubKey,
@@ -222,6 +228,24 @@ impl WireMessage {
         Self::GetLinksRes { msg_id, response }
     }
 
+    /// Outgoing "CountLinks" request.
+    pub fn count_links_req(to_agent: AgentPubKey, query: WireLinkQuery) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::CountLinksReq {
+                msg_id,
+                to_agent,
+                query,
+            },
+        )
+    }
+
+    /// Incoming "CountLinks" response.
+    pub fn count_links_res(msg_id: u64, response: CountLinksResponse) -> WireMessage {
+        Self::CountLinksRes { msg_id, response }
+    }
+
     /*
     pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
         Self::ValidationReceipts { receipts }
@@ -229,9 +253,6 @@ impl WireMessage {
 
 
 
-    pub fn count_links(query: WireLinkQuery) -> WireMessage {
-        Self::CountLinks { query }
-    }
 
     pub fn get_agent_activity(
         agent: AgentPubKey,
