@@ -152,8 +152,6 @@ impl HcRunLocalServices {
 
                         a_out.close().await?;
 
-                        println!("# HC BOOTSTRAP - RUNNING");
-
                         tokio::signal::ctrl_c().await?;
 
                         drop(bootstrap_srv);
@@ -189,8 +187,6 @@ impl HcRunLocalServices {
             }
 
             a_out.close().await?;
-
-            println!("# HC SIGNAL - RUNNING");
 
             Some(sig_hnd)
         } else {
