@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 /// Struct for encoding DhtOp as bytes.
 pub struct WireDhtOpData {
     /// The dht op.
@@ -9,29 +9,42 @@ pub struct WireDhtOpData {
 
 impl WireDhtOpData {
     /// Encode as bytes.
-    pub fn encode(self) -> Result<Vec<u8>, SerializedBytesError> {
-        Ok(UnsafeBytes::from(SerializedBytes::try_from(self)?).into())
+    pub fn encode(self) -> Result<bytes::Bytes, HolochainP2pError> {
+        let mut b = bytes::BufMut::writer(bytes::BytesMut::new());
+        rmp_serde::encode::write_named(&mut b, &self).map_err(HolochainP2pError::other)?;
+        Ok(b.into_inner().freeze())
     }
 
     /// Decode from bytes.
-    pub fn decode(data: Vec<u8>) -> Result<Self, SerializedBytesError> {
-        let request: SerializedBytes = UnsafeBytes::from(data).into();
-        request.try_into()
+    pub fn decode(data: &[u8]) -> Result<Self, HolochainP2pError> {
+        rmp_serde::decode::from_slice(data).map_err(HolochainP2pError::other)
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "content")]
 #[allow(missing_docs)]
 pub enum WireMessage {
-    CallRemote {
+    ErrorRes {
+        msg_id: u64,
+        error: String,
+    },
+    CallRemoteReq {
+        msg_id: u64,
         to_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
     },
-    CallRemoteMulti {
-        to_agents: Vec<(holo_hash::AgentPubKey, ExternIO, Signature)>,
+    CallRemoteRes {
+        msg_id: u64,
+        response: SerializedBytes,
     },
+    RemoteSignalEvt {
+        to_agent: AgentPubKey,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
+    },
+    /*
     ValidationReceipts {
         receipts: ValidationReceiptBundle,
     },
@@ -66,42 +79,63 @@ pub enum WireMessage {
         flag: bool,
         op: DhtOp,
     },
+    */
+}
+
+fn next_msg_id() -> u64 {
+    static M: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    M.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
 }
 
 #[allow(missing_docs)]
 impl WireMessage {
-    pub fn encode(&self) -> Result<Vec<u8>, SerializedBytesError> {
-        holochain_serialized_bytes::encode(&self)
+    pub fn encode_batch(batch: &[&WireMessage]) -> Result<bytes::Bytes, HolochainP2pError> {
+        let mut b = bytes::BufMut::writer(bytes::BytesMut::new());
+        rmp_serde::encode::write_named(&mut b, batch).map_err(HolochainP2pError::other)?;
+        Ok(b.into_inner().freeze())
     }
 
-    pub fn decode(data: &[u8]) -> Result<Self, SerializedBytesError> {
-        holochain_serialized_bytes::decode(&data)
+    pub fn decode_batch(data: &[u8]) -> Result<Vec<Self>, HolochainP2pError> {
+        rmp_serde::decode::from_slice(data).map_err(HolochainP2pError::other)
     }
 
-    pub fn publish_countersign(flag: bool, op: DhtOp) -> WireMessage {
-        Self::PublishCountersign { flag, op }
+    /// Outgoing "CallRemote" request.
+    pub fn call_remote_req(
+        to_agent: holo_hash::AgentPubKey,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::CallRemoteReq {
+                msg_id,
+                to_agent,
+                zome_call_params_serialized,
+                signature,
+            },
+        )
     }
 
-    /// For an outgoing remote call.
-    pub fn call_remote(
+    /// Incoming "CallRemote" response.
+    pub fn call_remote_res(msg_id: u64, response: SerializedBytes) -> WireMessage {
+        Self::CallRemoteRes { msg_id, response }
+    }
+
+    /// Outgoing fire-and-forget "RemoteSignal" notify event.
+    pub fn remote_signal_evt(
         to_agent: holo_hash::AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
     ) -> WireMessage {
-        Self::CallRemote {
+        Self::RemoteSignalEvt {
             to_agent,
             zome_call_params_serialized,
             signature,
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn call_remote_multi(
-        to_agents: Vec<(holo_hash::AgentPubKey, ExternIO, Signature)>,
-    ) -> WireMessage {
-        Self::CallRemoteMulti { to_agents }
-    }
-
+    /*
     pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
         Self::ValidationReceipts { receipts }
     }
@@ -149,4 +183,9 @@ impl WireMessage {
     ) -> WireMessage {
         Self::CountersigningSessionNegotiation { message }
     }
+
+    pub fn publish_countersign(flag: bool, op: DhtOp) -> WireMessage {
+        Self::PublishCountersign { flag, op }
+    }
+    */
 }

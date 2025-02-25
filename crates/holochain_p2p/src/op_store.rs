@@ -14,6 +14,50 @@ use kitsune2_api::*;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
+use std::sync::Arc;
+
+/// Holochain implementation of the Kitsune2 [OpStoreFactory].
+pub struct HolochainOpStoreFactory {
+    /// The database connection getter.
+    pub getter: crate::GetDbOpStore,
+    /// The event handler.
+    pub handler: crate::types::event::DynHcP2pHandler,
+}
+
+impl std::fmt::Debug for HolochainOpStoreFactory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HolochainOpStoreFactory").finish()
+    }
+}
+
+impl kitsune2_api::OpStoreFactory for HolochainOpStoreFactory {
+    fn default_config(&self, _config: &mut kitsune2_api::Config) -> kitsune2_api::K2Result<()> {
+        Ok(())
+    }
+
+    fn validate_config(&self, _config: &kitsune2_api::Config) -> kitsune2_api::K2Result<()> {
+        Ok(())
+    }
+
+    fn create(
+        &self,
+        _builder: Arc<kitsune2_api::Builder>,
+        space: kitsune2_api::SpaceId,
+    ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynOpStore>> {
+        let getter = self.getter.clone();
+        let handler = self.handler.clone();
+        Box::pin(async move {
+            let dna_hash = DnaHash::from_k2_space(&space);
+            let db = getter(dna_hash.clone()).await.map_err(|err| {
+                kitsune2_api::K2Error::other_src("failed to get op_store db", err)
+            })?;
+            let op_store: kitsune2_api::DynOpStore =
+                Arc::new(HolochainOpStore::new(db, dna_hash, handler));
+
+            Ok(op_store)
+        })
+    }
+}
 
 /// Holochain implementation of the Kitsune2 [OpStore].
 pub struct HolochainOpStore {
@@ -145,7 +189,7 @@ impl OpStore for HolochainOpStore {
                         op_ids
                             .iter()
                             .map(|id| {
-                                let hash = DhtOpHash::from_k2_op(&id);
+                                let hash = DhtOpHash::from_k2_op(id);
                                 Value::from(hash.into_inner())
                             })
                             .collect::<Vec<_>>(),
