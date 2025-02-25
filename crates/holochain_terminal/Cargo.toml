@@ -1,6 +1,6 @@
 [package]
 name = "hcterm"
-version = "0.5.0-dev.19"
+version = "0.5.0-dev.20"
 description = "A terminal for Holochain"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -26,9 +26,9 @@ holo_hash = { version = "^0.5.0-dev.7", path = "../holo_hash", features = [
   "encoding",
 ] }
 holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util" }
-holochain_conductor_api = { version = "^0.5.0-dev.19", path = "../holochain_conductor_api" }
-holochain_websocket = { version = "^0.5.0-dev.19", path = "../holochain_websocket" }
-holochain_types = { version = "^0.5.0-dev.19", path = "../holochain_types" }
+holochain_conductor_api = { version = "^0.5.0-dev.20", path = "../holochain_conductor_api" }
+holochain_websocket = { version = "^0.5.0-dev.20", path = "../holochain_websocket" }
+holochain_types = { version = "^0.5.0-dev.20", path = "../holochain_types" }
 tokio = { version = "1.36.0", features = ["full"] }
 
 [lints]

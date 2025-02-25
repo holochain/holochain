@@ -519,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.5.0-dev.18"
+version = "0.5.0-dev.19"
 dependencies = [
  "getrandom",
  "hdi",
@@ -655,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.5.0-dev.18"
+version = "0.5.0-dev.19"
 dependencies = [
  "hdk",
  "serde",
@@ -707,7 +707,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.5.0-dev.16"
+version = "0.5.0-dev.17"
 dependencies = [
  "derive_builder",
  "derive_more",
