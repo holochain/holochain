@@ -83,14 +83,20 @@ pub enum WireMessage {
         msg_id: u64,
         response: CountLinksResponse,
     },
-    /*
-    ValidationReceipts {
-        receipts: ValidationReceiptBundle,
-    },
-    GetAgentActivity {
+    GetAgentActivityReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: event::GetActivityOptions,
+    },
+    GetAgentActivityRes {
+        msg_id: u64,
+        response: AgentActivityResponse,
+    },
+    /*
+    ValidationReceipts {
+        receipts: ValidationReceiptBundle,
     },
     MustGetAgentActivity {
         agent: AgentPubKey,
@@ -246,6 +252,31 @@ impl WireMessage {
         Self::CountLinksRes { msg_id, response }
     }
 
+    /// Outgoing "GetAgentActivity" request.
+    pub fn get_agent_activity_req(
+        to_agent: AgentPubKey,
+        agent: AgentPubKey,
+        query: ChainQueryFilter,
+        options: event::GetActivityOptions,
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::GetAgentActivityReq {
+                msg_id,
+                to_agent,
+                agent,
+                query,
+                options,
+            },
+        )
+    }
+
+    /// Incoming "GetAgentActivity" response.
+    pub fn get_agent_activity_res(msg_id: u64, response: AgentActivityResponse) -> WireMessage {
+        Self::GetAgentActivityRes { msg_id, response }
+    }
+
     /*
     pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
         Self::ValidationReceipts { receipts }
@@ -254,17 +285,6 @@ impl WireMessage {
 
 
 
-    pub fn get_agent_activity(
-        agent: AgentPubKey,
-        query: ChainQueryFilter,
-        options: event::GetActivityOptions,
-    ) -> WireMessage {
-        Self::GetAgentActivity {
-            agent,
-            query,
-            options,
-        }
-    }
 
     pub fn must_get_agent_activity(
         agent: AgentPubKey,

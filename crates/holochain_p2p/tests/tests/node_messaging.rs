@@ -111,7 +111,17 @@ impl HcP2pHandler for Handler {
         _query: ChainQueryFilter,
         _options: GetActivityOptions,
     ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            self.0.lock().unwrap().push("get_agent_activity".into());
+            Ok(AgentActivityResponse {
+                agent: AgentPubKey::from_raw_36(vec![2; 36]),
+                valid_activity: ChainItems::NotRequested,
+                rejected_activity: ChainItems::NotRequested,
+                status: ChainStatus::Empty,
+                highest_observed: None,
+                warrants: Vec::new(),
+            })
+        })
     }
 
     fn must_get_agent_activity(
@@ -303,6 +313,39 @@ async fn test_count_links() {
             after: None,
             author: None,
         },
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_agent_activity() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+
+    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+
+    // give some time for the full arcs to propagate
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+
+    // if we get a response at all, the full back-n-forth succeeded
+    hc2.get_agent_activity(
+        dna_hash,
+        AgentPubKey::from_raw_36(vec![2; 36]),
+        ChainQueryFilter {
+            sequence_range: ChainQueryFilterRange::Unbounded,
+            entry_type: None,
+            entry_hashes: None,
+            action_type: None,
+            include_entries: false,
+            order_descending: false,
+        },
+        holochain_p2p::actor::GetActivityOptions::default(),
     )
     .await
     .unwrap();
