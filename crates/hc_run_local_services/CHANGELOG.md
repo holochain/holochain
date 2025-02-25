@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Switch to using `kitsune2_bootstrap_srv` as the bootstrap server
+
 ## 0.5.0-dev.12
 
 ## 0.5.0-dev.11
