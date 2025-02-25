@@ -437,26 +437,11 @@ impl HolochainP2pActor {
         space: &DynSpace,
         loc: u32,
     ) -> HolochainP2pResult<(AgentPubKey, Url)> {
-        println!("*&$^*&$%^ -- noodle");
-
-        let agent_list = space
-            .peer_store()
-            .get_all()
-            .await?;
-
-        println!("*&$^*&$%^ full ALL list: {agent_list:#?}");
-
-        let agent_list = space
-            .peer_store()
-            .get_near_location(loc, 1024)
-            .await?;
-
-        println!("*&$^*&$%^ full near list: {agent_list:#?}");
+        let agent_list = space.peer_store().get_near_location(loc, 1024).await?;
 
         let mut agent_list = agent_list
             .into_iter()
             .filter_map(|a| {
-                println!("*&$^*&$%^ {a:#?}");
                 if a.url.is_none() {
                     return None;
                 }

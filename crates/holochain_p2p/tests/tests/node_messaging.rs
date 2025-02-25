@@ -191,14 +191,13 @@ async fn test_get() {
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
 
     // if we get a response at all, the full back-n-forth succeeded
-    hc2
-        .get(
-            dna_hash,
-            HoloHash::from_raw_36_and_type(vec![1; 36], holo_hash::hash_type::AnyDht::Entry),
-            holochain_p2p::actor::GetOptions::default(),
-        )
-        .await
-        .unwrap();
+    hc2.get(
+        dna_hash,
+        HoloHash::from_raw_36_and_type(vec![1; 36], holo_hash::hash_type::AnyDht::Entry),
+        holochain_p2p::actor::GetOptions::default(),
+    )
+    .await
+    .unwrap();
 }
 
 async fn spawn_test(dna_hash: DnaHash, handler: DynHcP2pHandler) -> (AgentPubKey, actor::DynHcP2p) {
