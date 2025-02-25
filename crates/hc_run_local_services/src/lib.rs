@@ -109,30 +109,62 @@ impl HcRunLocalServices {
     }
 
     pub async fn run_err(self) -> Result<()> {
-        let mut task_list = Vec::new();
+        if self.disable_bootstrap && self.disable_signal {
+            println!("All Services Disabled - Aborting");
+            return Ok(());
+        }
 
+        let (bootstrap_shutdown_tx, bootstrap_shutdown_rx) = tokio::sync::oneshot::channel();
         if !self.disable_bootstrap {
             let bs_ip: std::net::IpAddr = self.bootstrap_interface.parse().map_err(Error::other)?;
             let bs_addr = std::net::SocketAddr::from((bs_ip, self.bootstrap_port));
-            let (bs_driver, bs_addr, shutdown) = kitsune_p2p_bootstrap::run(bs_addr, vec![])
-                .await
-                .map_err(Error::other)?;
-            std::mem::forget(shutdown);
-            task_list.push(bs_driver);
 
-            let mut a_out = AOut::new(&self.bootstrap_address_path).await?;
+            let mut config = kitsune2_bootstrap_srv::Config::testing();
+            config.listen_address_list = vec![bs_addr];
 
-            for addr in tx_addr(bs_addr)? {
-                a_out.write(format!("http://{addr}\n")).await?;
-                println!("# HC BOOTSTRAP - ADDR: http://{addr}");
-            }
+            std::thread::Builder::new()
+                .name("bootstrap_srv".to_string())
+                .spawn(move || {
+                    // Signal that the bootstrap server is shutting down if the thread dies.
+                    struct D(Option<tokio::sync::oneshot::Sender<()>>);
+                    impl Drop for D {
+                        fn drop(&mut self) {
+                            if let Some(s) = self.0.take() {
+                                let _ = s.send(());
+                            }
+                        }
+                    }
+                    let _d = D(Some(bootstrap_shutdown_tx));
 
-            a_out.close().await?;
+                    let bootstrap_srv = kitsune2_bootstrap_srv::BootstrapSrv::new(config).unwrap();
 
-            println!("# HC BOOTSTRAP - RUNNING");
-        }
+                    let rt = tokio::runtime::Builder::new_multi_thread()
+                        .enable_io()
+                        .build()
+                        .unwrap();
+                    rt.block_on(async move {
+                        let mut a_out = AOut::new(&self.bootstrap_address_path).await?;
 
-        if !self.disable_signal {
+                        for addr in tx_addr(bootstrap_srv.listen_addrs()[0])? {
+                            a_out.write(format!("http://{addr}\n")).await?;
+                            println!("# HC BOOTSTRAP - ADDR: http://{addr}");
+                        }
+
+                        a_out.close().await?;
+
+                        println!("# HC BOOTSTRAP - RUNNING");
+
+                        tokio::signal::ctrl_c().await?;
+
+                        drop(bootstrap_srv);
+
+                        std::io::Result::Ok(())
+                    })
+                    .unwrap();
+                })?;
+        };
+
+        let sig_hnd = if !self.disable_signal {
             let bind = self
                 .signal_interfaces
                 .split(',')
@@ -149,12 +181,6 @@ impl HcRunLocalServices {
 
             let addr_list = sig_hnd.bind_addrs().to_vec();
 
-            // there is no real task here... just fake it
-            task_list.push(Box::pin(async move {
-                let _sig_hnd = sig_hnd;
-                std::future::pending().await
-            }));
-
             let mut a_out = AOut::new(&self.signal_address_path).await?;
 
             for addr in addr_list {
@@ -165,14 +191,18 @@ impl HcRunLocalServices {
             a_out.close().await?;
 
             println!("# HC SIGNAL - RUNNING");
+
+            Some(sig_hnd)
+        } else {
+            None
+        };
+
+        tokio::select! {
+            _ = bootstrap_shutdown_rx => (),
+            _ = tokio::signal::ctrl_c() => (),
         }
 
-        if task_list.is_empty() {
-            println!("All Services Disabled - Aborting");
-            return Ok(());
-        }
-
-        futures::future::join_all(task_list).await;
+        drop(sig_hnd);
 
         Ok(())
     }
