@@ -437,12 +437,26 @@ impl HolochainP2pActor {
         space: &DynSpace,
         loc: u32,
     ) -> HolochainP2pResult<(AgentPubKey, Url)> {
-        let mut agent_list = space
+        println!("*&$^*&$%^ -- noodle");
+
+        let agent_list = space
+            .peer_store()
+            .get_all()
+            .await?;
+
+        println!("*&$^*&$%^ full ALL list: {agent_list:#?}");
+
+        let agent_list = space
             .peer_store()
             .get_near_location(loc, 1024)
-            .await?
+            .await?;
+
+        println!("*&$^*&$%^ full near list: {agent_list:#?}");
+
+        let mut agent_list = agent_list
             .into_iter()
             .filter_map(|a| {
+                println!("*&$^*&$%^ {a:#?}");
                 if a.url.is_none() {
                     return None;
                 }
@@ -800,6 +814,27 @@ macro_rules! timing_trace_out {
 }
 
 impl actor::HcP2p for HolochainP2pActor {
+    #[cfg(feature = "test_utils")]
+    fn test_set_full_arcs(&self, space: SpaceId) -> BoxFut<'_, ()> {
+        Box::pin(async {
+            for agent in self
+                .kitsune()
+                .unwrap()
+                .space(space)
+                .await
+                .unwrap()
+                .local_agent_store()
+                .get_all()
+                .await
+                .unwrap()
+            {
+                agent.set_cur_storage_arc(DhtArc::FULL);
+                agent.set_tgt_storage_arc_hint(DhtArc::FULL);
+                agent.invoke_cb();
+            }
+        })
+    }
+
     fn join(
         &self,
         dna_hash: DnaHash,

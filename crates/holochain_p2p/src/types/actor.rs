@@ -203,6 +203,10 @@ impl Default for GetActivityOptions {
 
 /// Trait defining the main holochain_p2p interface.
 pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
+    /// Test utility to force local agents to report full storage arcs.
+    #[cfg(feature = "test_utils")]
+    fn test_set_full_arcs(&self, space: kitsune2_api::SpaceId) -> BoxFut<'_, ()>;
+
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     fn join(
         &self,
