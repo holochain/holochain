@@ -431,6 +431,75 @@ impl HolochainP2pActor {
         }
     }
 
+    async fn get_peer_for_loc(
+        &self,
+        tag: &'static str,
+        space: &DynSpace,
+        loc: u32,
+    ) -> HolochainP2pResult<(AgentPubKey, Url)> {
+        let mut agent_list = space
+            .peer_store()
+            .get_near_location(loc, 1024)
+            .await?
+            .into_iter()
+            .filter_map(|a| {
+                if a.url.is_none() {
+                    return None;
+                }
+                if !a.storage_arc.contains(loc) {
+                    return None;
+                }
+                Some((
+                    AgentPubKey::from_k2_agent(&a.agent),
+                    a.url.as_ref().unwrap().clone(),
+                ))
+            })
+            .collect::<Vec<_>>();
+
+        rand::seq::SliceRandom::shuffle(&mut agent_list[..], &mut rand::thread_rng());
+        agent_list.into_iter().next().ok_or_else(|| {
+            HolochainP2pError::other(format!("{tag}: no viable peers from which to get",))
+        })
+    }
+
+    async fn send_notify(
+        &self,
+        space: &DynSpace,
+        to_url: Url,
+        req: crate::wire::WireMessage,
+    ) -> HolochainP2pResult<()> {
+        let req = crate::wire::WireMessage::encode_batch(&[&req])?;
+        space.send_notify(to_url, req).await?;
+        Ok(())
+    }
+
+    async fn send_request<O, C>(
+        &self,
+        tag: &'static str,
+        space: &DynSpace,
+        to_url: Url,
+        msg_id: u64,
+        req: crate::wire::WireMessage,
+        cb: C,
+    ) -> HolochainP2pResult<O>
+    where
+        C: FnOnce(crate::wire::WireMessage) -> HolochainP2pResult<O>,
+    {
+        let req = crate::wire::WireMessage::encode_batch(&[&req])?;
+
+        let (s, r) = tokio::sync::oneshot::channel();
+        self.pending.lock().unwrap().register(msg_id, s);
+
+        space.send_notify(to_url, req).await?;
+
+        match r.await {
+            Err(_) => Err(HolochainP2pError::other(format!(
+                "{tag} response channel dropped: likely response timeout"
+            ))),
+            Ok(resp) => cb(resp),
+        }
+    }
+
     /* -----------------
      * saving so we can implement similiar stuff later
 
@@ -792,32 +861,24 @@ impl actor::HcP2p for HolochainP2pActor {
                 zome_call_params_serialized,
                 signature,
             );
-            // someday we may support batching
-            let req = crate::wire::WireMessage::encode_batch(&[&req])?;
 
             let start = std::time::Instant::now();
 
-            let (s, r) = tokio::sync::oneshot::channel();
-            self.pending.lock().unwrap().register(msg_id, s);
-
-            space.send_notify(to_url, req).await?;
-
-            let out = match r.await {
-                Err(_) => Err(K2Error::other(
-                    "call_remote response channel dropped: likely response timeout",
+            let out = self
+                .send_request(
+                    "call_remote",
+                    &space,
+                    to_url,
+                    msg_id,
+                    req,
+                    |res| match res {
+                        crate::wire::WireMessage::CallRemoteRes { response, .. } => Ok(response),
+                        _ => Err(HolochainP2pError::other(format!(
+                            "invalid response to call_remote: {res:?}"
+                        ))),
+                    },
                 )
-                .into()),
-                Ok(resp) => {
-                    if let crate::wire::WireMessage::CallRemoteRes { response, .. } = resp {
-                        Ok(response)
-                    } else {
-                        Err(
-                            K2Error::other(format!("invalid response message type: {resp:?}"))
-                                .into(),
-                        )
-                    }
-                }
-            };
+                .await;
 
             timing_trace_out!(out, start, byte_count, a = "send_call_remote");
 
@@ -855,20 +916,19 @@ impl actor::HcP2p for HolochainP2pActor {
                     payload,
                     signature,
                 );
-                // someday we may support batching
-                let req = crate::wire::WireMessage::encode_batch(&[&req])?;
 
-                all.push(space.send_notify(to_url, req));
+                all.push(async {
+                    if let Err(err) = self.send_notify(&space, to_url, req).await {
+                        tracing::debug!(?err, "send_remote_signal failed");
+                    }
+                });
             }
 
             let start = std::time::Instant::now();
 
             if !all.is_empty() {
-                for r in futures::future::join_all(all).await {
-                    if let Err(err) = r {
-                        tracing::debug!(?err, "send_remote_signal failed");
-                    }
-                }
+                // errors handled in individual futures
+                let _ = futures::future::join_all(all).await;
             }
 
             let out = Ok(());
@@ -913,59 +973,24 @@ impl actor::HcP2p for HolochainP2pActor {
             let kitsune = self.kitsune()?;
             let space_id = dna_hash.to_k2_space();
             let space = kitsune.space(space_id.clone()).await?;
-            let basis = dht_hash.get_loc();
-            let mut agent_list = space
-                .peer_store()
-                .get_near_location(basis, 1024)
-                .await?
-                .into_iter()
-                .filter_map(|a| {
-                    if a.url.is_none() {
-                        return None;
-                    }
-                    if !a.storage_arc.contains(basis) {
-                        return None;
-                    }
-                    Some((
-                        AgentPubKey::from_k2_agent(&a.agent),
-                        a.url.as_ref().unwrap().clone(),
-                    ))
-                })
-                .collect::<Vec<_>>();
+            let loc = dht_hash.get_loc();
 
-            rand::seq::SliceRandom::shuffle(&mut agent_list[..], &mut rand::thread_rng());
-            let (to_agent, to_url) = agent_list.into_iter().next().ok_or_else(|| {
-                HolochainP2pError::other("get: no viable peers from which to get")
-            })?;
+            let (to_agent, to_url) = self.get_peer_for_loc("get", &space, loc).await?;
 
             let r_options: event::GetOptions = (&options).into();
 
             let (msg_id, req) = crate::wire::WireMessage::get_req(to_agent, dht_hash, r_options);
-            let req = crate::wire::WireMessage::encode_batch(&[&req])?;
 
             let start = std::time::Instant::now();
 
-            let (s, r) = tokio::sync::oneshot::channel();
-            self.pending.lock().unwrap().register(msg_id, s);
-
-            space.send_notify(to_url, req).await?;
-
-            let out = match r.await {
-                Err(_) => Err(K2Error::other(
-                    "get response channel dropped: likely response timeout",
-                )
-                .into()),
-                Ok(resp) => {
-                    if let crate::wire::WireMessage::GetRes { response, .. } = resp {
-                        Ok(vec![response])
-                    } else {
-                        Err(
-                            K2Error::other(format!("invalid response message type: {resp:?}"))
-                                .into(),
-                        )
-                    }
-                }
-            };
+            let out = self
+                .send_request("get", &space, to_url, msg_id, req, |res| match res {
+                    crate::wire::WireMessage::GetRes { response, .. } => Ok(vec![response]),
+                    _ => Err(HolochainP2pError::other(format!(
+                        "invalid response to get: {res:?}"
+                    ))),
+                })
+                .await;
 
             timing_trace_out!(out, start, a = "send_get");
 
