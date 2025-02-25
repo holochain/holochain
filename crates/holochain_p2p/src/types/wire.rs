@@ -54,29 +54,59 @@ pub enum WireMessage {
         msg_id: u64,
         response: WireOps,
     },
-    /*
-    ValidationReceipts {
-        receipts: ValidationReceiptBundle,
-    },
-    GetMeta {
+    GetMetaReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: event::GetMetaOptions,
     },
-    GetLinks {
+    GetMetaRes {
+        msg_id: u64,
+        response: MetadataSet,
+    },
+    GetLinksReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
         link_key: WireLinkKey,
         options: event::GetLinksOptions,
     },
-    CountLinks {
+    GetLinksRes {
+        msg_id: u64,
+        response: WireLinkOps,
+    },
+    CountLinksReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
         query: WireLinkQuery,
     },
-    GetAgentActivity {
+    CountLinksRes {
+        msg_id: u64,
+        response: CountLinksResponse,
+    },
+    GetAgentActivityReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: event::GetActivityOptions,
     },
-    MustGetAgentActivity {
+    GetAgentActivityRes {
+        msg_id: u64,
+        response: AgentActivityResponse,
+    },
+    MustGetAgentActivityReq {
+        msg_id: u64,
+        to_agent: AgentPubKey,
         agent: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
+    },
+    MustGetAgentActivityRes {
+        msg_id: u64,
+        response: MustGetAgentActivityResponse,
+    },
+    /*
+    ValidationReceipts {
+        receipts: ValidationReceiptBundle,
     },
     CountersigningSessionNegotiation {
         message: event::CountersigningSessionNegotiationMessage,
@@ -164,44 +194,124 @@ impl WireMessage {
         Self::GetRes { msg_id, response }
     }
 
-    /*
-    pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
-        Self::ValidationReceipts { receipts }
-    }
-
-
-    pub fn get_meta(
+    /// Outgoing "GetMeta" request.
+    pub fn get_meta_req(
+        to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: event::GetMetaOptions,
-    ) -> WireMessage {
-        Self::GetMeta { dht_hash, options }
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::GetMetaReq {
+                msg_id,
+                to_agent,
+                dht_hash,
+                options,
+            },
+        )
     }
 
-    pub fn get_links(link_key: WireLinkKey, options: event::GetLinksOptions) -> WireMessage {
-        Self::GetLinks { link_key, options }
+    /// Incoming "GetMeta" response.
+    pub fn get_meta_res(msg_id: u64, response: MetadataSet) -> WireMessage {
+        Self::GetMetaRes { msg_id, response }
     }
 
-    pub fn count_links(query: WireLinkQuery) -> WireMessage {
-        Self::CountLinks { query }
+    /// Outgoing "GetLinks" request.
+    pub fn get_links_req(
+        to_agent: AgentPubKey,
+        link_key: WireLinkKey,
+        options: event::GetLinksOptions,
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::GetLinksReq {
+                msg_id,
+                to_agent,
+                link_key,
+                options,
+            },
+        )
     }
 
-    pub fn get_agent_activity(
+    /// Incoming "GetLinks" response.
+    pub fn get_links_res(msg_id: u64, response: WireLinkOps) -> WireMessage {
+        Self::GetLinksRes { msg_id, response }
+    }
+
+    /// Outgoing "CountLinks" request.
+    pub fn count_links_req(to_agent: AgentPubKey, query: WireLinkQuery) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::CountLinksReq {
+                msg_id,
+                to_agent,
+                query,
+            },
+        )
+    }
+
+    /// Incoming "CountLinks" response.
+    pub fn count_links_res(msg_id: u64, response: CountLinksResponse) -> WireMessage {
+        Self::CountLinksRes { msg_id, response }
+    }
+
+    /// Outgoing "GetAgentActivity" request.
+    pub fn get_agent_activity_req(
+        to_agent: AgentPubKey,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: event::GetActivityOptions,
-    ) -> WireMessage {
-        Self::GetAgentActivity {
-            agent,
-            query,
-            options,
-        }
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::GetAgentActivityReq {
+                msg_id,
+                to_agent,
+                agent,
+                query,
+                options,
+            },
+        )
     }
 
-    pub fn must_get_agent_activity(
+    /// Incoming "GetAgentActivity" response.
+    pub fn get_agent_activity_res(msg_id: u64, response: AgentActivityResponse) -> WireMessage {
+        Self::GetAgentActivityRes { msg_id, response }
+    }
+
+    /// Outgoing "MustGetAgentActivity" request.
+    pub fn must_get_agent_activity_req(
+        to_agent: AgentPubKey,
         agent: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
+    ) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::MustGetAgentActivityReq {
+                msg_id,
+                to_agent,
+                agent,
+                filter,
+            },
+        )
+    }
+
+    /// Incoming "MustGetAgentActivity" response.
+    pub fn must_get_agent_activity_res(
+        msg_id: u64,
+        response: MustGetAgentActivityResponse,
     ) -> WireMessage {
-        Self::MustGetAgentActivity { agent, filter }
+        Self::MustGetAgentActivityRes { msg_id, response }
+    }
+
+    /*
+    pub fn validation_receipts(receipts: ValidationReceiptBundle) -> WireMessage {
+        Self::ValidationReceipts { receipts }
     }
 
     pub fn countersigning_session_negotiation(
