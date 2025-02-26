@@ -319,9 +319,6 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         receipts: ValidationReceiptBundle,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
-    /// New data has been integrated and is ready for gossiping.
-    fn new_integrated_data(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<()>>;
-
     /// Check if any local agent in this space is an authority for a hash.
     fn authority_for_hash(
         &self,
@@ -345,9 +342,6 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
 
     /// Dump network stats.
     fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<String>>;
-
-    // /// Get struct for diagnostic data
-    // fn get_diagnostics(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<KitsuneDiagnostics>>;
 
     /// Get the storage arcs of the agents currently in this space.
     fn storage_arcs(

@@ -143,9 +143,6 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         message: event::CountersigningSessionNegotiationMessage,
     ) -> HolochainP2pResult<()>;
 
-    /// New data has been integrated and is ready for gossiping.
-    async fn new_integrated_data(&self) -> HolochainP2pResult<()>;
-
     /// Get the storage arcs of the agents currently in this space.
     async fn storage_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>>;
 
@@ -346,12 +343,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     ) -> HolochainP2pResult<()> {
         self.sender
             .countersigning_session_negotiation((*self.dna_hash).clone(), agents, message)
-            .await
-    }
-
-    async fn new_integrated_data(&self) -> HolochainP2pResult<()> {
-        self.sender
-            .new_integrated_data((*self.dna_hash).clone())
             .await
     }
 
