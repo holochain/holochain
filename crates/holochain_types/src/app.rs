@@ -270,7 +270,7 @@ pub enum RoleSettingsYaml {
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppBundleSource {
     /// The actual serialized bytes of a bundle
-    Bundle(AppBundle),
+    Bundle(Bytes),
     /// A local file path
     Path(PathBuf),
     // /// A URL
@@ -281,7 +281,7 @@ impl AppBundleSource {
     /// Get the bundle from the source. Consumes the source.
     pub async fn resolve(self) -> Result<AppBundle, AppBundleError> {
         Ok(match self {
-            Self::Bundle(bundle) => bundle,
+            Self::Bundle(bytes) => AppBundle::decode(&bytes)?,
             Self::Path(path) => AppBundle::decode(&ffs::read(&path).await?)?,
             // Self::Url(url) => todo!("reqwest::get"),
         })

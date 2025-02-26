@@ -573,7 +573,11 @@ mod test {
 
         let (dna_file, _, _) =
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitSignal]).await;
-        let app_bundle = app_bundle_from_dnas(&[dna_file.clone()], false, None).await;
+        let app_bundle = app_bundle_from_dnas(&[dna_file.clone()], false, None)
+            .await
+            .encode()
+            .unwrap()
+            .into();
         let request = AdminRequest::InstallApp(Box::new(InstallAppPayload {
             source: AppBundleSource::Bundle(app_bundle),
             agent_key: None,
