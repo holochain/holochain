@@ -22,30 +22,20 @@
 //! ## Configure the network.
 //! network:
 //!
-//!   ## Use the Holo-provided default production bootstrap server.
-//!   bootstrap_service: https://bootstrap.holo.host
+//!   ## Use the Holochain-provided dev-test bootstrap server.
+//!   bootstrap_url: https://devtest-bootstrap-1.holochain.org
 //!
-//!   ## This currently has no effect on functionality but is required. Please just include as-is for now.
-//!   network_type: quic_bootstrap
+//!   ## Use the Holochain-provided dev-test sbd/signalling server.
+//!   signal_url: wss://devtest-sbd-1.holochain.org
 //!
-//!   ## Setup a specific network configuration.
-//!   transport_pool:
-//!     ## Use WebRTC, which is the only option for now.
-//!     - type: webrtc
-//!
-//!       ## Use the Holo-provided default production sbd (signal) server.
-//!       ## `signal_url` is REQUIRED.
-//!       signal_url: wss://sbd-0.main.infra.holo.host
-//!
-//!       ## Override the default WebRTC STUN configuration.
-//!       ## This is OPTIONAL. If this is not specified, it will default
-//!       ## to what you can see here:
-//!       webrtc_config: {
-//!         "iceServers": [
-//!           { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
-//!           { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
-//!         ]
-//!       }
+//!   ## Override the default WebRTC STUN configuration.
+//!   ## This is OPTIONAL. Ifthis is not specified, it will default
+//!   ## to what you can see here:
+//!   webrtc_config: {
+//!     "iceServers": [
+//!       { "urls": ["stun:devtest-stun-1.holochain.org:443"] }
+//!     ]
+//!   }
 //! "#;
 //!
 //!use holochain_conductor_api::conductor::ConductorConfig;
@@ -55,7 +45,6 @@
 
 use crate::conductor::process::ERROR_CODE;
 use holochain_types::prelude::DbSyncStrategy;
-use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -82,7 +71,6 @@ use std::path::Path;
 
 use crate::config::conductor::paths::DataRootPath;
 
-// TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default, JsonSchema)]
 pub struct ConductorConfig {
@@ -128,7 +116,7 @@ pub struct ConductorConfig {
 
     /// Optional config for the network module.
     #[serde(default)]
-    pub network: KitsuneP2pConfig,
+    pub network: NetworkConfig,
 
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
@@ -173,16 +161,6 @@ impl ConductorConfig {
         config_from_yaml(&config_yaml)
     }
 
-    /// Get tuning params for this config (default if not set)
-    pub fn kitsune_tuning_params(&self) -> KitsuneP2pTuningParams {
-        self.network.tuning_params.clone()
-    }
-
-    /// Get the tracing scope from the network config
-    pub fn tracing_scope(&self) -> Option<String> {
-        self.network.tracing_scope.clone()
-    }
-
     /// Get the data directory for this config or say something nice and die.
     pub fn data_root_path_or_die(&self) -> DataRootPath {
         match &self.data_root_path {
@@ -207,7 +185,40 @@ impl ConductorConfig {
 
     /// Check if the config is set to use a rendezvous bootstrap server
     pub fn has_rendezvous_bootstrap(&self) -> bool {
-        self.network.bootstrap_service == Some(url2::url2!("rendezvous:"))
+        self.network.bootstrap_url == url2::url2!("rendezvous:")
+    }
+}
+
+/// All the network config information for the conductor.
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub struct NetworkConfig {
+    /// The Kitsune2 bootstrap server to use for WAN discovery.
+    #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
+    bootstrap_url: url2::Url2,
+
+    /// The Kitsune2 sbd server to use for webrtc signalling.
+    #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
+    signal_url: url2::Url2,
+
+    /// The Kitsune2 webrtc_config to use for connecting to peers.
+    webrtc_config: Option<serde_json::Value>,
+
+    /// Use this advanced field to directly configure kitsune2.
+    ///
+    /// The above options actually just set specific values in this config.
+    /// Use only if you know what you are doing!
+    advanced: Option<serde_json::Value>,
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            bootstrap_url: url2::Url2::parse("https://devtest-bootstrap-1.holochain.org"),
+            signal_url: url2::Url2::parse("wss://devtest-sbd-1.holochain.org"),
+            webrtc_config: None,
+            advanced: None,
+        }
     }
 }
 
@@ -294,7 +305,6 @@ impl Default for ConductorTuningParams {
 mod tests {
     use super::*;
     use holochain_types::websocket::AllowedOrigins;
-    use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;
     use std::path::Path;
     use std::path::PathBuf;
@@ -321,9 +331,6 @@ mod tests {
     fn test_config_complete_minimal_config() {
         let yaml = r#"---
     data_root_path: /path/to/env
-    network:
-      transport_pool:
-        - type: mem
     keystore:
       type: danger_test_keystore
     "#;
@@ -335,7 +342,7 @@ mod tests {
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
-                network: KitsuneP2pConfig::mem(),
+                network: NetworkConfig::default(),
                 dpki: DpkiConfig::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
@@ -374,56 +381,48 @@ mod tests {
           allowed_origins: "*"
 
     network:
-      bootstrap_service: https://bootstrap-staging.holo.host
-      transport_pool:
-        - type: webrtc
-          signal_url: wss://sbd-0.main.infra.holo.host
-          webrtc_config: {
-            "iceServers": [
-              { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
-              { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
-            ]
+      bootstrap_url: https://test-boot.tld
+      signal_url: wss://test-sig.tld
+      webrtc_config: {
+        "iceServers": [
+          { "urls": ["stun:test-stun.tld:443"] },
+        ]
+      }
+      advanced: {
+        "my": {
+          "totally": {
+            "random": {
+              "advanced": {
+                "config": true
+              }
+            }
           }
-      tuning_params:
-        gossip_loop_iteration_delay_ms: 42
-        default_rpc_single_timeout_ms: 42
-        default_rpc_multi_remote_agent_count: 42
-        default_rpc_multi_remote_request_grace_ms: 42
-        agent_info_expires_after_ms: 42
-        tls_in_mem_session_storage: 42
-        proxy_keepalive_ms: 42
-        proxy_to_expire_ms: 42
-        tx5_min_ephemeral_udp_port: 40000
-        tx5_max_ephemeral_udp_port: 40255
-      network_type: quic_bootstrap
+        }
+      }
 
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let mut network_config = KitsuneP2pConfig::mem();
-        network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-        network_config.transport_pool = vec![TransportConfig::WebRTC {
-            signal_url: "wss://sbd-0.main.infra.holo.host".into(),
-            webrtc_config: Some(serde_json::json!({
-              "iceServers": [
-                { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
-                { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
-              ]
-            })),
-        }];
-        let mut tuning_params =
-            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-        tuning_params.gossip_loop_iteration_delay_ms = 42;
-        tuning_params.default_rpc_single_timeout_ms = 42;
-        tuning_params.default_rpc_multi_remote_agent_count = 42;
-        tuning_params.default_rpc_multi_remote_request_grace_ms = 42;
-        tuning_params.agent_info_expires_after_ms = 42;
-        tuning_params.tls_in_mem_session_storage = 42;
-        tuning_params.proxy_keepalive_ms = 42;
-        tuning_params.proxy_to_expire_ms = 42;
-        tuning_params.tx5_min_ephemeral_udp_port = 40000;
-        tuning_params.tx5_max_ephemeral_udp_port = 40255;
-        network_config.tuning_params = std::sync::Arc::new(tuning_params);
+        let mut network_config = NetworkConfig::default();
+        network_config.bootstrap_url = url2::url2!("https://test-boot.tld");
+        network_config.signal_url = url2::url2!("wss://test-sig.tld");
+        network_config.webrtc_config = Some(serde_json::json!({
+            "iceServers": [
+                { "urls": ["stun:test-stun.tld:443"] },
+            ]
+        }));
+        network_config.advanced = Some(serde_json::json!({
+            "my": {
+                "totally": {
+                    "random": {
+                        "advanced": {
+                            "config": true,
+                        }
+                    }
+                }
+            }
+        }));
+
         pretty_assertions::assert_eq!(
             result.unwrap(),
             ConductorConfig {
@@ -554,9 +553,6 @@ mod tests {
         let yaml = r#"---
     data_root_path: /path/to/env
     keystore_path: /path/to/keystore
-    network:
-      transport_pool:
-        - type: mem
     keystore:
       type: lair_server
       connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
@@ -569,7 +565,7 @@ mod tests {
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
-                network: KitsuneP2pConfig::mem(),
+                network: NetworkConfig::default(),
                 dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
@@ -581,22 +577,5 @@ mod tests {
                 tuning_params: None,
             }
         );
-    }
-
-    #[test]
-    #[cfg(not(feature = "unstable-sharding"))]
-    fn test_config_default_network_config_no_sharding() {
-        let config = ConductorConfig::default();
-        assert_eq!(
-            config.network.tuning_params.arc_clamping(),
-            Some(kitsune_p2p::dht::arq::ArqClamping::Full)
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "unstable-sharding")]
-    fn test_config_default_network_config_sharding() {
-        let config = ConductorConfig::default();
-        assert_eq!(config.network.tuning_params.arc_clamping(), None);
     }
 }

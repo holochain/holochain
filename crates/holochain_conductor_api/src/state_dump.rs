@@ -2,7 +2,6 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_state_types::SourceChainDump;
 use holochain_types::dht_op::DhtOp;
-use kitsune_p2p_bin_data::{KitsuneAgent, KitsuneSpace};
 use serde::Deserialize;
 use serde::Serialize;
 use std::sync::Arc;
@@ -69,10 +68,10 @@ pub struct FullIntegrationStateDump {
 pub struct P2pAgentsDump {
     /// The info of this agents cell.
     pub this_agent_info: Option<AgentInfoDump>,
-    /// The dna as a [`DnaHash`] and [`KitsuneSpace`].
-    pub this_dna: Option<(DnaHash, KitsuneSpace)>,
-    /// The agent as [`AgentPubKey`] and [`KitsuneAgent`].
-    pub this_agent: Option<(AgentPubKey, KitsuneAgent)>,
+    /// The dna as a [`DnaHash`] and [`kitsune2_api::SpaceId`].
+    pub this_dna: Option<(DnaHash, kitsune2_api::SpaceId)>,
+    /// The agent as [`AgentPubKey`] and [`kitsune2_api::AgentId`].
+    pub this_agent: Option<(AgentPubKey, kitsune2_api::AgentId)>,
     /// All other agent info.
     pub peers: Vec<AgentInfoDump>,
 }
@@ -82,8 +81,8 @@ pub struct P2pAgentsDump {
 /// space, signed time, expires in and
 /// urls printed in a pretty way.
 pub struct AgentInfoDump {
-    pub kitsune_agent: Arc<KitsuneAgent>,
-    pub kitsune_space: Arc<KitsuneSpace>,
+    pub kitsune_agent: Arc<kitsune2_api::AgentId>,
+    pub kitsune_space: Arc<kitsune2_api::SpaceId>,
     pub dump: String,
 }
 
