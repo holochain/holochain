@@ -4,7 +4,6 @@ use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use indexmap::IndexMap;
-use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -531,6 +530,17 @@ impl From<AppInfoStatus> for AppStatus {
             AppInfoStatus::AwaitingMemproofs => AppStatus::AwaitingMemproofs,
         }
     }
+}
+
+/// Temporarily copying this here until we actually implement something
+/// equivalent in kitsune2.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct FetchPoolInfo {
+    /// Total number of bytes expected to be received through fetches
+    pub op_bytes_to_fetch: usize,
+
+    /// Total number of ops expected to be received through fetches
+    pub num_ops_to_fetch: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]

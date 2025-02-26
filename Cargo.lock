@@ -2677,6 +2677,7 @@ dependencies = [
  "holochain_util",
  "holochain_zome_types",
  "indexmap 2.7.1",
+ "kitsune2_api",
  "matches",
  "pretty_assertions",
  "rmp-serde",

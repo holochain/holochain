@@ -4,7 +4,6 @@ use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 use crate::{AppInfo, FullStateDump, RevokeAgentKeyPayload, StorageInfo};
 
@@ -295,7 +294,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::AgentInfoAdded`]
     AddAgentInfo {
         /// list of signed agent info to add to peer store
-        agent_infos: Vec<AgentInfoSigned>,
+        agent_infos: Vec<String>,
     },
 
     /// Request the [`AgentInfoSigned`] stored in this conductor's
@@ -550,7 +549,7 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::AgentInfo`].
     ///
     /// This is all the agent info that was found for the request.
-    AgentInfo(Vec<AgentInfoSigned>),
+    AgentInfo(Vec<String>),
 
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,
