@@ -110,7 +110,7 @@ impl HcRunLocalServices {
 
     pub async fn run_err(self) -> Result<()> {
         if self.disable_bootstrap && self.disable_signal {
-            println!("All Services Disabled - Aborting");
+            tracing::error!("All Services Disabled - Aborting");
             return Ok(());
         }
 
@@ -152,6 +152,8 @@ impl HcRunLocalServices {
 
                         a_out.close().await?;
 
+                        println!("# HC BOOTSTRAP - RUNNING");
+
                         tokio::signal::ctrl_c().await?;
 
                         drop(bootstrap_srv);
@@ -187,6 +189,8 @@ impl HcRunLocalServices {
             }
 
             a_out.close().await?;
+
+            println!("# HC SIGNAL - RUNNING");
 
             Some(sig_hnd)
         } else {
