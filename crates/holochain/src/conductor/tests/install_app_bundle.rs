@@ -47,7 +47,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             .await
             .unwrap();
 
-        let bundle_bytes = bundle.encode().unwrap().into();
+        let bundle_bytes = bundle.encode().unwrap();
         InstallAppPayload {
             agent_key: None,
             source: AppBundleSource::Bundle(bundle_bytes),
@@ -167,7 +167,7 @@ async fn reject_duplicate_app_for_same_agent() {
         .await
         .unwrap();
 
-    let bundle_bytes = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
     let app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -189,7 +189,7 @@ async fn reject_duplicate_app_for_same_agent() {
     let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
         .await
         .unwrap();
-    let bundle_bytes = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
     let duplicate_install_with_app_disabled = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -214,7 +214,7 @@ async fn reject_duplicate_app_for_same_agent() {
     let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
         .await
         .unwrap();
-    let bundle_bytes = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
     let duplicate_install_with_app_enabled = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -236,7 +236,7 @@ async fn reject_duplicate_app_for_same_agent() {
     let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
         .await
         .unwrap();
-    let bundle_bytes = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
     let valid_install_of_second_app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -287,7 +287,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
         .await
         .unwrap();
 
-    let bundle_bytes = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -332,7 +332,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
         .await
         .unwrap();
 
-    let bundle_bytes = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -477,7 +477,6 @@ async fn use_existing_integration() {
             .unwrap()
             .encode()
             .unwrap()
-            .into()
     };
 
     let bundle2 = |correct: bool| {
@@ -529,7 +528,6 @@ async fn use_existing_integration() {
                 .unwrap()
                 .encode()
                 .unwrap()
-                .into()
         }
     };
 

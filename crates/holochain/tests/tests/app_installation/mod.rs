@@ -6,7 +6,6 @@ use holochain::sweettest::*;
 use holochain_conductor_api::{AppInfoStatus, CellInfo};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use serde_bytes::ByteBuf;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_install_app_with_custom_modifiers_overridden_correctly() {
@@ -94,7 +93,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
 
     let network_seed_override = "overridden by network_seed field";
 
-    let bundle_bytes: ByteBuf = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -273,7 +272,7 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
         },
     );
 
-    let bundle_bytes: ByteBuf = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -335,7 +334,7 @@ async fn installing_with_modifiers_for_non_existing_role_fails() {
         },
     );
 
-    let bundle_bytes: ByteBuf = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
     let result = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
@@ -371,7 +370,7 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
         },
     );
 
-    let bundle_bytes: ByteBuf = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
     //- Install with a membrane proof provided in the roles_settings
     let app = conductor
         .clone()

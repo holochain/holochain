@@ -576,8 +576,7 @@ mod test {
         let app_bundle = app_bundle_from_dnas(&[dna_file.clone()], false, None)
             .await
             .encode()
-            .unwrap()
-            .into();
+            .unwrap();
         let request = AdminRequest::InstallApp(Box::new(InstallAppPayload {
             source: AppBundleSource::Bundle(app_bundle),
             agent_key: None,

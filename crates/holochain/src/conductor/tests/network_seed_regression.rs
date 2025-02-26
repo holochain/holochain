@@ -51,14 +51,12 @@ async fn network_seed_regression() {
         .await
         .unwrap()
         .encode()
-        .unwrap()
-        .into();
+        .unwrap();
     let bundle2 = AppBundle::new(manifest.into(), vec![], PathBuf::from("."))
         .await
         .unwrap()
         .encode()
-        .unwrap()
-        .into();
+        .unwrap();
 
     // if both of these apps can be installed under the same agent, the
     // network seed change was successful -- otherwise there will be a
@@ -309,7 +307,7 @@ impl TestCase {
                 AppBundleSource::Path(happ_path)
             }
             Location::Bundle => {
-                let bundle_bytes = bundle.encode().unwrap().into();
+                let bundle_bytes = bundle.encode().unwrap();
                 AppBundleSource::Bundle(bundle_bytes)
             }
         };

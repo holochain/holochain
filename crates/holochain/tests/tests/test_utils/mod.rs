@@ -359,8 +359,7 @@ pub async fn register_and_install_dna_named(
         .await
         .unwrap()
         .encode()
-        .expect("failed to encode AppBundle to bytes")
-        .into();
+        .expect("failed to encode AppBundle to bytes");
 
     let payload = InstallAppPayload {
         agent_key: None,

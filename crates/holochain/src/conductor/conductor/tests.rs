@@ -1211,7 +1211,7 @@ async fn test_deferred_memproof_provisioning() {
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
     let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
-    let bundle_bytes = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
 
     //- Install with deferred memproofs
     let app = conductor
@@ -1340,7 +1340,7 @@ async fn test_deferred_memproof_provisioning_uninstall() {
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
     let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
-    let bundle_bytes = bundle.encode().unwrap().into();
+    let bundle_bytes = bundle.encode().unwrap();
 
     //- Install with deferred memproofs
     conductor

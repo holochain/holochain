@@ -62,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
         let payload = InstallAppPayload {
             installed_app_id: Some(app_id),
             agent_key: None,
-            source: AppBundleSource::Bundle(bytes.into()),
+            source: AppBundleSource::Bundle(bytes),
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,

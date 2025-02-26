@@ -270,7 +270,7 @@ pub enum RoleSettingsYaml {
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppBundleSource {
     /// The actual serialized bytes of a bundle
-    Bundle(Bytes),
+    Bundle(Vec<u8>),
     /// A local file path
     Path(PathBuf),
     // /// A URL
