@@ -4139,9 +4139,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_srv"
-version = "0.0.1-alpha3"
+version = "0.0.1-alpha5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d4cf2768acce82730e429b90d2484b7ca4166336d29e81457eef4e3ed602d12"
+checksum = "545802e6766496465781caea81328bd60f53f795342a9d82658692dae56e8673"
 dependencies = [
  "async-channel",
  "axum",

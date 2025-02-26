@@ -10,7 +10,7 @@ categories = [
   "development-tools::build-utils",
   "filesystem",
 ]
-edition = "2024"
+edition = "2021"
 license = "Apache-2.0"
 description = "Run a holochain webrtc signal server and bootstrap server."
 
@@ -24,7 +24,7 @@ clap = { version = "4.0", features = ["derive"] }
 futures = "0.3"
 holochain_trace = { version = "^0.5.0-dev.1", path = "../holochain_trace" }
 if-addrs = "0.12"
-kitsune2_bootstrap_srv = "0.0.1-alpha3"
+kitsune2_bootstrap_srv = "0.0.1-alpha5"
 sbd-server = "=0.0.8-alpha"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
