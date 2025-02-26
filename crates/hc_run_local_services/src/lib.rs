@@ -115,14 +115,14 @@ impl HcRunLocalServices {
         }
 
         let (bootstrap_shutdown_tx, bootstrap_shutdown_rx) = tokio::sync::oneshot::channel();
-        if !self.disable_bootstrap {
+        let bootstrap_handle = if !self.disable_bootstrap {
             let bs_ip: std::net::IpAddr = self.bootstrap_interface.parse().map_err(Error::other)?;
             let bs_addr = std::net::SocketAddr::from((bs_ip, self.bootstrap_port));
 
             let mut config = kitsune2_bootstrap_srv::Config::testing();
             config.listen_address_list = vec![bs_addr];
 
-            std::thread::Builder::new()
+            let bootstrap_handle = std::thread::Builder::new()
                 .name("bootstrap_srv".to_string())
                 .spawn(move || {
                     // Signal that the bootstrap server is shutting down if the thread dies.
@@ -162,6 +162,10 @@ impl HcRunLocalServices {
                     })
                     .unwrap();
                 })?;
+
+            Some(bootstrap_handle)
+        } else {
+            None
         };
 
         let sig_hnd = if !self.disable_signal {
@@ -203,6 +207,9 @@ impl HcRunLocalServices {
         }
 
         drop(sig_hnd);
+        if let Some(bootstrap_handle) = bootstrap_handle {
+            bootstrap_handle.join().expect("Could not join the bootstrap thread");
+        }
 
         Ok(())
     }
