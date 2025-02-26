@@ -460,10 +460,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                             .call_remote(dna_hash, to_agent, zome_call_params_serialized, signature)
                             .await;
                     }
-                    ValidationReceiptsEvt {
-                        to_agent,
-                        receipts,
-                    } => {
+                    ValidationReceiptsEvt { to_agent, receipts } => {
                         let dna_hash = DnaHash::from_k2_space(&space);
                         // validation receipts are fire-and-forget
                         // so it's safe to ignore the response
@@ -832,7 +829,7 @@ impl actor::HcP2p for HolochainP2pActor {
         dna_hash: DnaHash,
         target_payload_list: Vec<(AgentPubKey, ExternIO, Signature)>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-    Box::pin(async move {
+        Box::pin(async move {
             let kitsune = self.kitsune()?;
             let space_id = dna_hash.to_k2_space();
             let space = kitsune.space(space_id.clone()).await?;
@@ -891,7 +888,10 @@ impl actor::HcP2p for HolochainP2pActor {
         _timeout_ms: Option<u64>,
         _reflect_ops: Option<Vec<DhtOp>>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            tracing::error!("publish is currently a STUB in holochain_p2p--deferring since we'll eventually get stuff on gossip anyways...");
+            Ok(())
+        })
     }
 
     fn publish_countersign(
@@ -1164,13 +1164,14 @@ impl actor::HcP2p for HolochainP2pActor {
                 .and_then(|i| i.url.clone())
             {
                 Some(to_url) => to_url,
-                None => return Err(HolochainP2pError::other("send_validation_receipts could not find url for peer")),
+                None => {
+                    return Err(HolochainP2pError::other(
+                        "send_validation_receipts could not find url for peer",
+                    ))
+                }
             };
 
-            let req = crate::wire::WireMessage::validation_receipts(
-                to_agent.clone(),
-                receipts
-            );
+            let req = crate::wire::WireMessage::validation_receipts(to_agent.clone(), receipts);
 
             let start = std::time::Instant::now();
 
