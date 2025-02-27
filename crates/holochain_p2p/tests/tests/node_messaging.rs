@@ -218,15 +218,27 @@ async fn test_get() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    // give some time for the full arcs to propagate
-    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
-    // if we get a response at all, the full back-n-forth succeeded
-    hc2.get(
-        dna_hash,
-        HoloHash::from_raw_36_and_type(vec![1; 36], holo_hash::hash_type::AnyDht::Entry),
-        holochain_p2p::actor::GetOptions::default(),
-    )
+            // if we get a response at all, the full back-n-forth succeeded
+            if hc2
+                .get(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                    holochain_p2p::actor::GetOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
     .await
     .unwrap();
 }
@@ -243,15 +255,27 @@ async fn test_get_meta() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    // give some time for the full arcs to propagate
-    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
-    // if we get a response at all, the full back-n-forth succeeded
-    hc2.get_meta(
-        dna_hash,
-        HoloHash::from_raw_36_and_type(vec![1; 36], holo_hash::hash_type::AnyDht::Entry),
-        holochain_p2p::actor::GetMetaOptions::default(),
-    )
+            // if we get a response at all, the full back-n-forth succeeded
+            if hc2
+                .get_meta(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                    holochain_p2p::actor::GetMetaOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
     .await
     .unwrap();
 }
@@ -268,23 +292,35 @@ async fn test_get_links() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    // give some time for the full arcs to propagate
-    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
-    // if we get a response at all, the full back-n-forth succeeded
-    hc2.get_links(
-        dna_hash,
-        WireLinkKey {
-            base: HoloHash::from_raw_36_and_type(vec![1; 36], holo_hash::hash_type::AnyDht::Entry)
-                .into(),
-            type_query: LinkTypeFilter::Types(Vec::new()),
-            tag: None,
-            after: None,
-            before: None,
-            author: None,
-        },
-        holochain_p2p::actor::GetLinksOptions::default(),
-    )
+            // if we get a response at all, the full back-n-forth succeeded
+            if hc2
+                .get_links(
+                    dna_hash.clone(),
+                    WireLinkKey {
+                        base: HoloHash::from_raw_36_and_type(
+                            vec![1; 36],
+                            holo_hash::hash_type::AnyDht::Entry,
+                        )
+                        .into(),
+                        type_query: LinkTypeFilter::Types(Vec::new()),
+                        tag: None,
+                        after: None,
+                        before: None,
+                        author: None,
+                    },
+                    holochain_p2p::actor::GetLinksOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
     .await
     .unwrap();
 }
@@ -301,22 +337,34 @@ async fn test_count_links() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    // give some time for the full arcs to propagate
-    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
-    // if we get a response at all, the full back-n-forth succeeded
-    hc2.count_links(
-        dna_hash,
-        WireLinkQuery {
-            base: HoloHash::from_raw_36_and_type(vec![1; 36], holo_hash::hash_type::AnyDht::Entry)
-                .into(),
-            link_type: LinkTypeFilter::Types(Vec::new()),
-            tag_prefix: None,
-            before: None,
-            after: None,
-            author: None,
-        },
-    )
+            // if we get a response at all, the full back-n-forth succeeded
+            if hc2
+                .count_links(
+                    dna_hash.clone(),
+                    WireLinkQuery {
+                        base: HoloHash::from_raw_36_and_type(
+                            vec![1; 36],
+                            holo_hash::hash_type::AnyDht::Entry,
+                        )
+                        .into(),
+                        link_type: LinkTypeFilter::Types(Vec::new()),
+                        tag_prefix: None,
+                        before: None,
+                        after: None,
+                        author: None,
+                    },
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
     .await
     .unwrap();
 }
@@ -333,23 +381,32 @@ async fn test_get_agent_activity() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    // give some time for the full arcs to propagate
-    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
-    // if we get a response at all, the full back-n-forth succeeded
-    hc2.get_agent_activity(
-        dna_hash,
-        AgentPubKey::from_raw_36(vec![2; 36]),
-        ChainQueryFilter {
-            sequence_range: ChainQueryFilterRange::Unbounded,
-            entry_type: None,
-            entry_hashes: None,
-            action_type: None,
-            include_entries: false,
-            order_descending: false,
-        },
-        holochain_p2p::actor::GetActivityOptions::default(),
-    )
+            // if we get a response at all, the full back-n-forth succeeded
+            if hc2
+                .get_agent_activity(
+                    dna_hash.clone(),
+                    AgentPubKey::from_raw_36(vec![2; 36]),
+                    ChainQueryFilter {
+                        sequence_range: ChainQueryFilterRange::Unbounded,
+                        entry_type: None,
+                        entry_hashes: None,
+                        action_type: None,
+                        include_entries: false,
+                        order_descending: false,
+                    },
+                    holochain_p2p::actor::GetActivityOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
     .await
     .unwrap();
 }
@@ -366,19 +423,28 @@ async fn test_must_get_agent_activity() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    // give some time for the full arcs to propagate
-    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
-    // if we get a response at all, the full back-n-forth succeeded
-    hc2.must_get_agent_activity(
-        dna_hash,
-        AgentPubKey::from_raw_36(vec![2; 36]),
-        ChainFilter {
-            chain_top: ActionHash::from_raw_36(vec![3; 36]),
-            filters: ChainFilters::ToGenesis,
-            include_cached_entries: false,
-        },
-    )
+            // if we get a response at all, the full back-n-forth succeeded
+            if hc2
+                .must_get_agent_activity(
+                    dna_hash.clone(),
+                    AgentPubKey::from_raw_36(vec![2; 36]),
+                    ChainFilter {
+                        chain_top: ActionHash::from_raw_36(vec![3; 36]),
+                        filters: ChainFilters::ToGenesis,
+                        include_cached_entries: false,
+                    },
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
     .await
     .unwrap();
 }
