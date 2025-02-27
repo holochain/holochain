@@ -15,7 +15,7 @@ impl Default for Handler {
 }
 
 impl HcP2pHandler for Handler {
-    fn call_remote(
+    fn handle_call_remote(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -32,7 +32,7 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn publish(
+    fn handle_publish(
         &self,
         _dna_hash: DnaHash,
         _request_validation_receipt: bool,
@@ -42,7 +42,7 @@ impl HcP2pHandler for Handler {
         Box::pin(async move { todo!() })
     }
 
-    fn get(
+    fn handle_get(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -56,7 +56,7 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn get_meta(
+    fn handle_get_meta(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -75,7 +75,7 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn get_links(
+    fn handle_get_links(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -91,7 +91,7 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn count_links(
+    fn handle_count_links(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -103,7 +103,7 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn get_agent_activity(
+    fn handle_get_agent_activity(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -124,7 +124,7 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn must_get_agent_activity(
+    fn handle_must_get_agent_activity(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -137,7 +137,7 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn validation_receipts_received(
+    fn handle_validation_receipts_received(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -149,7 +149,7 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn countersigning_session_negotiation(
+    fn handle_countersigning_session_negotiation(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,

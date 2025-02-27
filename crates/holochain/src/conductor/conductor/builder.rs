@@ -1,5 +1,4 @@
 use super::*;
-use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
 use crate::conductor::metrics::{create_post_commit_duration_metric, PostCommitDurationMetric};
 use crate::conductor::paths::DataRootPath;
@@ -212,28 +211,6 @@ impl ConductorBuilder {
             .await;
 
         let network_config = config.network.clone();
-        let (cert_digest, cert, cert_priv_key) = keystore
-            .get_or_create_tls_cert_by_tag(tag.0.clone())
-            .await?;
-        let tls_config =
-            holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
-                cert,
-                cert_priv_key,
-                cert_digest,
-            };
-
-        info!("Conductor startup: TLS cert created.");
-
-        let strat = network_config.tuning_params.to_arq_strat();
-
-        let host = KitsuneHostImpl::new(
-            spaces.clone(),
-            config.clone(),
-            ribosome_store.clone(),
-            strat,
-            Some(tag_ed),
-            Some(keystore.lair_client()),
-        );
 
         // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
         let dpki_config = Some(config.dpki.clone());
@@ -262,20 +239,14 @@ impl ConductorBuilder {
             .map(|dna| dna.dna_hash().get_raw_32().try_into().expect("32 bytes"));
         let network_compat = NetworkCompatParams { dpki_uuid };
 
-        let (holochain_p2p, p2p_evt) = match holochain_p2p::spawn_holochain_p2p(
-            network_config,
-            tls_config,
-            host,
-            network_compat,
-        )
-        .await
-        {
-            Ok(r) => r,
-            Err(err) => {
-                tracing::error!(?err, "Error spawning networking");
-                return Err(err.into());
-            }
-        };
+        let (holochain_p2p, p2p_evt) =
+            match holochain_p2p::spawn_holochain_p2p(network_config, network_compat).await {
+                Ok(r) => r,
+                Err(err) => {
+                    tracing::error!(?err, "Error spawning networking");
+                    return Err(err.into());
+                }
+            };
 
         info!("Conductor startup: networking started.");
 
@@ -379,7 +350,6 @@ impl ConductorBuilder {
         conductor: ConductorHandle,
         config: Arc<ConductorConfig>,
         dpki_dna_to_install: Option<DnaFile>,
-        p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         outcome_receiver: OutcomeReceiver,
         no_print_setup: bool,
@@ -390,10 +360,6 @@ impl ConductorBuilder {
             .await?;
 
         info!("Conductor startup: scheduler task started.");
-
-        tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()).in_current_span());
-
-        info!("Conductor startup: p2p event task started.");
 
         let tm = conductor.task_manager();
         let conductor2 = conductor.clone();
@@ -495,17 +461,7 @@ impl ConductorBuilder {
             .await;
 
         let network_config = config.network.clone();
-        let strat = network_config.tuning_params.to_arq_strat();
-
         let ribosome_store = RwShare::new(builder.ribosome_store);
-        let host = KitsuneHostImpl::new(
-            spaces.clone(),
-            config.clone(),
-            ribosome_store.clone(),
-            strat,
-            Some(tag_ed),
-            Some(keystore.lair_client()),
-        );
 
         // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
         let dpki_config = Some(config.dpki.clone());
@@ -539,8 +495,7 @@ impl ConductorBuilder {
         let network_compat = NetworkCompatParams { dpki_uuid };
 
         let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host, network_compat)
-                    .await?;
+            holochain_p2p::spawn_holochain_p2p(network_config, network_compat).await?;
 
         let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);

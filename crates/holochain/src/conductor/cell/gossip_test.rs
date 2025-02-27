@@ -5,7 +5,6 @@ use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_sqlite::store::AsP2pStateReadExt;
 use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p_types::config::TransportConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "This test is flaky"]

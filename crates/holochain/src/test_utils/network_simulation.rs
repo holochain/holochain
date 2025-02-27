@@ -9,21 +9,12 @@ use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_p2p::dht_arc::{DhtArcRange, DhtLocation};
-use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt};
 use holochain_sqlite::error::DatabaseResult;
-use holochain_sqlite::store::{p2p_put_single, AsP2pStateTxExt};
 use holochain_state::prelude::from_blob;
 use holochain_types::dht_op::{ChainOp, ChainOpHashed, ChainOpType};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
-use kitsune_p2p::agent_store::AgentInfoSigned;
-use kitsune_p2p::dht::arq::ArqSize;
-use kitsune_p2p::dht::spacetime::SpaceDimension;
-use kitsune_p2p::dht::Arq;
-use kitsune_p2p::{fixt::*, KitsuneAgent, KitsuneOpHash};
-use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
-use kitsune_p2p_types::config::KitsuneP2pConfig;
+use kitsune2_api::{AgentId, AgentInfoSigned, DhtArc, OpId};
 use rand::distributions::Alphanumeric;
 use rand::distributions::Standard;
 use rand::Rng;
@@ -37,21 +28,21 @@ pub struct MockNetworkData {
     /// The hashes authored by each agent.
     pub authored: HashMap<Arc<AgentPubKey>, Vec<Arc<DhtOpHash>>>,
     /// DhtOpHash -> KitsuneOpHash
-    pub op_hash_to_kit: HashMap<Arc<DhtOpHash>, Arc<KitsuneOpHash>>,
+    pub op_hash_to_kit: HashMap<Arc<DhtOpHash>, OpId>,
     /// KitsuneOpHash -> DhtOpHash
-    pub op_kit_to_hash: HashMap<Arc<KitsuneOpHash>, Arc<DhtOpHash>>,
+    pub op_kit_to_hash: HashMap<OpId, Arc<DhtOpHash>>,
     /// AgentPubKey -> KitsuneAgent
-    pub agent_hash_to_kit: HashMap<Arc<AgentPubKey>, Arc<KitsuneAgent>>,
+    pub agent_hash_to_kit: HashMap<Arc<AgentPubKey>, AgentId>,
     /// KitsuneAgent -> AgentPubKey
-    pub agent_kit_to_hash: HashMap<Arc<KitsuneAgent>, Arc<AgentPubKey>>,
+    pub agent_kit_to_hash: HashMap<AgentId, Arc<AgentPubKey>>,
     /// Agent storage arcs.
-    pub agent_to_arq: HashMap<Arc<AgentPubKey>, Arq>,
+    pub agent_to_arq: HashMap<Arc<AgentPubKey>, DhtArc>,
     /// Agents peer info.
     pub agent_to_info: HashMap<Arc<AgentPubKey>, AgentInfoSigned>,
     /// Hashes ordered by their basis location.
-    pub ops_by_loc: BTreeMap<DhtLocation, Vec<Arc<DhtOpHash>>>,
+    pub ops_by_loc: BTreeMap<u32, Vec<Arc<DhtOpHash>>>,
     /// Hash to basis location.
-    pub op_to_loc: HashMap<Arc<DhtOpHash>, DhtLocation>,
+    pub op_to_loc: HashMap<Arc<DhtOpHash>, u32>,
     /// The DhtOps
     pub ops: HashMap<Arc<DhtOpHash>, ChainOpHashed>,
     /// The uuid for the integrity zome (also for the dna).
@@ -243,9 +234,6 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
     holochain_sqlite::schema::SCHEMA_CELL
         .initialize(&mut conn, None)
         .unwrap();
-    holochain_sqlite::schema::SCHEMA_P2P_STATE
-        .initialize(&mut conn, None)
-        .unwrap();
     let mut txn = conn
         .transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)
         .unwrap();
@@ -295,11 +283,14 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
             .unwrap();
         }
     }
+    todo!()
+    /*
     for agent in data.agent_to_info.values() {
         p2p_put_single(agent.space.clone(), &mut txn, agent).unwrap();
     }
     txn.commit().unwrap();
     conn
+    */
 }
 
 fn get_cached() -> Option<GeneratedData> {
@@ -386,17 +377,9 @@ async fn create_test_data(
         }
     }
 
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.gossip_strategy = "none".to_string();
-    tuning.disable_publish = true;
-
     // This is gonna get dropped at the end of this fn.
     let tmpdir = tempfile::TempDir::new().unwrap();
-    let mut network = KitsuneP2pConfig::mem();
-    network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
-        network,
         data_root_path: Some(tmpdir.path().to_path_buf().into()),
         ..Default::default()
     };

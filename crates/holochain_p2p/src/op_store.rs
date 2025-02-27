@@ -114,7 +114,7 @@ impl OpStore for HolochainOpStore {
                 .collect();
 
             self.sender
-                .publish(
+                .handle_publish(
                     self.dna_hash.clone(),
                     false,
                     false,

@@ -14,15 +14,12 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_chc::ChcImpl;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::test_db_dir;
 use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -187,8 +184,6 @@ impl ConductorTestData {
                 modifiers: DnaModifiers {
                     network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                     properties: SerializedBytes::try_from(()).unwrap(),
-                    origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                    quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
                 },
                 integrity_zomes: zomes
                     .clone()

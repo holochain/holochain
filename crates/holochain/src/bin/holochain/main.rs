@@ -128,8 +128,6 @@ async fn async_main() {
         .init()
         .await;
 
-    kitsune_p2p_types::metrics::init_sys_info_poll();
-
     info!("Conductor startup: metrics loop spawned.");
 
     let conductor = conductor_handle_from_config(&opt, config).await;

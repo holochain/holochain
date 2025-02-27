@@ -20,7 +20,6 @@ use holo_hash::AnyDhtHash;
 use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::db_cache::DhtDbQueryCache;

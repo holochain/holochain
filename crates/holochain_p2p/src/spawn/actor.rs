@@ -37,7 +37,7 @@ macro_rules! timing_trace {
 struct WrapEvtSender(event::DynHcP2pHandler);
 
 impl event::HcP2pHandler for WrapEvtSender {
-    fn call_remote(
+    fn handle_call_remote(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -48,7 +48,7 @@ impl event::HcP2pHandler for WrapEvtSender {
         timing_trace!(
             true,
             {
-                self.0.call_remote(
+                self.0.handle_call_remote(
                     dna_hash, // from,
                     to_agent,
                     zome_call_params_serialized,
@@ -60,7 +60,7 @@ impl event::HcP2pHandler for WrapEvtSender {
         )
     }
 
-    fn publish(
+    fn handle_publish(
         &self,
         dna_hash: DnaHash,
         request_validation_receipt: bool,
@@ -71,11 +71,11 @@ impl event::HcP2pHandler for WrapEvtSender {
         timing_trace!(
             true,
             {
-                self.0.publish(dna_hash, request_validation_receipt, countersigning_session, ops)
+                self.0.handle_publish(dna_hash, request_validation_receipt, countersigning_session, ops)
             }, %op_count, a = "recv_publish")
     }
 
-    fn get(
+    fn handle_get(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -84,12 +84,12 @@ impl event::HcP2pHandler for WrapEvtSender {
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         timing_trace!(
             true,
-            { self.0.get(dna_hash, to_agent, dht_hash, options) },
+            { self.0.handle_get(dna_hash, to_agent, dht_hash, options) },
             a = "recv_get",
         )
     }
 
-    fn get_meta(
+    fn handle_get_meta(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -98,12 +98,15 @@ impl event::HcP2pHandler for WrapEvtSender {
     ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
         timing_trace!(
             true,
-            { self.0.get_meta(dna_hash, to_agent, dht_hash, options) },
+            {
+                self.0
+                    .handle_get_meta(dna_hash, to_agent, dht_hash, options)
+            },
             a = "recv_get_meta",
         )
     }
 
-    fn get_links(
+    fn handle_get_links(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -112,12 +115,15 @@ impl event::HcP2pHandler for WrapEvtSender {
     ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
         timing_trace!(
             true,
-            { self.0.get_links(dna_hash, to_agent, link_key, options) },
+            {
+                self.0
+                    .handle_get_links(dna_hash, to_agent, link_key, options)
+            },
             a = "recv_get_links",
         )
     }
 
-    fn count_links(
+    fn handle_count_links(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -125,12 +131,12 @@ impl event::HcP2pHandler for WrapEvtSender {
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
         timing_trace!(
             true,
-            { self.0.count_links(dna_hash, to_agent, query) },
+            { self.0.handle_count_links(dna_hash, to_agent, query) },
             a = "recv_count_links"
         )
     }
 
-    fn get_agent_activity(
+    fn handle_get_agent_activity(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -142,13 +148,13 @@ impl event::HcP2pHandler for WrapEvtSender {
             true,
             {
                 self.0
-                    .get_agent_activity(dna_hash, to_agent, agent, query, options)
+                    .handle_get_agent_activity(dna_hash, to_agent, agent, query, options)
             },
             a = "recv_get_agent_activity",
         )
     }
 
-    fn must_get_agent_activity(
+    fn handle_must_get_agent_activity(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -159,13 +165,13 @@ impl event::HcP2pHandler for WrapEvtSender {
             true,
             {
                 self.0
-                    .must_get_agent_activity(dna_hash, to_agent, agent, filter)
+                    .handle_must_get_agent_activity(dna_hash, to_agent, agent, filter)
             },
             a = "recv_must_get_agent_activity",
         )
     }
 
-    fn validation_receipts_received(
+    fn handle_validation_receipts_received(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -175,13 +181,13 @@ impl event::HcP2pHandler for WrapEvtSender {
             false,
             {
                 self.0
-                    .validation_receipts_received(dna_hash, to_agent, receipts)
+                    .handle_validation_receipts_received(dna_hash, to_agent, receipts)
             },
             a = "recv_validation_receipt_received",
         )
     }
 
-    fn countersigning_session_negotiation(
+    fn handle_countersigning_session_negotiation(
         &self,
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
@@ -191,7 +197,7 @@ impl event::HcP2pHandler for WrapEvtSender {
             false,
             {
                 self.0
-                    .countersigning_session_negotiation(dna_hash, to_agent, message)
+                    .handle_countersigning_session_negotiation(dna_hash, to_agent, message)
             },
             a = "recv_countersigning_session_negotiation"
         )
@@ -272,7 +278,12 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                     } => {
                         let dna_hash = DnaHash::from_k2_space(&space);
                         let resp = match evt_sender
-                            .call_remote(dna_hash, to_agent, zome_call_params_serialized, signature)
+                            .handle_call_remote(
+                                dna_hash,
+                                to_agent,
+                                zome_call_params_serialized,
+                                signature,
+                            )
                             .await
                         {
                             Ok(response) => CallRemoteRes { msg_id, response },
@@ -298,7 +309,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         options,
                     } => {
                         let dna_hash = DnaHash::from_k2_space(&space);
-                        let resp = match evt_sender.get(dna_hash, to_agent, dht_hash, options).await
+                        let resp = match evt_sender
+                            .handle_get(dna_hash, to_agent, dht_hash, options)
+                            .await
                         {
                             Ok(response) => GetRes { msg_id, response },
                             Err(err) => ErrorRes {
@@ -324,7 +337,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                     } => {
                         let dna_hash = DnaHash::from_k2_space(&space);
                         let resp = match evt_sender
-                            .get_meta(dna_hash, to_agent, dht_hash, options)
+                            .handle_get_meta(dna_hash, to_agent, dht_hash, options)
                             .await
                         {
                             Ok(response) => GetMetaRes { msg_id, response },
@@ -351,7 +364,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                     } => {
                         let dna_hash = DnaHash::from_k2_space(&space);
                         let resp = match evt_sender
-                            .get_links(dna_hash, to_agent, link_key, options)
+                            .handle_get_links(dna_hash, to_agent, link_key, options)
                             .await
                         {
                             Ok(response) => GetLinksRes { msg_id, response },
@@ -376,7 +389,10 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         query,
                     } => {
                         let dna_hash = DnaHash::from_k2_space(&space);
-                        let resp = match evt_sender.count_links(dna_hash, to_agent, query).await {
+                        let resp = match evt_sender
+                            .handle_count_links(dna_hash, to_agent, query)
+                            .await
+                        {
                             Ok(response) => CountLinksRes { msg_id, response },
                             Err(err) => ErrorRes {
                                 msg_id,
@@ -402,7 +418,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                     } => {
                         let dna_hash = DnaHash::from_k2_space(&space);
                         let resp = match evt_sender
-                            .get_agent_activity(dna_hash, to_agent, agent, query, options)
+                            .handle_get_agent_activity(dna_hash, to_agent, agent, query, options)
                             .await
                         {
                             Ok(response) => GetAgentActivityRes { msg_id, response },
@@ -429,7 +445,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                     } => {
                         let dna_hash = DnaHash::from_k2_space(&space);
                         let resp = match evt_sender
-                            .must_get_agent_activity(dna_hash, to_agent, agent, filter)
+                            .handle_must_get_agent_activity(dna_hash, to_agent, agent, filter)
                             .await
                         {
                             Ok(response) => MustGetAgentActivityRes { msg_id, response },
@@ -457,7 +473,12 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         // remote signals are fire-and-forget
                         // so it's safe to ignore the response
                         let _response = evt_sender
-                            .call_remote(dna_hash, to_agent, zome_call_params_serialized, signature)
+                            .handle_call_remote(
+                                dna_hash,
+                                to_agent,
+                                zome_call_params_serialized,
+                                signature,
+                            )
                             .await;
                     }
                     ValidationReceiptsEvt { to_agent, receipts } => {
@@ -465,7 +486,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         // validation receipts are fire-and-forget
                         // so it's safe to ignore the response
                         let _response = evt_sender
-                            .validation_receipts_received(dna_hash, to_agent, receipts)
+                            .handle_validation_receipts_received(dna_hash, to_agent, receipts)
                             .await;
                     }
                 }

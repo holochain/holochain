@@ -358,7 +358,9 @@ impl Cell {
             }
         }
     }
+}
 
+/*
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, evt)))]
     /// Entry point for incoming messages from the network that need to be handled
     //
@@ -564,7 +566,9 @@ impl Cell {
         }
         Ok(())
     }
+*/
 
+impl holochain_p2p::event::HcP2pHandler for Cell {
     #[cfg(feature = "unstable-countersigning")]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     /// we are receiving a response from a countersigning authority
@@ -629,30 +633,6 @@ impl Cell {
             error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
         }
         r
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
-    async fn handle_get_entry(
-        &self,
-        hash: EntryHash,
-        options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<WireEntryOps> {
-        let db = self.space.dht_db.clone();
-        authority::handle_get_entry(db.into(), hash, options)
-            .await
-            .map_err(Into::into)
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    async fn handle_get_record(
-        &self,
-        hash: ActionHash,
-        options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<WireRecordOps> {
-        let db = self.space.dht_db.clone();
-        authority::handle_get_record(db.into(), hash, options)
-            .await
-            .map_err(Into::into)
     }
 
     #[cfg_attr(
@@ -725,8 +705,10 @@ impl Cell {
 
     /// A remote agent is sending us a validation receipt bundle.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, receipts)))]
-    async fn handle_validation_receipts(
+    async fn handle_validation_receipts_received(
         &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
         receipts: ValidationReceiptBundle,
     ) -> CellResult<()> {
         for receipt in receipts.into_iter() {
@@ -839,12 +821,6 @@ impl Cell {
         Ok(())
     }
 
-    /// the network module would like this cell/agent to sign some data
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    async fn handle_sign_network_data(&self) -> CellResult<Signature> {
-        Ok([0; 64].into())
-    }
-
     #[cfg_attr(
         feature = "instrument",
         tracing::instrument(skip(self, from_agent, fn_name, cap_secret, payload))
@@ -875,6 +851,32 @@ impl Cell {
         // - ConductorApiResult
         // - ZomeCallResult
         Ok(self.call_zome(zome_call_params, None).await??.try_into()?)
+    }
+}
+
+impl Cell {
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
+    async fn handle_get_entry(
+        &self,
+        hash: EntryHash,
+        options: holochain_p2p::event::GetOptions,
+    ) -> CellResult<WireEntryOps> {
+        let db = self.space.dht_db.clone();
+        authority::handle_get_entry(db.into(), hash, options)
+            .await
+            .map_err(Into::into)
+    }
+
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
+    async fn handle_get_record(
+        &self,
+        hash: ActionHash,
+        options: holochain_p2p::event::GetOptions,
+    ) -> CellResult<WireRecordOps> {
+        let db = self.space.dht_db.clone();
+        authority::handle_get_record(db.into(), hash, options)
+            .await
+            .map_err(Into::into)
     }
 
     /// Function called by the Conductor
@@ -1041,11 +1043,6 @@ impl Cell {
             .conductor_handle
             .get_ribosome(self.dna_hash())
             .map_err(|_| DnaError::DnaMissing(self.dna_hash().to_owned()))?)
-    }
-
-    /// Accessor for the p2p_agents_db backing this Cell
-    pub(crate) fn p2p_agents_db(&self) -> &DbWrite<DbKindP2pAgents> {
-        &self.space.p2p_agents_db
     }
 
     /// Accessor for the authored database backing this Cell
