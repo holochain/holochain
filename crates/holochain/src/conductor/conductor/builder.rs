@@ -111,7 +111,7 @@ impl ConductorBuilder {
         Ok(self)
     }
 
-    /// Initialize a "production" Conductor
+    /// Initialize a Conductor
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope)))]
     pub async fn build(self) -> ConductorResult<ConductorHandle> {
         let builder = self;
