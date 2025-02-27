@@ -587,6 +587,8 @@ impl HolochainP2pActor {
         let mut agent_list = agent_list
             .into_iter()
             .filter_map(|a| {
+                // much less clear code-wise that way, clippy...
+                #[allow(clippy::question_mark)]
                 if a.url.is_none() {
                     return None;
                 }
