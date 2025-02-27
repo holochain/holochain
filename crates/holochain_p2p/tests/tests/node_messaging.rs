@@ -143,7 +143,10 @@ impl HcP2pHandler for Handler {
         _to_agent: AgentPubKey,
         _receipts: ValidationReceiptBundle,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            self.0.lock().unwrap().push("validation_receipts".into());
+            Ok(())
+        })
     }
 
     fn countersigning_session_negotiation(
@@ -447,6 +450,66 @@ async fn test_must_get_agent_activity() {
     })
     .await
     .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_validation_receipts() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let handler = Arc::new(Handler::default());
+
+    let (agent1, _hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler.clone()).await;
+
+    hc2.send_validation_receipts(
+        dna_hash,
+        agent1,
+        <Vec<SignedValidationReceipt>>::new().into(),
+    )
+    .await
+    .unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            if let Some(res) = handler.0.lock().unwrap().first() {
+                assert_eq!("validation_receipts", res);
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_authority_for_hash() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+
+    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    hc1.test_set_full_arcs(space.clone()).await;
+
+    assert!(hc1
+        .authority_for_hash(
+            dna_hash,
+            HoloHash::from_raw_36_and_type(vec![4; 36], holo_hash::hash_type::AnyLinkable::Entry)
+        )
+        .await
+        .unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_storage_arcs() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+
+    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    hc1.test_set_full_arcs(space.clone()).await;
+
+    let arcs = hc1.storage_arcs(dna_hash).await.unwrap();
+    assert_eq!(&[DhtArc::FULL][..], &arcs);
 }
 
 async fn spawn_test(dna_hash: DnaHash, handler: DynHcP2pHandler) -> (AgentPubKey, actor::DynHcP2p) {
