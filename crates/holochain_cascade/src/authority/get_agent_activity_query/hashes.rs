@@ -1,9 +1,8 @@
 use crate::authority::get_agent_activity_query::{fold, render, Item, State};
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash, WarrantHash};
-use holochain_p2p::dht::op::Timestamp;
 use holochain_p2p::event::GetActivityOptions;
 use holochain_sqlite::rusqlite::{named_params, Row};
-use holochain_state::prelude::{from_blob, ActionHashed, Query, StateQueryResult, Store};
+use holochain_state::prelude::{from_blob, ActionHashed, Query, StateQueryResult, Store, Timestamp};
 use holochain_state::query::QueryData;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::dht_op::{ChainOpType, DhtOpType};
