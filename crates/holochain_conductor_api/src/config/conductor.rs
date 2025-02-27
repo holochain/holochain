@@ -29,7 +29,7 @@
 //!   signal_url: wss://devtest-sbd-1.holochain.org
 //!
 //!   ## Override the default WebRTC STUN configuration.
-//!   ## This is OPTIONAL. Ifthis is not specified, it will default
+//!   ## This is OPTIONAL. If this is not specified, it will default
 //!   ## to what you can see here:
 //!   webrtc_config: {
 //!     "iceServers": [
