@@ -195,20 +195,20 @@ impl ConductorConfig {
 pub struct NetworkConfig {
     /// The Kitsune2 bootstrap server to use for WAN discovery.
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
-    bootstrap_url: url2::Url2,
+    pub bootstrap_url: url2::Url2,
 
     /// The Kitsune2 sbd server to use for webrtc signalling.
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
-    signal_url: url2::Url2,
+    pub signal_url: url2::Url2,
 
     /// The Kitsune2 webrtc_config to use for connecting to peers.
-    webrtc_config: Option<serde_json::Value>,
+    pub webrtc_config: Option<serde_json::Value>,
 
     /// Use this advanced field to directly configure kitsune2.
     ///
     /// The above options actually just set specific values in this config.
     /// Use only if you know what you are doing!
-    advanced: Option<serde_json::Value>,
+    pub advanced: Option<serde_json::Value>,
 }
 
 impl Default for NetworkConfig {
