@@ -47,9 +47,10 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             .await
             .unwrap();
 
+        let bundle_bytes = bundle.encode().unwrap();
         InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             roles_settings: Default::default(),
@@ -166,11 +167,12 @@ async fn reject_duplicate_app_for_same_agent() {
         .await
         .unwrap();
 
+    let bundle_bytes = bundle.encode().unwrap();
     let app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             roles_settings: Default::default(),
@@ -187,10 +189,11 @@ async fn reject_duplicate_app_for_same_agent() {
     let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
         .await
         .unwrap();
+    let bundle_bytes = bundle.encode().unwrap();
     let duplicate_install_with_app_disabled = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
@@ -211,10 +214,11 @@ async fn reject_duplicate_app_for_same_agent() {
     let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
         .await
         .unwrap();
+    let bundle_bytes = bundle.encode().unwrap();
     let duplicate_install_with_app_enabled = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
@@ -232,10 +236,11 @@ async fn reject_duplicate_app_for_same_agent() {
     let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
         .await
         .unwrap();
+    let bundle_bytes = bundle.encode().unwrap();
     let valid_install_of_second_app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
@@ -282,11 +287,12 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
         .await
         .unwrap();
 
+    let bundle_bytes = bundle.encode().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_1".into()),
             network_seed: Some("final seed".into()),
             roles_settings: Default::default(),
@@ -326,11 +332,12 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
         .await
         .unwrap();
 
+    let bundle_bytes = bundle.encode().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
             roles_settings: Default::default(),
@@ -440,7 +447,7 @@ async fn use_existing_integration() {
     let (dna1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
     let (dna2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
 
-    let bundle1 = {
+    let bundle1_bytes = {
         let path = PathBuf::from(format!("{}", dna1.dna_hash()));
 
         let roles = vec![AppRoleManifest {
@@ -468,9 +475,11 @@ async fn use_existing_integration() {
         AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
             .await
             .unwrap()
+            .encode()
+            .unwrap()
     };
 
-    let bundle2 = |correct: bool| {
+    let bundle2_bytes = |correct: bool| {
         let dna2 = dna2.clone();
         async move {
             let path = PathBuf::from(format!("{}", dna2.dna_hash()));
@@ -517,6 +526,8 @@ async fn use_existing_integration() {
             AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
                 .await
                 .unwrap()
+                .encode()
+                .unwrap()
         }
     };
 
@@ -525,7 +536,7 @@ async fn use_existing_integration() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle1),
+            source: AppBundleSource::Bytes(bundle1_bytes),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             roles_settings: Default::default(),
@@ -541,7 +552,7 @@ async fn use_existing_integration() {
             .clone()
             .install_app_bundle(InstallAppPayload {
                 agent_key: None,
-                source: AppBundleSource::Bundle(bundle2(false).await),
+                source: AppBundleSource::Bytes(bundle2_bytes(false).await),
                 installed_app_id: Some("app_2".into()),
                 network_seed: None,
                 roles_settings: Default::default(),
@@ -562,7 +573,7 @@ async fn use_existing_integration() {
             .clone()
             .install_app_bundle(InstallAppPayload {
                 agent_key: None,
-                source: AppBundleSource::Bundle(bundle2(true).await),
+                source: AppBundleSource::Bytes(bundle2_bytes(true).await),
                 installed_app_id: Some("app_2".into()),
                 network_seed: None,
                 roles_settings: Default::default(),
@@ -595,7 +606,7 @@ async fn use_existing_integration() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle2(true).await),
+            source: AppBundleSource::Bytes(bundle2_bytes(true).await),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
             roles_settings: Some(HashMap::from([role_settings])),

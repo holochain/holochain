@@ -47,11 +47,15 @@ async fn network_seed_regression() {
             .unwrap()
     };
 
-    let bundle1 = AppBundle::new(manifest.clone().into(), vec![], PathBuf::from("."))
+    let bundle1_bytes = AppBundle::new(manifest.clone().into(), vec![], PathBuf::from("."))
         .await
+        .unwrap()
+        .encode()
         .unwrap();
-    let bundle2 = AppBundle::new(manifest.into(), vec![], PathBuf::from("."))
+    let bundle2_bytes = AppBundle::new(manifest.into(), vec![], PathBuf::from("."))
         .await
+        .unwrap()
+        .encode()
         .unwrap();
 
     // if both of these apps can be installed under the same agent, the
@@ -62,7 +66,7 @@ async fn network_seed_regression() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle1),
+            source: AppBundleSource::Bytes(bundle1_bytes),
             installed_app_id: Some("no-seed".into()),
             network_seed: None,
             roles_settings: Default::default(),
@@ -76,7 +80,7 @@ async fn network_seed_regression() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle2),
+            source: AppBundleSource::Bytes(bundle2_bytes),
             installed_app_id: Some("yes-seed".into()),
             network_seed: Some("seed".into()),
             roles_settings: Default::default(),
@@ -302,7 +306,10 @@ impl TestCase {
                 bundle.write_to_file(&happ_path).await.unwrap();
                 AppBundleSource::Path(happ_path)
             }
-            Location::Bundle => AppBundleSource::Bundle(bundle),
+            Location::Bundle => {
+                let bundle_bytes = bundle.encode().unwrap();
+                AppBundleSource::Bytes(bundle_bytes)
+            }
         };
 
         let app = common
