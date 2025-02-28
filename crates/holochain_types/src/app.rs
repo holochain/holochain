@@ -235,7 +235,7 @@ impl Default for RoleSettings {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AppBundleSource {
-    /// The actual serialized bytes of a bundle
+    /// A bundle of an AppManifest and collection of DNAs
     Bundle(AppBundle),
     /// A local file path
     Path(PathBuf),
