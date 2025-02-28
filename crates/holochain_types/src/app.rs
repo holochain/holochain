@@ -7,6 +7,8 @@
 //! Each Cell maintains its own identity separate from any App.
 //! Access to Cells can be shared between different Apps.
 
+#![allow(deprecated)] // Remove warnings created by using serde on deprecated AppBundleSource::Bundle variant
+
 mod app_bundle;
 mod app_manifest;
 mod error;
@@ -236,6 +238,10 @@ impl Default for RoleSettings {
 #[serde(rename_all = "snake_case")]
 pub enum AppBundleSource {
     /// A bundle of an AppManifest and collection of DNAs
+    #[deprecated(
+        since = "0.4.2",
+        note = "Unsupported variant. Instead, encode an AppBundle to Vec<u8> and use Bytes variant."
+    )]
     Bundle(AppBundle),
     /// The raw bytes of an app bundle
     #[serde(with = "serde_bytes")]
