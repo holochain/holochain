@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 - Prevent "TODO" comments from being rendered in cargo docs.
+- Add `Bytes(Vec<u8>)` variant in `AppBundleSource`.
+- Deprecated `Bundle` variant in `AppBundleSource`, to be replaced by `Bytes` variant.
 
 ## 0.4.1
 

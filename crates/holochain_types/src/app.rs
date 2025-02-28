@@ -7,6 +7,8 @@
 //! Each Cell maintains its own identity separate from any App.
 //! Access to Cells can be shared between different Apps.
 
+#![allow(deprecated)] // Remove warnings created by using serde on deprecated AppBundleSource::Bundle variant
+
 mod app_bundle;
 mod app_manifest;
 mod error;
@@ -235,8 +237,15 @@ impl Default for RoleSettings {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AppBundleSource {
-    /// The actual serialized bytes of a bundle
+    /// A bundle of an AppManifest and collection of DNAs
+    #[deprecated(
+        since = "0.4.2",
+        note = "Unsupported variant. Instead, encode an AppBundle to Vec<u8> and use Bytes variant."
+    )]
     Bundle(AppBundle),
+    /// The raw bytes of an app bundle
+    #[serde(with = "serde_bytes")]
+    Bytes(Vec<u8>),
     /// A local file path
     Path(PathBuf),
     // /// A URL
@@ -248,6 +257,7 @@ impl AppBundleSource {
     pub async fn resolve(self) -> Result<AppBundle, AppBundleError> {
         Ok(match self {
             Self::Bundle(bundle) => bundle,
+            Self::Bytes(bytes) => AppBundle::decode(&bytes)?,
             Self::Path(path) => AppBundle::decode(&ffs::read(&path).await?)?,
             // Self::Url(url) => todo!("reqwest::get"),
         })
