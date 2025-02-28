@@ -172,24 +172,6 @@ pub type CellStartupErrors = Vec<(CellId, CellError)>;
 /// Cloneable reference to a Conductor
 pub type ConductorHandle = Arc<Conductor>;
 
-/// Legacy CellStatus which is no longer used. This can be removed
-/// and is only here to avoid breaking deserialization specs.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[deprecated = "Only here for deserialization, should be removed altogether when all clients are updated"]
-pub enum CellStatus {
-    /// Kitsune knows about this Cell and it is considered fully "online"
-    Joined,
-
-    /// The Cell is on its way to being fully joined. It is a valid Cell from
-    /// the perspective of the conductor, and can handle HolochainP2pEvents,
-    /// but it is considered not to be fully running from the perspective of
-    /// app status, i.e. if any app has a required Cell with this status,
-    /// the app is considered to be in the Paused state.
-    PendingJoin(PendingJoinReason),
-
-    /// The Cell is currently in the process of trying to join the network.
-    Joining,
-}
 
 /// The reason why a cell is waiting to join the network.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -210,15 +192,6 @@ pub enum PendingJoinReason {
     TimedOut,
 }
 
-/// A [`Cell`] tracked by a Conductor, along with its [`CellStatus`]
-#[derive(Debug, Clone)]
-#[allow(deprecated)]
-#[allow(unused)]
-struct CellItem {
-    cell: Arc<Cell>,
-    status: CellStatus,
-}
-
 #[allow(dead_code)]
 pub(crate) type StopBroadcaster = task_motel::StopBroadcaster;
 pub(crate) type StopReceiver = task_motel::StopListener;
@@ -226,7 +199,7 @@ pub(crate) type StopReceiver = task_motel::StopListener;
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
     /// The collection of available, running cells associated with this Conductor
-    running_cells: RwShare<IndexMap<CellId, CellItem>>,
+    running_cells: RwShare<IndexMap<CellId, Arc<Cell>>>,
 
     /// The config used to create this Conductor
     pub config: Arc<ConductorConfig>,
@@ -3574,10 +3547,7 @@ impl Conductor {
                 tracing::debug!(?cell_id, "added cell");
                 cells.insert(
                     cell_id,
-                    CellItem {
-                        cell: Arc::new(cell),
-                        status: CellStatus::Joined,
-                    },
+                    Arc::new(cell),
                 );
             }
         });
