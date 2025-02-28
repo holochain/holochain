@@ -357,11 +357,13 @@ pub async fn register_and_install_dna_named(
 
     let bundle = AppBundle::new(manifest.clone().into(), resources, dna_path.clone())
         .await
-        .unwrap();
+        .unwrap()
+        .encode()
+        .expect("failed to encode AppBundle to bytes");
 
     let payload = InstallAppPayload {
         agent_key: None,
-        source: AppBundleSource::Bundle(bundle),
+        source: AppBundleSource::Bytes(bundle),
         installed_app_id: Some(name),
         network_seed: None,
         roles_settings: Default::default(),

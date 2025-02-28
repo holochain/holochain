@@ -1211,12 +1211,13 @@ async fn test_deferred_memproof_provisioning() {
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
     let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
+    let bundle_bytes = bundle.encode().unwrap();
 
     //- Install with deferred memproofs
     let app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: None,
             installed_app_id: Some(app_id.clone()),
             roles_settings: Default::default(),
@@ -1339,12 +1340,13 @@ async fn test_deferred_memproof_provisioning_uninstall() {
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
     let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
+    let bundle_bytes = bundle.encode().unwrap();
 
     //- Install with deferred memproofs
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: None,
             installed_app_id: Some(app_id.clone()),
             roles_settings: Default::default(),

@@ -81,9 +81,12 @@ pub async fn get_install_app_payload_from_dnas(
             .collect(),
     );
 
+    let bytes = bundle
+        .encode()
+        .expect("failed to encode app bundle as bytes");
     InstallAppPayload {
         agent_key,
-        source: AppBundleSource::Bundle(bundle),
+        source: AppBundleSource::Bytes(bytes),
         installed_app_id: Some(installed_app_id.into()),
         network_seed: None,
         roles_settings,

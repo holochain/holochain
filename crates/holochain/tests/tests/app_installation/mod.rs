@@ -93,11 +93,12 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
 
     let network_seed_override = "overridden by network_seed field";
 
+    let bundle_bytes = bundle.encode().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle.clone()),
+            source: AppBundleSource::Bytes(bundle_bytes.clone()),
             installed_app_id: Some("app_0".into()),
             network_seed: Some(network_seed_override.into()),
             roles_settings: None,
@@ -111,7 +112,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle.clone()),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_1".into()),
             network_seed: Some(network_seed_override.into()),
             roles_settings: Some(HashMap::from([role_settings])),
@@ -271,11 +272,12 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
         },
     );
 
+    let bundle_bytes = bundle.encode().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle.clone()),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app".into()),
             network_seed: None,
             roles_settings: Some(HashMap::from([role_settings])),
@@ -332,11 +334,12 @@ async fn installing_with_modifiers_for_non_existing_role_fails() {
         },
     );
 
+    let bundle_bytes = bundle.encode().unwrap();
     let result = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle.clone()),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_3".into()),
             network_seed: Some("final seed".into()),
             roles_settings: Some(HashMap::from([role_settings])),
@@ -367,11 +370,12 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
         },
     );
 
+    let bundle_bytes = bundle.encode().unwrap();
     //- Install with a membrane proof provided in the roles_settings
     let app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: None,
             installed_app_id: Some(app_id.clone()),
             roles_settings: Some(HashMap::from([role_settings])),
