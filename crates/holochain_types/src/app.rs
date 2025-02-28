@@ -237,6 +237,9 @@ impl Default for RoleSettings {
 pub enum AppBundleSource {
     /// A bundle of an AppManifest and collection of DNAs
     Bundle(AppBundle),
+    /// The raw bytes of an app bundle
+    #[serde(with = "serde_bytes")]
+    Bytes(Vec<u8>),
     /// A local file path
     Path(PathBuf),
     // /// A URL
@@ -248,6 +251,7 @@ impl AppBundleSource {
     pub async fn resolve(self) -> Result<AppBundle, AppBundleError> {
         Ok(match self {
             Self::Bundle(bundle) => bundle,
+            Self::Bytes(bytes) => AppBundle::decode(&bytes)?,
             Self::Path(path) => AppBundle::decode(&ffs::read(&path).await?)?,
             // Self::Url(url) => todo!("reqwest::get"),
         })
