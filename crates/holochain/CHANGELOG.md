@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Handle empty databases in `StorageInfo` request. Previously, if the database was empty, the request would return an error. #4756
 - Add `DnaHash` to the `DnaStorageInfo` which is part of the `StorageInfo` response.
 
 ## 0.5.0-dev.21
