@@ -7,8 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Handle empty databases in `StorageInfo` request. Previously, if the database was empty, the request would return an error. #4756
-- Prevent "TODO" comments from being rendered in cargo docs.
+## 0.4.2-rc.0
+
+- Handle empty databases in `StorageInfo` request. Previously, if the database was empty, the request would return an error. \#4756
+- Prevent “TODO” comments from being rendered in cargo docs.
 
 ## 0.4.1
 
