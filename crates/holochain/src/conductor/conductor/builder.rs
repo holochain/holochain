@@ -237,10 +237,15 @@ impl ConductorBuilder {
         let dpki_uuid = dpki_dna_to_install
             .as_ref()
             .map(|dna| dna.dna_hash().get_raw_32().try_into().expect("32 bytes"));
-        let network_compat = NetworkCompatParams { dpki_uuid };
+        let compat = NetworkCompatParams { dpki_uuid };
+
+        let p2p_config = holochain_p2p::HolochainP2pConfig {
+            compat,
+            ..Default::default()
+        };
 
         let (holochain_p2p, p2p_evt) =
-            match holochain_p2p::spawn_holochain_p2p(network_config, network_compat).await {
+            match holochain_p2p::spawn_holochain_p2p(p2p_config, (), keystore.clone()).await {
                 Ok(r) => r,
                 Err(err) => {
                     tracing::error!(?err, "Error spawning networking");

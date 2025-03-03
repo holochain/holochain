@@ -290,12 +290,24 @@ impl AdminInterfaceApi {
                 Ok(AdminResponse::NetworkStatsDumped(stats))
             }
             AddAgentInfo { agent_infos } => {
-                self.conductor_handle.add_agent_infos(agent_infos).await?;
+                let mut parsed = Vec::with_capacity(agent_infos.len());
+                for info in agent_infos {
+                    parsed.push(kitsune2_api::AgentInfoSigned::decode(
+                        &kitsune2_core::Ed25519Verifier,
+                        info.as_bytes(),
+                    )?);
+                }
+
+                self.conductor_handle.add_agent_infos(parsed).await?;
                 Ok(AdminResponse::AgentInfoAdded)
             }
             AgentInfo { cell_id } => {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
-                Ok(AdminResponse::AgentInfo(r))
+                let mut encoded = Vec::with_capacity(r.len());
+                for info in r {
+                    encoded.push(info.encode()?);
+                }
+                Ok(AdminResponse::AgentInfo(encoded))
             }
             GraftRecords {
                 cell_id,

@@ -20,12 +20,13 @@ use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_chc::ChcImpl;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::{HolochainP2pDna, HolochainP2pResult};
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
 use holochain_types::db_cache::DhtDbQueryCache;
+use kitsune2_api::BoxFut;
 
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::cell::error::CellResult;
@@ -44,11 +45,11 @@ use crate::core::workflow::GenesisWorkspace;
 use crate::core::workflow::InitializeZomesWorkflowArgs;
 use crate::core::workflow::ZomeCallResult;
 use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT};
+use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 #[cfg(feature = "unstable-countersigning")]
 use {
     crate::core::workflow::countersigning_workflow::countersigning_success,
     crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops,
-    holochain_p2p::event::CountersigningSessionNegotiationMessage,
 };
 
 use super::api::CellConductorHandle;
@@ -569,70 +570,90 @@ impl Cell {
 */
 
 impl holochain_p2p::event::HcP2pHandler for Cell {
-    #[cfg(feature = "unstable-countersigning")]
+    fn handle_publish(
+        &self,
+        _dna_hash: DnaHash,
+        _request_validation_receipt: bool,
+        _countersigning_session: bool,
+        _ops: Vec<holochain_types::dht_op::DhtOp>,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async { unimplemented!() })
+    }
+
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     /// we are receiving a response from a countersigning authority
-    async fn handle_countersigning_session_negotiation(
+    fn handle_countersigning_session_negotiation(
         &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
         message: CountersigningSessionNegotiationMessage,
-    ) -> CellResult<()> {
-        match message {
-            CountersigningSessionNegotiationMessage::EnzymePush(chain_op) => {
-                let ops = vec![*chain_op]
-                    .into_iter()
-                    .map(|op| {
-                        let hash = DhtOpHash::with_data_sync(&op);
-                        (hash, op)
-                    })
-                    .collect();
-                receive_incoming_countersigning_ops(
-                    ops,
-                    &self.space.witnessing_workspace,
-                    self.queue_triggers.witnessing.clone(),
-                )
-                .map_err(Box::new)?;
-                Ok(())
-            }
-            CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {
-                countersigning_success(
-                    self.space.clone(),
-                    self.id.agent_pubkey().clone(),
-                    signed_actions,
-                    self.queue_triggers.countersigning.clone(),
-                )
-                .await;
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async {
+            #[cfg(not(feature = "unstable-countersigning"))]
+            { Ok(()) }
+            #[cfg(feature = "unstable-countersigning")]
+            match message {
+                CountersigningSessionNegotiationMessage::EnzymePush(chain_op) => {
+                    let ops = vec![*chain_op]
+                        .into_iter()
+                        .map(|op| {
+                            let hash = DhtOpHash::with_data_sync(&op);
+                            (hash, op)
+                        })
+                        .collect();
+                    receive_incoming_countersigning_ops(
+                        ops,
+                        &self.space.witnessing_workspace,
+                        self.queue_triggers.witnessing.clone(),
+                    )
+                    .map_err(Box::new)?;
+                    Ok(())
+                }
+                CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {
+                    countersigning_success(
+                        self.space.clone(),
+                        self.id.agent_pubkey().clone(),
+                        signed_actions,
+                        self.queue_triggers.countersigning.clone(),
+                    )
+                    .await;
 
-                Ok(())
+                    Ok(())
+                }
             }
-        }
+        })
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// a remote node is asking us for entry data
-    async fn handle_get(
+    fn handle_get(
         &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
         options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<WireOps> {
-        debug!("handling get");
-        // TODO: Later we will need more get types but for now
-        // we can just have these defaults depending on whether or not
-        // the hash is an entry or action.
-        // In the future we should use GetOptions to choose which get to run.
-        let mut r = match dht_hash.into_primitive() {
-            AnyDhtHashPrimitive::Entry(hash) => self
-                .handle_get_entry(hash, options)
-                .await
-                .map(WireOps::Entry),
-            AnyDhtHashPrimitive::Action(hash) => self
-                .handle_get_record(hash, options)
-                .await
-                .map(WireOps::Record),
-        };
-        if let Err(e) = &mut r {
-            error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
-        }
-        r
+    ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
+        Box::pin(async {
+            debug!("handling get");
+            // TODO: Later we will need more get types but for now
+            // we can just have these defaults depending on whether or not
+            // the hash is an entry or action.
+            // In the future we should use GetOptions to choose which get to run.
+            let mut r = match dht_hash.into_primitive() {
+                AnyDhtHashPrimitive::Entry(hash) => self
+                    .handle_get_entry(hash, options)
+                    .await
+                    .map(WireOps::Entry),
+                AnyDhtHashPrimitive::Action(hash) => self
+                    .handle_get_record(hash, options)
+                    .await
+                    .map(WireOps::Record),
+            };
+            if let Err(e) = &mut r {
+                error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
+            }
+            r
+        })
     }
 
     #[cfg_attr(
@@ -640,12 +661,14 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         tracing::instrument(skip(self, _dht_hash, _options))
     )]
     /// a remote node is asking us for metadata
-    async fn handle_get_meta(
+    fn handle_get_meta(
         &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
         _dht_hash: holo_hash::AnyDhtHash,
         _options: holochain_p2p::event::GetMetaOptions,
-    ) -> CellResult<MetadataSet> {
-        unimplemented!()
+    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
+        Box::pin(async { unimplemented!() })
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
@@ -653,133 +676,153 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
     // TODO: Right now we are returning all the full actions
     // We could probably send some smaller types instead of the full actions
     // if we are careful.
-    async fn handle_get_links(
+    fn handle_get_links(
         &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
         link_key: WireLinkKey,
         options: holochain_p2p::event::GetLinksOptions,
-    ) -> CellResult<WireLinkOps> {
-        debug!(id = ?self.id());
-        let db = self.space.dht_db.clone();
-        authority::handle_get_links(db.into(), link_key, options)
-            .await
-            .map_err(Into::into)
+    ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
+        Box::pin(async {
+            debug!(id = ?self.id());
+            let db = self.space.dht_db.clone();
+            authority::handle_get_links(db.into(), link_key, options)
+                .await
+                .map_err(Into::into)
+        })
     }
 
     /// a remote node is asking us to count links
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    async fn handle_count_links(&self, query: WireLinkQuery) -> CellResult<CountLinksResponse> {
-        let db = self.space.dht_db.clone();
-        Ok(CountLinksResponse::new(
-            authority::handle_get_links_query(db.into(), query)
-                .await?
-                .into_iter()
-                .map(|l| l.create_link_hash)
-                .collect::<Vec<_>>(),
-        ))
+    fn handle_count_links(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        query: WireLinkQuery,
+    ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
+        Box::pin(async {
+            let db = self.space.dht_db.clone();
+            Ok(CountLinksResponse::new(
+                authority::handle_get_links_query(db.into(), query)
+                    .await?
+                    .into_iter()
+                    .map(|l| l.create_link_hash)
+                    .collect::<Vec<_>>(),
+            ))
+        })
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
-    async fn handle_get_agent_activity(
+    fn handle_get_agent_activity(
         &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
         agent: AgentPubKey,
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
-    ) -> CellResult<AgentActivityResponse> {
-        let db = self.space.dht_db.clone();
-        authority::handle_get_agent_activity(db.into(), agent, query, options)
-            .await
-            .map_err(Into::into)
+    ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>> {
+        Box::pin(async {
+            let db = self.space.dht_db.clone();
+            authority::handle_get_agent_activity(db.into(), agent, query, options)
+                .await
+                .map_err(Into::into)
+        })
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    async fn handle_must_get_agent_activity(
+    fn handle_must_get_agent_activity(
         &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
         author: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
-    ) -> CellResult<MustGetAgentActivityResponse> {
-        let db = self.space.dht_db.clone();
-        authority::handle_must_get_agent_activity(db.into(), author, filter)
-            .await
-            .map_err(Into::into)
+    ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
+        Box::pin(async {
+            let db = self.space.dht_db.clone();
+            authority::handle_must_get_agent_activity(db.into(), author, filter)
+                .await
+                .map_err(Into::into)
+        })
     }
 
     /// A remote agent is sending us a validation receipt bundle.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, receipts)))]
-    async fn handle_validation_receipts_received(
+    fn handle_validation_receipts_received(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         receipts: ValidationReceiptBundle,
-    ) -> CellResult<()> {
-        for receipt in receipts.into_iter() {
-            debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async {
+            for receipt in receipts.into_iter() {
+                debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
 
-            // Get the action for this op so we can check the entry type.
-            let hash = receipt.receipt.dht_op_hash.clone();
-            let action: Option<SignedAction> = self
-                .get_or_create_authored_db()?
-                .read_async(move |txn| {
-                    let h: Option<Vec<u8>> = txn
-                        .query_row(
-                            "SELECT Action.blob as action_blob
+                // Get the action for this op so we can check the entry type.
+                let hash = receipt.receipt.dht_op_hash.clone();
+                let action: Option<SignedAction> = self
+                    .get_or_create_authored_db()?
+                    .read_async(move |txn| {
+                        let h: Option<Vec<u8>> = txn
+                            .query_row(
+                                "SELECT Action.blob as action_blob
                     FROM DhtOp
                     JOIN Action ON Action.hash = DhtOp.action_hash
                     WHERE DhtOp.hash = :hash",
-                            named_params! {
-                                ":hash": hash,
-                            },
-                            |row| row.get("action_blob"),
-                        )
-                        .optional()?;
-                    match h {
-                        Some(h) => from_blob(h),
-                        None => Ok(None),
+                                named_params! {
+                                    ":hash": hash,
+                                },
+                                |row| row.get("action_blob"),
+                            )
+                            .optional()?;
+                        match h {
+                            Some(h) => from_blob(h),
+                            None => Ok(None),
+                        }
+                    })
+                    .await?;
+
+                // If the action has an app entry type get the entry def
+                // from the conductor.
+                let required_receipt_count = match action.as_ref().and_then(|h| h.entry_type()) {
+                    Some(EntryType::App(AppEntryDef {
+                        zome_index,
+                        entry_index,
+                        ..
+                    })) => {
+                        let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
+                        let zome = ribosome.get_integrity_zome(zome_index);
+                        match zome {
+                            Some(zome) => self
+                                .conductor_api
+                                .get_entry_def(&EntryDefBufferKey::new(
+                                    zome.into_inner().1,
+                                    *entry_index,
+                                ))
+                                .map(|e| u8::from(e.required_validations)),
+                            None => None,
+                        }
                     }
-                })
-                .await?;
+                    _ => None,
+                };
 
-            // If the action has an app entry type get the entry def
-            // from the conductor.
-            let required_receipt_count = match action.as_ref().and_then(|h| h.entry_type()) {
-                Some(EntryType::App(AppEntryDef {
-                    zome_index,
-                    entry_index,
-                    ..
-                })) => {
-                    let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
-                    let zome = ribosome.get_integrity_zome(zome_index);
-                    match zome {
-                        Some(zome) => self
-                            .conductor_api
-                            .get_entry_def(&EntryDefBufferKey::new(
-                                zome.into_inner().1,
-                                *entry_index,
-                            ))
-                            .map(|e| u8::from(e.required_validations)),
-                        None => None,
-                    }
-                }
-                _ => None,
-            };
+                // If no required receipt count was found then fallback to the default.
+                let required_validation_count = required_receipt_count.unwrap_or(
+                    crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
+                );
 
-            // If no required receipt count was found then fallback to the default.
-            let required_validation_count = required_receipt_count.unwrap_or(
-                crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
-            );
+                let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
 
-            let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
+                let receipt_count = self
+                    .space
+                    .dht_db
+                    .write_async({
+                        let receipt_op_hash = receipt_op_hash.clone();
+                        move |txn| -> StateMutationResult<usize> {
+                            // Add the new receipts to the db
+                            add_if_unique(txn, receipt)?;
 
-            let receipt_count = self
-                .space
-                .dht_db
-                .write_async({
-                    let receipt_op_hash = receipt_op_hash.clone();
-                    move |txn| -> StateMutationResult<usize> {
-                        // Add the new receipts to the db
-                        add_if_unique(txn, receipt)?;
-
-                        // Get the current count for this DhtOp.
-                        let receipt_count: usize = txn.query_row(
+                            // Get the current count for this DhtOp.
+                            let receipt_count: usize = txn.query_row(
                             "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
                             named_params! {
                                 ":op_hash": receipt_op_hash,
@@ -787,38 +830,39 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                             |row| row.get(0),
                         )?;
 
-                        if receipt_count >= required_validation_count as usize {
-                            // If we have enough receipts then set receipts to complete.
-                            //
-                            // Don't fail here if this doesn't work, it's only informational. Getting
-                            // the same flag set in the authored db is what will stop the publish
-                            // workflow from republishing this op.
-                            set_receipts_complete_redundantly_in_dht_db(
-                                txn,
-                                &receipt_op_hash,
-                                true,
-                            )
-                            .ok();
+                            if receipt_count >= required_validation_count as usize {
+                                // If we have enough receipts then set receipts to complete.
+                                //
+                                // Don't fail here if this doesn't work, it's only informational. Getting
+                                // the same flag set in the authored db is what will stop the publish
+                                // workflow from republishing this op.
+                                set_receipts_complete_redundantly_in_dht_db(
+                                    txn,
+                                    &receipt_op_hash,
+                                    true,
+                                )
+                                .ok();
+                            }
+
+                            Ok(receipt_count)
                         }
-
-                        Ok(receipt_count)
-                    }
-                })
-                .await?;
-
-            // If we have enough receipts then set receipts to complete.
-            if receipt_count >= required_validation_count as usize {
-                // Note that the flag is set in the authored db because that's what the publish workflow checks to decide
-                // whether to republish the op for more validation receipts.
-                self.get_or_create_authored_db()?
-                    .write_async(move |txn| -> StateMutationResult<()> {
-                        set_receipts_complete(txn, &receipt_op_hash, true)
                     })
                     .await?;
-            }
-        }
 
-        Ok(())
+                // If we have enough receipts then set receipts to complete.
+                if receipt_count >= required_validation_count as usize {
+                    // Note that the flag is set in the authored db because that's what the publish workflow checks to decide
+                    // whether to republish the op for more validation receipts.
+                    self.get_or_create_authored_db()?
+                        .write_async(move |txn| -> StateMutationResult<()> {
+                            set_receipts_complete(txn, &receipt_op_hash, true)
+                        })
+                        .await?;
+                }
+            }
+
+            Ok(())
+        })
     }
 
     #[cfg_attr(
@@ -827,30 +871,34 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
     )]
     #[allow(clippy::too_many_arguments)]
     /// a remote agent is attempting a "call_remote" on this cell.
-    async fn handle_call_remote(
+    fn handle_call_remote(
         &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
-    ) -> CellResult<SerializedBytes> {
-        let zome_call_params = zome_call_params_serialized.decode::<ZomeCallParams>()?;
-        if !is_valid_signature(
-            &zome_call_params.provenance,
-            zome_call_params_serialized.as_bytes(),
-            &signature,
-        )
-        .await
-        .map_err(|err| CellError::ConductorApiError(Box::new(err)))?
-        {
-            return Err(CellError::ZomeCallAuthenticationFailed(
-                signature,
-                zome_call_params.provenance,
-            ));
-        }
+    ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
+        Box::pin(async {
+            let zome_call_params = zome_call_params_serialized.decode::<ZomeCallParams>()?;
+            if !is_valid_signature(
+                &zome_call_params.provenance,
+                zome_call_params_serialized.as_bytes(),
+                &signature,
+            )
+            .await
+            .map_err(|err| CellError::ConductorApiError(Box::new(err)))?
+            {
+                return Err(CellError::ZomeCallAuthenticationFailed(
+                    signature,
+                    zome_call_params.provenance,
+                ));
+            }
 
-        // double ? because
-        // - ConductorApiResult
-        // - ZomeCallResult
-        Ok(self.call_zome(zome_call_params, None).await??.try_into()?)
+            // double ? because
+            // - ConductorApiResult
+            // - ZomeCallResult
+            Ok(self.call_zome(zome_call_params, None).await??.try_into()?)
+        })
     }
 }
 

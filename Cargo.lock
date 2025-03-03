@@ -2461,6 +2461,7 @@ dependencies = [
  "isotest",
  "itertools 0.12.1",
  "kitsune2_api",
+ "kitsune2_core",
  "lair_keystore",
  "maplit",
  "matches",

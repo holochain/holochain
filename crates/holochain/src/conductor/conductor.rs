@@ -856,6 +856,8 @@ mod network_impls {
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
     use zome_call_signature_verification::is_valid_signature;
+    use holochain_p2p::HolochainP2pResult;
+    use kitsune2_api::BoxFut;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -869,6 +871,8 @@ mod network_impls {
             &self,
             cell_id: Option<CellId>,
         ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
+            unimplemented!()
+            /*
             match cell_id {
                 Some(c) => {
                     let (d, a) = c.into_dna_and_agent();
@@ -888,6 +892,7 @@ mod network_impls {
                     Ok(out)
                 }
             }
+            */
         }
 
         pub(crate) async fn witness_nonce_from_calling_agent(
@@ -950,6 +955,8 @@ mod network_impls {
             installed_app_id: &InstalledAppId,
             payload: &NetworkInfoRequestPayload,
         ) -> ConductorResult<Vec<NetworkInfo>> {
+            unimplemented!()
+            /*
             use holochain_sqlite::sql::sql_cell::SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP;
 
             let NetworkInfoRequestPayload {
@@ -1092,6 +1099,7 @@ mod network_impls {
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
+            */
         }
 
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -1456,6 +1464,106 @@ mod network_impls {
                 Ok(Err(error)) => Err(ConductorApiError::Other(Box::new(error))),
                 Err(error) => Err(error),
             }
+        }
+    }
+
+    impl holochain_p2p::event::HcP2pHandler for Conductor {
+        fn handle_call_remote(
+            &self,
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            zome_call_params_serialized: ExternIO,
+            signature: Signature,
+        ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
+            Box::pin(async { unimplemented!() })
+        }
+
+        fn handle_publish(
+            &self,
+            dna_hash: DnaHash,
+            request_validation_receipt: bool,
+            countersigning_session: bool,
+            ops: Vec<holochain_types::dht_op::DhtOp>,
+        ) -> BoxFut<'_, HolochainP2pResult<()>> {
+            Box::pin(async { unimplemented!() })
+        }
+
+        fn handle_get(
+            &self,
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            dht_hash: holo_hash::AnyDhtHash,
+            options: GetOptions,
+        ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
+            Box::pin(async { unimplemented!() })
+        }
+
+        fn handle_get_meta(
+            &self,
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            dht_hash: holo_hash::AnyDhtHash,
+            options: holochain_p2p::event::GetMetaOptions,
+        ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
+            Box::pin(async { unimplemented!() })
+        }
+
+        fn handle_get_links(
+            &self,
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            link_key: WireLinkKey,
+            options: holochain_p2p::event::GetLinksOptions,
+        ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
+            Box::pin(async { unimplemented!() })
+        }
+
+        fn handle_count_links(
+            &self,
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            query: WireLinkQuery,
+        ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
+            Box::pin(async { unimplemented!() })
+        }
+
+        fn handle_get_agent_activity(
+            &self,
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            agent: AgentPubKey,
+            query: ChainQueryFilter,
+            options: holochain_p2p::event::GetActivityOptions,
+        ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>> {
+            Box::pin(async { unimplemented!() })
+        }
+
+        fn handle_must_get_agent_activity(
+            &self,
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            author: AgentPubKey,
+            filter: holochain_zome_types::chain::ChainFilter,
+        ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
+            Box::pin(async { unimplemented!() })
+        }
+
+        fn handle_validation_receipts_received(
+            &self,
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            receipts: ValidationReceiptBundle,
+        ) -> BoxFut<'_, HolochainP2pResult<()>> {
+            Box::pin(async { unimplemented!() })
+        }
+
+        fn handle_countersigning_session_negotiation(
+            &self,
+            dna_hash: DnaHash,
+            to_agent: AgentPubKey,
+            message: holochain_p2p::event::CountersigningSessionNegotiationMessage,
+        ) -> BoxFut<'_, HolochainP2pResult<()>> {
+            Box::pin(async { unimplemented!() })
         }
     }
 }
@@ -2519,19 +2627,14 @@ mod app_status_impls {
 
             future::join_all(new_cells.iter().enumerate().map(|(i, (cell, _))| {
                 async move {
-                    let p2p_agents_db = cell.p2p_agents_db().clone();
                     let cell_id = cell.id().clone();
-                    let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = p2p_agents_db.p2p_get_agent(&kagent).await.ok().flatten();
-                    let maybe_initial_arq = maybe_agent_info.clone().map(|i| i.storage_arq);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
                     let res = tokio::time::timeout(
                         JOIN_NETWORK_WAITING_PERIOD,
                         cell.holochain_p2p_dna().clone().join(
                             agent_pubkey,
-                            maybe_agent_info,
-                            maybe_initial_arq,
+                            None,
                         ),
                     )
                         .await;
@@ -3043,6 +3146,8 @@ mod misc_impls {
         /// Create a JSON dump of the cell's state
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
+            unimplemented!()
+            /*
             let cell = self.cell_by_id(cell_id).await?;
             let authored_db = cell.get_or_create_authored_db()?;
             let dht_db = cell.dht_db();
@@ -3066,6 +3171,7 @@ mod misc_impls {
             let summary = out.to_string();
             let out = (out, summary);
             Ok(serde_json::to_string_pretty(&out)?)
+            */
         }
 
         /// Create a JSON dump of the conductor's state
@@ -3117,6 +3223,8 @@ mod misc_impls {
             cell_id: &CellId,
             dht_ops_cursor: Option<u64>,
         ) -> ConductorApiResult<FullStateDump> {
+            unimplemented!()
+            /*
             let authored_db =
                 self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let dht_db = self.get_or_create_dht_db(cell_id.dna_hash())?;
@@ -3135,6 +3243,7 @@ mod misc_impls {
                 integration_dump: full_integration_dump(&dht_db, dht_ops_cursor).await?,
             };
             Ok(out)
+            */
         }
 
         /// JSON dump of network metrics
@@ -3142,38 +3251,32 @@ mod misc_impls {
             &self,
             dna_hash: Option<DnaHash>,
         ) -> ConductorApiResult<String> {
+            unimplemented!()
+            /*
             self.holochain_p2p()
                 .dump_network_metrics(dna_hash)
                 .await
                 .map_err(crate::conductor::api::error::ConductorApiError::other)
+            */
         }
 
         /// JSON dump of backend network stats
         pub async fn dump_network_stats(&self) -> ConductorApiResult<String> {
+            unimplemented!()
+            /*
             self.holochain_p2p()
                 .dump_network_stats()
                 .await
                 .map_err(crate::conductor::api::error::ConductorApiError::other)
+            */
         }
 
         /// Add signed agent info to the conductor
         pub async fn add_agent_infos(
             &self,
-            agent_infos: Vec<AgentInfoSigned>,
+            _agent_infos: Vec<Arc<AgentInfoSigned>>,
         ) -> ConductorApiResult<()> {
-            let mut space_map = HashMap::new();
-            for agent_info_signed in agent_infos {
-                let space = agent_info_signed.space.clone();
-                space_map
-                    .entry(space)
-                    .or_insert_with(Vec::new)
-                    .push(agent_info_signed);
-            }
-            for (space, agent_infos) in space_map {
-                let db = self.p2p_agents_db(&DnaHash::from_kitsune(&space));
-                inject_agent_infos(db, agent_infos.iter()).await?;
-            }
-            Ok(())
+            unimplemented!()
         }
 
         /// Update coordinator zomes on an existing dna.
@@ -3711,8 +3814,11 @@ impl Conductor {
             let handle = self.clone();
             let chc = handle.get_chc(cell_id);
             async move {
-                let holochain_p2p_cell =
-                    handle.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
+                let holochain_p2p_cell = holochain_p2p::HolochainP2pDna::new(
+                    handle.holochain_p2p.clone(),
+                    cell_id.dna_hash().clone(),
+                    chc,
+                );
 
                 let space = handle
                     .get_or_create_space(cell_id.dna_hash())
