@@ -19,6 +19,13 @@ impl HcP2p for StubNetwork {
         Box::pin(async {})
     }
 
+    fn register_handler(
+        &self,
+        handler: event::DynHcP2pHandler,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async { Err("stub".into()) })
+    }
+
     fn join(
         &self,
         dna_hash: DnaHash,

@@ -21,7 +21,7 @@ pub struct HolochainOpStoreFactory {
     /// The database connection getter.
     pub getter: crate::GetDbOpStore,
     /// The event handler.
-    pub handler: crate::types::event::DynHcP2pHandler,
+    pub handler: Arc<std::sync::OnceLock<crate::spawn::WrapEvtSender>>,
 }
 
 impl std::fmt::Debug for HolochainOpStoreFactory {
@@ -63,7 +63,7 @@ impl kitsune2_api::OpStoreFactory for HolochainOpStoreFactory {
 pub struct HolochainOpStore {
     db: DbWrite<DbKindDht>,
     dna_hash: DnaHash,
-    sender: crate::event::DynHcP2pHandler,
+    sender: Arc<std::sync::OnceLock<crate::spawn::WrapEvtSender>>,
 }
 
 impl Debug for HolochainOpStore {
@@ -79,7 +79,7 @@ impl HolochainOpStore {
     pub fn new(
         db: DbWrite<DbKindDht>,
         dna_hash: DnaHash,
-        sender: crate::event::DynHcP2pHandler,
+        sender: Arc<std::sync::OnceLock<crate::spawn::WrapEvtSender>>,
     ) -> HolochainOpStore {
         Self {
             db,
@@ -113,7 +113,10 @@ impl OpStore for HolochainOpStore {
                 })
                 .collect();
 
+            use crate::types::event::HcP2pHandler;
             self.sender
+                .get()
+                .ok_or_else(|| K2Error::other("event handler not registered"))?
                 .handle_publish(
                     self.dna_hash.clone(),
                     false,

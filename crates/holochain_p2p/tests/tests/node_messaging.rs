@@ -533,11 +533,12 @@ async fn spawn_test(dna_hash: DnaHash, handler: DynHcP2pHandler) -> (AgentPubKey
             k2_test_builder: true,
             ..Default::default()
         },
-        handler,
         lair_client,
     )
     .await
     .unwrap();
+
+    hc.register_handler(handler).await.unwrap();
 
     hc.join(dna_hash, agent.clone(), None).await.unwrap();
 

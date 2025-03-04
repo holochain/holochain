@@ -459,8 +459,10 @@ async fn setup_test() -> (DbWrite<DbKindDht>, HolochainOpStore) {
     let db = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
 
     let sender: DynHcP2pHandler = Arc::new(StubHost { db: db.clone() });
+    let sender_w = Arc::new(std::sync::OnceLock::new());
+    sender_w.set(holochain_p2p::WrapEvtSender(sender)).unwrap();
 
-    let op_store = HolochainOpStore::new(db.clone(), dna_hash, sender);
+    let op_store = HolochainOpStore::new(db.clone(), dna_hash, sender_w);
 
     (db, op_store)
 }

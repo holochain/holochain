@@ -3951,8 +3951,6 @@ dependencies = [
 [[package]]
 name = "kitsune2"
 version = "0.0.1-alpha5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3942b838ddea71e0cf189d821ae69c3e5d7e5430f86a4476cb4d21692b522439"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -3964,8 +3962,6 @@ dependencies = [
 [[package]]
 name = "kitsune2_api"
 version = "0.0.1-alpha5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "872f9ba3e03aa5aead3a6681036def8dca867b476bcac5ba14c634b3a5251783"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -3981,8 +3977,6 @@ dependencies = [
 [[package]]
 name = "kitsune2_bootstrap_client"
 version = "0.0.1-alpha5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b42824b7e0e7e68de5483ac604653b1518dce532292d90fa5d8c7039a207e65"
 dependencies = [
  "kitsune2_api",
  "tracing",
@@ -3992,8 +3986,6 @@ dependencies = [
 [[package]]
 name = "kitsune2_core"
 version = "0.0.1-alpha5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "281eb07d20d8d0d5a8a889474458f560534fc488c9ffc4718b1418fa3627bd6f"
 dependencies = [
  "backon",
  "bytes",
@@ -4014,8 +4006,6 @@ dependencies = [
 [[package]]
 name = "kitsune2_dht"
 version = "0.0.1-alpha5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f6ec3d502eaf610cef617f094af212d2385d56f1dd951c2afbbb42b6bccd2e1"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4025,8 +4015,6 @@ dependencies = [
 [[package]]
 name = "kitsune2_gossip"
 version = "0.0.1-alpha5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "733d00efcfcf58888651077cdb88a26b58b19fb3b0b456a661044c03554b3b6c"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4044,8 +4032,6 @@ dependencies = [
 [[package]]
 name = "kitsune2_transport_tx5"
 version = "0.0.1-alpha5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45835283577f8b35075b9852e8b33a24f88a82f015cd2cb5e88471a30e9578b1"
 dependencies = [
  "bytes",
  "kitsune2_api",
