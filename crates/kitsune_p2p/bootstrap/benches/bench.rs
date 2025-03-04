@@ -31,7 +31,7 @@ fn bootstrap(bench: &mut Criterion) {
             .unwrap_or(100),
     );
     let runtime = rt();
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder().use_rustls_tls().build().unwrap();
 
     let mut url = url2!("http://127.0.0.1:0");
     let (driver, addr, _shutdown) = runtime.block_on(async {
