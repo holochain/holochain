@@ -37,7 +37,6 @@ members = [
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
-  "crates/hc_run_local_services",
   "crates/hc_demo_cli",
   "crates/hc_service_check",
   "crates/holochain_terminal",

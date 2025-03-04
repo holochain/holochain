@@ -2586,7 +2586,6 @@ dependencies = [
  "anyhow",
  "clap 4.5.31",
  "holochain_cli_bundle",
- "holochain_cli_run_local_services",
  "holochain_cli_sandbox",
  "holochain_trace",
  "lazy_static",
@@ -2617,19 +2616,6 @@ dependencies = [
  "tracing",
  "walkdir",
  "wasmer",
-]
-
-[[package]]
-name = "holochain_cli_run_local_services"
-version = "0.5.0-dev.12"
-dependencies = [
- "clap 4.5.31",
- "futures",
- "holochain_trace",
- "if-addrs 0.12.0",
- "sbd-server",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -3588,16 +3574,6 @@ checksum = "cabb0019d51a643781ff15c9c8a3e5dedc365c47211270f4e8f82812fedd8f0a"
 dependencies = [
  "libc",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "if-addrs"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb2a33e9c38988ecbda730c85b0fd9ddcdf83c0305ac7fd21c8bb9f57f2f0cc8"
-dependencies = [
- "libc",
- "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7607,7 +7583,7 @@ dependencies = [
  "base64 0.22.1",
  "dirs 5.0.1",
  "dunce",
- "if-addrs 0.10.2",
+ "if-addrs",
  "once_cell",
  "sha2",
  "tokio",
