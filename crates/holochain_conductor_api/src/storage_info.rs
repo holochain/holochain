@@ -9,6 +9,7 @@ pub struct DnaStorageInfo {
     pub dht_data_size_on_disk: usize,
     pub cache_data_size: usize,
     pub cache_data_size_on_disk: usize,
+    pub dna_hash: DnaHash,
     pub used_by: Vec<InstalledAppId>,
 }
 
