@@ -1,8 +1,8 @@
-use rusqlite::OptionalExtension;
 use crate::{
     db::{DbKindT, Txn},
     error::DatabaseError,
 };
+use rusqlite::OptionalExtension;
 
 pub fn get_size_on_disk<K: DbKindT>(txn: &Txn<K>) -> Result<usize, DatabaseError> {
     Ok(txn
