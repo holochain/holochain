@@ -4,7 +4,6 @@ use crossterm::event::{self, Event, KeyCode};
 #[derive(Debug)]
 pub enum ScreenEvent {
     Refresh,
-    SwitchNetwork,
     NavDown,
     NavUp,
 }
@@ -21,8 +20,6 @@ pub fn handle_events(app: &mut App) -> anyhow::Result<()> {
                     app.stop();
                 } else if key.code == KeyCode::Char('r') {
                     app.push_event(ScreenEvent::Refresh);
-                } else if key.code == KeyCode::Char('n') {
-                    app.push_event(ScreenEvent::SwitchNetwork);
                 } else if key.code == KeyCode::Down {
                     app.push_event(ScreenEvent::NavDown)
                 } else if key.code == KeyCode::Up {

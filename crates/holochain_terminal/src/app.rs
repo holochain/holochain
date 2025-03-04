@@ -1,7 +1,6 @@
 use crate::cli::Args;
 use crate::client::{AdminClient, AppClient};
 use crate::event::ScreenEvent;
-use kitsune_p2p_types::dependencies::tokio;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

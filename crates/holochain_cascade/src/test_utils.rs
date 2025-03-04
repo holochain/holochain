@@ -116,10 +116,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         Ok(out)
     }
 
-    async fn count_links(
-        &self,
-        query: WireLinkQuery,
-    ) -> HolochainP2pResult<CountLinksResponse> {
+    async fn count_links(&self, query: WireLinkQuery) -> HolochainP2pResult<CountLinksResponse> {
         let mut out = HashSet::new();
 
         for db in &self.envs {
@@ -176,10 +173,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         Ok(out)
     }
 
-    async fn authority_for_hash(
-        &self,
-        _dht_hash: holo_hash::OpBasis,
-    ) -> HolochainP2pResult<bool> {
+    async fn authority_for_hash(&self, _dht_hash: holo_hash::OpBasis) -> HolochainP2pResult<bool> {
         Ok(self.authority)
     }
 
