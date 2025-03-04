@@ -91,9 +91,9 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
-kitsune2_api = { path = "../kitsune2/crates/api" }
-kitsune2_core = { path = "../kitsune2/crates/core" }
-kitsune2 = { path = "../kitsune2/crates/kitsune2" }
+# kitsune2_api = { path = "../kitsune2/crates/api" }
+# kitsune2_core = { path = "../kitsune2/crates/core" }
+# kitsune2 = { path = "../kitsune2/crates/kitsune2" }
 # holochain_deepkey_dna = { path = "../deepkey/crates/holochain_deepkey_dna" }
 # task-motel = { path = "../task-motel" }
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
