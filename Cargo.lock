@@ -2530,7 +2530,7 @@ dependencies = [
 
 [[package]]
 name = "hc_service_check"
-version = "0.1.2-rc.0"
+version = "0.1.2-rc.1"
 dependencies = [
  "clap 4.5.21",
  "kitsune_p2p_bootstrap_client",
@@ -2542,7 +2542,7 @@ dependencies = [
 
 [[package]]
 name = "hc_sleuth"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2565,7 +2565,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2756,7 +2756,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "aitia",
  "anyhow",
@@ -2874,7 +2874,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2905,7 +2905,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_chc"
-version = "0.1.2-rc.0"
+version = "0.1.2-rc.1"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2933,7 +2933,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "anyhow",
  "clap 4.5.21",
@@ -2947,7 +2947,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2973,7 +2973,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_run_local_services"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "clap 4.5.21",
  "futures",
@@ -2987,7 +2987,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -3018,7 +3018,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "cfg-if 1.0.0",
  "derive_more",
@@ -3047,7 +3047,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.3.2-rc.0"
+version = "0.3.2-rc.1"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3114,7 +3114,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "assert_cmd",
  "base64 0.22.1",
@@ -3144,7 +3144,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_metrics"
-version = "0.4.1"
+version = "0.4.2-rc.0"
 dependencies = [
  "influxive",
  "opentelemetry_api",
@@ -3170,7 +3170,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "aitia",
  "async-trait",
@@ -3239,7 +3239,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3287,7 +3287,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "aitia",
  "anyhow",
@@ -3371,7 +3371,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "anyhow",
  "arbitrary",
@@ -3448,7 +3448,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -3504,7 +3504,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "async-trait",
  "criterion",
@@ -4315,7 +4315,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "arbitrary",
  "arrayref",
@@ -4395,7 +4395,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap"
-version = "0.3.2-rc.0"
+version = "0.3.2-rc.1"
 dependencies = [
  "clap 4.5.21",
  "criterion",
@@ -4417,7 +4417,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune_p2p_bootstrap_client"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 dependencies = [
  "arbitrary",
  "ed25519-dalek",
@@ -5047,7 +5047,7 @@ checksum = "7843ec2de400bcbc6a6328c958dc38e5359da6e93e72e37bc5246bf1ae776389"
 
 [[package]]
 name = "mr_bundle"
-version = "0.4.1"
+version = "0.4.2-rc.0"
 dependencies = [
  "anyhow",
  "arbitrary",

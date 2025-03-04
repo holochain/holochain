@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.4.2-rc.0"
+version = "0.4.2-rc.1"
 description = "Holochain common types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -33,10 +33,10 @@ one_err = "0.0.8"
 holo_hash = { version = "^0.4.2-rc.0", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_keystore = { version = "^0.4.2-rc.0", path = "../holochain_keystore" }
+holochain_keystore = { version = "^0.4.2-rc.1", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.4.2-rc.0", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.4.2-rc.0" }
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.4.2-rc.1"}
 holochain_trace = { version = "^0.4.1", path = "../holochain_trace" }
 holochain_util = { version = "^0.4.1", path = "../holochain_util", features = [
   "backtrace",
@@ -48,7 +48,7 @@ itertools = { version = "0.12" }
 kitsune_p2p_dht = { version = "^0.4.2-rc.0", path = "../kitsune_p2p/dht" }
 mr_bundle = { path = "../mr_bundle", features = [
   "packing",
-], version = "^0.4.1" }
+], version = "^0.4.2-rc.0"}
 must_future = "0.1.1"
 nanoid = "0.4"
 parking_lot = "0.12"
