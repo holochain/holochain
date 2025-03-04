@@ -37,7 +37,9 @@ pub fn spawn_publish_dht_ops_consumer(
                 .conductor_tuning_params()
                 .min_publish_interval();
             async move {
-                if conductor.get_config().network.tuning_params.disable_publish {
+                if false
+                /*conductor.get_config().network.tuning_params.disable_publish*/
+                {
                     Ok(WorkComplete::Complete)
                 } else {
                     publish_dht_ops_workflow(

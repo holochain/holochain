@@ -2463,6 +2463,7 @@ dependencies = [
  "kitsune2_api",
  "kitsune2_core",
  "lair_keystore",
+ "lair_keystore_api",
  "maplit",
  "matches",
  "mockall",
@@ -3950,7 +3951,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune2"
-version = "0.0.1-alpha5"
+version = "0.0.1-alpha6"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -3961,7 +3962,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_api"
-version = "0.0.1-alpha5"
+version = "0.0.1-alpha6"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -3976,7 +3977,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_client"
-version = "0.0.1-alpha5"
+version = "0.0.1-alpha6"
 dependencies = [
  "kitsune2_api",
  "tracing",
@@ -3985,7 +3986,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_core"
-version = "0.0.1-alpha5"
+version = "0.0.1-alpha6"
 dependencies = [
  "backon",
  "bytes",
@@ -4005,7 +4006,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_dht"
-version = "0.0.1-alpha5"
+version = "0.0.1-alpha6"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4014,7 +4015,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_gossip"
-version = "0.0.1-alpha5"
+version = "0.0.1-alpha6"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4031,7 +4032,7 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_transport_tx5"
-version = "0.0.1-alpha5"
+version = "0.0.1-alpha6"
 dependencies = [
  "bytes",
  "kitsune2_api",

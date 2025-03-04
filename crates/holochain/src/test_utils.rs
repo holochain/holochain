@@ -168,11 +168,9 @@ impl TestNetwork {
 
 impl Drop for TestNetwork {
     fn drop(&mut self) {
-        use ghost_actor::GhostControlSender;
         let network = self.network.take().unwrap();
         let respond_task = self.respond_task.take().unwrap();
         tokio::task::spawn(async move {
-            network.ghost_actor_shutdown_immediate().await.ok();
             respond_task.await.ok();
         });
     }
@@ -430,7 +428,6 @@ pub async fn setup_app_inner(
                 allowed_origins: AllowedOrigins::Any,
             },
         }]),
-        network: network.unwrap_or_else(KitsuneP2pConfig::mem),
         ..Default::default()
     };
     let conductor_handle = ConductorBuilder::new()
@@ -907,6 +904,8 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
+    todo!()
+    /*
     for cell_id in conductor.running_cell_ids() {
         let space = cell_id.dna_hash();
         let db = conductor.get_p2p_db(space);
@@ -915,6 +914,7 @@ pub async fn display_agent_infos(conductor: &ConductorHandle) {
             .unwrap();
         tracing::debug!(%info);
     }
+    */
 }
 
 /// Helper to create a signed zome invocation for tests

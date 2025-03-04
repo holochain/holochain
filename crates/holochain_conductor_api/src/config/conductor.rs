@@ -139,6 +139,9 @@ pub struct ConductorConfig {
     /// Tuning parameters to adjust the behaviour of the conductor.
     #[serde(default)]
     pub tuning_params: Option<ConductorTuningParams>,
+
+    /// Tracing scope.
+    pub tracing_scope: Option<String>,
 }
 
 /// Helper function to load a config from a YAML string.
@@ -159,6 +162,11 @@ impl ConductorConfig {
             _ => err.into(),
         })?;
         config_from_yaml(&config_yaml)
+    }
+
+    /// Get the tracing scope from the network config
+    pub fn tracing_scope(&self) -> Option<String> {
+        self.tracing_scope.clone()
     }
 
     /// Get the data directory for this config or say something nice and die.

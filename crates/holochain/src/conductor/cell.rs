@@ -20,7 +20,7 @@ use holo_hash::*;
 use holochain_cascade::authority;
 use holochain_chc::ChcImpl;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::{HolochainP2pDna, HolochainP2pResult};
+use holochain_p2p::{HolochainP2pDna, HolochainP2pError, HolochainP2pResult};
 use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
@@ -590,7 +590,9 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async {
             #[cfg(not(feature = "unstable-countersigning"))]
-            { Ok(()) }
+            {
+                Ok(())
+            }
             #[cfg(feature = "unstable-countersigning")]
             match message {
                 CountersigningSessionNegotiationMessage::EnzymePush(chain_op) => {
@@ -652,7 +654,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             if let Err(e) = &mut r {
                 error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
             }
-            r
+            r.map_err(HolochainP2pError::other)
         })
     }
 
@@ -688,7 +690,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             let db = self.space.dht_db.clone();
             authority::handle_get_links(db.into(), link_key, options)
                 .await
-                .map_err(Into::into)
+                .map_err(HolochainP2pError::other)
         })
     }
 
@@ -704,7 +706,8 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             let db = self.space.dht_db.clone();
             Ok(CountLinksResponse::new(
                 authority::handle_get_links_query(db.into(), query)
-                    .await?
+                    .await
+                    .map_err(HolochainP2pError::other)?
                     .into_iter()
                     .map(|l| l.create_link_hash)
                     .collect::<Vec<_>>(),
@@ -725,7 +728,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             let db = self.space.dht_db.clone();
             authority::handle_get_agent_activity(db.into(), agent, query, options)
                 .await
-                .map_err(Into::into)
+                .map_err(HolochainP2pError::other)
         })
     }
 
@@ -741,7 +744,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             let db = self.space.dht_db.clone();
             authority::handle_must_get_agent_activity(db.into(), author, filter)
                 .await
-                .map_err(Into::into)
+                .map_err(HolochainP2pError::other)
         })
     }
 
@@ -753,7 +756,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         _to_agent: AgentPubKey,
         receipts: ValidationReceiptBundle,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async {
+        let fut = async move {
             for receipt in receipts.into_iter() {
                 debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
 
@@ -861,8 +864,10 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                 }
             }
 
-            Ok(())
-        })
+            CellResult::Ok(())
+        };
+
+        Box::pin(async move { fut.await.map_err(HolochainP2pError::other) })
     }
 
     #[cfg_attr(
@@ -878,7 +883,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         zome_call_params_serialized: ExternIO,
         signature: Signature,
     ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
-        Box::pin(async {
+        let fut = async move {
             let zome_call_params = zome_call_params_serialized.decode::<ZomeCallParams>()?;
             if !is_valid_signature(
                 &zome_call_params.provenance,
@@ -897,8 +902,10 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             // double ? because
             // - ConductorApiResult
             // - ZomeCallResult
-            Ok(self.call_zome(zome_call_params, None).await??.try_into()?)
-        })
+            CellResult::Ok(self.call_zome(zome_call_params, None).await??.try_into()?)
+        };
+
+        Box::pin(async move { fut.await.map_err(HolochainP2pError::other) })
     }
 }
 

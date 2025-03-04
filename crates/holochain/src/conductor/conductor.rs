@@ -274,6 +274,12 @@ pub struct Conductor {
     app_broadcast: AppBroadcast,
 }
 
+impl std::fmt::Debug for Conductor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Conductor").finish()
+    }
+}
+
 impl Conductor {
     /// Create a conductor builder.
     pub fn builder() -> ConductorBuilder {
@@ -364,13 +370,11 @@ mod startup_shutdown_impls {
             self.shutting_down
                 .store(true, std::sync::atomic::Ordering::Relaxed);
 
-            use ghost_actor::GhostControlSender;
-            let ghost_shutdown = self.holochain_p2p.ghost_actor_shutdown_immediate();
             let mut tm = self.task_manager();
             let task = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
             tokio::task::spawn(async move {
                 tracing::info!("Sending shutdown signal to all managed tasks.");
-                let (_, _, r) = futures::join!(ghost_shutdown, tm.shutdown().boxed(), task,);
+                let (_, r) = futures::join!(tm.shutdown().boxed(), task,);
                 r?
             })
         }
@@ -852,12 +856,12 @@ mod network_impls {
     use holochain_conductor_api::{
         CellInfo, DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo,
     };
+    use holochain_p2p::HolochainP2pResult;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
-    use zome_call_signature_verification::is_valid_signature;
-    use holochain_p2p::HolochainP2pResult;
     use kitsune2_api::BoxFut;
+    use zome_call_signature_verification::is_valid_signature;
 
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
@@ -928,26 +932,6 @@ mod network_impls {
             timestamp: Timestamp,
         ) -> DatabaseResult<bool> {
             self.spaces.is_blocked(input, timestamp).await
-        }
-
-        pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
-            let mut space_to_agents = HashMap::new();
-
-            for cell in self.running_cells.share_ref(|c| {
-                <Result<_, one_err::OneErr>>::Ok(c.keys().cloned().collect::<Vec<_>>())
-            })? {
-                space_to_agents
-                    .entry(cell.dna_hash().clone())
-                    .or_insert_with(Vec::new)
-                    .push(cell.agent_pubkey().to_kitsune());
-            }
-
-            for (space, agents) in space_to_agents {
-                let db = self.spaces.p2p_agents_db(&space)?;
-                p2p_prune(&db, agents).await?;
-            }
-
-            Ok(())
         }
 
         pub(crate) async fn network_info(
@@ -1493,7 +1477,7 @@ mod network_impls {
             dna_hash: DnaHash,
             to_agent: AgentPubKey,
             dht_hash: holo_hash::AnyDhtHash,
-            options: GetOptions,
+            options: holochain_p2p::event::GetOptions,
         ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
             Box::pin(async { unimplemented!() })
         }
@@ -2164,7 +2148,7 @@ mod app_impls {
                 .get_entry(dst_tag.clone().into())
                 .await;
             let seed_info = match entry_info {
-                Ok(LairEntryInfo::Seed { seed_info, .. }) => {
+                Ok(lair_keystore_api::lair_store::LairEntryInfo::Seed { seed_info, .. }) => {
                     // If the seed already exists, we don't need to create it again.
                     seed_info
                 }

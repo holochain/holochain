@@ -648,7 +648,10 @@ async fn check_expected_data_inner(
 async fn check_agents<'iter>(
     expected_agents: &'iter [AgentId],
 ) -> DatabaseResult<impl Iterator<Item = &'iter AgentId> + 'iter> {
-    todo!()
+    if true {
+        todo!()
+    }
+    Ok(<Vec<&'iter AgentId>>::new().into_iter())
     /*
     // Poll the peer database for the currently held agents.
     let agents_held: HashSet<_> = p2p_agents_db
@@ -685,7 +688,7 @@ async fn check_hashes(
                 .read_async(move |txn| {
                     for hash in &expected {
                         // TODO: This might be too slow, could instead save the holochain hash versions.
-                        let h_hash: DhtOpHash = DhtOpHashExt::from_kitsune_raw(hash.clone());
+                        let h_hash = DhtOpHash::from_k2_op(hash);
                         let integrated: bool = txn.query_row(
                             "
                             SELECT EXISTS(
@@ -722,7 +725,7 @@ async fn gather_published_data(
             .into_iter()
             .map(|(l, h, _)| (l, h))
             .collect();
-        let storage_arc = request_arc(&stores.p2p_agents_db, (*stores.agent).clone()).await?;
+        let storage_arc = request_arc(stores.agent.clone()).await?;
         Ok(storage_arc.map(|storage_arc| {
             // The line below was added when migrating to rust edition 2021, per
             // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
@@ -787,7 +790,7 @@ where
                     let loc: u32 = row.get("loc")?;
                     let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
 
-                    Ok((loc.into(), h.into_kitsune_raw(), op))
+                    Ok((loc.into(), h.to_k2_op(), op))
                 },
             )?
             .collect::<StateQueryResult<_>>()?
@@ -801,7 +804,7 @@ where
                         let h: DhtOpHash = row.get("dht_op_hash")?;
                         let loc: u32 = row.get("loc")?;
                         let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
-                        StateQueryResult::Ok((loc.into(), h.into_kitsune_raw(), op))
+                        StateQueryResult::Ok((loc.into(), h.to_k2_op(), op))
                     },
                 )?
                 .collect::<StateQueryResult<_>>()?

@@ -244,8 +244,8 @@ impl ConductorBuilder {
             ..Default::default()
         };
 
-        let (holochain_p2p, p2p_evt) =
-            match holochain_p2p::spawn_holochain_p2p(p2p_config, (), keystore.clone()).await {
+        let holochain_p2p =
+            match holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone()).await {
                 Ok(r) => r,
                 Err(err) => {
                     tracing::error!(?err, "Error spawning networking");
@@ -264,7 +264,7 @@ impl ConductorBuilder {
             config.clone(),
             ribosome_store,
             keystore,
-            holochain_p2p,
+            holochain_p2p.clone(),
             spaces,
             post_commit_sender,
             outcome_tx,
@@ -278,23 +278,12 @@ impl ConductorBuilder {
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
 
-        {
-            let handle = handle.clone();
-            tokio::task::spawn(async move {
-                while !shutting_down.load(std::sync::atomic::Ordering::Relaxed) {
-                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                    if let Err(e) = handle.prune_p2p_agents_db().await {
-                        tracing::error!("failed to prune p2p_agents_db: {:?}", e);
-                    }
-                }
-            });
-        }
+        holochain_p2p.register_handler(handle.clone()).await?;
 
         Self::finish(
             handle,
             config,
             dpki_dna_to_install,
-            p2p_evt,
             post_commit_receiver,
             outcome_rx,
             builder.no_print_setup,
@@ -497,10 +486,15 @@ impl ConductorBuilder {
             ),
         };
 
-        let network_compat = NetworkCompatParams { dpki_uuid };
+        let compat = NetworkCompatParams { dpki_uuid };
 
-        let (holochain_p2p, p2p_evt) =
-            holochain_p2p::spawn_holochain_p2p(network_config, network_compat).await?;
+        let p2p_config = holochain_p2p::HolochainP2pConfig {
+            compat,
+            ..Default::default()
+        };
+
+        let holochain_p2p =
+            holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone()).await?;
 
         let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
@@ -511,7 +505,7 @@ impl ConductorBuilder {
             config.clone(),
             ribosome_store,
             keystore,
-            holochain_p2p,
+            holochain_p2p.clone(),
             spaces,
             post_commit_sender,
             outcome_tx,
@@ -521,6 +515,8 @@ impl ConductorBuilder {
 
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
+
+        holochain_p2p.register_handler(handle.clone()).await?;
 
         // Install DPKI from DNA or mock
         if let Some(dpki_impl) = builder.dpki {
@@ -545,7 +541,6 @@ impl ConductorBuilder {
             handle,
             config,
             dpki_dna_to_install,
-            p2p_evt,
             post_commit_receiver,
             outcome_rx,
             builder.no_print_setup,

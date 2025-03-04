@@ -91,7 +91,6 @@ pub async fn publish_dht_ops_workflow(
     let continue_publish = db
         .write_async(move |txn| {
             for hash in success {
-                let hash = DhtOpHash::from_kitsune(hash.data_ref());
                 set_last_publish_time(txn, &hash, now)?;
             }
             WorkflowResult::Ok(publish_query::num_still_needing_publish(txn, agent)? > 0)

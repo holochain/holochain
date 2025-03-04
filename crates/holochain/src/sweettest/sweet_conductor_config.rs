@@ -1,7 +1,7 @@
 use std::sync::{atomic::AtomicUsize, Arc};
 
 use holochain_conductor_api::{
-    conductor::{ConductorConfig, ConductorTuningParams},
+    conductor::{ConductorConfig, ConductorTuningParams, NetworkConfig},
     AdminInterfaceConfig, InterfaceDriver,
 };
 use holochain_types::websocket::AllowedOrigins;
@@ -31,6 +31,28 @@ impl From<ConductorConfig> for SweetConductorConfig {
     }
 }
 
+impl From<NetworkConfig> for SweetConductorConfig {
+    fn from(network: NetworkConfig) -> Self {
+        ConductorConfig {
+            network,
+            admin_interfaces: Some(vec![AdminInterfaceConfig {
+                driver: InterfaceDriver::Websocket {
+                    port: 0,
+                    allowed_origins: AllowedOrigins::Any,
+                },
+            }]),
+            tuning_params: Some(ConductorTuningParams {
+                sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),
+                countersigning_resolution_retry_delay: Some(std::time::Duration::from_secs(3)),
+                countersigning_resolution_retry_limit: None,
+                min_publish_interval: None,
+            }),
+            ..Default::default()
+        }
+        .into()
+    }
+}
+
 impl SweetConductorConfig {
     /// Rewrite the config to point to the given rendezvous server
     pub fn apply_rendezvous(mut self, rendezvous: &DynSweetRendezvous) -> Self {
@@ -50,16 +72,9 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        let mut c = SweetConductorConfig::from(KitsuneP2pConfig::mem())
-            .tune(|tune| {
-                tune.gossip_loop_iteration_delay_ms = 500;
-                tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
-                tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
-                tune.gossip_round_timeout_ms = 10_000;
-            })
-            .tune_conductor(|tune| {
-                tune.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
-            });
+        let mut c = SweetConductorConfig::from(NetworkConfig::default()).tune_conductor(|tune| {
+            tune.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
+        });
 
         // Allow device seed generation to exercise key derivation in sweettests.
         c.device_seed_lair_tag = Some("sweet-conductor-device-seed".to_string());
@@ -106,6 +121,14 @@ impl SweetConductorConfig {
     /// Build a SweetConductor from this config
     pub async fn build_conductor(self) -> SweetConductor {
         SweetConductor::from_config(self).await
+    }
+
+    /// Apply a function to the conductor's tuning parameters to customise them.
+    pub fn tune_conductor(mut self, f: impl FnOnce(&mut ConductorTuningParams)) -> Self {
+        if let Some(ref mut params) = self.tuning_params {
+            f(params);
+        }
+        self
     }
 
     /// Completely disable networking

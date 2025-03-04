@@ -22,6 +22,9 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction};
 
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 
+/// Canonical string repr of AgentInfoSigned
+pub type AgentInfoSignedString = String;
+
 #[derive(SerializedBytes, serde::Serialize, serde::Deserialize, Debug)]
 /// Data to use to simulate a dht network.
 pub struct MockNetworkData {
@@ -38,7 +41,7 @@ pub struct MockNetworkData {
     /// Agent storage arcs.
     pub agent_to_arq: HashMap<Arc<AgentPubKey>, DhtArc>,
     /// Agents peer info.
-    pub agent_to_info: HashMap<Arc<AgentPubKey>, AgentInfoSigned>,
+    pub agent_to_info: HashMap<Arc<AgentPubKey>, AgentInfoSignedString>,
     /// Hashes ordered by their basis location.
     pub ops_by_loc: BTreeMap<u32, Vec<Arc<DhtOpHash>>>,
     /// Hash to basis location.
@@ -71,7 +74,7 @@ impl MockNetworkData {
         let (agent_hash_to_kit, agent_kit_to_hash): (HashMap<_, _>, HashMap<_, _>) = authored
             .keys()
             .map(|agent| {
-                let k_agent = agent.to_kitsune();
+                let k_agent = agent.to_k2_agent();
                 ((agent.clone(), k_agent.clone()), (k_agent, agent.clone()))
             })
             .unzip();
@@ -80,7 +83,7 @@ impl MockNetworkData {
         let mut ops_by_loc = BTreeMap::new();
         let mut op_to_loc = HashMap::with_capacity(ops.len());
         for (hash, op) in &ops {
-            let k_hash = hash.to_kitsune();
+            let k_hash = hash.to_k2_op();
             op_hash_to_kit.insert(hash.clone(), k_hash.clone());
             op_kit_to_hash.insert(k_hash, hash.clone());
 
@@ -98,7 +101,11 @@ impl MockNetworkData {
             .collect();
         let agent_to_arq = agent_to_info
             .iter()
-            .map(|(k, v)| (k.clone(), v.storage_arq))
+            .map(|(k, v)| (k.clone(), v.storage_arc))
+            .collect();
+        let agent_to_info: HashMap<_, _> = agent_to_info
+            .into_iter()
+            .map(|(k, v)| (k, v.encode().unwrap()))
             .collect();
         Self {
             authored,
@@ -133,12 +140,14 @@ impl MockNetworkData {
     }
 
     /// The agent info of the simulated agents.
-    pub fn agent_info(&self) -> impl Iterator<Item = &AgentInfoSigned> {
+    pub fn agent_info(&self) -> impl Iterator<Item = &AgentInfoSignedString> {
         self.agent_to_info.values()
     }
 
     /// Hashes that an agent is an authority for.
     pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
+        todo!()
+        /*
         let arq = self.agent_to_arq[agent];
         if arq.is_empty() {
             Vec::with_capacity(0)
@@ -161,6 +170,7 @@ impl MockNetworkData {
                     .collect()
             }
         }
+        */
     }
 }
 
@@ -294,6 +304,8 @@ fn cache_data(in_memory: bool, data: &MockNetworkData, is_cached: bool) -> Conne
 }
 
 fn get_cached() -> Option<GeneratedData> {
+    todo!()
+    /*
     let p = std::env::temp_dir()
         .join("mock_test_data")
         .join("mock_test_data.sqlite3");
@@ -336,6 +348,7 @@ fn get_cached() -> Option<GeneratedData> {
             ops,
         })
     })
+    */
 }
 
 async fn create_test_data(
@@ -349,7 +362,7 @@ async fn create_test_data(
     let num_storage_buckets = (1.0 / coverage).round() as u32;
     let bucket_size = u32::MAX / num_storage_buckets;
     let buckets = (0..num_storage_buckets)
-        .map(|i| DhtArcRange::from_bounds(i * bucket_size, i * bucket_size + bucket_size))
+        .map(|i| DhtArc::Arc(i * bucket_size, i * bucket_size + bucket_size))
         .collect::<Vec<_>>();
     let mut bucket_counts = vec![0; buckets.len()];
     let mut entries = Vec::with_capacity(buckets.len() * approx_num_ops_held);
@@ -432,8 +445,10 @@ async fn create_test_data(
 
 /// Set the peers to seem like they come from separate nodes and have accurate storage arcs.
 async fn reset_peer_data(peers: Vec<AgentInfoSigned>, dna_hash: &DnaHash) -> Vec<AgentInfoSigned> {
+    todo!()
+    /*
     let coverage = ((50.0 / peers.len() as f64) * 2.0).clamp(0.0, 1.0);
-    let space_hash = dna_hash.to_kitsune();
+    let space_hash = dna_hash.to_k2_space();
     let mut peer_data = Vec::with_capacity(peers.len());
     let rng = rand::thread_rng();
     let mut rand_string = rng.sample_iter(&Alphanumeric);
@@ -459,6 +474,7 @@ async fn reset_peer_data(peers: Vec<AgentInfoSigned>, dna_hash: &DnaHash) -> Vec
         peer_data.push(info);
     }
     peer_data
+    */
 }
 
 fn get_chain_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, ChainOpHashed> {

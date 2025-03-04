@@ -113,7 +113,6 @@ pub async fn integrate_dht_ops_workflow(
     tracing::debug!(?changed, %ops_ps);
     if changed > 0 {
         trigger_receipt.trigger(&"integrate_dht_ops_workflow");
-        network.new_integrated_data().await?;
         Ok(WorkComplete::Incomplete(None))
     } else {
         Ok(WorkComplete::Complete)

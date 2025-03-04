@@ -251,12 +251,12 @@ impl Spaces {
         let cell_ids = match &target_id {
             BlockTargetId::Cell(cell_id) => vec![cell_id.to_owned()],
             BlockTargetId::NodeDna(node_id, dna_hash) => {
-                self.node_agents_in_spaces((*node_id).clone(), vec![dna_hash.clone()])
+                self.node_agents_in_spaces(node_id, vec![dna_hash.clone()])
                     .await?
             }
             BlockTargetId::Node(node_id) => {
                 self.node_agents_in_spaces(
-                    (*node_id).clone(),
+                    node_id,
                     self.map
                         .share_ref(|m| m.keys().cloned().collect::<Vec<DnaHash>>()),
                 )
@@ -704,14 +704,6 @@ impl Spaces {
         }
         Ok(())
     }
-
-    /// Get the recent_threshold based on the kitsune network config
-    pub fn recent_threshold(&self) -> Duration {
-        self.config
-            .network
-            .tuning_params
-            .danger_gossip_recent_threshold()
-    }
 }
 
 impl Space {
@@ -721,63 +713,39 @@ impl Space {
         db_sync_strategy: DbSyncStrategy,
         db_key: DbKey,
     ) -> DatabaseResult<Self> {
-        let space = dna_hash.to_kitsune();
+        let space = dna_hash.to_k2_space();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let (cache, dht_db, p2p_agents_db, p2p_metrics_db, conductor_db) =
-            tokio::task::block_in_place(|| {
-                let cache = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindCache(dna_hash.clone()),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                let dht_db = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindDht(dna_hash.clone()),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                let p2p_agents_db = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindP2pAgents(space.clone()),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                let p2p_metrics_db = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindP2pMetrics(space),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindConductor,
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                DatabaseResult::Ok((cache, dht_db, p2p_agents_db, p2p_metrics_db, conductor_db))
-            })?;
-
-        let (tx, rx) = tokio::sync::mpsc::channel(100);
-        tokio::spawn(p2p_agent_store::p2p_put_all_batch(
-            p2p_agents_db.clone(),
-            rx,
-        ));
-        let p2p_batch_sender = tx;
+        let (cache, dht_db, conductor_db) = tokio::task::block_in_place(|| {
+            let cache = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindCache(dna_hash.clone()),
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                },
+            )?;
+            let dht_db = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindDht(dna_hash.clone()),
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                },
+            )?;
+            let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindConductor,
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                },
+            )?;
+            DatabaseResult::Ok((cache, dht_db, conductor_db))
+        })?;
 
         let witnessing_workspace = WitnessingWorkspace::default();
         let incoming_op_hashes = IncomingOpHashes::default();
@@ -788,9 +756,6 @@ impl Space {
             cache_db: cache,
             authored_dbs: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             dht_db,
-            p2p_agents_db,
-            p2p_metrics_db,
-            p2p_batch_sender,
             countersigning_workspaces: Default::default(),
             witnessing_workspace,
             incoming_op_hashes,

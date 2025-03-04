@@ -169,27 +169,24 @@ impl SweetConductor {
         let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
             config.apply_rendezvous(&r).into()
         } else {
-            if let Some(b) = config.network.bootstrap_service.as_ref() {
-                if b.to_string().starts_with("rendezvous:") {
-                    panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.bootstrap_service");
-                }
+            if config
+                .network
+                .bootstrap_url
+                .as_str()
+                .starts_with("rendezvous:")
+            {
+                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.bootstrap_service");
             }
-            if config.network.transport_pool.iter().any(|p| match p {
-                TransportConfig::WebRTC { signal_url, .. } => signal_url.starts_with("rendezvous:"),
-                _ => false,
-            }) {
+            if config
+                .network
+                .signal_url
+                .as_str()
+                .starts_with("rendezvous:")
+            {
                 panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.transport_pool[].signal_url");
             }
             config.into()
         };
-
-        if config.tracing_scope().is_none() {
-            config.network.tracing_scope = Some(format!(
-                "{}.{}",
-                NUM_CREATED.load(Ordering::SeqCst),
-                nanoid!(5)
-            ));
-        }
 
         if config.data_root_path.is_none() {
             config.data_root_path = Some(dir.as_ref().to_path_buf().into());
@@ -866,7 +863,7 @@ impl SweetConductor {
                     .get_agent_infos(cell_id.clone())
                     .await?
                     .into_iter()
-                    .map(|p| AgentPubKey::from_kitsune(&p.agent))
+                    .map(|p| AgentPubKey::from_k2_agent(&p.agent))
                     .collect::<HashSet<_>>();
                 if infos.is_superset(&peers) {
                     break;
