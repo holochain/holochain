@@ -543,7 +543,7 @@ pub struct NetworkInfo {
     pub completed_rounds_since_last_time_queried: u32,
 }
 
-/// The request payload that should be sent in a [`holochain_websocket::WireMessage::Authenticate`]
+/// The request payload sent on a Holochain app websocket to authenticate the connection.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppAuthenticationRequest {
     /// The authentication token that was provided by the conductor when [`crate::admin_interface::AdminRequest::IssueAppAuthenticationToken`] was called.
