@@ -11,7 +11,7 @@ pub struct Args {
     pub admin_url: Option<Url>,
 
     /// The bootstrap URL to connect to for debugging peer discovery. For example http://localhost:3000
-    #[arg(long, default_value = "https://bootstrap.holochain.org")]
+    #[arg(long, default_value = "https://test-test-bootstrap2.holochain.org")]
     pub bootstrap_url: Option<Url>,
 
     /// The DNA hash in Base64 format to use for
