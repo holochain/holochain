@@ -3,12 +3,12 @@ use crate::components::common::show_message;
 use crate::event::ScreenEvent;
 use chrono::{DateTime, Utc};
 use holo_hash::AgentPubKey;
+use kitsune2_api::AgentInfoSigned;
+use kitsune2_core::Ed25519Verifier;
 use ratatui::{prelude::*, widgets::*};
 use std::sync::OnceLock;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
-use kitsune2_api::AgentInfoSigned;
-use kitsune2_core::Ed25519Verifier;
 
 fn get_agents() -> &'static RwLock<Vec<Arc<AgentInfoSigned>>> {
     static AGENTS: OnceLock<RwLock<Vec<Arc<AgentInfoSigned>>>> = OnceLock::new();
@@ -150,10 +150,7 @@ impl Widget for BootstrapWidget {
                     "agent       : {:?}",
                     AgentPubKey::from_k2_agent(&agents[selected].agent)
                 )),
-                ListItem::new(format!(
-                    "storage arc : {:?}",
-                    agents[selected].storage_arc
-                )),
+                ListItem::new(format!("storage arc : {:?}", agents[selected].storage_arc)),
                 ListItem::new(format!("url list    : {:?}", agents[selected].url)),
                 ListItem::new(format!(
                     "signed at   : {:?}",
