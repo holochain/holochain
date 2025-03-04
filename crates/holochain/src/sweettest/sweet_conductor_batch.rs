@@ -219,6 +219,7 @@ impl SweetConductorBatch {
             .into())
     }
 
+    /*
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
         SweetConductor::exchange_peer_info(&self.0).await
@@ -256,6 +257,7 @@ impl SweetConductorBatch {
 
         crate::conductor::p2p_agent_store::reveal_peer_info(observer_envs, seen_envs).await;
     }
+    */
 
     /// Get the DPKI cell for each conductor, if applicable
     pub fn dpki_cells(&self) -> Vec<SweetCell> {

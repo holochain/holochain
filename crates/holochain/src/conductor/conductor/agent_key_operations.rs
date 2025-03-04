@@ -139,9 +139,11 @@ impl Conductor {
 
                 // Insert `Delete` action of agent pub key into source chain
                 source_chain.delete_valid_agent_pub_key().await?;
-                let network = conductor
-                    .holochain_p2p
-                    .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(&cell_id));
+                let network = holochain_p2p::HolochainP2pDna::new(
+                    conductor.holochain_p2p.clone(),
+                    cell_id.dna_hash().clone(),
+                    conductor.get_chc(&cell_id),
+                );
                 source_chain
                     .flush(
                         network

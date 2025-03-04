@@ -1,4 +1,3 @@
-use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasmPair;
@@ -62,8 +61,6 @@ impl SweetDnaFile {
             .modifiers(DnaModifiers {
                 network_seed,
                 properties: properties.clone(),
-                origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                quantum_time: STANDARD_QUANTUM_TIME,
             })
             .integrity_zomes(iz)
             .coordinator_zomes(cz)

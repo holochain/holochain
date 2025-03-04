@@ -8,11 +8,7 @@ use std::{
     time::Duration,
 };
 
-use super::{
-    conductor::RwShare,
-    error::ConductorResult,
-    p2p_agent_store::{self, P2pBatch},
-};
+use super::{conductor::RwShare, error::ConductorResult};
 use crate::conductor::{error::ConductorError, state::ConductorState};
 use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::{
@@ -28,17 +24,9 @@ use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::paths::DatabasesRootPath;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::AgentPubKeyExt;
-use holochain_p2p::DnaHashExt;
-use holochain_p2p::{
-    dht::region::RegionBounds,
-    dht_arc::{DhtArcRange, DhtArcSet},
-    event::FetchOpDataQuery,
-};
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
-    DbKindP2pAgents, DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite,
-    PoolConfig, ReadAccess,
+    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindWasm,
+    DbSyncLevel, DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
 };
 use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,
@@ -47,9 +35,6 @@ use holochain_state::{
     query::{map_sql_dht_op_common, StateQueryError},
 };
 use holochain_util::timed;
-use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
-use kitsune_p2p_block::NodeId;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
@@ -92,15 +77,6 @@ pub struct Space {
     /// The dht databases. These are shared across cells.
     /// There is one per unique Dna.
     pub dht_db: DbWrite<DbKindDht>,
-
-    /// The database for storing AgentInfoSigned
-    pub p2p_agents_db: DbWrite<DbKindP2pAgents>,
-
-    /// The database for storing p2p MetricDatum(s)
-    pub p2p_metrics_db: DbWrite<DbKindP2pMetrics>,
-
-    /// The batch sender for writes to the p2p database.
-    pub p2p_batch_sender: tokio::sync::mpsc::Sender<P2pBatch>,
 
     /// A cache for slow database queries.
     pub dht_query_cache: DhtDbQueryCache,
@@ -234,9 +210,11 @@ impl Spaces {
 
     async fn node_agents_in_spaces(
         &self,
-        node_id: NodeId,
-        dnas: Vec<DnaHash>,
+        _node_id: &str,
+        _dnas: Vec<DnaHash>,
     ) -> DatabaseResult<Vec<CellId>> {
+        todo!()
+        /*
         let mut agent_lists: Vec<Vec<AgentInfoSigned>> = vec![];
         for dna in dnas {
             // @todo join_all for these awaits
@@ -261,6 +239,7 @@ impl Spaces {
                 )
             })
             .collect())
+        */
     }
 
     /// Check if some target is blocked.
@@ -439,24 +418,7 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_db.clone())
     }
 
-    /// Get the peer database (this will create the space if it doesn't already exist).
-    pub fn p2p_agents_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindP2pAgents>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.p2p_agents_db.clone())
-    }
-
-    /// Get the peer database (this will create the space if it doesn't already exist).
-    pub fn p2p_metrics_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindP2pMetrics>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.p2p_metrics_db.clone())
-    }
-
-    /// Get the batch sender (this will create the space if it doesn't already exist).
-    pub fn p2p_batch_sender(
-        &self,
-        dna_hash: &DnaHash,
-    ) -> DatabaseResult<tokio::sync::mpsc::Sender<P2pBatch>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.p2p_batch_sender.clone())
-    }
-
+    /*
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// the network module is requesting a list of dht op hashes
     /// Get the [`DhtOpHash`]es and authored timestamps for a given time window.
@@ -546,8 +508,8 @@ impl Spaces {
                         )?;
                         DatabaseResult::Ok(Some((
                             hashes,
-                            kitsune_p2p_types::Timestamp::from_micros(start.0)
-                                ..=kitsune_p2p_types::Timestamp::from_micros(end.0),
+                            Timestamp::from_micros(start.0)
+                                ..=Timestamp::from_micros(end.0),
                         )))
                     }
                     None => Ok(None),
@@ -634,7 +596,7 @@ impl Spaces {
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         let mut sql = "
             SELECT DhtOp.hash, DhtOp.type AS dht_type,
-            Action.blob AS action_blob, 
+            Action.blob AS action_blob,
             Action.author as author,
             Entry.blob AS entry_blob
             FROM DHtOp
@@ -676,6 +638,7 @@ impl Spaces {
             .await?;
         Ok(results)
     }
+    */
 
     #[cfg_attr(
         feature = "instrument",

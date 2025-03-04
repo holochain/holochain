@@ -112,6 +112,9 @@ pub enum ConductorApiError {
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
 
+    #[error(transparent)]
+    KitsuneError(#[from] kitsune2_api::K2Error),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

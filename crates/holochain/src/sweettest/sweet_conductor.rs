@@ -14,14 +14,12 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, CellInfo, ProvisionedCell,
 };
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::AgentPubKeyExt;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::source_chain::SourceChain;
 use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
-use kitsune_p2p_types::config::TransportConfig;
 use nanoid::nanoid;
 use rand::Rng;
 use std::net::ToSocketAddrs;
@@ -709,6 +707,7 @@ impl SweetConductor {
         }
     }
 
+    /*
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(conductors: impl Clone + IntoIterator<Item = &Self>) {
         let mut all = Vec::new();
@@ -765,6 +764,7 @@ impl SweetConductor {
         let connectivity = covering(rng, all.len(), s);
         crate::conductor::p2p_agent_store::exchange_peer_info_sparse(all, connectivity).await;
     }
+    */
 
     /// Wait for at least one gossip round to have completed for the given cell
     ///
