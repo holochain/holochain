@@ -10,7 +10,11 @@ enum Cmd {
     /// Check the health of a bootstrap server.
     Bootstrap {
         /// The url of the bootstrap server to check.
-        #[arg(short, long, default_value = "https://dev-test-bootstrap2.holochain.org")]
+        #[arg(
+            short,
+            long,
+            default_value = "https://dev-test-bootstrap2.holochain.org"
+        )]
         url: String,
     },
 
