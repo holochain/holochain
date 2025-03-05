@@ -72,14 +72,7 @@ where
             },
             |row| {
                 let op = map_sql_dht_op(false, "dht_type", row)?;
-                /*
-                let action_size: usize = row.get("action_size")?;
-                // will be NULL if the op has no associated entry
-                let entry_size: Option<usize> = row.get("entry_size")?;
-                let op_size = (action_size + entry_size.unwrap_or(0)).into();
-                */
                 let op_hash: DhtOpHash = row.get("dht_hash")?;
-                //let op_hash_sized = OpHashSized::new(hash.to_kitsune(), Some(op_size));
                 let basis = op.dht_basis();
                 WorkflowResult::Ok((basis, op_hash, op))
             },
