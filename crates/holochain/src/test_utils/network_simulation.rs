@@ -39,7 +39,7 @@ pub struct MockNetworkData {
     /// KitsuneAgent -> AgentPubKey
     pub agent_kit_to_hash: HashMap<AgentId, Arc<AgentPubKey>>,
     /// Agent storage arcs.
-    pub agent_to_arq: HashMap<Arc<AgentPubKey>, DhtArc>,
+    pub agent_to_storage_arc: HashMap<Arc<AgentPubKey>, DhtArc>,
     /// Agents peer info.
     pub agent_to_info: HashMap<Arc<AgentPubKey>, AgentInfoSignedString>,
     /// Hashes ordered by their basis location.
@@ -99,7 +99,7 @@ impl MockNetworkData {
             .into_iter()
             .map(|info| (agent_kit_to_hash[&info.agent].clone(), info))
             .collect();
-        let agent_to_arq = agent_to_info
+        let agent_to_storage_arc = agent_to_info
             .iter()
             .map(|(k, v)| (k.clone(), v.storage_arc))
             .collect();
@@ -113,7 +113,7 @@ impl MockNetworkData {
             op_kit_to_hash,
             agent_hash_to_kit,
             agent_kit_to_hash,
-            agent_to_arq,
+            agent_to_storage_arc,
             agent_to_info,
             ops_by_loc,
             op_to_loc,
@@ -148,13 +148,13 @@ impl MockNetworkData {
     pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
         todo!()
         /*
-        let arq = self.agent_to_arq[agent];
-        if arq.is_empty() {
+        let storage_arc = self.agent_to_storage_arc[agent];
+        if storage_arc.is_empty() {
             Vec::with_capacity(0)
-        } else if arq.is_full(SpaceDimension::standard()) {
+        } else if storage_arc.is_full(SpaceDimension::standard()) {
             self.ops_by_loc.values().flatten().cloned().collect()
         } else {
-            let (start, end) = arq.to_dht_arc_range_std().to_bounds_grouped().unwrap();
+            let (start, end) = storage_arc.to_dht_arc_range_std().to_bounds_grouped().unwrap();
             if start <= end {
                 self.ops_by_loc
                     .range(start..=end)
