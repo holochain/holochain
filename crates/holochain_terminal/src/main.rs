@@ -21,6 +21,8 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     args.validate()?;
 
+    println!("Validated args");
+
     let (admin_client, app_client) = if let Some(admin_url) = &args.admin_url {
         let connect_clients_result = block_on(
             async {
@@ -39,11 +41,16 @@ fn main() -> anyhow::Result<()> {
                 };
 
                 let mut admin_client = AdminClient::connect(addr).await?;
+
+                println!("Connected admin_client");
+
                 let app_client = if let Some(app_id) = &args.app_id {
                     Some(admin_client.connect_app_client(app_id.clone()).await?)
                 } else {
                     None
                 };
+
+                println!("Connected app_client");
 
                 Ok((admin_client, app_client))
             },
