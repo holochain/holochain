@@ -37,6 +37,7 @@ pub fn spawn_publish_dht_ops_consumer(
                 .conductor_tuning_params()
                 .min_publish_interval();
             async move {
+                // TODO provide a way to disable publish in K2
                 if false
                 /*conductor.get_config().network.tuning_params.disable_publish*/
                 {
