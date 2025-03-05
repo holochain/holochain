@@ -1,18 +1,17 @@
 use crate::actor::*;
-use crate::event::*;
 
 use super::*;
 
 mod actor;
+pub use actor::WrapEvtSender;
 
 /// Spawn a new HolochainP2p actor.
 /// Conductor will call this on initialization.
 pub async fn spawn_holochain_p2p(
     config: HolochainP2pConfig,
-    handler: DynHcP2pHandler,
     lair_client: holochain_keystore::MetaLairClient,
 ) -> HolochainP2pResult<DynHcP2p> {
-    actor::HolochainP2pActor::create(config, handler, lair_client).await
+    actor::HolochainP2pActor::create(config, lair_client).await
 }
 
 /// Callback function to retrieve a peer meta database handle for a dna hash.

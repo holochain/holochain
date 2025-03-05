@@ -17,7 +17,6 @@ use crate::core::queue_consumer::WorkComplete;
 use holo_hash::*;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time;
@@ -92,8 +91,6 @@ pub async fn publish_dht_ops_workflow(
     let continue_publish = db
         .write_async(move |txn| {
             for hash in success {
-                use holochain_p2p::DhtOpHashExt;
-                let hash = DhtOpHash::from_kitsune(hash.data_ref());
                 set_last_publish_time(txn, &hash, now)?;
             }
             WorkflowResult::Ok(publish_query::num_still_needing_publish(txn, agent)? > 0)
@@ -119,7 +116,7 @@ pub async fn publish_dht_ops_workflow_inner(
     db: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
     min_publish_interval: Duration,
-) -> WorkflowResult<HashMap<OpBasis, Vec<(OpHashSized, crate::prelude::DhtOp)>>> {
+) -> WorkflowResult<HashMap<OpBasis, Vec<(DhtOpHash, crate::prelude::DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 

@@ -4,7 +4,6 @@ use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
 use crate::conductor::integration_dump;
-use crate::conductor::p2p_agent_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
@@ -14,20 +13,14 @@ use hdk::prelude::ZomeName;
 use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_conductor_api::conductor::NetworkConfig;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::dht::prelude::Topology;
-use holochain_p2p::dht::ArqStrat;
-use holochain_p2p::dht::PeerViewQ;
-use holochain_p2p::event::HolochainP2pEvent;
 use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pRef;
-use holochain_p2p::HolochainP2pSender;
 use holochain_p2p::NetworkCompatParams;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
@@ -40,8 +33,6 @@ use holochain_types::prelude::*;
 use holochain_types::test_utils::fake_dna_file;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
-use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -132,38 +123,25 @@ macro_rules! meta_mock {
 /// A running test network with a joined cell.
 /// Will shutdown on drop.
 pub struct TestNetwork {
-    network: Option<HolochainP2pRef>,
+    network: Option<holochain_p2p::actor::DynHcP2p>,
     respond_task: Option<tokio::task::JoinHandle<()>>,
     dna_network: HolochainP2pDna,
 
     /// List of arguments used for `check_op_data` calls
     #[allow(clippy::type_complexity)]
-    pub check_op_data_calls: Arc<
-        std::sync::Mutex<
-            Vec<(
-                kitsune_p2p_types::KSpace,
-                Vec<kitsune_p2p_types::KOpHash>,
-                Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
-            )>,
-        >,
-    >,
+    pub check_op_data_calls:
+        Arc<std::sync::Mutex<Vec<(kitsune2_api::SpaceId, Vec<kitsune2_api::OpId>)>>>,
 }
 
 impl TestNetwork {
     /// Create a new test network
     #[allow(clippy::type_complexity)]
     fn new(
-        network: HolochainP2pRef,
+        network: holochain_p2p::actor::DynHcP2p,
         respond_task: tokio::task::JoinHandle<()>,
         dna_network: HolochainP2pDna,
         check_op_data_calls: Arc<
-            std::sync::Mutex<
-                Vec<(
-                    kitsune_p2p_types::KSpace,
-                    Vec<kitsune_p2p_types::KOpHash>,
-                    Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
-                )>,
-            >,
+            std::sync::Mutex<Vec<(kitsune2_api::SpaceId, Vec<kitsune2_api::OpId>)>>,
         >,
     ) -> Self {
         Self {
@@ -175,7 +153,7 @@ impl TestNetwork {
     }
 
     /// Get the holochain p2p network
-    pub fn network(&self) -> HolochainP2pRef {
+    pub fn network(&self) -> holochain_p2p::actor::DynHcP2p {
         self.network
             .as_ref()
             .expect("Tried to use network while it was shutting down")
@@ -190,16 +168,15 @@ impl TestNetwork {
 
 impl Drop for TestNetwork {
     fn drop(&mut self) {
-        use ghost_actor::GhostControlSender;
         let network = self.network.take().unwrap();
         let respond_task = self.respond_task.take().unwrap();
         tokio::task::spawn(async move {
-            network.ghost_actor_shutdown_immediate().await.ok();
             respond_task.await.ok();
         });
     }
 }
 
+/*
 /// Convenience constructor for cell networks
 pub async fn test_network(
     dna_hash: Option<DnaHash>,
@@ -230,6 +207,8 @@ async fn test_network_inner<F>(
 where
     F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
 {
+    todo!()
+    /*
     let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv().await;
     let mut config = holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pConfig::from_signal_addr(signal_url);
     let mut tuning =
@@ -270,7 +249,6 @@ where
                     continue;
                 }
             }
-            use holochain_p2p::event::HolochainP2pEvent::*;
             match evt {
                 SignNetworkData { respond, .. } => {
                     respond.r(ok_fut(Ok([0; 64].into())));
@@ -308,7 +286,9 @@ where
         .await
         .unwrap();
     TestNetwork::new(network, respond_task, dna_network, check_op_data_calls)
+    */
 }
+*/
 
 /// Do what's necessary to install an app
 pub async fn install_app(
@@ -420,7 +400,7 @@ pub async fn setup_app_with_names(
 pub async fn setup_app_with_network(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
-    network: KitsuneP2pConfig,
+    network: NetworkConfig,
 ) -> (TempDir, AppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
     let (iface, handle) = setup_app_inner(
@@ -438,7 +418,7 @@ pub async fn setup_app_inner(
     data_root_path: DataRootPath,
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
-    network: Option<KitsuneP2pConfig>,
+    network: Option<NetworkConfig>,
 ) -> (AppInterfaceApi, ConductorHandle) {
     let config = ConductorConfig {
         data_root_path: Some(data_root_path.clone()),
@@ -448,7 +428,6 @@ pub async fn setup_app_inner(
                 allowed_origins: AllowedOrigins::Any,
             },
         }]),
-        network: network.unwrap_or_else(KitsuneP2pConfig::mem),
         ..Default::default()
     };
     let conductor_handle = ConductorBuilder::new()
@@ -925,6 +904,8 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
+    todo!()
+    /*
     for cell_id in conductor.running_cell_ids() {
         let space = cell_id.dna_hash();
         let db = conductor.get_p2p_db(space);
@@ -933,6 +914,7 @@ pub async fn display_agent_infos(conductor: &ConductorHandle) {
             .unwrap();
         tracing::debug!(%info);
     }
+    */
 }
 
 /// Helper to create a signed zome invocation for tests

@@ -201,12 +201,6 @@ pub fn check_valid_if_dna(action: &Action, dna_def: &DnaDefHashed) -> SysValidat
             let dna_hash = dna_def.as_hash();
             if a.hash != *dna_hash {
                 Err(ValidationOutcome::WrongDna(a.hash.clone(), dna_hash.clone()).into())
-            } else if action.timestamp() < dna_def.modifiers.origin_time {
-                // If the Dna timestamp is ahead of the origin time, every other action
-                // will be inductively so also due to the prev_action check
-                Err(PrevActionErrorKind::InvalidRootOriginTime).map_err(|e| {
-                    ValidationOutcome::PrevActionError((e, action.clone()).into()).into()
-                })
             } else {
                 Ok(())
             }

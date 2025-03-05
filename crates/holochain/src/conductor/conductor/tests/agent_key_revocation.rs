@@ -1,5 +1,4 @@
 use holo_hash::{ActionHash, AgentPubKey, DnaHash, EntryHash};
-use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_state::source_chain::{SourceChain, SourceChainError};
 use holochain_types::app::{AppError, CreateCloneCellPayload};
 use holochain_types::dna::DnaFile;

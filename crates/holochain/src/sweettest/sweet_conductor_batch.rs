@@ -41,11 +41,13 @@ impl SweetConductorBatch {
             future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c))).await,
         );
 
+        /*
         let dpki_cells = conductors.dpki_cells();
         if !dpki_cells.is_empty() {
             conductors.exchange_peer_info().await;
             await_consistency(10, dpki_cells.as_slice()).await.unwrap();
         }
+        */
 
         conductors
     }
@@ -73,6 +75,7 @@ impl SweetConductorBatch {
             .iter()
             .any(|c| !c.get_config().has_rendezvous_bootstrap());
 
+        /*
         let dpki_cells = conductors.dpki_cells();
         if !dpki_cells.is_empty() {
             // Typically we expect either all nodes are using a rendezvous bootstrap, or none are.
@@ -83,6 +86,7 @@ impl SweetConductorBatch {
             }
             await_consistency(15, dpki_cells.as_slice()).await.unwrap();
         }
+        */
 
         conductors
     }
@@ -219,6 +223,7 @@ impl SweetConductorBatch {
             .into())
     }
 
+    /*
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(&self) {
         SweetConductor::exchange_peer_info(&self.0).await
@@ -256,6 +261,7 @@ impl SweetConductorBatch {
 
         crate::conductor::p2p_agent_store::reveal_peer_info(observer_envs, seen_envs).await;
     }
+    */
 
     /// Get the DPKI cell for each conductor, if applicable
     pub fn dpki_cells(&self) -> Vec<SweetCell> {

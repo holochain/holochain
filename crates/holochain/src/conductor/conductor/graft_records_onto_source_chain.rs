@@ -23,7 +23,11 @@ impl Conductor {
         let space = self.get_or_create_space(cell_id.dna_hash())?;
 
         let chc = None;
-        let network = self.holochain_p2p().to_dna(cell_id.dna_hash().clone(), chc);
+        let network = holochain_p2p::HolochainP2pDna::new(
+            self.holochain_p2p().clone(),
+            cell_id.dna_hash().clone(),
+            chc,
+        );
 
         let source_chain: SourceChain = space
             .source_chain(self.keystore().clone(), cell_id.agent_pubkey().clone())
@@ -141,7 +145,11 @@ impl Conductor {
         let space = self.get_or_create_space(cell_id.dna_hash())?;
         let ribosome = self.get_ribosome(cell_id.dna_hash())?;
         let chc = None;
-        let network = self.holochain_p2p().to_dna(cell_id.dna_hash().clone(), chc);
+        let network = holochain_p2p::HolochainP2pDna::new(
+            self.holochain_p2p().clone(),
+            cell_id.dna_hash().clone(),
+            chc,
+        );
 
         // Create a raw source chain to validate against because
         // genesis may not have been run yet.

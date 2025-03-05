@@ -16,9 +16,7 @@ pub type DynSweetRendezvous = Arc<dyn SweetRendezvous>;
 /// Local rendezvous infrastructure for unit testing.
 pub struct SweetLocalRendezvous {
     bs_addr: String,
-    bs_shutdown: Option<kitsune_p2p_bootstrap::BootstrapShutdown>,
-
-    turn_srv: Option<tx5_go_pion_turn::Tx5TurnServer>,
+    //bs_shutdown: Option<kitsune_p2p_bootstrap::BootstrapShutdown>,
     sig_addr: String,
     sig_hnd: Mutex<Option<sbd_server::SbdServer>>,
     sig_ip: std::net::IpAddr,
@@ -27,14 +25,11 @@ pub struct SweetLocalRendezvous {
 
 impl Drop for SweetLocalRendezvous {
     fn drop(&mut self) {
+        /*
         if let Some(s) = self.bs_shutdown.take() {
             s();
         }
-        if let Some(s) = self.turn_srv.take() {
-            tokio::task::spawn(async move {
-                let _ = s.stop().await;
-            });
-        }
+        */
     }
 }
 
@@ -77,25 +72,23 @@ impl SweetLocalRendezvous {
 
         let addr = addr.expect("no matching network interfaces found");
 
+        /*
         let (bs_driver, bs_addr, bs_shutdown) = kitsune_p2p_bootstrap::run((addr, 0), Vec::new())
             .await
             .unwrap();
         tokio::task::spawn(bs_driver);
         let bs_addr = format!("http://{bs_addr}");
         tracing::info!("RUNNING BOOTSTRAP: {bs_addr:?}");
+        */
 
         {
-            let (turn_addr, turn_srv) = tx5_go_pion_turn::test_turn_server().await.unwrap();
-            tracing::info!("RUNNING TURN: {turn_addr:?}");
-
             let (sig_addr, sig_port, sig_hnd) = spawn_sig(addr, 0).await;
 
             let sig_hnd = Mutex::new(Some(sig_hnd));
 
             Arc::new(Self {
-                bs_addr,
-                bs_shutdown: Some(bs_shutdown),
-                turn_srv: Some(turn_srv),
+                bs_addr: "http://FIX-ME".into(),
+                //bs_shutdown: Some(bs_shutdown),
                 sig_addr,
                 sig_hnd,
                 sig_ip: addr,
