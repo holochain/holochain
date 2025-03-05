@@ -390,6 +390,13 @@ async fn create_test_data(
         }
     }
 
+    /*
+    let mut tuning =
+        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
+    tuning.gossip_strategy = "none".to_string();
+    tuning.disable_publish = true;
+    */
+
     // This is gonna get dropped at the end of this fn.
     let tmpdir = tempfile::TempDir::new().unwrap();
     let config = ConductorConfig {
