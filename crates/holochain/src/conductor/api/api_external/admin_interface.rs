@@ -290,15 +290,7 @@ impl AdminInterfaceApi {
                 Ok(AdminResponse::NetworkStatsDumped(stats))
             }
             AddAgentInfo { agent_infos } => {
-                let mut parsed = Vec::with_capacity(agent_infos.len());
-                for info in agent_infos {
-                    parsed.push(kitsune2_api::AgentInfoSigned::decode(
-                        &kitsune2_core::Ed25519Verifier,
-                        info.as_bytes(),
-                    )?);
-                }
-
-                self.conductor_handle.add_agent_infos(parsed).await?;
+                self.conductor_handle.add_agent_infos(agent_infos).await?;
                 Ok(AdminResponse::AgentInfoAdded)
             }
             AgentInfo { cell_id } => {

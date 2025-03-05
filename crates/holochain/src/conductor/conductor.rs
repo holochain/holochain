@@ -3258,8 +3258,17 @@ mod misc_impls {
         /// Add signed agent info to the conductor
         pub async fn add_agent_infos(
             &self,
-            _agent_infos: Vec<Arc<AgentInfoSigned>>,
+            agent_infos: Vec<String>,
         ) -> ConductorApiResult<()> {
+            let mut parsed = Vec::with_capacity(agent_infos.len());
+            for info in agent_infos {
+                parsed.push(kitsune2_api::AgentInfoSigned::decode(
+                    &kitsune2_core::Ed25519Verifier,
+                    info.as_bytes(),
+                )?);
+            }
+
+            // TODO actually add them to k2 peer store.
             unimplemented!()
         }
 
