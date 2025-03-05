@@ -164,7 +164,7 @@ impl ConductorConfig {
         config_from_yaml(&config_yaml)
     }
 
-    /// Get the tracing scope from the network config
+    /// Get the tracing scope from the conductor config.
     pub fn tracing_scope(&self) -> Option<String> {
         self.tracing_scope.clone()
     }
@@ -358,6 +358,7 @@ mod tests {
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
+                tracing_scope: None,
             }
         );
     }
@@ -451,6 +452,7 @@ mod tests {
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
+                tracing_scope: None,
             }
         );
     }
@@ -583,6 +585,7 @@ mod tests {
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
+                tracing_scope: None,
             }
         );
     }
