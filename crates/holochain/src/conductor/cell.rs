@@ -636,7 +636,6 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         options: holochain_p2p::event::GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         Box::pin(async {
-            debug!("handling get");
             // TODO: Later we will need more get types but for now
             // we can just have these defaults depending on whether or not
             // the hash is an entry or action.
