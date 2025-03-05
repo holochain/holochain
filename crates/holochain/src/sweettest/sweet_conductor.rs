@@ -188,6 +188,14 @@ impl SweetConductor {
             config.into()
         };
 
+        if config.tracing_scope().is_none() {
+            config.tracing_scope = Some(format!(
+                "{}.{}",
+                NUM_CREATED.load(Ordering::SeqCst),
+                nanoid!(5)
+            ));
+        }
+
         if config.data_root_path.is_none() {
             config.data_root_path = Some(dir.as_ref().to_path_buf().into());
         }
