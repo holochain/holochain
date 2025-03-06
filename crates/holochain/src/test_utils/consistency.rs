@@ -2,7 +2,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
     time::Duration,
 };
 
@@ -88,19 +87,22 @@ pub enum SessionReport {
     },
 }
 
+#[allow(dead_code)]
 struct Stores {
     agent: AgentId,
     authored_db: DbRead<DbKindAuthored>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 struct Reporter(tokio::sync::mpsc::Sender<SessionMessage>, AgentId);
 
+#[allow(dead_code)]
 const CONCURRENCY: usize = 100;
 
 /// A helper for checking consistency of all published ops for all cells in all conductors
 /// has reached consistency in a sharded context.
-pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Duration) {
+pub async fn local_machine_session(_conductors: &[ConductorHandle], _timeout: Duration) {
     todo!()
     /*
     // For each space get all the cells, their db and the p2p envs.
@@ -175,10 +177,10 @@ pub async fn local_machine_session(conductors: &[ConductorHandle], timeout: Dura
 
 /// Get consistency for a particular hash.
 pub async fn local_machine_session_with_hashes(
-    handles: Vec<&ConductorHandle>,
-    hashes: impl Iterator<Item = (u32, DhtOpHash)>,
-    space: &DnaHash,
-    timeout: Duration,
+    _handles: Vec<&ConductorHandle>,
+    _hashes: impl Iterator<Item = (u32, DhtOpHash)>,
+    _space: &DnaHash,
+    _timeout: Duration,
 ) {
     todo!()
     /*
@@ -256,6 +258,7 @@ pub async fn local_machine_session_with_hashes(
 
 impl Reporter {
     /// Send a report back.
+    #[allow(dead_code)]
     async fn send_report(&self, report: SessionReport) {
         if self
             .0
@@ -274,6 +277,7 @@ impl Reporter {
 /// Wait for all agents to report success, timeout or failure.
 /// Additionally print out debug tracing with some statistics.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(rx, agents)))]
+#[allow(dead_code)]
 async fn wait_for_consistency(
     mut rx: tokio::sync::mpsc::Receiver<SessionMessage>,
     mut agents: HashSet<AgentId>,
@@ -418,6 +422,7 @@ Average hashes held: {}%.
 }
 
 /// Gather all the published op hashes and agents from a conductor.
+#[allow(dead_code)]
 async fn gather_conductor_data(
     agents: Vec<(DbRead<DbKindAuthored>, DbRead<DbKindDht>, AgentId)>,
 ) -> (Vec<(AgentId, DhtArc)>, Vec<(u32, OpId)>) {
@@ -446,6 +451,7 @@ async fn gather_conductor_data(
 }
 
 /// Generate the consistency session and then check all agents concurrently.
+#[allow(dead_code)]
 async fn expect_all(
     tx: tokio::sync::mpsc::Sender<SessionMessage>,
     timeout: Duration,
@@ -459,6 +465,7 @@ async fn expect_all(
 
 /// Generate the consistency sessions for each agent along with their environments.
 /// This is where we check which agents should be holding which hashes and agents.
+#[allow(dead_code)]
 fn generate_session<'iter>(
     all_agents: &'iter Vec<(AgentId, DhtArc)>,
     all_hashes: &'iter Vec<(u32, OpId)>,
@@ -510,9 +517,10 @@ fn generate_session<'iter>(
 /// Concurrently check all agents for consistency.
 /// Report back the results on the channel.
 /// Checks will report timeouts and failures.
+#[allow(dead_code)]
 async fn check_all(
-    iter: impl Iterator<Item = (AgentId, ConsistencySession, DbRead<DbKindDht>)>,
-    tx: tokio::sync::mpsc::Sender<SessionMessage>,
+    _iter: impl Iterator<Item = (AgentId, ConsistencySession, DbRead<DbKindDht>)>,
+    _tx: tokio::sync::mpsc::Sender<SessionMessage>,
 ) {
     todo!()
     /*
@@ -531,10 +539,11 @@ async fn check_all(
 }
 
 /// Check the expected data against for a single agent.
+#[allow(dead_code)]
 async fn check_expected_data(
-    reporter: Reporter,
-    session: ConsistencySession,
-    dht_db: DbRead<DbKindDht>,
+    _reporter: Reporter,
+    _session: ConsistencySession,
+    _dht_db: DbRead<DbKindDht>,
 ) {
     todo!()
     /*
@@ -553,10 +562,11 @@ async fn check_expected_data(
 /// The check expected data inner loop.
 /// This runs for each agent until success, failure or timeout.
 /// All outcomes are reported back on the channel.
+#[allow(dead_code)]
 async fn check_expected_data_inner(
-    reporter: Reporter,
-    session: ConsistencySession,
-    dht_db: DbRead<DbKindDht>,
+    _reporter: Reporter,
+    _session: ConsistencySession,
+    _dht_db: DbRead<DbKindDht>,
 ) -> DatabaseResult<()> {
     todo!()
     /*
@@ -645,8 +655,9 @@ async fn check_expected_data_inner(
 /// Check the agent is holding the expected agents in their peer store.
 // Seems these lifetimes are actually needed.
 #[allow(clippy::needless_lifetimes)]
+#[allow(dead_code)]
 async fn check_agents<'iter>(
-    expected_agents: &'iter [AgentId],
+    _expected_agents: &'iter [AgentId],
 ) -> DatabaseResult<impl Iterator<Item = &'iter AgentId> + 'iter> {
     if true {
         todo!()
@@ -670,6 +681,7 @@ async fn check_agents<'iter>(
 
 /// Check the op hashes we are meant to be holding.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+#[allow(dead_code)]
 async fn check_hashes(
     dht_db: &DbRead<DbKindDht>,
     expected_hashes: &mut Vec<OpId>,
@@ -714,6 +726,7 @@ async fn check_hashes(
 }
 
 /// Concurrently Gather all published op hashes and agent's storage arcs.
+#[allow(dead_code)]
 async fn gather_published_data(
     iter: impl Iterator<Item = Stores>,
     concurrency: usize,
@@ -745,6 +758,7 @@ async fn gather_published_data(
 }
 
 /// Request the published hashes for the given agent.
+#[allow(dead_code)]
 pub async fn request_published_ops<AuthorDb>(
     db: &AuthorDb,
     author: Option<AgentPubKey>,
@@ -815,7 +829,8 @@ where
 }
 
 /// Request the storage arc for the given agent.
-async fn request_arc(agent: AgentId) -> StateQueryResult<Option<DhtArc>> {
+#[allow(dead_code)]
+async fn request_arc(_agent: AgentId) -> StateQueryResult<Option<DhtArc>> {
     todo!()
     /*
     Ok(db

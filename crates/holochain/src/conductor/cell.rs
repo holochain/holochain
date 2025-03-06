@@ -591,6 +591,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         Box::pin(async {
             #[cfg(not(feature = "unstable-countersigning"))]
             {
+                drop(message);
                 Ok(())
             }
             #[cfg(feature = "unstable-countersigning")]

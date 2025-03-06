@@ -1,8 +1,8 @@
 use hdk::prelude::*;
-use holochain::conductor::config::{ConductorConfig, DpkiConfig};
+//use holochain::conductor::config::{ConductorConfig, DpkiConfig};
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::*;
-use holochain_conductor_api::conductor::ConductorTuningParams;
+//use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_sqlite::prelude::DatabaseResult;
 use unwrap_to::unwrap_to;

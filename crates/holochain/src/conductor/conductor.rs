@@ -66,7 +66,7 @@ use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
-use holochain_conductor_api::JsonDump;
+//use holochain_conductor_api::JsonDump;
 pub use holochain_conductor_services::*;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
@@ -87,7 +87,7 @@ use crate::conductor::conductor::app_auth_token_store::AppAuthTokenStore;
 use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
-use crate::conductor::metrics::create_p2p_event_duration_metric;
+//use crate::conductor::metrics::create_p2p_event_duration_metric;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueConsumerMap;
 #[cfg(any(test, feature = "test_utils"))]
@@ -849,14 +849,14 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use std::time::Duration;
+    //use std::time::Duration;
 
     use futures::future::join_all;
     use holochain_conductor_api::ZomeCallParamsSigned;
-    use rusqlite::params;
+    //use rusqlite::params;
 
     use holochain_conductor_api::{
-        CellInfo, DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo,
+        /*CellInfo, */DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo,
     };
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
@@ -873,7 +873,7 @@ mod network_impls {
         /// Get signed agent info from the conductor
         pub async fn get_agent_infos(
             &self,
-            cell_id: Option<CellId>,
+            _cell_id: Option<CellId>,
         ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
             unimplemented!()
             /*
@@ -936,8 +936,8 @@ mod network_impls {
 
         pub(crate) async fn network_info(
             &self,
-            installed_app_id: &InstalledAppId,
-            payload: &NetworkInfoRequestPayload,
+            _installed_app_id: &InstalledAppId,
+            _payload: &NetworkInfoRequestPayload,
         ) -> ConductorResult<Vec<NetworkInfo>> {
             unimplemented!()
             /*
@@ -3030,7 +3030,7 @@ mod misc_impls {
 
         /// Create a JSON dump of the cell's state
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
+        pub async fn dump_cell_state(&self, _cell_id: &CellId) -> ConductorApiResult<String> {
             unimplemented!()
             /*
             let cell = self.cell_by_id(cell_id).await?;
@@ -3105,8 +3105,8 @@ mod misc_impls {
         /// Create a comprehensive structured dump of a cell's state
         pub async fn dump_full_cell_state(
             &self,
-            cell_id: &CellId,
-            dht_ops_cursor: Option<u64>,
+            _cell_id: &CellId,
+            _dht_ops_cursor: Option<u64>,
         ) -> ConductorApiResult<FullStateDump> {
             unimplemented!()
             /*
@@ -3134,7 +3134,7 @@ mod misc_impls {
         /// JSON dump of network metrics
         pub async fn dump_network_metrics(
             &self,
-            dna_hash: Option<DnaHash>,
+            _dna_hash: Option<DnaHash>,
         ) -> ConductorApiResult<String> {
             unimplemented!()
             /*
@@ -3265,6 +3265,7 @@ mod accessor_impls {
             self.spaces.dht_db(dna_hash)
         }
 
+        #[allow(dead_code)]
         pub(crate) fn get_or_create_cache_db(
             &self,
             dna_hash: &DnaHash,

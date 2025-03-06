@@ -496,7 +496,7 @@ mod test {
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
     use crate::sweettest::websocket_client_by_port;
-    use crate::sweettest::SweetConductorConfig;
+    //use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::WsPollRecv;
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
@@ -515,7 +515,7 @@ mod test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasm_test_utils::TestZomes;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use kitsune2_api::{AgentId, AgentInfoSigned, SpaceId};
+    //use kitsune2_api::{AgentId, AgentInfoSigned, SpaceId};
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
     use std::collections::HashSet;
@@ -1287,6 +1287,7 @@ mod test {
         conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
+    #[allow(dead_code)]
     async fn make_dna(network_seed: &str, zomes: Vec<TestWasm>) -> DnaFile {
         DnaFile::new(
             DnaDef {

@@ -10,7 +10,7 @@ use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
 use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
-use holo_hash::fixt::*;
+//use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
 use holochain_conductor_api::conductor::NetworkConfig;
@@ -19,9 +19,9 @@ use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::spawn_holochain_p2p;
+//use holochain_p2p::spawn_holochain_p2p;
 use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::NetworkCompatParams;
+//use holochain_p2p::NetworkCompatParams;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::test_db_dir;
@@ -40,7 +40,7 @@ use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
-use tokio::sync::mpsc;
+//use tokio::sync::mpsc;
 
 pub use itertools;
 
@@ -136,6 +136,7 @@ pub struct TestNetwork {
 impl TestNetwork {
     /// Create a new test network
     #[allow(clippy::type_complexity)]
+    #[allow(dead_code)]
     fn new(
         network: holochain_p2p::actor::DynHcP2p,
         respond_task: tokio::task::JoinHandle<()>,
@@ -168,7 +169,7 @@ impl TestNetwork {
 
 impl Drop for TestNetwork {
     fn drop(&mut self) {
-        let network = self.network.take().unwrap();
+        let _ = self.network.take().unwrap();
         let respond_task = self.respond_task.take().unwrap();
         tokio::task::spawn(async move {
             respond_task.await.ok();
@@ -419,7 +420,7 @@ pub async fn setup_app_inner(
     data_root_path: DataRootPath,
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
-    network: Option<NetworkConfig>,
+    _network: Option<NetworkConfig>,
 ) -> (AppInterfaceApi, ConductorHandle) {
     let config = ConductorConfig {
         data_root_path: Some(data_root_path.clone()),
@@ -904,7 +905,7 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
 }
 
 /// Helper for displaying agent infos stored on a conductor
-pub async fn display_agent_infos(conductor: &ConductorHandle) {
+pub async fn display_agent_infos(_conductor: &ConductorHandle) {
     todo!()
     /*
     for cell_id in conductor.running_cell_ids() {

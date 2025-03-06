@@ -2442,6 +2442,7 @@ impl TestCase {
         &mut self.cascade
     }
 
+    #[allow(dead_code)]
     pub fn dna_def_mut(&mut self) -> &mut DnaDef {
         &mut self.dna_def
     }

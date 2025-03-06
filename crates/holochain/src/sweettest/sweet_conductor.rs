@@ -1021,6 +1021,7 @@ impl std::fmt::Debug for SweetConductor {
     }
 }
 
+#[allow(dead_code)]
 fn covering(rng: &mut StdRng, n: usize, s: usize) -> Vec<HashSet<usize>> {
     let nodes: Vec<_> = (0..n)
         .map(|i| {
