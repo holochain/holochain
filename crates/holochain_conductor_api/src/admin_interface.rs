@@ -391,6 +391,10 @@ pub enum AdminRequest {
     DeleteCloneCell(Box<DeleteCloneCellPayload>),
 
     /// Info about storage used by apps
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::StorageInfo`]
     StorageInfo,
 
     /// Connecting to an app over an app websocket requires an authentication token. This endpoint

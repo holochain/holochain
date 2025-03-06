@@ -553,11 +553,6 @@ pub struct NetworkInfo {
     pub completed_rounds_since_last_time_queried: u32,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub enum ScottyPanel {
-    GossipInfo { last_round: Option<Timestamp> },
-}
-
 /// The request payload sent on a Holochain app websocket to authenticate the connection.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppAuthenticationRequest {

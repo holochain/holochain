@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Update `hcterm` to work with bootstrap2 bootstrap servers. By default, it uses `https://dev-test-bootstrap2.holochain.org` as the bootstrap2 server. #4767
 - Update `hc-service-check` to check bootstrap2 servers. By default, it uses `https://dev-test-bootstrap2.holochain.org` as the bootstrap2 server. #4767
 - Remove `hc-run-local-services`, please use `kitsune2-bootstrap-srv` instead.
+- Handle empty databases in `StorageInfo` request. Previously, if the database was empty, the request would return an error. #4756
+- Add `DnaHash` to the `DnaStorageInfo` which is part of the `StorageInfo` response.
+
+## 0.5.0-dev.21
 
 ## 0.5.0-dev.20
 

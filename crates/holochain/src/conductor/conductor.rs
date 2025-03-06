@@ -1163,6 +1163,7 @@ mod network_impls {
                     .read_async(get_used_size)
                     .map_err(ConductorError::DatabaseError)
                     .await?,
+                dna_hash: dna_hash.clone(),
                 used_by: used_by.clone(),
             }))
         }
