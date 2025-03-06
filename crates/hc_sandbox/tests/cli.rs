@@ -6,7 +6,7 @@ use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequ
 use holochain_conductor_api::{AppResponse, CellInfo};
 use holochain_conductor_config::config::read_config;
 use holochain_types::app::InstalledAppId;
-use holochain_types::prelude::{SerializedBytes, SerializedBytesError, Timestamp, YamlProperties};
+use holochain_types::prelude::{SerializedBytes, SerializedBytesError, YamlProperties};
 use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
@@ -363,11 +363,6 @@ async fn generate_sandbox_with_roles_settings_override() {
                     "some properties in the manifest",
                 )))
             );
-            assert_eq!(
-                role1.dna.modifiers.origin_time.unwrap(),
-                Timestamp::from_micros(1731436443698324)
-            );
-            assert_eq!(role1.dna.modifiers.quantum_time, None);
 
             let role2 = roles
                 .clone()
@@ -384,14 +379,6 @@ async fn generate_sandbox_with_roles_settings_override() {
                 YamlProperties::new(serde_yaml::Value::String(String::from(
                     "some properties in the manifest",
                 )))
-            );
-            assert_eq!(
-                role2.dna.modifiers.origin_time.unwrap(),
-                Timestamp::from_micros(1731436443698326)
-            );
-            assert_eq!(
-                role2.dna.modifiers.quantum_time.unwrap(),
-                std::time::Duration::from_secs(60),
             );
 
             //- Test that the modifiers for role 3 have remained unaltered, i.e.
@@ -411,11 +398,6 @@ async fn generate_sandbox_with_roles_settings_override() {
                     "should remain untouched by roles settings test",
                 )))
             );
-            assert_eq!(
-                role3.dna.modifiers.origin_time.unwrap(),
-                Timestamp::from_micros(1000000000000000)
-            );
-            assert_eq!(role3.dna.modifiers.quantum_time, None,);
         }
         _ => panic!("AppResponse is of the wrong type"),
     }

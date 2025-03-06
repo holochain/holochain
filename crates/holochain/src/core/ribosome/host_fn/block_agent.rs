@@ -97,11 +97,13 @@ mod test {
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
         let config = SweetConductorConfig::standard().no_dpki()
+            /*
             .tune(|tune| {
                 tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
                 tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
                 tune.gossip_round_timeout_ms = 3000;
             })
+            */
             .tune_conductor(|c| {
                 c.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
             });
@@ -116,8 +118,8 @@ mod test {
 
         let bob_pubkey = bob_cell.cell_id().agent_pubkey();
 
-        conductors.reveal_peer_info(0, 1).await;
-        conductors.reveal_peer_info(1, 0).await;
+        //conductors.reveal_peer_info(0, 1).await;
+        //conductors.reveal_peer_info(1, 0).await;
 
         let alice_conductor = conductors.get(0).unwrap();
         let bob_conductor = conductors.get(1).unwrap();
@@ -154,7 +156,7 @@ mod test {
         // If carol joins the party but DOES NOT block bob then she will
         // give access to data once more for bob.
 
-        conductors.exchange_peer_info().await;
+        //conductors.exchange_peer_info().await;
 
         await_consistency(60, [&alice_cell, &bob_cell, &carol_cell])
             .await

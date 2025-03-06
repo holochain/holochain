@@ -483,57 +483,17 @@ mod tests {
           allowed_origins: "*"
 
     network:
-      bootstrap_service: https://bootstrap-staging.holo.host
-      transport_pool:
-        - type: webrtc
-          signal_url: wss://sbd-0.main.infra.holo.host
-          webrtc_config: {
-            "iceServers": [
-              { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
-              { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
-            ]
-          }
-      tuning_params:
-        gossip_loop_iteration_delay_ms: 42
-        default_rpc_single_timeout_ms: 42
-        default_rpc_multi_remote_agent_count: 42
-        default_rpc_multi_remote_request_grace_ms: 42
-        agent_info_expires_after_ms: 42
-        tls_in_mem_session_storage: 42
-        proxy_keepalive_ms: 42
-        proxy_to_expire_ms: 42
-        tx5_min_ephemeral_udp_port: 40000
-        tx5_max_ephemeral_udp_port: 40255
-      network_type: quic_bootstrap
+      bootstrap_url: https://test-boot.tld
+      signal_url: wss://test-sig.tld
 
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let mut network_config = KitsuneP2pConfig::mem();
-        network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-        network_config.transport_pool.clear();
-        network_config.transport_pool.push(TransportConfig::WebRTC {
-            signal_url: "wss://sbd-0.main.infra.holo.host".into(),
-            webrtc_config: Some(serde_json::json!({
-              "iceServers": [
-                { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
-                { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
-              ]
-            })),
-        });
-        let mut tuning_params =
-            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-        tuning_params.gossip_loop_iteration_delay_ms = 42;
-        tuning_params.default_rpc_single_timeout_ms = 42;
-        tuning_params.default_rpc_multi_remote_agent_count = 42;
-        tuning_params.default_rpc_multi_remote_request_grace_ms = 42;
-        tuning_params.agent_info_expires_after_ms = 42;
-        tuning_params.tls_in_mem_session_storage = 42;
-        tuning_params.proxy_keepalive_ms = 42;
-        tuning_params.proxy_to_expire_ms = 42;
-        tuning_params.tx5_min_ephemeral_udp_port = 40000;
-        tuning_params.tx5_max_ephemeral_udp_port = 40255;
-        network_config.tuning_params = std::sync::Arc::new(tuning_params);
+        let network_config = NetworkConfig {
+            bootstrap_url: url2::url2!("https://test-boot.tld"),
+            signal_url: url2::url2!("wss://test-sig.tld"),
+            ..Default::default()
+        };
         pretty_assertions::assert_eq!(
             result.unwrap(),
             ConductorConfig {
@@ -554,6 +514,7 @@ mod tests {
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
+                tracing_scope: None,
             }
         );
     }

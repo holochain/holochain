@@ -609,7 +609,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
                         &self.space.witnessing_workspace,
                         self.queue_triggers.witnessing.clone(),
                     )
-                    .map_err(Box::new)?;
+                    .map_err(HolochainP2pError::other)?;
                     Ok(())
                 }
                 CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {

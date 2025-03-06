@@ -450,7 +450,10 @@ async fn create_test_data(
 }
 
 /// Set the peers to seem like they come from separate nodes and have accurate storage arcs.
-async fn reset_peer_data(_peers: Vec<AgentInfoSigned>, _dna_hash: &DnaHash) -> Vec<AgentInfoSigned> {
+async fn reset_peer_data(
+    _peers: Vec<AgentInfoSigned>,
+    _dna_hash: &DnaHash,
+) -> Vec<AgentInfoSigned> {
     todo!()
     /*
     let coverage = ((50.0 / peers.len() as f64) * 2.0).clamp(0.0, 1.0);

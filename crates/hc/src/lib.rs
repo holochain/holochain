@@ -103,7 +103,6 @@ impl CliSubcommand {
             CliSubcommand::Dna(cmd) => cmd.run().await?,
             CliSubcommand::WebApp(cmd) => cmd.run().await?,
             CliSubcommand::Sandbox(cmd) => cmd.run().await?,
-            CliSubcommand::RunLocalServices(cmd) => cmd.run().await,
             CliSubcommand::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
                 Command::new(format!("hc-{}", command_suffix))

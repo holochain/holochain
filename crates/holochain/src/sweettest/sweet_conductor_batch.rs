@@ -31,6 +31,7 @@ impl SweetConductorBatch {
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
+    #[allow(clippy::let_and_return)]
     pub async fn from_configs<C, I>(configs: I) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig>,
@@ -55,6 +56,7 @@ impl SweetConductorBatch {
     /// using a "rendezvous" bootstrap server for peer discovery.
     ///
     /// Also await consistency for DPKI cells, if DPKI is enabled.
+    #[allow(clippy::let_and_return)]
     pub async fn from_configs_rendezvous<C, I>(configs: I) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig>,

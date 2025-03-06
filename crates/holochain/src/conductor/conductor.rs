@@ -856,7 +856,7 @@ mod network_impls {
     //use rusqlite::params;
 
     use holochain_conductor_api::{
-        /*CellInfo, */DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo,
+        /*CellInfo, */ DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo,
     };
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;

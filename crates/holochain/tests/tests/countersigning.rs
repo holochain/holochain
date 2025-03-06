@@ -1215,10 +1215,10 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
             c.countersigning_resolution_retry_limit = Some(3);
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
-        .tune(|params| {
+        /*.tune(|params| {
             // Incredible, but true: set the timeout for a network
             params.tx5_implicit_timeout_ms = 3_000;
-        });
+        })*/;
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -1365,10 +1365,10 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
             c.countersigning_resolution_retry_limit = Some(3);
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
-        .tune(|params| {
+        /*.tune(|params| {
             // Incredible, but true: set the timeout for a network
             params.tx5_implicit_timeout_ms = 3_000;
-        });
+        })*/;
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;

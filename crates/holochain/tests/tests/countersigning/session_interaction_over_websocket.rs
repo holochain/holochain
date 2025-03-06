@@ -28,7 +28,6 @@ use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
-use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
 use matches::assert_matches;
 use rand::rngs::OsRng;
 use serde::{de::DeserializeOwned, Serialize};
@@ -593,10 +592,12 @@ impl Agent {
         let path = tmp_dir.into_path();
         let environment_path = path.clone();
         let mut config = create_config(admin_port, environment_path.into());
+        /*
         config.network = KitsuneP2pConfig::default().tune(|mut kc| {
             kc.tx5_implicit_timeout_ms = 3_000;
             kc
         });
+        */
         config.keystore = KeystoreConfig::LairServerInProc { lair_root: None };
         config.tuning_params = Some(ConductorTuningParams {
             countersigning_resolution_retry_limit: Some(3),
@@ -604,11 +605,8 @@ impl Agent {
             min_publish_interval: Some(Duration::from_secs(5)),
             ..Default::default()
         });
-        config.network.bootstrap_service = Some(Url2::parse(bootstrap_url));
-        config.network.transport_pool = vec![TransportConfig::WebRTC {
-            signal_url,
-            webrtc_config: None,
-        }];
+        config.network.bootstrap_url = Url2::parse(bootstrap_url);
+        config.network.signal_url = Url2::parse(signal_url);
         let config_path = write_config(path.clone(), &config);
 
         let (_holochain, admin_port) = start_holochain_with_lair(config_path.clone(), true).await;

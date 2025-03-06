@@ -35,7 +35,7 @@ use holochain_state::{
     //query::{map_sql_dht_op_common, StateQueryError},
 };
 use holochain_util::timed;
-use rusqlite::{/*named_params, */OptionalExtension};
+use rusqlite::{/*named_params, */ OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
 
