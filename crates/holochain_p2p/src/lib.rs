@@ -17,8 +17,8 @@ mod spawn;
 pub use spawn::*;
 //#[cfg(feature = "test_utils")]
 //pub use test::stub_network;
-//#[cfg(feature = "test_utils")]
-//pub use test::HolochainP2pDnaFixturator;
+#[cfg(feature = "test_utils")]
+pub use test::HolochainP2pDnaFixturator;
 
 mod peer_meta_store;
 pub use peer_meta_store::*;
@@ -157,6 +157,17 @@ pub struct HolochainP2pDna {
     sender: actor::DynHcP2p,
     dna_hash: Arc<DnaHash>,
     chc: Option<ChcImpl>,
+}
+
+impl HolochainP2pDna {
+    /// Construct a HolochainP2pDna from components.
+    pub fn new(hc_p2p: actor::DynHcP2p, dna_hash: DnaHash, chc: Option<ChcImpl>) -> Self {
+        Self {
+            sender: hc_p2p,
+            dna_hash: dna_hash.into(),
+            chc,
+        }
+    }
 }
 
 impl From<HolochainP2pDna> for GenericNetwork {

@@ -14,14 +14,12 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, CellInfo, ProvisionedCell,
 };
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::AgentPubKeyExt;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::source_chain::SourceChain;
 use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
-use kitsune_p2p_types::config::TransportConfig;
 use nanoid::nanoid;
 use rand::Rng;
 use std::net::ToSocketAddrs;
@@ -171,22 +169,27 @@ impl SweetConductor {
         let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
             config.apply_rendezvous(&r).into()
         } else {
-            if let Some(b) = config.network.bootstrap_service.as_ref() {
-                if b.to_string().starts_with("rendezvous:") {
-                    panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.bootstrap_service");
-                }
+            if config
+                .network
+                .bootstrap_url
+                .as_str()
+                .starts_with("rendezvous:")
+            {
+                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.bootstrap_service");
             }
-            if config.network.transport_pool.iter().any(|p| match p {
-                TransportConfig::WebRTC { signal_url, .. } => signal_url.starts_with("rendezvous:"),
-                _ => false,
-            }) {
+            if config
+                .network
+                .signal_url
+                .as_str()
+                .starts_with("rendezvous:")
+            {
                 panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.transport_pool[].signal_url");
             }
             config.into()
         };
 
         if config.tracing_scope().is_none() {
-            config.network.tracing_scope = Some(format!(
+            config.tracing_scope = Some(format!(
                 "{}.{}",
                 NUM_CREATED.load(Ordering::SeqCst),
                 nanoid!(5)
@@ -709,6 +712,7 @@ impl SweetConductor {
         }
     }
 
+    /*
     /// Let each conductor know about each others' agents so they can do networking
     pub async fn exchange_peer_info(conductors: impl Clone + IntoIterator<Item = &Self>) {
         let mut all = Vec::new();
@@ -765,6 +769,7 @@ impl SweetConductor {
         let connectivity = covering(rng, all.len(), s);
         crate::conductor::p2p_agent_store::exchange_peer_info_sparse(all, connectivity).await;
     }
+    */
 
     /// Wait for at least one gossip round to have completed for the given cell
     ///
@@ -866,7 +871,7 @@ impl SweetConductor {
                     .get_agent_infos(cell_id.clone())
                     .await?
                     .into_iter()
-                    .map(|p| AgentPubKey::from_kitsune(&p.agent))
+                    .map(|p| AgentPubKey::from_k2_agent(&p.agent))
                     .collect::<HashSet<_>>();
                 if infos.is_superset(&peers) {
                     break;

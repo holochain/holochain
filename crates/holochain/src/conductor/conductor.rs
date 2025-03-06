@@ -71,9 +71,6 @@ pub use holochain_conductor_services::*;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::event::HolochainP2pEvent;
-use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -83,7 +80,7 @@ use holochain_state::prelude::*;
 use holochain_state::source_chain;
 pub use holochain_types::share;
 use holochain_zome_types::prelude::{AppCapGrantInfo, ClonedCell, Signature, Timestamp};
-use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune2_api::AgentInfoSigned;
 
 use crate::conductor::cell::Cell;
 use crate::conductor::conductor::app_auth_token_store::AppAuthTokenStore;
@@ -91,9 +88,6 @@ use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::metrics::create_p2p_event_duration_metric;
-use crate::conductor::p2p_agent_store::get_single_agent_info;
-use crate::conductor::p2p_agent_store::list_all_agent_info;
-use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueConsumerMap;
 #[cfg(any(test, feature = "test_utils"))]
@@ -118,9 +112,6 @@ use super::interface::websocket::spawn_admin_interface_tasks;
 use super::interface::websocket::spawn_app_interface_task;
 use super::interface::websocket::spawn_websocket_listener;
 use super::manager::TaskManagerResult;
-use super::p2p_agent_store;
-use super::p2p_agent_store::P2pBatch;
-use super::p2p_agent_store::*;
 use super::ribosome_store::RibosomeStore;
 use super::space::Space;
 use super::space::Spaces;
@@ -137,6 +128,8 @@ mod chc;
 mod graft_records_onto_source_chain;
 
 mod app_auth_token_store;
+
+mod hc_p2p_handler_impl;
 
 /// Verify signature of a signed zome call.
 ///
@@ -258,7 +251,7 @@ pub struct Conductor {
     keystore: MetaLairClient,
 
     /// Handle to the network actor.
-    holochain_p2p: holochain_p2p::HolochainP2pRef,
+    holochain_p2p: holochain_p2p::actor::DynHcP2p,
 
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 
@@ -281,6 +274,12 @@ pub struct Conductor {
 
     /// Container to connect app signals to app interfaces, by installed app id.
     app_broadcast: AppBroadcast,
+}
+
+impl std::fmt::Debug for Conductor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Conductor").finish()
+    }
 }
 
 impl Conductor {
@@ -306,7 +305,7 @@ mod startup_shutdown_impls {
             config: Arc<ConductorConfig>,
             ribosome_store: RwShare<RibosomeStore>,
             keystore: MetaLairClient,
-            holochain_p2p: holochain_p2p::HolochainP2pRef,
+            holochain_p2p: holochain_p2p::actor::DynHcP2p,
             spaces: Spaces,
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
             outcome_sender: OutcomeSender,
@@ -373,13 +372,11 @@ mod startup_shutdown_impls {
             self.shutting_down
                 .store(true, std::sync::atomic::Ordering::Relaxed);
 
-            use ghost_actor::GhostControlSender;
-            let ghost_shutdown = self.holochain_p2p.ghost_actor_shutdown_immediate();
             let mut tm = self.task_manager();
             let task = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
             tokio::task::spawn(async move {
                 tracing::info!("Sending shutdown signal to all managed tasks.");
-                let (_, _, r) = futures::join!(ghost_shutdown, tm.shutdown().boxed(), task,);
+                let (_, r) = futures::join!(tm.shutdown().boxed(), task,);
                 r?
             })
         }
@@ -728,7 +725,7 @@ mod dna_impls {
         }
 
         /// Get a reference to the conductor's HolochainP2p.
-        pub fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
+        pub fn holochain_p2p(&self) -> &holochain_p2p::actor::DynHcP2p {
             &self.holochain_p2p
         }
 
@@ -861,12 +858,9 @@ mod network_impls {
     use holochain_conductor_api::{
         CellInfo, DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo,
     };
-    use holochain_p2p::HolochainP2pSender;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
-    use kitsune_p2p::KitsuneAgent;
-    use kitsune_p2p::KitsuneBinType;
     use zome_call_signature_verification::is_valid_signature;
 
     use crate::conductor::api::error::{
@@ -881,6 +875,8 @@ mod network_impls {
             &self,
             cell_id: Option<CellId>,
         ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
+            unimplemented!()
+            /*
             match cell_id {
                 Some(c) => {
                     let (d, a) = c.into_dna_and_agent();
@@ -900,6 +896,7 @@ mod network_impls {
                     Ok(out)
                 }
             }
+            */
         }
 
         pub(crate) async fn witness_nonce_from_calling_agent(
@@ -937,33 +934,13 @@ mod network_impls {
             self.spaces.is_blocked(input, timestamp).await
         }
 
-        pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
-            use holochain_p2p::AgentPubKeyExt;
-
-            let mut space_to_agents = HashMap::new();
-
-            for cell in self.running_cells.share_ref(|c| {
-                <Result<_, one_err::OneErr>>::Ok(c.keys().cloned().collect::<Vec<_>>())
-            })? {
-                space_to_agents
-                    .entry(cell.dna_hash().clone())
-                    .or_insert_with(Vec::new)
-                    .push(cell.agent_pubkey().to_kitsune());
-            }
-
-            for (space, agents) in space_to_agents {
-                let db = self.spaces.p2p_agents_db(&space)?;
-                p2p_prune(&db, agents).await?;
-            }
-
-            Ok(())
-        }
-
         pub(crate) async fn network_info(
             &self,
             installed_app_id: &InstalledAppId,
             payload: &NetworkInfoRequestPayload,
         ) -> ConductorResult<Vec<NetworkInfo>> {
+            unimplemented!()
+            /*
             use holochain_sqlite::sql::sql_cell::SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP;
 
             let NetworkInfoRequestPayload {
@@ -1106,6 +1083,7 @@ mod network_impls {
             .await
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
+            */
         }
 
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -1189,12 +1167,12 @@ mod network_impls {
             }))
         }
 
+        /*
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn dispatch_holochain_p2p_event(
             &self,
             event: holochain_p2p::event::HolochainP2pEvent,
         ) -> ConductorApiResult<()> {
-            use HolochainP2pEvent::*;
             let dna_hash = event.dna_hash().clone();
             trace!(dispatch_event = ?event);
             match event {
@@ -1383,6 +1361,7 @@ mod network_impls {
             }
             Ok(())
         }
+        */
 
         /// List all host functions provided by this conductor for wasms.
         pub async fn list_wasm_host_functions(&self) -> ConductorApiResult<Vec<String>> {
@@ -1489,7 +1468,6 @@ pub struct InstallAppCommonFlags {
 /// Tests related to app installation can be found in ../../tests/tests/app_installation/mod.rs
 mod app_impls {
     use holochain_types::deepkey_roundtrip_backward;
-    use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairEntryInfo;
 
     use crate::conductor::state::is_app;
 
@@ -2070,7 +2048,7 @@ mod app_impls {
                 .get_entry(dst_tag.clone().into())
                 .await;
             let seed_info = match entry_info {
-                Ok(LairEntryInfo::Seed { seed_info, .. }) => {
+                Ok(lair_keystore_api::lair_store::LairEntryInfo::Seed { seed_info, .. }) => {
                     // If the seed already exists, we don't need to create it again.
                     seed_info
                 }
@@ -2393,8 +2371,6 @@ mod clone_cell_impls {
 
 /// Methods related to management of app and cell status
 mod app_status_impls {
-    use holochain_p2p::AgentPubKeyExt;
-
     use super::*;
 
     impl Conductor {
@@ -2535,19 +2511,14 @@ mod app_status_impls {
 
             future::join_all(new_cells.iter().enumerate().map(|(i, (cell, _))| {
                 async move {
-                    let p2p_agents_db = cell.p2p_agents_db().clone();
                     let cell_id = cell.id().clone();
-                    let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = p2p_agents_db.p2p_get_agent(&kagent).await.ok().flatten();
-                    let maybe_initial_arq = maybe_agent_info.clone().map(|i| i.storage_arq);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
                     let res = tokio::time::timeout(
                         JOIN_NETWORK_WAITING_PERIOD,
                         cell.holochain_p2p_dna().clone().join(
                             agent_pubkey,
-                            maybe_agent_info,
-                            maybe_initial_arq,
+                            None,
                         ),
                     )
                         .await;
@@ -3059,6 +3030,8 @@ mod misc_impls {
         /// Create a JSON dump of the cell's state
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
+            unimplemented!()
+            /*
             let cell = self.cell_by_id(cell_id).await?;
             let authored_db = cell.get_or_create_authored_db()?;
             let dht_db = cell.dht_db();
@@ -3082,6 +3055,7 @@ mod misc_impls {
             let summary = out.to_string();
             let out = (out, summary);
             Ok(serde_json::to_string_pretty(&out)?)
+            */
         }
 
         /// Create a JSON dump of the conductor's state
@@ -3133,6 +3107,8 @@ mod misc_impls {
             cell_id: &CellId,
             dht_ops_cursor: Option<u64>,
         ) -> ConductorApiResult<FullStateDump> {
+            unimplemented!()
+            /*
             let authored_db =
                 self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let dht_db = self.get_or_create_dht_db(cell_id.dna_hash())?;
@@ -3151,6 +3127,7 @@ mod misc_impls {
                 integration_dump: full_integration_dump(&dht_db, dht_ops_cursor).await?,
             };
             Ok(out)
+            */
         }
 
         /// JSON dump of network metrics
@@ -3158,40 +3135,41 @@ mod misc_impls {
             &self,
             dna_hash: Option<DnaHash>,
         ) -> ConductorApiResult<String> {
-            use holochain_p2p::HolochainP2pSender;
+            unimplemented!()
+            /*
             self.holochain_p2p()
                 .dump_network_metrics(dna_hash)
                 .await
                 .map_err(crate::conductor::api::error::ConductorApiError::other)
+            */
         }
 
         /// JSON dump of backend network stats
         pub async fn dump_network_stats(&self) -> ConductorApiResult<String> {
-            use holochain_p2p::HolochainP2pSender;
+            unimplemented!()
+            /*
             self.holochain_p2p()
                 .dump_network_stats()
                 .await
                 .map_err(crate::conductor::api::error::ConductorApiError::other)
+            */
         }
 
         /// Add signed agent info to the conductor
         pub async fn add_agent_infos(
             &self,
-            agent_infos: Vec<AgentInfoSigned>,
+            agent_infos: Vec<String>,
         ) -> ConductorApiResult<()> {
-            let mut space_map = HashMap::new();
-            for agent_info_signed in agent_infos {
-                let space = agent_info_signed.space.clone();
-                space_map
-                    .entry(space)
-                    .or_insert_with(Vec::new)
-                    .push(agent_info_signed);
+            let mut parsed = Vec::with_capacity(agent_infos.len());
+            for info in agent_infos {
+                parsed.push(kitsune2_api::AgentInfoSigned::decode(
+                    &kitsune2_core::Ed25519Verifier,
+                    info.as_bytes(),
+                )?);
             }
-            for (space, agent_infos) in space_map {
-                let db = self.p2p_agents_db(&DnaHash::from_kitsune(&space));
-                inject_agent_infos(db, agent_infos.iter()).await?;
-            }
-            Ok(())
+
+            // TODO actually add them to k2 peer store.
+            unimplemented!()
         }
 
         /// Update coordinator zomes on an existing dna.
@@ -3294,28 +3272,6 @@ mod accessor_impls {
             dna_hash: &DnaHash,
         ) -> DatabaseResult<DbWrite<DbKindCache>> {
             self.spaces.cache(dna_hash)
-        }
-
-        pub(crate) fn p2p_agents_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pAgents> {
-            self.spaces
-                .p2p_agents_db(hash)
-                .expect("failed to open p2p_agent_store database")
-        }
-
-        pub(crate) fn p2p_batch_sender(
-            &self,
-            hash: &DnaHash,
-        ) -> tokio::sync::mpsc::Sender<P2pBatch> {
-            self.spaces
-                .p2p_batch_sender(hash)
-                .expect("failed to get p2p_batch_sender")
-        }
-
-        #[cfg(feature = "test_utils")]
-        pub(crate) fn p2p_metrics_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
-            self.spaces
-                .p2p_metrics_db(hash)
-                .expect("failed to open p2p_metrics_store database")
         }
 
         /// Get the post commit sender.
@@ -3751,8 +3707,11 @@ impl Conductor {
             let handle = self.clone();
             let chc = handle.get_chc(cell_id);
             async move {
-                let holochain_p2p_cell =
-                    handle.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
+                let holochain_p2p_cell = holochain_p2p::HolochainP2pDna::new(
+                    handle.holochain_p2p.clone(),
+                    cell_id.dna_hash().clone(),
+                    chc,
+                );
 
                 let space = handle
                     .get_or_create_space(cell_id.dna_hash())
@@ -3981,14 +3940,6 @@ mod test_utils_impls {
             Ok(cell.cache().clone())
         }
 
-        pub fn get_p2p_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgents> {
-            self.p2p_agents_db(space)
-        }
-
-        pub fn get_p2p_metrics_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
-            self.p2p_metrics_db(space)
-        }
-
         pub fn get_spaces(&self) -> Spaces {
             self.spaces.clone()
         }
@@ -4212,70 +4163,6 @@ fn query_dht_ops_from_statement(
         })?
         .collect::<StateQueryResult<Vec<_>>>()?;
     Ok(r)
-}
-
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(p2p_evt, handle)))]
-async fn p2p_event_task(
-    p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
-    handle: ConductorHandle,
-) {
-    /// The number of events we allow to run in parallel before
-    /// starting to await on the join handles.
-    const NUM_PARALLEL_EVTS: usize = 512;
-    let num_tasks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
-    let duration_metric = create_p2p_event_duration_metric();
-    p2p_evt
-        .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
-            let handle = handle.clone();
-            let num_tasks = num_tasks.clone();
-            let max_time = max_time.clone();
-            let duration_metric = duration_metric.clone();
-            async move {
-                // Track whether the concurrency limit has been reached and keep the start time for reporting if so.
-                let start = Instant::now();
-                let current_num_tasks = num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-
-                let evt_dna_hash = evt.dna_hash().clone();
-
-                // This loop is critical, ensure that nothing in the dispatch kills it by blocking permanently
-                match tokio::time::timeout(std::time::Duration::from_secs(30), handle.dispatch_holochain_p2p_event(evt)).await {
-                    Ok(Ok(())) => {}
-                    Ok(Err(e)) => {
-                        tracing::error!(
-                                message = "error dispatching network event",
-                                error = ?e,
-                            );
-                    }
-                    Err(_) => {
-                        tracing::error!("timeout while dispatching network event");
-                    }
-                }
-
-                if current_num_tasks >= NUM_PARALLEL_EVTS {
-                    let el = start.elapsed();
-                    let us = el.as_micros() as u64;
-                    let max_us = max_time
-                        .fetch_max(us, std::sync::atomic::Ordering::Relaxed)
-                        .max(us);
-
-                    let s = tracing::info_span!("holochain_perf", this_event_time = ?el, max_event_micros = %max_us);
-                    s.in_scope(|| tracing::info!("dispatch_holochain_p2p_event is saturated"))
-                } else {
-                    max_time.store(0, std::sync::atomic::Ordering::Relaxed);
-                }
-
-                duration_metric.record(start.elapsed().as_secs_f64(), &[
-                    opentelemetry_api::KeyValue::new("dna_hash", format!("{:?}", evt_dna_hash)),
-                ]);
-
-                num_tasks.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
-            }
-                .in_current_span()
-        })
-        .await;
-
-    tracing::info!("p2p_event_task has ended");
 }
 
 /// Extract the modifiers from the RoleSettingsMap into their own HashMap

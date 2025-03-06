@@ -43,7 +43,6 @@ mod local_network_tests;
 
 pub mod prelude {
     pub use holo_hash;
-    pub use holochain_p2p::{AgentPubKeyExt, DhtOpHashExt, DnaHashExt, HolochainP2pSender};
 
     #[cfg(feature = "hdk")]
     pub use hdk::link::GetLinksInputBuilder;

@@ -8,11 +8,7 @@ use std::{
     time::Duration,
 };
 
-use super::{
-    conductor::RwShare,
-    error::ConductorResult,
-    p2p_agent_store::{self, P2pBatch},
-};
+use super::{conductor::RwShare, error::ConductorResult};
 use crate::conductor::{error::ConductorError, state::ConductorState};
 use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::{
@@ -28,17 +24,9 @@ use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::paths::DatabasesRootPath;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::AgentPubKeyExt;
-use holochain_p2p::DnaHashExt;
-use holochain_p2p::{
-    dht::region::RegionBounds,
-    dht_arc::{DhtArcRange, DhtArcSet},
-    event::FetchOpDataQuery,
-};
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
-    DbKindP2pAgents, DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite,
-    PoolConfig, ReadAccess,
+    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindWasm,
+    DbSyncLevel, DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
 };
 use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,
@@ -47,9 +35,6 @@ use holochain_state::{
     query::{map_sql_dht_op_common, StateQueryError},
 };
 use holochain_util::timed;
-use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
-use kitsune_p2p_block::NodeId;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use rusqlite::{named_params, OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
@@ -92,15 +77,6 @@ pub struct Space {
     /// The dht databases. These are shared across cells.
     /// There is one per unique Dna.
     pub dht_db: DbWrite<DbKindDht>,
-
-    /// The database for storing AgentInfoSigned
-    pub p2p_agents_db: DbWrite<DbKindP2pAgents>,
-
-    /// The database for storing p2p MetricDatum(s)
-    pub p2p_metrics_db: DbWrite<DbKindP2pMetrics>,
-
-    /// The batch sender for writes to the p2p database.
-    pub p2p_batch_sender: tokio::sync::mpsc::Sender<P2pBatch>,
 
     /// A cache for slow database queries.
     pub dht_query_cache: DhtDbQueryCache,
@@ -234,9 +210,11 @@ impl Spaces {
 
     async fn node_agents_in_spaces(
         &self,
-        node_id: NodeId,
-        dnas: Vec<DnaHash>,
+        _node_id: &str,
+        _dnas: Vec<DnaHash>,
     ) -> DatabaseResult<Vec<CellId>> {
+        todo!()
+        /*
         let mut agent_lists: Vec<Vec<AgentInfoSigned>> = vec![];
         for dna in dnas {
             // @todo join_all for these awaits
@@ -261,6 +239,7 @@ impl Spaces {
                 )
             })
             .collect())
+        */
     }
 
     /// Check if some target is blocked.
@@ -272,12 +251,12 @@ impl Spaces {
         let cell_ids = match &target_id {
             BlockTargetId::Cell(cell_id) => vec![cell_id.to_owned()],
             BlockTargetId::NodeDna(node_id, dna_hash) => {
-                self.node_agents_in_spaces((*node_id).clone(), vec![dna_hash.clone()])
+                self.node_agents_in_spaces(node_id, vec![dna_hash.clone()])
                     .await?
             }
             BlockTargetId::Node(node_id) => {
                 self.node_agents_in_spaces(
-                    (*node_id).clone(),
+                    node_id,
                     self.map
                         .share_ref(|m| m.keys().cloned().collect::<Vec<DnaHash>>()),
                 )
@@ -439,24 +418,7 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_db.clone())
     }
 
-    /// Get the peer database (this will create the space if it doesn't already exist).
-    pub fn p2p_agents_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindP2pAgents>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.p2p_agents_db.clone())
-    }
-
-    /// Get the peer database (this will create the space if it doesn't already exist).
-    pub fn p2p_metrics_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindP2pMetrics>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.p2p_metrics_db.clone())
-    }
-
-    /// Get the batch sender (this will create the space if it doesn't already exist).
-    pub fn p2p_batch_sender(
-        &self,
-        dna_hash: &DnaHash,
-    ) -> DatabaseResult<tokio::sync::mpsc::Sender<P2pBatch>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.p2p_batch_sender.clone())
-    }
-
+    /*
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// the network module is requesting a list of dht op hashes
     /// Get the [`DhtOpHash`]es and authored timestamps for a given time window.
@@ -546,8 +508,8 @@ impl Spaces {
                         )?;
                         DatabaseResult::Ok(Some((
                             hashes,
-                            kitsune_p2p_types::Timestamp::from_micros(start.0)
-                                ..=kitsune_p2p_types::Timestamp::from_micros(end.0),
+                            Timestamp::from_micros(start.0)
+                                ..=Timestamp::from_micros(end.0),
                         )))
                     }
                     None => Ok(None),
@@ -634,7 +596,7 @@ impl Spaces {
     ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
         let mut sql = "
             SELECT DhtOp.hash, DhtOp.type AS dht_type,
-            Action.blob AS action_blob, 
+            Action.blob AS action_blob,
             Action.author as author,
             Entry.blob AS entry_blob
             FROM DHtOp
@@ -676,6 +638,7 @@ impl Spaces {
             .await?;
         Ok(results)
     }
+    */
 
     #[cfg_attr(
         feature = "instrument",
@@ -741,14 +704,6 @@ impl Spaces {
         }
         Ok(())
     }
-
-    /// Get the recent_threshold based on the kitsune network config
-    pub fn recent_threshold(&self) -> Duration {
-        self.config
-            .network
-            .tuning_params
-            .danger_gossip_recent_threshold()
-    }
 }
 
 impl Space {
@@ -758,63 +713,39 @@ impl Space {
         db_sync_strategy: DbSyncStrategy,
         db_key: DbKey,
     ) -> DatabaseResult<Self> {
-        let space = dna_hash.to_kitsune();
+        let space = dna_hash.to_k2_space();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let (cache, dht_db, p2p_agents_db, p2p_metrics_db, conductor_db) =
-            tokio::task::block_in_place(|| {
-                let cache = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindCache(dna_hash.clone()),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                let dht_db = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindDht(dna_hash.clone()),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                let p2p_agents_db = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindP2pAgents(space.clone()),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                let p2p_metrics_db = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindP2pMetrics(space),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindConductor,
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                DatabaseResult::Ok((cache, dht_db, p2p_agents_db, p2p_metrics_db, conductor_db))
-            })?;
-
-        let (tx, rx) = tokio::sync::mpsc::channel(100);
-        tokio::spawn(p2p_agent_store::p2p_put_all_batch(
-            p2p_agents_db.clone(),
-            rx,
-        ));
-        let p2p_batch_sender = tx;
+        let (cache, dht_db, conductor_db) = tokio::task::block_in_place(|| {
+            let cache = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindCache(dna_hash.clone()),
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                },
+            )?;
+            let dht_db = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindDht(dna_hash.clone()),
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                },
+            )?;
+            let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindConductor,
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                },
+            )?;
+            DatabaseResult::Ok((cache, dht_db, conductor_db))
+        })?;
 
         let witnessing_workspace = WitnessingWorkspace::default();
         let incoming_op_hashes = IncomingOpHashes::default();
@@ -825,9 +756,6 @@ impl Space {
             cache_db: cache,
             authored_dbs: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             dht_db,
-            p2p_agents_db,
-            p2p_metrics_db,
-            p2p_batch_sender,
             countersigning_workspaces: Default::default(),
             witnessing_workspace,
             incoming_op_hashes,

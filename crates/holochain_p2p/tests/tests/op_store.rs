@@ -30,7 +30,7 @@ struct StubHost {
 }
 
 impl HcP2pHandler for StubHost {
-    fn call_remote(
+    fn handle_call_remote(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -40,7 +40,7 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn publish(
+    fn handle_publish(
         &self,
         _dna_hash: DnaHash,
         _request_validation_receipt: bool,
@@ -70,7 +70,7 @@ impl HcP2pHandler for StubHost {
         })
     }
 
-    fn get(
+    fn handle_get(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -80,7 +80,7 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn get_meta(
+    fn handle_get_meta(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -90,7 +90,7 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn get_links(
+    fn handle_get_links(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -100,7 +100,7 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn count_links(
+    fn handle_count_links(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -109,7 +109,7 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn get_agent_activity(
+    fn handle_get_agent_activity(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -120,7 +120,7 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn must_get_agent_activity(
+    fn handle_must_get_agent_activity(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -130,7 +130,7 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn validation_receipts_received(
+    fn handle_validation_receipts_received(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -139,7 +139,7 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn countersigning_session_negotiation(
+    fn handle_countersigning_session_negotiation(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
@@ -459,8 +459,10 @@ async fn setup_test() -> (DbWrite<DbKindDht>, HolochainOpStore) {
     let db = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
 
     let sender: DynHcP2pHandler = Arc::new(StubHost { db: db.clone() });
+    let sender_w = Arc::new(std::sync::OnceLock::new());
+    sender_w.set(holochain_p2p::WrapEvtSender(sender)).unwrap();
 
-    let op_store = HolochainOpStore::new(db.clone(), dna_hash, sender);
+    let op_store = HolochainOpStore::new(db.clone(), dna_hash, sender_w);
 
     (db, op_store)
 }

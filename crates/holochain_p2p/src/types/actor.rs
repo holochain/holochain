@@ -207,6 +207,13 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     #[cfg(feature = "test_utils")]
     fn test_set_full_arcs(&self, space: kitsune2_api::SpaceId) -> BoxFut<'_, ()>;
 
+    /// Call this exactly once before any other invocations on this
+    /// instance in order to register the HcP2pHandler.
+    fn register_handler(
+        &self,
+        handler: event::DynHcP2pHandler,
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
+
     /// The p2p module must be informed at runtime which dna/agent pairs it should be tracking.
     fn join(
         &self,

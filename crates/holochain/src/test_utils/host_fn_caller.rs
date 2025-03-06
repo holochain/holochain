@@ -20,7 +20,6 @@ use holo_hash::AnyDhtHash;
 use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
-use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::db_cache::DhtDbQueryCache;
@@ -124,9 +123,11 @@ impl HostFnCaller {
         let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
         let cache = handle.get_cache_db(cell_id).await.unwrap();
         let keystore = handle.keystore().clone();
-        let network = handle
-            .holochain_p2p()
-            .to_dna(cell_id.dna_hash().clone(), None);
+        let network = holochain_p2p::HolochainP2pDna::new(
+            handle.holochain_p2p().clone(),
+            cell_id.dna_hash().clone(),
+            None,
+        );
 
         let zome_path = (
             cell_id.clone(),

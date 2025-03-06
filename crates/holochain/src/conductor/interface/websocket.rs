@@ -507,7 +507,6 @@ mod test {
     use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_conductor_api::*;
     use holochain_keystore::test_keystore;
-    use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::prelude::*;
     use holochain_trace;
@@ -516,10 +515,6 @@ mod test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasm_test_utils::TestZomes;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use kitsune_p2p::agent_store::AgentInfoSigned;
-    use kitsune_p2p::dependencies::kitsune_p2p_types::fetch_pool::FetchPoolInfo;
-    use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
-    use kitsune_p2p_types::fixt::*;
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
     use std::collections::HashSet;
@@ -1295,8 +1290,6 @@ mod test {
                 modifiers: DnaModifiers {
                     network_seed: network_seed.to_string(),
                     properties: SerializedBytes::try_from(()).unwrap(),
-                    origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                    quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
                 },
                 integrity_zomes: zomes
                     .clone()

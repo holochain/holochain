@@ -295,7 +295,11 @@ impl AdminInterfaceApi {
             }
             AgentInfo { cell_id } => {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
-                Ok(AdminResponse::AgentInfo(r))
+                let mut encoded = Vec::with_capacity(r.len());
+                for info in r {
+                    encoded.push(info.encode()?);
+                }
+                Ok(AdminResponse::AgentInfo(encoded))
             }
             GraftRecords {
                 cell_id,
