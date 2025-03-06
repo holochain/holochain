@@ -1,6 +1,19 @@
 use super::*;
-use holochain_p2p::HolochainP2pResult;
+use holochain_p2p::{HolochainP2pError, HolochainP2pResult};
 use kitsune2_api::BoxFut;
+
+impl Conductor {
+    async fn cell_by_parts(
+        &self,
+        dna_hash: &DnaHash,
+        agent: &AgentPubKey,
+    ) -> HolochainP2pResult<Arc<Cell>> {
+        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+        self.cell_by_id(&cell_id)
+            .await
+            .map_err(HolochainP2pError::other)
+    }
+}
 
 impl holochain_p2p::event::HcP2pHandler for Conductor {
     fn handle_call_remote(
@@ -10,7 +23,12 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         zome_call_params_serialized: ExternIO,
         signature: Signature,
     ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
-        Box::pin(async { unimplemented!() })
+        Box::pin(async {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_call_remote(dna_hash, to_agent, zome_call_params_serialized, signature)
+                .await
+        })
     }
 
     fn handle_publish(
@@ -20,7 +38,17 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         countersigning_session: bool,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async { unimplemented!() })
+        Box::pin(async move {
+            self.spaces
+                .handle_publish(
+                    &dna_hash,
+                    request_validation_receipt,
+                    countersigning_session,
+                    ops,
+                )
+                .await
+                .map_err(HolochainP2pError::other)
+        })
     }
 
     fn handle_get(
@@ -30,7 +58,12 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         dht_hash: holo_hash::AnyDhtHash,
         options: holochain_p2p::event::GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
-        Box::pin(async { unimplemented!() })
+        Box::pin(async {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_get(dna_hash, to_agent, dht_hash, options)
+                .await
+        })
     }
 
     fn handle_get_meta(
@@ -40,7 +73,12 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         dht_hash: holo_hash::AnyDhtHash,
         options: holochain_p2p::event::GetMetaOptions,
     ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
-        Box::pin(async { unimplemented!() })
+        Box::pin(async {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_get_meta(dna_hash, to_agent, dht_hash, options)
+                .await
+        })
     }
 
     fn handle_get_links(
@@ -50,7 +88,12 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         link_key: WireLinkKey,
         options: holochain_p2p::event::GetLinksOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
-        Box::pin(async { unimplemented!() })
+        Box::pin(async {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_get_links(dna_hash, to_agent, link_key, options)
+                .await
+        })
     }
 
     fn handle_count_links(
@@ -59,7 +102,12 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         to_agent: AgentPubKey,
         query: WireLinkQuery,
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
-        Box::pin(async { unimplemented!() })
+        Box::pin(async {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_count_links(dna_hash, to_agent, query)
+                .await
+        })
     }
 
     fn handle_get_agent_activity(
@@ -70,7 +118,12 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         query: ChainQueryFilter,
         options: holochain_p2p::event::GetActivityOptions,
     ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>> {
-        Box::pin(async { unimplemented!() })
+        Box::pin(async {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_get_agent_activity(dna_hash, to_agent, agent, query, options)
+                .await
+        })
     }
 
     fn handle_must_get_agent_activity(
@@ -80,7 +133,12 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         author: AgentPubKey,
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
-        Box::pin(async { unimplemented!() })
+        Box::pin(async {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_must_get_agent_activity(dna_hash, to_agent, author, filter)
+                .await
+        })
     }
 
     fn handle_validation_receipts_received(
@@ -89,7 +147,12 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         to_agent: AgentPubKey,
         receipts: ValidationReceiptBundle,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async { unimplemented!() })
+        Box::pin(async {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_validation_receipts_received(dna_hash, to_agent, receipts)
+                .await
+        })
     }
 
     fn handle_countersigning_session_negotiation(
@@ -98,6 +161,11 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         to_agent: AgentPubKey,
         message: holochain_p2p::event::CountersigningSessionNegotiationMessage,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async { unimplemented!() })
+        Box::pin(async {
+            self.cell_by_parts(&dna_hash, &to_agent)
+                .await?
+                .handle_countersigning_session_negotiation(dna_hash, to_agent, message)
+                .await
+        })
     }
 }
