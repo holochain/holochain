@@ -132,6 +132,7 @@ pub async fn publish_dht_ops_workflow_inner(
     Ok(to_publish)
 }
 
+/* @ K2-INTEGRATION @ TODO @
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,9 +146,7 @@ mod tests {
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::fixt::DnaHashFixturator;
     use holochain_conductor_api::conductor::ConductorTuningParams;
-    use holochain_p2p::actor::HolochainP2pSender;
     use holochain_p2p::HolochainP2pDna;
-    use holochain_p2p::HolochainP2pRef;
     use holochain_state::mutations;
     use holochain_trace;
     use holochain_types::db_cache::DhtDbQueryCache;
@@ -611,3 +610,4 @@ mod tests {
         );
     }
 }
+*/

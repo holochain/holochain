@@ -121,9 +121,9 @@ mod tests {
                     .times(1)
                     .in_sequence(&mut sequence)
                     .returning(|_, _, _, _| {
-                        box_fut(Ok(Some(
-                            ExternIO::encode(InitCallbackResult::Pass).unwrap(),
-                        )))
+                        must_future::MustBoxFuture::new(async {
+                            Ok(Some(ExternIO::encode(InitCallbackResult::Pass).unwrap()))
+                        })
                     });
             }
         }

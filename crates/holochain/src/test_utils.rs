@@ -176,15 +176,16 @@ impl Drop for TestNetwork {
     }
 }
 
-/*
 /// Convenience constructor for cell networks
 pub async fn test_network(
-    dna_hash: Option<DnaHash>,
-    agent_key: Option<AgentPubKey>,
+    _dna_hash: Option<DnaHash>,
+    _agent_key: Option<AgentPubKey>,
 ) -> TestNetwork {
-    test_network_inner::<fn(&HolochainP2pEvent) -> bool>(dna_hash, agent_key, None).await
+    todo!()
+    //test_network_inner::<fn(&HolochainP2pEvent) -> bool>(dna_hash, agent_key, None).await
 }
 
+/*
 /// Convenience constructor for cell networks
 /// where you need to filter some events into a channel
 pub async fn test_network_with_events<F>(

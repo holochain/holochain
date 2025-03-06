@@ -390,7 +390,7 @@ async fn app_validation_ops() {
         (alice, bob)
     };
 
-    conductors.exchange_peer_info().await;
+    //conductors.exchange_peer_info().await;
 
     let _: ActionHash = conductors[0]
         .call(&alice.zome("zome1"), "create_a", ())

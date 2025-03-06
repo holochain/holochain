@@ -83,7 +83,7 @@ strum = "0.18.0"
 subtle-encoding = "0.5"
 tempfile = "3.3"
 thiserror = "1.0.22"
-tokio = { version = "1.36.0" }
+tokio = { version = "1.36.0", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["sync", "net"] }
 task-motel = "0.1.0"
 tracing = "0.1"
@@ -152,6 +152,7 @@ pretty_assertions = "1.4"
 regex = "1.5"
 reqwest = { version = "0.12", default-features = false }
 test-case = "3.3"
+tokio = { version = "1.36.0", features = ["full", "test-util"] }
 tokio-tungstenite = "0.21"
 tx5 = "0.1.5-beta"
 predicates = "3.1"

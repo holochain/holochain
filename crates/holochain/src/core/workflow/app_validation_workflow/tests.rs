@@ -135,7 +135,11 @@ async fn main_workflow() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -176,7 +180,11 @@ async fn main_workflow() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -327,7 +335,11 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -466,7 +478,11 @@ async fn validate_ops_in_sequence_must_get_action() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -627,7 +643,11 @@ async fn handle_error_in_op_validation() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -676,7 +696,7 @@ async fn app_validation_workflow_test() {
     let alice_cell_id = alice.cell_id().clone();
     let bob_cell_id = bob.cell_id().clone();
 
-    conductors.exchange_peer_info().await;
+    //conductors.exchange_peer_info().await;
 
     let expected_count = run_test(
         alice_cell_id.clone(),
@@ -773,7 +793,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
-    conductors.exchange_peer_info().await;
+    //conductors.exchange_peer_info().await;
 
     let () = conductors[0]
         .call(&alice.zome("coordinator"), "create", ())
@@ -856,8 +876,6 @@ async fn check_app_entry_def_test() {
             modifiers: DnaModifiers {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
-                origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
             },
             integrity_zomes: vec![TestZomes::from(TestWasm::EntryDefs).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
@@ -1002,7 +1020,11 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -1134,7 +1156,7 @@ async fn app_validation_produces_warrants() {
     println!("1 bob   {}", bob.agent_pubkey());
     println!("2 carol {}", carol.agent_pubkey());
 
-    conductors.exchange_peer_info().await;
+    //conductors.exchange_peer_info().await;
 
     await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
 

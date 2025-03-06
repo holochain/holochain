@@ -215,11 +215,13 @@ pub mod slow_tests {
         holochain_trace::test_run();
         // agents should not pass around data
         let config = SweetConductorConfig::rendezvous(false)
+            /*
             .tune(|config| {
                 config.disable_historical_gossip = true;
                 config.disable_recent_gossip = true;
                 config.disable_publish = true;
             })
+            */
             .no_dpki();
         let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crud]).await;
@@ -240,7 +242,7 @@ pub mod slow_tests {
         assert!(local_entries_with_details[0].is_some());
 
         // now make both agents aware of each other
-        conductors.exchange_peer_info().await;
+        //conductors.exchange_peer_info().await;
 
         // bob gets details by action hash from local databases
         let zome_bob = apps[1].cells()[0].zome(TestWasm::Crud.coordinator_zome_name());

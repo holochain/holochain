@@ -5,7 +5,6 @@ use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AdminResponse};
 use holochain_types::websocket::AllowedOrigins;
-use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::dependencies::*;
 use lair_keystore_api::ipc_keystore::*;
 use lair_keystore_api::mem_store::*;

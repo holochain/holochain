@@ -3157,10 +3157,7 @@ mod misc_impls {
         }
 
         /// Add signed agent info to the conductor
-        pub async fn add_agent_infos(
-            &self,
-            agent_infos: Vec<String>,
-        ) -> ConductorApiResult<()> {
+        pub async fn add_agent_infos(&self, agent_infos: Vec<String>) -> ConductorApiResult<()> {
             let mut parsed = Vec::with_capacity(agent_infos.len());
             for info in agent_infos {
                 parsed.push(kitsune2_api::AgentInfoSigned::decode(

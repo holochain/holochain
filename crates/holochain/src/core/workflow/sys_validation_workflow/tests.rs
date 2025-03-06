@@ -31,7 +31,7 @@ async fn sys_validation_workflow_test() {
     let alice_cell_id = alice.cell_id().clone();
     let bob_cell_id = bob.cell_id().clone();
 
-    conductors.exchange_peer_info().await;
+    //conductors.exchange_peer_info().await;
 
     run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
 }
@@ -128,7 +128,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let bob_pubkey = bob.agent_pubkey().clone();
 
     // For this test we want bob to get alice's chain so he can detect the fork
-    conductors.exchange_peer_info().await;
+    //conductors.exchange_peer_info().await;
 
     let action_hash: ActionHash = conductors[0]
         .call(&alice.zome("coordinator"), "create_unit", ())

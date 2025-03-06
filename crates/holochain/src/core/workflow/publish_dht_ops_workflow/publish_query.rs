@@ -156,14 +156,12 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(
-            r.into_iter()
-                .map(|t| t.1.into_inner().0)
-                .collect::<Vec<_>>(),
+            r.into_iter().map(|t| t.1).collect::<Vec<_>>(),
             expected
                 .results
                 .iter()
                 .cloned()
-                .map(|op| op.into_inner().1.to_kitsune())
+                .map(|op| op.into_inner().1)
                 .collect::<Vec<_>>(),
         );
 

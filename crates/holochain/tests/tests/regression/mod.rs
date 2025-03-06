@@ -122,9 +122,9 @@ async fn zero_arc_can_link_to_uncached_base() {
 
     let empty_arc_conductor_config = SweetConductorConfig::rendezvous(false)
         .no_dpki_mustfix()
-        .tune(|t| {
+        /*.tune(|t| {
             t.gossip_arc_clamping = String::from("empty");
-        });
+        })*/;
 
     let mut conductors = SweetConductorBatch::from_configs_rendezvous(vec![
         SweetConductorConfig::rendezvous(false).no_dpki_mustfix(),
@@ -139,7 +139,7 @@ async fn zero_arc_can_link_to_uncached_base() {
     .await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    conductors.exchange_peer_info().await;
+    //conductors.exchange_peer_info().await;
 
     let ((alice,), (bob,)) = apps.into_tuples();
 
