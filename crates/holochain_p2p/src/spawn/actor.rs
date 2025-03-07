@@ -542,6 +542,43 @@ impl HolochainP2pActor {
         config: HolochainP2pConfig,
         lair_client: holochain_keystore::MetaLairClient,
     ) -> HolochainP2pResult<actor::DynHcP2p> {
+        static K2_CONFIG: std::sync::Once = std::sync::Once::new();
+        K2_CONFIG.call_once(|| {
+            // Set up some kitsune2 specializations specific to holochain.
+
+            // Kitsune2 by default just xors subsequent bytes of the hash
+            // itself and treats that result as a LE u32.
+            // Holochain, instead, first does a blake2b hash, and
+            // then xors those bytes.
+            kitsune2_api::Id::set_global_loc_callback(|bytes| {
+                let hash = blake2b_simd::Params::new().hash_length(16).hash(bytes);
+                let hash = hash.as_bytes();
+                let mut out = [hash[0], hash[1], hash[2], hash[3]];
+                for i in (4..16).step_by(4) {
+                    out[0] ^= hash[i];
+                    out[1] ^= hash[i + 1];
+                    out[2] ^= hash[i + 2];
+                    out[3] ^= hash[i + 3];
+                }
+                (out[0] as u32)
+                    + ((out[1] as u32) << 8)
+                    + ((out[2] as u32) << 16)
+                    + ((out[3] as u32) << 24)
+            });
+
+            // Kitsune2 just displays the bytes as direct base64.
+            // Holochain prepends some prefix bytes and appends the loc bytes.
+            kitsune2_api::SpaceId::set_global_display_callback(|bytes, f| {
+                write!(f, "{}", DnaHash::from_raw_32(bytes.to_vec()))
+            });
+            kitsune2_api::AgentId::set_global_display_callback(|bytes, f| {
+                write!(f, "{}", AgentPubKey::from_raw_32(bytes.to_vec()))
+            });
+            kitsune2_api::OpId::set_global_display_callback(|bytes, f| {
+                write!(f, "{}", DhtOpHash::from_raw_32(bytes.to_vec()))
+            });
+        });
+
         let mut builder = if config.k2_test_builder {
             kitsune2_core::default_test_builder()
         } else {
@@ -1478,4 +1515,53 @@ impl actor::HcP2p for HolochainP2pActor {
     }
 
     ----------------- */
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn correct_id_loc_calc() {
+        // make sure our "Once" kitsune2 setup is executed
+        let _ = HolochainP2pActor::create(Default::default(), holochain_keystore::test_keystore())
+            .await;
+
+        let h_space = DnaHash::from_raw_32(vec![0xdb; 32]);
+        let k_space = h_space.to_k2_space();
+
+        assert_eq!(h_space.get_loc(), k_space.loc());
+
+        let h_agent = AgentPubKey::from_raw_32(vec![0xdc; 32]);
+        let k_agent = h_agent.to_k2_agent();
+
+        assert_eq!(h_agent.get_loc(), k_agent.loc());
+
+        let h_op = DhtOpHash::from_raw_32(vec![0xdd; 32]);
+        let k_op = h_op.to_k2_op();
+
+        assert_eq!(h_op.get_loc(), k_op.loc());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn correct_id_display() {
+        // make sure our "Once" kitsune2 setup is executed
+        let _ = HolochainP2pActor::create(Default::default(), holochain_keystore::test_keystore())
+            .await;
+
+        let h_space = DnaHash::from_raw_32(vec![0xdb; 32]);
+        let k_space = h_space.to_k2_space();
+
+        assert_eq!(h_space.to_string(), k_space.to_string());
+
+        let h_agent = AgentPubKey::from_raw_32(vec![0xdc; 32]);
+        let k_agent = h_agent.to_k2_agent();
+
+        assert_eq!(h_agent.to_string(), k_agent.to_string());
+
+        let h_op = DhtOpHash::from_raw_32(vec![0xdd; 32]);
+        let k_op = h_op.to_k2_op();
+
+        assert_eq!(h_op.to_string(), k_op.to_string());
+    }
 }
