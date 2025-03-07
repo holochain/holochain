@@ -560,10 +560,7 @@ impl HolochainP2pActor {
                     out[2] ^= hash[i + 2];
                     out[3] ^= hash[i + 3];
                 }
-                (out[0] as u32)
-                    + ((out[1] as u32) << 8)
-                    + ((out[2] as u32) << 16)
-                    + ((out[3] as u32) << 24)
+                u32::from_le_bytes(out)
             });
 
             // Kitsune2 just displays the bytes as direct base64.
