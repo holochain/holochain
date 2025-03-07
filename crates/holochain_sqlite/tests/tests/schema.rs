@@ -31,10 +31,7 @@ async fn check_schema_migrations_execute() {
     let wasm = DbWrite::test_in_mem(DbKindWasm).unwrap();
     check_migrations_run(wasm, "./src/sql/wasm/schema").await;
 
-    let peer_meta_store = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(
-        kitsune2_api::SpaceId::from(bytes::Bytes::from_static("test".as_bytes())),
-    )))
-    .unwrap();
+    let peer_meta_store = DbWrite::test_in_mem(DbKindPeerMetaStore).unwrap();
     check_migrations_run(peer_meta_store, "./src/sql/peer_meta_store/schema").await;
 }
 

@@ -49,6 +49,7 @@ pub struct Spaces {
     pub(crate) config: Arc<ConductorConfig>,
     /// The map of running queue consumer workflows.
     pub(crate) queue_consumer_map: QueueConsumerMap,
+    pub(crate) peer_meta_store_db: DbWrite<DbKindPeerMetaStore>,
     pub(crate) conductor_db: DbWrite<DbKindConductor>,
     pub(crate) wasm_db: DbWrite<DbKindWasm>,
     db_key: DbKey,
@@ -167,7 +168,15 @@ impl Spaces {
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let (conductor_db, wasm_db) = tokio::task::block_in_place(|| {
+        let (peer_meta_store_db, conductor_db, wasm_db) = tokio::task::block_in_place(|| {
+            let peer_meta_store_db = DbWrite::open_with_pool_config(
+                root_db_dir.as_ref(),
+                DbKindPeerMetaStore,
+                PoolConfig {
+                    synchronous_level: db_sync_level,
+                    key: db_key.clone(),
+                },
+            )?;
             let conductor_db = DbWrite::open_with_pool_config(
                 root_db_dir.as_ref(),
                 DbKindConductor,
@@ -184,7 +193,7 @@ impl Spaces {
                     key: db_key.clone(),
                 },
             )?;
-            ConductorResult::Ok((conductor_db, wasm_db))
+            ConductorResult::Ok((peer_meta_store_db, conductor_db, wasm_db))
         })?;
 
         Ok(Spaces {
@@ -192,6 +201,7 @@ impl Spaces {
             db_dir: Arc::new(root_db_dir),
             config,
             queue_consumer_map: QueueConsumerMap::new(),
+            peer_meta_store_db,
             conductor_db,
             wasm_db,
             db_key,
@@ -411,6 +421,11 @@ impl Spaces {
         dna_hash: &DnaHash,
     ) -> DatabaseResult<Vec<DbWrite<DbKindAuthored>>> {
         self.get_or_create_space_ref(dna_hash, |space| space.get_all_authored_dbs())
+    }
+
+    /// Get the peer_meta_store database.
+    pub fn peer_meta_store_db(&self) -> DatabaseResult<DbWrite<DbKindPeerMetaStore>> {
+        Ok(self.peer_meta_store_db.clone())
     }
 
     /// Get the dht database (this will create the space if it doesn't already exist).

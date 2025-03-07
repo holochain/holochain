@@ -20,8 +20,7 @@ pub enum DbKind {
     /// Specifies the environment used to save wasm
     Wasm,
     /// Metadata about peers, for tracking local state and observations about peers.
-    #[display(fmt = "peer-meta-{:?}", "_0")]
-    PeerMetaStore(Arc<kitsune2_api::SpaceId>),
+    PeerMetaStore,
     #[cfg(feature = "test_utils")]
     Test(String),
 }
@@ -69,7 +68,7 @@ pub struct DbKindWasm;
 
 /// Database kind for [DbKind::PeerMetaStore]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
-pub struct DbKindPeerMetaStore(pub Arc<kitsune2_api::SpaceId>);
+pub struct DbKindPeerMetaStore;
 
 impl DbKindT for DbKindAuthored {
     fn kind(&self) -> DbKind {
@@ -178,11 +177,11 @@ impl DbKindT for DbKindWasm {
 
 impl DbKindT for DbKindPeerMetaStore {
     fn kind(&self) -> DbKind {
-        DbKind::PeerMetaStore(self.0.clone())
+        DbKind::PeerMetaStore
     }
 
     fn filename_inner(&self) -> PathBuf {
-        ["p2p", &format!("peer-meta-{}", self.0)].iter().collect()
+        ["p2p", "peer-meta"].iter().collect()
     }
 
     fn if_corrupt_wipe(&self) -> bool {

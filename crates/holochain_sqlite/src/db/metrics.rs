@@ -62,7 +62,7 @@ fn db_kind_name(kind: DbKind) -> String {
         DbKind::Cache(_) => "cache",
         DbKind::Conductor => "conductor",
         DbKind::Wasm => "wasm",
-        DbKind::PeerMetaStore(_) => "peer_meta_store",
+        DbKind::PeerMetaStore => "peer_meta_store",
         #[cfg(feature = "test_utils")]
         DbKind::Test(_) => "test",
     }
