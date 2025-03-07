@@ -9,7 +9,7 @@ use holochain_sqlite::sql::sql_peer_meta_store;
 use kitsune2_api::{BoxFut, K2Error, K2Result, PeerMetaStore, Timestamp, Url};
 use std::sync::Arc;
 
-/// Holochain implementation of the Kitsune2 [OpStoreFactory].
+/// Holochain implementation of the Kitsune2 [kitsune2_api::OpStoreFactory].
 pub struct HolochainPeerMetaStoreFactory {
     /// The database connection getter.
     pub getter: crate::GetDbPeerMeta,
