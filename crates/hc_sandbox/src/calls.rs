@@ -759,7 +759,7 @@ async fn list_capability_grants(
     )
 }
 
-/// Calls [`AdminRequest::AddAgentInfo`] with and adds the list of agent info.
+/// Calls [`AdminRequest::AddAgentInfo`] and adds the list of agent info.
 pub async fn add_agent_info(
     cmd: &mut CmdRunner,
     args: Vec<Arc<AgentInfoSigned>>,
