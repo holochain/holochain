@@ -513,8 +513,7 @@ async fn test_storage_arcs() {
 }
 
 async fn spawn_test(dna_hash: DnaHash, handler: DynHcP2pHandler) -> (AgentPubKey, actor::DynHcP2p) {
-    let space_id = dna_hash.to_k2_space();
-    let db_peer_meta = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(space_id))).unwrap();
+    let db_peer_meta = DbWrite::test_in_mem(DbKindPeerMetaStore).unwrap();
     let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
     let lair_client = test_keystore();
 
