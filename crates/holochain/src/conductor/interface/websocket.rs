@@ -496,7 +496,7 @@ mod test {
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
     use crate::sweettest::websocket_client_by_port;
-    use crate::sweettest::SweetConductorConfig;
+    //use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::WsPollRecv;
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
@@ -515,6 +515,7 @@ mod test {
     use holochain_wasm_test_utils::TestWasm;
     use holochain_wasm_test_utils::TestZomes;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
+    //use kitsune2_api::{AgentId, AgentInfoSigned, SpaceId};
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
     use std::collections::HashSet;
@@ -1286,6 +1287,7 @@ mod test {
         conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
+    #[allow(dead_code)]
     async fn make_dna(network_seed: &str, zomes: Vec<TestWasm>) -> DnaFile {
         DnaFile::new(
             DnaDef {
@@ -1313,6 +1315,7 @@ mod test {
         .await
     }
 
+    /* @ K2-INTEGRATION @ TODO @
     /// Check that we can add and get agent info for a conductor
     /// across the admin websocket.
     #[tokio::test(flavor = "multi_thread")]
@@ -1412,7 +1415,7 @@ mod test {
         rx
     }
 
-    fn to_key(r: Vec<AgentInfoSigned>) -> Vec<(Arc<KitsuneSpace>, Arc<KitsuneAgent>)> {
+    fn to_key(r: Vec<AgentInfoSigned>) -> Vec<(SpaceId, AgentId)> {
         let mut results = r
             .into_iter()
             .map(|a| (a.space.clone(), a.agent.clone()))
@@ -1420,6 +1423,7 @@ mod test {
         results.sort();
         results
     }
+    */
 
     fn get_app_data_storage_info(
         info: &StorageInfo,

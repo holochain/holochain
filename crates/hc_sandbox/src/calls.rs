@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use anyhow::bail;
@@ -24,13 +25,11 @@ use holochain_types::app::RoleSettingsMapYaml;
 use holochain_types::prelude::AppCapGrantInfo;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
-use holochain_types::prelude::Timestamp;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -42,6 +41,7 @@ use clap::{Args, Parser, Subcommand};
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::WebsocketError;
+use kitsune2_api::AgentInfoSigned;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
@@ -147,9 +147,6 @@ pub struct RegisterDna {
     #[arg(long)]
     /// Properties to override when installing this DNA
     pub properties: Option<PathBuf>,
-    #[arg(long)]
-    /// Origin time to override when installing this DNA
-    pub origin_time: Option<Timestamp>,
     #[arg(long, conflicts_with = "hash", required_unless_present = "hash")]
     /// Path to a DnaBundle file.
     pub path: Option<PathBuf>,
@@ -449,31 +446,31 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                 let agents = cell_info
                     .iter()
                     .map(|c| c.agent_pubkey().clone())
-                    .map(|a| (a.clone(), holochain_p2p::agent_holo_to_kit(a)))
+                    .map(|a| (a.clone(), a.to_k2_agent()))
                     .collect::<Vec<_>>();
 
                 let dnas = cell_info
                     .iter()
                     .map(|c| c.dna_hash().clone())
-                    .map(|d| (d.clone(), holochain_p2p::space_holo_to_kit(d)))
+                    .map(|d| (d.clone(), d.to_k2_space()))
                     .collect::<Vec<_>>();
 
-                let this_agent = agents.iter().find(|a| *info.agent == a.1);
-                let this_dna = dnas.iter().find(|d| *info.space == d.1).unwrap();
+                let this_agent = agents.iter().find(|a| info.agent == a.1);
+                let this_dna = dnas.iter().find(|d| info.space == d.1).unwrap();
                 if let Some(this_agent) = this_agent {
                     writeln!(out, "This agent {:?} is {:?}", this_agent.0, this_agent.1)?;
                 }
                 writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
 
                 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-                let duration = Duration::try_milliseconds(info.signed_at_ms as i64)
+                let duration = Duration::try_milliseconds(info.created_at.as_micros() / 1000)
                     .ok_or_else(|| anyhow!("Agent info timestamp out of range"))?;
                 let s = duration.num_seconds();
                 let n = duration.clone().to_std().unwrap().subsec_nanos();
                 // TODO FIXME
                 #[allow(deprecated)]
                 let dt = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-                let duration = Duration::try_milliseconds(info.expires_at_ms as i64)
+                let duration = Duration::try_milliseconds(info.expires_at.as_micros() / 1000)
                     .ok_or_else(|| anyhow!("Agent info timestamp out of range"))?;
                 let s = duration.num_seconds();
                 let n = duration.clone().to_std().unwrap().subsec_nanos();
@@ -491,7 +488,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                 )?;
                 writeln!(out, "space: {:?}", info.space)?;
                 writeln!(out, "agent: {:?}", info.agent)?;
-                writeln!(out, "URLs: {:?}", info.url_list)?;
+                writeln!(out, "URLs: {:?}", info.url)?;
                 msg!("{}\n", out);
             }
         }
@@ -526,7 +523,6 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
     let RegisterDna {
         network_seed,
         properties,
-        origin_time,
         path,
         hash,
     } = args;
@@ -545,8 +541,6 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
         modifiers: DnaModifiersOpt {
             properties,
             network_seed,
-            origin_time,
-            quantum_time: None,
         },
         source,
     };
@@ -765,10 +759,17 @@ async fn list_capability_grants(
     )
 }
 
-/// Calls [`AdminRequest::AddAgentInfo`] with and adds the list of agent info.
-pub async fn add_agent_info(cmd: &mut CmdRunner, args: Vec<AgentInfoSigned>) -> anyhow::Result<()> {
+/// Calls [`AdminRequest::AddAgentInfo`] and adds the list of agent info.
+pub async fn add_agent_info(
+    cmd: &mut CmdRunner,
+    args: Vec<Arc<AgentInfoSigned>>,
+) -> anyhow::Result<()> {
+    let mut agent_infos = Vec::new();
+    for info in args {
+        agent_infos.push(info.encode()?);
+    }
     let resp = cmd
-        .command(AdminRequest::AddAgentInfo { agent_infos: args })
+        .command(AdminRequest::AddAgentInfo { agent_infos })
         .await?;
     ensure!(
         matches!(resp, AdminResponse::AgentInfoAdded),
@@ -782,13 +783,25 @@ pub async fn add_agent_info(cmd: &mut CmdRunner, args: Vec<AgentInfoSigned>) -> 
 pub async fn request_agent_info(
     cmd: &mut CmdRunner,
     args: ListAgents,
-) -> anyhow::Result<Vec<AgentInfoSigned>> {
+) -> anyhow::Result<Vec<Arc<AgentInfoSigned>>> {
     let resp = cmd
         .command(AdminRequest::AgentInfo {
             cell_id: args.into(),
         })
         .await?;
-    Ok(expect_match!(resp => AdminResponse::AgentInfo, "Failed to request agent info"))
+
+    let resp: Vec<String> =
+        expect_match!(resp => AdminResponse::AgentInfo, "Failed to request agent info");
+
+    let mut out = Vec::new();
+    for info in resp {
+        out.push(AgentInfoSigned::decode(
+            &kitsune2_core::Ed25519Verifier,
+            info.as_bytes(),
+        )?);
+    }
+
+    Ok(out)
 }
 
 fn parse_agent_key(arg: &str) -> anyhow::Result<AgentPubKey> {

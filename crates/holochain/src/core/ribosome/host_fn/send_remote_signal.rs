@@ -185,7 +185,7 @@ mod tests {
             .await
             .unwrap();
 
-        conductors.exchange_peer_info().await;
+        //conductors.exchange_peer_info().await;
 
         let cells: Vec<_> = apps.cells_flattened();
 

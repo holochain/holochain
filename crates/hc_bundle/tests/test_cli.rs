@@ -7,8 +7,6 @@ use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
     process::Command,
-    str::FromStr,
-    time::Duration,
 };
 use walkdir::WalkDir;
 
@@ -188,8 +186,6 @@ async fn test_multi_integrity() {
     ]);
 
     // Create the expected dependencies on the coordinator zomes.
-    let s = "2022-02-11T23:05:19.470323Z";
-    let origin_time = Timestamp::from_str(s).unwrap();
     let lineage = vec![
         DnaHash::try_from_raw_39(
             holo_hash_decode_unchecked("uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm")
@@ -207,8 +203,6 @@ async fn test_multi_integrity() {
         modifiers: DnaModifiers {
             network_seed: "00000000-0000-0000-0000-000000000000".into(),
             properties: ().try_into().unwrap(),
-            origin_time,
-            quantum_time: Duration::from_secs(5 * 60),
         },
         integrity_zomes: vec![
             (
@@ -329,7 +323,6 @@ fn test_default_dna_manifest_matches_schema() {
         "test-dna".to_string(),
         Some("00000000-0000-0000-0000-000000000000".to_string()),
         None,
-        Timestamp::now().into(),
         vec![],
         vec![],
         vec![],

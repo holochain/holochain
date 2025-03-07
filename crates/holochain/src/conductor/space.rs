@@ -5,7 +5,7 @@ use std::{
     cell::Cell,
     collections::{hash_map, HashMap},
     sync::Arc,
-    time::Duration,
+    //time::Duration,
 };
 
 use super::{conductor::RwShare, error::ConductorResult};
@@ -32,10 +32,10 @@ use holochain_state::{
     host_fn_workspace::SourceChainWorkspace,
     mutations,
     prelude::*,
-    query::{map_sql_dht_op_common, StateQueryError},
+    //query::{map_sql_dht_op_common, StateQueryError},
 };
 use holochain_util::timed;
-use rusqlite::{named_params, OptionalExtension};
+use rusqlite::{/*named_params, */ OptionalExtension};
 use std::convert::TryInto;
 use std::path::PathBuf;
 
@@ -713,7 +713,6 @@ impl Space {
         db_sync_strategy: DbSyncStrategy,
         db_key: DbKey,
     ) -> DatabaseResult<Self> {
-        let space = dna_hash.to_k2_space();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,

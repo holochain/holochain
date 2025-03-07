@@ -9,7 +9,6 @@ mod conductor_services;
 // Countersigning HDK functions needed
 #[cfg(feature = "unstable-countersigning")]
 mod countersigning;
-mod dht_arc;
 mod dna_properties;
 mod graft_records_onto_source_chain;
 mod hc_stress_test;

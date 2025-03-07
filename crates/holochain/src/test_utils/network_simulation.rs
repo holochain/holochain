@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use ::fixt::prelude::*;
+//use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::ConductorConfig;
@@ -15,10 +15,9 @@ use holochain_types::dht_op::{ChainOp, ChainOpHashed, ChainOpType};
 use holochain_types::inline_zome::{InlineEntryTypes, InlineZomeSet};
 use holochain_types::prelude::DnaFile;
 use kitsune2_api::{AgentId, AgentInfoSigned, DhtArc, OpId};
-use rand::distributions::Alphanumeric;
 use rand::distributions::Standard;
 use rand::Rng;
-use rusqlite::{params, Connection, OptionalExtension, Transaction};
+use rusqlite::{params, Connection, Transaction};
 
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 
@@ -145,7 +144,7 @@ impl MockNetworkData {
     }
 
     /// Hashes that an agent is an authority for.
-    pub fn hashes_authority_for(&self, agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
+    pub fn hashes_authority_for(&self, _agent: &AgentPubKey) -> Vec<Arc<DhtOpHash>> {
         todo!()
         /*
         let storage_arc = self.agent_to_storage_arc[agent];
@@ -451,7 +450,10 @@ async fn create_test_data(
 }
 
 /// Set the peers to seem like they come from separate nodes and have accurate storage arcs.
-async fn reset_peer_data(peers: Vec<AgentInfoSigned>, dna_hash: &DnaHash) -> Vec<AgentInfoSigned> {
+async fn reset_peer_data(
+    _peers: Vec<AgentInfoSigned>,
+    _dna_hash: &DnaHash,
+) -> Vec<AgentInfoSigned> {
     todo!()
     /*
     let coverage = ((50.0 / peers.len() as f64) * 2.0).clamp(0.0, 1.0);
@@ -484,6 +486,7 @@ async fn reset_peer_data(peers: Vec<AgentInfoSigned>, dna_hash: &DnaHash) -> Vec
     */
 }
 
+#[allow(dead_code)]
 fn get_chain_ops(txn: &mut Transaction<'_>) -> HashMap<Arc<DhtOpHash>, ChainOpHashed> {
     txn.prepare(
         "

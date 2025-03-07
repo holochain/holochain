@@ -1,4 +1,4 @@
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::sync::atomic::AtomicUsize;
 
 use holochain_conductor_api::{
     conductor::{ConductorConfig, ConductorTuningParams, NetworkConfig},
@@ -140,7 +140,7 @@ impl SweetConductorConfig {
     }
 
     /// Completely disable networking
-    pub fn no_networking(mut self) -> Self {
+    pub fn no_networking(self) -> Self {
         todo!()
         /*
         self.network = self.network.clone().tune(|mut tp| {
@@ -154,7 +154,7 @@ impl SweetConductorConfig {
     }
 
     /// Disable publishing
-    pub fn no_publish(mut self) -> Self {
+    pub fn no_publish(self) -> Self {
         todo!()
         /*
         self.network = self.network.clone().tune(|mut tp| {
@@ -166,7 +166,7 @@ impl SweetConductorConfig {
     }
 
     /// Disable publishing and recent gossip
-    pub fn historical_only(mut self) -> Self {
+    pub fn historical_only(self) -> Self {
         todo!()
         /*
         self.network = self.network.clone().tune(|mut tp| {
@@ -179,7 +179,7 @@ impl SweetConductorConfig {
     }
 
     /// Disable recent op gossip, but keep agent gossip
-    pub fn historical_and_agent_gossip_only(mut self) -> Self {
+    pub fn historical_and_agent_gossip_only(self) -> Self {
         todo!()
         /*
         self.network = self.network.clone().tune(|mut tp| {
@@ -193,7 +193,7 @@ impl SweetConductorConfig {
     }
 
     /// Disable publishing and historical gossip
-    pub fn recent_only(mut self) -> Self {
+    pub fn recent_only(self) -> Self {
         todo!()
         /*
         self.network = self.network.clone().tune(|mut tp| {

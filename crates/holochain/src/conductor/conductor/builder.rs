@@ -210,8 +210,6 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        let network_config = config.network.clone();
-
         // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
         let dpki_config = Some(config.dpki.clone());
 
@@ -269,8 +267,6 @@ impl ConductorBuilder {
             post_commit_sender,
             outcome_tx,
         );
-
-        let shutting_down = conductor.shutting_down.clone();
 
         #[cfg(any(test, feature = "test_utils"))]
         let conductor = Self::update_fake_state(builder.state, conductor).await?;
@@ -454,7 +450,6 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        let network_config = config.network.clone();
         let ribosome_store = RwShare::new(builder.ribosome_store);
 
         // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,

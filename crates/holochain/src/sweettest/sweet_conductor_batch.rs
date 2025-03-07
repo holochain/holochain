@@ -1,7 +1,6 @@
 use super::{SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::sweettest::*;
-use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
@@ -32,6 +31,7 @@ impl SweetConductorBatch {
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
+    #[allow(clippy::let_and_return)]
     pub async fn from_configs<C, I>(configs: I) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig>,
@@ -56,6 +56,7 @@ impl SweetConductorBatch {
     /// using a "rendezvous" bootstrap server for peer discovery.
     ///
     /// Also await consistency for DPKI cells, if DPKI is enabled.
+    #[allow(clippy::let_and_return)]
     pub async fn from_configs_rendezvous<C, I>(configs: I) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig>,
@@ -71,11 +72,11 @@ impl SweetConductorBatch {
             .await,
         );
 
+        /*
         let not_full_bootstrap = conductors
             .iter()
             .any(|c| !c.get_config().has_rendezvous_bootstrap());
 
-        /*
         let dpki_cells = conductors.dpki_cells();
         if !dpki_cells.is_empty() {
             // Typically we expect either all nodes are using a rendezvous bootstrap, or none are.

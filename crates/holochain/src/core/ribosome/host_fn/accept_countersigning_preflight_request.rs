@@ -1201,8 +1201,8 @@ pub mod wasm_test {
 
         // Alice and bob can see carol but not each other.
         // We will simply teleport the countersigning requests and responses.
-        conductors.reveal_peer_info(0, 2).await;
-        conductors.reveal_peer_info(1, 2).await;
+        //conductors.reveal_peer_info(0, 2).await;
+        //conductors.reveal_peer_info(1, 2).await;
 
         let alice_conductor = conductors.get(0).unwrap();
         let bob_conductor = conductors.get(1).unwrap();

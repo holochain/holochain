@@ -164,7 +164,6 @@ async fn gen_dna_file(output: std::path::PathBuf) {
         .modifiers(
             DnaModifiersBuilder::default()
                 .network_seed(network_seed.into())
-                .origin_time(Timestamp::now())
                 .build()
                 .unwrap(),
         )

@@ -297,7 +297,7 @@ pub enum AdminRequest {
         agent_infos: Vec<String>,
     },
 
-    /// Request the [`AgentInfoSigned`] stored in this conductor's
+    /// Request the [`kitsune2_api::AgentInfoSigned`] stored in this conductor's
     /// peer store.
     ///
     /// You can:

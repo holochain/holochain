@@ -1,8 +1,8 @@
 use hdk::prelude::*;
-use holochain::conductor::config::{ConductorConfig, DpkiConfig};
+//use holochain::conductor::config::{ConductorConfig, DpkiConfig};
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::*;
-use holochain_conductor_api::conductor::ConductorTuningParams;
+//use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_sqlite::prelude::DatabaseResult;
 use unwrap_to::unwrap_to;
@@ -20,7 +20,7 @@ async fn dpki_publish() {
     let config = SweetConductorConfig::standard();
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
-    conductors.exchange_peer_info().await;
+    //conductors.exchange_peer_info().await;
 
     await_consistency(10, conductors.dpki_cells().as_slice())
         .await
@@ -35,13 +35,14 @@ async fn dpki_no_publish() {
     let config = SweetConductorConfig::standard().no_publish();
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
-    conductors.exchange_peer_info().await;
+    //conductors.exchange_peer_info().await;
 
     await_consistency(10, conductors.dpki_cells().as_slice())
         .await
         .unwrap();
 }
 
+/* @ K2-INTEGRATION @ TODO @
 /// Test that op publishing is sufficient for bobbo to get alice's op
 /// even with gossip disabled.
 #[cfg(feature = "test_utils")]
@@ -109,6 +110,7 @@ async fn test_publish() -> anyhow::Result<()> {
 
     Ok(())
 }
+*/
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
@@ -171,12 +173,14 @@ async fn multi_conductor() -> anyhow::Result<()> {
     let stats = conductors[1].dump_network_stats().await?;
     tracing::info!(target: "TEST", "@!@! - stats: {stats}");
 
+    /*
     let stats: tx5::stats::Stats = serde_json::from_str(&stats).unwrap();
 
     // make sure that, by this point, we have upgraded connections to webrtc
     for con in stats.connection_list {
         assert!(con.is_webrtc);
     }
+    */
 
     Ok(())
 }
@@ -193,13 +197,13 @@ async fn sharded_consistency() {
     const NUM_CONDUCTORS: usize = 3;
     const NUM_CELLS: usize = 5;
 
-    let config = SweetConductorConfig::standard().tune(|tuning| {
+    let config = SweetConductorConfig::standard()/*.tune(|tuning| {
         tuning.gossip_strategy = "sharded-gossip".to_string();
         #[cfg(feature = "unstable-sharding")]
         {
             tuning.gossip_dynamic_arcs = true;
         }
-    });
+    })*/;
     let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) =
@@ -213,7 +217,7 @@ async fn sharded_consistency() {
     for i in 0..NUM_CELLS {
         conductors.setup_app(&i.to_string(), &dnas).await.unwrap();
     }
-    conductors.exchange_peer_info().await;
+    //conductors.exchange_peer_info().await;
     conductors.force_all_publish_dht_ops().await;
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]

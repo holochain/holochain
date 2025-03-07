@@ -3,6 +3,7 @@ use opentelemetry_api::{global::meter_with_version, metrics::*};
 pub type P2pEventDurationMetric = Histogram<f64>;
 pub type PostCommitDurationMetric = Histogram<f64>;
 
+#[allow(dead_code)]
 pub fn create_p2p_event_duration_metric() -> P2pEventDurationMetric {
     meter_with_version(
         "hc.conductor",

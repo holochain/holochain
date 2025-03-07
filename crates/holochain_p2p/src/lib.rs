@@ -15,8 +15,8 @@ pub use types::*;
 
 mod spawn;
 pub use spawn::*;
-//#[cfg(feature = "test_utils")]
-//pub use test::stub_network;
+#[cfg(feature = "test_utils")]
+pub use test::stub_network;
 #[cfg(feature = "test_utils")]
 pub use test::HolochainP2pDnaFixturator;
 

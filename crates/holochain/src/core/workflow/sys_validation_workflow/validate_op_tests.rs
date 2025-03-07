@@ -77,41 +77,6 @@ async fn validate_dna_op_mismatched_dna_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn validate_dna_op_before_origin_time() {
-    holochain_trace::test_run();
-
-    let mut test_case = TestCase::new().await;
-
-    // Put the origin time in the future so that ops created now shouldn't be valid.
-    test_case.dna_def_mut().modifiers.origin_time =
-        (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
-
-    let dna_action = HdkDna {
-        author: test_case.agent.clone(),
-        timestamp: Timestamp::now(),
-        hash: test_case.dna_def_hash().hash,
-    };
-    let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action.clone())).into();
-
-    let outcome = test_case.with_op(op).run().await.unwrap();
-
-    assert_eq!(
-        Outcome::Rejected(
-            ValidationOutcome::PrevActionError(
-                (
-                    PrevActionErrorKind::InvalidRootOriginTime,
-                    Action::Dna(dna_action)
-                )
-                    .into()
-            )
-            .to_string()
-        ),
-        outcome
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn non_dna_op_as_first_action() {
     holochain_trace::test_run();
 
@@ -2477,6 +2442,7 @@ impl TestCase {
         &mut self.cascade
     }
 
+    #[allow(dead_code)]
     pub fn dna_def_mut(&mut self) -> &mut DnaDef {
         &mut self.dna_def
     }

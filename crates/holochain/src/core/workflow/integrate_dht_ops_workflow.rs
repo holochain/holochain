@@ -4,7 +4,6 @@ use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
 
 #[cfg(test)]
@@ -18,7 +17,7 @@ pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
     dht_query_cache: DhtDbQueryCache,
     trigger_receipt: TriggerSender,
-    network: HolochainP2pDna,
+    _network: HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
     let time = holochain_zome_types::prelude::Timestamp::now();
