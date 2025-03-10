@@ -2,6 +2,13 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2025-03-10: v0.4.2-rc.1
+
+*Success*
+- Day 1: Started with 7 nodes and ran through the first test steps of sending signals, creating entries and syncing 
+  with a node that has been offline.
+- As this is just a regression test with small changes, we concluded the test there.
+
 ## 2025-01-27: v0.4.1-rc.2
 
 *Success*
