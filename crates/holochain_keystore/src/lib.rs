@@ -85,6 +85,9 @@ pub mod crude_mock_keystore;
 /// ```
 #[cfg(feature = "test_utils")]
 pub async fn spawn_mem_keystore() -> LairResult<MetaLairClient> {
+    use ::lair_keystore::dependencies::lair_keystore_api;
+    use std::sync::Arc;
+
     // in-memory secure random passphrase
     let passphrase = sodoken::BufWrite::new_mem_locked(32)?;
     sodoken::random::bytes_buf(passphrase.clone()).await?;
