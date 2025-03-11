@@ -2849,6 +2849,7 @@ name = "holochain_p2p"
 version = "0.5.0-dev.21"
 dependencies = [
  "async-trait",
+ "blake2b_simd",
  "bytes",
  "derive_more",
  "fixt",
