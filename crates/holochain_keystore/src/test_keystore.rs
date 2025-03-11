@@ -1,10 +1,9 @@
-//! DANGER! This is a mock keystore for testing, DO NOT USE THIS IN PRODUCTION!
+//! DANGER! This is an in-memory keystore for testing, DO NOT USE THIS IN PRODUCTION!
 
 use crate::*;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use kitsune_p2p_types::dependencies::lair_keystore_api;
-use lair_keystore_api::prelude::*;
 use std::sync::Arc;
 
 /// First Test Agent Pub Key
@@ -34,7 +33,7 @@ fn s(s: &str) -> [u8; 32] {
     o
 }
 
-/// Construct a new TestKeystore with the new lair api.
+/// Construct a new test keystore with the new lair api.
 pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
     // in-memory secure random passphrase
     let passphrase = sodoken::BufWrite::new_mem_locked(32)?;
@@ -78,8 +77,7 @@ pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
     Ok(MetaLairClient(Arc::new(parking_lot::Mutex::new(client)), s))
 }
 
-/// Generate a test keystore pre-populated with a couple test keypairs.
-#[cfg(feature = "test_utils")]
+/// Generate a test keystore pre-populated with a couple of test key-pairs.
 pub fn test_keystore() -> MetaLairClient {
     holochain_util::tokio_helper::block_on(
         async move { spawn_test_keystore().await.unwrap() },
