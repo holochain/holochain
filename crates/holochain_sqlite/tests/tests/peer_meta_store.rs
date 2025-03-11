@@ -1,11 +1,16 @@
+use holo_hash::DnaHash;
 use holochain_sqlite::db::{DbKindPeerMetaStore, DbWrite, ReadAccess};
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::sql::sql_peer_meta_store::{DELETE, GET, INSERT, PRUNE};
 use rusqlite::named_params;
+use std::sync::Arc;
 
 #[tokio::test]
 async fn insert_read_delete() {
-    let peer_meta_store = DbWrite::test_in_mem(DbKindPeerMetaStore).unwrap();
+    let peer_meta_store = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(
+        DnaHash::from_raw_36(vec![0xdb; 36]),
+    )))
+    .unwrap();
 
     let peer_url = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
     peer_meta_store
@@ -83,7 +88,10 @@ async fn insert_read_delete() {
 
 #[tokio::test]
 async fn prune() {
-    let peer_meta_store = DbWrite::test_in_mem(DbKindPeerMetaStore).unwrap();
+    let peer_meta_store = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(
+        DnaHash::from_raw_36(vec![0xdb; 36]),
+    )))
+    .unwrap();
 
     let peer_url = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
     peer_meta_store
@@ -181,7 +189,10 @@ async fn prune() {
 
 #[tokio::test]
 async fn insert_overwrite() {
-    let peer_meta_store = DbWrite::test_in_mem(DbKindPeerMetaStore).unwrap();
+    let peer_meta_store = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(
+        DnaHash::from_raw_36(vec![0xdb; 36]),
+    )))
+    .unwrap();
 
     let peer_url = kitsune2_api::Url::from_str("ws://test:80/1").unwrap();
     peer_meta_store

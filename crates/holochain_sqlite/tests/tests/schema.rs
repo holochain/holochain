@@ -31,7 +31,12 @@ async fn check_schema_migrations_execute() {
     let wasm = DbWrite::test_in_mem(DbKindWasm).unwrap();
     check_migrations_run(wasm, "./src/sql/wasm/schema").await;
 
-    let peer_meta_store = DbWrite::test_in_mem(DbKindPeerMetaStore).unwrap();
+    let peer_meta_store =
+        DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(DnaHash::from_raw_36(vec![
+            1;
+            36
+        ]))))
+        .unwrap();
     check_migrations_run(peer_meta_store, "./src/sql/peer_meta_store/schema").await;
 }
 

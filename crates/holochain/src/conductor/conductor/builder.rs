@@ -237,15 +237,15 @@ impl ConductorBuilder {
             .map(|dna| dna.dna_hash().get_raw_32().try_into().expect("32 bytes"));
         let compat = NetworkCompatParams { dpki_uuid };
 
-        let net_peer_meta_store_db = spaces.peer_meta_store_db()?;
-        let net_spaces = spaces.clone();
+        let net_spaces1 = spaces.clone();
+        let net_spaces2 = spaces.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
-            get_db_peer_meta: Arc::new(move || {
-                let peer_meta = net_peer_meta_store_db.clone();
-                Box::pin(async move { Ok(peer_meta) })
+            get_db_peer_meta: Arc::new(move |dna_hash| {
+                let res = net_spaces1.peer_meta_store_db(&dna_hash);
+                Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_db_op_store: Arc::new(move |dna_hash| {
-                let res = net_spaces.dht_db(&dna_hash);
+                let res = net_spaces2.dht_db(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             compat,
@@ -493,15 +493,15 @@ impl ConductorBuilder {
 
         let compat = NetworkCompatParams { dpki_uuid };
 
-        let net_peer_meta_store_db = spaces.peer_meta_store_db()?;
-        let net_spaces = spaces.clone();
+        let net_spaces1 = spaces.clone();
+        let net_spaces2 = spaces.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
-            get_db_peer_meta: Arc::new(move || {
-                let peer_meta = net_peer_meta_store_db.clone();
-                Box::pin(async move { Ok(peer_meta) })
+            get_db_peer_meta: Arc::new(move |dna_hash| {
+                let res = net_spaces1.peer_meta_store_db(&dna_hash);
+                Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             get_db_op_store: Arc::new(move |dna_hash| {
-                let res = net_spaces.dht_db(&dna_hash);
+                let res = net_spaces2.dht_db(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
             k2_test_builder: true,

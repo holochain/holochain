@@ -521,7 +521,7 @@ async fn spawn_test(dna_hash: DnaHash, handler: DynHcP2pHandler) -> (AgentPubKey
 
     let hc = spawn_holochain_p2p(
         HolochainP2pConfig {
-            get_db_peer_meta: Arc::new(move || {
+            get_db_peer_meta: Arc::new(move |_| {
                 let db_peer_meta = db_peer_meta.clone();
                 Box::pin(async move { Ok(db_peer_meta.clone()) })
             }),

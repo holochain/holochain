@@ -16,7 +16,7 @@ pub async fn spawn_holochain_p2p(
 
 /// Callback function to retrieve a peer meta database handle for a dna hash.
 pub type GetDbPeerMeta = Arc<
-    dyn Fn() -> BoxFut<'static, HolochainP2pResult<DbWrite<DbKindPeerMetaStore>>>
+    dyn Fn(DnaHash) -> BoxFut<'static, HolochainP2pResult<DbWrite<DbKindPeerMetaStore>>>
         + 'static
         + Send
         + Sync,
@@ -48,7 +48,7 @@ pub struct HolochainP2pConfig {
 impl Default for HolochainP2pConfig {
     fn default() -> Self {
         Self {
-            get_db_peer_meta: Arc::new(|| unimplemented!()),
+            get_db_peer_meta: Arc::new(|_| unimplemented!()),
             get_db_op_store: Arc::new(|_| unimplemented!()),
             k2_test_builder: false,
             compat: Default::default(),
