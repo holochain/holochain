@@ -45,6 +45,7 @@ pub use meta_lair_client::*;
 
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;
+use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::PwHashLimits;
 
 pub mod lair_keystore;
 
@@ -87,18 +88,7 @@ pub async fn spawn_mem_keystore() -> LairResult<MetaLairClient> {
     // in-memory secure random passphrase
     let passphrase = sodoken::BufWrite::new_mem_locked(32)?;
     sodoken::random::bytes_buf(passphrase.clone()).await?;
-
-    spawn_mem_keystore_with_passphrase(passphrase.to_read()).await
-}
-
-/// Construct a simple in-memory in-process keystore with the given passphrase.
-#[cfg(feature = "test_utils")]
-pub async fn spawn_mem_keystore_with_passphrase(
-    passphrase: sodoken::BufRead,
-) -> LairResult<MetaLairClient> {
-    use kitsune_p2p_types::dependencies::lair_keystore_api;
-    use lair_keystore_api::prelude::*;
-    use std::sync::Arc;
+    let passphrase = passphrase.to_read();
 
     // in-mem / in-proc config
     let config = Arc::new(
