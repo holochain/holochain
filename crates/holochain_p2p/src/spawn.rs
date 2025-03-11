@@ -56,10 +56,30 @@ impl Default for HolochainP2pConfig {
     }
 }
 
+/// See [NetworkCompatParams::proto_ver].
+pub const HCP2P_PROTO_VER: u32 = 2;
+
 /// Some parameters used as part of a protocol compability check during tx5 preflight
-#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct NetworkCompatParams {
+    /// The current protocol version. This should be incremented whenever
+    /// any breaking protocol changes are made to prevent incompatible
+    /// nodes from talking to each other.
+    pub proto_ver: u32,
+
     /// The UUID of the installed DPKI service.
     /// If the service is backed by a Dna, this is the core 32 bytes of the DnaHash.
-    pub dpki_uuid: Option<[u8; 32]>,
+    /// If not, set this to all zeroes.
+    pub dpki_uuid: [u8; 32],
+}
+
+impl Default for NetworkCompatParams {
+    fn default() -> Self {
+        Self {
+            proto_ver: HCP2P_PROTO_VER,
+            dpki_uuid: [0; 32],
+        }
+    }
 }
