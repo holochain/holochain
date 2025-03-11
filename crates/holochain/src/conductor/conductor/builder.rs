@@ -506,7 +506,6 @@ impl ConductorBuilder {
             }),
             k2_test_builder: true,
             compat,
-            ..Default::default()
         };
 
         let holochain_p2p =
