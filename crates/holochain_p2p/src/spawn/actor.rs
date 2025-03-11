@@ -570,12 +570,11 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
             let kitsune = self.kitsune.clone();
             tokio::task::spawn(async move {
                 for agent in agents {
-                    kitsune
-                        .space(agent.space.clone())
-                        .await?
-                        .peer_store()
-                        .insert(vec![agent])
-                        .await?;
+                    let space = match kitsune.space_if_exists(agent.space.clone()).await {
+                        None => continue,
+                        Some(space) => space,
+                    };
+                    space.peer_store().insert(vec![agent]).await?;
                 }
                 K2Result::Ok(())
             });
