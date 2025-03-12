@@ -1,14 +1,15 @@
 use bytes::Bytes;
+use holo_hash::DnaHash;
 use holochain_p2p::HolochainPeerMetaStore;
 use holochain_sqlite::db::{DbKindPeerMetaStore, DbWrite, ReadAccess};
 use holochain_sqlite::error::DatabaseResult;
-use kitsune2_api::{PeerMetaStore, SpaceId, Timestamp, Url};
+use kitsune2_api::{PeerMetaStore, Timestamp, Url};
 use std::sync::Arc;
 
 #[tokio::test]
 async fn peer_meta_crd() {
-    let db = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(SpaceId::from(
-        Bytes::from_static("test".as_bytes()),
+    let db = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(DnaHash::from_raw_36(
+        vec![0xdb; 36],
     ))))
     .unwrap();
 
@@ -41,8 +42,8 @@ async fn peer_meta_crd() {
 
 #[tokio::test]
 async fn prune_on_create() {
-    let db = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(SpaceId::from(
-        Bytes::from_static("test".as_bytes()),
+    let db = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(DnaHash::from_raw_36(
+        vec![0xdb; 36],
     ))))
     .unwrap();
 

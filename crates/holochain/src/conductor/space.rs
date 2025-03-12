@@ -78,6 +78,9 @@ pub struct Space {
     /// There is one per unique Dna.
     pub dht_db: DbWrite<DbKindDht>,
 
+    /// The peer meta store database. One per unique Dna.
+    pub peer_meta_store_db: DbWrite<DbKindPeerMetaStore>,
+
     /// A cache for slow database queries.
     pub dht_query_cache: DhtDbQueryCache,
 
@@ -418,6 +421,14 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_db.clone())
     }
 
+    /// Get the peer_meta_store database.
+    pub fn peer_meta_store_db(
+        &self,
+        dna_hash: &DnaHash,
+    ) -> DatabaseResult<DbWrite<DbKindPeerMetaStore>> {
+        self.get_or_create_space_ref(dna_hash, |space| space.peer_meta_store_db.clone())
+    }
+
     /*
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// the network module is requesting a list of dht op hashes
@@ -718,33 +729,42 @@ impl Space {
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let (cache, dht_db, conductor_db) = tokio::task::block_in_place(|| {
-            let cache = DbWrite::open_with_pool_config(
-                root_db_dir.as_ref(),
-                DbKindCache(dna_hash.clone()),
-                PoolConfig {
-                    synchronous_level: db_sync_level,
-                    key: db_key.clone(),
-                },
-            )?;
-            let dht_db = DbWrite::open_with_pool_config(
-                root_db_dir.as_ref(),
-                DbKindDht(dna_hash.clone()),
-                PoolConfig {
-                    synchronous_level: db_sync_level,
-                    key: db_key.clone(),
-                },
-            )?;
-            let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
-                root_db_dir.as_ref(),
-                DbKindConductor,
-                PoolConfig {
-                    synchronous_level: db_sync_level,
-                    key: db_key.clone(),
-                },
-            )?;
-            DatabaseResult::Ok((cache, dht_db, conductor_db))
-        })?;
+        let (cache, dht_db, peer_meta_store_db, conductor_db) =
+            tokio::task::block_in_place(|| {
+                let cache = DbWrite::open_with_pool_config(
+                    root_db_dir.as_ref(),
+                    DbKindCache(dna_hash.clone()),
+                    PoolConfig {
+                        synchronous_level: db_sync_level,
+                        key: db_key.clone(),
+                    },
+                )?;
+                let dht_db = DbWrite::open_with_pool_config(
+                    root_db_dir.as_ref(),
+                    DbKindDht(dna_hash.clone()),
+                    PoolConfig {
+                        synchronous_level: db_sync_level,
+                        key: db_key.clone(),
+                    },
+                )?;
+                let peer_meta_store_db = DbWrite::open_with_pool_config(
+                    root_db_dir.as_ref(),
+                    DbKindPeerMetaStore(dna_hash.clone()),
+                    PoolConfig {
+                        synchronous_level: db_sync_level,
+                        key: db_key.clone(),
+                    },
+                )?;
+                let conductor_db: DbWrite<DbKindConductor> = DbWrite::open_with_pool_config(
+                    root_db_dir.as_ref(),
+                    DbKindConductor,
+                    PoolConfig {
+                        synchronous_level: db_sync_level,
+                        key: db_key.clone(),
+                    },
+                )?;
+                DatabaseResult::Ok((cache, dht_db, peer_meta_store_db, conductor_db))
+            })?;
 
         let witnessing_workspace = WitnessingWorkspace::default();
         let incoming_op_hashes = IncomingOpHashes::default();
@@ -755,6 +775,7 @@ impl Space {
             cache_db: cache,
             authored_dbs: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             dht_db,
+            peer_meta_store_db,
             countersigning_workspaces: Default::default(),
             witnessing_workspace,
             incoming_op_hashes,

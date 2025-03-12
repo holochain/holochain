@@ -20,8 +20,7 @@ pub enum DbKind {
     /// Specifies the environment used to save wasm
     Wasm,
     /// Metadata about peers, for tracking local state and observations about peers.
-    #[display(fmt = "peer-meta-{:?}", "_0")]
-    PeerMetaStore(Arc<kitsune2_api::SpaceId>),
+    PeerMetaStore(Arc<DnaHash>),
     #[cfg(feature = "test_utils")]
     Test(String),
 }
@@ -69,7 +68,7 @@ pub struct DbKindWasm;
 
 /// Database kind for [DbKind::PeerMetaStore]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
-pub struct DbKindPeerMetaStore(pub Arc<kitsune2_api::SpaceId>);
+pub struct DbKindPeerMetaStore(pub Arc<DnaHash>);
 
 impl DbKindT for DbKindAuthored {
     fn kind(&self) -> DbKind {

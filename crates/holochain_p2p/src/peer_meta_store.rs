@@ -33,12 +33,15 @@ impl kitsune2_api::PeerMetaStoreFactory for HolochainPeerMetaStoreFactory {
     fn create(
         &self,
         _builder: Arc<kitsune2_api::Builder>,
+        space: kitsune2_api::SpaceId,
     ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynPeerMetaStore>> {
         let getter = self.getter.clone();
         Box::pin(async move {
-            let db = getter().await.map_err(|err| {
-                kitsune2_api::K2Error::other_src("failed to get peer_meta_store db", err)
-            })?;
+            let db = getter(holo_hash::DnaHash::from_k2_space(&space))
+                .await
+                .map_err(|err| {
+                    kitsune2_api::K2Error::other_src("failed to get peer_meta_store db", err)
+                })?;
             let peer_meta_store: kitsune2_api::DynPeerMetaStore =
                 Arc::new(HolochainPeerMetaStore::create(db).await.map_err(|err| {
                     K2Error::other_src("failed to connect to peer store database", err)
