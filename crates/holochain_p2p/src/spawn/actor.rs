@@ -573,7 +573,7 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
         }
 
         // if they sent us agents, spawn a task to insert them into the store
-        if agents.is_empty() {
+        if !agents.is_empty() {
             let kitsune = self.kitsune.clone();
             tokio::task::spawn(async move {
                 for agent in agents {
@@ -949,6 +949,17 @@ impl actor::HcP2p for HolochainP2pActor {
                 agent.set_tgt_storage_arc_hint(DhtArc::FULL);
                 agent.invoke_cb();
             }
+        })
+    }
+
+    fn peer_store(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<DynPeerStore>> {
+        Box::pin(async move {
+            Ok(self
+                .kitsune
+                .space(dna_hash.to_k2_space())
+                .await?
+                .peer_store()
+                .clone())
         })
     }
 

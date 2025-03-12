@@ -19,6 +19,13 @@ impl HcP2p for StubNetwork {
         Box::pin(async {})
     }
 
+    fn peer_store(
+        &self,
+        dna_hash: DnaHash,
+    ) -> BoxFut<'_, HolochainP2pResult<kitsune2_api::DynPeerStore>> {
+        Box::pin(async { Err("stub".into()) })
+    }
+
     fn register_handler(
         &self,
         handler: event::DynHcP2pHandler,
