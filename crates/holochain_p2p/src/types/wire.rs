@@ -24,7 +24,7 @@ impl WireDhtOpData {
 /// Encoding for the hcp2p preflight message.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct WirePreflightMessage {
-    /// Compatability parameters.
+    /// Compatibility parameters.
     pub compat: NetworkCompatParams,
     /// Local agent infos.
     pub agents: Vec<String>,

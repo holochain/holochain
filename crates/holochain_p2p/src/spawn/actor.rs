@@ -651,7 +651,7 @@ impl kitsune2_api::Bootstrap for BootWrap {
             *preflight.lock().unwrap() = encoded;
         }
 
-        // don't forget to invoke the original bootsrap handler
+        // don't forget to invoke the original bootstrap handler
         orig.put(info);
     }
 }
