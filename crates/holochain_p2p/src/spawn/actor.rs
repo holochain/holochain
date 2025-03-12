@@ -616,11 +616,11 @@ impl kitsune2_api::Bootstrap for BootWrap {
             // remove expired infos and previous infos that match the
             // one that was generated
             let now = kitsune2_api::Timestamp::now();
-            cache.retain(|cache| {
-                if cache.expires_at < now {
+            cache.retain(|cache_info| {
+                if cache_info.expires_at < now {
                     return false;
                 }
-                if cache.agent == info.agent && cache.space == info.space {
+                if cache_info.agent == info.agent && cache_info.space == info.space {
                     return false;
                 }
                 true
