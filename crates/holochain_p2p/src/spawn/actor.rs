@@ -584,6 +584,101 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
     }
 }
 
+#[derive(Debug)]
+struct BootWrap {
+    compat: NetworkCompatParams,
+    preflight: Arc<std::sync::Mutex<bytes::Bytes>>,
+    orig: kitsune2_api::DynBootstrap,
+    cache: std::sync::Mutex<Vec<Arc<AgentInfoSigned>>>,
+}
+
+impl kitsune2_api::Bootstrap for BootWrap {
+    fn put(&self, info: Arc<AgentInfoSigned>) {
+        let Self {
+            compat,
+            preflight,
+            orig,
+            cache,
+        } = self;
+
+        let agents = {
+            let mut cache = cache.lock().unwrap();
+
+            let now = kitsune2_api::Timestamp::now();
+            cache.retain(|cache| {
+                if cache.expires_at < now {
+                    return false;
+                }
+                if cache.agent == info.agent && cache.space == info.space {
+                    return false;
+                }
+                true
+            });
+
+            cache.push(info.clone());
+
+            let mut agents = Vec::new();
+
+            for agent in cache.iter() {
+                if let Ok(encoded) = agent.encode() {
+                    agents.push(encoded);
+                }
+            }
+
+            agents
+        };
+
+        if let Ok(encoded) = (crate::wire::WirePreflightMessage {
+            compat: compat.clone(),
+            agents,
+        })
+        .encode()
+        {
+            *preflight.lock().unwrap() = encoded;
+        }
+
+        orig.put(info);
+    }
+}
+
+#[derive(Debug)]
+struct BootWrapFact {
+    compat: NetworkCompatParams,
+    preflight: Arc<std::sync::Mutex<bytes::Bytes>>,
+    orig: kitsune2_api::DynBootstrapFactory,
+}
+
+impl kitsune2_api::BootstrapFactory for BootWrapFact {
+    fn default_config(&self, config: &mut Config) -> K2Result<()> {
+        self.orig.default_config(config)
+    }
+
+    fn validate_config(&self, config: &Config) -> K2Result<()> {
+        self.orig.validate_config(config)
+    }
+
+    fn create(
+        &self,
+        builder: Arc<Builder>,
+        peer_store: DynPeerStore,
+        space: SpaceId,
+    ) -> BoxFut<'static, K2Result<DynBootstrap>> {
+        let compat = self.compat.clone();
+        let preflight = self.preflight.clone();
+        let orig_fut = self.orig.create(builder, peer_store, space);
+        Box::pin(async move {
+            let orig = orig_fut.await?;
+            let out: DynBootstrap = Arc::new(BootWrap {
+                compat,
+                preflight,
+                orig,
+                cache: std::sync::Mutex::new(Vec::new()),
+            });
+            Ok(out)
+        })
+    }
+}
+
 impl HolochainP2pActor {
     /// constructor
     pub async fn create(
@@ -639,6 +734,19 @@ impl HolochainP2pActor {
             getter: config.get_db_op_store.clone(),
             handler: evt_sender.clone(),
         });
+        let preflight = Arc::new(Mutex::new(
+            crate::wire::WirePreflightMessage {
+                compat: config.compat.clone(),
+                agents: Vec::new(),
+            }
+            .encode()?,
+        ));
+
+        builder.bootstrap = Arc::new(BootWrapFact {
+            compat: config.compat.clone(),
+            preflight: preflight.clone(),
+            orig: builder.bootstrap,
+        });
 
         let builder = builder.with_default_config()?;
 
@@ -650,14 +758,6 @@ impl HolochainP2pActor {
         });
 
         let kitsune = builder.build().await?;
-
-        let preflight = Arc::new(Mutex::new(
-            crate::wire::WirePreflightMessage {
-                compat: config.compat.clone(),
-                agents: Vec::new(),
-            }
-            .encode()?,
-        ));
 
         Ok(Arc::new_cyclic(|this| Self {
             this: this.clone(),

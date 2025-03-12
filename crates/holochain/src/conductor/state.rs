@@ -327,12 +327,8 @@ impl ConductorState {
     /// (but this can't actually be on the Conductor since it must be retrieved before
     /// conductor initialization)
     pub fn get_network_compat(&self) -> NetworkCompatParams {
-        NetworkCompatParams {
-            dpki_uuid: {
-                tracing::warn!("Using default NetworkCompatParams");
-                None
-            },
-        }
+        tracing::warn!("Using default NetworkCompatParams");
+        Default::default()
     }
 
     /// Find all installed apps that have a role which depends on a cell in this app

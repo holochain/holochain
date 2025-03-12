@@ -234,8 +234,12 @@ impl ConductorBuilder {
 
         let dpki_uuid = dpki_dna_to_install
             .as_ref()
-            .map(|dna| dna.dna_hash().get_raw_32().try_into().expect("32 bytes"));
-        let compat = NetworkCompatParams { dpki_uuid };
+            .map(|dna| dna.dna_hash().get_raw_32().try_into().expect("32 bytes"))
+            .unwrap_or_default();
+        let compat = NetworkCompatParams {
+            dpki_uuid,
+            ..Default::default()
+        };
 
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
@@ -491,7 +495,10 @@ impl ConductorBuilder {
             ),
         };
 
-        let compat = NetworkCompatParams { dpki_uuid };
+        let compat = NetworkCompatParams {
+            dpki_uuid: dpki_uuid.unwrap_or_default(),
+            ..Default::default()
+        };
 
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
