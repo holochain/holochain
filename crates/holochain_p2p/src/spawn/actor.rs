@@ -301,8 +301,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -330,8 +331,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -359,8 +361,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -388,8 +391,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -416,8 +420,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -446,8 +451,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -475,8 +481,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -584,6 +591,8 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
     }
 }
 
+/// A wrapper for the default Bootstrap K2 module, so we can capture
+/// the generated agent infos for publishing in the preflight.
 #[derive(Debug)]
 struct BootWrap {
     compat: NetworkCompatParams,
@@ -604,6 +613,8 @@ impl kitsune2_api::Bootstrap for BootWrap {
         let agents = {
             let mut cache = cache.lock().unwrap();
 
+            // remove expired infos and previous infos that match the
+            // one that was generated
             let now = kitsune2_api::Timestamp::now();
             cache.retain(|cache| {
                 if cache.expires_at < now {
@@ -615,10 +626,12 @@ impl kitsune2_api::Bootstrap for BootWrap {
                 true
             });
 
+            // add the one that was generated
             cache.push(info.clone());
 
             let mut agents = Vec::new();
 
+            // string encoding
             for agent in cache.iter() {
                 if let Ok(encoded) = agent.encode() {
                     agents.push(encoded);
@@ -628,6 +641,7 @@ impl kitsune2_api::Bootstrap for BootWrap {
             agents
         };
 
+        // encode the preflight message and cache
         if let Ok(encoded) = (crate::wire::WirePreflightMessage {
             compat: compat.clone(),
             agents,
@@ -637,10 +651,13 @@ impl kitsune2_api::Bootstrap for BootWrap {
             *preflight.lock().unwrap() = encoded;
         }
 
+        // don't forget to invoke the original bootsrap handler
         orig.put(info);
     }
 }
 
+/// This factory wraps the original bootstrap factory, generating
+/// original bootstrap instances, and wrapping them with our wrapper.
 #[derive(Debug)]
 struct BootWrapFact {
     compat: NetworkCompatParams,
@@ -742,6 +759,8 @@ impl HolochainP2pActor {
             .encode()?,
         ));
 
+        // build with whatever bootstrap module is configured,
+        // but wrap it in our bootsrtap wrapper.
         builder.bootstrap = Arc::new(BootWrapFact {
             compat: config.compat.clone(),
             preflight: preflight.clone(),
