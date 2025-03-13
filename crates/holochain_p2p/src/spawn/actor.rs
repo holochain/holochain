@@ -561,7 +561,7 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
             )));
         }
 
-        let mut agents = Vec::new();
+        let mut agents = Vec::with_capacity(rem.agents.len());
 
         // decode the agents inline, so we can reject the connection
         // if they sent us bad agent data
@@ -689,7 +689,7 @@ impl kitsune2_api::BootstrapFactory for BootWrapFact {
                 compat,
                 preflight,
                 orig,
-                cache: std::sync::Mutex::new(Vec::new()),
+                cache: Default::default(),
             });
             Ok(out)
         })

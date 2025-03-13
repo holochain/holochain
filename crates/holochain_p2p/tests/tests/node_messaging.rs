@@ -171,7 +171,7 @@ async fn test_call_remote() {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
-            // make sure h2 has its own address
+            // make sure hc2 has its own address
             #[allow(clippy::len_zero)] // !<7 lines>.is_empty() is NOT clearer!
             if hc2
                 .peer_store(dna_hash.clone())
