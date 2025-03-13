@@ -6,7 +6,6 @@ use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "This test is flaky"]
 async fn gossip_test() {
     holochain_trace::test_run();
     let config = SweetConductorConfig::standard().no_publish();

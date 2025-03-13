@@ -345,7 +345,7 @@ impl OpStore for HolochainOpStore {
             let out = db
                 .read_async(move |txn| -> StateMutationResult<u64> {
                     let mut stmt = txn.prepare(
-                        r#"SELECT MAX(slice_index) FROM SliceHash
+                        r#"SELECT COALESCE(MAX(slice_index),0) FROM SliceHash
                     WHERE arc_start = :arc_start AND arc_end = :arc_end"#,
                     )?;
 

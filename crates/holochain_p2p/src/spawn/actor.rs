@@ -737,7 +737,13 @@ impl HolochainP2pActor {
         });
 
         let mut builder = if config.k2_test_builder {
-            kitsune2_core::default_test_builder()
+            let mut builder = kitsune2_core::default_test_builder();
+
+            // Still want the real gossip module to be used. The test builder comes with a stub
+            // gossip module fur use in K2 testing.
+            builder.gossip = kitsune2_gossip::K2GossipFactory::create();
+
+            builder
         } else {
             kitsune2::default_builder()
         };
@@ -767,7 +773,12 @@ impl HolochainP2pActor {
             orig: builder.bootstrap,
         });
 
+        // Load default configuration provided by the module factories.
         let builder = builder.with_default_config()?;
+        // Then override any configuration values provided by the user.
+        if let Some(network_config) = config.network_config {
+            builder.config.set_module_config(&network_config)?;
+        }
 
         let pending = Arc::new_cyclic(|this| {
             Mutex::new(Pending {
