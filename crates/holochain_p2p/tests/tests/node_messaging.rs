@@ -39,7 +39,10 @@ impl HcP2pHandler for Handler {
         _countersigning_session: bool,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async move { todo!() })
+        Box::pin(async move {
+            self.0.lock().unwrap().push("publish".into());
+            Ok(())
+        })
     }
 
     fn handle_get(
@@ -257,6 +260,119 @@ async fn test_remote_signal() {
                 break;
             }
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+}
+
+fn test_dht_op(authored_timestamp: holochain_types::prelude::Timestamp) -> DhtOpHashed {
+    let mut create = ::fixt::fixt!(Create);
+    create.timestamp = authored_timestamp;
+
+    let op = DhtOp::from(ChainOp::StoreRecord(
+        ::fixt::fixt!(Signature),
+        Action::Create(create),
+        RecordEntry::Present(::fixt::fixt!(Entry)),
+    ));
+    DhtOpHashed::from_content_sync(op)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_publish() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+
+    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+
+            let op = test_dht_op(holochain_types::prelude::Timestamp::now());
+            let op_hash = op.as_hash().clone();
+
+            hc2.test_kitsune()
+                .space(dna_hash.to_k2_space())
+                .await
+                .unwrap()
+                .op_store()
+                .process_incoming_ops(vec![bytes::Bytes::from(
+                    holochain_serialized_bytes::encode(op.as_content()).unwrap(),
+                )])
+                .await
+                .unwrap();
+
+            hc2.publish(
+                dna_hash.clone(),
+                false,
+                false,
+                HoloHash::from_raw_36_and_type(
+                    op_hash.get_raw_36().to_vec(),
+                    holo_hash::hash_type::AnyLinkable::Action,
+                ),
+                AgentPubKey::from_raw_32(vec![2; 32]),
+                vec![op_hash],
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+            if let Some(res) = handler.0.lock().unwrap().first() {
+                assert_eq!("publish", res);
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_publish_reflect() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+
+    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+
+            let op = test_dht_op(holochain_types::prelude::Timestamp::now());
+            let op_hash = op.as_hash();
+
+            hc2.publish(
+                dna_hash.clone(),
+                false,
+                false,
+                HoloHash::from_raw_36_and_type(
+                    op_hash.get_raw_36().to_vec(),
+                    holo_hash::hash_type::AnyLinkable::Action,
+                ),
+                AgentPubKey::from_raw_32(vec![2; 32]),
+                vec![],
+                None,
+                Some(vec![op.into_content()]),
+            )
+            .await
+            .unwrap();
+
+            if let Some(res) = handler.0.lock().unwrap().first() {
+                assert_eq!("publish", res);
+                break;
+            }
         }
     })
     .await
