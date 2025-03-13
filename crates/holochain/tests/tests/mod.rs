@@ -14,6 +14,7 @@ mod graft_records_onto_source_chain;
 mod hc_stress_test;
 mod init;
 mod inline_zome_spec;
+mod integrity_zome;
 mod lair_in_proc_restart;
 mod migration;
 mod multi_conductor;
