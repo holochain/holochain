@@ -230,6 +230,8 @@ impl Pending {
 
 pub(crate) struct HolochainP2pActor {
     this: Weak<Self>,
+    compat: NetworkCompatParams,
+    preflight: Arc<std::sync::Mutex<bytes::Bytes>>,
     evt_sender: Arc<std::sync::OnceLock<WrapEvtSender>>,
     lair_client: holochain_keystore::MetaLairClient,
     kitsune: kitsune2_api::DynKitsune,
@@ -299,8 +301,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -328,8 +331,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -357,8 +361,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -386,8 +391,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -414,8 +420,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -444,8 +451,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -473,8 +481,9 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space(space)
-                            .await?
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
                             .await
                         {
@@ -534,6 +543,157 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
             }
         })
     }
+
+    fn preflight_gather_outgoing(&self, _peer_url: Url) -> K2Result<bytes::Bytes> {
+        Ok(self.preflight.lock().unwrap().clone())
+    }
+
+    fn preflight_validate_incoming(&self, _peer_url: Url, data: bytes::Bytes) -> K2Result<()> {
+        // decode the preflight that the remote sent us
+        let rem = crate::wire::WirePreflightMessage::decode(&data)
+            .map_err(|err| K2Error::other_src("Invalid remote preflight", err))?;
+
+        // if the compats don't match, reject the connection
+        if rem.compat != self.compat {
+            return Err(K2Error::other(format!(
+                "Invalid remote preflight, wanted {:?}, got: {:?}",
+                self.compat, rem.compat
+            )));
+        }
+
+        let mut agents = Vec::with_capacity(rem.agents.len());
+
+        // decode the agents inline, so we can reject the connection
+        // if they sent us bad agent data
+        for agent in rem.agents {
+            agents.push(AgentInfoSigned::decode(
+                &kitsune2_core::Ed25519Verifier,
+                agent.as_bytes(),
+            )?);
+        }
+
+        // if they sent us agents, spawn a task to insert them into the store
+        if !agents.is_empty() {
+            let kitsune = self.kitsune.clone();
+            tokio::task::spawn(async move {
+                for agent in agents {
+                    let space = match kitsune.space_if_exists(agent.space.clone()).await {
+                        None => continue,
+                        Some(space) => space,
+                    };
+                    space.peer_store().insert(vec![agent]).await?;
+                }
+                K2Result::Ok(())
+            });
+        }
+
+        Ok(())
+    }
+}
+
+/// A wrapper for the default Bootstrap K2 module, so we can capture
+/// the generated agent infos for publishing in the preflight.
+#[derive(Debug)]
+struct BootWrap {
+    compat: NetworkCompatParams,
+    preflight: Arc<std::sync::Mutex<bytes::Bytes>>,
+    orig: kitsune2_api::DynBootstrap,
+    cache: std::sync::Mutex<Vec<Arc<AgentInfoSigned>>>,
+}
+
+impl kitsune2_api::Bootstrap for BootWrap {
+    fn put(&self, info: Arc<AgentInfoSigned>) {
+        let Self {
+            compat,
+            preflight,
+            orig,
+            cache,
+        } = self;
+
+        let agents = {
+            let mut cache = cache.lock().unwrap();
+
+            // remove expired infos and previous infos that match the
+            // one that was generated
+            let now = kitsune2_api::Timestamp::now();
+            cache.retain(|cache_info| {
+                if cache_info.expires_at < now {
+                    return false;
+                }
+                if cache_info.agent == info.agent && cache_info.space == info.space {
+                    return false;
+                }
+                true
+            });
+
+            // add the one that was generated
+            cache.push(info.clone());
+
+            let mut agents = Vec::new();
+
+            // string encoding
+            for agent in cache.iter() {
+                if let Ok(encoded) = agent.encode() {
+                    agents.push(encoded);
+                }
+            }
+
+            agents
+        };
+
+        // encode the preflight message and cache
+        if let Ok(encoded) = (crate::wire::WirePreflightMessage {
+            compat: compat.clone(),
+            agents,
+        })
+        .encode()
+        {
+            *preflight.lock().unwrap() = encoded;
+        }
+
+        // don't forget to invoke the original bootstrap handler
+        orig.put(info);
+    }
+}
+
+/// This factory wraps the original bootstrap factory, generating
+/// original bootstrap instances, and wrapping them with our wrapper.
+#[derive(Debug)]
+struct BootWrapFact {
+    compat: NetworkCompatParams,
+    preflight: Arc<std::sync::Mutex<bytes::Bytes>>,
+    orig: kitsune2_api::DynBootstrapFactory,
+}
+
+impl kitsune2_api::BootstrapFactory for BootWrapFact {
+    fn default_config(&self, config: &mut Config) -> K2Result<()> {
+        self.orig.default_config(config)
+    }
+
+    fn validate_config(&self, config: &Config) -> K2Result<()> {
+        self.orig.validate_config(config)
+    }
+
+    fn create(
+        &self,
+        builder: Arc<Builder>,
+        peer_store: DynPeerStore,
+        space: SpaceId,
+    ) -> BoxFut<'static, K2Result<DynBootstrap>> {
+        let compat = self.compat.clone();
+        let preflight = self.preflight.clone();
+        let orig_fut = self.orig.create(builder, peer_store, space);
+        Box::pin(async move {
+            let orig = orig_fut.await?;
+            let out: DynBootstrap = Arc::new(BootWrap {
+                compat,
+                preflight,
+                orig,
+                cache: Default::default(),
+            });
+            Ok(out)
+        })
+    }
 }
 
 impl HolochainP2pActor {
@@ -591,6 +751,21 @@ impl HolochainP2pActor {
             getter: config.get_db_op_store.clone(),
             handler: evt_sender.clone(),
         });
+        let preflight = Arc::new(Mutex::new(
+            crate::wire::WirePreflightMessage {
+                compat: config.compat.clone(),
+                agents: Vec::new(),
+            }
+            .encode()?,
+        ));
+
+        // build with whatever bootstrap module is configured,
+        // but wrap it in our bootsrtap wrapper.
+        builder.bootstrap = Arc::new(BootWrapFact {
+            compat: config.compat.clone(),
+            preflight: preflight.clone(),
+            orig: builder.bootstrap,
+        });
 
         let builder = builder.with_default_config()?;
 
@@ -605,41 +780,13 @@ impl HolochainP2pActor {
 
         Ok(Arc::new_cyclic(|this| Self {
             this: this.clone(),
+            compat: config.compat,
+            preflight,
             evt_sender,
             lair_client,
             kitsune,
             pending,
         }))
-        /*
-        let mut bytes = vec![];
-        kitsune_p2p_types::codec::rmp_encode(&mut bytes, &compat)
-            .map_err(HolochainP2pError::other)?;
-
-        let preflight_user_data = PreflightUserData {
-            bytes: bytes.clone(),
-            comparator: Box::new(move |url, mut recvd_bytes| {
-                if bytes.as_slice() != recvd_bytes {
-                    let common = "Cannot complete preflight handshake with peer because network compatibility params don't match";
-                    Err(
-                        match kitsune_p2p_types::codec::rmp_decode::<_, NetworkCompatParams>(
-                            &mut recvd_bytes,
-                        ) {
-                            Ok(theirs) => {
-                                format!("{common}. ours={compat:?}, theirs={theirs:?}, url={url}")
-                            }
-                            Err(err) => {
-                                format!(
-                                "{common}. (Can't decode peer's sent hash.) url={url}, err={err}"
-                            )
-                            }
-                        },
-                    )
-                } else {
-                    Ok(())
-                }
-            }),
-        };
-        */
     }
 
     async fn get_peer_for_loc(
@@ -802,6 +949,17 @@ impl actor::HcP2p for HolochainP2pActor {
                 agent.set_tgt_storage_arc_hint(DhtArc::FULL);
                 agent.invoke_cb();
             }
+        })
+    }
+
+    fn peer_store(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<DynPeerStore>> {
+        Box::pin(async move {
+            Ok(self
+                .kitsune
+                .space(dna_hash.to_k2_space())
+                .await?
+                .peer_store()
+                .clone())
         })
     }
 

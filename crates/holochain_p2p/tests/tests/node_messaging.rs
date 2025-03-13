@@ -164,21 +164,75 @@ async fn test_call_remote() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (agent1, _hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+    let (agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
 
-    let resp = hc2
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+
+            // make sure hc2 has its own address
+            #[allow(clippy::len_zero)] // !<7 lines>.is_empty() is NOT clearer!
+            if hc2
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap()
+                .len()
+                > 0
+            {
+                break;
+            }
+        }
+
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+
+            let resp = hc2
+                .call_remote(
+                    dna_hash.clone(),
+                    agent1.clone(),
+                    ExternIO(b"hello".to_vec()),
+                    Signature([0; 64]),
+                )
+                .await
+                .unwrap();
+            let resp: Vec<u8> = UnsafeBytes::from(resp).into();
+            let resp = String::from_utf8_lossy(&resp);
+            assert_eq!("got_call_remote: hello", resp);
+
+            // break when hc1 has hc2's address
+            if hc1
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap()
+                .len()
+                > 1
+            {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let resp = hc1
         .call_remote(
             dna_hash,
-            agent1,
-            ExternIO(b"hello".to_vec()),
+            agent2,
+            ExternIO(b"world".to_vec()),
             Signature([0; 64]),
         )
         .await
         .unwrap();
     let resp: Vec<u8> = UnsafeBytes::from(resp).into();
     let resp = String::from_utf8_lossy(&resp);
-    assert_eq!("got_call_remote: hello", resp);
+    assert_eq!("got_call_remote: world", resp);
 }
 
 #[tokio::test(flavor = "multi_thread")]

@@ -11,6 +11,7 @@ pub async fn spawn_holochain_p2p(
     config: HolochainP2pConfig,
     lair_client: holochain_keystore::MetaLairClient,
 ) -> HolochainP2pResult<DynHcP2p> {
+    tracing::info!(?config, "Lanuching HolochainP2p");
     actor::HolochainP2pActor::create(config, lair_client).await
 }
 
@@ -45,6 +46,15 @@ pub struct HolochainP2pConfig {
     pub compat: NetworkCompatParams,
 }
 
+impl std::fmt::Debug for HolochainP2pConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HolochainP2pConfig")
+            .field("k2_test_builder", &self.k2_test_builder)
+            .field("compat", &self.compat)
+            .finish()
+    }
+}
+
 impl Default for HolochainP2pConfig {
     fn default() -> Self {
         Self {
@@ -56,10 +66,38 @@ impl Default for HolochainP2pConfig {
     }
 }
 
+/// See [NetworkCompatParams::proto_ver].
+pub const HCP2P_PROTO_VER: u32 = 2;
+
 /// Some parameters used as part of a protocol compability check during tx5 preflight
-#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NetworkCompatParams {
+    /// The current protocol version. This should be incremented whenever
+    /// any breaking protocol changes are made to prevent incompatible
+    /// nodes from talking to each other.
+    pub proto_ver: u32,
+
     /// The UUID of the installed DPKI service.
     /// If the service is backed by a Dna, this is the core 32 bytes of the DnaHash.
-    pub dpki_uuid: Option<[u8; 32]>,
+    /// If not, set this to all zeroes.
+    pub dpki_uuid: [u8; 32],
+}
+
+impl std::fmt::Debug for NetworkCompatParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dna_hash = DnaHash::from_raw_32(self.dpki_uuid.to_vec());
+        f.debug_struct("NetworkCompatParams")
+            .field("proto_ver", &self.proto_ver)
+            .field("dpki_uuid", &dna_hash)
+            .finish()
+    }
+}
+
+impl Default for NetworkCompatParams {
+    fn default() -> Self {
+        Self {
+            proto_ver: HCP2P_PROTO_VER,
+            dpki_uuid: [0; 32],
+        }
+    }
 }
