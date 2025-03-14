@@ -766,7 +766,7 @@ impl HolochainP2pActor {
         ));
 
         // build with whatever bootstrap module is configured,
-        // but wrap it in our bootsrtap wrapper.
+        // but wrap it in our bootstrap wrapper.
         builder.bootstrap = Arc::new(BootWrapFact {
             compat: config.compat.clone(),
             preflight: preflight.clone(),

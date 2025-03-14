@@ -266,11 +266,6 @@ where
 {
     let filter = standard_filter()?;
 
-    println!(
-        "Initialising log output formatting with option {:?}",
-        output
-    );
-
     match output {
         Output::Json => Registry::default()
             .with(

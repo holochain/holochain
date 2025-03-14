@@ -209,6 +209,16 @@ pub struct NetworkConfig {
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub signal_url: url2::Url2,
 
+    /// The interval between initiating gossip rounds.
+    pub gossip_initiate_interval_ms: Option<u32>,
+
+    /// The minimum amount of time that must be allowed to pass before a gossip round can be
+    /// initiated by a given peer.
+    pub gossip_min_initiate_interval_ms: Option<u32>,
+
+    /// The timeout for a gossip round.
+    pub gossip_round_timeout_ms: Option<u32>,
+
     /// The Kitsune2 webrtc_config to use for connecting to peers.
     pub webrtc_config: Option<serde_json::Value>,
 
@@ -224,6 +234,9 @@ impl Default for NetworkConfig {
         Self {
             bootstrap_url: url2::Url2::parse("https://devtest-bootstrap-1.holochain.org"),
             signal_url: url2::Url2::parse("wss://devtest-sbd-1.holochain.org"),
+            gossip_initiate_interval_ms: None,
+            gossip_min_initiate_interval_ms: None,
+            gossip_round_timeout_ms: None,
             webrtc_config: None,
             advanced: None,
         }
@@ -231,6 +244,27 @@ impl Default for NetworkConfig {
 }
 
 impl NetworkConfig {
+    /// Set the gossip interval.
+    pub fn with_gossip_initiate_interval_ms(mut self, gossip_initiate_interval_ms: u32) -> Self {
+        self.gossip_initiate_interval_ms = Some(gossip_initiate_interval_ms);
+        self
+    }
+
+    /// Set the gossip min initiate interval.
+    pub fn with_gossip_min_initiate_interval_ms(
+        mut self,
+        gossip_min_initiate_interval_ms: u32,
+    ) -> Self {
+        self.gossip_min_initiate_interval_ms = Some(gossip_min_initiate_interval_ms);
+        self
+    }
+
+    /// Set the gossip round timeout.
+    pub fn with_gossip_round_timeout_ms(mut self, gossip_round_timeout_ms: u32) -> Self {
+        self.gossip_round_timeout_ms = Some(gossip_round_timeout_ms);
+        self
+    }
+
     /// Convert the network config to a K2 config object.
     ///
     /// Values that are set directly on the network config are merged into the [`NetworkConfig::advanced`] field.
@@ -279,16 +313,43 @@ impl NetworkConfig {
             insert_module_config(
                 module_config,
                 "coreBootstrap",
-                "server_url",
+                "serverUrl",
                 serde_json::Value::String(self.bootstrap_url.as_str().into()),
             )?;
 
             insert_module_config(
                 module_config,
                 "tx5Transport",
-                "server_url",
+                "serverUrl",
                 serde_json::Value::String(self.signal_url.as_str().into()),
             )?;
+
+            if let Some(initiate_interval_ms) = self.gossip_initiate_interval_ms {
+                insert_module_config(
+                    module_config,
+                    "k2Gossip",
+                    "initiateIntervalMs",
+                    serde_json::Value::Number(serde_json::Number::from(initiate_interval_ms)),
+                )?;
+            }
+
+            if let Some(min_initiate_interval_ms) = self.gossip_min_initiate_interval_ms {
+                insert_module_config(
+                    module_config,
+                    "k2Gossip",
+                    "minInitiateIntervalMs",
+                    serde_json::Value::Number(serde_json::Number::from(min_initiate_interval_ms)),
+                )?;
+            }
+
+            if let Some(round_timeout_ms) = self.gossip_round_timeout_ms {
+                insert_module_config(
+                    module_config,
+                    "k2Gossip",
+                    "roundTimeoutMs",
+                    serde_json::Value::Number(serde_json::Number::from(round_timeout_ms)),
+                )?;
+            }
 
             // TODO nowhere to put the webrtc config in K2 yet!
         } else {
@@ -636,18 +697,20 @@ mod tests {
 
     #[test]
     fn network_config_preserves_advanced_overrides() {
-        let mut network_config = NetworkConfig::default();
-        network_config.advanced = Some(serde_json::json!({
-            "coreBootstrap": {
-                "backoff_min_ms": "3500",
-            },
-            "tx5Transport": {
-                "timeout_s": "10",
-            },
-            "coreSpace": {
-                "re_sign_freq_ms": "1000",
-            }
-        }));
+        let network_config = NetworkConfig {
+            advanced: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "backoff_min_ms": "3500",
+                },
+                "tx5Transport": {
+                    "timeout_s": "10",
+                },
+                "coreSpace": {
+                    "re_sign_freq_ms": "1000",
+                }
+            })),
+            ..Default::default()
+        };
 
         let k2_config = network_config.to_k2_config().unwrap();
 
@@ -676,15 +739,17 @@ mod tests {
 
     #[test]
     fn network_config_overrides_extracted_fields() {
-        let mut network_config = NetworkConfig::default();
-        network_config.advanced = Some(serde_json::json!({
-            "coreBootstrap": {
-                "server_url": "https://something-else.net",
-            },
-            "tx5Transport": {
-                "server_url": "wss://sbd.nowhere.net",
-            },
-        }));
+        let network_config = NetworkConfig {
+            advanced: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "server_url": "https://something-else.net",
+                },
+                "tx5Transport": {
+                    "server_url": "wss://sbd.nowhere.net",
+                },
+            })),
+            ..Default::default()
+        };
 
         let k2_config = network_config.to_k2_config().unwrap();
 

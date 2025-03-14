@@ -1,10 +1,10 @@
 use holochain_keystore::*;
 use holochain_p2p::event::*;
 use holochain_p2p::*;
+use holochain_trace::test_run;
 use holochain_types::prelude::*;
 use kitsune2_api::*;
 use std::sync::{Arc, Mutex};
-use holochain_trace::test_run;
 
 #[derive(Clone, Debug)]
 struct Handler(pub Arc<Mutex<Vec<String>>>);
