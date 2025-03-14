@@ -43,7 +43,7 @@ tracing = "0.1.26"
 cron = "0.12"
 async-recursion = "1.1"
 
-kitsune2_api = "0.0.1-alpha9"
+kitsune2_api = "=0.0.1-alpha.11"
 
 tempfile = { version = "3.3", optional = true }
 base64 = { version = "0.22", optional = true }
