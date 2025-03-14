@@ -414,7 +414,7 @@ async fn sys_validation_workflow_inner(
         if let Some(cache) = workspace.dht_query_cache.as_ref() {
             // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
             holochain_state::integrate::authored_ops_to_dht_db(
-                _network.storage_arcs().await?,
+                _network.target_arcs().await?,
                 warrant_op_hashes,
                 workspace.authored_db.clone().into(),
                 workspace.dht_db.clone(),

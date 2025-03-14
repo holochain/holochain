@@ -147,7 +147,7 @@ impl Conductor {
                 source_chain
                     .flush(
                         network
-                            .storage_arcs()
+                            .target_arcs()
                             .await
                             .map_err(ConductorApiError::other)?,
                         network.chc(),

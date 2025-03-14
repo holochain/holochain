@@ -143,8 +143,8 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         message: event::CountersigningSessionNegotiationMessage,
     ) -> HolochainP2pResult<()>;
 
-    /// Get the storage arcs of the agents currently in this space.
-    async fn storage_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>>;
+    /// Get the target arcs of the agents currently in this space.
+    async fn target_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>>;
 
     /// Access to the specified CHC
     fn chc(&self) -> Option<ChcImpl>;
@@ -357,8 +357,8 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .await
     }
 
-    async fn storage_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>> {
-        self.sender.storage_arcs((*self.dna_hash).clone()).await
+    async fn target_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>> {
+        self.sender.target_arcs((*self.dna_hash).clone()).await
     }
 
     fn chc(&self) -> Option<ChcImpl> {

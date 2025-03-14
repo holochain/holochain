@@ -247,7 +247,7 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         todo!()
     }
 
-    async fn storage_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>> {
+    async fn target_arcs(&self) -> HolochainP2pResult<Vec<kitsune2_api::DhtArc>> {
         todo!()
     }
 

@@ -183,7 +183,7 @@ impl HcP2p for StubNetwork {
         Box::pin(async { Err("stub".into()) })
     }
 
-    fn storage_arcs(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<Vec<DhtArc>>> {
+    fn target_arcs(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<Vec<DhtArc>>> {
         Box::pin(async { Err("stub".into()) })
     }
 }

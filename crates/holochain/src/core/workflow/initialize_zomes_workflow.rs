@@ -61,7 +61,7 @@ where
     if result == InitResult::Pass {
         let flushed_actions = workspace
             .source_chain()
-            .flush(network.storage_arcs().await?, network.chc())
+            .flush(network.target_arcs().await?, network.chc())
             .await?;
 
         send_post_commit(

@@ -1480,7 +1480,7 @@ impl actor::HcP2p for HolochainP2pActor {
         })
     }
 
-    fn storage_arcs(
+    fn target_arcs(
         &self,
         dna_hash: DnaHash,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<kitsune2_api::DhtArc>>> {
@@ -1493,7 +1493,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 .get_all()
                 .await?
                 .into_iter()
-                .map(|a| a.get_cur_storage_arc())
+                .map(|a| a.get_tgt_storage_arc())
                 .collect())
         })
     }
