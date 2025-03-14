@@ -303,7 +303,7 @@ impl OpStore for HolochainOpStore {
         };
 
         Box::pin(async move {
-            Ok(db
+            db
                 .read_async(move |txn| -> StateMutationResult<Option<Timestamp>> {
                     let mut stmt = txn.prepare(EARLIEST_TIMESTAMP)?;
 
@@ -320,7 +320,7 @@ impl OpStore for HolochainOpStore {
                 .await
                 .map_err(|e| {
                     K2Error::other_src("Failed to retrieve earliest timestamp in arc", e)
-                })?)
+                })
         })
     }
 

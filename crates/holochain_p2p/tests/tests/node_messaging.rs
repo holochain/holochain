@@ -559,7 +559,6 @@ async fn test_authority_for_hash() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_target_arcs() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
-    let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
     let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
