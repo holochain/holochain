@@ -20,7 +20,7 @@ async fn dpki_publish() {
     let config = SweetConductorConfig::standard();
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
     await_consistency(10, conductors.dpki_cells().as_slice())
         .await
@@ -35,7 +35,7 @@ async fn dpki_no_publish() {
     let config = SweetConductorConfig::standard().no_publish();
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
     await_consistency(10, conductors.dpki_cells().as_slice())
         .await
@@ -217,7 +217,7 @@ async fn sharded_consistency() {
     for i in 0..NUM_CELLS {
         conductors.setup_app(&i.to_string(), &dnas).await.unwrap();
     }
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
     conductors.force_all_publish_dht_ops().await;
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]

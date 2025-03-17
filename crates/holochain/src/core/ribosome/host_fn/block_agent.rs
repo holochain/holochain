@@ -156,7 +156,7 @@ mod test {
         // If carol joins the party but DOES NOT block bob then she will
         // give access to data once more for bob.
 
-        //conductors.exchange_peer_info().await;
+        conductors.exchange_peer_info().await;
 
         await_consistency(60, [&alice_cell, &bob_cell, &carol_cell])
             .await

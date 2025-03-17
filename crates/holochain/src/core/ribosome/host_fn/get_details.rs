@@ -242,7 +242,7 @@ pub mod slow_tests {
         assert!(local_entries_with_details[0].is_some());
 
         // now make both agents aware of each other
-        //conductors.exchange_peer_info().await;
+        conductors.exchange_peer_info().await;
 
         // bob gets details by action hash from local databases
         let zome_bob = apps[1].cells()[0].zome(TestWasm::Crud.coordinator_zome_name());

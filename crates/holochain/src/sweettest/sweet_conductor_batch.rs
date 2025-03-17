@@ -41,13 +41,11 @@ impl SweetConductorBatch {
             future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c))).await,
         );
 
-        /*
         let dpki_cells = conductors.dpki_cells();
         if !dpki_cells.is_empty() {
             conductors.exchange_peer_info().await;
             await_consistency(10, dpki_cells.as_slice()).await.unwrap();
         }
-        */
 
         conductors
     }
@@ -72,7 +70,6 @@ impl SweetConductorBatch {
             .await,
         );
 
-        /*
         let not_full_bootstrap = conductors
             .iter()
             .any(|c| !c.get_config().has_rendezvous_bootstrap());
@@ -87,7 +84,6 @@ impl SweetConductorBatch {
             }
             await_consistency(15, dpki_cells.as_slice()).await.unwrap();
         }
-        */
 
         conductors
     }
@@ -224,18 +220,24 @@ impl SweetConductorBatch {
             .into())
     }
 
-    /*
-    /// Let each conductor know about each others' agents so they can do networking
+    /// Let each conductor know about each other's agents so they can do networking
     pub async fn exchange_peer_info(&self) {
-        SweetConductor::exchange_peer_info(&self.0).await
+        tokio::time::timeout(std::time::Duration::from_secs(10), async move {
+            while !SweetConductor::exchange_peer_info(&self.0).await {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("Timeout while exchanging peer info");
     }
 
-    /// Let each conductor know about each others' agents so they can do networking
+    /*
+    /// Let each conductor know about each other's agents so they can do networking
     pub async fn forget_peer_info(&self, agents_to_forget: impl IntoIterator<Item = &AgentPubKey>) {
         SweetConductor::forget_peer_info(&self.0, agents_to_forget).await
     }
 
-    /// Let each conductor know about each others' agents so they can do networking
+    /// Let each conductor know about each other's agents so they can do networking
     pub async fn exchange_peer_info_sampled(&self, rng: &mut StdRng, s: usize) {
         SweetConductor::exchange_peer_info_sampled(&self.0, rng, s).await
     }

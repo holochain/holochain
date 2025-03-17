@@ -16,7 +16,7 @@ async fn gossip_test() {
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
     let ((cell_1,), (cell_2,)) = apps.into_tuples();
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
     let anchor = AnchorInput("alice".to_string(), "0".to_string());
     let _: EntryHash = conductors[0]

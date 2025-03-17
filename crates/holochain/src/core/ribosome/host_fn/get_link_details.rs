@@ -178,7 +178,7 @@ pub mod slow_tests {
         let _: ActionHash = conductors[0].call(&zome_alice, "create_link", ()).await;
 
         // now make both agents aware of each other
-        //conductors.exchange_peer_info().await;
+        conductors.exchange_peer_info().await;
 
         // bob gets link details locally only
         let zome_bob = apps[1].cells()[0].zome(TestWasm::Link.coordinator_zome_name());

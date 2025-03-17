@@ -21,7 +21,7 @@ async fn test_validation_receipt() {
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 

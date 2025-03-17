@@ -139,7 +139,7 @@ async fn zero_arc_can_link_to_uncached_base() {
     .await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
     let ((alice,), (bob,)) = apps.into_tuples();
 
