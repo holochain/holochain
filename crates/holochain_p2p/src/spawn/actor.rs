@@ -1119,13 +1119,16 @@ impl actor::HcP2p for HolochainP2pActor {
             use crate::types::event::HcP2pHandler;
 
             // This single function is/was a weird mix of a bunch of strange
-            // operations.
+            // operations. We're trying to narrow it down now.
             //
-            // - inexplicably `reflect_ops` back to holochain
+            // - `reflect_ops` back to holochain
+            //   - TODO - remove this (fix anything it breaks)
             // - actually publish `op_hash_list`
+            //   - This is the core functionality we want to keep here
             // - send a notification to peers that we'd like validation receipts
             //   - moving this to a separate call
             // - i have no idea at all what the countersigning bool is for
+            //   - moving this to a separate call
 
             // -- handle the bizzarre reflection thing -- //
 
@@ -1169,8 +1172,6 @@ impl actor::HcP2p for HolochainP2pActor {
                     .publish_ops(op_hash_list.clone(), url)
                     .await?;
             }
-
-            // -- TODO why is there a bool about countersigning?? -- //
 
             Ok(())
         })
