@@ -172,19 +172,15 @@ impl event::HcP2pHandler for WrapEvtSender {
         )
     }
 
-    fn handle_validation_receipts_received(
+    fn handle_validation_receipt(
         &self,
         dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        dht_op_list: Vec<DhtOpHash>,
+    ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>> {
         timing_trace!(
             false,
-            {
-                self.0
-                    .handle_validation_receipts_received(dna_hash, to_agent, receipts)
-            },
-            a = "recv_validation_receipt_received",
+            { self.0.handle_validation_receipt(dna_hash, dht_op_list) },
+            a = "recv_validation_receipt",
         )
     }
 
@@ -270,7 +266,8 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                     | GetLinksRes { msg_id, .. }
                     | CountLinksRes { msg_id, .. }
                     | GetAgentActivityRes { msg_id, .. }
-                    | MustGetAgentActivityRes { msg_id, .. } => {
+                    | MustGetAgentActivityRes { msg_id, .. }
+                    | ValidationReceiptRes { msg_id, .. } => {
                         if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
                             let _ = resp.send(msg);
                         }
@@ -490,6 +487,35 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                             tracing::debug!(?err, "Error sending must_get_agent_activity response");
                         }
                     }
+                    ValidationReceiptReq {
+                        msg_id,
+                        dht_op_list,
+                    } => {
+                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let resp = match evt_sender
+                            .get()
+                            .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
+                            .handle_validation_receipt(dna_hash, dht_op_list)
+                            .await
+                        {
+                            Ok(receipts) => ValidationReceiptRes { msg_id, receipts },
+                            Err(err) => ErrorRes {
+                                msg_id,
+                                error: format!("{err:?}"),
+                            },
+                        };
+                        let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
+
+                        if let Err(err) = kitsune
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
+                            .send_notify(from_peer, resp)
+                            .await
+                        {
+                            tracing::debug!(?err, "Error sending validation_receipt response");
+                        }
+                    }
                     RemoteSignalEvt {
                         to_agent,
                         zome_call_params_serialized,
@@ -507,16 +533,6 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                                 zome_call_params_serialized,
                                 signature,
                             )
-                            .await;
-                    }
-                    ValidationReceiptsEvt { to_agent, receipts } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
-                        // validation receipts are fire-and-forget
-                        // so it's safe to ignore the response
-                        let _response = evt_sender
-                            .get()
-                            .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
-                            .handle_validation_receipts_received(dna_hash, to_agent, receipts)
                             .await;
                     }
                 }
@@ -1434,39 +1450,70 @@ impl actor::HcP2p for HolochainP2pActor {
         })
     }
 
-    fn send_validation_receipts(
+    fn get_validation_receipts(
         &self,
         dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        dht_op: DhtOpHash,
+        exclude_list: Vec<AgentPubKey>,
+        limit: usize,
+    ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>> {
         Box::pin(async move {
-            let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
-
-            let to_url = match space
+            let exclude_list: Vec<AgentId> =
+                exclude_list.into_iter().map(|a| a.to_k2_agent()).collect();
+            let space = dna_hash.to_k2_space();
+            let space = self.kitsune.space(space).await?;
+            let urls: std::collections::HashSet<Url> = space
                 .peer_store()
-                .get(to_agent.to_k2_agent())
+                .get_near_location(dht_op.get_loc(), usize::MAX)
                 .await?
-                .and_then(|i| i.url.clone())
-            {
-                Some(to_url) => to_url,
-                None => {
-                    return Err(HolochainP2pError::other(
-                        "send_validation_receipts could not find url for peer",
-                    ))
-                }
-            };
+                .into_iter()
+                .filter_map(|info| {
+                    if info.is_tombstone {
+                        return None;
+                    }
+                    if exclude_list.contains(&info.agent) {
+                        return None;
+                    }
+                    info.url.clone()
+                })
+                .collect();
 
-            let req = crate::wire::WireMessage::validation_receipts(to_agent.clone(), receipts);
+            if urls.is_empty() {
+                return Ok(<Vec<SignedValidationReceipt>>::new().into());
+            }
 
-            let start = std::time::Instant::now();
+            let mut recv = Vec::new();
 
-            let out = self.send_notify(&space, to_url, req).await;
+            for url in urls.into_iter().take(limit) {
+                let (msg_id, req) =
+                    crate::wire::WireMessage::validation_receipt_req(vec![dht_op.clone()]);
+                let req = crate::wire::WireMessage::encode_batch(&[&req])?;
+                let (s, r) = tokio::sync::oneshot::channel();
+                recv.push(r);
+                self.pending.lock().unwrap().register(msg_id, s);
+                space.send_notify(url, req).await?;
+            }
 
-            timing_trace_out!(out, start, a = "send_validation_receipts");
+            let mut out: Vec<SignedValidationReceipt> = Vec::new();
 
-            Ok(())
+            for bundle in futures::future::join_all(recv).await {
+                let mut bundle = match bundle {
+                    Ok(wire::WireMessage::ValidationReceiptRes { receipts, .. }) => {
+                        receipts.into_iter().collect::<Vec<_>>()
+                    }
+                    Ok(resp) => {
+                        tracing::debug!(?resp, "bad response fetching validation receipts");
+                        continue;
+                    }
+                    Err(err) => {
+                        tracing::debug!(?err, "error responce fetching validation receipts");
+                        continue;
+                    }
+                };
+                out.append(&mut bundle);
+            }
+
+            Ok(out.into())
         })
     }
 

@@ -130,12 +130,11 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn handle_validation_receipts_received(
+    fn handle_validation_receipt(
         &self,
         _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        _receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        _dht_op_list: Vec<holo_hash::DhtOpHash>,
+    ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>> {
         unimplemented!()
     }
 

@@ -126,13 +126,6 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>>;
 
-    /// Send a validation receipt to a remote node.
-    async fn send_validation_receipts(
-        &self,
-        to_agent: AgentPubKey,
-        receipts: ValidationReceiptBundle,
-    ) -> HolochainP2pResult<()>;
-
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(&self, basis: holo_hash::OpBasis) -> HolochainP2pResult<bool>;
 
@@ -326,17 +319,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
         self.sender
             .must_get_agent_activity((*self.dna_hash).clone(), author, filter)
-            .await
-    }
-
-    /// Send a validation receipt to a remote node.
-    async fn send_validation_receipts(
-        &self,
-        to_agent: AgentPubKey,
-        receipts: ValidationReceiptBundle,
-    ) -> HolochainP2pResult<()> {
-        self.sender
-            .send_validation_receipts((*self.dna_hash).clone(), to_agent, receipts)
             .await
     }
 

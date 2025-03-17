@@ -182,13 +182,12 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>>;
 
-    /// A remote node has sent us a validation receipt.
-    fn handle_validation_receipts_received(
+    /// A remote node has requested that we send it validation receipts.
+    fn handle_validation_receipt(
         &self,
         dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HolochainP2pResult<()>>;
+        dht_op_list: Vec<DhtOpHash>,
+    ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>>;
 
     /// Messages between agents that drive a countersigning session.
     fn handle_countersigning_session_negotiation(

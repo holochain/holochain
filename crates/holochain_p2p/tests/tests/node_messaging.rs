@@ -141,15 +141,14 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn handle_validation_receipts_received(
+    fn handle_validation_receipt(
         &self,
         _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        _receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        _dht_op_list: Vec<DhtOpHash>,
+    ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("validation_receipts".into());
-            Ok(())
+            self.0.lock().unwrap().push("validation_receipt".into());
+            Ok(<Vec<SignedValidationReceipt>>::new().into())
         })
     }
 
@@ -628,26 +627,32 @@ async fn test_must_get_agent_activity() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_validation_receipts() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (agent1, _hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
     let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler.clone()).await;
 
-    hc2.send_validation_receipts(
-        dna_hash,
-        agent1,
-        <Vec<SignedValidationReceipt>>::new().into(),
-    )
-    .await
-    .unwrap();
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
 
     tokio::time::timeout(std::time::Duration::from_secs(20), async {
         loop {
-            if let Some(res) = handler.0.lock().unwrap().first() {
-                assert_eq!("validation_receipts", res);
-                break;
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+
+            // if we get a response at all, the full back-n-forth succeeded
+            if hc2
+                .get_validation_receipts(
+                    dna_hash.clone(),
+                    DhtOpHash::from_raw_36(vec![0xdb; 36]),
+                    Vec::new(),
+                    usize::MAX,
+                )
+                .await
+                .is_ok()
+            {
+                return;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     })
     .await

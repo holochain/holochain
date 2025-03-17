@@ -146,12 +146,13 @@ impl HcP2p for StubNetwork {
         Box::pin(async { Err("stub".into()) })
     }
 
-    fn send_validation_receipts(
+    fn get_validation_receipts(
         &self,
         dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        dht_op: DhtOpHash,
+        exclude_list: Vec<AgentPubKey>,
+        limit: usize,
+    ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>> {
         Box::pin(async { Err("stub".into()) })
     }
 

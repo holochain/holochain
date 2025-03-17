@@ -4,7 +4,6 @@
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
-use holochain_types::prelude::ValidationReceiptBundle;
 
 #[derive(Clone, Debug)]
 /// Get options help control how the get is processed at various levels.
@@ -345,13 +344,15 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<MustGetAgentActivityResponse>>>;
 
-    /// Send a validation receipt to a remote node.
-    fn send_validation_receipts(
+    /// Request validation receipts for op hashes from remote nodes
+    /// (excluding those we already have).
+    fn get_validation_receipts(
         &self,
         dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HolochainP2pResult<()>>;
+        dht_op: DhtOpHash,
+        exclude_list: Vec<AgentPubKey>,
+        limit: usize,
+    ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>>;
 
     /// Check if any local agent in this space is an authority for a hash.
     fn authority_for_hash(

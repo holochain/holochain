@@ -122,14 +122,18 @@ pub enum WireMessage {
         msg_id: u64,
         response: MustGetAgentActivityResponse,
     },
+    ValidationReceiptReq {
+        msg_id: u64,
+        dht_op_list: Vec<DhtOpHash>,
+    },
+    ValidationReceiptRes {
+        msg_id: u64,
+        receipts: ValidationReceiptBundle,
+    },
     RemoteSignalEvt {
         to_agent: AgentPubKey,
         zome_call_params_serialized: ExternIO,
         signature: Signature,
-    },
-    ValidationReceiptsEvt {
-        to_agent: AgentPubKey,
-        receipts: ValidationReceiptBundle,
     },
     /*
     CountersigningSessionNegotiation {
@@ -320,6 +324,23 @@ impl WireMessage {
         Self::MustGetAgentActivityRes { msg_id, response }
     }
 
+    /// Outgoing "ValidationReceipt" request.
+    pub fn validation_receipt_req(dht_op_list: Vec<DhtOpHash>) -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (
+            msg_id,
+            Self::ValidationReceiptReq {
+                msg_id,
+                dht_op_list,
+            },
+        )
+    }
+
+    /// Incoming "ValidationReceipt" response.
+    pub fn validation_receipt_res(msg_id: u64, receipts: ValidationReceiptBundle) -> WireMessage {
+        Self::ValidationReceiptRes { msg_id, receipts }
+    }
+
     /// Outgoing fire-and-forget "RemoteSignal" notify event.
     pub fn remote_signal_evt(
         to_agent: holo_hash::AgentPubKey,
@@ -331,14 +352,6 @@ impl WireMessage {
             zome_call_params_serialized,
             signature,
         }
-    }
-
-    /// Outgoing fire-and-forget "ValidationReceipts" notify event.
-    pub fn validation_receipts(
-        to_agent: holo_hash::AgentPubKey,
-        receipts: ValidationReceiptBundle,
-    ) -> WireMessage {
-        Self::ValidationReceiptsEvt { to_agent, receipts }
     }
 
     /*

@@ -748,6 +748,16 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         })
     }
 
+    fn handle_want_validation_receipts(
+        &self,
+        _dna_hash: DnaHash,
+        _dht_op_list: Vec<DhtOpHash>,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async move {
+            unreachable!("This function is handled at the conductor level, not the cell level")
+        })
+    }
+
     /// A remote agent is sending us a validation receipt bundle.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, receipts)))]
     fn handle_validation_receipts_received(
