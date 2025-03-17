@@ -944,23 +944,8 @@ macro_rules! timing_trace_out {
 
 impl actor::HcP2p for HolochainP2pActor {
     #[cfg(feature = "test_utils")]
-    fn test_set_full_arcs(&self, space: SpaceId) -> BoxFut<'_, ()> {
-        Box::pin(async {
-            for agent in self
-                .kitsune
-                .space(space)
-                .await
-                .unwrap()
-                .local_agent_store()
-                .get_all()
-                .await
-                .unwrap()
-            {
-                agent.set_cur_storage_arc(DhtArc::FULL);
-                agent.set_tgt_storage_arc_hint(DhtArc::FULL);
-                agent.invoke_cb();
-            }
-        })
+    fn test_kitsune(&self) -> &DynKitsune {
+        &self.kitsune
     }
 
     fn peer_store(&self, dna_hash: DnaHash) -> BoxFut<'_, HolochainP2pResult<DynPeerStore>> {
@@ -1132,17 +1117,73 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn publish(
         &self,
-        _dna_hash: DnaHash,
-        _request_validation_receipt: bool,
-        _countersigning_session: bool,
-        _basis_hash: holo_hash::OpBasis,
+        dna_hash: DnaHash,
+        request_validation_receipt: bool,
+        countersigning_session: bool,
+        basis_hash: holo_hash::OpBasis,
         _source: AgentPubKey,
-        _op_hash_list: Vec<DhtOpHash>,
+        op_hash_list: Vec<DhtOpHash>,
         _timeout_ms: Option<u64>,
-        _reflect_ops: Option<Vec<DhtOp>>,
+        reflect_ops: Option<Vec<DhtOp>>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            tracing::error!("publish is currently a STUB in holochain_p2p--deferring since we'll eventually get stuff on gossip anyways...");
+            use crate::types::event::HcP2pHandler;
+
+            // This single function is/was a weird mix of a bunch of strange
+            // operations. We're trying to narrow it down now.
+            //
+            // - `reflect_ops` back to holochain
+            //   - TODO - remove this (fix anything it breaks)
+            // - actually publish `op_hash_list`
+            //   - This is the core functionality we want to keep here
+            // - send a notification to peers that we'd like validation receipts
+            //   - moving this to a separate call
+            // - i have no idea at all what the countersigning bool is for
+            //   - moving this to a separate call
+
+            // -- handle the bizzarre reflection thing -- //
+
+            if let Some(reflect_ops) = reflect_ops {
+                self.evt_sender
+                    .get()
+                    .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
+                    .handle_publish(
+                        dna_hash.clone(),
+                        request_validation_receipt,
+                        countersigning_session,
+                        reflect_ops,
+                    )
+                    .await?;
+            }
+
+            let space = dna_hash.to_k2_space();
+
+            let space = self.kitsune.space(space).await?;
+
+            // -- actually publish the op hashes -- //
+
+            let op_hash_list: Vec<OpId> = op_hash_list.into_iter().map(|h| h.to_k2_op()).collect();
+
+            let urls: std::collections::HashSet<Url> = space
+                .peer_store()
+                .get_near_location(basis_hash.get_loc(), usize::MAX)
+                .await?
+                .into_iter()
+                .filter_map(|info| {
+                    if info.is_tombstone {
+                        return None;
+                    }
+                    info.url.clone()
+                })
+                .collect();
+
+            for url in urls {
+                space
+                    .publish()
+                    .publish_ops(op_hash_list.clone(), url)
+                    .await?;
+            }
+
             Ok(())
         })
     }

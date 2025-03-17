@@ -203,9 +203,30 @@ impl Default for GetActivityOptions {
 
 /// Trait defining the main holochain_p2p interface.
 pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
+    /// Test access to underlying kitsune instance.
+    #[cfg(feature = "test_utils")]
+    fn test_kitsune(&self) -> &kitsune2_api::DynKitsune;
+
     /// Test utility to force local agents to report full storage arcs.
     #[cfg(feature = "test_utils")]
-    fn test_set_full_arcs(&self, space: kitsune2_api::SpaceId) -> BoxFut<'_, ()>;
+    fn test_set_full_arcs(&self, space: kitsune2_api::SpaceId) -> BoxFut<'_, ()> {
+        Box::pin(async {
+            for agent in self
+                .test_kitsune()
+                .space(space)
+                .await
+                .unwrap()
+                .local_agent_store()
+                .get_all()
+                .await
+                .unwrap()
+            {
+                agent.set_cur_storage_arc(kitsune2_api::DhtArc::FULL);
+                agent.set_tgt_storage_arc_hint(kitsune2_api::DhtArc::FULL);
+                agent.invoke_cb();
+            }
+        })
+    }
 
     /// Access the k2 peer store for a particular dna hash.
     fn peer_store(
