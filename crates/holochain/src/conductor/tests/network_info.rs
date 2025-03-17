@@ -20,7 +20,7 @@ async fn network_info() {
     let alice_app = &apps[0];
     let bob_app = &apps[1];
 
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
     // query since beginning of unix epoch
     let payload = NetworkInfoRequestPayload {

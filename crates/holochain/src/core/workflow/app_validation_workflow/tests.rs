@@ -696,7 +696,7 @@ async fn app_validation_workflow_test() {
     let alice_cell_id = alice.cell_id().clone();
     let bob_cell_id = bob.cell_id().clone();
 
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
     let expected_count = run_test(
         alice_cell_id.clone(),
@@ -793,7 +793,7 @@ async fn test_private_entries_are_passed_to_validation_only_when_authored_with_f
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
     let () = conductors[0]
         .call(&alice.zome("coordinator"), "create", ())
@@ -1156,7 +1156,7 @@ async fn app_validation_produces_warrants() {
     println!("1 bob   {}", bob.agent_pubkey());
     println!("2 carol {}", carol.agent_pubkey());
 
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
     await_consistency(10, [&alice, &bob, &carol]).await.unwrap();
 

@@ -22,6 +22,7 @@ use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
 use nanoid::nanoid;
 use rand::Rng;
+use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::sync::atomic::Ordering;
@@ -712,11 +713,17 @@ impl SweetConductor {
         }
     }
 
-    /*
-    /// Let each conductor know about each others' agents so they can do networking
-    pub async fn exchange_peer_info(conductors: impl Clone + IntoIterator<Item = &Self>) {
-        let mut all = Vec::new();
-        for c in conductors.into_iter() {
+    /// Let each conductor know about each other's agents so they can do networking.
+    ///
+    /// Returns a boolean indicating whether each space has at least one agent info for each conductor.
+    pub async fn exchange_peer_info(conductors: impl Clone + IntoIterator<Item = &Self>) -> bool {
+        // Combined peer info set across all conductors, separated by DNA hash (space)
+        let mut all = HashMap::<Arc<DnaHash>, HashSet<_>>::new();
+
+        let conductor_count = conductors.clone().into_iter().count();
+
+        // Collect all the agent infos across the spaces on these conductors.
+        for c in conductors.clone().into_iter() {
             if c.get_config().has_rendezvous_bootstrap() {
                 panic!(
                     "exchange_peer_info cannot reliably be used with rendezvous bootstrap servers"
@@ -732,13 +739,47 @@ impl SweetConductor {
                 // Ensure the space is created for DPKI so the agent db exists
                 c.spaces.get_or_create_space(dpki_dna_hash).unwrap();
             }
-            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                all.push(env.clone());
+            for dna_hash in c.spaces.get_from_spaces(|s| s.dna_hash.clone()) {
+                let agent_infos = c
+                    .holochain_p2p()
+                    .peer_store((*dna_hash).clone())
+                    .await
+                    .unwrap()
+                    .get_all()
+                    .await
+                    .unwrap();
+
+                match all.entry(dna_hash) {
+                    std::collections::hash_map::Entry::Vacant(e) => {
+                        e.insert(agent_infos.into_iter().collect());
+                    }
+                    std::collections::hash_map::Entry::Occupied(mut e) => {
+                        e.get_mut().extend(agent_infos);
+                    }
+                }
             }
         }
-        crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
+
+        // Insert the agent infos into each conductor's peer store
+        for c in conductors.into_iter() {
+            for dna_hash in c.spaces.get_from_spaces(|s| s.dna_hash.clone()) {
+                let inject_agent_infos = all.get(&dna_hash).unwrap().iter().cloned().collect();
+                tracing::info!("Injecting agent infos: {:?}", inject_agent_infos);
+                c.holochain_p2p()
+                    .peer_store((*dna_hash).clone())
+                    .await
+                    .unwrap()
+                    .insert(inject_agent_infos)
+                    .await
+                    .unwrap();
+            }
+        }
+
+        // Check that each space has at least one agent info for each conductor
+        all.iter().all(|(_, v)| v.len() >= conductor_count)
     }
 
+    /*
     /// Drop the specified agent keys from each conductor's peer table
     pub async fn forget_peer_info(
         conductors: impl IntoIterator<Item = &Self>,

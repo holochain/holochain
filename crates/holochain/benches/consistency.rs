@@ -157,7 +157,7 @@ async fn setup() -> (Producer, Consumer, Others) {
     let alice = cells.next().unwrap();
     let bobbo = cells.next().unwrap();
 
-    //conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
     let mut conductors = conductors.into_inner().into_iter();
     tx.send(0).await.unwrap();
 

@@ -303,7 +303,7 @@ async fn test_zero_arc_get_links() {
     let _ = conductor1.setup_app("app", [&dna_file]).await.unwrap();
     let (cell0,) = app0.into_tuple();
 
-    // conductors.exchange_peer_info().await;
+    conductors.exchange_peer_info().await;
 
     let zome0 = cell0.zome(tw);
     let _hash0: ActionHash = conductor0.call(&zome0, "create_link", ()).await;
