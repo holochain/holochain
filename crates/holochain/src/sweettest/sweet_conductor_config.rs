@@ -73,7 +73,7 @@ impl SweetConductorConfig {
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
         let network_config = NetworkConfig::default()
-            .with_gossip_initiate_interval_ms(500)
+            .with_gossip_initiate_interval_ms(1000)
             .with_gossip_min_initiate_interval_ms(1000)
             .with_gossip_round_timeout_ms(10_000);
 

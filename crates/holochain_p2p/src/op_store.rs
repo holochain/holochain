@@ -303,24 +303,21 @@ impl OpStore for HolochainOpStore {
         };
 
         Box::pin(async move {
-            db
-                .read_async(move |txn| -> StateMutationResult<Option<Timestamp>> {
-                    let mut stmt = txn.prepare(EARLIEST_TIMESTAMP)?;
+            db.read_async(move |txn| -> StateMutationResult<Option<Timestamp>> {
+                let mut stmt = txn.prepare(EARLIEST_TIMESTAMP)?;
 
-                    Ok(stmt
-                        .query_row(
-                            named_params! {
-                                ":storage_start_loc": arc_start,
-                                ":storage_end_loc": arc_end,
-                            },
-                            |row| row.get::<_, Option<i64>>(0),
-                        )?
-                        .map(Timestamp::from_micros))
-                })
-                .await
-                .map_err(|e| {
-                    K2Error::other_src("Failed to retrieve earliest timestamp in arc", e)
-                })
+                Ok(stmt
+                    .query_row(
+                        named_params! {
+                            ":storage_start_loc": arc_start,
+                            ":storage_end_loc": arc_end,
+                        },
+                        |row| row.get::<_, Option<i64>>(0),
+                    )?
+                    .map(Timestamp::from_micros))
+            })
+            .await
+            .map_err(|e| K2Error::other_src("Failed to retrieve earliest timestamp in arc", e))
         })
     }
 
