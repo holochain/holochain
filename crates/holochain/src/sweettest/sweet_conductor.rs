@@ -749,14 +749,7 @@ impl SweetConductor {
                     .await
                     .unwrap();
 
-                match all.entry(dna_hash) {
-                    std::collections::hash_map::Entry::Vacant(e) => {
-                        e.insert(agent_infos.into_iter().collect());
-                    }
-                    std::collections::hash_map::Entry::Occupied(mut e) => {
-                        e.get_mut().extend(agent_infos);
-                    }
-                }
+                all.entry(dna_hash).or_default().extend(agent_infos);
             }
         }
 
