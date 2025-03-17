@@ -252,6 +252,7 @@ impl ConductorBuilder {
                 let res = net_spaces2.dht_db(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
+            network_config: Some(config.network.to_k2_config()?),
             compat,
             ..Default::default()
         };
@@ -511,8 +512,9 @@ impl ConductorBuilder {
                 let res = net_spaces2.dht_db(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
             }),
-            k2_test_builder: true,
+            network_config: Some(config.network.to_k2_config()?),
             compat,
+            k2_test_builder: true,
         };
 
         let holochain_p2p =

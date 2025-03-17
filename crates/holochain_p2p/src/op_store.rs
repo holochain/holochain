@@ -5,7 +5,7 @@ use holochain_serialized_bytes::prelude::decode;
 use holochain_sqlite::db::{DbKindDht, DbWrite};
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_dht::{
-    OPS_BY_ID, OP_HASHES_IN_TIME_SLICE, OP_HASHES_SINCE_TIME_BATCH,
+    EARLIEST_TIMESTAMP, OPS_BY_ID, OP_HASHES_IN_TIME_SLICE, OP_HASHES_SINCE_TIME_BATCH,
 };
 use holochain_state::prelude::{named_params, StateMutationResult};
 use holochain_types::dht_op::DhtOpHashed;
@@ -292,6 +292,35 @@ impl OpStore for HolochainOpStore {
         })
     }
 
+    fn earliest_timestamp_in_arc(&self, arc: DhtArc) -> BoxFuture<'_, K2Result<Option<Timestamp>>> {
+        let db = self.db.clone();
+
+        let (arc_start, arc_end) = match arc {
+            DhtArc::Empty => {
+                return Box::pin(async move { Ok(None) });
+            }
+            DhtArc::Arc(start, end) => (start, end),
+        };
+
+        Box::pin(async move {
+            db.read_async(move |txn| -> StateMutationResult<Option<Timestamp>> {
+                let mut stmt = txn.prepare(EARLIEST_TIMESTAMP)?;
+
+                Ok(stmt
+                    .query_row(
+                        named_params! {
+                            ":storage_start_loc": arc_start,
+                            ":storage_end_loc": arc_end,
+                        },
+                        |row| row.get::<_, Option<i64>>(0),
+                    )?
+                    .map(Timestamp::from_micros))
+            })
+            .await
+            .map_err(|e| K2Error::other_src("Failed to retrieve earliest timestamp in arc", e))
+        })
+    }
+
     fn store_slice_hash(
         &self,
         arc: DhtArc,
@@ -345,7 +374,7 @@ impl OpStore for HolochainOpStore {
             let out = db
                 .read_async(move |txn| -> StateMutationResult<u64> {
                     let mut stmt = txn.prepare(
-                        r#"SELECT MAX(slice_index) FROM SliceHash
+                        r#"SELECT COALESCE(MAX(slice_index),0) FROM SliceHash
                     WHERE arc_start = :arc_start AND arc_end = :arc_end"#,
                     )?;
 

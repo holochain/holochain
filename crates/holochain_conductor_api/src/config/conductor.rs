@@ -230,6 +230,151 @@ impl Default for NetworkConfig {
     }
 }
 
+impl NetworkConfig {
+    /// Set the gossip interval.
+    #[cfg(feature = "test-utils")]
+    pub fn with_gossip_initiate_interval_ms(mut self, initiate_interval_ms: u32) -> Self {
+        self.insert_into_config(|module_config| {
+            Self::insert_module_config(
+                module_config,
+                "k2Gossip",
+                "initiateIntervalMs",
+                serde_json::Value::Number(serde_json::Number::from(initiate_interval_ms)),
+            )?;
+
+            Ok(())
+        })
+        .unwrap();
+
+        self
+    }
+
+    /// Set the gossip min initiate interval.
+    #[cfg(feature = "test-utils")]
+    pub fn with_gossip_min_initiate_interval_ms(mut self, min_initiate_interval_ms: u32) -> Self {
+        self.insert_into_config(|module_config| {
+            Self::insert_module_config(
+                module_config,
+                "k2Gossip",
+                "minInitiateIntervalMs",
+                serde_json::Value::Number(serde_json::Number::from(min_initiate_interval_ms)),
+            )?;
+
+            Ok(())
+        })
+        .unwrap();
+
+        self
+    }
+
+    /// Set the gossip round timeout.
+    #[cfg(feature = "test-utils")]
+    pub fn with_gossip_round_timeout_ms(mut self, round_timeout_ms: u32) -> Self {
+        self.insert_into_config(|module_config| {
+            Self::insert_module_config(
+                module_config,
+                "k2Gossip",
+                "roundTimeoutMs",
+                serde_json::Value::Number(serde_json::Number::from(round_timeout_ms)),
+            )?;
+
+            Ok(())
+        })
+        .unwrap();
+
+        self
+    }
+
+    /// Convert the network config to a K2 config object.
+    ///
+    /// Values that are set directly on the network config are merged into the [`NetworkConfig::advanced`] field.
+    pub fn to_k2_config(&self) -> ConductorConfigResult<serde_json::Value> {
+        let mut working = self
+            .advanced
+            .clone()
+            .unwrap_or_else(|| serde_json::Value::Object(Default::default()));
+
+        if let Some(module_config) = working.as_object_mut() {
+            Self::insert_module_config(
+                module_config,
+                "coreBootstrap",
+                "serverUrl",
+                serde_json::Value::String(self.bootstrap_url.as_str().into()),
+            )?;
+
+            Self::insert_module_config(
+                module_config,
+                "tx5Transport",
+                "serverUrl",
+                serde_json::Value::String(self.signal_url.as_str().into()),
+            )?;
+
+            // TODO nowhere to put the webrtc config in K2 yet!
+        } else {
+            return Err(ConductorConfigError::InvalidNetworkConfig(
+                "advanced field must be an object".to_string(),
+            ));
+        }
+
+        Ok(working)
+    }
+
+    fn insert_into_config(
+        &mut self,
+        mutator: impl Fn(&mut serde_json::Map<String, serde_json::Value>) -> ConductorConfigResult<()>,
+    ) -> ConductorConfigResult<()> {
+        if self.advanced.is_none() {
+            self.advanced = Some(serde_json::Value::Object(Default::default()));
+        }
+
+        if let Some(module_config) = self
+            .advanced
+            .as_mut()
+            .expect("Just checked")
+            .as_object_mut()
+        {
+            mutator(module_config)?;
+        }
+
+        Ok(())
+    }
+
+    // Helper function for injecting a key-value pair into a module's configuration
+    fn insert_module_config(
+        module_config: &mut serde_json::Map<String, serde_json::Value>,
+        module: &str,
+        key: &str,
+        value: serde_json::Value,
+    ) -> ConductorConfigResult<()> {
+        if let Some(module_config) = module_config.get_mut(module) {
+            if let Some(module_config) = module_config.as_object_mut() {
+                if module_config.contains_key(key) {
+                    tracing::warn!("The {} module configuration contains a '{}' field, which is being overwritten", module, key);
+                }
+
+                // The config for this module exists and is an object, insert the key-value pair
+                module_config.insert(key.into(), value);
+            } else {
+                // The configuration for this module exists, but isn't an object
+                return Err(ConductorConfigError::InvalidNetworkConfig(format!(
+                    "advanced.{} field must be an object",
+                    module
+                )));
+            }
+        } else {
+            // The config for this module isn't set at all, so we need to insert it
+            module_config.insert(
+                module.into(),
+                serde_json::json!({
+                    key: value,
+                }),
+            );
+        }
+
+        Ok(())
+    }
+}
+
 /// Tuning parameters to adjust the behaviour of the conductor.
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, JsonSchema)]
 pub struct ConductorTuningParams {
@@ -549,5 +694,127 @@ mod tests {
                 tracing_scope: None,
             }
         );
+    }
+
+    #[test]
+    fn default_network_config_accepted_by_k2() {
+        let network_config = NetworkConfig::default();
+        let k2_config = network_config.to_k2_config().unwrap();
+
+        let builder = kitsune2_core::default_test_builder()
+            .with_default_config()
+            .unwrap();
+        builder.config.set_module_config(&k2_config).unwrap();
+        builder.validate_config().unwrap();
+    }
+
+    #[test]
+    fn network_config_preserves_advanced_overrides() {
+        let network_config = NetworkConfig {
+            advanced: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "backoffMinMs": "3500",
+                },
+                "tx5Transport": {
+                    "timeoutS": "10",
+                },
+                "coreSpace": {
+                    "reSignFreqMs": "1000",
+                }
+            })),
+            ..Default::default()
+        };
+
+        let k2_config = network_config.to_k2_config().unwrap();
+
+        let builder = kitsune2_core::default_test_builder()
+            .with_default_config()
+            .unwrap();
+        builder.config.set_module_config(&k2_config).unwrap();
+        builder.validate_config().unwrap();
+        assert_eq!(
+            k2_config,
+            serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://devtest-bootstrap-1.holochain.org/",
+                    "backoffMinMs": "3500",
+                },
+                "tx5Transport": {
+                    "serverUrl": "wss://devtest-sbd-1.holochain.org/",
+                    "timeoutS": "10",
+                },
+                "coreSpace": {
+                    "reSignFreqMs": "1000",
+                }
+            })
+        )
+    }
+
+    #[test]
+    fn network_config_overrides_conflicting_advanced_fields() {
+        let network_config = NetworkConfig {
+            advanced: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://something-else.net",
+                },
+                "tx5Transport": {
+                    "serverUrl": "wss://sbd.nowhere.net",
+                },
+            })),
+            ..Default::default()
+        };
+
+        let k2_config = network_config.to_k2_config().unwrap();
+
+        let builder = kitsune2_core::default_test_builder()
+            .with_default_config()
+            .unwrap();
+        builder.config.set_module_config(&k2_config).unwrap();
+        builder.validate_config().unwrap();
+
+        assert_eq!(
+            k2_config,
+            serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://devtest-bootstrap-1.holochain.org/",
+                },
+                "tx5Transport": {
+                    "serverUrl": "wss://devtest-sbd-1.holochain.org/",
+                },
+            })
+        )
+    }
+
+    #[test]
+    fn tune_kitsune_params_for_testing() {
+        let network_config = NetworkConfig::default()
+            .with_gossip_round_timeout_ms(100)
+            .with_gossip_initiate_interval_ms(200)
+            .with_gossip_min_initiate_interval_ms(300);
+
+        let k2_config = network_config.to_k2_config().unwrap();
+
+        let builder = kitsune2_core::default_test_builder()
+            .with_default_config()
+            .unwrap();
+        builder.config.set_module_config(&k2_config).unwrap();
+        builder.validate_config().unwrap();
+
+        assert_eq!(
+            k2_config,
+            serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://devtest-bootstrap-1.holochain.org/",
+                },
+                "tx5Transport": {
+                    "serverUrl": "wss://devtest-sbd-1.holochain.org/",
+                },
+                "k2Gossip": {
+                    "roundTimeoutMs": 100,
+                    "initiateIntervalMs": 200,
+                    "minInitiateIntervalMs": 300,
+                }
+            })
+        )
     }
 }

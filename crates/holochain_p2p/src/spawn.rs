@@ -36,14 +36,19 @@ pub struct HolochainP2pConfig {
     /// Callback function to retrieve a peer meta database handle for a dna hash.
     pub get_db_peer_meta: GetDbPeerMeta,
 
-    /// Callback function to retrieve a op store database handle for a dna hash.
+    /// Callback function to retrieve an op store database handle for a dna hash.
     pub get_db_op_store: GetDbOpStore,
 
-    /// If true, will use kitsune core test bootstrap / transport / etc.
-    pub k2_test_builder: bool,
+    /// Configuration to pass to Kitsune2.
+    ///
+    /// This should contain module configurations such as [CoreBootstrapModConfig](kitsune2_core::factories::CoreBootstrapModConfig).
+    pub network_config: Option<serde_json::Value>,
 
     /// The compat params to use.
     pub compat: NetworkCompatParams,
+
+    /// If true, will use kitsune core test bootstrap / transport / etc.
+    pub k2_test_builder: bool,
 }
 
 impl std::fmt::Debug for HolochainP2pConfig {
@@ -60,8 +65,9 @@ impl Default for HolochainP2pConfig {
         Self {
             get_db_peer_meta: Arc::new(|_| unimplemented!()),
             get_db_op_store: Arc::new(|_| unimplemented!()),
-            k2_test_builder: false,
+            network_config: None,
             compat: Default::default(),
+            k2_test_builder: false,
         }
     }
 }
@@ -69,7 +75,7 @@ impl Default for HolochainP2pConfig {
 /// See [NetworkCompatParams::proto_ver].
 pub const HCP2P_PROTO_VER: u32 = 2;
 
-/// Some parameters used as part of a protocol compability check during tx5 preflight
+/// Some parameters used as part of a protocol compatibility check during tx5 preflight
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NetworkCompatParams {
     /// The current protocol version. This should be incremented whenever

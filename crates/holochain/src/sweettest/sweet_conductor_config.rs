@@ -72,15 +72,12 @@ impl SweetConductorConfig {
 
     /// Standard config for SweetConductors
     pub fn standard() -> Self {
-        /* TODO plumb these into kitsune2 somehow
-            .tune(|tune| {
-                tune.gossip_loop_iteration_delay_ms = 500;
-                tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
-                tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
-                tune.gossip_round_timeout_ms = 10_000;
-            })
-        */
-        let mut c = SweetConductorConfig::from(NetworkConfig::default()).tune_conductor(|tune| {
+        let network_config = NetworkConfig::default()
+            .with_gossip_initiate_interval_ms(1000)
+            .with_gossip_min_initiate_interval_ms(1000)
+            .with_gossip_round_timeout_ms(10_000);
+
+        let mut c = SweetConductorConfig::from(network_config).tune_conductor(|tune| {
             tune.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
         });
 
