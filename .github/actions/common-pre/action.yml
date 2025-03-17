@@ -20,6 +20,11 @@ runs:
         sudo rm -rf "/usr/local/share/boost"
         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
+    - name: go toolchain
+      uses: actions/setup-go@v5
+      with:
+        go-version: '=1.20.0'
+
     - name: rust cache
       uses: Swatinem/rust-cache@v2
 
