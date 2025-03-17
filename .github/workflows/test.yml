@@ -74,6 +74,12 @@ jobs:
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
+      - name: Set up Clang
+        uses: egor-tensin/setup-clang@v1
+        with:
+          version: latest
+          platform: x64
+
       - name: install build dependencies (macos-latest, wasmer_wamr)
         if: matrix.os == 'macos-latest' && matrix.target == 'wasmer_wamr'
         shell: bash
