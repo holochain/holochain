@@ -116,7 +116,7 @@ impl Conductor {
         if self.running_cell_ids().contains(&cell_id) {
             holochain_state::integrate::authored_ops_to_dht_db(
                 network
-                    .storage_arcs()
+                    .target_arcs()
                     .await
                     .map_err(ConductorApiError::other)?,
                 ops_to_integrate,

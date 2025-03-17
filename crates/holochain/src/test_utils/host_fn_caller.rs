@@ -287,7 +287,7 @@ impl HostFnCaller {
         workspace
             .source_chain()
             .flush(
-                self.network.storage_arcs().await.unwrap(),
+                self.network.target_arcs().await.unwrap(),
                 self.network.chc(),
             )
             .await
@@ -311,7 +311,7 @@ impl HostFnCaller {
         workspace
             .source_chain()
             .flush(
-                self.network.storage_arcs().await.unwrap(),
+                self.network.target_arcs().await.unwrap(),
                 self.network.chc(),
             )
             .await
@@ -338,7 +338,7 @@ impl HostFnCaller {
         workspace
             .source_chain()
             .flush(
-                self.network.storage_arcs().await.unwrap(),
+                self.network.target_arcs().await.unwrap(),
                 self.network.chc(),
             )
             .await
@@ -386,7 +386,7 @@ impl HostFnCaller {
         workspace
             .source_chain()
             .flush(
-                self.network.storage_arcs().await.unwrap(),
+                self.network.target_arcs().await.unwrap(),
                 self.network.chc(),
             )
             .await
@@ -410,7 +410,7 @@ impl HostFnCaller {
         workspace
             .source_chain()
             .flush(
-                self.network.storage_arcs().await.unwrap(),
+                self.network.target_arcs().await.unwrap(),
                 self.network.chc(),
             )
             .await
@@ -443,7 +443,7 @@ impl HostFnCaller {
         workspace
             .source_chain()
             .flush(
-                self.network.storage_arcs().await.unwrap(),
+                self.network.target_arcs().await.unwrap(),
                 self.network.chc(),
             )
             .await
@@ -476,7 +476,7 @@ impl HostFnCaller {
         workspace
             .source_chain()
             .flush(
-                self.network.storage_arcs().await.unwrap(),
+                self.network.target_arcs().await.unwrap(),
                 self.network.chc(),
             )
             .await
@@ -511,7 +511,7 @@ impl HostFnCaller {
         workspace
             .source_chain()
             .flush(
-                self.network.storage_arcs().await.unwrap(),
+                self.network.target_arcs().await.unwrap(),
                 self.network.chc(),
             )
             .await

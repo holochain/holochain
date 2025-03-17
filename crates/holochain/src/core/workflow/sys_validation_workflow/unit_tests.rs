@@ -51,7 +51,7 @@ async fn validate_op_with_no_dependency() {
     {
         let mut network = MockHolochainP2pDnaT::default();
         network
-            .expect_storage_arcs()
+            .expect_target_arcs()
             .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
         test_case.actual_network = Some(network);
     }
@@ -123,7 +123,7 @@ async fn validate_op_with_dependency_held_in_cache() {
     {
         let mut network = MockHolochainP2pDnaT::default();
         network
-            .expect_storage_arcs()
+            .expect_target_arcs()
             .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
         test_case.with_network_behaviour(network);
     }
@@ -182,14 +182,14 @@ async fn validate_op_with_dependency_not_held() {
         .return_once(move |_, _| Ok(vec![response]));
 
     network
-        .expect_storage_arcs()
+        .expect_target_arcs()
         .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
 
     test_case.with_network_behaviour(network).run().await;
 
     let mut network = MockHolochainP2pDnaT::default();
     network
-        .expect_storage_arcs()
+        .expect_target_arcs()
         .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
 
     test_case.with_network_behaviour(network).run().await;
@@ -246,7 +246,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
 
     #[cfg(feature = "unstable-warrants")]
     network
-        .expect_storage_arcs()
+        .expect_target_arcs()
         .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
 
     test_case.with_network_behaviour(network).run().await;
@@ -263,7 +263,7 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
 
     let mut network = MockHolochainP2pDnaT::new();
     network
-        .expect_storage_arcs()
+        .expect_target_arcs()
         .return_once(move || Ok(vec![kitsune2_api::DhtArc::FULL]));
 
     let mut test_case = TestCase::new().await;

@@ -377,8 +377,8 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     /// Dump network stats.
     fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<String>>;
 
-    /// Get the storage arcs of the agents currently in this space.
-    fn storage_arcs(
+    /// Get the target arcs of the agents currently in this space.
+    fn target_arcs(
         &self,
         dna_hash: DnaHash,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<kitsune2_api::DhtArc>>>;

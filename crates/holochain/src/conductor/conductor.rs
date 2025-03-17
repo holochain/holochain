@@ -2932,7 +2932,7 @@ mod misc_impls {
             source_chain
                 .flush(
                     cell.holochain_p2p_dna()
-                        .storage_arcs()
+                        .target_arcs()
                         .await
                         .map_err(ConductorApiError::other)?,
                     cell.holochain_p2p_dna().chc(),

@@ -310,7 +310,7 @@ mod single_conductor {
             conductor.get_chc(&cell_id_1),
         );
         source_chain_1
-            .flush(network.storage_arcs().await.unwrap(), network.chc())
+            .flush(network.target_arcs().await.unwrap(), network.chc())
             .await
             .unwrap();
 
@@ -408,7 +408,7 @@ mod single_conductor {
             conductor.get_chc(&cell_id_1),
         );
         source_chain_1
-            .flush(network.storage_arcs().await.unwrap(), network.chc())
+            .flush(network.target_arcs().await.unwrap(), network.chc())
             .await
             .unwrap();
 
@@ -981,7 +981,7 @@ async fn delete_agent_key_from_source_chain(
         conductor.get_chc(cell_id),
     );
     source_chain
-        .flush(network.storage_arcs().await.unwrap(), network.chc())
+        .flush(network.target_arcs().await.unwrap(), network.chc())
         .await
         .unwrap();
     conductor
