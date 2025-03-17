@@ -751,7 +751,7 @@ mod tests {
     }
 
     #[test]
-    fn network_config_overrides_extracted_fields() {
+    fn network_config_overrides_conflicting_advanced_fields() {
         let network_config = NetworkConfig {
             advanced: Some(serde_json::json!({
                 "coreBootstrap": {
