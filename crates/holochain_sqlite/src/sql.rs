@@ -74,6 +74,8 @@ pub mod sql_dht {
         include_str!("sql/dht/op_hashes_since_time_batch.sql");
 
     pub const OPS_BY_ID: &str = include_str!("sql/dht/ops_by_id.sql");
+
+    pub const EARLIEST_TIMESTAMP: &str = include_str!("sql/dht/earliest_timestamp.sql");
 }
 
 pub mod sql_conductor {

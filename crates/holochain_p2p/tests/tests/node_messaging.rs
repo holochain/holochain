@@ -1,6 +1,7 @@
 use holochain_keystore::*;
 use holochain_p2p::event::*;
 use holochain_p2p::*;
+use holochain_trace::test_run;
 use holochain_types::prelude::*;
 use kitsune2_api::*;
 use std::sync::{Arc, Mutex};
@@ -655,6 +656,8 @@ async fn test_validation_receipts() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_authority_for_hash() {
+    test_run();
+
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
