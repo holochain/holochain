@@ -297,6 +297,8 @@ async fn test_publish() {
             let op = test_dht_op(holochain_types::prelude::Timestamp::now());
             let op_hash = op.as_hash().clone();
 
+            // TODO invoking process_incoming_ops is a hack,
+            //      prefer calling a function on the mem store directly.
             hc2.test_kitsune()
                 .space(dna_hash.to_k2_space())
                 .await
