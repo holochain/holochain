@@ -15,8 +15,8 @@ struct StubNetwork;
 #[allow(unused_variables)]
 impl HcP2p for StubNetwork {
     #[cfg(feature = "test_utils")]
-    fn test_set_full_arcs(&self, _space: kitsune2_api::SpaceId) -> BoxFut<'_, ()> {
-        Box::pin(async {})
+    fn test_kitsune(&self) -> &kitsune2_api::DynKitsune {
+        unimplemented!()
     }
 
     fn peer_store(
