@@ -44,9 +44,3 @@ runs:
         token: ${{ github.token }}
         manifest-dir: ${{ github.workspace }}/.github/manifest
         github-binarycache: true
-
-    - name: Tweak Perl (Windows)
-      if: matrix.os == 'windows-latest'
-      shell: pwsh
-      run: |
-        cpan install Locale::Maketext::Simple
