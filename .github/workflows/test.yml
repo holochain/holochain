@@ -83,8 +83,6 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |-
           cargo clean
-#          $env:OPENSSL_NO_VENDOR="1"
-#          $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
           make build-workspace-${{ matrix.target }}
 
@@ -95,8 +93,6 @@ jobs:
       - name: test (windows-latest)
         if: matrix.os == 'windows-latest'
         run: |-
-#          $env:OPENSSL_NO_VENDOR="1"
-#          $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
           make test-workspace-${{ matrix.target }}
 
