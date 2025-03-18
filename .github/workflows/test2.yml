@@ -15,4 +15,4 @@ jobs:
           perl --version
           cmake --version
           
-          cargo build
+          make build-workspace-wasmer_sys
