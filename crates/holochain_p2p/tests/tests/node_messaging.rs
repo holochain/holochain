@@ -141,7 +141,7 @@ impl HcP2pHandler for Handler {
         })
     }
 
-    fn handle_validation_receipt(
+    fn handle_validation_receipts(
         &self,
         _dna_hash: DnaHash,
         _dht_op_list: Vec<DhtOpHash>,
@@ -644,7 +644,11 @@ async fn test_validation_receipts() {
             if hc2
                 .get_validation_receipts(
                     dna_hash.clone(),
-                    DhtOpHash::from_raw_36(vec![0xdb; 36]),
+                    HoloHash::from_raw_36_and_type(
+                        vec![0xdb; 36],
+                        holo_hash::hash_type::AnyLinkable::Entry,
+                    ),
+                    vec![DhtOpHash::from_raw_36(vec![0xdb; 36])],
                     Vec::new(),
                     usize::MAX,
                 )

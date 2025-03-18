@@ -37,16 +37,20 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
     tracing::instrument(skip(db, network, trigger_self, min_publish_interval))
 )]
 pub async fn publish_dht_ops_workflow(
-    db: DbWrite<DbKindAuthored>,
+    authored_db: DbWrite<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
     network: Arc<impl HolochainP2pDnaT>,
     trigger_self: TriggerSender,
     agent: AgentPubKey,
     min_publish_interval: Duration,
 ) -> WorkflowResult<WorkComplete> {
     let mut complete = WorkComplete::Complete;
-    let to_publish =
-        publish_dht_ops_workflow_inner(db.clone().into(), agent.clone(), min_publish_interval)
-            .await?;
+    let to_publish = publish_dht_ops_workflow_inner(
+        authored_db.clone().into(),
+        agent.clone(),
+        min_publish_interval,
+    )
+    .await?;
     let to_publish_count: usize = to_publish.values().map(Vec::len).sum();
 
     if to_publish_count > 0 {
@@ -57,11 +61,14 @@ pub async fn publish_dht_ops_workflow(
     let mut success = Vec::with_capacity(to_publish.len());
     for (basis, list) in to_publish {
         let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
+
+        // first notify peers that there is an op hash,
+        // if they don't already have it, they will download the op data.
         match network
             .publish(
                 true,
                 false,
-                basis,
+                basis.clone(),
                 agent.clone(),
                 op_hash_list.clone(),
                 None,
@@ -78,7 +85,86 @@ pub async fn publish_dht_ops_workflow(
                 warn!(failed_to_send_publish = ?e);
             }
             Ok(()) => {
-                success.extend(op_hash_list);
+                success.extend(op_hash_list.clone());
+            }
+        }
+
+        // next, maybe we just don't know they already have it,
+        // so let's try to get validation receipts from them.
+        // TODO - we don't currently track the agents that generated the
+        //        receipts in our database, so we can't make use of the
+        //        exclude list, so we may get duplicate receipts.
+        if let Ok(bundle) = network
+            .get_validation_receipts(
+                basis,
+                op_hash_list.clone(),
+                Vec::new(), // exclude list
+                DEFAULT_RECEIPT_BUNDLE_SIZE as usize,
+            )
+            .await
+        {
+            for receipt in bundle.into_iter() {
+                /* ... yeah... no idea how to get this from within a workflow
+
+                // Get the action for this op so we can check the entry type.
+                let hash = receipt.receipt.dht_op_hash.clone();
+                let action: Option<SignedAction> = authored_db
+                    .read_async(move |txn| {
+                        let h: Option<Vec<u8>> = txn
+                            .query_row(
+                                "SELECT Action.blob as action_blob
+                    FROM DhtOp
+                    JOIN Action ON Action.hash = DhtOp.action_hash
+                    WHERE DhtOp.hash = :hash",
+                                named_params! {
+                                    ":hash": hash,
+                                },
+                                |row| row.get("action_blob"),
+                            )
+                            .optional()?;
+                        match h {
+                            Some(h) => from_blob(h),
+                            None => Ok(None),
+                        }
+                    })
+                    .await?;
+
+                // If the action has an app entry type get the entry def
+                // from the conductor.
+                let required_receipt_count = match action.as_ref().and_then(|h| h.entry_type()) {
+                    Some(EntryType::App(AppEntryDef {
+                        zome_index,
+                        entry_index,
+                        ..
+                    })) => {
+                        let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
+                        let zome = ribosome.get_integrity_zome(zome_index);
+                        match zome {
+                            Some(zome) => self
+                                .conductor_api
+                                .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *entry_index))
+                                .map(|e| u8::from(e.required_validations)),
+                            None => None,
+                        }
+                    }
+                    _ => None,
+                };
+
+                // If no required receipt count was found then fallback to the default.
+                let required_validation_count = required_receipt_count
+                    .unwrap_or(crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE);
+                */
+
+                if let Err(err) = process_validation_receipt(
+                    authored_db.clone(),
+                    dht_db.clone(),
+                    receipt,
+                    crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
+                )
+                .await
+                {
+                    debug!(?err, "error processing validation receipt");
+                }
             }
         }
     }
@@ -88,7 +174,7 @@ pub async fn publish_dht_ops_workflow(
     }
 
     let now = time::SystemTime::now().duration_since(time::UNIX_EPOCH)?;
-    let continue_publish = db
+    let continue_publish = authored_db
         .write_async(move |txn| {
             for hash in success {
                 set_last_publish_time(txn, &hash, now)?;
@@ -113,14 +199,16 @@ pub async fn publish_dht_ops_workflow(
 
 /// Read the authored for ops with receipt count < R
 pub async fn publish_dht_ops_workflow_inner(
-    db: DbRead<DbKindAuthored>,
+    authored_db: DbRead<DbKindAuthored>,
     agent: AgentPubKey,
     min_publish_interval: Duration,
 ) -> WorkflowResult<HashMap<OpBasis, Vec<(DhtOpHash, crate::prelude::DhtOp)>>> {
     // Ops to publish by basis
     let mut to_publish = HashMap::new();
 
-    for (basis, op_hash, op) in get_ops_to_publish(agent, &db, min_publish_interval).await? {
+    for (basis, op_hash, op) in
+        get_ops_to_publish(agent, &authored_db, min_publish_interval).await?
+    {
         // For every op publish a request
         // Collect and sort ops by basis
         to_publish
@@ -130,6 +218,60 @@ pub async fn publish_dht_ops_workflow_inner(
     }
 
     Ok(to_publish)
+}
+
+async fn process_validation_receipt(
+    authored_db: DbWrite<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
+    receipt: SignedValidationReceipt,
+    required_validation_count: u8,
+) -> WorkflowResult<()> {
+    debug!(from = ?receipt.receipt.validators, hash = ?receipt.receipt.dht_op_hash);
+
+    let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
+
+    let receipt_count = dht_db
+        .write_async({
+            let receipt_op_hash = receipt_op_hash.clone();
+            move |txn| -> StateMutationResult<usize> {
+                // Add the new receipts to the db
+                add_if_unique(txn, receipt)?;
+
+                // Get the current count for this DhtOp.
+                let receipt_count: usize = txn.query_row(
+                    "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
+                    named_params! {
+                        ":op_hash": receipt_op_hash,
+                    },
+                    |row| row.get(0),
+                )?;
+
+                if receipt_count >= required_validation_count as usize {
+                    // If we have enough receipts then set receipts to complete.
+                    //
+                    // Don't fail here if this doesn't work, it's only informational. Getting
+                    // the same flag set in the authored db is what will stop the publish
+                    // workflow from republishing this op.
+                    set_receipts_complete_redundantly_in_dht_db(txn, &receipt_op_hash, true).ok();
+                }
+
+                Ok(receipt_count)
+            }
+        })
+        .await?;
+
+    // If we have enough receipts then set receipts to complete.
+    if receipt_count >= required_validation_count as usize {
+        // Note that the flag is set in the authored db because that's what the publish workflow checks to decide
+        // whether to republish the op for more validation receipts.
+        authored_db
+            .write_async(move |txn| -> StateMutationResult<()> {
+                set_receipts_complete(txn, &receipt_op_hash, true)
+            })
+            .await?;
+    }
+
+    Ok(())
 }
 
 /* @ K2-INTEGRATION @ TODO @

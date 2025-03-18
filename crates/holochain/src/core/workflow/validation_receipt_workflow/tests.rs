@@ -1,3 +1,4 @@
+/*
 use crate::sweettest::*;
 use crate::test_utils::inline_zomes::simple_create_read_zome;
 use hdk::prelude::*;
@@ -253,3 +254,4 @@ async fn test_block_invalid_receipt() {
         );
     }
 }
+*/

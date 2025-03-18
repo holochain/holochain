@@ -349,7 +349,8 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     fn get_validation_receipts(
         &self,
         dna_hash: DnaHash,
-        dht_op: DhtOpHash,
+        basis_hash: holo_hash::OpBasis,
+        op_hash_list: Vec<DhtOpHash>,
         exclude_list: Vec<AgentPubKey>,
         limit: usize,
     ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>>;

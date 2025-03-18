@@ -1,19 +1,19 @@
 use futures::future::BoxFuture;
-use futures::{stream, StreamExt};
-use itertools::Itertools;
+//use futures::{stream, StreamExt};
+//use itertools::Itertools;
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_state::prelude::*;
-use tracing::*;
+//use tracing::*;
 
 use super::error::WorkflowResult;
 use crate::core::queue_consumer::WorkComplete;
 use holochain_zome_types::block::Block;
-use holochain_zome_types::block::BlockTarget;
-use holochain_zome_types::block::CellBlockReason;
+//use holochain_zome_types::block::BlockTarget;
+//use holochain_zome_types::block::CellBlockReason;
 
 #[cfg(test)]
 mod tests;
@@ -27,16 +27,19 @@ mod unit_tests;
 )]
 /// Send validation receipts to their authors in serial and without waiting for responses.
 pub async fn validation_receipt_workflow<B>(
-    dna_hash: Arc<DnaHash>,
-    vault: DbWrite<DbKindDht>,
-    network: impl HolochainP2pDnaT,
-    keystore: MetaLairClient,
-    running_cell_ids: HashSet<CellId>,
-    apply_block: B,
+    _dna_hash: Arc<DnaHash>,
+    _vault: DbWrite<DbKindDht>,
+    _network: impl HolochainP2pDnaT,
+    _keystore: MetaLairClient,
+    _running_cell_ids: HashSet<CellId>,
+    _apply_block: B,
 ) -> WorkflowResult<WorkComplete>
 where
     B: Fn(Block) -> BoxFuture<'static, DatabaseResult<()>> + Clone,
 {
+    Ok(WorkComplete::Complete)
+
+    /*
     if running_cell_ids.is_empty() {
         return Ok(WorkComplete::Complete);
     }
@@ -102,8 +105,10 @@ where
     }
 
     Ok(WorkComplete::Complete)
+    */
 }
 
+/*
 /// Perform the signing and sending of
 /// Requires that the receipts to send are all by the same author.
 async fn sign_and_send_receipts_to_author<B>(
@@ -176,6 +181,7 @@ where
         );
     }
 
+    /*
     // Send it and don't wait for response.
     if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipts(
         network,
@@ -187,6 +193,7 @@ where
         // No one home, they will need to publish again.
         info!(failed_send_receipt = ?e);
     }
+    */
 
     Ok(())
 }
@@ -200,3 +207,4 @@ async fn pending_receipts(
         .read_async(move |txn| get_pending_validation_receipts(txn, validators))
         .await
 }
+*/

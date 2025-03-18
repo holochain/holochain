@@ -172,14 +172,14 @@ impl event::HcP2pHandler for WrapEvtSender {
         )
     }
 
-    fn handle_validation_receipt(
+    fn handle_validation_receipts(
         &self,
         dna_hash: DnaHash,
         dht_op_list: Vec<DhtOpHash>,
     ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>> {
         timing_trace!(
             false,
-            { self.0.handle_validation_receipt(dna_hash, dht_op_list) },
+            { self.0.handle_validation_receipts(dna_hash, dht_op_list) },
             a = "recv_validation_receipt",
         )
     }
@@ -495,7 +495,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         let resp = match evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
-                            .handle_validation_receipt(dna_hash, dht_op_list)
+                            .handle_validation_receipts(dna_hash, dht_op_list)
                             .await
                         {
                             Ok(receipts) => ValidationReceiptRes { msg_id, receipts },
@@ -1453,7 +1453,8 @@ impl actor::HcP2p for HolochainP2pActor {
     fn get_validation_receipts(
         &self,
         dna_hash: DnaHash,
-        dht_op: DhtOpHash,
+        basis_hash: holo_hash::OpBasis,
+        op_hash_list: Vec<DhtOpHash>,
         exclude_list: Vec<AgentPubKey>,
         limit: usize,
     ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>> {
@@ -1464,7 +1465,7 @@ impl actor::HcP2p for HolochainP2pActor {
             let space = self.kitsune.space(space).await?;
             let urls: std::collections::HashSet<Url> = space
                 .peer_store()
-                .get_near_location(dht_op.get_loc(), usize::MAX)
+                .get_near_location(basis_hash.get_loc(), usize::MAX)
                 .await?
                 .into_iter()
                 .filter_map(|info| {
@@ -1486,7 +1487,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             for url in urls.into_iter().take(limit) {
                 let (msg_id, req) =
-                    crate::wire::WireMessage::validation_receipt_req(vec![dht_op.clone()]);
+                    crate::wire::WireMessage::validation_receipt_req(op_hash_list.clone());
                 let req = crate::wire::WireMessage::encode_batch(&[&req])?;
                 let (s, r) = tokio::sync::oneshot::channel();
                 recv.push(r);

@@ -100,6 +100,7 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_publish = spawn_publish_dht_ops_consumer(
         cell_id.clone(),
         authored_db.clone(),
+        dht_db.clone(),
         conductor.clone(),
         network.clone(),
     );

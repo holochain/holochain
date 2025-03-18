@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use futures::future::FutureExt;
 use holochain_serialized_bytes::SerializedBytes;
-use rusqlite::OptionalExtension;
+//use rusqlite::OptionalExtension;
 use tokio::sync::broadcast;
 use tracing::*;
 use tracing_futures::Instrument;
@@ -748,16 +748,17 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         })
     }
 
-    fn handle_want_validation_receipts(
+    fn handle_validation_receipts(
         &self,
         _dna_hash: DnaHash,
         _dht_op_list: Vec<DhtOpHash>,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+    ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>> {
         Box::pin(async move {
             unreachable!("This function is handled at the conductor level, not the cell level")
         })
     }
 
+    /*
     /// A remote agent is sending us a validation receipt bundle.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, receipts)))]
     fn handle_validation_receipts_received(
@@ -879,6 +880,7 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
 
         Box::pin(async move { fut.await.map_err(HolochainP2pError::other) })
     }
+    */
 
     #[cfg_attr(
         feature = "instrument",

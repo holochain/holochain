@@ -29,7 +29,6 @@ pub use activity_test_data::*;
 pub use entry_test_data::*;
 use holochain_p2p::HolochainP2pResult;
 use holochain_types::test_utils::ActionRefMut;
-use holochain_types::validation_receipt::ValidationReceiptBundle;
 pub use record_test_data::*;
 
 mod activity_test_data;
@@ -173,6 +172,16 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         Ok(out)
     }
 
+    async fn get_validation_receipts(
+        &self,
+        _basis_hash: holo_hash::OpBasis,
+        _op_hash_list: Vec<DhtOpHash>,
+        _exclude_list: Vec<AgentPubKey>,
+        _limit: usize,
+    ) -> HolochainP2pResult<ValidationReceiptBundle> {
+        Ok(<Vec<SignedValidationReceipt>>::new().into())
+    }
+
     async fn authority_for_hash(&self, _dht_hash: holo_hash::OpBasis) -> HolochainP2pResult<bool> {
         Ok(self.authority)
     }
@@ -206,14 +215,6 @@ impl HolochainP2pDnaT for PassThroughNetwork {
         _flag: bool,
         _basis_hash: holo_hash::OpBasis,
         _op: crate::DhtOp,
-    ) -> HolochainP2pResult<()> {
-        todo!()
-    }
-
-    async fn send_validation_receipts(
-        &self,
-        _to_agent: AgentPubKey,
-        _receipts: ValidationReceiptBundle,
     ) -> HolochainP2pResult<()> {
         todo!()
     }

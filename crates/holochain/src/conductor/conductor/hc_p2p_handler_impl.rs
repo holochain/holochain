@@ -141,11 +141,11 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         })
     }
 
-    fn handle_want_validation_receipts(
+    fn handle_validation_receipts(
         &self,
         dna_hash: DnaHash,
         dht_op_list: Vec<DhtOpHash>,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+    ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>> {
         Box::pin(async move {
             let dht_db = self
                 .spaces
@@ -167,27 +167,7 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
 
             let receipts: ValidationReceiptBundle = out.into();
 
-            self.holochain_p2p().send_validation_receipts(
-                dna_hash,
-                AgentPubKey::from_raw_36(vec![0; 36]),
-                receipts,
-            ).await?;
-
-            Ok(())
-        })
-    }
-
-    fn handle_validation_receipts_received(
-        &self,
-        dna_hash: DnaHash,
-        to_agent: AgentPubKey,
-        receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async {
-            self.cell_by_parts(&dna_hash, &to_agent)
-                .await?
-                .handle_validation_receipts_received(dna_hash, to_agent, receipts)
-                .await
+            Ok(receipts)
         })
     }
 

@@ -130,7 +130,7 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn handle_validation_receipt(
+    fn handle_validation_receipts(
         &self,
         _dna_hash: DnaHash,
         _dht_op_list: Vec<holo_hash::DhtOpHash>,

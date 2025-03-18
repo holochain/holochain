@@ -12,6 +12,7 @@ use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 pub fn spawn_publish_dht_ops_consumer(
     cell_id: CellId,
     env: DbWrite<DbKindAuthored>,
+    dht_db: DbWrite<DbKindDht>,
     conductor: ConductorHandle,
     network: impl HolochainP2pDnaT + Clone + 'static,
 ) -> TriggerSender {
@@ -30,6 +31,7 @@ pub fn spawn_publish_dht_ops_consumer(
             let conductor = conductor.clone();
             let tx = tx.clone();
             let env = env.clone();
+            let dht_db = dht_db.clone();
             let agent = cell_id.agent_pubkey().clone();
             let network = network.clone();
             let min_publish_interval = conductor
@@ -45,6 +47,7 @@ pub fn spawn_publish_dht_ops_consumer(
                 } else {
                     publish_dht_ops_workflow(
                         env,
+                        dht_db,
                         Arc::new(network),
                         tx,
                         agent,

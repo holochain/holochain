@@ -126,6 +126,16 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
         filter: holochain_zome_types::chain::ChainFilter,
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>>;
 
+    /// Request validation receipts for op hashes from remote nodes
+    /// (excluding those we already have).
+    async fn get_validation_receipts(
+        &self,
+        basis_hash: holo_hash::OpBasis,
+        op_hash_list: Vec<DhtOpHash>,
+        exclude_list: Vec<AgentPubKey>,
+        limit: usize,
+    ) -> HolochainP2pResult<ValidationReceiptBundle>;
+
     /// Check if an agent is an authority for a hash.
     async fn authority_for_hash(&self, basis: holo_hash::OpBasis) -> HolochainP2pResult<bool>;
 
@@ -319,6 +329,24 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     ) -> HolochainP2pResult<Vec<MustGetAgentActivityResponse>> {
         self.sender
             .must_get_agent_activity((*self.dna_hash).clone(), author, filter)
+            .await
+    }
+
+    async fn get_validation_receipts(
+        &self,
+        basis_hash: holo_hash::OpBasis,
+        op_hash_list: Vec<DhtOpHash>,
+        exclude_list: Vec<AgentPubKey>,
+        limit: usize,
+    ) -> HolochainP2pResult<ValidationReceiptBundle> {
+        self.sender
+            .get_validation_receipts(
+                (*self.dna_hash).clone(),
+                basis_hash,
+                op_hash_list,
+                exclude_list,
+                limit,
+            )
             .await
     }
 

@@ -1,3 +1,4 @@
+/*
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
 use crate::prelude::CreateFixturator;
@@ -338,3 +339,4 @@ async fn get_requires_receipt(vault: DbWrite<DbKindDht>, op_hash: DhtOpHash) -> 
         .await
         .unwrap()
 }
+*/

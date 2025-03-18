@@ -183,7 +183,7 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>>;
 
     /// A remote node has requested that we send it validation receipts.
-    fn handle_validation_receipt(
+    fn handle_validation_receipts(
         &self,
         dna_hash: DnaHash,
         dht_op_list: Vec<DhtOpHash>,
