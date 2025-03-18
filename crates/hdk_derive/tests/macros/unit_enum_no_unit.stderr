@@ -2,7 +2,7 @@ error: macro requires attribute `unit_enum`.
 
          = help: Add attribute like `unit_enum(UnitEnumName)`
 
- --> tests/tests/macros/unit_enum_no_unit.rs:3:10
+ --> tests/macros/unit_enum_no_unit.rs:3:10
   |
 3 | #[derive(UnitEnum)]
   |          ^^^^^^^^
