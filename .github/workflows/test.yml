@@ -82,7 +82,6 @@ jobs:
       - name: build (windows-latest)
         if: matrix.os == 'windows-latest'
         run: |-
-          cargo clean
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
           make build-workspace-${{ matrix.target }}
 

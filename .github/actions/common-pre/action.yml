@@ -45,6 +45,7 @@ runs:
         manifest-dir: ${{ github.workspace }}/.github/manifest
         github-binarycache: true
 
+    # Thanks to https://github.com/sfackler/rust-openssl/issues/2149#issuecomment-2014064057
     - name: Set Perl environment variables
       if: runner.os == 'Windows'
       shell: pwsh
