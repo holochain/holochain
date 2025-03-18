@@ -44,3 +44,10 @@ runs:
         token: ${{ github.token }}
         manifest-dir: ${{ github.workspace }}/.github/manifest
         github-binarycache: true
+
+    - name: Set Perl environment variables
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        echo "PERL=$((where.exe perl)[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        echo "OPENSSL_SRC_PERL=$((where.exe perl)[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8

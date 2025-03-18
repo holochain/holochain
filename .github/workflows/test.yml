@@ -81,7 +81,6 @@ jobs:
 
       - name: build (windows-latest)
         if: matrix.os == 'windows-latest'
-        shell: pwsh
         run: |-
           cargo clean
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
@@ -93,7 +92,6 @@ jobs:
 
       - name: test (windows-latest)
         if: matrix.os == 'windows-latest'
-        shell: pwsh
         run: |-
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
           make test-workspace-${{ matrix.target }}
