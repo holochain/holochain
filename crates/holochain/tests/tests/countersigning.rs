@@ -127,7 +127,11 @@ async fn retry_countersigning_commit_on_missing_deps() {
     // but before creating any data, disable publish and recent gossip.
     // Now the only way peers can get data is through get requests!
     for conductor in conductors.iter_mut() {
-        conductor.update_config(|c| SweetConductorConfig::from(c).historical_only().into());
+        conductor.update_config(|c| {
+            SweetConductorConfig::from(c)
+                .tune_network_config(|nc| nc.disable_publish = true)
+                .into()
+        });
         conductor.startup().await;
     }
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;

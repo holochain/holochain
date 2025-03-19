@@ -217,6 +217,14 @@ pub struct NetworkConfig {
     /// The above options actually just set specific values in this config.
     /// Use only if you know what you are doing!
     pub advanced: Option<serde_json::Value>,
+
+    /// Disable Kitsune publish.
+    #[cfg(feature = "test-utils")]
+    pub disable_publish: bool,
+
+    /// Disable Kitsune gossip.
+    #[cfg(feature = "test-utils")]
+    pub disable_gossip: bool,
 }
 
 impl Default for NetworkConfig {
@@ -226,6 +234,10 @@ impl Default for NetworkConfig {
             signal_url: url2::Url2::parse("wss://devtest-sbd-1.holochain.org"),
             webrtc_config: None,
             advanced: None,
+            #[cfg(feature = "test-utils")]
+            disable_publish: false,
+            #[cfg(feature = "test-utils")]
+            disable_gossip: false,
         }
     }
 }
