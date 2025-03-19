@@ -2,7 +2,9 @@
 
 use super::*;
 
-use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
+use crate::core::workflow::publish_dht_ops_workflow::{
+    publish_dht_ops_workflow, RequiredReceiptCounts,
+};
 
 /// Spawn the QueueConsumer for Publish workflow
 #[cfg_attr(
@@ -13,6 +15,7 @@ pub fn spawn_publish_dht_ops_consumer(
     cell_id: CellId,
     env: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    required_receipt_counts: Arc<RequiredReceiptCounts>,
     conductor: ConductorHandle,
     network: impl HolochainP2pDnaT + Clone + 'static,
 ) -> TriggerSender {
@@ -32,6 +35,7 @@ pub fn spawn_publish_dht_ops_consumer(
             let tx = tx.clone();
             let env = env.clone();
             let dht_db = dht_db.clone();
+            let required_receipt_counts = required_receipt_counts.clone();
             let agent = cell_id.agent_pubkey().clone();
             let network = network.clone();
             let min_publish_interval = conductor
@@ -48,6 +52,7 @@ pub fn spawn_publish_dht_ops_consumer(
                     publish_dht_ops_workflow(
                         env,
                         dht_db,
+                        required_receipt_counts,
                         Arc::new(network),
                         tx,
                         agent,

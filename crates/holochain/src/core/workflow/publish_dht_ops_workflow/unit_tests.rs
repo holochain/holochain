@@ -15,6 +15,7 @@ use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::prelude::*;
 use holochain_state::prelude::*;
 use rusqlite::named_params;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -24,6 +25,9 @@ async fn no_ops_to_publish() {
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
+    let test_dht_db = holochain_state::test_utils::test_dht_db();
+    let dht_db = test_dht_db.to_db();
+    let required_receipt_counts = Arc::new(HashMap::new());
 
     let mut network = MockHolochainP2pDnaT::new();
     network.expect_publish().never();
@@ -33,6 +37,8 @@ async fn no_ops_to_publish() {
 
     let work_complete = publish_dht_ops_workflow(
         vault,
+        dht_db,
+        required_receipt_counts,
         Arc::new(network),
         tx,
         fixt!(AgentPubKey),
@@ -51,6 +57,9 @@ async fn workflow_incomplete_on_routing_error() {
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
+    let test_dht_db = holochain_state::test_utils::test_dht_db();
+    let dht_db = test_dht_db.to_db();
+    let required_receipt_counts = Arc::new(HashMap::new());
 
     let agent = fixt!(AgentPubKey);
 
@@ -68,6 +77,8 @@ async fn workflow_incomplete_on_routing_error() {
 
     let work_complete = publish_dht_ops_workflow(
         vault.clone(),
+        dht_db,
+        required_receipt_counts,
         Arc::new(network),
         tx,
         agent,
@@ -89,6 +100,9 @@ async fn workflow_handles_publish_errors() {
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
+    let test_dht_db = holochain_state::test_utils::test_dht_db();
+    let dht_db = test_dht_db.to_db();
+    let required_receipt_counts = Arc::new(HashMap::new());
 
     let agent = fixt!(AgentPubKey);
 
@@ -106,6 +120,8 @@ async fn workflow_handles_publish_errors() {
 
     let work_complete = publish_dht_ops_workflow(
         vault.clone(),
+        dht_db,
+        required_receipt_counts,
         Arc::new(network),
         tx,
         agent,
@@ -127,6 +143,9 @@ async fn retry_publish_until_receipts_received() {
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
+    let test_dht_db = holochain_state::test_utils::test_dht_db();
+    let dht_db = test_dht_db.to_db();
+    let required_receipt_counts = Arc::new(HashMap::new());
 
     let agent = fixt!(AgentPubKey);
 
@@ -145,6 +164,8 @@ async fn retry_publish_until_receipts_received() {
     for _ in 0..3 {
         let work_complete = publish_dht_ops_workflow(
             vault.clone(),
+            dht_db.clone(),
+            required_receipt_counts.clone(),
             network.clone(),
             tx.clone(),
             agent.clone(),
@@ -165,6 +186,8 @@ async fn retry_publish_until_receipts_received() {
 
     let work_complete = publish_dht_ops_workflow(
         vault.clone(),
+        dht_db,
+        required_receipt_counts,
         network,
         tx,
         agent,
@@ -183,6 +206,9 @@ async fn loop_resumes_on_new_data() {
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
+    let test_dht_db = holochain_state::test_utils::test_dht_db();
+    let dht_db = test_dht_db.to_db();
+    let required_receipt_counts = Arc::new(HashMap::new());
 
     let agent = fixt!(AgentPubKey);
 
@@ -199,6 +225,8 @@ async fn loop_resumes_on_new_data() {
     // Do a publish with no data to get into a paused state
     let work_complete = publish_dht_ops_workflow(
         vault.clone(),
+        dht_db.clone(),
+        required_receipt_counts.clone(),
         network.clone(),
         tx.clone(),
         agent.clone(),
@@ -215,6 +243,8 @@ async fn loop_resumes_on_new_data() {
 
     let work_complete = publish_dht_ops_workflow(
         vault,
+        dht_db.clone(),
+        required_receipt_counts.clone(),
         network,
         tx,
         agent.clone(),
@@ -233,6 +263,9 @@ async fn ignores_data_by_other_authors() {
 
     let test_db = holochain_state::test_utils::test_authored_db();
     let vault = test_db.to_db();
+    let test_dht_db = holochain_state::test_utils::test_dht_db();
+    let dht_db = test_dht_db.to_db();
+    let required_receipt_counts = Arc::new(HashMap::new());
 
     // Create an op for some other author
     create_op(vault.clone(), fixt!(AgentPubKey)).await.unwrap();
@@ -249,6 +282,8 @@ async fn ignores_data_by_other_authors() {
 
     let work_complete = publish_dht_ops_workflow(
         vault.clone(),
+        dht_db.clone(),
+        required_receipt_counts.clone(),
         network.clone(),
         tx.clone(),
         agent.clone(),

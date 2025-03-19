@@ -32,6 +32,9 @@ mod unit_tests;
 /// Default redundancy factor for validation receipts
 pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 
+/// Map of required validation receipts.
+pub type RequiredReceiptCounts = HashMap<ZomeIndex, HashMap<EntryDefIndex, u8>>;
+
 #[cfg_attr(
     feature = "instrument",
     tracing::instrument(skip(db, network, trigger_self, min_publish_interval))
@@ -39,6 +42,7 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 pub async fn publish_dht_ops_workflow(
     authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    required_receipt_counts: Arc<RequiredReceiptCounts>,
     network: Arc<impl HolochainP2pDnaT>,
     trigger_self: TriggerSender,
     agent: AgentPubKey,
@@ -62,41 +66,15 @@ pub async fn publish_dht_ops_workflow(
     for (basis, list) in to_publish {
         let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
 
-        // first notify peers that there is an op hash,
-        // if they don't already have it, they will download the op data.
-        match network
-            .publish(
-                true,
-                false,
-                basis.clone(),
-                agent.clone(),
-                op_hash_list.clone(),
-                None,
-                Some(op_data_list),
-            )
-            .await
-        {
-            Err(e) => {
-                // If we get a routing error it means the space hasn't started yet and we should try publishing again.
-                if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
-                    // TODO if this doesn't change what is the loop terminate condition?
-                    complete = WorkComplete::Incomplete(None);
-                }
-                warn!(failed_to_send_publish = ?e);
-            }
-            Ok(()) => {
-                success.extend(op_hash_list.clone());
-            }
-        }
+        let mut have_enough_receipts = false;
 
-        // next, maybe we just don't know they already have it,
-        // so let's try to get validation receipts from them.
+        // First, check to see if we can get the required validation receipts.
         // TODO - we don't currently track the agents that generated the
         //        receipts in our database, so we can't make use of the
         //        exclude list, so we may get duplicate receipts.
         if let Ok(bundle) = network
             .get_validation_receipts(
-                basis,
+                basis.clone(),
                 op_hash_list.clone(),
                 Vec::new(), // exclude list
                 DEFAULT_RECEIPT_BUNDLE_SIZE as usize,
@@ -104,8 +82,6 @@ pub async fn publish_dht_ops_workflow(
             .await
         {
             for receipt in bundle.into_iter() {
-                /* ... yeah... no idea how to get this from within a workflow
-
                 // Get the action for this op so we can check the entry type.
                 let hash = receipt.receipt.dht_op_hash.clone();
                 let action: Option<SignedAction> = authored_db
@@ -136,35 +112,67 @@ pub async fn publish_dht_ops_workflow(
                         zome_index,
                         entry_index,
                         ..
-                    })) => {
-                        let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
-                        let zome = ribosome.get_integrity_zome(zome_index);
-                        match zome {
-                            Some(zome) => self
-                                .conductor_api
-                                .get_entry_def(&EntryDefBufferKey::new(zome.into_inner().1, *entry_index))
-                                .map(|e| u8::from(e.required_validations)),
-                            None => None,
-                        }
-                    }
+                    })) => required_receipt_counts
+                        .get(zome_index)
+                        .and_then(|z| z.get(entry_index)),
                     _ => None,
                 };
 
                 // If no required receipt count was found then fallback to the default.
-                let required_validation_count = required_receipt_count
-                    .unwrap_or(crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE);
-                */
+                let required_validation_count = required_receipt_count.unwrap_or(
+                    &crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
+                );
 
-                if let Err(err) = process_validation_receipt(
+                match process_validation_receipt(
                     authored_db.clone(),
                     dht_db.clone(),
                     receipt,
-                    crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
+                    *required_validation_count,
                 )
                 .await
                 {
-                    debug!(?err, "error processing validation receipt");
+                    Err(err) => {
+                        debug!(?err, "error processing validation receipt");
+                    }
+                    Ok(false) => (),
+                    Ok(true) => {
+                        have_enough_receipts = true;
+                    }
                 }
+            }
+        }
+
+        if have_enough_receipts {
+            // We have enough receipts!
+            // Short-ciruit so we don't publish.
+            success.extend(op_hash_list);
+            continue;
+        }
+
+        // second, if we still need validation receipts,
+        // try re-publishing the op hashes.
+        match network
+            .publish(
+                true,
+                false,
+                basis,
+                agent.clone(),
+                op_hash_list.clone(),
+                None,
+                Some(op_data_list),
+            )
+            .await
+        {
+            Err(e) => {
+                // If we get a routing error it means the space hasn't started yet and we should try publishing again.
+                if let holochain_p2p::HolochainP2pError::RoutingDnaError(_) = e {
+                    // TODO if this doesn't change what is the loop terminate condition?
+                    complete = WorkComplete::Incomplete(None);
+                }
+                warn!(failed_to_send_publish = ?e);
+            }
+            Ok(()) => {
+                success.extend(op_hash_list);
             }
         }
     }
@@ -225,7 +233,7 @@ async fn process_validation_receipt(
     dht_db: DbWrite<DbKindDht>,
     receipt: SignedValidationReceipt,
     required_validation_count: u8,
-) -> WorkflowResult<()> {
+) -> WorkflowResult<bool> {
     debug!(from = ?receipt.receipt.validators, hash = ?receipt.receipt.dht_op_hash);
 
     let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
@@ -269,9 +277,11 @@ async fn process_validation_receipt(
                 set_receipts_complete(txn, &receipt_op_hash, true)
             })
             .await?;
-    }
 
-    Ok(())
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 /* @ K2-INTEGRATION @ TODO @

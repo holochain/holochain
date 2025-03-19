@@ -224,12 +224,14 @@ async fn test_concurrency() {
 
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
+    let required_receipt_counts = Arc::new(HashMap::new());
     let kind = DbKindAuthored(Arc::new(fixt!(CellId)));
     let tmpdir = tempfile::Builder::new()
         .prefix("holochain-test-environments")
         .tempdir()
         .unwrap();
     let db = DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database");
+    let dht_db = holochain_state::test_utils::test_dht_db();
     let action = Action::Create(Create {
         author: fixt!(AgentPubKey),
         timestamp: Timestamp::now(),
@@ -275,6 +277,8 @@ async fn publish_loop() {
 
     publish_dht_ops_workflow(
         db.clone(),
+        dht_db.clone(),
+        required_receipt_counts.clone(),
         dna_network.clone(),
         ts.clone(),
         author.clone(),
@@ -295,6 +299,8 @@ async fn publish_loop() {
     );
     publish_dht_ops_workflow(
         db.clone(),
+        dht_db.clone(),
+        required_receipt_counts.clone(),
         dna_network.clone(),
         ts.clone(),
         author.clone(),
@@ -317,6 +323,8 @@ async fn publish_loop() {
     assert!(timer.elapsed() < Duration::from_secs(1));
     publish_dht_ops_workflow(
         db.clone(),
+        dht_db.clone(),
+        required_receipt_counts.clone(),
         dna_network.clone(),
         ts.clone(),
         author.clone(),
@@ -358,6 +366,8 @@ async fn publish_loop() {
 
     publish_dht_ops_workflow(
         db.clone(),
+        dht_db.clone(),
+        required_receipt_counts.clone(),
         dna_network.clone(),
         ts.clone(),
         author.clone(),
@@ -388,6 +398,8 @@ async fn publish_loop() {
     );
     publish_dht_ops_workflow(
         db.clone(),
+        dht_db.clone(),
+        required_receipt_counts.clone(),
         dna_network.clone(),
         ts.clone(),
         author.clone(),
@@ -431,6 +443,8 @@ async fn publish_loop() {
     assert!(timer.elapsed() < Duration::from_secs(1));
     publish_dht_ops_workflow(
         db.clone(),
+        dht_db.clone(),
+        required_receipt_counts.clone(),
         dna_network.clone(),
         ts.clone(),
         author.clone(),
@@ -451,6 +465,8 @@ async fn publish_loop() {
 
     publish_dht_ops_workflow(
         db.clone(),
+        dht_db.clone(),
+        required_receipt_counts.clone(),
         dna_network.clone(),
         ts.clone(),
         author.clone(),
