@@ -256,6 +256,7 @@ impl PublishFactory for NoopPublishFactory {
     ) -> BoxFut<'static, K2Result<DynPublish>> {
         Box::pin(async {
             let instance: DynPublish = Arc::new(NoopPublish);
-            Ok(instance) })
+            Ok(instance)
+        })
     }
 }
