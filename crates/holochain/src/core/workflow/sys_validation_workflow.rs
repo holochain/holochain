@@ -12,11 +12,11 @@
 //! Checks that you can rely on sys validation having performed are:
 //! - For a [`ChainOp::StoreRecord`]
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
-//!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op can progress.
+//!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be found locally before this op can progress.
 //!    - The [`Action`] must be either a [`Action::Create`] or an [`Action::Update`].
 //!    - Run the [store entry checks](#store-entry-checks).
 //! - For a [`ChainOp::StoreEntry`]
-//!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be be found locally before this op is accepted.
+//!    - If the [`Entry`] is an [`Entry::CounterSign`], then the countersigning session data is mapped to a set of [`Action`]s and each of those actions must be found locally before this op is accepted.
 //!    - Check that the [`Action`] is either a [`Action::Dna`] at sequence number 0, or has a previous action with sequence number strictly greater than 0.
 //!    - Run the [store entry checks](#store-entry-checks).
 //! - For a [`ChainOp::RegisterAgentActivity`]
