@@ -71,7 +71,7 @@ use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::CallStream;
 use derive_more::Constructor;
 use error::RibosomeResult;
-use ghost_actor::dependencies::must_future::MustBoxFuture;
+use must_future::MustBoxFuture;
 use guest_callback::entry_defs::EntryDefsHostAccess;
 use guest_callback::init::InitHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;

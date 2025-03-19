@@ -77,7 +77,7 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use futures::FutureExt;
-use ghost_actor::dependencies::must_future::MustBoxFuture;
+use must_future::MustBoxFuture;
 use holochain_types::prelude::*;
 use holochain_util::timed;
 use holochain_wasmer_host::module::build_module as build_wasmer_module;

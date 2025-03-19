@@ -2070,22 +2070,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ghost_actor"
-version = "0.3.0-alpha.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a34addaffa7d2c80637807444f171c646cad7549fcdac8019544034678f76d5"
-dependencies = [
- "futures",
- "mockall",
- "must_future",
- "paste",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-futures",
-]
-
-[[package]]
 name = "gimli"
 version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2470,7 +2454,6 @@ dependencies = [
  "futures",
  "get_if_addrs",
  "getrandom 0.2.15",
- "ghost_actor",
  "hc_deepkey_sdk",
  "hdk",
  "holo_hash",
