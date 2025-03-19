@@ -709,7 +709,8 @@ impl CascadeImpl {
     ) -> CascadeResult<Option<EntryDetails>> {
         let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
 
-        self.get_with_query(query, entry_hash.into(), options).await
+        self.get_local_first_with_query(query, entry_hash.into(), options)
+            .await
     }
 
     /// Get the specified Record along with all Updates and Deletes associated with it.
@@ -728,7 +729,7 @@ impl CascadeImpl {
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        self.get_with_query(query, action_hash.into(), options)
+        self.get_local_first_with_query(query, action_hash.into(), options)
             .await
     }
 
@@ -748,7 +749,7 @@ impl CascadeImpl {
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        self.get_with_query(query, action_hash.into(), options)
+        self.get_local_first_with_query(query, action_hash.into(), options)
             .await
     }
 
@@ -762,10 +763,11 @@ impl CascadeImpl {
     ) -> CascadeResult<Option<Record>> {
         let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
 
-        self.get_with_query(query, entry_hash.into(), options).await
+        self.get_local_first_with_query(query, entry_hash.into(), options)
+            .await
     }
 
-    async fn get_with_query<Q, O>(
+    async fn get_local_first_with_query<Q, O>(
         &self,
         query: Q,
         get_target: AnyDhtHash,
