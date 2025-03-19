@@ -319,6 +319,7 @@ impl NetworkConfig {
         Ok(working)
     }
 
+    #[cfg(feature = "test-utils")]
     fn insert_into_config(
         &mut self,
         mutator: impl Fn(&mut serde_json::Map<String, serde_json::Value>) -> ConductorConfigResult<()>,
