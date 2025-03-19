@@ -109,7 +109,10 @@ async fn check_timeout<T>(response: impl Future<Output = WebsocketResult<T>>) ->
 
 async fn package_fixture_if_not_packaged() {
     static PACKAGE_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
-    let _lock = PACKAGE_LOCK.get_or_init(|| tokio::sync::Mutex::new(())).lock().await;
+    let _lock = PACKAGE_LOCK
+        .get_or_init(|| tokio::sync::Mutex::new(()))
+        .lock()
+        .await;
 
     if PathBuf::from("tests/fixtures/my-app/my-fixture-app.happ").exists()
         && PathBuf::from("tests/fixtures/my-app-deferred/my-fixture-app-deferred.happ").exists()
