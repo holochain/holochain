@@ -37,19 +37,13 @@ pub fn spawn_publish_dht_ops_consumer(
                 .conductor_tuning_params()
                 .min_publish_interval();
             async move {
-                if conductor.get_config().network.disable_publish
-                {
-                    Ok(WorkComplete::Complete)
-                } else {
-                    publish_dht_ops_workflow(
-                        env,
-                        Arc::new(network),
-                        tx,
-                        agent,
-                        min_publish_interval,
-                    )
-                    .await
+                #[cfg(feature = "test_utils")]
+                if conductor.get_config().network.disable_publish {
+                    return Ok(WorkComplete::Complete);
                 }
+
+                publish_dht_ops_workflow(env, Arc::new(network), tx, agent, min_publish_interval)
+                    .await
             }
         },
     );

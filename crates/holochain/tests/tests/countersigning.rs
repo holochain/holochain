@@ -129,6 +129,8 @@ async fn retry_countersigning_commit_on_missing_deps() {
     for conductor in conductors.iter_mut() {
         conductor.update_config(|c| {
             SweetConductorConfig::from(c)
+                // TODO This should be disabling sending countersigning "publish" messages, not
+                //      general publish now that the two are separate operations.
                 .tune_network_config(|nc| nc.disable_publish = true)
                 .into()
         });
