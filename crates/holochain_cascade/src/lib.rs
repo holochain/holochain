@@ -791,11 +791,12 @@ impl CascadeImpl {
             if !(authoring || authority) {
                 // Fetch the data if there is anyone to fetch it from.
                 match self.fetch_record(get_target, options.into()).await {
-                    Ok(_)
-                    | Err(CascadeError::NetworkError(HolochainP2pError::NoPeersForLocation(
-                        _,
-                        _,
-                    ))) => (),
+                    Ok(_) => (),
+                    Err(CascadeError::NetworkError(
+                        e @ HolochainP2pError::NoPeersForLocation(_, _),
+                    )) => {
+                        tracing::debug!(?e, "No peers to fetch record from");
+                    }
                     Err(e) => {
                         return Err(e);
                     }
@@ -883,11 +884,12 @@ impl CascadeImpl {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
                 match self.fetch_links(key.clone(), options).await {
-                    Ok(_)
-                    | Err(CascadeError::NetworkError(HolochainP2pError::NoPeersForLocation(
-                        _,
-                        _,
-                    ))) => (),
+                    Ok(_) => (),
+                    Err(CascadeError::NetworkError(
+                        e @ HolochainP2pError::NoPeersForLocation(_, _),
+                    )) => {
+                        tracing::debug!(?e, "No peers to fetch links from");
+                    }
                     Err(e) => {
                         return Err(e);
                     }
@@ -922,11 +924,12 @@ impl CascadeImpl {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
                 match self.fetch_links(key.clone(), options).await {
-                    Ok(_)
-                    | Err(CascadeError::NetworkError(HolochainP2pError::NoPeersForLocation(
-                        _,
-                        _,
-                    ))) => (),
+                    Ok(_) => (),
+                    Err(CascadeError::NetworkError(
+                        e @ HolochainP2pError::NoPeersForLocation(_, _),
+                    )) => {
+                        tracing::debug!(?e, "No peers to fetch link details from");
+                    }
                     Err(e) => {
                         return Err(e);
                     }
@@ -947,9 +950,10 @@ impl CascadeImpl {
                     Ok(actions) => {
                         links.extend(actions.create_link_actions());
                     }
-                    Err(HolochainP2pError::NoPeersForLocation(_, _)) => {
+                    Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
                         // No peers available for this location, can't add new links to the cache
                         // at the moment.
+                        tracing::debug!(?e, "No peers to fetch link count from");
                     }
                     Err(e) => {
                         return Err(e.into());
