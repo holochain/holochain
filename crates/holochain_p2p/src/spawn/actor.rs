@@ -745,9 +745,12 @@ impl HolochainP2pActor {
                 // Still want the real gossip module to be used. The test builder comes with a stub
                 // gossip module fur use in K2 testing.
                 builder.gossip = kitsune2_gossip::K2GossipFactory::create();
+            } else {
+                tracing::info!("Running with gossip disabled");
             }
 
             if config.disable_publish {
+                tracing::info!("Running with publish disabled");
                 builder.publish = Arc::new(test::NoopPublishFactory);
             }
 
