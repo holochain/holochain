@@ -21,6 +21,15 @@ pub enum HolochainP2pError {
     #[error("InvalidP2pMessage: {0}")]
     InvalidP2pMessage(String),
 
+    /// No peers available for DHT location.
+    ///
+    /// This error is returned when there are no peers available for a given DHT location. If a
+    /// p2p request is allowed to fail when no peers are available then this error can be used to
+    /// filter the error from other network errors. For example, when getting links, and it is
+    /// acceptable to return the links that are already held locally.
+    #[error("{0}: No peers available for DHT location: {1}")]
+    NoPeersForLocation(String, u32),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),

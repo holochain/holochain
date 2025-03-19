@@ -23,6 +23,7 @@
 //!
 #![warn(missing_docs)]
 
+use crate::error::CascadeError;
 use error::CascadeResult;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -31,7 +32,7 @@ use holo_hash::EntryHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::GenericNetwork;
+use holochain_p2p::{GenericNetwork, HolochainP2pError};
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::insert_action;
@@ -707,21 +708,8 @@ impl CascadeImpl {
         options: GetOptions,
     ) -> CascadeResult<Option<EntryDetails>> {
         let query: GetEntryDetailsQuery = self.construct_query_with_data_access(entry_hash.clone());
-        if let GetStrategy::Local = options.strategy {
-            // Only return what is in the database.
-            return self.cascading(query.clone()).await;
-        }
 
-        // If we are not in the process of authoring this hash or its
-        // authority we need a network call.
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
-        if !(authoring || authority) {
-            self.fetch_record(entry_hash.into(), options.into()).await?;
-        }
-
-        // Check if we have the data now after the network call.
-        self.cascading(query).await
+        self.get_with_query(query, entry_hash.into(), options).await
     }
 
     /// Get the specified Record along with all Updates and Deletes associated with it.
@@ -740,29 +728,15 @@ impl CascadeImpl {
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        if let GetStrategy::Local = options.strategy {
-            // Only return what is in the database.
-            return self.cascading(query.clone()).await;
-        }
-
-        // If we are not in the process of authoring this hash or its
-        // authority we need a network call.
-        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
-        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
-        if !(authoring || authority) {
-            self.fetch_record(action_hash.into(), options.into())
-                .await?;
-        }
-
-        // Check if we have the data now after the network call.
-        self.cascading(query).await
+        self.get_with_query(query, action_hash.into(), options)
+            .await
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// Returns the [Record] for this [ActionHash] if it is live
     /// by getting the latest available metadata from authorities
     /// combined with this agents authored data.
     /// _Note: Deleted actions are a tombstone set_
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn dht_get_action(
         &self,
         action_hash: ActionHash,
@@ -774,27 +748,13 @@ impl CascadeImpl {
         // Is this bad because we will not go back to the network until our
         // cache is cleared. Could someone create an attack based on this fact?
 
-        if let GetStrategy::Local = options.strategy {
-            // Only return what is in the database.
-            return self.cascading(query.clone()).await;
-        }
-
-        // If we are not in the process of authoring this hash or its
-        // authority we need a network call.
-        let authoring = self.am_i_authoring(&action_hash.clone().into())?;
-        let authority = self.am_i_an_authority(action_hash.clone().into()).await?;
-        if !(authoring || authority) {
-            self.fetch_record(action_hash.into(), options.into())
-                .await?;
-        }
-
-        // Check if we have the data now after the network call.
-        self.cascading(query).await
+        self.get_with_query(query, action_hash.into(), options)
+            .await
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// Returns the oldest live [Record] for this [EntryHash] by getting the
     /// latest available metadata from authorities combined with this agents authored data.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn dht_get_entry(
         &self,
         entry_hash: EntryHash,
@@ -802,21 +762,51 @@ impl CascadeImpl {
     ) -> CascadeResult<Option<Record>> {
         let query: GetLiveEntryQuery = self.construct_query_with_data_access(entry_hash.clone());
 
-        if let GetStrategy::Local = options.strategy {
-            // Only return what is in the database.
-            return self.cascading(query.clone()).await;
+        self.get_with_query(query, entry_hash.into(), options).await
+    }
+
+    async fn get_with_query<Q, O>(
+        &self,
+        query: Q,
+        get_target: AnyDhtHash,
+        options: GetOptions,
+    ) -> CascadeResult<Q::Output>
+    where
+        Q: Query<Item = Judged<SignedActionHashed>, Output = Option<O>> + Send + 'static,
+        O: Send + 'static,
+    {
+        // Try to get the record from our databases first.
+        if let Some(record) = self.cascading(query.clone()).await? {
+            return Ok(Some(record));
         }
 
-        // If we are not in the process of authoring this hash or its
-        // authority we need a network call.
-        let authoring = self.am_i_authoring(&entry_hash.clone().into())?;
-        let authority = self.am_i_an_authority(entry_hash.clone().into()).await?;
-        if !(authoring || authority) {
-            self.fetch_record(entry_hash.into(), options.into()).await?;
-        }
+        // If we are allowed to get the data from the network then try to retrieve the missing data.
+        if options.strategy == GetStrategy::Network {
+            // If we are not in the process of authoring this hash or its
+            // authority we need a network call.
+            let authoring = self.am_i_authoring(&get_target)?;
+            let authority = self.am_i_an_authority(get_target.clone().into()).await?;
+            if !(authoring || authority) {
+                // Fetch the data if there is anyone to fetch it from.
+                match self.fetch_record(get_target, options.into()).await {
+                    Ok(_)
+                    | Err(CascadeError::NetworkError(HolochainP2pError::NoPeersForLocation(
+                        _,
+                        _,
+                    ))) => (),
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
+            }
 
-        // Check if we have the data now after the network call.
-        self.cascading(query).await
+            // Check if we have the data now after the network call.
+            self.cascading(query).await
+        } else {
+            // We're not allowed to get the data from the network, and it's not stored locally so
+            // just return None.
+            Ok(None)
+        }
     }
 
     /// Perform a concurrent `get` on multiple hashes simultaneously, returning
@@ -877,9 +867,9 @@ impl CascadeImpl {
         }
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
-    /// Gets an links from the cas or cache depending on it's metadata
+    /// Gets links from the DHT or cache depending on its metadata.
     // The default behavior is to skip deleted or replaced entries.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn dht_get_links(
         &self,
         key: WireLinkKey,
@@ -890,7 +880,16 @@ impl CascadeImpl {
         if let GetStrategy::Network = options.get_options.strategy {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
-                self.fetch_links(key.clone(), options).await?;
+                match self.fetch_links(key.clone(), options).await {
+                    Ok(_)
+                    | Err(CascadeError::NetworkError(HolochainP2pError::NoPeersForLocation(
+                        _,
+                        _,
+                    ))) => (),
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
             }
         }
 
@@ -908,9 +907,8 @@ impl CascadeImpl {
         self.cascading(query).await
     }
 
+    /// Return all CreateLink actions and DeleteLink actions ordered by time.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, key, options)))]
-    /// Return all CreateLink actions
-    /// and DeleteLink actions ordered by time.
     pub async fn get_link_details(
         &self,
         key: WireLinkKey,
@@ -921,7 +919,16 @@ impl CascadeImpl {
         if let GetStrategy::Network = options.get_options.strategy {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
-                self.fetch_links(key.clone(), options).await?;
+                match self.fetch_links(key.clone(), options).await {
+                    Ok(_)
+                    | Err(CascadeError::NetworkError(HolochainP2pError::NoPeersForLocation(
+                        _,
+                        _,
+                    ))) => (),
+                    Err(e) => {
+                        return Err(e);
+                    }
+                }
             }
         }
         let query = GetLinkDetailsQuery::new(key.base, key.type_query, key.tag);
@@ -934,12 +941,18 @@ impl CascadeImpl {
         let mut links = HashSet::<ActionHash>::new();
         if !self.am_i_an_authority(query.base.clone()).await? {
             if let Some(network) = &self.network {
-                links.extend(
-                    network
-                        .count_links(query.clone())
-                        .await?
-                        .create_link_actions(),
-                );
+                match network.count_links(query.clone()).await {
+                    Ok(actions) => {
+                        links.extend(actions.create_link_actions());
+                    }
+                    Err(HolochainP2pError::NoPeersForLocation(_, _)) => {
+                        // No peers available for this location, can't add new links to the cache
+                        // at the moment.
+                    }
+                    Err(e) => {
+                        return Err(e.into());
+                    }
+                }
             }
         }
 

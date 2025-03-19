@@ -827,9 +827,10 @@ impl HolochainP2pActor {
             .collect::<Vec<_>>();
 
         rand::seq::SliceRandom::shuffle(&mut agent_list[..], &mut rand::thread_rng());
-        agent_list.into_iter().next().ok_or_else(|| {
-            HolochainP2pError::other(format!("{tag}: no viable peers from which to get",))
-        })
+        agent_list
+            .into_iter()
+            .next()
+            .ok_or_else(|| HolochainP2pError::NoPeersForLocation(tag.to_string(), loc))
     }
 
     async fn send_notify(
