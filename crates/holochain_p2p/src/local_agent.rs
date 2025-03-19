@@ -7,6 +7,30 @@ use parking_lot::Mutex;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
+fn apply_arc_factor(arc: DhtArc, factor: u32) -> DhtArc {
+    match arc {
+        DhtArc::Empty => DhtArc::Empty,
+        DhtArc::Arc(start, _end) => {
+            let len = (arc.arc_span() as u64 + 1).saturating_mul(factor as u64);
+
+            if len == 0 {
+                return DhtArc::Empty;
+            }
+
+            let span = if len >= u32::MAX as u64 {
+                u32::MAX
+            } else {
+                (len - 1) as u32
+            };
+
+            DhtArc::Arc(
+                start,
+                (std::num::Wrapping(start) + std::num::Wrapping(span)).0,
+            )
+        }
+    }
+}
+
 struct LocalAgentInner {
     callback: Option<Arc<dyn Fn() + 'static + Send + Sync>>,
     /// The storage arc that the agent is currently claiming authority over.
@@ -25,11 +49,18 @@ pub struct HolochainP2pLocalAgent {
     keystore_client: MetaLairClient,
     /// The inner state that can be modified during the lifecycle of the agent
     inner: Mutex<LocalAgentInner>,
+    /// The target arc factor to apply to hints.
+    target_arc_factor: u32,
 }
 
 impl HolochainP2pLocalAgent {
     /// Create a new [HolochainP2pLocalAgent].
-    pub fn new(agent: AgentPubKey, initial_target_arc: DhtArc, client: MetaLairClient) -> Self {
+    pub fn new(
+        agent: AgentPubKey,
+        initial_target_arc: DhtArc,
+        initial_target_arc_factor: u32,
+        client: MetaLairClient,
+    ) -> Self {
         let agent_id = agent.to_k2_agent();
         Self {
             agent,
@@ -40,6 +71,7 @@ impl HolochainP2pLocalAgent {
                 storage_arc: DhtArc::Empty,
                 target_arc: initial_target_arc,
             }),
+            target_arc_factor: initial_target_arc_factor,
         }
     }
 }
@@ -98,6 +130,39 @@ impl LocalAgent for HolochainP2pLocalAgent {
     }
 
     fn set_tgt_storage_arc_hint(&self, arc: DhtArc) {
-        self.inner.lock().target_arc = arc;
+        self.inner.lock().target_arc = apply_arc_factor(arc, self.target_arc_factor);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn apply_arc_factor_fixture() {
+        for (expect, orig, factor) in [
+            (DhtArc::Empty, DhtArc::Empty, 0),
+            (DhtArc::Empty, DhtArc::Empty, 27),
+            (DhtArc::Empty, DhtArc::Empty, u32::MAX),
+            (DhtArc::Arc(0, 0), DhtArc::Arc(0, 0), 1),
+            (DhtArc::Arc(0, 1), DhtArc::Arc(0, 1), 1),
+            (DhtArc::Arc(u32::MAX, 0), DhtArc::Arc(u32::MAX, 0), 1),
+            (DhtArc::Arc(0, 1), DhtArc::Arc(0, 0), 2),
+            (DhtArc::Arc(13, 522), DhtArc::Arc(13, 42), 17),
+            (
+                DhtArc::Arc(u32::MAX - 7, 110),
+                DhtArc::Arc(u32::MAX - 7, u32::MAX - 1),
+                17,
+            ),
+            (DhtArc::Arc(u32::MAX, 0), DhtArc::Arc(u32::MAX, u32::MAX), 2),
+            (DhtArc::Arc(0, u32::MAX), DhtArc::Arc(0, 0), u32::MAX),
+            (
+                DhtArc::Arc(u32::MAX, u32::MAX - 1),
+                DhtArc::Arc(u32::MAX, u32::MAX),
+                u32::MAX,
+            ),
+        ] {
+            assert_eq!(expect, apply_arc_factor(orig, factor));
+        }
     }
 }

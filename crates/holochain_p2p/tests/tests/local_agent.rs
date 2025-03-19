@@ -12,7 +12,7 @@ async fn create_and_sign() {
     let client = test_keystore();
     let agent = client.new_sign_keypair_random().await.unwrap();
 
-    let local_agent = HolochainP2pLocalAgent::new(agent.clone(), DhtArc::FULL, client);
+    let local_agent = HolochainP2pLocalAgent::new(agent.clone(), DhtArc::FULL, 1, client);
 
     // Check initial arc values
     assert_eq!(DhtArc::FULL, local_agent.get_tgt_storage_arc());
