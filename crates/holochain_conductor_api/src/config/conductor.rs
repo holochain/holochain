@@ -197,6 +197,11 @@ impl ConductorConfig {
     }
 }
 
+#[inline(always)]
+fn one() -> u32 {
+    1
+}
+
 /// All the network config information for the conductor.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -211,6 +216,13 @@ pub struct NetworkConfig {
 
     /// The Kitsune2 webrtc_config to use for connecting to peers.
     pub webrtc_config: Option<serde_json::Value>,
+
+    /// The target arc factor to apply when receiving hints from kitsune2.
+    /// In normal operation, leave this as the default 1.
+    /// For leacher nodes that do not contribute to gossip, set to zero.
+    /// To take on additional gossip burden, set to > 1.
+    #[serde(default = "one")]
+    pub target_arc_factor: u32,
 
     /// Use this advanced field to directly configure kitsune2.
     ///
@@ -235,6 +247,7 @@ impl Default for NetworkConfig {
             bootstrap_url: url2::Url2::parse("https://devtest-bootstrap-1.holochain.org"),
             signal_url: url2::Url2::parse("wss://devtest-sbd-1.holochain.org"),
             webrtc_config: None,
+            target_arc_factor: 1,
             advanced: None,
             #[cfg(feature = "test-utils")]
             disable_publish: false,

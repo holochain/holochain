@@ -39,6 +39,9 @@ pub struct HolochainP2pConfig {
     /// Callback function to retrieve an op store database handle for a dna hash.
     pub get_db_op_store: GetDbOpStore,
 
+    /// The arc factor to apply to target arc hints.
+    pub target_arc_factor: u32,
+
     /// Configuration to pass to Kitsune2.
     ///
     /// This should contain module configurations such as [CoreBootstrapModConfig](kitsune2_core::factories::CoreBootstrapModConfig).
@@ -86,6 +89,7 @@ impl Default for HolochainP2pConfig {
         Self {
             get_db_peer_meta: Arc::new(|_| unimplemented!()),
             get_db_op_store: Arc::new(|_| unimplemented!()),
+            target_arc_factor: 1,
             network_config: None,
             compat: Default::default(),
             #[cfg(feature = "test_utils")]
