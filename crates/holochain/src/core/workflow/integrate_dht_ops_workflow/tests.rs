@@ -1,8 +1,10 @@
-use super::*;
+use std::sync::Arc;
 
+use super::*;
 use crate::core::queue_consumer::TriggerSender;
-use crate::test_utils::test_network;
 use ::fixt::prelude::*;
+use holo_hash::fixt::DnaHashFixturator;
+use holochain_p2p::actor::MockHcP2p;
 use holochain_state::mutations;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
 
@@ -351,9 +353,8 @@ impl Db {
 #[allow(unused)]
 async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
-    let test_network = test_network(None, None).await;
-    let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.clone(), env.clone().into(), qt, holochain_p2p_cell)
+    let mock_network = HolochainP2pDna::new(Arc::new(MockHcP2p::new()), fixt!(DnaHash), None);
+    integrate_dht_ops_workflow(env.clone(), env.clone().into(), qt, mock_network)
         .await
         .unwrap();
 }
