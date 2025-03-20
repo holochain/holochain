@@ -230,6 +230,7 @@ impl Pending {
 
 pub(crate) struct HolochainP2pActor {
     this: Weak<Self>,
+    target_arc_factor: u32,
     compat: NetworkCompatParams,
     preflight: Arc<std::sync::Mutex<bytes::Bytes>>,
     evt_sender: Arc<std::sync::OnceLock<WrapEvtSender>>,
@@ -805,6 +806,7 @@ impl HolochainP2pActor {
 
         Ok(Arc::new_cyclic(|this| Self {
             this: this.clone(),
+            target_arc_factor: config.target_arc_factor,
             compat: config.compat,
             preflight,
             evt_sender,
@@ -1007,6 +1009,7 @@ impl actor::HcP2p for HolochainP2pActor {
             let local_agent: DynLocalAgent = Arc::new(HolochainP2pLocalAgent::new(
                 agent_pub_key,
                 DhtArc::FULL,
+                self.target_arc_factor,
                 self.lair_client.clone(),
             ));
 
