@@ -14,7 +14,7 @@ jobs:
         id: dispatch
         env:
           USER: ${{ github.event.sender.login }}
-          ALLOWED_USERS: ${{ join(fromJson('["ThetaSinner", "jost-s", "maackle", "thedavidmeister", "steveej", "neonphog", "matthme", "c12i"]'), '\n') }}
+          ALLOWED_USERS: ${{ join(fromJson('["ThetaSinner", "jost-s", "steveej", "neonphog", "matthme", "c12i", "cdunster"]'), '\n') }}
           COMMENT: ${{ github.event.comment.body }}
         run: |
           set -euo pipefail

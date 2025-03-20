@@ -517,6 +517,10 @@ impl ConductorBuilder {
             network_config: Some(config.network.to_k2_config()?),
             compat,
             k2_test_builder: true,
+            #[cfg(feature = "test_utils")]
+            disable_publish: config.network.disable_publish,
+            #[cfg(feature = "test_utils")]
+            disable_gossip: config.network.disable_gossip,
         };
 
         let holochain_p2p =

@@ -18,7 +18,6 @@ use {
 };
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn sys_validation_workflow_test() {
     holochain_trace::test_run();
 
@@ -395,6 +394,9 @@ async fn bob_links_in_a_legit_way(
     triggers
         .publish_dht_ops
         .trigger(&"bob_links_in_a_legit_way");
+    triggers
+        .integrate_dht_ops
+        .trigger(&"bob_links_in_a_legit_way");
     link_add_address
 }
 
@@ -460,6 +462,9 @@ async fn bob_makes_a_large_link(
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"bob_makes_a_large_link");
+    triggers
+        .integrate_dht_ops
+        .trigger(&"bob_makes_a_large_link");
     (bad_update_action, bad_update_entry_hash, link_add_address)
 }
 

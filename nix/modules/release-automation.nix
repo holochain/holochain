@@ -115,6 +115,7 @@
             } ''
             set -xeuo pipefail
 
+            export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib";
             export HOME="$(mktemp -d)"
             export TEST_WORKSPACE="''${HOME:?}/src"
 
