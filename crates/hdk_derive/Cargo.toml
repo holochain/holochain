@@ -27,7 +27,6 @@ holochain_integrity_types = { version = "^0.5.0-dev.12", path = "../holochain_in
 proc-macro-error = "1.0.4"
 
 [dev-dependencies]
-hdk = { version = "^0.5.0-dev.12", path = "../hdk" }
 trybuild = "1.0"
 
 [lints]

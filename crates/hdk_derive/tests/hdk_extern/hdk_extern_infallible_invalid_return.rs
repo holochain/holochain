@@ -1,4 +1,4 @@
-use hdk::prelude::*;
+use hdk_derive::*;
 
 #[hdk_extern(infallible)]
 fn zome_fn() -> ExternResult<String> {
