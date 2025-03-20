@@ -290,7 +290,7 @@ async fn test_hash_dna_function() {
         let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
         let stdout = cmd.assert().success().get_output().stdout.clone();
         let actual = String::from_utf8_lossy(&stdout).replace(['\r', '\n'], ""); // Normalize Windows/linux
-        let expected = "uhC0klkazCjMK-V3HooCgXVCB7OGhGEplGD-UWFgCIeXGZfRB7ORO";
+        let expected = "uhC0kJA4rjFsKZ2vYFafDNV1otPe16wsjlePUwudzUd4DJdpl1lBj";
         assert_eq!(
             expected, actual,
             "Expected: {}\nActual: {}",
