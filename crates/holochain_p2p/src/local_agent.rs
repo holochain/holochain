@@ -130,7 +130,14 @@ impl LocalAgent for HolochainP2pLocalAgent {
     }
 
     fn set_tgt_storage_arc_hint(&self, arc: DhtArc) {
-        self.inner.lock().target_arc = apply_arc_factor(arc, self.target_arc_factor);
+        let factor = if self.target_arc_factor > 1 {
+            tracing::error!("Received target arc factor > 1, this is not yet allowed until sharding is implemented!");
+            1
+        } else {
+            self.target_arc_factor
+        };
+
+        self.inner.lock().target_arc = apply_arc_factor(arc, factor);
     }
 }
 
