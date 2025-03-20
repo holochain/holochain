@@ -19,6 +19,7 @@ use holochain_types::test_utils::chain::chain_to_ops;
 use holochain_types::test_utils::chain::entry_hash;
 use holochain_types::test_utils::chain::TestChainItem;
 use kitsune2_api::AgentInfoSigned;
+use kitsune2_api::StoredOp;
 use std::collections::HashSet;
 use std::sync::Arc;
 use QueryFilter;
@@ -235,6 +236,10 @@ impl HolochainP2pDnaT for PassThroughNetwork {
     }
 
     async fn leave(&self, _agent: AgentPubKey) -> HolochainP2pResult<()> {
+        todo!()
+    }
+
+    async fn new_integrated_data(&self, _ops: Vec<StoredOp>) -> HolochainP2pResult<()> {
         todo!()
     }
 

@@ -887,6 +887,19 @@ impl HolochainP2pActor {
         }
     }
 
+    async fn inform_ops_stored(
+        &self,
+        space_id: SpaceId,
+        ops: Vec<StoredOp>,
+    ) -> HolochainP2pResult<()> {
+        self.kitsune
+            .space(space_id)
+            .await?
+            .inform_ops_stored(ops)
+            .await
+            .map_err(HolochainP2pError::K2Error)
+    }
+
     /* -----------------
      * saving so we can implement similiar stuff later
 
@@ -1029,6 +1042,14 @@ impl actor::HcP2p for HolochainP2pActor {
             space.local_agent_leave(agent_pub_key.to_k2_agent()).await;
             Ok(())
         })
+    }
+
+    fn new_integrated_data(
+        &self,
+        space_id: SpaceId,
+        ops: Vec<StoredOp>,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async move { self.inform_ops_stored(space_id, ops).await })
     }
 
     fn call_remote(

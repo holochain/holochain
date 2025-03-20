@@ -5,6 +5,8 @@ use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
+use kitsune2_api::{SpaceId, StoredOp};
+use mockall::automock;
 
 #[derive(Clone, Debug)]
 /// Get options help control how the get is processed at various levels.
@@ -255,6 +257,14 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         &self,
         dna_hash: DnaHash,
         agent_pub_key: AgentPubKey,
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
+
+    /// Inform p2p module when ops have been integrated into the store, so that it can start
+    /// gossiping them.
+    fn new_integrated_data(
+        &self,
+        space_id: SpaceId,
+        ops: Vec<StoredOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
