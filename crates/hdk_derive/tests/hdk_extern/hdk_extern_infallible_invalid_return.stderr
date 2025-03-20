@@ -1,5 +1,5 @@
 error: functions marked as infallible must return the inner type directly
- --> tests/tests/hdk_extern/hdk_extern_infallible_invalid_return.rs:4:17
+ --> tests/hdk_extern/hdk_extern_infallible_invalid_return.rs:4:17
   |
 4 | fn zome_fn() -> ExternResult<String> {
   |                 ^^^^^^^^^^^^

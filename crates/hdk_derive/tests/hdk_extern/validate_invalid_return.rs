@@ -1,4 +1,4 @@
-use hdk::prelude::*;
+use hdk_derive::*;
 
 #[hdk_extern] 
 fn validate() -> String {
