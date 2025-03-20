@@ -25,7 +25,6 @@ either = "1.5.0"
 fallible-iterator = "0.3.0"
 futures = "0.3"
 getrandom = "0.2.7"
-ghost_actor = "0.3.0-alpha.6"
 hc_deepkey_sdk = { version = "^0.8.0-dev.19", path = "../hc_deepkey_sdk" }
 holo_hash = { version = "^0.5.0-dev.7", path = "../holo_hash", features = [
   "full",
@@ -200,7 +199,6 @@ test_utils = [
   "contrafact",
   "deepkey-wasm-cache",
   "diff",
-  "ghost_actor/test_utils",
   "hdk/test_utils",
   "holochain_sqlite/test_utils",
   "holochain_state/test_utils",
