@@ -220,10 +220,12 @@ pub struct NetworkConfig {
 
     /// Disable Kitsune publish.
     #[cfg(feature = "test-utils")]
+    #[serde(default)]
     pub disable_publish: bool,
 
     /// Disable Kitsune gossip.
     #[cfg(feature = "test-utils")]
+    #[serde(default)]
     pub disable_gossip: bool,
 }
 
