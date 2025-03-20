@@ -88,13 +88,10 @@ pub mod slow_tests {
         holochain_trace::test_run();
         // agents should not pass around data
         let config = SweetConductorConfig::rendezvous(false)
-            /*
-            .tune(|config| {
-                config.disable_historical_gossip = true;
-                config.disable_recent_gossip = true;
-                config.disable_publish = true;
+            .tune_network_config(|nc| {
+                nc.disable_publish = true;
+                nc.disable_gossip = true;
             })
-            */
             .no_dpki();
         let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
