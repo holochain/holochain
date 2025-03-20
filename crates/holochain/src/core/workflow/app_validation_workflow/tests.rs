@@ -516,9 +516,8 @@ async fn validate_ops_in_sequence_must_get_action() {
 async fn multi_create_link_validation() {
     holochain_trace::test_run();
 
-    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
     pub struct Post(String);
-    holochain_serial!(Post);
     app_entry!(Post);
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AppValidation]).await;

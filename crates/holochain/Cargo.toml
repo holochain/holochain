@@ -25,7 +25,6 @@ either = "1.5.0"
 fallible-iterator = "0.3.0"
 futures = "0.3"
 getrandom = "0.2.7"
-ghost_actor = "0.3.0-alpha.6"
 hc_deepkey_sdk = { version = "^0.8.0-dev.19", path = "../hc_deepkey_sdk" }
 holo_hash = { version = "^0.5.0-dev.7", path = "../holo_hash", features = [
   "full",
@@ -55,8 +54,8 @@ holochain_conductor_config = { version = "^0.5.0-dev.8", path = "../holochain_co
 holochain_timestamp = { version = "^0.5.0-dev.1", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.12" }
-kitsune2_api = "=0.0.1-alpha.12"
-kitsune2_core = "=0.0.1-alpha.12"
+kitsune2_api = "=0.0.1-alpha.13"
+kitsune2_core = "=0.0.1-alpha.13"
 mockall = "0.11.3"
 mr_bundle = { version = "^0.5.0-dev.5", path = "../mr_bundle" }
 must_future = "0.1.1"
@@ -200,7 +199,6 @@ test_utils = [
   "contrafact",
   "deepkey-wasm-cache",
   "diff",
-  "ghost_actor/test_utils",
   "hdk/test_utils",
   "holochain_sqlite/test_utils",
   "holochain_state/test_utils",

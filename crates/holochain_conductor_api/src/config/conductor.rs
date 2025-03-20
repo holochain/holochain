@@ -197,6 +197,11 @@ impl ConductorConfig {
     }
 }
 
+#[inline(always)]
+fn one() -> u32 {
+    1
+}
+
 /// All the network config information for the conductor.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -212,11 +217,28 @@ pub struct NetworkConfig {
     /// The Kitsune2 webrtc_config to use for connecting to peers.
     pub webrtc_config: Option<serde_json::Value>,
 
+    /// The target arc factor to apply when receiving hints from kitsune2.
+    /// In normal operation, leave this as the default 1.
+    /// For leacher nodes that do not contribute to gossip, set to zero.
+    /// To take on additional gossip burden, set to > 1.
+    #[serde(default = "one")]
+    pub target_arc_factor: u32,
+
     /// Use this advanced field to directly configure kitsune2.
     ///
     /// The above options actually just set specific values in this config.
     /// Use only if you know what you are doing!
     pub advanced: Option<serde_json::Value>,
+
+    /// Disable Kitsune publish.
+    #[cfg(feature = "test-utils")]
+    #[serde(default)]
+    pub disable_publish: bool,
+
+    /// Disable Kitsune gossip.
+    #[cfg(feature = "test-utils")]
+    #[serde(default)]
+    pub disable_gossip: bool,
 }
 
 impl Default for NetworkConfig {
@@ -225,7 +247,12 @@ impl Default for NetworkConfig {
             bootstrap_url: url2::Url2::parse("https://devtest-bootstrap-1.holochain.org"),
             signal_url: url2::Url2::parse("wss://devtest-sbd-1.holochain.org"),
             webrtc_config: None,
+            target_arc_factor: 1,
             advanced: None,
+            #[cfg(feature = "test-utils")]
+            disable_publish: false,
+            #[cfg(feature = "test-utils")]
+            disable_gossip: false,
         }
     }
 }
@@ -319,6 +346,7 @@ impl NetworkConfig {
         Ok(working)
     }
 
+    #[cfg(feature = "test-utils")]
     fn insert_into_config(
         &mut self,
         mutator: impl Fn(&mut serde_json::Map<String, serde_json::Value>) -> ConductorConfigResult<()>,

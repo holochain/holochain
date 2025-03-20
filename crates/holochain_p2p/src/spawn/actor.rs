@@ -226,6 +226,7 @@ impl Pending {
 
 pub(crate) struct HolochainP2pActor {
     this: Weak<Self>,
+    target_arc_factor: u32,
     compat: NetworkCompatParams,
     preflight: Arc<std::sync::Mutex<bytes::Bytes>>,
     evt_sender: Arc<std::sync::OnceLock<WrapEvtSender>>,
@@ -752,17 +753,31 @@ impl HolochainP2pActor {
             });
         });
 
+        #[cfg(feature = "test_utils")]
         let mut builder = if config.k2_test_builder {
             let mut builder = kitsune2_core::default_test_builder();
 
-            // Still want the real gossip module to be used. The test builder comes with a stub
-            // gossip module fur use in K2 testing.
-            builder.gossip = kitsune2_gossip::K2GossipFactory::create();
+            // Make it possible to disable the gossip module for testing.
+            if !config.disable_gossip {
+                // Still want the real gossip module to be used. The test builder comes with a stub
+                // gossip module fur use in K2 testing.
+                builder.gossip = kitsune2_gossip::K2GossipFactory::create();
+            } else {
+                tracing::info!("Running with gossip disabled");
+            }
+
+            if config.disable_publish {
+                tracing::info!("Running with publish disabled");
+                builder.publish = Arc::new(test::NoopPublishFactory);
+            }
 
             builder
         } else {
             kitsune2::default_builder()
         };
+
+        #[cfg(not(feature = "test_utils"))]
+        let mut builder = kitsune2::default_builder();
 
         let evt_sender = Arc::new(std::sync::OnceLock::new());
 
@@ -807,6 +822,7 @@ impl HolochainP2pActor {
 
         Ok(Arc::new_cyclic(|this| Self {
             this: this.clone(),
+            target_arc_factor: config.target_arc_factor,
             compat: config.compat,
             preflight,
             evt_sender,
@@ -843,9 +859,10 @@ impl HolochainP2pActor {
             .collect::<Vec<_>>();
 
         rand::seq::SliceRandom::shuffle(&mut agent_list[..], &mut rand::thread_rng());
-        agent_list.into_iter().next().ok_or_else(|| {
-            HolochainP2pError::other(format!("{tag}: no viable peers from which to get",))
-        })
+        agent_list
+            .into_iter()
+            .next()
+            .ok_or_else(|| HolochainP2pError::NoPeersForLocation(tag.to_string(), loc))
     }
 
     async fn send_notify(
@@ -1008,6 +1025,7 @@ impl actor::HcP2p for HolochainP2pActor {
             let local_agent: DynLocalAgent = Arc::new(HolochainP2pLocalAgent::new(
                 agent_pub_key,
                 DhtArc::FULL,
+                self.target_arc_factor,
                 self.lair_client.clone(),
             ));
 

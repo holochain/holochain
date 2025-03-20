@@ -13,6 +13,7 @@
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
         RUST_SODIUM_SHARED = "1";
+        LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib";
 
         pname = "holochain";
         src = flake.config.srcCleanedHolochain;

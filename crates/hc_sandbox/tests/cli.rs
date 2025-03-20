@@ -108,6 +108,9 @@ async fn check_timeout<T>(response: impl Future<Output = WebsocketResult<T>>) ->
 }
 
 async fn package_fixture_if_not_packaged() {
+    static PACKAGE_SEMAPHORE: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
+    let _lock = PACKAGE_SEMAPHORE.acquire().await.unwrap();
+
     if PathBuf::from("tests/fixtures/my-app/my-fixture-app.happ").exists()
         && PathBuf::from("tests/fixtures/my-app-deferred/my-fixture-app-deferred.happ").exists()
     {

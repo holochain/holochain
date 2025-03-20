@@ -7,7 +7,10 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::fixt::ActionFixturator;
-use kitsune2_api::DhtArc;
+use kitsune2_api::{
+    Builder, Config, DhtArc, DynFetch, DynPeerStore, DynPublish, DynTransport, K2Result, OpId,
+    Publish, PublishFactory, SpaceId, Url,
+};
 
 #[derive(Debug)]
 struct StubNetwork;
@@ -215,3 +218,47 @@ fixturator!(
         HolochainP2pDnaFixturator::new(Empty).next().unwrap()
     };
 );
+
+#[derive(Debug)]
+pub struct NoopPublish;
+
+impl Publish for NoopPublish {
+    fn publish_ops(&self, _op_ids: Vec<OpId>, _target: Url) -> BoxFut<'_, K2Result<()>> {
+        Box::pin(async { Ok(()) })
+    }
+
+    fn publish_agent(
+        &self,
+        _agent_info: Arc<AgentInfoSigned>,
+        _target: Url,
+    ) -> BoxFut<'_, K2Result<()>> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
+#[derive(Debug)]
+pub struct NoopPublishFactory;
+
+impl PublishFactory for NoopPublishFactory {
+    fn default_config(&self, _config: &mut Config) -> K2Result<()> {
+        Ok(())
+    }
+
+    fn validate_config(&self, _config: &Config) -> K2Result<()> {
+        Ok(())
+    }
+
+    fn create(
+        &self,
+        _builder: Arc<Builder>,
+        _space_id: SpaceId,
+        _fetch: DynFetch,
+        _peer_store: DynPeerStore,
+        _transport: DynTransport,
+    ) -> BoxFut<'static, K2Result<DynPublish>> {
+        Box::pin(async {
+            let instance: DynPublish = Arc::new(NoopPublish);
+            Ok(instance)
+        })
+    }
+}

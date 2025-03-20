@@ -39,6 +39,9 @@ pub struct HolochainP2pConfig {
     /// Callback function to retrieve an op store database handle for a dna hash.
     pub get_db_op_store: GetDbOpStore,
 
+    /// The arc factor to apply to target arc hints.
+    pub target_arc_factor: u32,
+
     /// Configuration to pass to Kitsune2.
     ///
     /// This should contain module configurations such as [CoreBootstrapModConfig](kitsune2_core::factories::CoreBootstrapModConfig).
@@ -48,15 +51,36 @@ pub struct HolochainP2pConfig {
     pub compat: NetworkCompatParams,
 
     /// If true, will use kitsune core test bootstrap / transport / etc.
+    #[cfg(feature = "test_utils")]
     pub k2_test_builder: bool,
+
+    /// If true, will replace the default publish module with a no-op module.
+    ///
+    /// This flag is only used when [HolochainP2pConfig::k2_test_builder] is true.
+    #[cfg(feature = "test_utils")]
+    pub disable_publish: bool,
+
+    /// If true, will leave the default no-op gossip module in place rather than replacing it with
+    /// the real gossip module.
+    ///
+    /// This flag is only used when [HolochainP2pConfig::k2_test_builder] is true.
+    #[cfg(feature = "test_utils")]
+    pub disable_gossip: bool,
 }
 
 impl std::fmt::Debug for HolochainP2pConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("HolochainP2pConfig")
-            .field("k2_test_builder", &self.k2_test_builder)
-            .field("compat", &self.compat)
-            .finish()
+        let mut dbg = f.debug_struct("HolochainP2pConfig");
+        dbg.field("compat", &self.compat);
+
+        #[cfg(feature = "test_utils")]
+        {
+            dbg.field("k2_test_builder", &self.k2_test_builder)
+                .field("disable_publish", &self.disable_publish)
+                .field("disable_gossip", &self.disable_gossip);
+        }
+
+        dbg.finish()
     }
 }
 
@@ -65,9 +89,15 @@ impl Default for HolochainP2pConfig {
         Self {
             get_db_peer_meta: Arc::new(|_| unimplemented!()),
             get_db_op_store: Arc::new(|_| unimplemented!()),
+            target_arc_factor: 1,
             network_config: None,
             compat: Default::default(),
+            #[cfg(feature = "test_utils")]
             k2_test_builder: false,
+            #[cfg(feature = "test_utils")]
+            disable_publish: false,
+            #[cfg(feature = "test_utils")]
+            disable_gossip: false,
         }
     }
 }

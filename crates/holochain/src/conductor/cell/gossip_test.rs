@@ -6,10 +6,10 @@ use holochain_test_wasm_common::AnchorInput;
 use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "This test is flaky"]
 async fn gossip_test() {
     holochain_trace::test_run();
-    let config = SweetConductorConfig::standard().no_publish();
+    let config =
+        SweetConductorConfig::standard().tune_network_config(|nc| nc.disable_publish = true);
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Anchor]).await;
@@ -59,7 +59,9 @@ async fn signature_smoke_test() {
 #[tokio::test(flavor = "multi_thread")]
 async fn agent_info_test() {
     holochain_trace::test_run();
-    let config = SweetConductorConfig::standard().no_publish().no_dpki();
+    let config = SweetConductorConfig::standard()
+        .tune_network_config(|nc| nc.disable_publish = true)
+        .no_dpki();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
 
     let (dna_file, _, _) =

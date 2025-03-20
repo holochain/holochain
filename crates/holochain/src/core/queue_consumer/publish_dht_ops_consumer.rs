@@ -43,23 +43,21 @@ pub fn spawn_publish_dht_ops_consumer(
                 .conductor_tuning_params()
                 .min_publish_interval();
             async move {
-                // TODO provide a way to disable publish in K2
-                if false
-                /*conductor.get_config().network.tuning_params.disable_publish*/
-                {
-                    Ok(WorkComplete::Complete)
-                } else {
-                    publish_dht_ops_workflow(
-                        env,
+                #[cfg(feature = "test_utils")]
+                if conductor.get_config().network.disable_publish {
+                    return Ok(WorkComplete::Complete);
+                }
+
+                publish_dht_ops_workflow(
+                    env,
                         dht_db,
                         required_receipt_counts,
-                        Arc::new(network),
-                        tx,
-                        agent,
-                        min_publish_interval,
-                    )
-                    .await
-                }
+                    Arc::new(network),
+                    tx,
+                    agent,
+                    min_publish_interval,
+                )
+                .await
             }
         },
     );
