@@ -736,17 +736,31 @@ impl HolochainP2pActor {
             });
         });
 
+        #[cfg(feature = "test_utils")]
         let mut builder = if config.k2_test_builder {
             let mut builder = kitsune2_core::default_test_builder();
 
-            // Still want the real gossip module to be used. The test builder comes with a stub
-            // gossip module fur use in K2 testing.
-            builder.gossip = kitsune2_gossip::K2GossipFactory::create();
+            // Make it possible to disable the gossip module for testing.
+            if !config.disable_gossip {
+                // Still want the real gossip module to be used. The test builder comes with a stub
+                // gossip module fur use in K2 testing.
+                builder.gossip = kitsune2_gossip::K2GossipFactory::create();
+            } else {
+                tracing::info!("Running with gossip disabled");
+            }
+
+            if config.disable_publish {
+                tracing::info!("Running with publish disabled");
+                builder.publish = Arc::new(test::NoopPublishFactory);
+            }
 
             builder
         } else {
             kitsune2::default_builder()
         };
+
+        #[cfg(not(feature = "test_utils"))]
+        let mut builder = kitsune2::default_builder();
 
         let evt_sender = Arc::new(std::sync::OnceLock::new());
 

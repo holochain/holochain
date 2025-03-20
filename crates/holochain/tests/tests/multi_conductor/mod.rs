@@ -32,7 +32,8 @@ async fn dpki_publish() {
 async fn dpki_no_publish() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::standard().no_publish();
+    let config =
+        SweetConductorConfig::standard().tune_network_config(|nc| nc.disable_publish = true);
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     conductors.exchange_peer_info().await;
