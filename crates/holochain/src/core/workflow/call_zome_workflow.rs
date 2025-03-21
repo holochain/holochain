@@ -26,6 +26,8 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 #[cfg(test)]
+mod unit_tests;
+#[cfg(test)]
 mod validation_test;
 
 /// Placeholder for the return value of a zome invocation
