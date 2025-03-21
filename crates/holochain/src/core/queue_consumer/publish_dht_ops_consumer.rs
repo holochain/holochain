@@ -50,8 +50,8 @@ pub fn spawn_publish_dht_ops_consumer(
 
                 publish_dht_ops_workflow(
                     env,
-                        dht_db,
-                        required_receipt_counts,
+                    dht_db,
+                    required_receipt_counts,
                     Arc::new(network),
                     tx,
                     agent,

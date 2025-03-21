@@ -62,10 +62,8 @@ mod publish_dht_ops_consumer;
 use crate::conductor::error::ConductorResult;
 use crate::core::queue_consumer::countersigning_consumer::spawn_countersigning_consumer;
 use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
-use validation_receipt_consumer::*;
 
 mod countersigning_consumer;
-mod validation_receipt_consumer;
 
 mod witnessing_consumer;
 
@@ -114,6 +112,8 @@ pub async fn spawn_queue_consumer_tasks(
                                 .entry(zome_idx)
                                 .or_default()
                                 .insert(entry_idx, ed.required_validations.0);
+                        } else {
+                            break;
                         }
                     }
                 } else {
@@ -133,18 +133,6 @@ pub async fn spawn_queue_consumer_tasks(
         network.clone(),
     );
 
-    // Validation Receipt
-    // One per space.
-
-    let tx_receipt = queue_consumer_map.spawn_once_validation_receipt(dna_hash.clone(), || {
-        spawn_validation_receipt_consumer(
-            dna_hash.clone(),
-            dht_db.clone(),
-            conductor.clone(),
-            network.clone(),
-        )
-    });
-
     // Integration
     // One per space.
     let tx_integration = queue_consumer_map.spawn_once_integration(dna_hash.clone(), || {
@@ -153,7 +141,6 @@ pub async fn spawn_queue_consumer_tasks(
             dht_db.clone(),
             dht_query_cache.clone(),
             conductor.task_manager(),
-            tx_receipt.clone(),
             network.clone(),
         )
     });
@@ -261,7 +248,6 @@ pub async fn spawn_queue_consumer_tasks(
             tx_publish,
             tx_app,
             tx_integration,
-            tx_receipt,
             tx_countersigning,
         ),
     ))
@@ -285,13 +271,6 @@ impl QueueConsumerMap {
         Self {
             map: RwShare::new(HashMap::new()),
         }
-    }
-
-    fn spawn_once_validation_receipt<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender
-    where
-        S: FnOnce() -> TriggerSender,
-    {
-        self.spawn_once(QueueEntry(dna_hash, QueueType::Receipt), spawn)
     }
 
     fn spawn_once_integration<S>(&self, dna_hash: Arc<DnaHash>, spawn: S) -> TriggerSender
@@ -320,11 +299,6 @@ impl QueueConsumerMap {
         S: FnOnce() -> TriggerSender,
     {
         self.spawn_once(QueueEntry(dna_hash, QueueType::Witnessing), spawn)
-    }
-
-    /// Get the validation receipt trigger for this dna hash.
-    pub fn validation_receipt_trigger(&self, dna_hash: Arc<DnaHash>) -> Option<TriggerSender> {
-        self.get_trigger(&QueueEntry(dna_hash, QueueType::Receipt))
     }
 
     /// Get the integration trigger for this dna hash.
@@ -375,7 +349,6 @@ struct QueueEntry(Arc<DnaHash>, QueueType);
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
 enum QueueType {
-    Receipt,
     Integration,
     AppValidation,
     SysValidation,
@@ -407,7 +380,6 @@ pub struct InitialQueueTriggers {
     publish_dht_ops: TriggerSender,
     app_validation: TriggerSender,
     integrate_dht_ops: TriggerSender,
-    validation_receipt: TriggerSender,
     countersigning: TriggerSender,
 }
 
@@ -417,7 +389,6 @@ impl InitialQueueTriggers {
         publish_dht_ops: TriggerSender,
         app_validation: TriggerSender,
         integrate_dht_ops: TriggerSender,
-        validation_receipt: TriggerSender,
         countersigning: TriggerSender,
     ) -> Self {
         Self {
@@ -425,7 +396,6 @@ impl InitialQueueTriggers {
             publish_dht_ops,
             app_validation,
             integrate_dht_ops,
-            validation_receipt,
             countersigning,
         }
     }
@@ -436,7 +406,6 @@ impl InitialQueueTriggers {
         self.app_validation.trigger(&"init");
         self.integrate_dht_ops.trigger(&"init");
         self.publish_dht_ops.trigger(&"init");
-        self.validation_receipt.trigger(&"init");
         self.countersigning.trigger(&"init");
     }
 }

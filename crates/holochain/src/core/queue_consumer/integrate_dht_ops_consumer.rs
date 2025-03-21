@@ -15,7 +15,6 @@ pub fn spawn_integrate_dht_ops_consumer(
     env: DbWrite<DbKindDht>,
     dht_query_cache: DhtDbQueryCache,
     tm: TaskManagerClient,
-    trigger_receipt: TriggerSender,
     network: HolochainP2pDna,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
@@ -25,14 +24,7 @@ pub fn spawn_integrate_dht_ops_consumer(
         dna_hash,
         tm,
         (tx.clone(), rx),
-        move || {
-            integrate_dht_ops_workflow(
-                env.clone(),
-                dht_query_cache.clone(),
-                trigger_receipt.clone(),
-                network.clone(),
-            )
-        },
+        move || integrate_dht_ops_workflow(env.clone(), dht_query_cache.clone(), network.clone()),
     );
 
     tx

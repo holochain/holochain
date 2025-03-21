@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 use futures::future::FutureExt;
 use holochain_serialized_bytes::SerializedBytes;
-//use rusqlite::OptionalExtension;
 use tokio::sync::broadcast;
 use tracing::*;
 use tracing_futures::Instrument;
@@ -757,130 +756,6 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             unreachable!("This function is handled at the conductor level, not the cell level")
         })
     }
-
-    /*
-    /// A remote agent is sending us a validation receipt bundle.
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, receipts)))]
-    fn handle_validation_receipts_received(
-        &self,
-        _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        receipts: ValidationReceiptBundle,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        let fut = async move {
-            for receipt in receipts.into_iter() {
-                debug!(from = ?receipt.receipt.validators, to = ?self.id.agent_pubkey(), hash = ?receipt.receipt.dht_op_hash);
-
-                // Get the action for this op so we can check the entry type.
-                let hash = receipt.receipt.dht_op_hash.clone();
-                let action: Option<SignedAction> = self
-                    .get_or_create_authored_db()?
-                    .read_async(move |txn| {
-                        let h: Option<Vec<u8>> = txn
-                            .query_row(
-                                "SELECT Action.blob as action_blob
-                    FROM DhtOp
-                    JOIN Action ON Action.hash = DhtOp.action_hash
-                    WHERE DhtOp.hash = :hash",
-                                named_params! {
-                                    ":hash": hash,
-                                },
-                                |row| row.get("action_blob"),
-                            )
-                            .optional()?;
-                        match h {
-                            Some(h) => from_blob(h),
-                            None => Ok(None),
-                        }
-                    })
-                    .await?;
-
-                // If the action has an app entry type get the entry def
-                // from the conductor.
-                let required_receipt_count = match action.as_ref().and_then(|h| h.entry_type()) {
-                    Some(EntryType::App(AppEntryDef {
-                        zome_index,
-                        entry_index,
-                        ..
-                    })) => {
-                        let ribosome = self.conductor_api.get_this_ribosome().map_err(Box::new)?;
-                        let zome = ribosome.get_integrity_zome(zome_index);
-                        match zome {
-                            Some(zome) => self
-                                .conductor_api
-                                .get_entry_def(&EntryDefBufferKey::new(
-                                    zome.into_inner().1,
-                                    *entry_index,
-                                ))
-                                .map(|e| u8::from(e.required_validations)),
-                            None => None,
-                        }
-                    }
-                    _ => None,
-                };
-
-                // If no required receipt count was found then fallback to the default.
-                let required_validation_count = required_receipt_count.unwrap_or(
-                    crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
-                );
-
-                let receipt_op_hash = receipt.receipt.dht_op_hash.clone();
-
-                let receipt_count = self
-                    .space
-                    .dht_db
-                    .write_async({
-                        let receipt_op_hash = receipt_op_hash.clone();
-                        move |txn| -> StateMutationResult<usize> {
-                            // Add the new receipts to the db
-                            add_if_unique(txn, receipt)?;
-
-                            // Get the current count for this DhtOp.
-                            let receipt_count: usize = txn.query_row(
-                            "SELECT COUNT(rowid) FROM ValidationReceipt WHERE op_hash = :op_hash",
-                            named_params! {
-                                ":op_hash": receipt_op_hash,
-                            },
-                            |row| row.get(0),
-                        )?;
-
-                            if receipt_count >= required_validation_count as usize {
-                                // If we have enough receipts then set receipts to complete.
-                                //
-                                // Don't fail here if this doesn't work, it's only informational. Getting
-                                // the same flag set in the authored db is what will stop the publish
-                                // workflow from republishing this op.
-                                set_receipts_complete_redundantly_in_dht_db(
-                                    txn,
-                                    &receipt_op_hash,
-                                    true,
-                                )
-                                .ok();
-                            }
-
-                            Ok(receipt_count)
-                        }
-                    })
-                    .await?;
-
-                // If we have enough receipts then set receipts to complete.
-                if receipt_count >= required_validation_count as usize {
-                    // Note that the flag is set in the authored db because that's what the publish workflow checks to decide
-                    // whether to republish the op for more validation receipts.
-                    self.get_or_create_authored_db()?
-                        .write_async(move |txn| -> StateMutationResult<()> {
-                            set_receipts_complete(txn, &receipt_op_hash, true)
-                        })
-                        .await?;
-                }
-            }
-
-            CellResult::Ok(())
-        };
-
-        Box::pin(async move { fut.await.map_err(HolochainP2pError::other) })
-    }
-    */
 
     #[cfg_attr(
         feature = "instrument",

@@ -1,7 +1,6 @@
 //! The workflow and queue consumer for DhtOp integration
 
 use super::*;
-use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
@@ -11,12 +10,11 @@ mod tests;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(vault, trigger_receipt, network, dht_query_cache))
+    tracing::instrument(skip(vault, network, dht_query_cache))
 )]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
     dht_query_cache: DhtDbQueryCache,
-    trigger_receipt: TriggerSender,
     _network: HolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
@@ -111,7 +109,6 @@ pub async fn integrate_dht_ops_workflow(
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
     tracing::debug!(?changed, %ops_ps);
     if changed > 0 {
-        trigger_receipt.trigger(&"integrate_dht_ops_workflow");
         Ok(WorkComplete::Incomplete(None))
     } else {
         Ok(WorkComplete::Complete)
