@@ -36,7 +36,6 @@ use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
-//use tokio::sync::mpsc;
 
 pub use itertools;
 
@@ -61,59 +60,6 @@ macro_rules! here {
     ($test: expr) => {
         concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
     };
-}
-
-/// Create metadata mocks easily by passing in
-/// expected functions, return data and with_f checks
-#[macro_export]
-macro_rules! meta_mock {
-    () => {{
-        holochain_state::metadata::MockMetadataBuf::new()
-    }};
-    ($fun:ident) => {{
-        let d: Vec<holochain_types::metadata::TimedActionHash> = Vec::new();
-        meta_mock!($fun, d)
-    }};
-    ($fun:ident, $data:expr) => {{
-        let mut metadata = holochain_state::metadata::MockMetadataBuf::new();
-        metadata.$fun().returning({
-            move |_| {
-                Ok(Box::new(fallible_iterator::convert(
-                    $data
-                        .clone()
-                        .into_iter()
-                        .map(holochain_types::metadata::TimedActionHash::from)
-                        .map(Ok),
-                )))
-            }
-        });
-        metadata
-    }};
-    ($fun:ident, $data:expr, $match_fn:expr) => {{
-        let mut metadata = holochain_state::metadata::MockMetadataBuf::new();
-        metadata.$fun().returning({
-            move |a| {
-                if $match_fn(a) {
-                    Ok(Box::new(fallible_iterator::convert(
-                        $data
-                            .clone()
-                            .into_iter()
-                            .map(holochain_types::metadata::TimedActionHash::from)
-                            .map(Ok),
-                    )))
-                } else {
-                    let mut data = $data.clone();
-                    data.clear();
-                    Ok(Box::new(fallible_iterator::convert(
-                        data.into_iter()
-                            .map(holochain_types::metadata::TimedActionHash::from)
-                            .map(Ok),
-                    )))
-                }
-            }
-        });
-        metadata
-    }};
 }
 
 /// Do what's necessary to install an app

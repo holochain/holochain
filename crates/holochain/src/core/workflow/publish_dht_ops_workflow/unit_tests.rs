@@ -264,8 +264,10 @@ async fn ignores_data_by_other_authors() {
     assert!(rx.is_paused());
 }
 
+// Even though ops are created for actions with private entries, they should not
+// contain the private entry.
 #[tokio::test(flavor = "multi_thread")]
-async fn private_entries_are() {
+async fn private_entries_are_not_published() {
     holochain_trace::test_run();
 
     let test_db = holochain_state::test_utils::test_authored_db();
