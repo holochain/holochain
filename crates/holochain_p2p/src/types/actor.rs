@@ -202,6 +202,7 @@ impl Default for GetActivityOptions {
 }
 
 /// Trait defining the main holochain_p2p interface.
+#[cfg_attr(feature = "test_utils", automock)]
 pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     /// Test access to underlying kitsune instance.
     #[cfg(feature = "test_utils")]
