@@ -19,6 +19,8 @@ use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_p2p::actor::MockHcP2p;
+use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::insert_op_dht;
 use holochain_state::prelude::{from_blob, insert_op_cache, StateQueryResult};
@@ -129,17 +131,21 @@ async fn main_workflow() {
             .len();
     assert_eq!(ops_to_validate, 1);
 
+    let mut hc_p2p = MockHcP2p::new();
+    // Cascade should attempt once to get the missing create op from the network.
+    hc_p2p
+        .expect_get()
+        .times(1)
+        .return_once(|_, _, _| Box::pin(async { Ok(vec![]) }));
+    let network = HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone(), None);
+
     // run validation workflow
     // outcome should be incomplete - delete op is missing the dependent create op
     let outcome_summary = app_validation_workflow_inner(
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &holochain_p2p::HolochainP2pDna::new(
-            conductor.holochain_p2p().clone(),
-            dna_hash.clone(),
-            None,
-        ),
+        &network,
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
