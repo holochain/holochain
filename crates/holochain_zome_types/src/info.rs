@@ -12,6 +12,11 @@ pub struct AgentInfo {
     /// The current agent's pubkey at genesis.
     /// Always found at index 2 in the source chain.
     pub agent_initial_pubkey: AgentPubKey,
+    #[cfg(feature = "unstable-dpki")]
+    /// The current agent's current pubkey.
+    /// Same as the initial pubkey if it has never been changed.
+    /// The agent can revoke an old key and replace it with a new one, the latest appears here.
+    pub agent_latest_pubkey: AgentPubKey,
     pub chain_head: (ActionHash, u32, Timestamp),
 }
 
