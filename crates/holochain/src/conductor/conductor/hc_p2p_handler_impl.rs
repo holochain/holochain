@@ -147,27 +147,91 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         dht_op_list: Vec<DhtOpHash>,
     ) -> BoxFut<'_, HolochainP2pResult<ValidationReceiptBundle>> {
         Box::pin(async move {
+            // get the list of signers for these ops
+            let validators = self
+                .running_cell_ids()
+                .into_iter()
+                .filter_map(|id| {
+                    let (d, a) = id.into_dna_and_agent();
+                    if d == dna_hash {
+                        Some(a)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+
             let dht_db = self
                 .spaces
                 .dht_db(&dna_hash)
                 .map_err(HolochainP2pError::other)?;
 
-            let mut out = Vec::new();
+            // query the database
+            let unsign: Vec<ValidationReceipt> = dht_db
+                .read_async(move |txn| {
+                    let mut stmt = txn.prepare(
+                        "
+                        SELECT
+                            Action.author,
+                            DhtOp.validation_status,
+                            DhtOp.when_integrated
+                        FROM DhtOp
+                        JOIN Action ON DhtOp.action_hash = Action.hash
+                        WHERE
+                            DhtOp.hash = ?
+                            AND DhtOp.when_integrated IS NOT NULL
+                            AND DhtOp.validation_status IS NOT NULL
+                        ",
+                    )?;
 
-            for dht_op_hash in dht_op_list {
-                let mut receipts = dht_db
-                    .read_async(move |txn| {
-                        holochain_state::validation_receipts::list_receipts(txn, &dht_op_hash)
-                    })
-                    .await
-                    .map_err(HolochainP2pError::other)?;
+                    let mut out = Vec::new();
 
-                out.append(&mut receipts);
+                    // get the validation receipts if we are not the author
+                    for dht_op_hash in dht_op_list {
+                        for r in stmt.query_and_then([dht_op_hash.clone()], |r| {
+                            let author: AgentPubKey = r.get("author")?;
+                            let validation_status = r.get("validation_status")?;
+                            let when_integrated = r.get("when_integrated")?;
+                            StateQueryResult::Ok((
+                                ValidationReceipt {
+                                    dht_op_hash: dht_op_hash.clone(),
+                                    validation_status,
+                                    validators: validators.clone(),
+                                    when_integrated,
+                                },
+                                author,
+                            ))
+                        })? {
+                            if let Ok((receipt, author)) = r {
+                                // Do NOT sign our own receipts
+                                if validators.contains(&author) {
+                                    continue;
+                                }
+                                out.push(receipt);
+                            }
+                        }
+                    }
+
+                    StateQueryResult::Ok(out)
+                })
+                .await
+                .map_err(HolochainP2pError::other)?;
+
+            let mut sign: Vec<SignedValidationReceipt> = Vec::new();
+
+            // sign all the returned validation receipts
+            for receipt in unsign {
+                match ValidationReceipt::sign(receipt, self.keystore()).await {
+                    Ok(Some(r)) => sign.push(r),
+                    Ok(None) => (),
+                    Err(err) => info!(failed_to_sign_receipt = ?err),
+                }
             }
 
-            let receipts: ValidationReceiptBundle = out.into();
+            // convert into the bundle type
+            let out: ValidationReceiptBundle = sign.into();
 
-            Ok(receipts)
+            Ok(out)
         })
     }
 
