@@ -81,6 +81,7 @@ pub async fn spawn_queue_consumer_tasks(
     network: HolochainP2pDna,
     space: &Space,
     conductor: ConductorHandle,
+    api: &crate::conductor::api::CellConductorApi,
 ) -> ConductorResult<(QueueTriggers, InitialQueueTriggers)> {
     let Space {
         dht_db,
@@ -96,8 +97,8 @@ pub async fn spawn_queue_consumer_tasks(
 
     let mut required_receipt_counts: crate::core::workflow::publish_dht_ops_workflow::RequiredReceiptCounts = HashMap::new();
 
-    let cell = conductor.cell_by_id(&cell_id).await?;
-    let ribosome = cell.get_ribosome()?;
+    use crate::conductor::api::CellConductorApiT;
+    let ribosome = api.get_this_ribosome().map_err(ConductorError::other)?;
 
     for zidx in 0..u8::MAX {
         let zome_idx = ZomeIndex(zidx);

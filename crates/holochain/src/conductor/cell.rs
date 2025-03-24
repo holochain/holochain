@@ -142,6 +142,7 @@ impl Cell {
                 holochain_p2p_cell.clone(),
                 &space,
                 conductor_handle.clone(),
+                &conductor_api,
             )
             .await
             .map_err(Box::new)?;
