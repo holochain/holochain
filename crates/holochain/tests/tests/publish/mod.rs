@@ -8,7 +8,7 @@ use holochain_zome_types::validate::ValidationReceiptSet;
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "receipt completion is flaky, which has been rechecked since the workflow reviews"]
+//#[ignore = "receipt completion is flaky, which has been rechecked since the workflow reviews"]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     holochain_trace::test_run();
 
@@ -17,11 +17,10 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize
             + 1;
 
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(
-        NUM_CONDUCTORS,
-        SweetConductorConfig::rendezvous(true),
-    )
-    .await;
+    let config = SweetConductorConfig::rendezvous(true)
+        .tune_conductor(|p| p.min_publish_interval = Some(std::time::Duration::from_millis(10)));
+
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
@@ -33,14 +32,24 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         .call(&alice.zome(TestWasm::Create), "create_entry", ())
         .await;
 
+    tracing::warn!("@@@@ await consistency...");
+
     // Wait until they all see the created entry, at that point validation receipts should be getting sent soon
     await_consistency(60, [&alice, &bobbo, &carol, &danny, &emma, &fred])
         .await
         .unwrap();
 
+    tracing::warn!("@@@@ check num still needing publish...");
+
     let ops_to_publish = tokio::time::timeout(std::time::Duration::from_secs(60), async {
         let mut ops_to_publish = 1;
+        let mut dbg_ops_to_publish = ops_to_publish;
+
+        tracing::warn!(?dbg_ops_to_publish, "@@@@ OPS TO PUBLISH COUNT");
+
         while ops_to_publish > 0 {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
             ops_to_publish = alice
                 .authored_db()
                 .read_async({
@@ -53,6 +62,12 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
                 })
                 .await
                 .unwrap();
+
+            if dbg_ops_to_publish != ops_to_publish {
+                dbg_ops_to_publish = ops_to_publish;
+
+                tracing::warn!(?dbg_ops_to_publish, "@@@@ OPS TO PUBLISH COUNT");
+            }
         }
 
         ops_to_publish
@@ -61,6 +76,8 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
     .expect("timed out waiting for all receipts to be received");
 
     assert_eq!(ops_to_publish, 0);
+
+    tracing::warn!("@@@@ check receipt sets...");
 
     // Get the validation receipts to check that they are all complete
     let receipt_sets: Vec<ValidationReceiptSet> = conductors[0]
@@ -72,6 +89,8 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         .await;
     assert_eq!(receipt_sets.len(), 3);
     assert!(receipt_sets.iter().all(|r| r.receipts_complete));
+
+    tracing::warn!("@@@@ check agent activity receipt sets...");
 
     let agent_activity_receipt_set = receipt_sets
         .into_iter()
