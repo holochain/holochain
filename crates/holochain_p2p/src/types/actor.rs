@@ -1,6 +1,7 @@
 //! Module containing the HolochainP2p actor definition.
 #![allow(clippy::too_many_arguments)]
 
+use std::collections::HashMap;
 use crate::event::GetRequest;
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
@@ -382,11 +383,13 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     /// Dump network metrics.
     fn dump_network_metrics(
         &self,
-        dna_hash: Option<DnaHash>,
-    ) -> BoxFut<'_, HolochainP2pResult<String>>;
+        request: Kitsune2NetworkMetricsRequest
+    ) -> BoxFut<'_, HolochainP2pResult<HashMap<DnaHash, Kitsune2NetworkMetrics>>>;
 
-    /// Dump network stats.
-    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<String>>;
+    /// This is untyped because the returned data is backend-specific.
+    ///
+    /// See [Transport::dump_network_stats](kitsune2_api::Transport).
+    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<serde_json::Value>>;
 
     /// Get the target arcs of the agents currently in this space.
     fn target_arcs(

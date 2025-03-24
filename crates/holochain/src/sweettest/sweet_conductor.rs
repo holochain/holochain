@@ -819,32 +819,28 @@ impl SweetConductor {
     ) -> anyhow::Result<()> {
         let handle = self.raw_handle();
 
-        let installed_app = handle
-            .find_app_containing_cell(cell.cell_id())
-            .await?
-            .ok_or(anyhow::anyhow!("Could not find app containing cell"))?;
-
         let wait_start = Instant::now();
         loop {
             let (number_of_peers, completed_rounds) = handle
-                .network_info(
-                    installed_app.id(),
-                    &NetworkInfoRequestPayload {
-                        agent_pub_key: cell.agent_pubkey().clone(),
-                        dnas: vec![cell.cell_id.dna_hash().clone()],
-                        last_time_queried: None, // Just care about seeing the first data
-                    },
-                )
+                .dump_network_metrics(Kitsune2NetworkMetricsRequest {
+                    dna_hash: Some(cell.cell_id().dna_hash().clone()),
+                    ..Default::default()
+                })
                 .await?
-                .first()
+                .get(cell.cell_id.dna_hash())
                 .map_or((0, 0), |info| {
                     (
-                        info.current_number_of_peers,
-                        info.completed_rounds_since_last_time_queried,
+                        // The number of peers we're holding metadata for
+                        info.gossip_state_summary.peer_meta.len(),
+                        info.gossip_state_summary
+                            .peer_meta
+                            .values()
+                            .map(|meta| meta.completed_rounds.unwrap_or_default())
+                            .sum(),
                     )
                 });
 
-            if number_of_peers >= min_peers && completed_rounds > 0 {
+            if number_of_peers >= min_peers as usize && completed_rounds > 0 {
                 tracing::info!(
                     "Took {}s for cell {} to complete {} gossip rounds",
                     wait_start.elapsed().as_secs(),

@@ -795,7 +795,7 @@ async fn network_stats() {
         .admin_ws_client::<AdminResponse>()
         .await;
 
-    const EXPECT: &str = "backendGoPion";
+    const EXPECT: &str = "kitsune2-core-mem";
 
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();

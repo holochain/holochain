@@ -535,7 +535,7 @@ async fn multi_create_link_validation() {
 
     // Make sure the conductors are gossiping before creating posts
     conductors[0]
-        .require_initial_gossip_activity_for_cell(&alice, 2, Duration::from_secs(30))
+        .require_initial_gossip_activity_for_cell(&alice, 1, Duration::from_secs(30))
         .await
         .unwrap();
 

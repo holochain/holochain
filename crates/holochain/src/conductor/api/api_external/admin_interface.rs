@@ -281,13 +281,24 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::FullStateDumped(state))
             }
-            DumpNetworkMetrics { dna_hash } => {
-                let dump = self.conductor_handle.dump_network_metrics(dna_hash).await?;
+            DumpNetworkMetrics {
+                dna_hash,
+                include_dht_summary,
+            } => {
+                let dump = self
+                    .conductor_handle
+                    .dump_network_metrics(Kitsune2NetworkMetricsRequest {
+                        dna_hash,
+                        include_dht_summary,
+                    })
+                    .await?;
                 Ok(AdminResponse::NetworkMetricsDumped(dump))
             }
             DumpNetworkStats => {
                 let stats = self.conductor_handle.dump_network_stats().await?;
-                Ok(AdminResponse::NetworkStatsDumped(stats))
+                Ok(AdminResponse::NetworkStatsDumped(serde_json::to_string(
+                    &stats,
+                )?))
             }
             AddAgentInfo { agent_infos } => {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;

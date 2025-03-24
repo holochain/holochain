@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::{AppAuthenticationToken, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
@@ -164,12 +165,28 @@ pub enum AppRequest {
     /// [`AppResponse::CloneCellEnabled`]
     EnableCloneCell(Box<EnableCloneCellPayload>),
 
-    /// Info about networking processes
+    /// Retrieve network metrics for the current app.
+    ///
+    /// Identical to what [`AdminRequest::DumpNetworkMetrics`](crate::admin_interface::AdminRequest)
+    /// does, but scoped to the current app.
+    ///
+    /// If `dna_hash` is not set, metrics for all DNAs in the current app are returned.
     ///
     /// # Returns
     ///
-    /// [`AppResponse::NetworkInfo`]
-    NetworkInfo(Box<NetworkInfoRequestPayload>),
+    /// [`AppResponse::NetworkMetrics`]
+    NetworkMetrics {
+        /// If set, limits the metrics dumped to a single DNA hash space.
+        #[serde(default)]
+        dna_hash: Option<DnaHash>,
+
+        /// Whether to include a DHT summary.
+        ///
+        /// You need a dump from multiple nodes in order to make a comparison, so this is not
+        /// requested by default.
+        #[serde(default)]
+        include_dht_summary: bool,
+    },
 
     /// List all host functions available to wasm on this conductor.
     ///
@@ -261,8 +278,8 @@ pub enum AppResponse {
     /// is returned.
     CloneCellEnabled(ClonedCell),
 
-    /// NetworkInfo is returned
-    NetworkInfo(Vec<NetworkInfo>),
+    /// The successful result of a call to [`AppRequest::NetworkMetrics`].
+    NetworkMetrics(HashMap<DnaHash, Kitsune2NetworkMetrics>),
 
     /// All the wasm host functions supported by this conductor.
     ListWasmHostFunctions(Vec<String>),
@@ -530,27 +547,6 @@ impl From<AppInfoStatus> for AppStatus {
             AppInfoStatus::AwaitingMemproofs => AppStatus::AwaitingMemproofs,
         }
     }
-}
-
-/// Temporarily copying this here until we actually implement something
-/// equivalent in kitsune2.
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct FetchPoolInfo {
-    /// Total number of bytes expected to be received through fetches
-    pub op_bytes_to_fetch: usize,
-
-    /// Total number of ops expected to be received through fetches
-    pub num_ops_to_fetch: usize,
-}
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct NetworkInfo {
-    pub fetch_pool_info: FetchPoolInfo,
-    pub current_number_of_peers: u32,
-    pub arc_size: f64,
-    pub total_network_peers: u32,
-    pub bytes_since_last_time_queried: u64,
-    pub completed_rounds_since_last_time_queried: u32,
 }
 
 /// The request payload sent on a Holochain app websocket to authenticate the connection.

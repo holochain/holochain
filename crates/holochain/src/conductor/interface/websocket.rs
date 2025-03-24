@@ -827,56 +827,6 @@ mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn gossip_info_request() {
-        holochain_trace::test_run();
-        let uuid = Uuid::new_v4();
-        let dna = fake_dna_zomes(
-            &uuid.to_string(),
-            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-        );
-
-        // warm the zome
-        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
-
-        let dna_hash = dna.dna_hash().clone();
-
-        let (_tmpdir, app_api, handle, agent_pub_key) =
-            setup_app_in_new_conductor("test app".to_string(), None, vec![(dna, None)]).await;
-        let request = NetworkInfoRequestPayload {
-            agent_pub_key,
-            dnas: vec![dna_hash],
-            last_time_queried: None,
-        };
-
-        let msg = AppRequest::NetworkInfo(Box::new(request));
-        let respond = |response: AppResponse| match response {
-            AppResponse::NetworkInfo(info) => {
-                assert_eq!(
-                    info,
-                    vec![NetworkInfo {
-                        fetch_pool_info: FetchPoolInfo::default(),
-                        current_number_of_peers: 1,
-                        arc_size: 1.0,
-                        total_network_peers: 1,
-                        bytes_since_last_time_queried: 1838,
-                        completed_rounds_since_last_time_queried: 0,
-                    }]
-                )
-            }
-            other => panic!("unexpected response {:?}", other),
-        };
-        test_handle_incoming_app_message("test app".to_string(), msg, respond, app_api)
-            .await
-            .unwrap();
-        // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
-        // the overhead of a websocket request locally is small
-
-        handle.shutdown().await.unwrap().unwrap();
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
     async fn storage_info() {
         holochain_trace::test_run();
         let uuid_1 = Uuid::new_v4();
