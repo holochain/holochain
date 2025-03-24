@@ -113,7 +113,7 @@ pub async fn publish_dht_ops_workflow(
                 for receipt in bundle.into_iter() {
                     // Get the action for this op so we can check the entry type.
                     let hash = receipt.receipt.dht_op_hash.clone();
-                    let action: Option<SignedAction> = authored_db
+                    let action: Option<SignedAction> = match authored_db
                         .read_async(move |txn| {
                             let h: Option<Vec<u8>> = txn
                                 .query_row(
@@ -134,7 +134,14 @@ pub async fn publish_dht_ops_workflow(
                                 None => Ok(None),
                             }
                         })
-                        .await?;
+                        .await
+                    {
+                        Ok(a) => a,
+                        Err(err) => {
+                            debug!(?err, "error fetching action for receipt op");
+                            None
+                        }
+                    };
 
                     // If the action has an app entry type get the entry def
                     // from the conductor.
