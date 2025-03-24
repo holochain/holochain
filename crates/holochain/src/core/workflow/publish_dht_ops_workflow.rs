@@ -64,7 +64,7 @@ pub async fn publish_dht_ops_workflow(
     // Commit to the network
     let mut success = Vec::with_capacity(to_publish.len());
     for (basis, list) in to_publish {
-        let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
+        let (mut op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
 
         // build an exclude list of agents from whom we already have receipts
         let agent2 = agent.clone();
@@ -97,8 +97,6 @@ pub async fn publish_dht_ops_workflow(
                 StateQueryResult::Ok(exclude.into_iter().collect())
             })
             .await?;
-
-        let mut have_enough_receipts = false;
 
         // First, check to see if we can get the required validation receipts.
         if let Ok(bundle) = network
@@ -152,6 +150,8 @@ pub async fn publish_dht_ops_workflow(
                     &crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
                 );
 
+                let op_hash = receipt.receipt.dht_op_hash.clone();
+
                 match process_validation_receipt(
                     authored_db.clone(),
                     dht_db.clone(),
@@ -165,16 +165,16 @@ pub async fn publish_dht_ops_workflow(
                     }
                     Ok(false) => (),
                     Ok(true) => {
-                        have_enough_receipts = true;
+                        op_hash_list.retain(|e| e != &op_hash);
+                        success.push(op_hash);
                     }
                 }
             }
         }
 
-        if have_enough_receipts {
+        if op_hash_list.is_empty() {
             // We have enough receipts!
             // Short-circuit so we don't publish.
-            success.extend(op_hash_list);
             continue;
         }
 
