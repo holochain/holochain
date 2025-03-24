@@ -940,7 +940,6 @@ It is the application's responsibility to retrieve a stored capability claim usi
     ```rust
     struct AgentInfo {
         agent_initial_pubkey: AgentHash,
-        agent_latest_pubkey: AgentHash,
         chain_head: (ActionHash, u32, Timestamp),
     }
     ```
