@@ -66,17 +66,46 @@ pub async fn publish_dht_ops_workflow(
     for (basis, list) in to_publish {
         let (op_hash_list, op_data_list): (Vec<_>, Vec<_>) = list.into_iter().unzip();
 
+        // build an exclude list of agents from whom we already have receipts
+        let agent2 = agent.clone();
+        let op_hash_list2 = op_hash_list.clone();
+        let exclude = authored_db
+            .read_async(move |txn| {
+                let mut exclude = std::collections::HashSet::new();
+
+                // always add ourselves to the exclude list
+                exclude.insert(agent2);
+
+                let mut stmt =
+                    txn.prepare("SELECT blob FROM ValidationReceipt WHERE op_hash = ?")?;
+
+                for op_hash in op_hash_list2 {
+                    for receipt in stmt.query_map([op_hash], |row| {
+                        Ok(from_blob::<SignedValidationReceipt>(row.get("blob")?))
+                    })? {
+                        let receipt = match receipt {
+                            Ok(Ok(r)) => r,
+                            _ => continue,
+                        };
+
+                        for validator in receipt.receipt.validators {
+                            exclude.insert(validator);
+                        }
+                    }
+                }
+
+                StateQueryResult::Ok(exclude.into_iter().collect())
+            })
+            .await?;
+
         let mut have_enough_receipts = false;
 
         // First, check to see if we can get the required validation receipts.
-        // TODO - we don't currently track the agents that generated the
-        //        receipts in our database, so we can't make use of the
-        //        exclude list, so we may get duplicate receipts.
         if let Ok(bundle) = network
             .get_validation_receipts(
                 basis.clone(),
                 op_hash_list.clone(),
-                Vec::new(), // exclude list
+                exclude,
                 DEFAULT_RECEIPT_BUNDLE_SIZE as usize,
             )
             .await
