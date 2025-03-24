@@ -19,4 +19,6 @@ WHERE
     LIMIT
       1
   )
-RETURNING hash, authored_timestamp
+RETURNING
+  hash,
+  authored_timestamp
