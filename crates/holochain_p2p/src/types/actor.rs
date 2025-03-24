@@ -6,7 +6,6 @@ use crate::*;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
 use kitsune2_api::{SpaceId, StoredOp};
-use mockall::automock;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]

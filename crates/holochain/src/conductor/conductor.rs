@@ -380,8 +380,7 @@ mod startup_shutdown_impls {
             })
         }
 
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope=self.config.network.tracing_scope
-        )))]
+        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope=self.config.network.tracing_scope)))]
         pub(crate) async fn initialize_conductor(
             self: Arc<Self>,
             outcome_rx: OutcomeReceiver,
@@ -2985,30 +2984,34 @@ mod misc_impls {
             installed_app_id: &InstalledAppId,
             request: Kitsune2NetworkMetricsRequest,
         ) -> ConductorApiResult<HashMap<DnaHash, Kitsune2NetworkMetrics>> {
-            Ok(if request.dna_hash.is_some() {
+            let all_dna_hashes = {
+                let state = self.get_state().await?;
+                let installed_app = state.get_app(installed_app_id)?;
+
+                installed_app
+                    .role_assignments
+                    .values()
+                    .flat_map(|r| match r {
+                        AppRoleAssignment::Primary(p) if p.is_provisioned => {
+                            vec![p.base_dna_hash.clone()]
+                        }
+                        AppRoleAssignment::Primary(p) => {
+                            p.clones.values().cloned().collect::<Vec<_>>()
+                        }
+                        AppRoleAssignment::Dependency(d) => vec![d.cell_id.dna_hash().clone()],
+                    })
+                    .collect::<Vec<_>>()
+            };
+
+            Ok(if let Some(ref dna_hash) = request.dna_hash {
+                if !all_dna_hashes.contains(&dna_hash) {
+                    return Err(ConductorApiError::Other("DNA hash not found in app".into()));
+                }
+
                 self.holochain_p2p.dump_network_metrics(request).await?
             } else {
-                let dna_hashes = {
-                    let state = self.get_state().await?;
-                    let installed_app = state.get_app(installed_app_id)?;
-
-                    installed_app
-                        .role_assignments
-                        .values()
-                        .flat_map(|r| match r {
-                            AppRoleAssignment::Primary(p) if p.is_provisioned => {
-                                vec![p.base_dna_hash.clone()]
-                            }
-                            AppRoleAssignment::Primary(p) => {
-                                p.clones.values().cloned().collect::<Vec<_>>()
-                            }
-                            AppRoleAssignment::Dependency(d) => vec![d.cell_id.dna_hash().clone()],
-                        })
-                        .collect::<Vec<_>>()
-                };
-
                 let mut out = HashMap::new();
-                for dna_hash in dna_hashes {
+                for dna_hash in all_dna_hashes {
                     match self
                         .holochain_p2p
                         .dump_network_metrics(Kitsune2NetworkMetricsRequest {
