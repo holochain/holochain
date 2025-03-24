@@ -144,7 +144,7 @@ pub async fn publish_dht_ops_workflow(
 
         if have_enough_receipts {
             // We have enough receipts!
-            // Short-ciruit so we don't publish.
+            // Short-circuit so we don't publish.
             success.extend(op_hash_list);
             continue;
         }
