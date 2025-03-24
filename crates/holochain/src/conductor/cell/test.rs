@@ -2,9 +2,11 @@ use crate::conductor::space::TestSpaces;
 use crate::conductor::Conductor;
 use crate::core::ribosome::real_ribosome::{ModuleCacheLock, RealRibosome};
 use crate::core::workflow::incoming_dht_ops_workflow::op_exists;
-use crate::test_utils::{fake_valid_dna_file, test_network};
+use crate::test_utils::fake_valid_dna_file;
 use holo_hash::HasHash;
 use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_p2p::actor::MockHcP2p;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::prelude::*;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::action;
@@ -29,8 +31,7 @@ async fn test_cell_handle_publish() {
     let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
     let dht_db_cache = spaces.test_spaces[&dna].space.dht_query_cache.clone();
 
-    let test_network = test_network(Some(dna.clone()), Some(agent.clone())).await;
-    let holochain_p2p_cell = test_network.dna_network();
+    let holochain_p2p_cell = HolochainP2pDna::new(Arc::new(MockHcP2p::new()), dna.clone(), None);
 
     let db_dir = test_db_dir().path().to_path_buf();
     let data_root_path: DataRootPath = db_dir.clone().into();
