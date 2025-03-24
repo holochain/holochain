@@ -53,6 +53,14 @@ impl HcP2p for StubNetwork {
         Box::pin(async { Err("stub".into()) })
     }
 
+    fn new_integrated_data(
+        &self,
+        space_id: kitsune2_api::SpaceId,
+        ops: Vec<kitsune2_api::StoredOp>,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async { Err("stub".into()) })
+    }
+
     fn call_remote(
         &self,
         dna_hash: DnaHash,

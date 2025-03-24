@@ -7,3 +7,4 @@ WHERE
   validation_stage = 3
   AND validation_status IS NOT NULL
   AND DhtOp.type = :create_link
+RETURNING hash, authored_timestamp
