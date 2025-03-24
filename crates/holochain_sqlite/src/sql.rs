@@ -1,6 +1,21 @@
 pub mod sql_cell {
+    // UPDATE queries to set ops to integrated.
     pub const UPDATE_INTEGRATE_DEP_ACTIVITY: &str =
         include_str!("sql/cell/update_dep_activity.sql");
+    pub const UPDATE_INTEGRATE_STORE_RECORD: &str =
+        include_str!("sql/cell/update_store_record.sql");
+    pub const UPDATE_INTEGRATE_STORE_ENTRY: &str = include_str!("sql/cell/update_store_entry.sql");
+    pub const UPDATE_INTEGRATE_DEP_STORE_ENTRY: &str =
+        include_str!("sql/cell/update_dep_store_entry.sql");
+    pub const SET_ADD_LINK_OPS_TO_INTEGRATED: &str =
+        include_str!("sql/cell/set_add_link_ops_to_integrated.sql");
+    pub const UPDATE_INTEGRATE_DEP_STORE_RECORD: &str =
+        include_str!("sql/cell/update_dep_store_record.sql");
+    pub const SET_DELETE_LINK_OPS_TO_INTEGRATED: &str =
+        include_str!("sql/cell/set_delete_link_ops_to_integrated.sql");
+    pub const SET_CHAIN_INTEGRITY_WARRANT_OPS_TO_INTEGRATED: &str =
+        include_str!("sql/cell/set_chain_integrity_warrant_ops_to_integrated.sql");
+
     pub const ACTIVITY_INTEGRATED_UPPER_BOUND: &str =
         include_str!("sql/cell/activity_integrated_upper_bound.sql");
     pub const ACTION_HASH_BY_PREV: &str = include_str!("sql/cell/action_hash_by_prev.sql");
@@ -8,20 +23,6 @@ pub mod sql_cell {
     pub const ALL_READY_ACTIVITY: &str = include_str!("sql/cell/all_ready_activity.sql");
     pub const DELETE_ACTIONS_AFTER_SEQ: &str =
         include_str!("sql/cell/delete_actions_after_seq.sql");
-    pub const UPDATE_INTEGRATE_DEP_STORE_RECORD: &str =
-        include_str!("sql/cell/update_dep_store_record.sql");
-    pub const UPDATE_INTEGRATE_DEP_STORE_ENTRY: &str =
-        include_str!("sql/cell/update_dep_store_entry.sql");
-    pub const SET_ADD_LINK_OPS_TO_INTEGRATED: &str =
-        include_str!("sql/cell/set_add_link_ops_to_integrated.sql");
-    pub const SET_DELETE_LINK_OPS_TO_INTEGRATED: &str =
-        include_str!("sql/cell/set_delete_link_ops_to_integrated.sql");
-    pub const SET_CHAIN_INTEGRITY_WARRANT_OPS_TO_INTEGRATED: &str =
-        include_str!("sql/cell/set_chain_integrity_warrant_ops_to_integrated.sql");
-
-    pub const UPDATE_INTEGRATE_STORE_RECORD: &str =
-        include_str!("sql/cell/update_store_record.sql");
-    pub const UPDATE_INTEGRATE_STORE_ENTRY: &str = include_str!("sql/cell/update_store_entry.sql");
 
     pub const SELECT_VALID_AGENT_PUB_KEY: &str =
         include_str!("sql/cell/select_valid_agent_pub_key.sql");

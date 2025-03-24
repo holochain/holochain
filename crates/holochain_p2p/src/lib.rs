@@ -6,6 +6,7 @@ use holochain_chc::ChcImpl;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 use kitsune2_api::{AgentInfoSigned, BoxFut};
+use kitsune2_api::{SpaceId, StoredOp};
 use mockall::automock;
 use std::sync::Arc;
 use tracing::Instrument;
@@ -47,6 +48,10 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
 
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
     async fn leave(&self, agent: AgentPubKey) -> HolochainP2pResult<()>;
+
+    /// Inform p2p module when ops have been integrated into the store, so that it can start
+    /// gossiping them.
+    async fn new_integrated_data(&self, ops: Vec<StoredOp>) -> HolochainP2pResult<()>;
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).
     #[allow(clippy::too_many_arguments)]
@@ -200,6 +205,14 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     /// If a cell is disabled, we'll need to \"leave\" the network module as well.
     async fn leave(&self, agent: AgentPubKey) -> HolochainP2pResult<()> {
         self.sender.leave((*self.dna_hash).clone(), agent).await
+    }
+
+    /// Inform p2p module when ops have been integrated into the store, so that it can start
+    /// gossiping them.
+    async fn new_integrated_data(&self, ops: Vec<StoredOp>) -> HolochainP2pResult<()> {
+        self.sender
+            .new_integrated_data(self.dna_hash.to_k2_space(), ops)
+            .await
     }
 
     /// Invoke a zome function on a remote node (if you have been granted the capability).

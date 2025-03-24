@@ -2,13 +2,13 @@
 
 use hdk::prelude::*;
 use holochain::core::ribosome::guest_callback::validate::ValidateResult;
+use holochain::core::SourceChainError;
 use holochain::test_utils::inline_zomes::{simple_crud_zome, AppString};
 use holochain::{conductor::api::error::ConductorApiResult, sweettest::*};
 use holochain::{
     conductor::{api::error::ConductorApiError, CellError},
     core::workflow::WorkflowError,
 };
-use holochain::{core::SourceChainError, test_utils::display_agent_infos};
 use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::{op::Op, record::RecordEntry};
@@ -139,36 +139,6 @@ async fn inline_zome_3_agents_2_dnas() -> anyhow::Result<()> {
         *record.entry(),
         RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[cfg(feature = "test_utils")]
-// I can't remember what this test was for? Should we just delete?
-#[ignore = "Needs to be completed when HolochainP2pEvents is accessible"]
-async fn invalid_cell() -> anyhow::Result<()> {
-    holochain_trace::test_run();
-    let mut conductor = SweetConductor::from_standard_config().await;
-
-    let (dna_foo, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let (dna_bar, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-
-    let _app_foo = conductor.setup_app("foo", &[dna_foo]).await;
-
-    let _app_bar = conductor.setup_app("bar", &[dna_bar]).await;
-
-    // Give small amount of time for cells to join the network
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-
-    tracing::debug!(dnas = ?conductor.list_dnas());
-    tracing::debug!(cell_ids = ?conductor.running_cell_ids());
-    tracing::debug!(apps = ?conductor.list_running_apps().await.unwrap());
-
-    display_agent_infos(&conductor).await;
-
-    // Can't finish this test because there's no way to construct HolochainP2pEvents
-    // and I can't directly call query on the conductor because it's private.
 
     Ok(())
 }
