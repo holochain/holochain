@@ -99,7 +99,7 @@ pub async fn publish_dht_ops_workflow(
             .await?;
 
         // First, check to see if we can get the required validation receipts.
-        if let Ok(bundle) = network
+        match network
             .get_validation_receipts(
                 basis.clone(),
                 op_hash_list.clone(),
@@ -108,65 +108,71 @@ pub async fn publish_dht_ops_workflow(
             )
             .await
         {
-            for receipt in bundle.into_iter() {
-                // Get the action for this op so we can check the entry type.
-                let hash = receipt.receipt.dht_op_hash.clone();
-                let action: Option<SignedAction> = authored_db
-                    .read_async(move |txn| {
-                        let h: Option<Vec<u8>> = txn
-                            .query_row(
-                                "SELECT Action.blob as action_blob
-                    FROM DhtOp
-                    JOIN Action ON Action.hash = DhtOp.action_hash
-                    WHERE DhtOp.hash = :hash",
-                                named_params! {
-                                    ":hash": hash,
-                                },
-                                |row| row.get("action_blob"),
-                            )
-                            .optional()?;
-                        match h {
-                            Some(h) => from_blob(h),
-                            None => Ok(None),
+            Err(err) => debug!(?err, "error fetching validation receipts"),
+            Ok(bundle) => {
+                for receipt in bundle.into_iter() {
+                    // Get the action for this op so we can check the entry type.
+                    let hash = receipt.receipt.dht_op_hash.clone();
+                    let action: Option<SignedAction> = authored_db
+                        .read_async(move |txn| {
+                            let h: Option<Vec<u8>> = txn
+                                .query_row(
+                                    "
+                                    SELECT Action.blob as action_blob
+                                    FROM DhtOp
+                                    JOIN Action ON Action.hash = DhtOp.action_hash
+                                    WHERE DhtOp.hash = :hash
+                                    ",
+                                    named_params! {
+                                        ":hash": hash,
+                                    },
+                                    |row| row.get("action_blob"),
+                                )
+                                .optional()?;
+                            match h {
+                                Some(h) => from_blob(h),
+                                None => Ok(None),
+                            }
+                        })
+                        .await?;
+
+                    // If the action has an app entry type get the entry def
+                    // from the conductor.
+                    let required_receipt_count = match action.as_ref().and_then(|h| h.entry_type())
+                    {
+                        Some(EntryType::App(AppEntryDef {
+                            zome_index,
+                            entry_index,
+                            ..
+                        })) => required_receipt_counts
+                            .get(zome_index)
+                            .and_then(|z| z.get(entry_index)),
+                        _ => None,
+                    };
+
+                    // If no required receipt count was found then fallback to the default.
+                    let required_validation_count = required_receipt_count.unwrap_or(
+                        &crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
+                    );
+
+                    let op_hash = receipt.receipt.dht_op_hash.clone();
+
+                    match process_validation_receipt(
+                        authored_db.clone(),
+                        dht_db.clone(),
+                        receipt,
+                        *required_validation_count,
+                    )
+                    .await
+                    {
+                        Err(err) => {
+                            debug!(?err, "error processing validation receipt");
                         }
-                    })
-                    .await?;
-
-                // If the action has an app entry type get the entry def
-                // from the conductor.
-                let required_receipt_count = match action.as_ref().and_then(|h| h.entry_type()) {
-                    Some(EntryType::App(AppEntryDef {
-                        zome_index,
-                        entry_index,
-                        ..
-                    })) => required_receipt_counts
-                        .get(zome_index)
-                        .and_then(|z| z.get(entry_index)),
-                    _ => None,
-                };
-
-                // If no required receipt count was found then fallback to the default.
-                let required_validation_count = required_receipt_count.unwrap_or(
-                    &crate::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE,
-                );
-
-                let op_hash = receipt.receipt.dht_op_hash.clone();
-
-                match process_validation_receipt(
-                    authored_db.clone(),
-                    dht_db.clone(),
-                    receipt,
-                    *required_validation_count,
-                )
-                .await
-                {
-                    Err(err) => {
-                        debug!(?err, "error processing validation receipt");
-                    }
-                    Ok(false) => (),
-                    Ok(true) => {
-                        op_hash_list.retain(|e| e != &op_hash);
-                        success.push(op_hash);
+                        Ok(false) => (),
+                        Ok(true) => {
+                            op_hash_list.retain(|e| e != &op_hash);
+                            success.push(op_hash);
+                        }
                     }
                 }
             }
