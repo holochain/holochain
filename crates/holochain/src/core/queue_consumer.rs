@@ -96,30 +96,29 @@ pub async fn spawn_queue_consumer_tasks(
 
     let mut required_receipt_counts: crate::core::workflow::publish_dht_ops_workflow::RequiredReceiptCounts = HashMap::new();
 
-    if let Ok(cell) = conductor.cell_by_id(&cell_id).await {
-        if let Ok(ribosome) = cell.get_ribosome() {
-            for zidx in 0..u8::MAX {
-                let zome_idx = ZomeIndex(zidx);
-                use crate::core::ribosome::RibosomeT;
-                if let Some(zome) = ribosome.get_integrity_zome(&zome_idx) {
-                    let zome = zome.into_inner();
-                    for eidx in 0..u8::MAX {
-                        let entry_idx = EntryDefIndex(eidx);
-                        if let Some(ed) = conductor
-                            .get_entry_def(&EntryDefBufferKey::new(zome.1.clone(), entry_idx))
-                        {
-                            required_receipt_counts
-                                .entry(zome_idx)
-                                .or_default()
-                                .insert(entry_idx, ed.required_validations.0);
-                        } else {
-                            break;
-                        }
-                    }
+    let cell = conductor.cell_by_id(&cell_id).await?;
+    let ribosome = cell.get_ribosome()?;
+
+    for zidx in 0..u8::MAX {
+        let zome_idx = ZomeIndex(zidx);
+        use crate::core::ribosome::RibosomeT;
+        if let Some(zome) = ribosome.get_integrity_zome(&zome_idx) {
+            let zome = zome.into_inner();
+            for eidx in 0..u8::MAX {
+                let entry_idx = EntryDefIndex(eidx);
+                if let Some(ed) =
+                    conductor.get_entry_def(&EntryDefBufferKey::new(zome.1.clone(), entry_idx))
+                {
+                    required_receipt_counts
+                        .entry(zome_idx)
+                        .or_default()
+                        .insert(entry_idx, ed.required_validations.0);
                 } else {
                     break;
                 }
             }
+        } else {
+            break;
         }
     }
 
