@@ -542,10 +542,18 @@ impl CascadeImpl {
         options: NetworkGetOptions,
     ) -> CascadeResult<()> {
         let network = some_or_return!(self.network.as_ref());
-        let results = network
+        let results = match network
             .get(hash, options.clone())
             .instrument(debug_span!("fetch_record::network_get"))
-            .await?;
+            .await
+        {
+            Ok(ops) => ops,
+            Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
+                tracing::debug!(?e, "No peers to fetch record from");
+                vec![]
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         self.merge_ops_into_cache(results).await?;
         Ok(())
@@ -558,7 +566,14 @@ impl CascadeImpl {
         options: GetLinksOptions,
     ) -> CascadeResult<()> {
         let network = some_or_return!(self.network.as_ref());
-        let results = network.get_links(link_key.clone(), options).await?;
+        let results = match network.get_links(link_key.clone(), options).await {
+            Ok(link_ops) => link_ops,
+            Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
+                tracing::debug!(?e, "No peers to fetch links from");
+                vec![]
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         self.merge_link_ops_into_cache(results, link_key.clone())
             .await?;
@@ -573,7 +588,15 @@ impl CascadeImpl {
         options: GetActivityOptions,
     ) -> CascadeResult<Vec<AgentActivityResponse>> {
         let network = some_or_return!(self.network.as_ref(), Vec::with_capacity(0));
-        Ok(network.get_agent_activity(agent, query, options).await?)
+        let results = match network.get_agent_activity(agent, query, options).await {
+            Ok(response) => response,
+            Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
+                tracing::debug!(?e, "No peers to fetch agent activity from");
+                vec![]
+            }
+            Err(e) => return Err(e.into()),
+        };
+        Ok(results)
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
@@ -587,7 +610,14 @@ impl CascadeImpl {
             self.network.as_ref(),
             MustGetAgentActivityResponse::IncompleteChain
         );
-        let results = network.must_get_agent_activity(author, filter).await?;
+        let results = match network.must_get_agent_activity(author, filter).await {
+            Ok(response) => response,
+            Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
+                tracing::debug!(?e, "No peers to fetch agent activity from");
+                vec![]
+            }
+            Err(e) => return Err(e.into()),
+        };
 
         self.add_activity_into_cache(results).await
     }

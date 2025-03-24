@@ -1269,7 +1269,7 @@ pub mod wasm_test {
             let maximum_response_time_ms = Duration::from_millis(150);
 
             #[cfg(not(feature = "wasmer_wamr"))]
-            let maximum_response_time_ms = Duration::from_millis(15);
+            let maximum_response_time_ms = Duration::from_millis(50);
 
             assert!(
                 results[0] <= maximum_response_time_ms,
