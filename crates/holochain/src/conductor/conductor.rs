@@ -3004,7 +3004,7 @@ mod misc_impls {
             };
 
             Ok(if let Some(ref dna_hash) = request.dna_hash {
-                if !all_dna_hashes.contains(&dna_hash) {
+                if !all_dna_hashes.contains(dna_hash) {
                     return Err(ConductorApiError::Other("DNA hash not found in app".into()));
                 }
 
