@@ -1,7 +1,7 @@
 //! Types for interacting with Holochain's network layer.
 
-use serde_derive::{Deserialize, Serialize};
 use holo_hash::DnaHash;
+use serde_derive::{Deserialize, Serialize};
 
 /// Request network metrics from Kitsune2.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

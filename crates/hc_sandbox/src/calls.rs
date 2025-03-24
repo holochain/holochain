@@ -435,7 +435,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                     &metrics
                         .into_iter()
                         .map(|(k, v)| (k.to_string(), v))
-                        .collect()
+                        .collect::<HashMap<_, _>>()
                 )?
             );
         }

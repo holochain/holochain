@@ -849,19 +849,17 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
+    use super::*;
+    use crate::conductor::api::error::{
+        zome_call_response_to_conductor_api_result, ConductorApiError,
+    };
     use futures::future::join_all;
     use holochain_conductor_api::ZomeCallParamsSigned;
-    use holochain_conductor_api::{
-        DnaStorageInfo, StorageBlob, StorageInfo,
-    };
+    use holochain_conductor_api::{DnaStorageInfo, StorageBlob, StorageInfo};
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
     use zome_call_signature_verification::is_valid_signature;
-    use crate::conductor::api::error::{
-        zome_call_response_to_conductor_api_result, ConductorApiError,
-    };
-    use super::*;
 
     impl Conductor {
         /// Get signed agent info from the conductor
@@ -2990,7 +2988,7 @@ mod misc_impls {
             Ok(if request.dna_hash.is_some() {
                 self.holochain_p2p.dump_network_metrics(request).await?
             } else {
-                let dna_hashes ={
+                let dna_hashes = {
                     let state = self.get_state().await?;
                     let installed_app = state.get_app(installed_app_id)?;
 

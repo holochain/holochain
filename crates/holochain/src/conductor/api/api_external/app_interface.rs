@@ -157,13 +157,19 @@ impl AppInterfaceApi {
                     .await?;
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
-            AppRequest::NetworkMetrics { dna_hash, include_dht_summary } => {
+            AppRequest::NetworkMetrics {
+                dna_hash,
+                include_dht_summary,
+            } => {
                 let info = self
                     .conductor_handle
-                    .dump_network_metrics_for_app(&installed_app_id, Kitsune2NetworkMetricsRequest {
-                        dna_hash,
-                        include_dht_summary,
-                    })
+                    .dump_network_metrics_for_app(
+                        &installed_app_id,
+                        Kitsune2NetworkMetricsRequest {
+                            dna_hash,
+                            include_dht_summary,
+                        },
+                    )
                     .await?;
                 Ok(AppResponse::NetworkMetrics(info))
             }

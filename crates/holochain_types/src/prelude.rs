@@ -23,11 +23,11 @@ pub use crate::dna::*;
 pub use crate::entry::*;
 pub use crate::link::*;
 pub use crate::metadata::*;
+pub use crate::network::*;
 pub use crate::record::*;
 pub use crate::signal::*;
 pub use crate::validation_receipt::*;
 pub use crate::warrant::*;
-pub use crate::network::*;
 
 #[cfg(feature = "fixturators")]
 pub use crate::fixt::TimestampFixturator;

@@ -18,10 +18,13 @@ async fn network_metrics() {
     conductors.exchange_peer_info().await;
 
     let network_metrics = conductors[0]
-        .dump_network_metrics_for_app(&app_id, Kitsune2NetworkMetricsRequest {
-            dna_hash: Some(dna.dna_hash().clone()),
-            include_dht_summary: false,
-        })
+        .dump_network_metrics_for_app(
+            &app_id,
+            Kitsune2NetworkMetricsRequest {
+                dna_hash: Some(dna.dna_hash().clone()),
+                include_dht_summary: false,
+            },
+        )
         .await
         .unwrap();
 
