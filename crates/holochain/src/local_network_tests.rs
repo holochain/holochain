@@ -23,9 +23,14 @@ async fn conductors_call_remote(num_conductors: usize) {
         .map(|c| c.into_cells().into_iter().next().unwrap())
         .collect();
 
-    // Make sure that genesis records are integrated now that conductors have discovered each other. This makes it
-    // more likely that Kitsune knows about all the agents in the network to be able to make remote calls to them.
-    await_consistency(60, cells.iter()).await.unwrap();
+    // Make sure the conductors are talking to each other before we start making remote calls.
+    for i in 0..num_conductors {
+        conductors[i].require_initial_gossip_activity_for_cell(
+            &cells[i],
+            num_conductors as u32 - 1,
+            std::time::Duration::from_secs(60),
+        ).await.unwrap();
+    }
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
 
