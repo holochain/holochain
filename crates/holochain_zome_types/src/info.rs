@@ -23,10 +23,13 @@ pub struct AgentInfo {
 impl AgentInfo {
     pub fn new(
         agent_initial_pubkey: AgentPubKey,
+        #[cfg(feature = "unstable-dpki")] agent_latest_pubkey: AgentPubKey,
         chain_head: (ActionHash, u32, Timestamp),
     ) -> Self {
         Self {
             agent_initial_pubkey,
+            #[cfg(feature = "unstable-dpki")]
+            agent_latest_pubkey,
             chain_head,
         }
     }
