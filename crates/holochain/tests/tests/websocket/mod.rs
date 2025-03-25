@@ -800,12 +800,10 @@ async fn network_stats() {
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();
     match res {
-        AdminResponse::NetworkStatsDumped(json) => {
-            println!("{json}");
+        AdminResponse::NetworkStatsDumped(stats) => {
+            println!("{stats:?}");
 
-            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-            let backend = parsed.as_object().unwrap().get("backend").unwrap();
-            assert_eq!(EXPECT, backend);
+            assert_eq!(EXPECT, stats.backend);
         }
         _ => panic!("unexpected"),
     }

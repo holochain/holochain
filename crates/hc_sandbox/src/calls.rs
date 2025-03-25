@@ -442,7 +442,7 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         AdminRequestCli::DumpNetworkStats => {
             let stats = dump_network_stats(cmd).await?;
             // Print without other text so it can be piped
-            println!("{}", stats);
+            println!("{}", serde_json::to_string(&stats)?);
         }
         AdminRequestCli::ListCapabilityGrants(args) => {
             let info = list_capability_grants(cmd, args).await?;
@@ -753,7 +753,7 @@ async fn dump_network_metrics(
 }
 
 /// Calls [`AdminRequest::DumpNetworkStats`] and dumps network stats.
-async fn dump_network_stats(cmd: &mut CmdRunner) -> anyhow::Result<String> {
+async fn dump_network_stats(cmd: &mut CmdRunner) -> anyhow::Result<kitsune2_api::TransportStats> {
     let resp = cmd.command(AdminRequest::DumpNetworkStats).await?;
     Ok(expect_match!(resp => AdminResponse::NetworkStatsDumped, "Failed to dump network stats"))
 }

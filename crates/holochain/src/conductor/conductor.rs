@@ -3038,7 +3038,7 @@ mod misc_impls {
         }
 
         /// JSON dump of backend network stats
-        pub async fn dump_network_stats(&self) -> ConductorApiResult<serde_json::Value> {
+        pub async fn dump_network_stats(&self) -> ConductorApiResult<kitsune2_api::TransportStats> {
             Ok(self.holochain_p2p.dump_network_stats().await?)
         }
 

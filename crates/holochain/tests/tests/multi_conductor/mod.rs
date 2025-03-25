@@ -179,7 +179,7 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     // See if we can fetch network stats from bobbo
     let stats = conductors[1].dump_network_stats().await?;
-    tracing::info!(target: "TEST", "@!@! - stats: {stats}");
+    tracing::info!(target: "TEST", "@!@! - stats: {}", serde_json::to_string_pretty(&stats).unwrap());
 
     /*
     let stats: tx5::stats::Stats = serde_json::from_str(&stats).unwrap();

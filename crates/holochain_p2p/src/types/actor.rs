@@ -388,7 +388,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     /// This is untyped because the returned data is backend-specific.
     ///
     /// See [Transport::dump_network_stats](kitsune2_api::Transport).
-    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<serde_json::Value>>;
+    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<kitsune2_api::TransportStats>>;
 
     /// Get the target arcs of the agents currently in this space.
     fn target_arcs(

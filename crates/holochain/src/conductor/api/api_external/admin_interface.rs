@@ -296,9 +296,7 @@ impl AdminInterfaceApi {
             }
             DumpNetworkStats => {
                 let stats = self.conductor_handle.dump_network_stats().await?;
-                Ok(AdminResponse::NetworkStatsDumped(serde_json::to_string(
-                    &stats,
-                )?))
+                Ok(AdminResponse::NetworkStatsDumped(stats))
             }
             AddAgentInfo { agent_infos } => {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;
