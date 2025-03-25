@@ -72,13 +72,13 @@ impl AppClient {
     pub async fn network_metrics(
         &mut self,
     ) -> anyhow::Result<HashMap<DnaHash, Kitsune2NetworkMetrics>> {
-        let msg = AppRequest::NetworkMetrics {
+        let msg = AppRequest::DumpNetworkMetrics {
             dna_hash: None,
             include_dht_summary: false,
         };
         let response = self.send(msg).await?;
         match response {
-            AppResponse::NetworkMetrics(metrics) => Ok(metrics),
+            AppResponse::NetworkMetricsDumped(metrics) => Ok(metrics),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

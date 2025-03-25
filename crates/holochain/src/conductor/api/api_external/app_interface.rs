@@ -157,7 +157,7 @@ impl AppInterfaceApi {
                     .await?;
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
-            AppRequest::NetworkMetrics {
+            AppRequest::DumpNetworkMetrics {
                 dna_hash,
                 include_dht_summary,
             } => {
@@ -171,7 +171,14 @@ impl AppInterfaceApi {
                         },
                     )
                     .await?;
-                Ok(AppResponse::NetworkMetrics(info))
+                Ok(AppResponse::NetworkMetricsDumped(info))
+            }
+            AppRequest::DumpNetworkStats => {
+                let stats = self
+                    .conductor_handle
+                    .dump_network_stats_for_app(&installed_app_id)
+                    .await?;
+                Ok(AppResponse::NetworkStatsDumped(stats))
             }
             AppRequest::ListWasmHostFunctions => Ok(AppResponse::ListWasmHostFunctions(
                 self.conductor_handle.list_wasm_host_functions().await?,

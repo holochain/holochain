@@ -2722,10 +2722,10 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
-    use holochain_zome_types::action::builder;
-    use std::sync::atomic::Ordering;
-
     use super::*;
+    use holochain_zome_types::action::builder;
+    use kitsune2_api::TransportStats;
+    use std::sync::atomic::Ordering;
 
     impl Conductor {
         /// Grant a zome call capability for a cell
@@ -3040,6 +3040,57 @@ mod misc_impls {
         /// JSON dump of backend network stats
         pub async fn dump_network_stats(&self) -> ConductorApiResult<kitsune2_api::TransportStats> {
             Ok(self.holochain_p2p.dump_network_stats().await?)
+        }
+
+        /// JSON dump of backend network stats
+        pub async fn dump_network_stats_for_app(
+            &self,
+            installed_app_id: &InstalledAppId,
+        ) -> ConductorApiResult<kitsune2_api::TransportStats> {
+            let all_dna_hashes = {
+                let state = self.get_state().await?;
+                let installed_app = state.get_app(installed_app_id)?;
+
+                installed_app
+                    .role_assignments
+                    .values()
+                    .flat_map(|r| match r {
+                        AppRoleAssignment::Primary(p) if p.is_provisioned => {
+                            vec![p.base_dna_hash.clone()]
+                        }
+                        AppRoleAssignment::Primary(p) => {
+                            p.clones.values().cloned().collect::<Vec<_>>()
+                        }
+                        AppRoleAssignment::Dependency(d) => vec![d.cell_id.dna_hash().clone()],
+                    })
+                    .collect::<Vec<_>>()
+            };
+
+            let mut keep_peer_ids = HashSet::new();
+            for dna_hash in all_dna_hashes {
+                let peer_store = self.holochain_p2p.peer_store(dna_hash).await?;
+                keep_peer_ids.extend(peer_store.get_all().await?.into_iter().filter_map(|p| {
+                    p.url
+                        .as_ref()
+                        .and_then(|u| u.peer_id())
+                        .map(|id| id.to_string())
+                }));
+            }
+
+            let stats = self.holochain_p2p.dump_network_stats().await?;
+            Ok(TransportStats {
+                // Common information, fine to return
+                backend: stats.backend,
+                // These are our peer URLs, always give this back
+                peer_urls: stats.peer_urls,
+                // This contains connections for the whole conductor, filter it down
+                // to only the connections that are relevant to the current app
+                connections: stats
+                    .connections
+                    .into_iter()
+                    .filter(|s| keep_peer_ids.contains(&s.pub_key))
+                    .collect(),
+            })
         }
 
         /// Add signed agent info to the conductor

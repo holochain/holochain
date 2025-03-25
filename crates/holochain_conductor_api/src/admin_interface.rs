@@ -286,7 +286,7 @@ pub enum AdminRequest {
         include_dht_summary: bool,
     },
 
-    /// Dump raw json network statistics from the backend networking lib.
+    /// Dump network statistics from the Kitsune2 networking transport module.
     ///
     /// # Returns
     ///

@@ -167,15 +167,15 @@ pub enum AppRequest {
 
     /// Retrieve network metrics for the current app.
     ///
-    /// Identical to what [`AdminRequest::DumpNetworkMetrics`](crate::admin_interface::AdminRequest)
+    /// Identical to what [`AdminRequest::DumpNetworkMetrics`](crate::admin_interface::AdminRequest::DumpNetworkMetrics)
     /// does, but scoped to the current app.
     ///
     /// If `dna_hash` is not set, metrics for all DNAs in the current app are returned.
     ///
     /// # Returns
     ///
-    /// [`AppResponse::NetworkMetrics`]
-    NetworkMetrics {
+    /// [`AppResponse::NetworkMetricsDumped`]
+    DumpNetworkMetrics {
         /// If set, limits the metrics dumped to a single DNA hash space.
         #[serde(default)]
         dna_hash: Option<DnaHash>,
@@ -187,6 +187,17 @@ pub enum AppRequest {
         #[serde(default)]
         include_dht_summary: bool,
     },
+
+    /// Dump network statistics from the Kitsune2 networking transport module.
+    ///
+    /// Identical to what [`AdminRequest::DumpNetworkStats`](crate::admin_interface::AdminRequest::DumpNetworkStats)
+    /// does, but scoped to the current app. Connections that are not relevant to a DNA in the
+    /// current app are filtered out.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::NetworkStatsDumped`]
+    DumpNetworkStats,
 
     /// List all host functions available to wasm on this conductor.
     ///
@@ -278,8 +289,11 @@ pub enum AppResponse {
     /// is returned.
     CloneCellEnabled(ClonedCell),
 
-    /// The successful result of a call to [`AppRequest::NetworkMetrics`].
-    NetworkMetrics(HashMap<DnaHash, Kitsune2NetworkMetrics>),
+    /// The successful result of a call to [`AppRequest::DumpNetworkMetrics`].
+    NetworkMetricsDumped(HashMap<DnaHash, Kitsune2NetworkMetrics>),
+
+    /// The successful result of a call to [`AppRequest::DumpNetworkStats`].
+    NetworkStatsDumped(kitsune2_api::TransportStats),
 
     /// All the wasm host functions supported by this conductor.
     ListWasmHostFunctions(Vec<String>),
