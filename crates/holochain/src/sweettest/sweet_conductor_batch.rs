@@ -271,14 +271,6 @@ impl SweetConductorBatch {
         self.0.iter().filter_map(|c| c.dpki_cell()).collect()
     }
 
-    /// Force trigger all dht ops that haven't received
-    /// enough validation receipts yet.
-    pub async fn force_all_publish_dht_ops(&self) {
-        for c in self.0.iter() {
-            c.force_all_publish_dht_ops().await;
-        }
-    }
-
     /// Make the temp db dir persistent
     pub fn persist_dbs(&mut self) {
         for c in self.0.iter_mut() {
