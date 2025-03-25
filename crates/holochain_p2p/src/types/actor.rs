@@ -385,9 +385,9 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         request: Kitsune2NetworkMetricsRequest,
     ) -> BoxFut<'_, HolochainP2pResult<HashMap<DnaHash, Kitsune2NetworkMetrics>>>;
 
-    /// This is untyped because the returned data is backend-specific.
+    /// Get network stats from the Kitsune2 transport.
     ///
-    /// See [Transport::dump_network_stats](kitsune2_api::Transport).
+    /// See [Transport::dump_network_stats](kitsune2_api::Transport::dump_network_stats).
     fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<kitsune2_api::TransportStats>>;
 
     /// Get the target arcs of the agents currently in this space.
