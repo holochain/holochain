@@ -34,6 +34,8 @@ pub fn agent_info(
                 .chain_head_nonempty()
                 .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
             Ok(AgentInfo {
+                #[cfg(feature = "unstable-dpki")]
+                agent_latest_pubkey: agent_pubkey.clone(),
                 agent_initial_pubkey: agent_pubkey,
                 chain_head: head.into_tuple(),
             })
