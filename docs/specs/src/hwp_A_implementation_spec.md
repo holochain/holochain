@@ -944,8 +944,6 @@ It is the application's responsibility to retrieve a stored capability claim usi
     }
     ```
 
-    The initial and latest public key may vary throughout the life of the source chain, as an `AgentPubKey` is an entry which may be updated like other entries. Updating a key entry is normally handled through a DPKI implementation (see [Human Error] section of System Correctness: Confidence).
-
 * `call_info() -> ExternResult<CallInfo>`: Get contextual information about the current zome call, where the return value is defined as:
 
     ```rust

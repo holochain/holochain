@@ -72,6 +72,8 @@ pub mod test {
         let call_info: CallInfo = conductor.call(&alice, "call_info", ()).await;
         let agent_info: AgentInfo = conductor.call(&alice, "agent_info", ()).await;
         assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
+        #[cfg(feature = "unstable-dpki")]
+        assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
 
         assert_eq!(agent_info.chain_head.1, call_info.as_at.1 + 1,);
 
