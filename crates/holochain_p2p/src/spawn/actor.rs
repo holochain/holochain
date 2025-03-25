@@ -1581,11 +1581,24 @@ impl actor::HcP2p for HolochainP2pActor {
                             })
                             .await?;
 
+                        let local_agents = space
+                            .local_agent_store()
+                            .get_all()
+                            .await?
+                            .into_iter()
+                            .map(|a| LocalAgentSummary {
+                                agent: AgentPubKey::from_k2_agent(a.agent()),
+                                storage_arc: a.get_cur_storage_arc(),
+                                target_arc: a.get_tgt_storage_arc(),
+                            })
+                            .collect();
+
                         Ok((
                             DnaHash::from_k2_space(&space_id),
                             Kitsune2NetworkMetrics {
                                 fetch_state_summary,
                                 gossip_state_summary,
+                                local_agents,
                             },
                         ))
                     })

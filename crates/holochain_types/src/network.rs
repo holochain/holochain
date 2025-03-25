@@ -28,4 +28,26 @@ pub struct Kitsune2NetworkMetrics {
     /// This includes both live gossip rounds and metrics about peers that we've gossiped with.
     /// Optionally, it can include a summary of the DHT state as Kitsune2 sees it.
     pub gossip_state_summary: kitsune2_api::GossipStateSummary,
+
+    /// A summary of the state of each local agent.
+    pub local_agents: Vec<LocalAgentSummary>,
+}
+
+/// Summary of a local agent's network state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalAgentSummary {
+    /// The agent's public key.
+    pub agent: holo_hash::AgentPubKey,
+
+    /// The current storage arc that the agent is declaring.
+    ///
+    /// This is the arc that the agent is claiming that it is an authority for.
+    pub storage_arc: kitsune2_api::DhtArc,
+
+    /// The target arc that the agent is trying to achieve as a storage arc.
+    ///
+    /// This is not declared to other peers on the network. It is used during gossip to try to sync
+    /// ops in the target arc. Once the DHT state appears to be in sync with the target arc, the
+    /// storage arc can be updated towards the target arc.
+    pub target_arc: kitsune2_api::DhtArc,
 }
