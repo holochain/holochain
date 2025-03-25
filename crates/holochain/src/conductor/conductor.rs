@@ -2727,6 +2727,7 @@ mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::JsonDump;
     use holochain_zome_types::action::builder;
+    use kitsune2_api::TransportStats;
     use std::sync::atomic::Ordering;
 
     impl Conductor {
@@ -2937,19 +2938,13 @@ mod misc_impls {
         /// Create a comprehensive structured dump of a cell's state
         pub async fn dump_full_cell_state(
             &self,
-            _cell_id: &CellId,
-            _dht_ops_cursor: Option<u64>,
+            cell_id: &CellId,
+            dht_ops_cursor: Option<u64>,
         ) -> ConductorApiResult<FullStateDump> {
-            unimplemented!()
-            /*
             let authored_db =
                 self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let dht_db = self.get_or_create_dht_db(cell_id.dna_hash())?;
-            let dna_hash = cell_id.dna_hash();
-            let p2p_agents_db = self.spaces.p2p_agents_db(dna_hash)?;
-
-            let peer_dump =
-                p2p_agent_store::dump_state(p2p_agents_db.into(), Some(cell_id.clone())).await?;
+            let peer_dump = peer_store_dump(self, cell_id).await?;
             let source_chain_dump =
                 source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
                     .await?;
@@ -2960,7 +2955,6 @@ mod misc_impls {
                 integration_dump: full_integration_dump(&dht_db, dht_ops_cursor).await?,
             };
             Ok(out)
-            */
         }
 
         /// Dump of network metrics from Kitsune2.
