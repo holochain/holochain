@@ -185,14 +185,17 @@ fixturator!(
     AgentInfo;
     curve Empty AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Empty),
+        #[cfg(feature = "unstable-dpki")] agent_latest_pubkey: fixt!(AgentPubKey, Empty),
         chain_head: (fixt!(ActionHash, Empty), fixt!(u32, Empty), fixt!(Timestamp, Empty)),
     };
     curve Unpredictable AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Unpredictable),
+        #[cfg(feature = "unstable-dpki")] agent_latest_pubkey: fixt!(AgentPubKey, Unpredictable),
         chain_head: (fixt!(ActionHash, Unpredictable), fixt!(u32, Unpredictable), fixt!(Timestamp, Unpredictable)),
     };
     curve Predictable AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Predictable),
+        #[cfg(feature = "unstable-dpki")] agent_latest_pubkey: fixt!(AgentPubKey, Predictable),
         chain_head: (fixt!(ActionHash, Predictable), fixt!(u32, Predictable), fixt!(Timestamp, Predictable)),
     };
 );
