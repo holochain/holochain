@@ -2978,7 +2978,10 @@ mod misc_impls {
             Ok(self.holochain_p2p.dump_network_metrics(request).await?)
         }
 
-        /// Dump of network metrics from Kitsune2 for a single app.
+        /// Dump of network metrics from Kitsune2.
+        ///
+        /// This version of the function filters the metrics to only include connections
+        /// relevant to the specified app.
         pub async fn dump_network_metrics_for_app(
             &self,
             installed_app_id: &InstalledAppId,
@@ -3037,12 +3040,15 @@ mod misc_impls {
             })
         }
 
-        /// JSON dump of backend network stats
+        /// Dump of backend network stats from the Kitsune2 network transport.
         pub async fn dump_network_stats(&self) -> ConductorApiResult<kitsune2_api::TransportStats> {
             Ok(self.holochain_p2p.dump_network_stats().await?)
         }
 
-        /// JSON dump of backend network stats
+        /// Dump of backend network stats from the Kitsune2 network transport.
+        ///
+        /// This version of the function filters the stats to only include connections
+        /// relevant to the specified app.
         pub async fn dump_network_stats_for_app(
             &self,
             installed_app_id: &InstalledAppId,
