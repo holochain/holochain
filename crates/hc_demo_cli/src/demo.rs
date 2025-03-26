@@ -247,6 +247,8 @@ async fn run(
 
     let config = holochain::sweettest::SweetConductorConfig::rendezvous(true);
 
+    tracing::info!("Using config: {:?}", *config);
+
     let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
 
     let mut conductor = holochain::sweettest::SweetConductor::create_with_defaults_and_metrics(

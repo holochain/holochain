@@ -11,7 +11,7 @@ pub async fn spawn_holochain_p2p(
     config: HolochainP2pConfig,
     lair_client: holochain_keystore::MetaLairClient,
 ) -> HolochainP2pResult<DynHcP2p> {
-    tracing::info!(?config, "Lanuching HolochainP2p");
+    tracing::info!(?config, "Launching HolochainP2p");
     actor::HolochainP2pActor::create(config, lair_client).await
 }
 

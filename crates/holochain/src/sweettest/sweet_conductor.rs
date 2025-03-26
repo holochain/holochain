@@ -205,6 +205,8 @@ impl SweetConductor {
 
         let handle = Self::handle_from_existing(keystore, &config, &[]).await;
 
+        tracing::info!("Starting with config: {:?}", config);
+
         Self::new(handle, dir, Arc::new(config), rendezvous).await
     }
 

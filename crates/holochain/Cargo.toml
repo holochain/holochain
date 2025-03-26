@@ -106,7 +106,7 @@ matches = { version = "0.1.8", optional = true }
 holochain_wasm_test_utils = { version = "^0.5.0-dev.21", path = "../test_utils/wasm", optional = true }
 holochain_test_wasm_common = { version = "^0.5.0-dev.19", path = "../test_utils/wasm_common", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
-sbd-server = { version = "=0.0.8-alpha", optional = true }
+kitsune2_bootstrap_srv = { version = "=0.0.1-alpha.15", optional = true }
 async-once-cell = { version = "0.5", optional = true }
 get_if_addrs = { version = "0.5.3", optional = true }
 schemars = "0.8.21"
@@ -117,7 +117,6 @@ reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
 ], optional = true }
-
 
 # fact deps
 petgraph = { version = "0.6.0", features = ["quickcheck", "stable_graph"] }
@@ -212,7 +211,7 @@ test_utils = [
   "holochain_test_wasm_common",
   "holochain_wasm_test_utils",
   "unwrap_to",
-  "sbd-server",
+  "kitsune2_bootstrap_srv",
   "async-once-cell",
   "get_if_addrs",
   "holo_hash/fixturators",
