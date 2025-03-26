@@ -491,7 +491,7 @@ dependencies = [
  "bitflags 2.9.0",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.12.1",
  "lazy_static",
  "lazycell",
  "log",
@@ -933,7 +933,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4141,6 +4141,8 @@ dependencies = [
 [[package]]
 name = "kitsune2"
 version = "0.0.1-alpha.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "792a02c5f5284eda0b7903f25c592e4f9523c71fa3312a8db8155f6d005799ef"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4152,6 +4154,8 @@ dependencies = [
 [[package]]
 name = "kitsune2_api"
 version = "0.0.1-alpha.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b85e3756d938f2e647b1da37099c94baa2fb82ae2388ca2eff3395028e73a4f7"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4167,6 +4171,8 @@ dependencies = [
 [[package]]
 name = "kitsune2_bootstrap_client"
 version = "0.0.1-alpha.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d166ff83603a6b3401df99c2f6d868c5c50e3d9a76df373f7557b93984645955"
 dependencies = [
  "base64 0.22.1",
  "kitsune2_api",
@@ -4178,6 +4184,8 @@ dependencies = [
 [[package]]
 name = "kitsune2_bootstrap_srv"
 version = "0.0.1-alpha.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05bccf217a3e569e13d5391c79d270fa394f5bf7dc057cef5d1c2323721fb26f"
 dependencies = [
  "async-channel",
  "axum",
@@ -4203,6 +4211,8 @@ dependencies = [
 [[package]]
 name = "kitsune2_core"
 version = "0.0.1-alpha.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e36e865b455690a8d09ad316f8f67389533ce31c527db6f29fb2b80f985da46"
 dependencies = [
  "backon",
  "bytes",
@@ -4223,6 +4233,8 @@ dependencies = [
 [[package]]
 name = "kitsune2_dht"
 version = "0.0.1-alpha.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0dc011d9e17770e8d52e916530d915b569fea74c414c3d91c327fa88be8ad1c"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4232,6 +4244,8 @@ dependencies = [
 [[package]]
 name = "kitsune2_gossip"
 version = "0.0.1-alpha.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25381729bbcc41436b78deb38e6e6803c54aee74938df28a4808b0d7ae23ef8a"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4249,6 +4263,8 @@ dependencies = [
 [[package]]
 name = "kitsune2_transport_tx5"
 version = "0.0.1-alpha.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be5666d737b0dda975b3fff9cea25eb02a75d13902259f18435bac038c15f87d"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4362,7 +4378,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -5375,7 +5391,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn 2.0.100",
@@ -7790,7 +7806,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 
@@ -8612,7 +8628,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
