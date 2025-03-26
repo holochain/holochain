@@ -68,23 +68,17 @@ impl Drop for OpsClaim {
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip(txn, ops)))]
-fn batch_process_entry(
-    txn: &mut Txn<DbKindDht>,
-    request_validation_receipt: bool,
-    ops: Vec<DhtOpHashed>,
-) -> WorkflowResult<()> {
+fn batch_process_entry(txn: &mut Txn<DbKindDht>, ops: Vec<DhtOpHashed>) -> WorkflowResult<()> {
     // add incoming ops to the validation limbo
     let mut to_pending = Vec::with_capacity(ops.len());
     for op in ops {
         if !op_exists_inner(txn, &op.hash)? {
             to_pending.push(op);
-        } else if request_validation_receipt {
-            set_require_receipt(txn, &op.hash, true)?;
         }
     }
 
     tracing::debug!("Inserting {} ops", to_pending.len());
-    add_to_pending(txn, &to_pending, request_validation_receipt)?;
+    add_to_pending(txn, &to_pending)?;
 
     Ok(())
 }
@@ -100,7 +94,8 @@ pub async fn incoming_dht_ops_workflow(
     space: Space,
     sys_validation_trigger: TriggerSender,
     ops: Vec<DhtOp>,
-    request_validation_receipt: bool,
+    // This is no longer used, but keeping here to limit refactor
+    _request_validation_receipt: bool,
 ) -> WorkflowResult<()> {
     let Space {
         incoming_op_hashes,
@@ -142,10 +137,8 @@ pub async fn incoming_dht_ops_workflow(
         }
     }
 
-    if !request_validation_receipt {
-        // Filter the list of ops to only include those that are not already in the database.
-        filter_ops = filter_existing_ops(&dht_db, filter_ops).await?;
-    }
+    // Filter the list of ops to only include those that are not already in the database.
+    filter_ops = filter_existing_ops(&dht_db, filter_ops).await?;
 
     // Check again whether everything has been filtered out and avoid launching a Tokio task if so
     if filter_ops.is_empty() {
@@ -155,8 +148,7 @@ pub async fn incoming_dht_ops_workflow(
         return Ok(());
     }
 
-    let (mut maybe_batch, rcv) =
-        incoming_ops_batch.check_insert(request_validation_receipt, filter_ops);
+    let (mut maybe_batch, rcv) = incoming_ops_batch.check_insert(filter_ops);
 
     let incoming_ops_batch = incoming_ops_batch.clone();
     if maybe_batch.is_some() {
@@ -170,12 +162,8 @@ pub async fn incoming_dht_ops_workflow(
                     if let Err(err) = dht_db
                         .write_async(move |txn| {
                             for entry in entries {
-                                let InOpBatchEntry {
-                                    snd,
-                                    request_validation_receipt,
-                                    ops,
-                                } = entry;
-                                let res = batch_process_entry(txn, request_validation_receipt, ops);
+                                let InOpBatchEntry { snd, ops } = entry;
+                                let res = batch_process_entry(txn, ops);
 
                                 // we can't send the results here...
                                 // we haven't committed
@@ -223,11 +211,7 @@ async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     Ok(())
 }
 
-fn add_to_pending(
-    txn: &mut Txn<DbKindDht>,
-    ops: &[DhtOpHashed],
-    request_validation_receipt: bool,
-) -> StateMutationResult<()> {
+fn add_to_pending(txn: &mut Txn<DbKindDht>, ops: &[DhtOpHashed]) -> StateMutationResult<()> {
     for op in ops {
         insert_op_dht(
             txn,
@@ -235,7 +219,10 @@ fn add_to_pending(
             holochain_serialized_bytes::encode(op.as_content())?.len() as u32,
             todo_no_cache_transfer_data(),
         )?;
-        set_require_receipt(txn, op.as_hash(), request_validation_receipt)?;
+
+        // As validators right now, we always try to send
+        // validation receipts.
+        set_require_receipt(txn, op.as_hash(), true)?;
     }
 
     Ok(())

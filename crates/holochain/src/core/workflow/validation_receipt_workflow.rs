@@ -86,18 +86,18 @@ where
         .await
         {
             Ok(()) => {
-                // Success, move on to mark them as sent
+                // Mark them sent so we don't keep trying
+                for receipt in receipts {
+                    vault
+                        .write_async(move |txn| {
+                            set_require_receipt(txn, &receipt.dht_op_hash, false)
+                        })
+                        .await?;
+                }
             }
             Err(e) => {
                 info!(failed_to_sign_and_send_receipt = ?e);
             }
-        }
-
-        // Attempted to send the receipts so we now mark them to not send in the next workflow run.
-        for receipt in receipts {
-            vault
-                .write_async(move |txn| set_require_receipt(txn, &receipt.dht_op_hash, false))
-                .await?;
         }
     }
 
@@ -176,17 +176,13 @@ where
         );
     }
 
-    // Send it and don't wait for response.
-    if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipts(
+    // Actually send the receipt to the author.
+    holochain_p2p::HolochainP2pDnaT::send_validation_receipts(
         network,
         op_author.clone(),
         receipts.into(),
     )
-    .await
-    {
-        // No one home, they will need to publish again.
-        info!(failed_send_receipt = ?e);
-    }
+    .await?;
 
     Ok(())
 }
