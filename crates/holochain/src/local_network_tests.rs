@@ -25,11 +25,14 @@ async fn conductors_call_remote(num_conductors: usize) {
 
     // Make sure the conductors are talking to each other before we start making remote calls.
     for i in 0..num_conductors {
-        conductors[i].require_initial_gossip_activity_for_cell(
-            &cells[i],
-            num_conductors as u32 - 1,
-            std::time::Duration::from_secs(60),
-        ).await.unwrap();
+        conductors[i]
+            .require_initial_gossip_activity_for_cell(
+                &cells[i],
+                num_conductors as u32 - 1,
+                std::time::Duration::from_secs(60),
+            )
+            .await
+            .unwrap();
     }
 
     let agents: Vec<_> = cells.iter().map(|c| c.agent_pubkey().clone()).collect();
