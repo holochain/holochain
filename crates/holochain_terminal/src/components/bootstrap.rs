@@ -100,7 +100,7 @@ impl Widget for BootstrapWidget {
             *get_selected().write().unwrap() = 0;
 
             let result = kitsune2_bootstrap_client::blocking_get(
-                bootstrap_url.as_str(),
+                bootstrap_url.clone(),
                 dna_hash.to_k2_space(),
                 Arc::new(Ed25519Verifier),
             );

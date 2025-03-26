@@ -202,6 +202,11 @@ fn one() -> u32 {
     1
 }
 
+#[cfg(feature = "test-utils")]
+fn default_mem_bootstrap() -> bool {
+    true
+}
+
 /// All the network config information for the conductor.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -239,6 +244,11 @@ pub struct NetworkConfig {
     #[cfg(feature = "test-utils")]
     #[serde(default)]
     pub disable_gossip: bool,
+
+    /// Use the in-memory bootstrap module instead of the real one.
+    #[cfg(feature = "test-utils")]
+    #[serde(default = "default_mem_bootstrap")]
+    pub mem_bootstrap: bool,
 }
 
 impl Default for NetworkConfig {
@@ -253,6 +263,8 @@ impl Default for NetworkConfig {
             disable_publish: false,
             #[cfg(feature = "test-utils")]
             disable_gossip: false,
+            #[cfg(feature = "test-utils")]
+            mem_bootstrap: true,
         }
     }
 }

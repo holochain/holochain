@@ -66,6 +66,10 @@ pub struct HolochainP2pConfig {
     /// This flag is only used when [HolochainP2pConfig::k2_test_builder] is true.
     #[cfg(feature = "test_utils")]
     pub disable_gossip: bool,
+
+    /// Request using the in-memory bootstrap module instead of the real one.
+    #[cfg(feature = "test_utils")]
+    pub mem_bootstrap: bool,
 }
 
 impl std::fmt::Debug for HolochainP2pConfig {
@@ -98,6 +102,8 @@ impl Default for HolochainP2pConfig {
             disable_publish: false,
             #[cfg(feature = "test_utils")]
             disable_gossip: false,
+            #[cfg(feature = "test_utils")]
+            mem_bootstrap: true,
         }
     }
 }

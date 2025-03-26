@@ -43,11 +43,12 @@ async fn spawn_test_bootstrap(
         config.listen_address_list = vec![bind_addr];
     }
 
-    let bootstrap =
-        tokio::task::spawn_blocking(|| {
-            tracing::info!("Starting bootstrap server");
-            kitsune2_bootstrap_srv::BootstrapSrv::new(config)
-        }).await.unwrap()?;
+    let bootstrap = tokio::task::spawn_blocking(|| {
+        tracing::info!("Starting bootstrap server");
+        kitsune2_bootstrap_srv::BootstrapSrv::new(config)
+    })
+    .await
+    .unwrap()?;
 
     tracing::info!("Bootstrap server started");
     let addr = bootstrap.listen_addrs().first().unwrap().clone();

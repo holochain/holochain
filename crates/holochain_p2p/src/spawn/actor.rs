@@ -755,6 +755,11 @@ impl HolochainP2pActor {
                 builder.publish = Arc::new(test::NoopPublishFactory);
             }
 
+            if !config.mem_bootstrap {
+                tracing::info!("Running with core bootstrap");
+                builder.bootstrap = kitsune2_core::factories::CoreBootstrapFactory::create();
+            }
+
             builder
         } else {
             kitsune2::default_builder()
@@ -782,7 +787,6 @@ impl HolochainP2pActor {
 
         // build with whatever bootstrap module is configured,
         // but wrap it in our bootstrap wrapper.
-        builder.bootstrap = kitsune2_core::factories::CoreBootstrapFactory::create();
         builder.bootstrap = Arc::new(BootWrapFact {
             compat: config.compat.clone(),
             preflight: preflight.clone(),

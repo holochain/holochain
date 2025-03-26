@@ -168,7 +168,10 @@ impl SweetConductor {
 
         let config: SweetConductorConfig = config.into();
         let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
-            config.apply_rendezvous(&r).into()
+            config
+                .tune_network_config(|nc| nc.mem_bootstrap = false)
+                .apply_rendezvous(&r)
+                .into()
         } else {
             if config
                 .network
