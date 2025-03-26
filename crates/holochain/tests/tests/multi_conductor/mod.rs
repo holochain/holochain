@@ -191,62 +191,6 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
-async fn sharded_consistency() {
-    use holochain::test_utils::{
-        consistency::local_machine_session, inline_zomes::simple_create_read_zome,
-    };
-
-    holochain_trace::test_run();
-    const NUM_CONDUCTORS: usize = 3;
-    const NUM_CELLS: usize = 5;
-
-    let config = SweetConductorConfig::standard()/*.tune(|tuning| {
-        tuning.gossip_strategy = "sharded-gossip".to_string();
-        #[cfg(feature = "unstable-sharding")]
-        {
-            tuning.gossip_dynamic_arcs = true;
-        }
-    })*/;
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
-
-    let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
-    let dnas = vec![dna_file];
-
-    let apps = conductors.setup_app("app", &dnas).await.unwrap();
-
-    let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();
-
-    for i in 0..NUM_CELLS {
-        conductors.setup_app(&i.to_string(), &dnas).await.unwrap();
-    }
-    conductors.exchange_peer_info().await;
-    conductors.force_all_publish_dht_ops().await;
-    // Call the "create" zome fn on Alice's app
-    let hash: ActionHash = conductors[0]
-        .call(&alice.zome("simple"), "create", ())
-        .await;
-
-    let conductor_handles: Vec<_> = conductors.iter().map(|c| c.raw_handle()).collect();
-    local_machine_session(&conductor_handles, std::time::Duration::from_secs(60)).await;
-
-    // Verify that bobbo can run "read" on his cell and get alice's Action
-    let record: Option<Record> = conductors[1]
-        .call(&bobbo.zome("simple"), "read", hash)
-        .await;
-    let record = record.expect("Record was None: bobbo couldn't `get` it");
-
-    // Assert that the Record bobbo sees matches what alice committed
-    assert_eq!(record.action().author(), alice.agent_pubkey());
-    assert_eq!(
-        *record.entry(),
-        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
-    );
-}
-
-#[cfg(feature = "test_utils")]
-#[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;

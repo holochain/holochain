@@ -687,32 +687,6 @@ impl SweetConductor {
             .expect("Tried to use a conductor that is offline")
     }
 
-    /// Force trigger all dht ops that haven't received
-    /// enough validation receipts yet.
-    pub async fn force_all_publish_dht_ops(&self) {
-        use futures::stream::StreamExt;
-        if let Some(handle) = self.handle.as_ref() {
-            let iter = handle.running_cell_ids().into_iter().map(|id| async move {
-                let db = self
-                    .get_or_create_authored_db(id.dna_hash(), id.agent_pubkey().clone())
-                    .unwrap();
-                let trigger = self.get_cell_triggers(&id).await.unwrap();
-                (db, trigger)
-            });
-            futures::stream::iter(iter)
-                .then(|f| f)
-                .for_each(|(db, mut triggers)| async move {
-                    // The line below was added when migrating to rust edition 2021, per
-                    // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
-                    let _ = &triggers;
-                    crate::test_utils::force_publish_dht_ops(&db, &mut triggers.publish_dht_ops)
-                        .await
-                        .unwrap();
-                })
-                .await;
-        }
-    }
-
     /// Let each conductor know about each other's agents so they can do networking.
     ///
     /// Returns a boolean indicating whether each space has at least one agent info for each conductor.
