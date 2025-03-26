@@ -271,7 +271,8 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                     | GetLinksRes { msg_id, .. }
                     | CountLinksRes { msg_id, .. }
                     | GetAgentActivityRes { msg_id, .. }
-                    | MustGetAgentActivityRes { msg_id, .. } => {
+                    | MustGetAgentActivityRes { msg_id, .. }
+                    | SendValidationReceiptsRes { msg_id } => {
                         if let Some(resp) = pending.lock().unwrap().respond(msg_id) {
                             let _ = resp.send(msg);
                         }
@@ -491,6 +492,39 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                             tracing::debug!(?err, "Error sending must_get_agent_activity response");
                         }
                     }
+                    SendValidationReceiptsReq {
+                        msg_id,
+                        to_agent,
+                        receipts,
+                    } => {
+                        let dna_hash = DnaHash::from_k2_space(&space);
+
+                        let resp = match evt_sender
+                            .get()
+                            .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
+                            .handle_validation_receipts_received(dna_hash, to_agent, receipts)
+                            .await
+                        {
+                            Ok(_) => SendValidationReceiptsRes { msg_id },
+                            Err(err) => ErrorRes {
+                                msg_id,
+                                error: format!("{err:?}"),
+                            },
+                        };
+                        let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
+                        if let Err(err) = kitsune
+                            .space_if_exists(space)
+                            .await
+                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
+                            .send_notify(from_peer, resp)
+                            .await
+                        {
+                            tracing::debug!(
+                                ?err,
+                                "Error sending send_validation_receipts response"
+                            );
+                        }
+                    }
                     RemoteSignalEvt {
                         to_agent,
                         zome_call_params_serialized,
@@ -508,16 +542,6 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                                 zome_call_params_serialized,
                                 signature,
                             )
-                            .await;
-                    }
-                    ValidationReceiptsEvt { to_agent, receipts } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
-                        // validation receipts are fire-and-forget
-                        // so it's safe to ignore the response
-                        let _response = evt_sender
-                            .get()
-                            .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
-                            .handle_validation_receipts_received(dna_hash, to_agent, receipts)
                             .await;
                     }
                 }
@@ -1497,11 +1521,26 @@ impl actor::HcP2p for HolochainP2pActor {
                 }
             };
 
-            let req = crate::wire::WireMessage::validation_receipts(to_agent.clone(), receipts);
+            let (msg_id, req) =
+                crate::wire::WireMessage::send_validation_receipts_req(to_agent.clone(), receipts);
 
             let start = std::time::Instant::now();
 
-            let out = self.send_notify(&space, to_url, req).await;
+            let out = self
+                .send_request(
+                    "send_validation_receipts",
+                    &space,
+                    to_url,
+                    msg_id,
+                    req,
+                    |res| match res {
+                        crate::wire::WireMessage::SendValidationReceiptsRes { .. } => Ok(()),
+                        _ => Err(HolochainP2pError::other(format!(
+                            "invalid response to send_validation_receipts: {res:?}"
+                        ))),
+                    },
+                )
+                .await;
 
             timing_trace_out!(out, start, a = "send_validation_receipts");
 
