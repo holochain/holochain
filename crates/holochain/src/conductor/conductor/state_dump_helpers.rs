@@ -1,8 +1,8 @@
 use super::Conductor;
 use crate::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use chrono::{DateTime, Utc};
-use hdk::prelude::CellId;
 use holochain_conductor_api::{AgentInfoDump, P2pAgentsDump};
+use holochain_zome_types::cell::CellId;
 use kitsune2_api::AgentInfoSigned;
 use std::sync::Arc;
 
