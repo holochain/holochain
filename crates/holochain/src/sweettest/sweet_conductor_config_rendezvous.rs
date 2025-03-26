@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
 /// How conductors should learn about each other / speak to each other.
@@ -16,39 +17,43 @@ pub type DynSweetRendezvous = Arc<dyn SweetRendezvous>;
 /// Local rendezvous infrastructure for unit testing.
 pub struct SweetLocalRendezvous {
     bs_addr: String,
-    //bs_shutdown: Option<kitsune_p2p_bootstrap::BootstrapShutdown>,
     sig_addr: String,
-    sig_hnd: Mutex<Option<sbd_server::SbdServer>>,
-    sig_ip: std::net::IpAddr,
-    sig_port: u16,
+    bootstrap_hnd: Mutex<Option<kitsune2_bootstrap_srv::BootstrapSrv>>,
+    bootstrap_addr: SocketAddr,
 }
 
 impl Drop for SweetLocalRendezvous {
     fn drop(&mut self) {
-        /*
-        if let Some(s) = self.bs_shutdown.take() {
-            s();
+        if let Some(mut s) = self.bootstrap_hnd.lock().unwrap().take() {
+            if let Err(err) = s.shutdown() {
+                tracing::error!(?err, "failed to shutdown bootstrap server");
+            }
         }
-        */
     }
 }
 
-async fn spawn_sig(ip: std::net::IpAddr, port: u16) -> (String, u16, sbd_server::SbdServer) {
-    let sig_hnd = sbd_server::SbdServer::new(Arc::new(sbd_server::Config {
-        bind: vec![format!("{ip}:{port}")],
-        limit_clients: 100,
-        disable_rate_limiting: true,
-        ..Default::default()
-    }))
+async fn spawn_test_bootstrap(
+    bind_addr: Option<SocketAddr>,
+) -> std::io::Result<(kitsune2_bootstrap_srv::BootstrapSrv, SocketAddr)> {
+    let mut config = kitsune2_bootstrap_srv::Config::testing();
+    config.sbd.limit_clients = 100;
+    config.sbd.disable_rate_limiting = true;
+
+    if let Some(bind_addr) = bind_addr {
+        config.listen_address_list = vec![bind_addr];
+    }
+
+    let bootstrap = tokio::task::spawn_blocking(|| {
+        tracing::info!("Starting bootstrap server");
+        kitsune2_bootstrap_srv::BootstrapSrv::new(config)
+    })
     .await
-    .unwrap();
+    .unwrap()?;
 
-    let sig_addr = *sig_hnd.bind_addrs().first().unwrap();
-    let sig_port = sig_addr.port();
-    let sig_addr = format!("ws://{sig_addr}");
-    tracing::info!("RUNNING SIG: {sig_addr:?}");
+    tracing::info!("Bootstrap server started");
+    let addr = *bootstrap.listen_addrs().first().unwrap();
 
-    (sig_addr, sig_port, sig_hnd)
+    Ok((bootstrap, addr))
 }
 
 impl SweetLocalRendezvous {
@@ -60,52 +65,27 @@ impl SweetLocalRendezvous {
 
     /// Create a new local rendezvous instance.
     pub async fn new_raw() -> Arc<Self> {
-        let mut addr = None;
+        let (bootstrap, bootstrap_addr) = spawn_test_bootstrap(None).await.unwrap();
 
-        for iface in get_if_addrs::get_if_addrs().expect("failed to get_if_addrs") {
-            if iface.ip().is_ipv6() {
-                continue;
-            }
-            addr = Some(iface.ip());
-            break;
-        }
+        let bootstrap_hnd = Mutex::new(Some(bootstrap));
 
-        let addr = addr.expect("no matching network interfaces found");
-
-        /*
-        let (bs_driver, bs_addr, bs_shutdown) = kitsune_p2p_bootstrap::run((addr, 0), Vec::new())
-            .await
-            .unwrap();
-        tokio::task::spawn(bs_driver);
-        let bs_addr = format!("http://{bs_addr}");
-        tracing::info!("RUNNING BOOTSTRAP: {bs_addr:?}");
-        */
-
-        {
-            let (sig_addr, sig_port, sig_hnd) = spawn_sig(addr, 0).await;
-
-            let sig_hnd = Mutex::new(Some(sig_hnd));
-
-            Arc::new(Self {
-                bs_addr: "http://FIX-ME".into(),
-                //bs_shutdown: Some(bs_shutdown),
-                sig_addr,
-                sig_hnd,
-                sig_ip: addr,
-                sig_port,
-            })
-        }
+        Arc::new(Self {
+            bs_addr: format!("http://{bootstrap_addr}"),
+            sig_addr: format!("ws://{bootstrap_addr}"),
+            bootstrap_hnd,
+            bootstrap_addr,
+        })
     }
 
     /// Drop (shutdown) the signal server.
     pub async fn drop_sig(&self) {
-        self.sig_hnd.lock().unwrap().take();
+        self.bootstrap_hnd.lock().unwrap().take();
 
         // wait up to 1 second until the socket is actually closed
         for _ in 0..100 {
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
-            match tokio::net::TcpStream::connect((self.sig_ip, self.sig_port)).await {
+            match tokio::net::TcpStream::connect(self.bootstrap_addr).await {
                 Ok(_) => (),
                 Err(_) => break,
             }
@@ -116,9 +96,11 @@ impl SweetLocalRendezvous {
     pub async fn start_sig(&self) {
         self.drop_sig().await;
 
-        let (_, _, sig_hnd) = spawn_sig(self.sig_ip, self.sig_port).await;
+        let (bootstrap, _) = spawn_test_bootstrap(Some(self.bootstrap_addr))
+            .await
+            .unwrap();
 
-        *self.sig_hnd.lock().unwrap() = Some(sig_hnd);
+        *self.bootstrap_hnd.lock().unwrap() = Some(bootstrap);
     }
 }
 
