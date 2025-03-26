@@ -168,7 +168,10 @@ impl SweetConductor {
 
         let config: SweetConductorConfig = config.into();
         let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
-            config.apply_rendezvous(&r).into()
+            config
+                .tune_network_config(|nc| nc.mem_bootstrap = false)
+                .apply_rendezvous(&r)
+                .into()
         } else {
             if config
                 .network
@@ -204,6 +207,8 @@ impl SweetConductor {
         let keystore = keystore.unwrap_or_else(holochain_keystore::test_keystore);
 
         let handle = Self::handle_from_existing(keystore, &config, &[]).await;
+
+        tracing::info!("Starting with config: {:?}", config);
 
         Self::new(handle, dir, Arc::new(config), rendezvous).await
     }

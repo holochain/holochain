@@ -95,6 +95,8 @@ lto = true
 # kitsune2 = { path = "../kitsune2/crates/kitsune2" }
 # kitsune2_dht = { path = "../kitsune2/crates/dht" }
 # kitsune2_gossip = { path = "../kitsune2/crates/gossip" }
+# kitsune2_bootstrap_srv = { path = "../kitsune2/crates/bootstrap_srv" }
+# kitsune2_bootstrap_client = { path = "../kitsune2/crates/bootstrap_client" }
 # holochain_deepkey_dna = { path = "../deepkey/crates/holochain_deepkey_dna" }
 # task-motel = { path = "../task-motel" }
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
