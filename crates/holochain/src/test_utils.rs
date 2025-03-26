@@ -62,6 +62,31 @@ macro_rules! here {
     };
 }
 
+/// Retry a code block with an exit condition after a pause, until a timeout has elapsed.
+/// The default timeout is 1 s.
+/// The default pause is 10 ms.
+#[macro_export]
+macro_rules! retry_until_timeout {
+    ($timeout_ms:literal, $sleep_ms:literal, $code:block) => {
+        tokio::time::timeout(std::time::Duration::from_millis($timeout_ms), async {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_millis($sleep_ms)).await;
+                $code
+            }
+        })
+        .await
+        .unwrap();
+    };
+
+    ($timeout_ms:literal, $code:block) => {
+        retry_until_timeout!($timeout_ms, 10, $code)
+    };
+
+    ($code:block) => {
+        retry_until_timeout!(1_000, $code)
+    };
+}
+
 /// Do what's necessary to install an app
 pub async fn install_app(
     name: &str,

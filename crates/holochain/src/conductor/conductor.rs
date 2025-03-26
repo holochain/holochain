@@ -131,6 +131,8 @@ mod app_auth_token_store;
 
 mod hc_p2p_handler_impl;
 
+mod state_dump_helpers;
+
 /// Verify signature of a signed zome call.
 ///
 /// [Signature verification](holochain_conductor_api::AppRequest::CallZome)
@@ -2722,7 +2724,8 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
-    use super::*;
+    use super::{state_dump_helpers::peer_store_dump, *};
+    use holochain_conductor_api::JsonDump;
     use holochain_zome_types::action::builder;
     use kitsune2_api::TransportStats;
     use std::sync::atomic::Ordering;
@@ -2869,22 +2872,14 @@ mod misc_impls {
 
         /// Create a JSON dump of the cell's state
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub async fn dump_cell_state(&self, _cell_id: &CellId) -> ConductorApiResult<String> {
-            unimplemented!()
-            /*
+        pub async fn dump_cell_state(&self, cell_id: &CellId) -> ConductorApiResult<String> {
             let cell = self.cell_by_id(cell_id).await?;
             let authored_db = cell.get_or_create_authored_db()?;
             let dht_db = cell.dht_db();
-            let space = cell_id.dna_hash();
-            let p2p_agents_db = self.p2p_agents_db(space);
-
-            let peer_dump =
-                p2p_agent_store::dump_state(p2p_agents_db.into(), Some(cell_id.clone())).await?;
-            let source_chain_dump = source_chain::dump_state(
-                authored_db.clone().into(),
-                cell_id.agent_pubkey().clone(),
-            )
-            .await?;
+            let agent_pub_key = cell_id.agent_pubkey().clone();
+            let peer_dump = peer_store_dump(self, cell_id).await?;
+            let source_chain_dump =
+                source_chain::dump_state(authored_db.clone().into(), agent_pub_key).await?;
 
             let out = JsonDump {
                 peer_dump,
@@ -2894,8 +2889,7 @@ mod misc_impls {
             // Add summary
             let summary = out.to_string();
             let out = (out, summary);
-            Ok(serde_json::to_string_pretty(&out)?)
-            */
+            Ok(serde_json::to_string(&out)?)
         }
 
         /// Create a JSON dump of the conductor's state
@@ -2944,19 +2938,13 @@ mod misc_impls {
         /// Create a comprehensive structured dump of a cell's state
         pub async fn dump_full_cell_state(
             &self,
-            _cell_id: &CellId,
-            _dht_ops_cursor: Option<u64>,
+            cell_id: &CellId,
+            dht_ops_cursor: Option<u64>,
         ) -> ConductorApiResult<FullStateDump> {
-            unimplemented!()
-            /*
             let authored_db =
                 self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let dht_db = self.get_or_create_dht_db(cell_id.dna_hash())?;
-            let dna_hash = cell_id.dna_hash();
-            let p2p_agents_db = self.spaces.p2p_agents_db(dna_hash)?;
-
-            let peer_dump =
-                p2p_agent_store::dump_state(p2p_agents_db.into(), Some(cell_id.clone())).await?;
+            let peer_dump = peer_store_dump(self, cell_id).await?;
             let source_chain_dump =
                 source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
                     .await?;
@@ -2967,7 +2955,6 @@ mod misc_impls {
                 integration_dump: full_integration_dump(&dht_db, dht_ops_cursor).await?,
             };
             Ok(out)
-            */
         }
 
         /// Dump of network metrics from Kitsune2.
