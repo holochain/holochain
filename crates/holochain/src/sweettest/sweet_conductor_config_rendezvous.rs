@@ -51,7 +51,7 @@ async fn spawn_test_bootstrap(
     .unwrap()?;
 
     tracing::info!("Bootstrap server started");
-    let addr = bootstrap.listen_addrs().first().unwrap().clone();
+    let addr = *bootstrap.listen_addrs().first().unwrap();
 
     Ok((bootstrap, addr))
 }
