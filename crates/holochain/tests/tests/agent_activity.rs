@@ -36,11 +36,10 @@ async fn get_agent_activity() {
     }
 
     // Wait for gossip to have started, so we know that Bob will be able to connect to Alice
-    conductor_batch[1].require_initial_gossip_activity_for_cell(
-        &bob_cell,
-        1,
-        std::time::Duration::from_secs(30),
-    ).await.unwrap();
+    conductor_batch[1]
+        .require_initial_gossip_activity_for_cell(bob_cell, 1, std::time::Duration::from_secs(30))
+        .await
+        .unwrap();
 
     // TODO No way to force a network call to get the agent activity, so we have to wait for a sync
     //      first and then check the agent activity
