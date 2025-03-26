@@ -69,7 +69,7 @@ impl HolochainP2pLocalAgent {
             inner: Mutex::new(LocalAgentInner {
                 callback: None,
                 storage_arc: DhtArc::Empty,
-                target_arc: initial_target_arc,
+                target_arc: apply_arc_factor(initial_target_arc, initial_target_arc_factor),
             }),
             target_arc_factor: initial_target_arc_factor,
         }

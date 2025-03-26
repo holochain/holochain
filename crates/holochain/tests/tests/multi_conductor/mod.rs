@@ -231,17 +231,15 @@ async fn private_entries_dont_leak() {
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
     let ((alice,), (bobbo,)) = apps.into_tuples();
 
-    conductors[0].require_initial_gossip_activity_for_cell(
-        &alice,
-        1,
-        std::time::Duration::from_secs(30),
-    ).await.unwrap();
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(&alice, 1, std::time::Duration::from_secs(30))
+        .await
+        .unwrap();
 
-    conductors[1].require_initial_gossip_activity_for_cell(
-        &bobbo,
-        1,
-        std::time::Duration::from_secs(30),
-    ).await.unwrap();
+    conductors[1]
+        .require_initial_gossip_activity_for_cell(&bobbo, 1, std::time::Duration::from_secs(30))
+        .await
+        .unwrap();
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
