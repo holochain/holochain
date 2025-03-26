@@ -351,7 +351,13 @@ impl Db {
 
 async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
-    let mock_network = HolochainP2pDna::new(Arc::new(MockHcP2p::new()), fixt!(DnaHash), None);
+
+    let mut mock_hc_p2p = MockHcP2p::new();
+    mock_hc_p2p
+        .expect_new_integrated_data()
+        .returning(move |_, _| Box::pin(async move { Ok(()) }));
+
+    let mock_network = HolochainP2pDna::new(Arc::new(mock_hc_p2p), fixt!(DnaHash), None);
     integrate_dht_ops_workflow(env.clone(), env.clone().into(), qt, mock_network)
         .await
         .unwrap();
