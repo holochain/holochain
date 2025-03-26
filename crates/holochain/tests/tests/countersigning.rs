@@ -407,7 +407,7 @@ async fn alice_can_recover_from_a_session_timeout() {
 
     // Make sure the conductors are gossiping before creating posts
     conductors[0]
-        .require_initial_gossip_activity_for_cell(alice, 3, Duration::from_secs(30))
+        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
         .await
         .unwrap();
 
@@ -546,7 +546,7 @@ async fn complete_session_with_chc_enabled() {
     let bob = &cells[1];
 
     conductors[0]
-        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
+        .require_initial_gossip_activity_for_cell(alice, 1, Duration::from_secs(30))
         .await
         .unwrap();
 
@@ -665,7 +665,7 @@ async fn session_rollback_with_chc_enabled() {
 
     // Make sure the conductors are gossiping before continuing
     conductors[0]
-        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
+        .require_initial_gossip_activity_for_cell(alice, 1, Duration::from_secs(30))
         .await
         .unwrap();
 
@@ -805,7 +805,7 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
 
     // Make sure the conductors are gossiping before continuing
     conductors[0]
-        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
+        .require_initial_gossip_activity_for_cell(alice, 1, Duration::from_secs(30))
         .await
         .unwrap();
 
@@ -1124,7 +1124,7 @@ async fn should_be_able_to_schedule_functions_during_session() {
 
     // Make sure the conductors are gossiping before creating posts
     conductors[0]
-        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
+        .require_initial_gossip_activity_for_cell(alice, 1, Duration::from_secs(30))
         .await
         .unwrap();
 

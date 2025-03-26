@@ -54,8 +54,8 @@ holochain_conductor_config = { version = "^0.5.0-dev.8", path = "../holochain_co
 holochain_timestamp = { version = "^0.5.0-dev.1", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.12" }
-kitsune2_api = "=0.0.1-alpha.13"
-kitsune2_core = "=0.0.1-alpha.13"
+kitsune2_api = "=0.0.1-alpha.15"
+kitsune2_core = "=0.0.1-alpha.15"
 mockall = "0.11.3"
 mr_bundle = { version = "^0.5.0-dev.5", path = "../mr_bundle" }
 must_future = "0.1.1"

@@ -281,8 +281,17 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::FullStateDumped(state))
             }
-            DumpNetworkMetrics { dna_hash } => {
-                let dump = self.conductor_handle.dump_network_metrics(dna_hash).await?;
+            DumpNetworkMetrics {
+                dna_hash,
+                include_dht_summary,
+            } => {
+                let dump = self
+                    .conductor_handle
+                    .dump_network_metrics(Kitsune2NetworkMetricsRequest {
+                        dna_hash,
+                        include_dht_summary,
+                    })
+                    .await?;
                 Ok(AdminResponse::NetworkMetricsDumped(dump))
             }
             DumpNetworkStats => {

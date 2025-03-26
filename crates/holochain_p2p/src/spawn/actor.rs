@@ -1543,21 +1543,75 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn dump_network_metrics(
         &self,
-        _dna_hash: Option<DnaHash>,
-    ) -> BoxFut<'_, HolochainP2pResult<String>> {
+        request: Kitsune2NetworkMetricsRequest,
+    ) -> BoxFut<'_, HolochainP2pResult<HashMap<DnaHash, Kitsune2NetworkMetrics>>> {
         Box::pin(async move {
-            tracing::error!("dump_network_metrics is currently a STUB in holochain_p2p--deferring until at least CI is building again");
-            // not sure if this was json, but make it an empty obj just in case : )
-            Ok("{}".into())
+            let spaces = match request.dna_hash {
+                Some(dna_hash) => {
+                    let space_id = dna_hash.to_k2_space();
+                    vec![(
+                        space_id.clone(),
+                        self.kitsune
+                            .space_if_exists(space_id)
+                            .await
+                            .ok_or_else(|| {
+                                K2Error::other(format!("No space found for: {dna_hash:?}"))
+                            })?,
+                    )]
+                }
+                None => {
+                    let all_space_ids = self.kitsune.list_spaces();
+                    let mut spaces = Vec::with_capacity(all_space_ids.len());
+                    for space_id in all_space_ids {
+                        spaces.push((space_id.clone(), self.kitsune.space(space_id).await?));
+                    }
+
+                    spaces
+                }
+            };
+
+            Ok(
+                futures::future::join_all(spaces.into_iter().map(|(space_id, space)| {
+                    Box::pin(async move {
+                        let fetch_state_summary = space.fetch().get_state_summary().await?;
+                        let gossip_state_summary = space
+                            .gossip()
+                            .get_state_summary(GossipStateSummaryRequest {
+                                include_dht_summary: request.include_dht_summary,
+                            })
+                            .await?;
+
+                        let local_agents = space
+                            .local_agent_store()
+                            .get_all()
+                            .await?
+                            .into_iter()
+                            .map(|a| LocalAgentSummary {
+                                agent: AgentPubKey::from_k2_agent(a.agent()),
+                                storage_arc: a.get_cur_storage_arc(),
+                                target_arc: a.get_tgt_storage_arc(),
+                            })
+                            .collect();
+
+                        Ok((
+                            DnaHash::from_k2_space(&space_id),
+                            Kitsune2NetworkMetrics {
+                                fetch_state_summary,
+                                gossip_state_summary,
+                                local_agents,
+                            },
+                        ))
+                    })
+                }))
+                .await
+                .into_iter()
+                .collect::<K2Result<HashMap<_, _>>>()?,
+            )
         })
     }
 
-    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<String>> {
-        Box::pin(async move {
-            tracing::error!("dump_network_stats is currently a STUB in holochain_p2p--deferring until at least CI is building again");
-            // not sure if this was json, but make it an empty obj just in case : )
-            Ok("{}".into())
-        })
+    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<TransportStats>> {
+        Box::pin(async move { Ok(self.kitsune.transport().await?.dump_network_stats().await?) })
     }
 
     fn target_arcs(

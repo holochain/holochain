@@ -39,6 +39,7 @@ use crate::run::run_async;
 use crate::CmdRunner;
 use clap::{Args, Parser, Subcommand};
 use holochain_trace::Output;
+use holochain_types::network::Kitsune2NetworkMetrics;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::WebsocketError;
 use kitsune2_api::AgentInfoSigned;
@@ -241,6 +242,10 @@ pub struct DumpNetworkMetrics {
     /// The DNA hash of the app network to dump.
     #[arg(value_parser = parse_dna_hash)]
     pub dna: Option<DnaHash>,
+
+    /// Include DHT summary in the response.
+    #[arg(long)]
+    pub include_dht_summary: bool,
 }
 
 /// Arguments for listing capability grants info.
@@ -424,12 +429,20 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
         AdminRequestCli::DumpNetworkMetrics(args) => {
             let metrics = dump_network_metrics(cmd, args).await?;
             // Print without other text so it can be piped
-            println!("{}", metrics);
+            println!(
+                "{}",
+                serde_json::to_string(
+                    &metrics
+                        .into_iter()
+                        .map(|(k, v)| (k.to_string(), v))
+                        .collect::<HashMap<_, _>>()
+                )?
+            );
         }
         AdminRequestCli::DumpNetworkStats => {
             let stats = dump_network_stats(cmd).await?;
             // Print without other text so it can be piped
-            println!("{}", stats);
+            println!("{}", serde_json::to_string(&stats)?);
         }
         AdminRequestCli::ListCapabilityGrants(args) => {
             let info = list_capability_grants(cmd, args).await?;
@@ -729,15 +742,18 @@ pub async fn dump_conductor_state(cmd: &mut CmdRunner) -> anyhow::Result<String>
 async fn dump_network_metrics(
     cmd: &mut CmdRunner,
     args: DumpNetworkMetrics,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<HashMap<DnaHash, Kitsune2NetworkMetrics>> {
     let resp = cmd
-        .command(AdminRequest::DumpNetworkMetrics { dna_hash: args.dna })
+        .command(AdminRequest::DumpNetworkMetrics {
+            dna_hash: args.dna,
+            include_dht_summary: args.include_dht_summary,
+        })
         .await?;
     Ok(expect_match!(resp => AdminResponse::NetworkMetricsDumped, "Failed to dump network metrics"))
 }
 
 /// Calls [`AdminRequest::DumpNetworkStats`] and dumps network stats.
-async fn dump_network_stats(cmd: &mut CmdRunner) -> anyhow::Result<String> {
+async fn dump_network_stats(cmd: &mut CmdRunner) -> anyhow::Result<kitsune2_api::TransportStats> {
     let resp = cmd.command(AdminRequest::DumpNetworkStats).await?;
     Ok(expect_match!(resp => AdminResponse::NetworkStatsDumped, "Failed to dump network stats"))
 }

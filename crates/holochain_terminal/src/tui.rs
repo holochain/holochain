@@ -1,7 +1,7 @@
 use crate::app::App;
 use crate::components::bootstrap::BootstrapWidget;
 use crate::components::home::HomeWidget;
-use crate::components::network_info::NetworkInfoWidget;
+use crate::components::network_metrics::NetworkMetricsWidget;
 use crossterm::terminal::{enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::{terminal, ExecutableCommand};
 use ratatui::backend::Backend;
@@ -96,7 +96,7 @@ fn render(app: &mut App, frame: &mut Frame) {
         }
         1 => {
             let app_client = app.app_client();
-            let network_info_widget = NetworkInfoWidget::new(app.args(), app_client, events);
+            let network_info_widget = NetworkMetricsWidget::new(app.args(), app_client, events);
             frame.render_widget(network_info_widget, root_layout[1]);
         }
         2 => {

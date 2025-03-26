@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Changed the response format for `DumpNetworkMetrics` and `DumpNetworkStats` to provide information from Kitsune2. #4816
+- Added a new option to the `DumpNetworkMetrics` on the admin interface. That is `include_dht_summary` which will return
+  a summary of the DHT state. #4816
+- Added `DumpNetworkMetrics` and `DumpNetworkStats` to the app interface. Please see the Rust docs for usage. #4816
+- Removed `NetworkInfo` from the app interface, please use `DumpNetworkMetrics` or `DumpNetworkStats` instead. #4816
 - Update `hcterm` to work with bootstrap2 bootstrap servers. By default, it uses `https://dev-test-bootstrap2.holochain.org` as the bootstrap2 server. #4767
 - Update `hc-service-check` to check bootstrap2 servers. By default, it uses `https://dev-test-bootstrap2.holochain.org` as the bootstrap2 server. #4767
 - Remove `hc-run-local-services`, please use `kitsune2-bootstrap-srv` instead.

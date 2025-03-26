@@ -2,11 +2,13 @@ use anyhow::{anyhow, Context};
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken, AppInfo,
-    AppInterfaceInfo, AppRequest, AppResponse, CellInfo, NetworkInfo,
+    AppInterfaceInfo, AppRequest, AppResponse, CellInfo,
 };
-use holochain_types::prelude::{InstalledAppId, NetworkInfoRequestPayload};
+use holochain_types::network::Kitsune2NetworkMetrics;
+use holochain_types::prelude::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct AppClient {
@@ -41,7 +43,7 @@ impl AppClient {
         Ok(AppClient { tx, rx })
     }
 
-    pub async fn discover_network_info_params(
+    pub async fn discover_network_metrics_params(
         &mut self,
         app_id: InstalledAppId,
     ) -> anyhow::Result<(AgentPubKey, Vec<(String, DnaHash)>)> {
@@ -67,20 +69,16 @@ impl AppClient {
         Ok((agent, named_dna_hashes))
     }
 
-    pub async fn network_info(
+    pub async fn network_metrics(
         &mut self,
-        agent: AgentPubKey,
-        dna_hashes: Vec<DnaHash>,
-    ) -> anyhow::Result<Vec<NetworkInfo>> {
-        let r = NetworkInfoRequestPayload {
-            agent_pub_key: agent,
-            dnas: dna_hashes,
-            last_time_queried: None,
+    ) -> anyhow::Result<HashMap<DnaHash, Kitsune2NetworkMetrics>> {
+        let msg = AppRequest::DumpNetworkMetrics {
+            dna_hash: None,
+            include_dht_summary: false,
         };
-        let msg = AppRequest::NetworkInfo(Box::new(r));
         let response = self.send(msg).await?;
         match response {
-            AppResponse::NetworkInfo(infos) => Ok(infos),
+            AppResponse::NetworkMetricsDumped(metrics) => Ok(metrics),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

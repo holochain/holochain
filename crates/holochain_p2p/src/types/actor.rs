@@ -6,7 +6,7 @@ use crate::*;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
 use kitsune2_api::{SpaceId, StoredOp};
-use mockall::automock;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 /// Get options help control how the get is processed at various levels.
@@ -382,11 +382,13 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     /// Dump network metrics.
     fn dump_network_metrics(
         &self,
-        dna_hash: Option<DnaHash>,
-    ) -> BoxFut<'_, HolochainP2pResult<String>>;
+        request: Kitsune2NetworkMetricsRequest,
+    ) -> BoxFut<'_, HolochainP2pResult<HashMap<DnaHash, Kitsune2NetworkMetrics>>>;
 
-    /// Dump network stats.
-    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<String>>;
+    /// Get network stats from the Kitsune2 transport.
+    ///
+    /// See [Transport::dump_network_stats](kitsune2_api::Transport::dump_network_stats).
+    fn dump_network_stats(&self) -> BoxFut<'_, HolochainP2pResult<kitsune2_api::TransportStats>>;
 
     /// Get the target arcs of the agents currently in this space.
     fn target_arcs(

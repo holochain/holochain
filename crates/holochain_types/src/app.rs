@@ -60,19 +60,6 @@ pub struct RegisterDnaPayload {
     pub source: DnaSource,
 }
 
-/// The instructions on how to request NetworkInfo
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NetworkInfoRequestPayload {
-    /// The calling agent
-    // TODO should this be restricted to the agent for the current app?
-    pub agent_pub_key: AgentPubKey,
-    /// Get gossip info for these DNAs
-    pub dnas: Vec<DnaHash>,
-    /// Timestamp in ms since which received amount of bytes from peers will
-    /// be returned. Defaults to UNIX_EPOCH.
-    pub last_time_queried: Option<Timestamp>,
-}
-
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 /// The instructions on how to update coordinators for a dna file.
 pub struct UpdateCoordinatorsPayload {

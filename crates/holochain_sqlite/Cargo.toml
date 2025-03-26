@@ -51,7 +51,7 @@ getrandom = "0.2.7"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 schemars = "0.8.21"
 
-kitsune2_api = "=0.0.1-alpha.13"
+kitsune2_api = "=0.0.1-alpha.15"
 bytes = "1.10"
 
 rusqlite = { version = "0.32.1", features = [

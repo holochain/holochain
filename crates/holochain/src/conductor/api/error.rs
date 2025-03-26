@@ -115,6 +115,9 @@ pub enum ConductorApiError {
     #[error(transparent)]
     KitsuneError(#[from] kitsune2_api::K2Error),
 
+    #[error(transparent)]
+    HolochainP2pError(#[from] HolochainP2pError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -149,6 +152,7 @@ pub enum SerializationError {
 pub type ConductorApiResult<T> = Result<T, ConductorApiError>;
 
 pub use holochain_conductor_api::ExternalApiWireError;
+use holochain_p2p::HolochainP2pError;
 
 impl From<ConductorApiError> for ExternalApiWireError {
     fn from(err: ConductorApiError) -> Self {
