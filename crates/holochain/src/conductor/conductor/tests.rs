@@ -25,6 +25,7 @@ use holochain_zome_types::op::Op;
 use maplit::hashset;
 use matches::assert_matches;
 
+mod add_agent_infos;
 mod state_dump;
 
 // Module with tests for agent key revocation. With or without DPKI, an agent can revoke their key,
