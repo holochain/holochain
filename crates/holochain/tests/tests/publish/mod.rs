@@ -22,8 +22,6 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
     )
     .await;
 
-    conductors.exchange_peer_info().await;
-
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
