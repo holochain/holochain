@@ -284,8 +284,13 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 
     assert_eq!(WorkComplete::Complete, work_complete);
 
-    // Should no longer require a receipt for either
-    assert!(!get_requires_receipt(vault.clone(), op_hash1).await);
+    // Sending the receipt to this author returned an error,
+    // so we did NOT clear the wants receipt flag.
+    assert!(get_requires_receipt(vault.clone(), op_hash1).await);
+
+    // But even after we got the above error, we proceeded to
+    // send the receipt for the second author which DID work,
+    // so its flag is cleared.
     assert!(!get_requires_receipt(vault.clone(), op_hash2).await);
 }
 
