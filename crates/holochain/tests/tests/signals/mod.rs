@@ -56,6 +56,14 @@ async fn remote_signals_work_after_sbd_restart() {
     let (app2,) = c2.setup_app("app", &[dna_file]).await.unwrap().into_tuple();
     let a2 = app2.agent_pubkey().clone();
 
+    c1.require_initial_gossip_activity_for_cell(&app1, 1, Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    c2.require_initial_gossip_activity_for_cell(&app2, 1, Duration::from_secs(30))
+        .await
+        .unwrap();
+
     let mut c2_rx = c2.subscribe_to_app_signals("app".to_string());
 
     let _: () = c1
