@@ -866,30 +866,39 @@ mod network_impls {
         /// Get signed agent info from the conductor
         pub async fn get_agent_infos(
             &self,
-            _cell_id: Option<CellId>,
-        ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
-            unimplemented!()
-            /*
+            cell_id: Option<CellId>,
+        ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
             match cell_id {
                 Some(c) => {
-                    let (d, a) = c.into_dna_and_agent();
-                    let db = self.p2p_agents_db(&d);
-                    Ok(get_single_agent_info(db.into(), d, a)
+                    let (dna_hash, agent_key) = c.into_dna_and_agent();
+                    let peer_store = self
+                        .holochain_p2p
+                        .peer_store(dna_hash)
+                        .await
+                        .map_err(|err| ConductorApiError::CellError(err.into()))?;
+                    Ok(peer_store
+                        .get(agent_key.to_k2_agent())
                         .await?
-                        .map(|a| vec![a])
+                        .map(|agent_info| vec![agent_info])
                         .unwrap_or_default())
                 }
                 None => {
+                    let dna_hashes = self
+                        .spaces
+                        .get_from_spaces(|space| (*space.dna_hash).clone());
                     let mut out = Vec::new();
-                    // collecting so the mutex lock can close
-                    let envs = self.spaces.get_from_spaces(|s| s.p2p_agents_db.clone());
-                    for db in envs {
-                        out.append(&mut all_agent_infos(db.into()).await?);
+                    for dna_hash in dna_hashes {
+                        let peer_store = self
+                            .holochain_p2p
+                            .peer_store(dna_hash)
+                            .await
+                            .map_err(|err| ConductorApiError::CellError(err.into()))?;
+                        let all_peers = peer_store.get_all().await?;
+                        out.extend(all_peers);
                     }
                     Ok(out)
                 }
             }
-            */
         }
 
         pub(crate) async fn witness_nonce_from_calling_agent(
@@ -2726,8 +2735,8 @@ mod scheduler_impls {
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
     use holochain_conductor_api::JsonDump;
-    use holochain_zome_types::action::builder;
-    use kitsune2_api::TransportStats;
+    use holochain_zome_types::{action::builder, Entry};
+    use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
 
     impl Conductor {
@@ -3088,16 +3097,30 @@ mod misc_impls {
 
         /// Add signed agent info to the conductor
         pub async fn add_agent_infos(&self, agent_infos: Vec<String>) -> ConductorApiResult<()> {
-            let mut parsed = Vec::with_capacity(agent_infos.len());
+            let mut parsed_by_space: HashMap<SpaceId, Vec<Arc<AgentInfoSigned>>> = HashMap::new();
+            // Parse agent infos and add them to a map indexed by space id.
             for info in agent_infos {
-                parsed.push(kitsune2_api::AgentInfoSigned::decode(
+                let parsed_info = kitsune2_api::AgentInfoSigned::decode(
                     &kitsune2_core::Ed25519Verifier,
                     info.as_bytes(),
-                )?);
+                )?;
+                let space_id = parsed_info.space.clone();
+                parsed_by_space
+                    .entry(space_id)
+                    .or_default()
+                    .push(parsed_info);
             }
 
-            // TODO actually add them to k2 peer store.
-            unimplemented!()
+            // Add agent infos of a space to the space's peer store.
+            for (space_id, agent_infos) in parsed_by_space {
+                self.holochain_p2p
+                    .peer_store(DnaHash::from_k2_space(&space_id))
+                    .await
+                    .map_err(|err| ConductorApiError::CellError(err.into()))?
+                    .insert(agent_infos)
+                    .await?;
+            }
+            Ok(())
         }
 
         /// Update coordinator zomes on an existing dna.
