@@ -7,7 +7,7 @@ use holochain_zome_types::validate::ValidationReceiptSet;
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-//#[ignore = "receipt completion is flaky, which has been rechecked since the workflow reviews"]
+#[cfg_attr(not(target_os = "linux"), ignore = "seems to actually work on macos wasmer_sys as well, but we don't have a great way to exclude only wasmer_wamr in CI")]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     holochain_trace::test_run();
 
