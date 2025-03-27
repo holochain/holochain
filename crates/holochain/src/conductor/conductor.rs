@@ -3105,14 +3105,10 @@ mod misc_impls {
                     info.as_bytes(),
                 )?;
                 let space_id = parsed_info.space.clone();
-                match parsed_by_space.entry(space_id) {
-                    std::collections::hash_map::Entry::Occupied(mut o) => {
-                        o.get_mut().push(parsed_info);
-                    }
-                    std::collections::hash_map::Entry::Vacant(v) => {
-                        v.insert(vec![parsed_info]);
-                    }
-                }
+                parsed_by_space
+                    .entry(space_id)
+                    .or_default()
+                    .push(parsed_info);
             }
 
             // Add agent infos of a space to the space's peer store.
