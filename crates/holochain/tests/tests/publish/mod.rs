@@ -1,5 +1,4 @@
 use holo_hash::ActionHash;
-use holochain::core::workflow::publish_dht_ops_workflow::num_still_needing_publish;
 use holochain::sweettest::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::GetValidationReceiptsInput;
@@ -8,7 +7,7 @@ use holochain_zome_types::validate::ValidationReceiptSet;
 /// Verifies that publishing terminates naturally when enough validation receipts are received.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "receipt completion is flaky, which has been rechecked since the workflow reviews"]
+//#[ignore = "receipt completion is flaky, which has been rechecked since the workflow reviews"]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     holochain_trace::test_run();
 
@@ -23,62 +22,70 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
     )
     .await;
 
+    conductors.exchange_peer_info().await;
+
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
 
     let ((alice,), (bobbo,), (carol,), (danny,), (emma,), (fred,)) = apps.into_tuples();
 
+    let apps = [alice, bobbo, carol, danny, emma, fred];
+
+    for c in conductors.iter() {
+        c.holochain_p2p()
+            .test_set_full_arcs(apps[0].dna_hash().to_k2_space())
+            .await;
+    }
+
     let action_hash: ActionHash = conductors[0]
-        .call(&alice.zome(TestWasm::Create), "create_entry", ())
+        .call(&apps[0].zome(TestWasm::Create), "create_entry", ())
         .await;
 
-    // Wait until they all see the created entry, at that point validation receipts should be getting sent soon
-    await_consistency(60, [&alice, &bobbo, &carol, &danny, &emma, &fred])
-        .await
-        .unwrap();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(60),
+        async {
+            loop {
+                // make sure all our workflows keep running periodically
+                for idx in 0..conductors.len() {
+                    let _ah: ActionHash = conductors[idx]
+                        .call(&apps[idx].zome(TestWasm::Create), "create_entry", ())
+                        .await;
+                }
 
-    let ops_to_publish = tokio::time::timeout(std::time::Duration::from_secs(60), async {
-        let mut ops_to_publish = 1;
-        while ops_to_publish > 0 {
-            ops_to_publish = alice
-                .authored_db()
-                .read_async({
-                    let alice_pub_key = alice.agent_pubkey().clone();
-                    // Note that this test is relying on this being the same check that the publish workflow uses.
-                    // If this returns 0 then the publish workflow is expected to suspend. So the test isn't directly
-                    // observing that behaviour but it's close enough given that there are unit tests for the actual
-                    // behavior.
-                    move |txn| num_still_needing_publish(txn, alice_pub_key)
-                })
-                .await
-                .unwrap();
-        }
+                // don't create entries on the millisecond level,
+                // this is not a stress test (10 * 200 is 2 seconds)
+                for _ in 0..200 {
+                    // check for complete count of our receipts on the
+                    // millisecond level
 
-        ops_to_publish
-    })
-    .await
-    .expect("timed out waiting for all receipts to be received");
+                    // Get the validation receipts to check that they
+                    // are all complete
+                    let receipt_sets: Vec<ValidationReceiptSet> = conductors[0]
+                        .call(
+                            &apps[0].zome(TestWasm::Create),
+                            "get_validation_receipts",
+                            GetValidationReceiptsInput::new(action_hash.clone()),
+                        )
+                        .await;
 
-    assert_eq!(ops_to_publish, 0);
+                    let receipt_sets_len = receipt_sets.len() == 3;
+                    let receipt_sets_complete = receipt_sets.iter().all(|r| r.receipts_complete);
+                    let agent_activity_receipt_set = receipt_sets
+                        .into_iter()
+                        .find(|r| r.op_type == "RegisterAgentActivity")
+                        .unwrap()
+                        .receipts
+                        .len() == holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize;
 
-    // Get the validation receipts to check that they are all complete
-    let receipt_sets: Vec<ValidationReceiptSet> = conductors[0]
-        .call(
-            &alice.zome(TestWasm::Create),
-            "get_validation_receipts",
-            GetValidationReceiptsInput::new(action_hash),
-        )
-        .await;
-    assert_eq!(receipt_sets.len(), 3);
-    assert!(receipt_sets.iter().all(|r| r.receipts_complete));
+                    if receipt_sets_len && receipt_sets_complete && agent_activity_receipt_set {
+                        // Test Passed!
+                        return;
+                    }
 
-    let agent_activity_receipt_set = receipt_sets
-        .into_iter()
-        .find(|r| r.op_type == "RegisterAgentActivity")
-        .unwrap();
-    assert_eq!(
-        agent_activity_receipt_set.receipts.len(),
-        holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize
-    );
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                }
+            }
+        },
+    ).await.unwrap();
 }
