@@ -120,7 +120,6 @@ impl OpStore for HolochainOpStore {
                 .handle_publish(
                     self.dna_hash.clone(),
                     false,
-                    false,
                     dht_ops.into_iter().map(|(_, op)| op).collect(),
                 )
                 .await

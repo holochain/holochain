@@ -135,15 +135,13 @@ pub enum WireMessage {
         zome_call_params_serialized: ExternIO,
         signature: Signature,
     },
-    /*
-    CountersigningSessionNegotiation {
+    PublishCountersignEvt {
+        op: ChainOp,
+    },
+    CountersigningSessionNegotiationEvt {
+        to_agent: AgentPubKey,
         message: event::CountersigningSessionNegotiationMessage,
     },
-    PublishCountersign {
-        flag: bool,
-        op: DhtOp,
-    },
-    */
 }
 
 fn next_msg_id() -> u64 {
@@ -341,8 +339,9 @@ impl WireMessage {
     }
 
     /// Incoming "SendValidationReceipts" response.
-    pub fn send_validation_receipts_res(msg_id: u64) -> WireMessage {
-        Self::SendValidationReceiptsRes { msg_id }
+    pub fn send_validation_receipts_res() -> (u64, WireMessage) {
+        let msg_id = next_msg_id();
+        (msg_id, Self::SendValidationReceiptsRes { msg_id })
     }
 
     /// Outgoing fire-and-forget "RemoteSignal" notify event.
@@ -358,15 +357,16 @@ impl WireMessage {
         }
     }
 
-    /*
-    pub fn countersigning_session_negotiation(
-        message: event::CountersigningSessionNegotiationMessage,
-    ) -> WireMessage {
-        Self::CountersigningSessionNegotiation { message }
+    /// Outgoing "PublishCountersign" notify event.
+    pub fn publish_countersign_evt(op: ChainOp) -> WireMessage {
+        Self::PublishCountersignEvt { op }
     }
 
-    pub fn publish_countersign(flag: bool, op: DhtOp) -> WireMessage {
-        Self::PublishCountersign { flag, op }
+    /// Outgoing "CountersigningSessionNegotiation" notify event.
+    pub fn countersigning_session_negotiation_evt(
+        to_agent: AgentPubKey,
+        message: event::CountersigningSessionNegotiationMessage,
+    ) -> WireMessage {
+        Self::CountersigningSessionNegotiationEvt { to_agent, message }
     }
-    */
 }

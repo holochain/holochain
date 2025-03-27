@@ -291,7 +291,6 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         &self,
         dna_hash: DnaHash,
         request_validation_receipt: bool,
-        countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
@@ -303,9 +302,8 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     fn publish_countersign(
         &self,
         dna_hash: DnaHash,
-        flag: bool,
         basis_hash: holo_hash::OpBasis,
-        op: DhtOp,
+        op: ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Get an entry from the DHT.

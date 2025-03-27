@@ -651,68 +651,64 @@ impl Spaces {
     }
     */
 
+    /// we are receiving a "publish" event from the network.
     #[cfg_attr(
         feature = "instrument",
         tracing::instrument(skip(self, request_validation_receipt, ops))
     )]
-    /// we are receiving a "publish" event from the network
     pub async fn handle_publish(
         &self,
         dna_hash: &DnaHash,
         request_validation_receipt: bool,
-        countersigning_session: bool,
         ops: Vec<DhtOp>,
     ) -> ConductorResult<()> {
-        // If this is a countersigning session then
-        // send it to the countersigning workflow otherwise
-        // send it to the incoming ops workflow.
-        if countersigning_session {
-            use futures::StreamExt;
-            let ops = futures::stream::iter(ops.into_iter().filter_map(|op| match op {
-                DhtOp::ChainOp(op) => {
-                    let hash = DhtOpHash::with_data_sync(&*op);
-                    Some((hash, *op))
-                }
-                _ => {
-                    tracing::warn!(
-                        ?op,
-                        "Invalid DhtOp in countersigning session, only ChainOps will be handled"
-                    );
-                    None
-                }
-            }))
-            .collect()
-            .await;
+        let space = self.get_or_create_space(dna_hash)?;
+        let trigger = match self
+            .queue_consumer_map
+            .sys_validation_trigger(space.dna_hash.clone())
+        {
+            Some(t) => t,
+            // If the workflow has not been spawned yet we can't handle incoming messages.
+            // Note this is not an error because only a validation receipt is proof of a publish.
+            None => {
+                tracing::warn!("No sys validation trigger yet for space: {}", dna_hash);
+                return Ok(());
+            }
+        };
 
-            let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
-                (
-                    space.witnessing_workspace.clone(),
-                    self.queue_consumer_map
-                        .witnessing_trigger(space.dna_hash.clone()),
-                )
-            })?;
-            let trigger = match trigger {
-                Some(t) => t,
-                // If the workflow has not been spawned yet, we can't handle incoming messages.
-                None => return Ok(()),
-            };
-            receive_incoming_countersigning_ops(ops, &workspace, trigger)?;
-        } else {
-            let space = self.get_or_create_space(dna_hash)?;
-            let trigger = match self
-                .queue_consumer_map
-                .sys_validation_trigger(space.dna_hash.clone())
-            {
-                Some(t) => t,
-                // If the workflow has not been spawned yet we can't handle incoming messages.
-                // Note this is not an error because only a validation receipt is proof of a publish.
-                None => {
-                    tracing::warn!("No sys validation trigger yet for space: {}", dna_hash);
-                    return Ok(());
-                }
-            };
-            incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
-        }
+        incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
+
+        Ok(())
+    }
+
+    /// Receive a publish countersign event from the network.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, ops)))]
+    pub async fn handle_publish_countersign(
+        &self,
+        dna_hash: &DnaHash,
+        op: ChainOp,
+    ) -> ConductorResult<()> {
+        let hash = DhtOpHash::with_data_sync(&op);
+
+        let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
+            (
+                space.witnessing_workspace.clone(),
+                self.queue_consumer_map
+                    .witnessing_trigger(space.dna_hash.clone()),
+            )
+        })?;
+
+        let trigger = match trigger {
+            Some(t) => t,
+            // If the workflow has not been spawned yet, we can't handle incoming messages.
+            None => {
+                tracing::warn!("No witnessing trigger yet for space: {}", dna_hash);
+                return Ok(());
+            }
+        };
+
+        receive_incoming_countersigning_ops(vec![(hash, op)], &workspace, trigger)?;
+
         Ok(())
     }
 }

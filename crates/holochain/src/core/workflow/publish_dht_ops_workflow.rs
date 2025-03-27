@@ -60,7 +60,6 @@ pub async fn publish_dht_ops_workflow(
         match network
             .publish(
                 true,
-                false,
                 basis,
                 agent.clone(),
                 op_hash_list.clone(),
