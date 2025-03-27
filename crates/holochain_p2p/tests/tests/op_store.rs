@@ -138,7 +138,11 @@ impl HcP2pHandler for StubHost {
         unimplemented!()
     }
 
-    fn handle_publish_countersign(&self, _dna_hash: DnaHash, _op: ChainOp) -> BoxFut<'_, HolochainP2pResult<()>> {
+    fn handle_publish_countersign(
+        &self,
+        _dna_hash: DnaHash,
+        _op: ChainOp,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
         unimplemented!()
     }
 
