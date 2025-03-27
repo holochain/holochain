@@ -283,8 +283,7 @@ async fn receive_signatures_and_complete() {
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
         net.expect_chc().return_once(|| None);
-        net.expect_publish_countersign()
-            .return_once(|_, _, _| Ok(()));
+        net.expect_publish_countersign().return_once(|_, _| Ok(()));
         net
     });
 
@@ -373,8 +372,7 @@ async fn receive_valid_and_invalid_signatures_and_complete() {
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
         net.expect_chc().return_once(|| None);
-        net.expect_publish_countersign()
-            .return_once(|_, _, _| Ok(()));
+        net.expect_publish_countersign().return_once(|_, _| Ok(()));
         net
     });
 
@@ -428,7 +426,7 @@ async fn ignore_signature_bundles_from_previous_session() {
 
             net.expect_publish_countersign()
                 .times(2)
-                .returning(|_, _, _| Ok(()));
+                .returning(|_, _| Ok(()));
 
             net
         }
@@ -866,8 +864,7 @@ async fn recover_from_commit_after_restart_when_other_agent_completes() {
 
             net.expect_chc().return_once(|| None);
 
-            net.expect_publish_countersign()
-                .return_once(|_, _, _| Ok(()));
+            net.expect_publish_countersign().return_once(|_, _| Ok(()));
 
             net
         }
@@ -1207,8 +1204,7 @@ async fn timeout_during_accept_does_not_interfere_with_previous_session() {
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
         net.expect_chc().return_once(|| None);
-        net.expect_publish_countersign()
-            .return_once(|_, _, _| Ok(()));
+        net.expect_publish_countersign().return_once(|_, _| Ok(()));
         net
     });
 
@@ -1666,8 +1662,7 @@ async fn recover_and_complete_after_resolution_failures() {
 
             net.expect_chc().return_once(|| None);
 
-            net.expect_publish_countersign()
-                .return_once(|_, _, _| Ok(()));
+            net.expect_publish_countersign().return_once(|_, _| Ok(()));
 
             net
         }
@@ -1701,8 +1696,7 @@ async fn recover_and_complete_after_resolution_failures() {
 
             net.expect_chc().return_once(|| None);
 
-            net.expect_publish_countersign()
-                .return_once(|_, _, _| Ok(()));
+            net.expect_publish_countersign().return_once(|_, _| Ok(()));
 
             net
         }

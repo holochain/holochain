@@ -44,7 +44,6 @@ impl HcP2pHandler for StubHost {
         &self,
         _dna_hash: DnaHash,
         _request_validation_receipt: bool,
-        _countersigning_session: bool,
         ops: Vec<DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let db = self.db.clone();
@@ -135,6 +134,14 @@ impl HcP2pHandler for StubHost {
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         _receipts: ValidationReceiptBundle,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        unimplemented!()
+    }
+
+    fn handle_publish_countersign(
+        &self,
+        _dna_hash: DnaHash,
+        _op: ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         unimplemented!()
     }

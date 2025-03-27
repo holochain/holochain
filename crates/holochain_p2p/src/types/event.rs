@@ -98,7 +98,7 @@ impl From<&actor::GetActivityOptions> for GetActivityOptions {
 }
 
 /// Message between agents actively driving/negotiating a countersigning session.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum CountersigningSessionNegotiationMessage {
     /// An authority has a complete set of signed actions and is responding with
     /// them back to the counterparties.
@@ -124,7 +124,6 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
         &self,
         dna_hash: DnaHash,
         request_validation_receipt: bool,
-        countersigning_session: bool,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
@@ -188,6 +187,13 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         receipts: ValidationReceiptBundle,
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
+
+    /// A remote node is publishing countersigning data to us.
+    fn handle_publish_countersign(
+        &self,
+        dna_hash: DnaHash,
+        op: holochain_types::dht_op::ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Messages between agents that drive a countersigning session.

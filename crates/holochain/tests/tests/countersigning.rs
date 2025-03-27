@@ -33,6 +33,16 @@ async fn listen_for_countersigning_completion() {
     let alice = &cells[0];
     let bob = &cells[1];
 
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
     let _: ActionHash = conductors[0]
@@ -141,6 +151,16 @@ async fn retry_countersigning_commit_on_missing_deps() {
     let cells = apps.cells_flattened();
     let alice = &cells[0];
     let bob = &cells[1];
+
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
 
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
@@ -298,6 +318,20 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
     let bob = &cells[1];
     let carol = &cells[2];
 
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[2]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+
     // Subscribe early in the test to avoid missing signals later
     let alice_signal_rx = conductors[0].subscribe_to_app_signals("app".into());
     let bob_signal_rx = conductors[1].subscribe_to_app_signals("app".into());
@@ -404,6 +438,20 @@ async fn alice_can_recover_from_a_session_timeout() {
     let alice = &cells[0];
     let bob = &cells[1];
     let carol = &cells[2];
+
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[2]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
 
     // Make sure the conductors are gossiping before creating posts
     conductors[0]
@@ -1248,6 +1296,16 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
 
     await_consistency(30, vec![alice, bob]).await.unwrap();
 
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+
     // Set up the session and accept it for both agents.
     let preflight_request: PreflightRequest = conductors[0]
         .call_fallible(
@@ -1383,6 +1441,16 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
     let cells = apps.cells_flattened();
     let alice = &cells[0];
     let bob = &cells[1];
+
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
 
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);

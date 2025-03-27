@@ -65,14 +65,13 @@ impl event::HcP2pHandler for WrapEvtSender {
         &self,
         dna_hash: DnaHash,
         request_validation_receipt: bool,
-        countersigning_session: bool,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         let op_count = ops.len();
         timing_trace!(
             true,
             {
-                self.0.handle_publish(dna_hash, request_validation_receipt, countersigning_session, ops)
+                self.0.handle_publish(dna_hash, request_validation_receipt, ops)
             }, %op_count, a = "recv_publish")
     }
 
@@ -185,6 +184,18 @@ impl event::HcP2pHandler for WrapEvtSender {
                     .handle_validation_receipts_received(dna_hash, to_agent, receipts)
             },
             a = "recv_validation_receipt_received",
+        )
+    }
+
+    fn handle_publish_countersign(
+        &self,
+        dna_hash: DnaHash,
+        op: holochain_types::dht_op::ChainOp,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        timing_trace!(
+            true,
+            { self.0.handle_publish_countersign(dna_hash, op) },
+            a = "recv_publish_countersign"
         )
     }
 
@@ -544,6 +555,22 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                             )
                             .await;
                     }
+                    PublishCountersignEvt { op } => {
+                        let dna_hash = DnaHash::from_k2_space(&space);
+                        evt_sender
+                            .get()
+                            .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
+                            .handle_publish_countersign(dna_hash, op)
+                            .await?;
+                    }
+                    CountersigningSessionNegotiationEvt { to_agent, message } => {
+                        let dna_hash = DnaHash::from_k2_space(&space);
+                        evt_sender
+                            .get()
+                            .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
+                            .handle_countersigning_session_negotiation(dna_hash, to_agent, message)
+                            .await?;
+                    }
                 }
                 HolochainP2pResult::Ok(())
             });
@@ -851,9 +878,23 @@ impl HolochainP2pActor {
         space: &DynSpace,
         loc: u32,
     ) -> HolochainP2pResult<(AgentPubKey, Url)> {
+        let mut agent_list = self.get_peers_for_location(space, loc).await?;
+
+        rand::seq::SliceRandom::shuffle(&mut agent_list[..], &mut rand::thread_rng());
+        agent_list
+            .into_iter()
+            .next()
+            .ok_or_else(|| HolochainP2pError::NoPeersForLocation(tag.to_string(), loc))
+    }
+
+    async fn get_peers_for_location(
+        &self,
+        space: &DynSpace,
+        loc: u32,
+    ) -> HolochainP2pResult<Vec<(AgentPubKey, Url)>> {
         let agent_list = space.peer_store().get_near_location(loc, 1024).await?;
 
-        let mut agent_list = agent_list
+        Ok(agent_list
             .into_iter()
             .filter_map(|a| {
                 // much less clear code-wise that way, clippy...
@@ -869,13 +910,7 @@ impl HolochainP2pActor {
                     a.url.as_ref().unwrap().clone(),
                 ))
             })
-            .collect::<Vec<_>>();
-
-        rand::seq::SliceRandom::shuffle(&mut agent_list[..], &mut rand::thread_rng());
-        agent_list
-            .into_iter()
-            .next()
-            .ok_or_else(|| HolochainP2pError::NoPeersForLocation(tag.to_string(), loc))
+            .collect::<Vec<_>>())
     }
 
     async fn send_notify(
@@ -1187,7 +1222,6 @@ impl actor::HcP2p for HolochainP2pActor {
         &self,
         dna_hash: DnaHash,
         request_validation_receipt: bool,
-        countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
         _source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
@@ -1215,12 +1249,7 @@ impl actor::HcP2p for HolochainP2pActor {
                 self.evt_sender
                     .get()
                     .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
-                    .handle_publish(
-                        dna_hash.clone(),
-                        request_validation_receipt,
-                        countersigning_session,
-                        reflect_ops,
-                    )
+                    .handle_publish(dna_hash.clone(), request_validation_receipt, reflect_ops)
                     .await?;
             }
 
@@ -1258,13 +1287,51 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn publish_countersign(
         &self,
-        _dna_hash: DnaHash,
-        _flag: bool,
-        _basis_hash: holo_hash::OpBasis,
-        _op: DhtOp,
+        dna_hash: DnaHash,
+        basis_hash: OpBasis,
+        op: ChainOp,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            tracing::error!("publish_countersign is currently a STUB in holochain_p2p--the countersigning feature is unstable");
+            let space_id = dna_hash.to_k2_space();
+            let space = self.kitsune.space(space_id.clone()).await?;
+
+            let peers = self
+                .get_peers_for_location(&space, basis_hash.get_loc())
+                .await?;
+
+            let out = futures::future::join_all(peers.into_iter().map(|p| {
+                let req = crate::wire::WireMessage::publish_countersign_evt(op.clone());
+
+                Box::pin({
+                    let space = space.clone();
+                    async move {
+                        self.send_notify(&space, p.1, req)
+                            .await
+                            .map_err(|e| (p.0, e))
+                    }
+                })
+            }))
+            .await;
+
+            if out.iter().all(|r| r.is_err()) {
+                return Err(HolochainP2pError::other(
+                    "publish_countersign failed to publish to any peers",
+                ));
+            } else {
+                // We don't need to publish to everyone, just a neighborhood. Any of those peers
+                // can collect signatures and respond. Log any peers that we failed to notify
+                // just for debugging purposes.
+                out.into_iter()
+                    .filter_map(|r| r.err())
+                    .for_each(|(agent, err)| {
+                        tracing::info!(
+                            ?err,
+                            ?agent,
+                            "publish_countersign failed to publish to a peer"
+                        );
+                    });
+            }
+
             Ok(())
         })
     }
@@ -1575,13 +1642,66 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn countersigning_session_negotiation(
         &self,
-        _dna_hash: DnaHash,
-        _agents: Vec<AgentPubKey>,
-        _message: event::CountersigningSessionNegotiationMessage,
+        dna_hash: DnaHash,
+        agents: Vec<AgentPubKey>,
+        message: event::CountersigningSessionNegotiationMessage,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            tracing::error!("countersigning_session_negotiation is currently a STUB in holochain_p2p--the countersigning feature is unstable");
-            Ok(())
+            let space_id = dna_hash.to_k2_space();
+            let space = self.kitsune.space(space_id.clone()).await?;
+
+            let mut peer_urls = Vec::with_capacity(agents.len());
+            for agent in agents {
+                if let Some(agent_info) = space
+                    .peer_store()
+                    .get(agent.to_k2_agent())
+                    .await
+                    .inspect_err(|e| {
+                        tracing::error!(
+                            ?e,
+                            ?agent,
+                            "Failed to get peer for countersigning negotiation"
+                        );
+                    })
+                    .ok()
+                    .flatten()
+                {
+                    if let Some(url) = &agent_info.url {
+                        peer_urls.push((agent, url.clone()));
+                    } else {
+                        tracing::error!(?agent, "Peer has no url for countersigning negotiation");
+                    }
+                }
+            }
+
+            let res = futures::future::join_all(peer_urls.into_iter().map(|(agent, url)| {
+                let req =
+                    WireMessage::countersigning_session_negotiation_evt(agent, message.clone());
+
+                Box::pin({
+                    let space = space.clone();
+                    async move { self.send_notify(&space, url, req).await }
+                })
+            }))
+            .await;
+
+            // We need this to go to all the targets, log any errors and then return an error if any
+            // are not okay.
+            let any_failed = res.iter().any(|r| r.is_err());
+            res.into_iter().filter_map(|r| r.err()).for_each(|err| {
+                tracing::error!(
+                    ?err,
+                    "Failed to send countersigning session negotiation to a peer"
+                );
+            });
+
+            if any_failed {
+                Err(HolochainP2pError::other(
+                    "Failed to send countersigning session negotiation to all peers",
+                ))
+            } else {
+                Ok(())
+            }
         })
     }
 

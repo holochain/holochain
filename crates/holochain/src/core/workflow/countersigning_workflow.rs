@@ -789,7 +789,6 @@ async fn force_abandon_session(
 pub async fn countersigning_publish(
     network: &HolochainP2pDna,
     op: ChainOp,
-    _author: AgentPubKey,
 ) -> Result<(), ZomeCallResponse> {
     if let Some(enzyme) = op.enzymatic_countersigning_enzyme() {
         if let Err(e) = network
@@ -807,12 +806,12 @@ pub async fn countersigning_publish(
         }
     } else {
         let basis = op.dht_basis();
-        if let Err(e) = network.publish_countersign(true, basis, op.into()).await {
+        if let Err(err) = network.publish_countersign(basis, op).await {
             tracing::error!(
-                "Failed to publish to entry authorities for countersigning session because of: {:?}",
-                e
+                ?err,
+                "Failed to publish to entry authorities for countersigning session"
             );
-            return Err(ZomeCallResponse::CountersigningSession(e.to_string()));
+            return Err(ZomeCallResponse::CountersigningSession(err.to_string()));
         }
     }
     Ok(())

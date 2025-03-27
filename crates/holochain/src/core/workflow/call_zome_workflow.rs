@@ -95,15 +95,8 @@ where
                     match countersigning_op {
                         Some(op) => {
                             if let Err(error_response) =
-                                super::countersigning_workflow::countersigning_publish(
-                                    &network,
-                                    op,
-                                    (*workspace.author().ok_or_else(|| {
-                                        WorkflowError::Other("author required".into())
-                                    })?)
-                                    .clone(),
-                                )
-                                .await
+                                super::countersigning_workflow::countersigning_publish(&network, op)
+                                    .await
                             {
                                 return Ok(Ok(error_response));
                             }
