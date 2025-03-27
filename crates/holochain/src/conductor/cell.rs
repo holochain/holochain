@@ -570,61 +570,51 @@ impl Cell {
 */
 
 impl holochain_p2p::event::HcP2pHandler for Cell {
+    #[cfg_attr(
+        feature = "instrument",
+        tracing::instrument(skip(self, from_agent, fn_name, cap_secret, payload))
+    )]
+    #[allow(clippy::too_many_arguments)]
+    /// a remote agent is attempting a "call_remote" on this cell.
+    fn handle_call_remote(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        zome_call_params_serialized: ExternIO,
+        signature: Signature,
+    ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
+        let fut = async move {
+            let zome_call_params = zome_call_params_serialized.decode::<ZomeCallParams>()?;
+            if !is_valid_signature(
+                &zome_call_params.provenance,
+                zome_call_params_serialized.as_bytes(),
+                &signature,
+            )
+            .await
+            .map_err(|err| CellError::ConductorApiError(Box::new(err)))?
+            {
+                return Err(CellError::ZomeCallAuthenticationFailed(
+                    signature,
+                    zome_call_params.provenance,
+                ));
+            }
+
+            // double ? because
+            // - ConductorApiResult
+            // - ZomeCallResult
+            CellResult::Ok(self.call_zome(zome_call_params, None).await??.try_into()?)
+        };
+
+        Box::pin(async move { fut.await.map_err(HolochainP2pError::other) })
+    }
+
     fn handle_publish(
         &self,
         _dna_hash: DnaHash,
         _request_validation_receipt: bool,
-        _countersigning_session: bool,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async { unimplemented!() })
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    /// we are receiving a response from a countersigning authority
-    fn handle_countersigning_session_negotiation(
-        &self,
-        _dna_hash: DnaHash,
-        _to_agent: AgentPubKey,
-        message: CountersigningSessionNegotiationMessage,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async {
-            #[cfg(not(feature = "unstable-countersigning"))]
-            {
-                drop(message);
-                Ok(())
-            }
-            #[cfg(feature = "unstable-countersigning")]
-            match message {
-                CountersigningSessionNegotiationMessage::EnzymePush(chain_op) => {
-                    let ops = vec![*chain_op]
-                        .into_iter()
-                        .map(|op| {
-                            let hash = DhtOpHash::with_data_sync(&op);
-                            (hash, op)
-                        })
-                        .collect();
-                    receive_incoming_countersigning_ops(
-                        ops,
-                        &self.space.witnessing_workspace,
-                        self.queue_triggers.witnessing.clone(),
-                    )
-                    .map_err(HolochainP2pError::other)?;
-                    Ok(())
-                }
-                CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {
-                    countersigning_success(
-                        self.space.clone(),
-                        self.id.agent_pubkey().clone(),
-                        signed_actions,
-                        self.queue_triggers.countersigning.clone(),
-                    )
-                    .await;
-
-                    Ok(())
-                }
-            }
-        })
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
@@ -870,42 +860,59 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         Box::pin(async move { fut.await.map_err(HolochainP2pError::other) })
     }
 
-    #[cfg_attr(
-        feature = "instrument",
-        tracing::instrument(skip(self, from_agent, fn_name, cap_secret, payload))
-    )]
-    #[allow(clippy::too_many_arguments)]
-    /// a remote agent is attempting a "call_remote" on this cell.
-    fn handle_call_remote(
+    fn handle_publish_countersign(
+        &self,
+        _dna_hash: DnaHash,
+        _op: ChainOp,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        todo!()
+    }
+
+    /// Receive a response from a countersigning authority.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    fn handle_countersigning_session_negotiation(
         &self,
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
-        zome_call_params_serialized: ExternIO,
-        signature: Signature,
-    ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
-        let fut = async move {
-            let zome_call_params = zome_call_params_serialized.decode::<ZomeCallParams>()?;
-            if !is_valid_signature(
-                &zome_call_params.provenance,
-                zome_call_params_serialized.as_bytes(),
-                &signature,
-            )
-            .await
-            .map_err(|err| CellError::ConductorApiError(Box::new(err)))?
+        message: CountersigningSessionNegotiationMessage,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async {
+            #[cfg(not(feature = "unstable-countersigning"))]
             {
-                return Err(CellError::ZomeCallAuthenticationFailed(
-                    signature,
-                    zome_call_params.provenance,
-                ));
+                drop(message);
+                Ok(())
             }
+            #[cfg(feature = "unstable-countersigning")]
+            match message {
+                CountersigningSessionNegotiationMessage::EnzymePush(chain_op) => {
+                    let ops = vec![*chain_op]
+                        .into_iter()
+                        .map(|op| {
+                            let hash = DhtOpHash::with_data_sync(&op);
+                            (hash, op)
+                        })
+                        .collect();
+                    receive_incoming_countersigning_ops(
+                        ops,
+                        &self.space.witnessing_workspace,
+                        self.queue_triggers.witnessing.clone(),
+                    )
+                    .map_err(HolochainP2pError::other)?;
+                    Ok(())
+                }
+                CountersigningSessionNegotiationMessage::AuthorityResponse(signed_actions) => {
+                    countersigning_success(
+                        self.space.clone(),
+                        self.id.agent_pubkey().clone(),
+                        signed_actions,
+                        self.queue_triggers.countersigning.clone(),
+                    )
+                    .await;
 
-            // double ? because
-            // - ConductorApiResult
-            // - ZomeCallResult
-            CellResult::Ok(self.call_zome(zome_call_params, None).await??.try_into()?)
-        };
-
-        Box::pin(async move { fut.await.map_err(HolochainP2pError::other) })
+                    Ok(())
+                }
+            }
+        })
     }
 }
 

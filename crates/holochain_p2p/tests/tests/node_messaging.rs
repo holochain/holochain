@@ -37,7 +37,6 @@ impl HcP2pHandler for Handler {
         &self,
         _dna_hash: DnaHash,
         _request_validation_receipt: bool,
-        _countersigning_session: bool,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
@@ -151,6 +150,14 @@ impl HcP2pHandler for Handler {
             self.0.lock().unwrap().push("validation_receipts".into());
             Ok(())
         })
+    }
+
+    fn handle_publish_countersign(
+        &self,
+        _dna_hash: DnaHash,
+        _op: ChainOp,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async move { todo!() })
     }
 
     fn handle_countersigning_session_negotiation(
@@ -314,7 +321,6 @@ async fn test_publish() {
             hc2.publish(
                 dna_hash.clone(),
                 false,
-                false,
                 HoloHash::from_raw_36_and_type(
                     op_hash.get_raw_36().to_vec(),
                     holo_hash::hash_type::AnyLinkable::Action,
@@ -358,7 +364,6 @@ async fn test_publish_reflect() {
 
             hc2.publish(
                 dna_hash.clone(),
-                false,
                 false,
                 HoloHash::from_raw_36_and_type(
                     op_hash.get_raw_36().to_vec(),

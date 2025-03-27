@@ -139,8 +139,7 @@ async fn remote_signals_work_after_sbd_restart() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
-#[ignore = "flaky"]
-async fn remote_signals_batch() -> anyhow::Result<()> {
+async fn remote_signals_batch() {
     holochain_trace::test_run();
 
     let mut conductors =
@@ -157,8 +156,8 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
         app_batch.into_tuples();
 
     // Make sure the conductors are talking to each other before sending signals.
-    conductors[1]
-        .require_initial_gossip_activity_for_cell(&bob, 2, Duration::from_secs(90))
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(&alice, 2, Duration::from_secs(90))
         .await
         .unwrap();
 
@@ -207,6 +206,4 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
     })
     .await
     .unwrap();
-
-    Ok(())
 }

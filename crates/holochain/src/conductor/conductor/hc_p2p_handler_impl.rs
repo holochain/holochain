@@ -35,17 +35,11 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         &self,
         dna_hash: DnaHash,
         request_validation_receipt: bool,
-        countersigning_session: bool,
         ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             self.spaces
-                .handle_publish(
-                    &dna_hash,
-                    request_validation_receipt,
-                    countersigning_session,
-                    ops,
-                )
+                .handle_publish(&dna_hash, request_validation_receipt, ops)
                 .await
                 .map_err(HolochainP2pError::other)
         })
@@ -152,6 +146,19 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
                 .await?
                 .handle_validation_receipts_received(dna_hash, to_agent, receipts)
                 .await
+        })
+    }
+
+    fn handle_publish_countersign(
+        &self,
+        dna_hash: DnaHash,
+        op: ChainOp,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async move {
+            self.spaces
+                .handle_publish_countersign(&dna_hash, op)
+                .await
+                .map_err(HolochainP2pError::other)
         })
     }
 

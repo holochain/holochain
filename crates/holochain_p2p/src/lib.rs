@@ -76,7 +76,6 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     async fn publish(
         &self,
         request_validation_receipt: bool,
-        countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
@@ -87,9 +86,8 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     /// Publish a countersigning op.
     async fn publish_countersign(
         &self,
-        flag: bool,
         basis_hash: holo_hash::OpBasis,
-        op: DhtOp,
+        op: ChainOp,
     ) -> HolochainP2pResult<()>;
 
     /// Get an entry from the DHT.
@@ -246,7 +244,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     async fn publish(
         &self,
         request_validation_receipt: bool,
-        countersigning_session: bool,
         basis_hash: holo_hash::OpBasis,
         source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
@@ -257,7 +254,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
             .publish(
                 (*self.dna_hash).clone(),
                 request_validation_receipt,
-                countersigning_session,
                 basis_hash,
                 source,
                 op_hash_list,
@@ -270,12 +266,11 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     /// Publish a countersigning op.
     async fn publish_countersign(
         &self,
-        flag: bool,
         basis_hash: holo_hash::OpBasis,
-        op: DhtOp,
+        op: ChainOp,
     ) -> HolochainP2pResult<()> {
         self.sender
-            .publish_countersign((*self.dna_hash).clone(), flag, basis_hash, op)
+            .publish_countersign((*self.dna_hash).clone(), basis_hash, op)
             .await
     }
 
