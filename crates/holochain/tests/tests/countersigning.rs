@@ -1433,13 +1433,23 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
 
     let config = SweetConductorConfig::rendezvous(true)
         .tune_conductor(|c| {
-            c.countersigning_resolution_retry_limit = Some(3);
+            c.countersigning_resolution_retry_limit = Some(5);
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
-        /*.tune(|params| {
-            // Incredible, but true: set the timeout for a network
-            params.tx5_implicit_timeout_ms = 3_000;
-        })*/;
+        .tune_network_config(|nc| {
+            nc.advanced
+                .as_mut()
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .insert(
+                    "tx5Transport".to_string(),
+                    serde_json::json!({
+                        "timeoutS": 3
+                    }),
+                );
+        });
+
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -1541,6 +1551,25 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
     // Bob comes back online too.
     conductors[1].startup().await;
 
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(alice, 1, Duration::from_secs(30))
+        .await
+        .unwrap();
+    conductors[1]
+        .require_initial_gossip_activity_for_cell(bob, 1, Duration::from_secs(30))
+        .await
+        .unwrap();
+
     // Wait until Alice's session has been attempted to be resolved.
     tokio::time::timeout(Duration::from_secs(30), async {
         loop {
@@ -1575,7 +1604,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         Signal::System(SystemSignal::SuccessfulCountersigning(entry_hash)) => {
             assert_eq!(entry_hash, preflight_request.app_entry_hash.clone());
         }
-        _ => panic!("Expected System signal"),
+        s => panic!("Expected successful countersigning signal but got: {:?}", s),
     }
     // Alice's session should be gone from memory.
     let alice_state = conductors[0]
@@ -1590,7 +1619,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         Signal::System(SystemSignal::SuccessfulCountersigning(entry_hash)) => {
             assert_eq!(entry_hash, preflight_request.app_entry_hash.clone());
         }
-        _ => panic!("Expected System signal"),
+        s => panic!("Expected successful countersigning signal but got: {:?}", s),
     }
     // Bob's session should be gone from memory.
     let bob_state = conductors[1]

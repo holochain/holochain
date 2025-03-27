@@ -254,8 +254,8 @@ pub struct NetworkConfig {
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
-            bootstrap_url: url2::Url2::parse("https://devtest-bootstrap-1.holochain.org"),
-            signal_url: url2::Url2::parse("wss://devtest-sbd-1.holochain.org"),
+            bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
+            signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
             webrtc_config: None,
             target_arc_factor: 1,
             advanced: None,
