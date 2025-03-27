@@ -123,7 +123,7 @@ Currently supported options:
 - `engine`: options for specific engines, e.g. `plantuml` or
   `mermaid`. The options must be nested below the engine name.
   Allowed settings are either `true` or `false` to enable or
-  disable the engine, respectively, or a a map of options.
+  disable the engine, respectively, or a map of options.
   The available settings are:
 
   + `mime-type`: the output MIME type that should be produced with

@@ -1,5 +1,5 @@
 error: `genesis_self_check` must return `ExternResult<ValidateCallbackResult>`
- --> tests/tests/hdk_extern/genesis_self_check_invalid_return.rs:4:28
+ --> tests/hdk_extern/genesis_self_check_invalid_return.rs:4:28
   |
 4 | fn genesis_self_check() -> String {
   |                            ^^^^^^

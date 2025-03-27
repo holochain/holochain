@@ -1,4 +1,4 @@
-use hdk::prelude::hdi::prelude::*;
+use hdk_derive::*;
 
 #[hdk_to_coordinates]
 struct Foo;

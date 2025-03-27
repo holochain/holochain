@@ -3,7 +3,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ZomeTypesError {
-    #[error("There is more then the maximum of 255 Zomes in in a single DNA")]
+    #[error("There is more then the maximum of 255 Zomes in a single DNA")]
     ZomeIndexOverflow,
     #[error("There is more then the maximum of 255 Entry Types in a single DNA")]
     EntryTypeIndexOverflow,
