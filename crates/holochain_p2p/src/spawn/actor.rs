@@ -893,6 +893,13 @@ impl HolochainP2pActor {
         loc: u32,
     ) -> HolochainP2pResult<Vec<(AgentPubKey, Url)>> {
         let agent_list = space.peer_store().get_near_location(loc, 1024).await?;
+        let local_agents = space
+            .local_agent_store()
+            .get_all()
+            .await?
+            .into_iter()
+            .map(|a| a.agent().clone())
+            .collect::<Vec<_>>();
 
         Ok(agent_list
             .into_iter()
@@ -903,6 +910,9 @@ impl HolochainP2pActor {
                     return None;
                 }
                 if !a.storage_arc.contains(loc) {
+                    return None;
+                }
+                if local_agents.contains(&a.agent) {
                     return None;
                 }
                 Some((
