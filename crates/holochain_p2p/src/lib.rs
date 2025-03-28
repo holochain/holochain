@@ -30,6 +30,8 @@ pub use local_agent::*;
 mod op_store;
 pub use op_store::*;
 
+mod metrics;
+
 #[automock]
 #[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
@@ -374,7 +376,6 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 }
 
-mod metrics;
 #[allow(unused)]
 #[cfg(any(test, feature = "test_utils"))]
 mod test;
