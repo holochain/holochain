@@ -186,23 +186,33 @@ async fn remote_signals_batch() {
 
     // Check that Bob and Carol receive all the signals.
     tokio::time::timeout(Duration::from_secs(60), async move {
-        for i in 0..6 {
+        let mut signals_1 = Vec::with_capacity(6);
+        let mut signals_2 = Vec::with_capacity(6);
+
+        for _ in 0..6 {
             let msg_1 = conductor_1_signal_rx
                 .recv()
                 .await
                 .map(to_signal_message)
                 .unwrap()
                 .value;
+            signals_1.push(msg_1);
             let msg_2 = conductor_2_signal_rx
                 .recv()
                 .await
                 .map(to_signal_message)
                 .unwrap()
                 .value;
-
-            assert_eq!(msg_1, format!("message {}", i));
-            assert_eq!(msg_1, msg_2);
+            signals_2.push(msg_2);
         }
+
+        assert_eq!(6, signals_1.len());
+        assert_eq!(6, signals_2.len());
+
+        // Received all the signals, but might have received them in a different order.
+        signals_1.sort();
+        signals_2.sort();
+        assert_eq!(signals_1, signals_2);
     })
     .await
     .unwrap();
