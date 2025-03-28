@@ -29,6 +29,8 @@ use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
+use kitsune2_api::{AgentInfoSigned, DhtArc};
+use kitsune2_core::Ed25519Verifier;
 use matches::assert_matches;
 use rand::rngs::OsRng;
 use serde::{de::DeserializeOwned, Serialize};
@@ -36,8 +38,6 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::time::Duration;
-use kitsune2_api::{AgentInfoSigned, DhtArc};
-use kitsune2_core::Ed25519Verifier;
 use tempfile::TempDir;
 use tokio::time::error::Elapsed;
 use url2::Url2;
@@ -522,8 +522,12 @@ async fn countersigning_session_interaction_calls() {
         }
     });
 
-    wait_for_full_arc_for_agent(bob.admin_tx.clone(), alice.cell_id.agent_pubkey().clone()).await.unwrap();
-    wait_for_full_arc_for_agent(alice.admin_tx.clone(), bob.cell_id.agent_pubkey().clone()).await.unwrap();
+    wait_for_full_arc_for_agent(bob.admin_tx.clone(), alice.cell_id.agent_pubkey().clone())
+        .await
+        .unwrap();
+    wait_for_full_arc_for_agent(alice.admin_tx.clone(), bob.cell_id.agent_pubkey().clone())
+        .await
+        .unwrap();
 
     // Alice's session should be in state unresolved.
     // Leave some time for the countersigning workflow to attempt to resolve the session.
@@ -562,15 +566,19 @@ async fn countersigning_session_interaction_calls() {
     // Alice's session should be gone from memory.
     assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
 
-    let resp = request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &alice.admin_tx).await;
+    let resp =
+        request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &alice.admin_tx)
+            .await;
     tracing::info!("Alice agent info: {:?}", resp);
 
-    let resp = request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &bob.admin_tx).await;
+    let resp =
+        request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &bob.admin_tx).await;
     tracing::info!("Bob agent info: {:?}", resp);
 
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-    let resp = request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &bob.admin_tx).await;
+    let resp =
+        request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &bob.admin_tx).await;
     tracing::info!("Bob agent info: {:?}", resp);
 
     tracing::info!("Alice published session.\n");
@@ -621,7 +629,9 @@ impl Agent {
             // Gossip faster to speed up the test.
             "k2Gossip": {
                 "initiateIntervalMs": 1000,
-                "minInitiateIntervalMs": 1000,
+                "minInitiateIntervalMs": 0,
+                "roundTimeoutMs": 500,
+                "initiateJitterMs": 100,
             },
             // Need agent infos published more often to publish updated storage arcs.
             "coreSpace": {
@@ -892,17 +902,23 @@ async fn get_session_state(
     }
 }
 
-async fn wait_for_full_arc_for_agent(admin_tx: WebsocketSender, other: AgentPubKey) -> Result<(), Elapsed> {
+async fn wait_for_full_arc_for_agent(
+    admin_tx: WebsocketSender,
+    other: AgentPubKey,
+) -> Result<(), Elapsed> {
     let agent_id = other.to_k2_agent();
 
     tokio::time::timeout(Duration::from_secs(30), async move {
         loop {
-            let resp = request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &admin_tx).await;
+            let resp =
+                request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &admin_tx)
+                    .await;
             match resp {
                 AdminResponse::AgentInfo(infos) => {
                     let mut agent_infos = Vec::with_capacity(infos.len());
                     for info in infos {
-                        let decoded = AgentInfoSigned::decode(&Ed25519Verifier, info.as_bytes()).unwrap();
+                        let decoded =
+                            AgentInfoSigned::decode(&Ed25519Verifier, info.as_bytes()).unwrap();
                         agent_infos.push(decoded);
                     }
 
@@ -914,11 +930,11 @@ async fn wait_for_full_arc_for_agent(admin_tx: WebsocketSender, other: AgentPubK
                         }
                     }
                 }
-                _ => unreachable!()
+                _ => unreachable!(),
             }
 
             tokio::time::sleep(Duration::from_millis(1000)).await;
         }
-
-    }).await
+    })
+    .await
 }
