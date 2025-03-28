@@ -8,8 +8,8 @@ use holochain_zome_types::validate::ValidationReceiptSet;
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
-    not(target_os = "linux"),
-    ignore = "seems to actually work on macos wasmer_sys as well, but we don't have a great way to exclude only wasmer_wamr in CI"
+    not(any(target_os = "linux", all(target_os = "macos", feature = "wasmer_sys"))),
+    ignore = "flaky on macos+wasmer_wamr and windows"
 )]
 async fn publish_terminates_after_receiving_required_validation_receipts() {
     holochain_trace::test_run();
