@@ -956,20 +956,31 @@ impl HolochainP2pActor {
         self.pending.lock().unwrap().register(msg_id, s);
 
         let start = std::time::Instant::now();
-        space.send_notify(to_url, req).await?;
+        space.send_notify(to_url.clone(), req).await?;
+
+        let record_metric = |error: bool| {
+            self.request_duration_metric.record(
+                start.elapsed().as_secs_f64(),
+                &[
+                    opentelemetry_api::KeyValue::new("dna_hash", format!("{:?}", dna_hash)),
+                    opentelemetry_api::KeyValue::new("tag", tag),
+                    opentelemetry_api::KeyValue::new("url", to_url.as_str().to_string()),
+                    opentelemetry_api::KeyValue::new("error", error),
+                ],
+            );
+        };
 
         match r.await {
-            Err(_) => Err(HolochainP2pError::other(format!(
-                "{tag} response channel dropped: likely response timeout"
-            ))),
+            Err(_) => {
+                record_metric(true);
+
+                Err(HolochainP2pError::other(format!(
+                    "{tag} response channel dropped: likely response timeout"
+                )))
+            }
             Ok(resp) => {
-                self.request_duration_metric.record(
-                    start.elapsed().as_secs_f64(),
-                    &[opentelemetry_api::KeyValue::new(
-                        "dna_hash",
-                        format!("{:?}", dna_hash),
-                    )],
-                );
+                let is_err = matches!(resp, WireMessage::ErrorRes { .. });
+                record_metric(is_err);
 
                 cb(resp)
             }
