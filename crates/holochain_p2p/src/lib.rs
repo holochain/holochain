@@ -374,6 +374,7 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 }
 
+mod metrics;
 #[allow(unused)]
 #[cfg(any(test, feature = "test_utils"))]
 mod test;

@@ -98,13 +98,6 @@ mod test {
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
         let config = SweetConductorConfig::standard().no_dpki()
-            /*
-            .tune(|tune| {
-                tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
-                tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
-                tune.gossip_round_timeout_ms = 3000;
-            })
-            */
             .tune_conductor(|c| {
                 c.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
             });

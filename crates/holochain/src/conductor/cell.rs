@@ -361,221 +361,13 @@ impl Cell {
     }
 }
 
-/*
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, evt)))]
-    /// Entry point for incoming messages from the network that need to be handled
-    //
-    // TODO: when we had CellStatus to track whether a cell had joined the network or not,
-    // we would disallow zome calls for cells which had not joined. If we want that behavior,
-    // we can do that check at the time of this function call, rather than at the time of trying
-    // to access the Cell itself, as it was previously done.
-    pub async fn handle_holochain_p2p_event(
-        &self,
-        evt: holochain_p2p::event::HolochainP2pEvent,
-    ) -> CellResult<()> {
-        use holochain_p2p::event::HolochainP2pEvent::*;
-        match evt {
-            PutAgentInfoSigned { .. }
-            | QueryAgentInfoSigned { .. }
-            | QueryGossipAgents { .. }
-            | QueryOpHashes { .. }
-            | QueryAgentInfoSignedNearBasis { .. }
-            | QueryPeerDensity { .. }
-            | Publish { .. }
-            | FetchOpData { .. } => {
-                // These events are aggregated over a set of cells, so need to be handled at the conductor level.
-                unreachable!()
-            }
-
-            CallRemote {
-                span_context: _,
-                zome_call_params_serialized,
-                signature,
-                respond,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_call_remote(zome_call_params_serialized, signature)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("call_remote"))
-                .await;
-            }
-
-            Get {
-                span_context: _,
-                respond,
-                dht_hash,
-                options,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_get(dht_hash, options)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_get"))
-                .await;
-            }
-
-            GetMeta {
-                span_context: _,
-                respond,
-                dht_hash,
-                options,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_get_meta(dht_hash, options)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_get_meta"))
-                .await;
-            }
-
-            GetLinks {
-                span_context: _,
-                respond,
-                link_key,
-                options,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_get_links(link_key, options)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_get_links"))
-                .await;
-            }
-
-            CountLinks {
-                span_context: _,
-                respond,
-                query,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_count_links(query)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_count_links"))
-                .await;
-            }
-
-            GetAgentActivity {
-                span_context: _,
-                respond,
-                agent,
-                query,
-                options,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_get_agent_activity(agent, query, options)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_get_agent_activity"))
-                .await;
-            }
-
-            MustGetAgentActivity {
-                span_context: _,
-                respond,
-                author,
-                filter,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_must_get_agent_activity(author, filter)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_must_get_agent_activity"))
-                .await;
-            }
-
-            ValidationReceiptsReceived {
-                span_context: _,
-                respond,
-                receipts,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_validation_receipts(receipts)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_validation_receipt_received"))
-                .await;
-                // We got a receipt so we must be connected to the network
-                // and should reset the publish back off loop to its minimum.
-                self.queue_triggers.publish_dht_ops.reset_back_off();
-            }
-
-            SignNetworkData {
-                span_context: _,
-                respond,
-                ..
-            } => {
-                async {
-                    let res = self
-                        .handle_sign_network_data()
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_sign_network_data"))
-                .await;
-            }
-
-            #[allow(unused_variables)]
-            CountersigningSessionNegotiation {
-                respond, message, ..
-            } => {
-                #[cfg(feature = "unstable-countersigning")]
-                async {
-                    let res = self
-                        .handle_countersigning_session_negotiation(message)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                .instrument(debug_span!("cell_handle_countersigning_response"))
-                .await;
-            }
-        }
-        Ok(())
-    }
-*/
-
 impl holochain_p2p::event::HcP2pHandler for Cell {
+    /// a remote agent is attempting a "call_remote" on this cell.
     #[cfg_attr(
         feature = "instrument",
         tracing::instrument(skip(self, from_agent, fn_name, cap_secret, payload))
     )]
     #[allow(clippy::too_many_arguments)]
-    /// a remote agent is attempting a "call_remote" on this cell.
     fn handle_call_remote(
         &self,
         _dna_hash: DnaHash,
@@ -617,8 +409,8 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         Box::pin(async { unimplemented!() })
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// a remote node is asking us for entry data
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     fn handle_get(
         &self,
         _dna_hash: DnaHash,
@@ -648,11 +440,11 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         })
     }
 
+    /// a remote node is asking us for metadata
     #[cfg_attr(
         feature = "instrument",
         tracing::instrument(skip(self, _dht_hash, _options))
     )]
-    /// a remote node is asking us for metadata
     fn handle_get_meta(
         &self,
         _dna_hash: DnaHash,
@@ -663,11 +455,11 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         Box::pin(async { unimplemented!() })
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     /// a remote node is asking us for links
     // TODO: Right now we are returning all the full actions
     // We could probably send some smaller types instead of the full actions
     // if we are careful.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     fn handle_get_links(
         &self,
         _dna_hash: DnaHash,
