@@ -288,6 +288,24 @@ impl NetworkConfig {
         self
     }
 
+    /// Set the gossip initiate jitter.
+    #[cfg(feature = "test-utils")]
+    pub fn with_gossip_initiate_jitter_ms(mut self, initiate_jitter_ms: u32) -> Self {
+        self.insert_into_config(|module_config| {
+            Self::insert_module_config(
+                module_config,
+                "k2Gossip",
+                "initiateJitterMs",
+                serde_json::Value::Number(serde_json::Number::from(initiate_jitter_ms)),
+            )?;
+
+            Ok(())
+        })
+            .unwrap();
+
+        self
+    }
+
     /// Set the gossip min initiate interval.
     #[cfg(feature = "test-utils")]
     pub fn with_gossip_min_initiate_interval_ms(mut self, min_initiate_interval_ms: u32) -> Self {
@@ -776,11 +794,11 @@ mod tests {
             k2_config,
             serde_json::json!({
                 "coreBootstrap": {
-                    "serverUrl": "https://devtest-bootstrap-1.holochain.org/",
+                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
                     "backoffMinMs": "3500",
                 },
                 "tx5Transport": {
-                    "serverUrl": "wss://devtest-sbd-1.holochain.org/",
+                    "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
                     "timeoutS": "10",
                 },
                 "coreSpace": {
@@ -816,10 +834,10 @@ mod tests {
             k2_config,
             serde_json::json!({
                 "coreBootstrap": {
-                    "serverUrl": "https://devtest-bootstrap-1.holochain.org/",
+                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
                 },
                 "tx5Transport": {
-                    "serverUrl": "wss://devtest-sbd-1.holochain.org/",
+                    "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
                 },
             })
         )
@@ -830,6 +848,7 @@ mod tests {
         let network_config = NetworkConfig::default()
             .with_gossip_round_timeout_ms(100)
             .with_gossip_initiate_interval_ms(200)
+            .with_gossip_initiate_jitter_ms(50)
             .with_gossip_min_initiate_interval_ms(300);
 
         let k2_config = network_config.to_k2_config().unwrap();
@@ -844,14 +863,15 @@ mod tests {
             k2_config,
             serde_json::json!({
                 "coreBootstrap": {
-                    "serverUrl": "https://devtest-bootstrap-1.holochain.org/",
+                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
                 },
                 "tx5Transport": {
-                    "serverUrl": "wss://devtest-sbd-1.holochain.org/",
+                    "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
                 },
                 "k2Gossip": {
                     "roundTimeoutMs": 100,
                     "initiateIntervalMs": 200,
+                    "initiateJitterMs": 50,
                     "minInitiateIntervalMs": 300,
                 }
             })
