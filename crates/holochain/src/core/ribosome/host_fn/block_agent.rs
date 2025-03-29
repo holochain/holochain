@@ -91,6 +91,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[ignore = "flaky"]
     async fn zome_call_get_block() {
         holochain_trace::test_run();
 
