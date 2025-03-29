@@ -468,8 +468,6 @@ async fn setup(
             modifiers: DnaModifiers {
                 network_seed,
                 properties: SerializedBytes::try_from(()).unwrap(),
-                origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                quantum_time: STANDARD_QUANTUM_TIME,
             },
             integrity_zomes: zomes
                 .clone()

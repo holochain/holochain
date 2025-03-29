@@ -4,15 +4,9 @@ role-1:
   modifiers:
     network_seed: some random network seed
     properties: some properties in the manifest
-    origin_time: 1731436443698324
-    quantum_time: ~
 role-2:
   type: provisioned
   membrane_proof: ~
   modifiers:
     network_seed: another random network seed
     properties: some properties in the manifest
-    origin_time: 1731436443698326
-    quantum_time:
-      secs: 60
-      nanos: 0
