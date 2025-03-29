@@ -61,16 +61,16 @@ macro_rules! here {
     };
 }
 
-/// Retry a code block with an exit condition after a pause, until a timeout has elapsed.
-/// The default timeout is 1 s.
-/// The default pause is 10 ms.
+/// Retry a code block with an exit condition and then pause, until a timeout has elapsed.
+/// The default timeout is 5 s.
+/// The default pause is 500 ms.
 #[macro_export]
 macro_rules! retry_until_timeout {
     ($timeout_ms:literal, $sleep_ms:literal, $code:block) => {
         tokio::time::timeout(std::time::Duration::from_millis($timeout_ms), async {
             loop {
                 tokio::time::sleep(std::time::Duration::from_millis($sleep_ms)).await;
-                $code
+                $codeß
             }
         })
         .await
@@ -78,11 +78,11 @@ macro_rules! retry_until_timeout {
     };
 
     ($timeout_ms:literal, $code:block) => {
-        retry_until_timeout!($timeout_ms, 10, $code)
+        retry_until_timeout!($timeout_ms, 500, $code)
     };
 
     ($code:block) => {
-        retry_until_timeout!(1_000, $code)
+        retry_until_timeout!(5_000, $code)
     };
 }
 
