@@ -1,8 +1,10 @@
 use holo_hash::ActionHash;
+use holochain::retry_until_timeout;
 use holochain::sweettest::{await_consistency, SweetConductorBatch, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::AgentActivity;
 use holochain_zome_types::query::ChainStatus;
+use kitsune2_api::DhtArc;
 use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -21,6 +23,27 @@ async fn get_agent_activity() {
 
     let alice_cell = cells.first().unwrap();
     let bob_cell = cells.last().unwrap();
+
+    conductor_batch[0]
+        .holochain_p2p()
+        .test_set_full_arcs(dna.dna_hash().to_k2_space())
+        .await;
+    retry_until_timeout!(5_000, 1_000, {
+        if conductor_batch[0]
+            .holochain_p2p()
+            .peer_store(dna.dna_hash().clone())
+            .await
+            .unwrap()
+            .get(alice_cell.agent_pubkey().to_k2_agent())
+            .await
+            .unwrap()
+            .unwrap()
+            .storage_arc
+            == DhtArc::FULL
+        {
+            break;
+        }
+    });
 
     let mut created_hashes = Vec::new();
     for _ in 0..5 {
