@@ -69,8 +69,8 @@ macro_rules! retry_until_timeout {
     ($timeout_ms:literal, $sleep_ms:literal, $code:block) => {
         tokio::time::timeout(std::time::Duration::from_millis($timeout_ms), async {
             loop {
+                $code
                 tokio::time::sleep(std::time::Duration::from_millis($sleep_ms)).await;
-                $codeß
             }
         })
         .await

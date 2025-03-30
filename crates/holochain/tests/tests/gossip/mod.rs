@@ -5,19 +5,18 @@
 use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holochain::sweettest::SweetConductorBatch;
+use holochain::sweettest::SweetInlineZomes;
 use holochain::sweettest::{
     await_consistency, DynSweetRendezvous, SweetAgents, SweetConductor, SweetConductorConfig,
     SweetDnaFile, SweetLocalRendezvous,
 };
 use holochain::test_utils::inline_zomes::{simple_create_read_zome, simple_crud_zome};
-use holochain::{retry_until_timeout, sweettest::SweetInlineZomes};
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_conductor_api::conductor::NetworkConfig;
 use holochain_zome_types::{
     record::{Record, RecordEntry},
     Entry,
 };
-use kitsune2_api::DhtArc;
 
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
@@ -95,23 +94,8 @@ async fn get_with_zero_arc_2_way() {
     let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
     conductors[0]
-        .holochain_p2p()
-        .test_set_full_arcs(dna_file.dna_hash().to_k2_space())
+        .declare_full_storage_arcs(dna_file.dna_hash())
         .await;
-    retry_until_timeout!(5_000, 500, {
-        let alice_in_own_peer_store = conductors[0]
-            .holochain_p2p()
-            .peer_store(alice.dna_hash().clone())
-            .await
-            .unwrap()
-            .get(alice.agent_pubkey().to_k2_agent())
-            .await
-            .unwrap()
-            .unwrap();
-        if alice_in_own_peer_store.storage_arc == DhtArc::FULL {
-            break;
-        }
-    });
     conductors.exchange_peer_info().await;
 
     let zome_0 = alice.zome(SweetInlineZomes::COORDINATOR);
