@@ -898,6 +898,21 @@ impl SweetConductor {
     pub fn rendezvous(&self) -> Option<&DynSweetRendezvous> {
         self.rendezvous.as_ref()
     }
+
+    /// Check if all ops in the DHT database have been integrated.
+    pub fn all_ops_integrated(&self, dna_hash: &DnaHash) -> ConductorApiResult<bool> {
+        let dht_db = self.get_dht_db(dna_hash)?;
+        dht_db.test_read(|txn| {
+            let all_integrated = txn
+                .query_row(
+                    "SELECT NOT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
+                    [],
+                    |row| row.get::<_, bool>(0),
+                )
+                .unwrap();
+            Ok(all_integrated)
+        })
+    }
 }
 
 /// You do not need to do anything with this type. While it is held it will keep polling a websocket
