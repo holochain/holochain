@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Moves the `lineage` field of the dna manifest behind an `unstable-migration` feature.
 - Handle empty databases in `StorageInfo` request. Previously, if the database was empty, the request would return an error. #4756
 - Add `DnaHash` to the `DnaStorageInfo` which is part of the `StorageInfo` response.
 
