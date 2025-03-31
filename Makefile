@@ -9,7 +9,7 @@ DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
 UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-countersigning,$(DEFAULT_FEATURES)
 
 # TODO - removed `unstable-dpki` from the UNSTABLE_FEATURES list
-#        it's so unstable it can't even pass CI
+#        this is temporary until dpki dep is rebuilt without origin_time
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
