@@ -16,6 +16,9 @@ pub struct AgentInfo {
     /// Same as the initial pubkey if it has never been changed.
     /// The agent can revoke an old key and replace it with a new one, the latest appears here.
     pub agent_latest_pubkey: AgentPubKey,
+    /// The current source chain head, including any changes staged in the
+    /// scratch space by the current function call but not yet persisted to
+    /// the database.
     pub chain_head: (ActionHash, u32, Timestamp),
 }
 
