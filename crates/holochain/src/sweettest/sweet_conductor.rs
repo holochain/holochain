@@ -907,6 +907,19 @@ impl SweetConductor {
         self.holochain_p2p()
             .test_set_full_arcs(dna_hash.to_k2_space())
             .await;
+        let local_agents = self
+            .holochain_p2p()
+            .test_kitsune()
+            .space(dna_hash.to_k2_space())
+            .await
+            .unwrap()
+            .local_agent_store()
+            .get_all()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|agent| agent.agent().clone())
+            .collect::<Vec<_>>();
         let peer_store = self
             .holochain_p2p()
             .peer_store(dna_hash.clone())
@@ -918,6 +931,8 @@ impl SweetConductor {
                 .await
                 .unwrap()
                 .into_iter()
+                // Only check this conductor's local agents for full storage arc.
+                .filter(|agent_info| local_agents.contains(&agent_info.agent))
                 .all(|agent_info| agent_info.storage_arc == DhtArc::FULL)
             {
                 break;
