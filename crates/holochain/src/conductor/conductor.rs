@@ -2072,8 +2072,7 @@ mod clone_cell_impls {
 
             if !modifiers.has_some_option_set() {
                 return Err(ConductorError::CloneCellError(
-                    "neither network_seed nor properties nor origin_time provided for clone cell"
-                        .to_string(),
+                    "neither network_seed nor properties provided for clone cell".to_string(),
                 ));
             }
 

@@ -23,6 +23,10 @@ async fn get_agent_activity() {
     let alice_cell = cells.first().unwrap();
     let bob_cell = cells.last().unwrap();
 
+    conductor_batch[0]
+        .declare_full_storage_arcs(dna.dna_hash())
+        .await;
+
     let mut created_hashes = Vec::new();
     for _ in 0..5 {
         let created: ActionHash = conductor_batch[0]

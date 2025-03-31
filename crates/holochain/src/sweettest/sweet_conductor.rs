@@ -8,6 +8,7 @@ use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, CellError,
     Conductor, ConductorBuilder,
 };
+use crate::retry_until_timeout;
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holochain_conductor_api::{
@@ -20,6 +21,7 @@ use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
+use kitsune2_api::DhtArc;
 use nanoid::nanoid;
 use rand::Rng;
 use std::collections::HashMap;
@@ -894,9 +896,68 @@ impl SweetConductor {
         .map_err(|_| ConductorApiError::other("Timeout"))?
     }
 
+    /// Declare full storage arc for all agents of the space and wait until the
+    /// agent infos have been published to the peer store.
+    ///
+    /// # Panics
+    ///
+    /// If peer store cannot be found for DNA hash.
+    /// If publishing to the peer store fails within the timeout of 5 s.
+    pub async fn declare_full_storage_arcs(&self, dna_hash: &DnaHash) {
+        self.holochain_p2p()
+            .test_set_full_arcs(dna_hash.to_k2_space())
+            .await;
+        let local_agents = self
+            .holochain_p2p()
+            .test_kitsune()
+            .space(dna_hash.to_k2_space())
+            .await
+            .unwrap()
+            .local_agent_store()
+            .get_all()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|agent| agent.agent().clone())
+            .collect::<Vec<_>>();
+        let peer_store = self
+            .holochain_p2p()
+            .peer_store(dna_hash.clone())
+            .await
+            .unwrap();
+        retry_until_timeout!(5_000, 500, {
+            if peer_store
+                .get_all()
+                .await
+                .unwrap()
+                .into_iter()
+                // Only check this conductor's local agents for full storage arc.
+                .filter(|agent_info| local_agents.contains(&agent_info.agent))
+                .all(|agent_info| agent_info.storage_arc == DhtArc::FULL)
+            {
+                break;
+            }
+        });
+    }
+
     /// Getter
     pub fn rendezvous(&self) -> Option<&DynSweetRendezvous> {
         self.rendezvous.as_ref()
+    }
+
+    /// Check if all ops in the DHT database have been integrated.
+    pub fn all_ops_integrated(&self, dna_hash: &DnaHash) -> ConductorApiResult<bool> {
+        let dht_db = self.get_dht_db(dna_hash)?;
+        dht_db.test_read(|txn| {
+            let all_integrated = txn
+                .query_row(
+                    "SELECT NOT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
+                    [],
+                    |row| row.get::<_, bool>(0),
+                )
+                .unwrap();
+            Ok(all_integrated)
+        })
     }
 }
 

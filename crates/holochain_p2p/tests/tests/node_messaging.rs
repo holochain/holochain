@@ -298,25 +298,25 @@ async fn test_publish() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
+    let op = test_dht_op(holochain_types::prelude::Timestamp::now());
+    let op_hash = op.as_hash().clone();
+
+    // TODO invoking process_incoming_ops is a hack,
+    //      prefer calling a function on the mem store directly.
+    hc2.test_kitsune()
+        .space(dna_hash.to_k2_space())
+        .await
+        .unwrap()
+        .op_store()
+        .process_incoming_ops(vec![bytes::Bytes::from(
+            holochain_serialized_bytes::encode(op.as_content()).unwrap(),
+        )])
+        .await
+        .unwrap();
+
     tokio::time::timeout(std::time::Duration::from_secs(20), async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
-
-            let op = test_dht_op(holochain_types::prelude::Timestamp::now());
-            let op_hash = op.as_hash().clone();
-
-            // TODO invoking process_incoming_ops is a hack,
-            //      prefer calling a function on the mem store directly.
-            hc2.test_kitsune()
-                .space(dna_hash.to_k2_space())
-                .await
-                .unwrap()
-                .op_store()
-                .process_incoming_ops(vec![bytes::Bytes::from(
-                    holochain_serialized_bytes::encode(op.as_content()).unwrap(),
-                )])
-                .await
-                .unwrap();
 
             hc2.publish(
                 dna_hash.clone(),
@@ -326,7 +326,7 @@ async fn test_publish() {
                     holo_hash::hash_type::AnyLinkable::Action,
                 ),
                 AgentPubKey::from_raw_32(vec![2; 32]),
-                vec![op_hash],
+                vec![op_hash.clone()],
                 None,
                 None,
             )

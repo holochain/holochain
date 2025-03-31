@@ -10,6 +10,8 @@ mod conductor_services;
 #[cfg(feature = "unstable-countersigning")]
 mod countersigning;
 mod dna_properties;
+#[cfg(not(target_os = "macos"))]
+mod gossip;
 mod graft_records_onto_source_chain;
 mod hc_stress_test;
 mod init;
@@ -23,8 +25,6 @@ mod publish;
 mod regression;
 mod send_signal;
 mod ser_regression;
-#[cfg(not(target_os = "macos"))]
-mod sharded_gossip;
 mod signals;
 mod test_cli;
 mod test_utils;
