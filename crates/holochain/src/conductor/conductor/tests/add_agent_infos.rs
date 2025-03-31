@@ -4,7 +4,7 @@ use holochain_wasm_test_utils::TestWasm;
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
     target_os = "windows",
-    ignore = "get agent infos for cell returns None for unknown reason"
+    ignore = "flaky-windows: get agent info from cell peer store returns None for unknown reason"
 )]
 async fn add_agent_infos_to_peer_store() {
     let mut conductor = SweetConductor::from_standard_config().await;
