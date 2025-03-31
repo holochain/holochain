@@ -453,7 +453,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             kind,
             PoolConfig::default(),
             Some(|sql| {
-                tracing::debug!("SQL: {}", sql);
+                tracing::trace!("SQL: {}", sql);
             }),
         )
     }
