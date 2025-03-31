@@ -1,4 +1,4 @@
-#[cfg(feature = "unstable-dpki")]
+#[cfg(feature = "unstable-migration")]
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -7,7 +7,7 @@ use crate::{conductor::error::ConductorError, sweettest::*};
 use holo_hash::DnaHash;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-#[cfg(feature = "unstable-dpki")]
+#[cfg(feature = "unstable-migration")]
 use maplit::btreeset;
 use matches::assert_matches;
 
