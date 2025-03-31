@@ -6,7 +6,6 @@ use holochain_zome_types::query::ChainStatus;
 use matches::assert_matches;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "flaky"]
 async fn get_agent_activity() {
     holochain_trace::test_run();
 
