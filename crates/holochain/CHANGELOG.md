@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Handle empty databases in `StorageInfo` request. Previously, if the database was empty, the request would return an error. #4756
 - Add `DnaHash` to the `DnaStorageInfo` which is part of the `StorageInfo` response.
+- The `agent_latest_pubkey` field of `AgentInfo` is put behind the `unstable-dpki` feature flag ([#4815](https://github.com/holochain/holochain/pull/4815)).
 
 ## 0.5.0-dev.21
 
