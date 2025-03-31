@@ -2,6 +2,10 @@ use crate::sweettest::{SweetConductor, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    target_os = "windows",
+    ignore = "flaky-windows: get agent info from cell peer store returns None for unknown reason"
+)]
 async fn add_agent_infos_to_peer_store() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd])

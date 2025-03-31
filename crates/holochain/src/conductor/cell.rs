@@ -958,7 +958,7 @@ impl Cell {
             .as_ref()
             .map_or(true, |w| !w.called_from_init())
         {
-            // Check if init has run if not run it
+            // Check if init has run. If not, run it.
             self.check_or_run_zome_init().await?;
         }
 
@@ -1029,14 +1029,12 @@ impl Cell {
         .await
         .map_err(|_| CellError::InitTimeout)?;
 
-        // If not run it
         let keystore = self.conductor_api.keystore().clone();
         let id = self.id.clone();
         let conductor_handle = self.conductor_handle.clone();
 
         // get the dna
         let ribosome = self.get_ribosome()?;
-
         let dna_def = ribosome.dna_def().clone();
 
         // Create the workspace

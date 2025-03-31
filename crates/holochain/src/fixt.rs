@@ -183,21 +183,6 @@ fixturator!(
     };
 );
 
-// fixturator!(
-//     LinkMetaVal;
-//     constructor fn new(ActionHash, EntryHash, Timestamp, u8, LinkTag);
-// );
-
-// impl Iterator for LinkMetaValFixturator<(EntryHash, LinkTag)> {
-//     type Item = LinkMetaVal;
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let mut f = fixt!(LinkMetaVal);
-//         f.target = self.0.curve.0.clone();
-//         f.tag = self.0.curve.1.clone();
-//         Some(f)
-//     }
-// }
-
 fixturator!(
     MetaLairClient;
     curve Empty {

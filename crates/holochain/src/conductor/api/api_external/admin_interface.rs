@@ -83,7 +83,7 @@ impl AdminInterfaceApi {
                     DnaSource::Hash(ref hash) => {
                         if !modifiers.has_some_option_set() {
                             return Err(ConductorApiError::DnaReadError(
-                                "DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
+                                "DnaSource::Hash requires `properties` or `network_seed` to create a derived Dna"
                                     .to_string(),
                             ));
                         }
@@ -445,7 +445,7 @@ mod test {
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == *"DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == *"DnaSource::Hash requires `properties` or `network_seed` to create a derived Dna"
         );
 
         // with a property should install and produce a different hash
