@@ -352,6 +352,7 @@ impl AdminInterfaceApi {
                     .revoke_app_authentication_token(token)?;
                 Ok(AdminResponse::AppAuthenticationTokenRevoked)
             }
+            #[cfg(feature = "unstable-migration")]
             GetCompatibleCells(dna_hash) => Ok(AdminResponse::CompatibleCells(
                 self.conductor_handle
                     .cells_by_dna_lineage(&dna_hash)

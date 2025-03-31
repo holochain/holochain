@@ -1,5 +1,6 @@
 //! Defines DnaDef struct
 
+#[cfg(feature = "unstable-migration")]
 use std::collections::HashSet;
 
 use crate::prelude::*;
@@ -68,6 +69,7 @@ pub struct DnaDef {
     ///
     /// Holochain does nothing to ensure the correctness of the lineage, it is up to
     /// the app developer to make the necessary guarantees.
+    #[cfg(feature = "unstable-migration")]
     #[serde(default)]
     #[cfg_attr(feature = "full-dna-def", builder(default))]
     pub lineage: HashSet<DnaHash>,

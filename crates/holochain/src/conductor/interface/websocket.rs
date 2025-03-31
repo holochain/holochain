@@ -1313,6 +1313,7 @@ mod test {
                     .map(TestZomes::from)
                     .map(|z| z.coordinator.into_inner())
                     .collect(),
+                #[cfg(feature = "unstable-migration")]
                 lineage: Default::default(),
             },
             zomes.into_iter().flat_map(Vec::<DnaWasm>::from),

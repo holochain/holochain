@@ -53,7 +53,7 @@ impl DnaManifest {
         origin_time: HumanTimestamp,
         integrity_zomes: Vec<ZomeManifest>,
         coordinator_zomes: Vec<ZomeManifest>,
-        lineage: Vec<DnaHash>,
+        #[cfg(feature = "unstable-migration")] lineage: Vec<DnaHash>,
     ) -> Self {
         DnaManifestCurrent::new(
             name,
@@ -61,6 +61,7 @@ impl DnaManifest {
             CoordinatorManifest {
                 zomes: coordinator_zomes,
             },
+            #[cfg(feature = "unstable-migration")]
             lineage.into_iter().map(Into::into).collect(),
         )
         .into()
@@ -150,6 +151,7 @@ mod tests {
         match &manifest {
             DnaManifest::V1(m) => {
                 assert_eq!(m.coordinator, CoordinatorManifest::default());
+                #[cfg(feature = "unstable-migration")]
                 assert_eq!(m.lineage, vec![]);
             }
         }

@@ -190,6 +190,7 @@ async fn test_multi_integrity() {
     // Create the expected dependencies on the coordinator zomes.
     let s = "2022-02-11T23:05:19.470323Z";
     let origin_time = Timestamp::from_str(s).unwrap();
+    #[cfg(feature = "unstable-migration")]
     let lineage = vec![
         DnaHash::try_from_raw_39(
             holo_hash_decode_unchecked("uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm")
@@ -250,6 +251,7 @@ async fn test_multi_integrity() {
                 .into(),
             ),
         ],
+        #[cfg(feature = "unstable-migration")]
         lineage: lineage.into_iter().collect(),
     };
     assert_eq!(
@@ -332,6 +334,7 @@ fn test_default_dna_manifest_matches_schema() {
         Timestamp::now().into(),
         vec![],
         vec![],
+        #[cfg(feature = "unstable-migration")]
         vec![],
     );
 

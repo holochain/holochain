@@ -1,3 +1,4 @@
+#[cfg(feature = "unstable-migration")]
 use std::collections::BTreeSet;
 
 use holo_hash::*;
@@ -415,6 +416,7 @@ pub enum AdminRequest {
 
     /// Find installed cells which use a DNA that's forward-compatible with the given DNA hash.
     /// Namely, this finds cells with DNAs whose manifest lists the given DNA hash in its `lineage` field.
+    #[cfg(feature = "unstable-migration")]
     GetCompatibleCells(DnaHash),
 }
 
@@ -578,9 +580,11 @@ pub enum AdminResponse {
     AppAuthenticationTokenRevoked,
 
     /// The successful response to an [`AdminRequest::GetCompatibleCells`].
+    #[cfg(feature = "unstable-migration")]
     CompatibleCells(CompatibleCells),
 }
 
+#[cfg(feature = "unstable-migration")]
 pub type CompatibleCells = BTreeSet<(InstalledAppId, BTreeSet<CellId>)>;
 
 /// Error type that goes over the websocket wire.

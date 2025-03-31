@@ -49,6 +49,7 @@ pub fn fake_dna_zomes_named(
         },
         integrity_zomes: Vec::new(),
         coordinator_zomes: Vec::new(),
+        #[cfg(feature = "unstable-migration")]
         lineage: Default::default(),
     };
     tokio_helper::block_forever_on(async move {

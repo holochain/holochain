@@ -313,6 +313,12 @@ unstable-dpki = [
   "holochain_conductor_config/unstable-dpki",
 ]
 
+# Enable the unstable migration feature
+unstable-migration = [
+  "holochain_types/unstable-migration",
+  "holochain_conductor_api/unstable-migration",
+]
+
 # Enables unstable warrants feature.
 unstable-warrants = [
   "holochain_state/unstable-warrants",

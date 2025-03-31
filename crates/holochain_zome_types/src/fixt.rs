@@ -741,6 +741,7 @@ fixturator!(
         coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        #[cfg(feature = "unstable-migration")]
         lineage: Default::default(),
     };
 
@@ -765,6 +766,7 @@ fixturator!(
             .next()
             .unwrap(),
         // TODO: non-empty lineage
+        #[cfg(feature = "unstable-migration")]
         lineage: Default::default(),
     };
 
@@ -789,6 +791,7 @@ fixturator!(
             .next()
             .unwrap(),
         // TODO: non-empty lineage
+        #[cfg(feature = "unstable-migration")]
         lineage: Default::default(),
     };
 );

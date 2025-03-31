@@ -348,6 +348,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
         .unwrap();
 }
 
+#[cfg(feature = "unstable-migration")]
 #[tokio::test(flavor = "multi_thread")]
 async fn cells_by_dna_lineage() {
     let mut conductor = SweetConductor::from_standard_config().await;

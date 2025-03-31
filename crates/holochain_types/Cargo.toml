@@ -106,6 +106,8 @@ test_utils = [
   "holochain_zome_types/test_utils",
 ]
 
+unstable-migration = []
+
 fuzzing = [
   "contrafact",
   "proptest",

@@ -2134,8 +2134,10 @@ mod app_impls {
 
 /// Methods related to cell access
 mod cell_impls {
+    #[cfg(feature = "unstable-migration")]
     use std::collections::BTreeSet;
 
+    #[cfg(feature = "unstable-migration")]
     use holochain_conductor_api::CompatibleCells;
 
     use super::*;
@@ -2180,6 +2182,7 @@ mod cell_impls {
         /// with the DNAs specified in its lineage. If the DnaHash parameter is contained within the lineage of any
         /// installed cell's DNA, that cell will be returned in the result set, since it has declared
         /// itself forward-compatible.
+        #[cfg(feature = "unstable-migration")]
         pub async fn cells_by_dna_lineage(
             &self,
             dna_hash: &DnaHash,
