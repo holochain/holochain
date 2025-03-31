@@ -27,5 +27,3 @@ fixt = { path = "../../../../fixt" }
 default = ["hdk"]
 integrity = []
 mock = ["hdk/mock"]
-unstable-dpki = ["hdk/unstable-dpki"]
-

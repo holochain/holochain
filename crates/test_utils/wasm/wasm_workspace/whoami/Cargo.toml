@@ -22,4 +22,3 @@ serde = "1.0"
 [features]
 default = []
 mock = ["hdk/mock"]
-unstable-dpki = ["hdk/unstable-dpki"]
