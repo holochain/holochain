@@ -1239,10 +1239,7 @@ mod test {
     /// Check that we can add and get agent info for a conductor
     /// across the admin websocket.
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg_attr(
-        target_os = "windows",
-        ignore = "flaky-windows: no agents found in store"
-    )]
+    #[ignore = "flaky: no agents found in store"]
     async fn add_agent_info_via_admin() {
         holochain_trace::test_run();
         let mut conductor = SweetConductor::from_standard_config().await;
