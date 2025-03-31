@@ -301,7 +301,7 @@ impl NetworkConfig {
 
             Ok(())
         })
-            .unwrap();
+        .unwrap();
 
         self
     }
