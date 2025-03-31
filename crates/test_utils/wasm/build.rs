@@ -89,8 +89,13 @@ fn build_test_wasms(
                 .arg("--target")
                 .arg("wasm32-unknown-unknown");
 
-            if enable_unstable_functions && defines_feature(&project, "unstable-functions") {
-                cmd.arg("--features").arg("unstable-functions");
+            if enable_unstable_functions {
+                if defines_feature(&project, "unstable-functions") {
+                    cmd.arg("--features").arg("unstable-functions");
+                }
+                if defines_feature(&project, "unstable-dpki") {
+                    cmd.arg("--features").arg("unstable-dpki");
+                }
             }
         } else {
             cmd.arg("check").arg("--manifest-path").arg(&path);
@@ -100,11 +105,19 @@ fn build_test_wasms(
             if defines_feature(&project, "integrity") {
                 features.push_str("integrity");
             }
-            if enable_unstable_functions && defines_feature(&project, "unstable-functions") {
-                if !features.is_empty() {
-                    features.push(',');
+            if enable_unstable_functions {
+                if defines_feature(&project, "unstable-functions") {
+                    if !features.is_empty() {
+                        features.push(',');
+                    }
+                    features.push_str("unstable-functions");
                 }
-                features.push_str("unstable-functions");
+                if defines_feature(&project, "unstable-dpki") {
+                    if !features.is_empty() {
+                        features.push(',');
+                    }
+                    features.push_str("unstable-dpki");
+                }
             }
 
             cmd.arg("--examples");
