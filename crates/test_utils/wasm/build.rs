@@ -6,6 +6,7 @@ fn main() {
     let should_build = std::env::var_os("CARGO_FEATURE_BUILD").is_some();
     let only_check = std::env::var_os("CARGO_FEATURE_ONLY_CHECK").is_some();
     let enable_unstable_functions = std::env::var_os("CARGO_FEATURE_UNSTABLE_FUNCTIONS").is_some();
+    let enable_unstable_dpki = std::env::var_os("CARGO_FEATURE_UNSTABLE_DPKI").is_some();
 
     if !(should_build || only_check) {
         return;
@@ -51,6 +52,7 @@ fn main() {
         should_build,
         false,
         enable_unstable_functions,
+        enable_unstable_dpki,
         &wasms_path,
     );
     build_test_wasms(
@@ -59,6 +61,7 @@ fn main() {
         should_build,
         true,
         enable_unstable_functions,
+        enable_unstable_dpki,
         &wasms_path,
     );
 }
@@ -69,6 +72,7 @@ fn build_test_wasms(
     should_build: bool,
     build_integrity_zomes: bool,
     enable_unstable_functions: bool,
+    enable_unstable_dpki: bool,
     wasms_path: &str,
 ) {
     let paths = list_wasms(PathBuf::from(wasms_path));
@@ -89,13 +93,11 @@ fn build_test_wasms(
                 .arg("--target")
                 .arg("wasm32-unknown-unknown");
 
-            if enable_unstable_functions {
-                if defines_feature(&project, "unstable-functions") {
-                    cmd.arg("--features").arg("unstable-functions");
-                }
-                if defines_feature(&project, "unstable-dpki") {
-                    cmd.arg("--features").arg("unstable-dpki");
-                }
+            if enable_unstable_functions && defines_feature(&project, "unstable-functions") {
+                cmd.arg("--features").arg("unstable-functions");
+            }
+            if enable_unstable_dpki && defines_feature(&project, "unstable-dpki") {
+                cmd.arg("--features").arg("unstable-dpki");
             }
         } else {
             cmd.arg("check").arg("--manifest-path").arg(&path);
@@ -105,19 +107,17 @@ fn build_test_wasms(
             if defines_feature(&project, "integrity") {
                 features.push_str("integrity");
             }
-            if enable_unstable_functions {
-                if defines_feature(&project, "unstable-functions") {
-                    if !features.is_empty() {
-                        features.push(',');
-                    }
-                    features.push_str("unstable-functions");
+            if enable_unstable_functions && defines_feature(&project, "unstable-functions") {
+                if !features.is_empty() {
+                    features.push(',');
                 }
-                if defines_feature(&project, "unstable-dpki") {
-                    if !features.is_empty() {
-                        features.push(',');
-                    }
-                    features.push_str("unstable-dpki");
+                features.push_str("unstable-functions");
+            }
+            if enable_unstable_dpki && defines_feature(&project, "unstable-dpki") {
+                if !features.is_empty() {
+                    features.push(',');
                 }
+                features.push_str("unstable-dpki");
             }
 
             cmd.arg("--examples");
