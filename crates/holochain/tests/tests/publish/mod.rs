@@ -34,59 +34,82 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
     let apps = [alice, bobbo, carol, danny, emma, fred];
 
     for c in conductors.iter() {
-        c.holochain_p2p()
-            .test_set_full_arcs(apps[0].dna_hash().to_k2_space())
-            .await;
+        c.declare_full_storage_arcs(apps[0].dna_hash()).await;
     }
 
+    // wait for all our conductors to see each other
+    tokio::time::timeout(std::time::Duration::from_secs(60), async {
+        loop {
+            let mut all_good = true;
+
+            for c in conductors.iter() {
+                if c.holochain_p2p()
+                    .peer_store(apps[0].dna_hash().clone())
+                    .await
+                    .unwrap()
+                    .get_all()
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .count()
+                    < 6
+                {
+                    all_good = false;
+                    break;
+                }
+            }
+
+            if all_good {
+                break;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+
+    // write an action
     let action_hash: ActionHash = conductors[0]
         .call(&apps[0].zome(TestWasm::Create), "create_entry", ())
         .await;
 
-    tokio::time::timeout(
-        std::time::Duration::from_secs(60),
-        async {
-            loop {
-                // make sure all our workflows keep running periodically
-                for idx in 0..conductors.len() {
-                    let _ah: ActionHash = conductors[idx]
-                        .call(&apps[idx].zome(TestWasm::Create), "create_entry", ())
-                        .await;
-                }
+    // wait for validation receipts
+    tokio::time::timeout(std::time::Duration::from_secs(60), async {
+        loop {
+            // check for complete count of our receipts on the
+            // millisecond level
 
-                // don't create entries on the millisecond level,
-                // this is not a stress test (10 * 200 is 2 seconds)
-                for _ in 0..200 {
-                    // check for complete count of our receipts on the
-                    // millisecond level
+            // Get the validation receipts to check that they
+            // are all complete
+            let receipt_sets: Vec<ValidationReceiptSet> = conductors[0]
+                .call(
+                    &apps[0].zome(TestWasm::Create),
+                    "get_validation_receipts",
+                    GetValidationReceiptsInput::new(action_hash.clone()),
+                )
+                .await;
 
-                    // Get the validation receipts to check that they
-                    // are all complete
-                    let receipt_sets: Vec<ValidationReceiptSet> = conductors[0]
-                        .call(
-                            &apps[0].zome(TestWasm::Create),
-                            "get_validation_receipts",
-                            GetValidationReceiptsInput::new(action_hash.clone()),
-                        )
-                        .await;
-
-                    let receipt_sets_len = receipt_sets.len() == 3;
-                    let receipt_sets_complete = receipt_sets.iter().all(|r| r.receipts_complete);
-                    let agent_activity_receipt_set = receipt_sets
-                        .into_iter()
-                        .find(|r| r.op_type == "RegisterAgentActivity")
-                        .unwrap()
-                        .receipts
-                        .len() == holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE as usize;
-
-                    if receipt_sets_len && receipt_sets_complete && agent_activity_receipt_set {
-                        // Test Passed!
-                        return;
-                    }
-
-                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-                }
+            let receipt_sets_len = receipt_sets.len() == 3;
+            let receipt_sets_complete = receipt_sets.iter().all(|r| r.receipts_complete);
+            let agent_activity_receipt_set = match receipt_sets
+                .into_iter()
+                .find(|r| r.op_type == "RegisterAgentActivity")
+            {
+                None => 0,
+                Some(r) => r.receipts.len(),
             }
-        },
-    ).await.unwrap();
+                == holochain::core::workflow::publish_dht_ops_workflow::DEFAULT_RECEIPT_BUNDLE_SIZE
+                    as usize;
+
+            if receipt_sets_len && receipt_sets_complete && agent_activity_receipt_set {
+                // Test Passed!
+                return;
+            }
+
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
 }
