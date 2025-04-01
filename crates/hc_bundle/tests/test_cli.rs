@@ -331,6 +331,26 @@ fn test_default_dna_manifest_matches_schema() {
 }
 
 #[test]
+#[cfg(feature = "unstable-migration")]
+fn test_default_dna_manifest_matches_schema() {
+    let default_manifest = DnaManifest::current(
+        "test-dna".to_string(),
+        Some("00000000-0000-0000-0000-000000000000".to_string()),
+        None,
+        Timestamp::now().into(),
+        vec![],
+        vec![],
+        vec![],
+    );
+
+    let default_manifest: Value =
+        serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+
+    let schema = load_schema("dna-manifest-unstable-migration");
+    validate_schema(&schema, &default_manifest, "default manifest");
+}
+
+#[test]
 fn test_all_app_manifests_match_schema() {
     let schema = load_schema("happ-manifest");
 
