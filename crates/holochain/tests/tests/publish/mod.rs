@@ -37,36 +37,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
         c.declare_full_storage_arcs(apps[0].dna_hash()).await;
     }
 
-    // wait for all our conductors to see each other
-    tokio::time::timeout(std::time::Duration::from_secs(60), async {
-        loop {
-            let mut all_good = true;
-
-            for c in conductors.iter() {
-                if c.holochain_p2p()
-                    .peer_store(apps[0].dna_hash().clone())
-                    .await
-                    .unwrap()
-                    .get_all()
-                    .await
-                    .unwrap()
-                    .len()
-                    < 6
-                {
-                    all_good = false;
-                    break;
-                }
-            }
-
-            if all_good {
-                break;
-            }
-
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        }
-    })
-    .await
-    .unwrap();
+    conductors.exchange_peer_info().await;
 
     // write an action
     let action_hash: ActionHash = conductors[0]
