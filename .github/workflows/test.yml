@@ -30,7 +30,7 @@ jobs:
       - name: cmake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: '3.5.x'
+          cmake-version: '3.31.x'
 
       - name: static-fmt
         run: make static-fmt
