@@ -35,7 +35,7 @@ pub fn create_post(post: Post) -> ExternResult<Record> {
         LinkTypes::AllPosts,
         (),
     )?;
-    let my_agent_pub_key = agent_info()?.agent_latest_pubkey;
+    let my_agent_pub_key = agent_info()?.agent_initial_pubkey;
     create_link(
         my_agent_pub_key,
         post_hash.clone(),
