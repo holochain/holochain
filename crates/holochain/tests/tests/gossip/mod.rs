@@ -14,7 +14,6 @@ use holochain_zome_types::record::Record;
 
 /// Test that conductors with arcs clamped to zero do not gossip.
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn get_with_zero_arc_2_way() {
     holochain_trace::test_run();
 
