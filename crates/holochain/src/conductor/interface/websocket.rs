@@ -494,6 +494,7 @@ mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::retry_until_timeout;
     use crate::sweettest::websocket_client_by_port;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
@@ -1239,7 +1240,6 @@ mod test {
     /// Check that we can add and get agent info for a conductor
     /// across the admin websocket.
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "flaky: no agents found in store"]
     async fn add_agent_info_via_admin() {
         holochain_trace::test_run();
         let mut conductor = SweetConductor::from_standard_config().await;
@@ -1247,7 +1247,22 @@ mod test {
         let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentInfo])
             .await
             .0;
-        let app = conductor.setup_app("1", &[dna_file]).await.unwrap();
+        let app = conductor.setup_app("1", &[dna_file.clone()]).await.unwrap();
+        // Await agent to be added to peer store.
+        retry_until_timeout!({
+            if conductor
+                .holochain_p2p()
+                .peer_store(dna_file.dna_hash().clone())
+                .await
+                .unwrap()
+                .get(app.agent().to_k2_agent())
+                .await
+                .unwrap()
+                .is_some()
+            {
+                break;
+            }
+        });
 
         // Request all infos
         let req = AdminRequest::AgentInfo { cell_id: None };
