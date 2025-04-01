@@ -27,6 +27,11 @@ jobs:
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
+      - name: cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.5.x'
+
       - name: static-fmt
         run: make static-fmt
 
