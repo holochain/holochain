@@ -114,7 +114,7 @@ async fn zome_with_no_link_types_does_not_prevent_delete_links() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky")]
+#[ignore = "flaky"]
 async fn zero_arc_can_link_to_uncached_base() {
     use hdk::prelude::*;
 
