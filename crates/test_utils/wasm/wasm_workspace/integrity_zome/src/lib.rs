@@ -182,8 +182,6 @@ pub mod test {
                     modifiers: DnaModifiers {
                         network_seed: String::new(),
                         properties: UnsafeBytes::from(vec![]).into(),
-                        origin_time: Timestamp(0),
-                        quantum_time: std::time::Duration::new(0, 0),
                     },
                     zome_names: vec![],
                 })

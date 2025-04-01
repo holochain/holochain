@@ -54,38 +54,3 @@ async fn signature_smoke_test() {
     // TODO should check that the app is running otherwise we don't know if bootstrap was called
     conductor.shutdown().await;
 }
-
-/* @ K2-INTEGRATION @ TODO @
-#[tokio::test(flavor = "multi_thread")]
-async fn agent_info_test() {
-    holochain_trace::test_run();
-    let config = SweetConductorConfig::standard()
-        .tune_network_config(|nc| nc.disable_publish = true)
-        .no_dpki();
-    let mut conductors = SweetConductorBatch::from_config(2, config).await;
-
-    let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("zome", simple_create_read_zome())).await;
-
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    let ((cell_1,), (cell_2,)) = apps.into_tuples();
-    conductors.exchange_peer_info().await;
-
-    let p2p_agents_dbs: Vec<_> = conductors
-        .iter()
-        .filter_map(|c| {
-            c.spaces
-                .get_from_spaces(|s| s.p2p_agents_db.clone())
-                .first()
-                .cloned()
-        })
-        .collect();
-
-    await_consistency(10, [&cell_1, &cell_2]).await.unwrap();
-    assert_eq!(p2p_agents_dbs.len(), 2);
-    for p2p_agents_db in p2p_agents_dbs {
-        let len = p2p_agents_db.p2p_count_agents().await.unwrap();
-        assert_eq!(len, 2);
-    }
-}
-*/

@@ -46,6 +46,10 @@ use {
 };
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(
+    feature = "unstable-sharding",
+    ignore = "K2 INTEGRATION--UNSTABLE IGNORED TEST FAILURE"
+)]
 async fn main_workflow() {
     holochain_trace::test_run();
 

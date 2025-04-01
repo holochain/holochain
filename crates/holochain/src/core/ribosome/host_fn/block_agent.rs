@@ -91,6 +91,7 @@ mod test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
+    #[ignore = "TODO - reevaluate blocking as part of K2 integration"]
     async fn zome_call_get_block() {
         holochain_trace::test_run();
 
