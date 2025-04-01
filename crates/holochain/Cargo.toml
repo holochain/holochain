@@ -311,6 +311,8 @@ chc = [
 unstable-dpki = [
   "holochain_conductor_api/unstable-dpki",
   "holochain_conductor_config/unstable-dpki",
+  "holochain_zome_types/unstable-dpki",
+  "holochain_wasm_test_utils/unstable-dpki",
 ]
 
 # Enables unstable warrants feature.
