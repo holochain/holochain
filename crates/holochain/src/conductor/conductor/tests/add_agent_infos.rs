@@ -1,11 +1,10 @@
-use crate::sweettest::{SweetConductor, SweetDnaFile};
+use crate::{
+    retry_until_timeout,
+    sweettest::{SweetConductor, SweetDnaFile},
+};
 use holochain_wasm_test_utils::TestWasm;
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(
-    target_os = "windows",
-    ignore = "flaky-windows: get agent info from cell peer store returns None for unknown reason"
-)]
 async fn add_agent_infos_to_peer_store() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd])
@@ -16,13 +15,26 @@ async fn add_agent_infos_to_peer_store() {
     assert_eq!(agent_infos, vec![]);
 
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
-    // App with agent has been created, agent should be included.
+
     let cell_id = app.cells()[0].cell_id().clone();
     let cell_peer_store = conductor
         .holochain_p2p
         .peer_store(cell_id.dna_hash().clone())
         .await
         .unwrap();
+    // Await agent to be added to peer store.
+    retry_until_timeout!({
+        if cell_peer_store
+            .get(cell_id.agent_pubkey().to_k2_agent())
+            .await
+            .unwrap()
+            .is_some()
+        {
+            break;
+        }
+    });
+
+    // Agent has been added to peer store.
     let expected_agent_infos = cell_peer_store.get_all().await.unwrap();
     let agent_infos = conductor.get_agent_infos(None).await.unwrap();
     assert_eq!(agent_infos, expected_agent_infos);
