@@ -50,8 +50,7 @@ async fn publish_terminates_after_receiving_required_validation_receipts() {
                     .get_all()
                     .await
                     .unwrap()
-                    .into_iter()
-                    .count()
+                    .len()
                     < 6
                 {
                     all_good = false;
