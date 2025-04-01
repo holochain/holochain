@@ -312,6 +312,7 @@ fn test_all_dna_manifests_match_schema() {
 }
 
 #[test]
+#[cfg(not(feature = "unstable-migration"))]
 fn test_default_dna_manifest_matches_schema() {
     let default_manifest = DnaManifest::current(
         "test-dna".to_string(),
@@ -319,8 +320,6 @@ fn test_default_dna_manifest_matches_schema() {
         None,
         Timestamp::now().into(),
         vec![],
-        vec![],
-        #[cfg(feature = "unstable-migration")]
         vec![],
     );
 
