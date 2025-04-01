@@ -7,9 +7,9 @@ use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
     process::Command,
-    str::FromStr,
-    time::Duration,
 };
+#[cfg(not(feature = "unstable-migration"))]
+use std::{str::FromStr, time::Duration};
 use walkdir::WalkDir;
 
 fn read_app(path: &Path) -> anyhow::Result<AppBundle> {
@@ -160,6 +160,7 @@ async fn test_integrity() {
 
 #[tokio::test]
 #[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
+#[cfg(not(feature = "unstable-migration"))]
 /// Test that a manifest with multiple integrity zomes and dependencies parses
 /// to the correct dna file.
 async fn test_multi_integrity() {
