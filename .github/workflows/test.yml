@@ -27,6 +27,12 @@ jobs:
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
+      # we cannot use cmake 4 until openssl-src is updated
+      - name: cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.x'
+
       - name: static-fmt
         run: make static-fmt
 
@@ -73,6 +79,12 @@ jobs:
 
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
+
+      # we cannot use cmake 4 until openssl-src is updated
+      - name: cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.x'
 
       - name: install build dependencies (macos-latest, wasmer_wamr)
         if: matrix.os == 'macos-latest' && matrix.target == 'wasmer_wamr'
