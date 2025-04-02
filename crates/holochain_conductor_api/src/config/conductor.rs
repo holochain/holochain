@@ -23,10 +23,10 @@
 //! network:
 //!
 //!   ## Use the Holochain-provided dev-test bootstrap server.
-//!   bootstrap_url: https://devtest-bootstrap-1.holochain.org
+//!   bootstrap_url: https://dev-test-bootstrap2.holochain.org
 //!
 //!   ## Use the Holochain-provided dev-test sbd/signalling server.
-//!   signal_url: wss://devtest-sbd-1.holochain.org
+//!   signal_url: wss://dev-test-bootstrap2.holochain.org
 //!
 //!   ## Override the default WebRTC STUN configuration.
 //!   ## This is OPTIONAL. If this is not specified, it will default
