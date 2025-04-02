@@ -42,8 +42,22 @@ pub fn call_stream<R: RibosomeT + 'static, I: Invocation + 'static>(
                     .await;
                 match r {
                     Ok(None) => {}
-                    Ok(Some(result)) => tx.send(Ok((zome.clone(), result))).await?,
-                    Err(e) => tx.send(Err((zome.clone(), e))).await?,
+                    Ok(Some(result)) => {
+                        tracing::info!(
+                            "Got an output from the ribosome while calling {}: {:?}",
+                            to_call,
+                            result
+                        );
+                        tx.send(Ok((zome.clone(), result))).await?
+                    }
+                    Err(e) => {
+                        tracing::info!(
+                            "Got an error from the ribosome while calling {}: {:?}",
+                            to_call,
+                            e
+                        );
+                        tx.send(Err((zome.clone(), e))).await?
+                    }
                 }
             }
         }

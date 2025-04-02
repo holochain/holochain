@@ -38,6 +38,7 @@ impl DeepkeyState {
         let cap_secret = None;
         let zome_name: ZomeName = DEEPKEY_ZOME_NAME.into();
         let fn_name: FunctionName = fn_name.into();
+        tracing::warn!("Calling zome: {} fn: {}", zome_name, fn_name);
         let payload = ExternIO::encode(input)?;
         self.runner
             .call_zome(

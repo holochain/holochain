@@ -1,7 +1,9 @@
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 
 use assert2::{assert, let_assert};
+use hc_deepkey_sdk::{AppBindingInput, CreateKeyInput, DerivationDetailsInput, KeyGeneration, KeyMeta, KeyRegistration};
 use hdk::prelude::{WasmError, WasmErrorInner};
 use holochain::conductor::api::error::ConductorApiError;
 use holochain::conductor::CellError;
@@ -9,7 +11,131 @@ use holochain::core::ribosome::error::RibosomeError;
 use holochain::core::workflow::WorkflowError;
 use holochain::prelude::*;
 use holochain::sweettest::*;
+use holochain_trace::test_run;
 use holochain_wasm_test_utils::TestWasm;
+
+#[tokio::test(flavor = "multi_thread")]
+async fn call_init_dpki() {
+    test_run();
+
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+
+    #[derive(Clone, Debug)]
+    struct ExistingDna {
+        name: RoleName,
+        dna_file: DnaFile,
+    }
+
+    impl ExistingDna {
+        pub async fn new(path: PathBuf) -> anyhow::Result<Self> {
+            let name = path.file_name().unwrap().to_str().unwrap().split(".").next().unwrap().into();
+            let bundle = DnaBundle::read_from_file(&path).await?;
+            let file = bundle.into_dna_file(DnaModifiersOpt::default()).await?;
+            Ok(Self {
+                name,
+                dna_file: file.0,
+            })
+        }
+    }
+
+    impl DnaWithRole for ExistingDna {
+        fn role(&self) -> RoleName {
+            self.name.clone()
+        }
+
+        fn dna(&self) -> &DnaFile {
+            &self.dna_file
+        }
+
+        fn into_dna(self) -> DnaFile {
+            self.dna_file
+        }
+    }
+
+    let app = conductor
+        .setup_app("my-dpki", [&ExistingDna::new("/home/thetasinner/source/holo/deepkey/dnas/deepkey/deepkey.dna".into()).await.unwrap()])
+        .await
+        .unwrap();
+
+    let dpki_agent = app.agent();
+
+    // This is the signature Deepkey requires
+    let signature = dpki_agent
+        .sign_raw(&conductor.keystore(), dpki_agent.get_raw_39().into())
+        .await
+        .unwrap();
+
+    conductor.easy_call_zome::<_, (ActionHash, KeyRegistration, KeyMeta), _>(
+        app.agent(),
+        None,
+        app.cells().first().unwrap().cell_id().clone(),
+        "deepkey",
+        "create_key",
+        CreateKeyInput {
+            key_generation: KeyGeneration::new(dpki_agent.clone(), signature),
+            app_binding: AppBindingInput {
+                app_name: app.installed_app_id().clone(),
+                installed_app_id: app.installed_app_id().clone(),
+                dna_hashes: app.cells().iter().map(|cell| cell.dna_hash().clone()).collect(),
+                metadata: Default::default(),
+            },
+            derivation_details: Some(DerivationDetailsInput {
+                app_index: 0,
+                key_index: 0,
+                derivation_bytes: vec![0; 32],
+                derivation_seed: vec![0; 32],
+            }),
+            create_only: false,
+        }
+    ).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn call_init_own_wasm() {
+    test_run();
+
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::InitPass]).await;
+    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+
+    let (cell,) = app.clone().into_tuple();
+    let zome = cell.zome(TestWasm::InitPass);
+
+    conductor.easy_call_zome::<_, InitCallbackResult, _>(
+        app.agent(),
+        None,
+        app.cells().first().unwrap().cell_id().clone(),
+        zome.name().clone(),
+        "init",
+        ()
+    ).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn call_other_fn_own_wam() {
+    test_run();
+
+    let config = SweetConductorConfig::standard().no_dpki();
+    let mut conductor = SweetConductor::from_config(config).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::InitPass]).await;
+    let app = conductor.setup_app("app", &[dna]).await.unwrap();
+
+    let (cell,) = app.clone().into_tuple();
+    let zome = cell.zome(TestWasm::InitPass);
+
+    conductor.easy_call_zome::<_, InitCallbackResult, _>(
+        app.agent(),
+        None,
+        app.cells().first().unwrap().cell_id().clone(),
+        zome.name().clone(),
+        "other_fn",
+        ()
+    ).await.unwrap();
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_in_inline_zomes_passes() {

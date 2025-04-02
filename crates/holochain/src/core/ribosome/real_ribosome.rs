@@ -694,11 +694,13 @@ impl RealRibosome {
 
         let mut store_lock = instance_with_store.store.lock();
         let mut store_mut = store_lock.as_store_mut();
+        tracing::warn!("Calling {}/{} with: {input:?}", zome.name, fn_name);
         let result =
             holochain_wasmer_host::guest::call(&mut store_mut, instance, fn_name.as_ref(), input);
         if let Err(runtime_error) = &result {
             tracing::error!(?runtime_error, ?zome, ?fn_name);
         }
+        tracing::warn!("Got response for {}/{}: {result:?}", zome.name, fn_name);
 
         Ok(result?)
     }
@@ -767,7 +769,10 @@ macro_rules! do_callback {
                     let wasm_error: WasmError = runtime_error.downcast()?;
                     if let WasmErrorInner::Deserialize(_) = wasm_error.error {
                         // Error returned when callback called via ribosome with invalid parameters
-                        return Err(RibosomeError::CallbackInvalidParameters(String::default()));
+                        return Err(RibosomeError::CallbackInvalidParameters(format!(
+                            "Not a valid {}",
+                            std::any::type_name::<$callback_result>()
+                        )));
                     }
 
                     (

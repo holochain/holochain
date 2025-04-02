@@ -14,6 +14,8 @@ pub fn dna_info_2(
     call_context: Arc<CallContext>,
     _input: (),
 ) -> Result<DnaInfoV2, RuntimeError> {
+    tracing::info!("Getting DNA info v2");
+
     match HostFnAccess::from(&call_context.host_context()) {
         HostFnAccess {
             bindings_deterministic: Permission::Allow,
