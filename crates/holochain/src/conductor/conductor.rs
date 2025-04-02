@@ -2134,12 +2134,6 @@ mod app_impls {
 
 /// Methods related to cell access
 mod cell_impls {
-    #[cfg(feature = "unstable-migration")]
-    use std::collections::BTreeSet;
-
-    #[cfg(feature = "unstable-migration")]
-    use holochain_conductor_api::CompatibleCells;
-
     use super::*;
 
     impl Conductor {
@@ -2186,8 +2180,9 @@ mod cell_impls {
         pub async fn cells_by_dna_lineage(
             &self,
             dna_hash: &DnaHash,
-        ) -> ConductorResult<CompatibleCells> {
+        ) -> ConductorResult<holochain_conductor_api::CompatibleCells> {
             // TODO: OPTIMIZE: cache the DNA lineages
+            use std::collections::BTreeSet;
             Ok(self
                 .get_state()
                 .await?
