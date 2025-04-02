@@ -111,7 +111,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore "flaky"]
+    #[ignore = "flaky"]
     async fn unlock_timeout_session() {
         holochain_trace::test_run();
 
