@@ -753,39 +753,6 @@ impl SweetConductor {
         all.iter().all(|(_, v)| v.len() >= conductor_count)
     }
 
-    /*
-    /// Drop the specified agent keys from each conductor's peer table
-    pub async fn forget_peer_info(
-        conductors: impl IntoIterator<Item = &Self>,
-        agents_to_forget: impl IntoIterator<Item = &AgentPubKey>,
-    ) {
-        let mut all = Vec::new();
-        for c in conductors.into_iter() {
-            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                all.push(env.clone());
-            }
-        }
-
-        crate::conductor::p2p_agent_store::forget_peer_info(all, agents_to_forget).await;
-    }
-
-    /// Let each conductor know about each others' agents so they can do networking
-    pub async fn exchange_peer_info_sampled(
-        conductors: impl IntoIterator<Item = &Self>,
-        rng: &mut StdRng,
-        s: usize,
-    ) {
-        let mut all = Vec::new();
-        for c in conductors.into_iter() {
-            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                all.push(env.clone());
-            }
-        }
-        let connectivity = covering(rng, all.len(), s);
-        crate::conductor::p2p_agent_store::exchange_peer_info_sparse(all, connectivity).await;
-    }
-    */
-
     /// Wait for at least one gossip round to have completed for the given cell
     ///
     /// Note that this is really a crutch. If gossip starts fast enough then this is unnecessary
