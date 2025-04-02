@@ -257,18 +257,18 @@ pub async fn attach_app_interface(client: &WebsocketSender, port: Option<u16>) -
     }
 }
 
-pub async fn retry_admin_interface(
+pub async fn retry_websocket_client_by_port(
     port: u16,
     mut attempts: usize,
     delay: Duration,
-) -> WebsocketSender {
+) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
     loop {
         match websocket_client_by_port(port).await {
-            Ok(c) => return c.0,
+            Ok(c) => return Ok(c),
             Err(e) => {
                 attempts -= 1;
                 if attempts == 0 {
-                    panic!("Failed to join admin interface");
+                    return Err(e);
                 }
                 warn!(
                     "Failed with {:?} to open admin interface, trying {} more times",
