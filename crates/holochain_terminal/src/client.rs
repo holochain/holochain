@@ -141,8 +141,6 @@ impl AdminClient {
             self.attach_app_interface(0).await?
         };
 
-        println!("Selected port {}", app_port);
-
         let app_addr = (self.addr.ip(), app_port).into();
 
         let issue_token_response = self
@@ -156,16 +154,12 @@ impl AdminClient {
             _ => anyhow::bail!("Unexpected response {:?}", issue_token_response),
         };
 
-        println!("Ready to connect app client");
-
         AppClient::connect(app_addr, token).await
     }
 
     async fn list_app_interfaces(&mut self) -> anyhow::Result<Vec<AppInterfaceInfo>> {
         let msg = AdminRequest::ListAppInterfaces;
-        println!("Sending {:?}", msg);
         let response = self.send(msg).await?;
-        println!("Got response {:?}", response);
         match response {
             AdminResponse::AppInterfacesListed(interfaces) => Ok(interfaces),
             _ => unreachable!("Unexpected response {:?}", response),
