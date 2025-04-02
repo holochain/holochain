@@ -86,7 +86,6 @@ use crate::conductor::conductor::app_auth_token_store::AppAuthTokenStore;
 use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
-//use crate::conductor::metrics::create_p2p_event_duration_metric;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueConsumerMap;
 #[cfg(any(test, feature = "test_utils"))]

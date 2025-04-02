@@ -231,41 +231,6 @@ impl SweetConductorBatch {
         .expect("Timeout while exchanging peer info");
     }
 
-    /*
-    /// Let each conductor know about each other's agents so they can do networking
-    pub async fn forget_peer_info(&self, agents_to_forget: impl IntoIterator<Item = &AgentPubKey>) {
-        SweetConductor::forget_peer_info(&self.0, agents_to_forget).await
-    }
-
-    /// Let each conductor know about each other's agents so they can do networking
-    pub async fn exchange_peer_info_sampled(&self, rng: &mut StdRng, s: usize) {
-        SweetConductor::exchange_peer_info_sampled(&self.0, rng, s).await
-    }
-
-    /// Let a conductor know about all agents on some other conductor.
-    pub async fn reveal_peer_info(&self, observer: usize, seen: usize) {
-        let observer_conductor = &self.0[observer];
-        let mut observer_envs = Vec::new();
-        for env in observer_conductor
-            .spaces
-            .get_from_spaces(|s| s.p2p_agents_db.clone())
-        {
-            observer_envs.push(env.clone());
-        }
-
-        let seen_conductor = &self.0[seen];
-        let mut seen_envs = Vec::new();
-        for env in seen_conductor
-            .spaces
-            .get_from_spaces(|s| s.p2p_agents_db.clone())
-        {
-            seen_envs.push(env.clone());
-        }
-
-        crate::conductor::p2p_agent_store::reveal_peer_info(observer_envs, seen_envs).await;
-    }
-    */
-
     /// Get the DPKI cell for each conductor, if applicable
     pub fn dpki_cells(&self) -> Vec<SweetCell> {
         self.0.iter().filter_map(|c| c.dpki_cell()).collect()

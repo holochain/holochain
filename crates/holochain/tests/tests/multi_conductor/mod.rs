@@ -1,12 +1,10 @@
 use hdk::prelude::*;
-use std::collections::HashMap;
-//use holochain::conductor::config::{ConductorConfig, DpkiConfig};
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::*;
-//use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_types::network::Kitsune2NetworkMetricsRequest;
+use std::collections::HashMap;
 use unwrap_to::unwrap_to;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
