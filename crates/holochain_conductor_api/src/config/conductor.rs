@@ -366,7 +366,14 @@ impl NetworkConfig {
                 serde_json::Value::String(self.signal_url.as_str().into()),
             )?;
 
-            // TODO nowhere to put the webrtc config in K2 yet!
+            if let Some(webrtc_config) = &self.webrtc_config {
+                Self::insert_module_config(
+                    module_config,
+                    "tx5Transport",
+                    "webrtcConfig",
+                    webrtc_config.clone(),
+                )?;
+            }
         } else {
             return Err(ConductorConfigError::InvalidNetworkConfig(
                 "advanced field must be an object".to_string(),
