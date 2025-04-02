@@ -57,6 +57,7 @@ pub struct HolochainP2pConfig {
     /// If true, will disable the default bootstrap module.
     ///
     /// This flag is only used when [HolochainP2pConfig::k2_test_builder] is true.
+    #[cfg(feature = "test_utils")]
     pub disable_bootstrap: bool,
 
     /// If true, will replace the default publish module with a no-op module.
