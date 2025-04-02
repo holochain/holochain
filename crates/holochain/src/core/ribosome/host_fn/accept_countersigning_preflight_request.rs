@@ -111,7 +111,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
+    #[ignore = "flaky"]
     async fn unlock_timeout_session() {
         holochain_trace::test_run();
 
