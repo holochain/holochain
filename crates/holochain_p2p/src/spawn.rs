@@ -54,6 +54,11 @@ pub struct HolochainP2pConfig {
     #[cfg(feature = "test_utils")]
     pub k2_test_builder: bool,
 
+    /// If true, will disable the default bootstrap module.
+    ///
+    /// This flag is only used when [HolochainP2pConfig::k2_test_builder] is true.
+    pub disable_bootstrap: bool,
+
     /// If true, will replace the default publish module with a no-op module.
     ///
     /// This flag is only used when [HolochainP2pConfig::k2_test_builder] is true.
@@ -80,6 +85,7 @@ impl std::fmt::Debug for HolochainP2pConfig {
         #[cfg(feature = "test_utils")]
         {
             dbg.field("k2_test_builder", &self.k2_test_builder)
+                .field("disable_bootstrap", &self.disable_bootstrap)
                 .field("disable_publish", &self.disable_publish)
                 .field("disable_gossip", &self.disable_gossip);
         }
@@ -98,6 +104,8 @@ impl Default for HolochainP2pConfig {
             compat: Default::default(),
             #[cfg(feature = "test_utils")]
             k2_test_builder: false,
+            #[cfg(feature = "test_utils")]
+            disable_bootstrap: false,
             #[cfg(feature = "test_utils")]
             disable_publish: false,
             #[cfg(feature = "test_utils")]
