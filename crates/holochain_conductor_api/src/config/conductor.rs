@@ -235,6 +235,11 @@ pub struct NetworkConfig {
     /// Use only if you know what you are doing!
     pub advanced: Option<serde_json::Value>,
 
+    /// Disable the bootstrap module.
+    #[cfg(feature = "test-utils")]
+    #[serde(default)]
+    pub disable_bootstrap: bool,
+
     /// Disable Kitsune publish.
     #[cfg(feature = "test-utils")]
     #[serde(default)]
@@ -259,6 +264,8 @@ impl Default for NetworkConfig {
             webrtc_config: None,
             target_arc_factor: 1,
             advanced: None,
+            #[cfg(feature = "test-utils")]
+            disable_bootstrap: false,
             #[cfg(feature = "test-utils")]
             disable_publish: false,
             #[cfg(feature = "test-utils")]
@@ -466,6 +473,12 @@ pub struct ConductorTuningParams {
     ///
     /// Default: 5 minutes
     pub min_publish_interval: Option<std::time::Duration>,
+    /// How often the publish workflow should be triggered.
+    ///
+    /// This should only be set in tests and will not be respected in production.
+    ///
+    /// Default: None
+    pub publish_trigger_interval: Option<std::time::Duration>,
 }
 
 impl ConductorTuningParams {
@@ -476,6 +489,7 @@ impl ConductorTuningParams {
             countersigning_resolution_retry_delay: None,
             countersigning_resolution_retry_limit: None,
             min_publish_interval: None,
+            publish_trigger_interval: None,
         }
     }
 
@@ -507,6 +521,7 @@ impl Default for ConductorTuningParams {
                 empty.countersigning_resolution_retry_delay(),
             ),
             countersigning_resolution_retry_limit: None,
+            publish_trigger_interval: None,
             min_publish_interval: None,
         }
     }

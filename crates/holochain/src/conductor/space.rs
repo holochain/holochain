@@ -17,6 +17,7 @@ use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::paths::DatabasesRootPath;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
+use holochain_p2p::actor::DynHcP2p;
 use holochain_sqlite::prelude::{
     DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindWasm,
     DbSyncLevel, DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
@@ -196,6 +197,9 @@ impl Spaces {
 
     /// Block some target.
     pub async fn block(&self, input: Block) -> DatabaseResult<()> {
+        tracing::warn!(
+            "Creating block, but this is currently not being respected by holochain_p2p!"
+        );
         holochain_state::block::block(&self.conductor_db, input).await
     }
 
@@ -206,36 +210,42 @@ impl Spaces {
 
     async fn node_agents_in_spaces(
         &self,
-        _node_id: &str,
-        _dnas: Vec<DnaHash>,
-    ) -> DatabaseResult<Vec<CellId>> {
-        todo!()
-        /*
-        let mut agent_lists: Vec<Vec<AgentInfoSigned>> = vec![];
+        node_id: &str,
+        dnas: Vec<DnaHash>,
+        holochain_p2p: DynHcP2p,
+    ) -> ConductorResult<Vec<CellId>> {
+        let mut agents = Vec::new();
         for dna in dnas {
-            // @todo join_all for these awaits
-            agent_lists.push(self.p2p_agents_db(&dna)?.p2p_list_agents().await?);
+            let dna_agents = holochain_p2p
+                .peer_store(dna)
+                .await?
+                .get_all()
+                .await
+                .map_err(ConductorError::other)?;
+
+            agents.extend(dna_agents);
         }
 
-        Ok(agent_lists
+        Ok(agents
             .into_iter()
-            .flatten()
-            .filter(|agent| {
-                agent.url_list.iter().any(|url| {
-                    kitsune_p2p_types::tx_utils::ProxyUrl::from(url.as_str())
-                        .digest()
-                        .map(|u| u.0 == *node_id)
-                        .unwrap_or(false)
-                })
-            })
-            .map(|agent_info| {
-                CellId::new(
-                    DnaHash::from_kitsune(&agent_info.space),
-                    AgentPubKey::from_kitsune(&agent_info.agent),
-                )
+            .filter_map(|agent| {
+                let is_matching_node_id = agent
+                    .url
+                    .as_ref()
+                    .and_then(|url| url.peer_id())
+                    .map(|peer_id| peer_id == node_id)
+                    .unwrap_or_default();
+
+                if is_matching_node_id {
+                    Some(CellId::new(
+                        DnaHash::from_k2_space(&agent.space),
+                        AgentPubKey::from_k2_agent(&agent.agent),
+                    ))
+                } else {
+                    None
+                }
             })
             .collect())
-        */
     }
 
     /// Check if some target is blocked.
@@ -243,11 +253,12 @@ impl Spaces {
         &self,
         target_id: BlockTargetId,
         timestamp: Timestamp,
-    ) -> DatabaseResult<bool> {
+        holochain_p2p: DynHcP2p,
+    ) -> ConductorResult<bool> {
         let cell_ids = match &target_id {
             BlockTargetId::Cell(cell_id) => vec![cell_id.to_owned()],
             BlockTargetId::NodeDna(node_id, dna_hash) => {
-                self.node_agents_in_spaces(node_id, vec![dna_hash.clone()])
+                self.node_agents_in_spaces(node_id, vec![dna_hash.clone()], holochain_p2p)
                     .await?
             }
             BlockTargetId::Node(node_id) => {
@@ -255,6 +266,7 @@ impl Spaces {
                     node_id,
                     self.map
                         .share_ref(|m| m.keys().cloned().collect::<Vec<DnaHash>>()),
+                    holochain_p2p,
                 )
                 .await?
             }
