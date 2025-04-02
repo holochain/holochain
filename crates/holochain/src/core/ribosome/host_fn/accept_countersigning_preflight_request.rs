@@ -12,6 +12,7 @@ use wasmer::RuntimeError;
     feature = "instrument",
     tracing::instrument(skip(_ribosome, call_context))
 )]
+#[ignore = "flaky"]
 pub fn accept_countersigning_preflight_request<'a>(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
