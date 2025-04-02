@@ -22,30 +22,20 @@
 //! ## Configure the network.
 //! network:
 //!
-//!   ## Use the Holo-provided default production bootstrap server.
-//!   bootstrap_service: https://bootstrap.holo.host
+//!   ## Use the Holochain-provided dev-test bootstrap server.
+//!   bootstrap_url: https://dev-test-bootstrap2.holochain.org
 //!
-//!   ## This currently has no effect on functionality but is required. Please just include as-is for now.
-//!   network_type: quic_bootstrap
+//!   ## Use the Holochain-provided dev-test sbd/signalling server.
+//!   signal_url: wss://dev-test-bootstrap2.holochain.org
 //!
-//!   ## Setup a specific network configuration.
-//!   transport_pool:
-//!     ## Use WebRTC, which is the only option for now.
-//!     - type: webrtc
-//!
-//!       ## Use the Holo-provided default production sbd (signal) server.
-//!       ## `signal_url` is REQUIRED.
-//!       signal_url: wss://sbd-0.main.infra.holo.host
-//!
-//!       ## Override the default WebRTC STUN configuration.
-//!       ## This is OPTIONAL. If this is not specified, it will default
-//!       ## to what you can see here:
-//!       webrtc_config: {
-//!         "iceServers": [
-//!           { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
-//!           { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
-//!         ]
-//!       }
+//!   ## Override the default WebRTC STUN configuration.
+//!   ## This is OPTIONAL. If this is not specified, it will default
+//!   ## to what you can see here:
+//!   webrtc_config: {
+//!     "iceServers": [
+//!       { "urls": ["stun:devtest-stun-1.holochain.org:443"] }
+//!     ]
+//!   }
 //! "#;
 //!
 //!use holochain_conductor_api::conductor::ConductorConfig;
@@ -55,7 +45,6 @@
 
 use crate::conductor::process::ERROR_CODE;
 use holochain_types::prelude::DbSyncStrategy;
-use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams};
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -82,7 +71,6 @@ use std::path::Path;
 
 use crate::config::conductor::paths::DataRootPath;
 
-// TODO change types from "stringly typed" to Url2
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default, JsonSchema)]
 pub struct ConductorConfig {
@@ -128,7 +116,7 @@ pub struct ConductorConfig {
 
     /// Optional config for the network module.
     #[serde(default)]
-    pub network: KitsuneP2pConfig,
+    pub network: NetworkConfig,
 
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
@@ -151,6 +139,9 @@ pub struct ConductorConfig {
     /// Tuning parameters to adjust the behaviour of the conductor.
     #[serde(default)]
     pub tuning_params: Option<ConductorTuningParams>,
+
+    /// Tracing scope.
+    pub tracing_scope: Option<String>,
 }
 
 /// Helper function to load a config from a YAML string.
@@ -173,14 +164,9 @@ impl ConductorConfig {
         config_from_yaml(&config_yaml)
     }
 
-    /// Get tuning params for this config (default if not set)
-    pub fn kitsune_tuning_params(&self) -> KitsuneP2pTuningParams {
-        self.network.tuning_params.clone()
-    }
-
-    /// Get the tracing scope from the network config
+    /// Get the tracing scope from the conductor config.
     pub fn tracing_scope(&self) -> Option<String> {
-        self.network.tracing_scope.clone()
+        self.tracing_scope.clone()
     }
 
     /// Get the data directory for this config or say something nice and die.
@@ -207,7 +193,257 @@ impl ConductorConfig {
 
     /// Check if the config is set to use a rendezvous bootstrap server
     pub fn has_rendezvous_bootstrap(&self) -> bool {
-        self.network.bootstrap_service == Some(url2::url2!("rendezvous:"))
+        self.network.bootstrap_url == url2::url2!("rendezvous:")
+    }
+}
+
+#[inline(always)]
+fn one() -> u32 {
+    1
+}
+
+#[cfg(feature = "test-utils")]
+fn default_mem_bootstrap() -> bool {
+    true
+}
+
+/// All the network config information for the conductor.
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub struct NetworkConfig {
+    /// The Kitsune2 bootstrap server to use for WAN discovery.
+    #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
+    pub bootstrap_url: url2::Url2,
+
+    /// The Kitsune2 sbd server to use for webrtc signalling.
+    #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
+    pub signal_url: url2::Url2,
+
+    /// The Kitsune2 webrtc_config to use for connecting to peers.
+    pub webrtc_config: Option<serde_json::Value>,
+
+    /// The target arc factor to apply when receiving hints from kitsune2.
+    /// In normal operation, leave this as the default 1.
+    /// For leacher nodes that do not contribute to gossip, set to zero.
+    /// To take on additional gossip burden, set to > 1.
+    #[serde(default = "one")]
+    pub target_arc_factor: u32,
+
+    /// Use this advanced field to directly configure kitsune2.
+    ///
+    /// The above options actually just set specific values in this config.
+    /// Use only if you know what you are doing!
+    pub advanced: Option<serde_json::Value>,
+
+    /// Disable the bootstrap module.
+    #[cfg(feature = "test-utils")]
+    #[serde(default)]
+    pub disable_bootstrap: bool,
+
+    /// Disable Kitsune publish.
+    #[cfg(feature = "test-utils")]
+    #[serde(default)]
+    pub disable_publish: bool,
+
+    /// Disable Kitsune gossip.
+    #[cfg(feature = "test-utils")]
+    #[serde(default)]
+    pub disable_gossip: bool,
+
+    /// Use the in-memory bootstrap module instead of the real one.
+    #[cfg(feature = "test-utils")]
+    #[serde(default = "default_mem_bootstrap")]
+    pub mem_bootstrap: bool,
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
+            signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
+            webrtc_config: None,
+            target_arc_factor: 1,
+            advanced: None,
+            #[cfg(feature = "test-utils")]
+            disable_bootstrap: false,
+            #[cfg(feature = "test-utils")]
+            disable_publish: false,
+            #[cfg(feature = "test-utils")]
+            disable_gossip: false,
+            #[cfg(feature = "test-utils")]
+            mem_bootstrap: true,
+        }
+    }
+}
+
+impl NetworkConfig {
+    /// Set the gossip interval.
+    #[cfg(feature = "test-utils")]
+    pub fn with_gossip_initiate_interval_ms(mut self, initiate_interval_ms: u32) -> Self {
+        self.insert_into_config(|module_config| {
+            Self::insert_module_config(
+                module_config,
+                "k2Gossip",
+                "initiateIntervalMs",
+                serde_json::Value::Number(serde_json::Number::from(initiate_interval_ms)),
+            )?;
+
+            Ok(())
+        })
+        .unwrap();
+
+        self
+    }
+
+    /// Set the gossip initiate jitter.
+    #[cfg(feature = "test-utils")]
+    pub fn with_gossip_initiate_jitter_ms(mut self, initiate_jitter_ms: u32) -> Self {
+        self.insert_into_config(|module_config| {
+            Self::insert_module_config(
+                module_config,
+                "k2Gossip",
+                "initiateJitterMs",
+                serde_json::Value::Number(serde_json::Number::from(initiate_jitter_ms)),
+            )?;
+
+            Ok(())
+        })
+        .unwrap();
+
+        self
+    }
+
+    /// Set the gossip min initiate interval.
+    #[cfg(feature = "test-utils")]
+    pub fn with_gossip_min_initiate_interval_ms(mut self, min_initiate_interval_ms: u32) -> Self {
+        self.insert_into_config(|module_config| {
+            Self::insert_module_config(
+                module_config,
+                "k2Gossip",
+                "minInitiateIntervalMs",
+                serde_json::Value::Number(serde_json::Number::from(min_initiate_interval_ms)),
+            )?;
+
+            Ok(())
+        })
+        .unwrap();
+
+        self
+    }
+
+    /// Set the gossip round timeout.
+    #[cfg(feature = "test-utils")]
+    pub fn with_gossip_round_timeout_ms(mut self, round_timeout_ms: u32) -> Self {
+        self.insert_into_config(|module_config| {
+            Self::insert_module_config(
+                module_config,
+                "k2Gossip",
+                "roundTimeoutMs",
+                serde_json::Value::Number(serde_json::Number::from(round_timeout_ms)),
+            )?;
+
+            Ok(())
+        })
+        .unwrap();
+
+        self
+    }
+
+    /// Convert the network config to a K2 config object.
+    ///
+    /// Values that are set directly on the network config are merged into the [`NetworkConfig::advanced`] field.
+    pub fn to_k2_config(&self) -> ConductorConfigResult<serde_json::Value> {
+        let mut working = self
+            .advanced
+            .clone()
+            .unwrap_or_else(|| serde_json::Value::Object(Default::default()));
+
+        if let Some(module_config) = working.as_object_mut() {
+            Self::insert_module_config(
+                module_config,
+                "coreBootstrap",
+                "serverUrl",
+                serde_json::Value::String(self.bootstrap_url.as_str().into()),
+            )?;
+
+            Self::insert_module_config(
+                module_config,
+                "tx5Transport",
+                "serverUrl",
+                serde_json::Value::String(self.signal_url.as_str().into()),
+            )?;
+
+            if let Some(webrtc_config) = &self.webrtc_config {
+                Self::insert_module_config(
+                    module_config,
+                    "tx5Transport",
+                    "webrtcConfig",
+                    webrtc_config.clone(),
+                )?;
+            }
+        } else {
+            return Err(ConductorConfigError::InvalidNetworkConfig(
+                "advanced field must be an object".to_string(),
+            ));
+        }
+
+        Ok(working)
+    }
+
+    #[cfg(feature = "test-utils")]
+    fn insert_into_config(
+        &mut self,
+        mutator: impl Fn(&mut serde_json::Map<String, serde_json::Value>) -> ConductorConfigResult<()>,
+    ) -> ConductorConfigResult<()> {
+        if self.advanced.is_none() {
+            self.advanced = Some(serde_json::Value::Object(Default::default()));
+        }
+
+        if let Some(module_config) = self
+            .advanced
+            .as_mut()
+            .expect("Just checked")
+            .as_object_mut()
+        {
+            mutator(module_config)?;
+        }
+
+        Ok(())
+    }
+
+    // Helper function for injecting a key-value pair into a module's configuration
+    fn insert_module_config(
+        module_config: &mut serde_json::Map<String, serde_json::Value>,
+        module: &str,
+        key: &str,
+        value: serde_json::Value,
+    ) -> ConductorConfigResult<()> {
+        if let Some(module_config) = module_config.get_mut(module) {
+            if let Some(module_config) = module_config.as_object_mut() {
+                if module_config.contains_key(key) {
+                    tracing::warn!("The {} module configuration contains a '{}' field, which is being overwritten", module, key);
+                }
+
+                // The config for this module exists and is an object, insert the key-value pair
+                module_config.insert(key.into(), value);
+            } else {
+                // The configuration for this module exists, but isn't an object
+                return Err(ConductorConfigError::InvalidNetworkConfig(format!(
+                    "advanced.{} field must be an object",
+                    module
+                )));
+            }
+        } else {
+            // The config for this module isn't set at all, so we need to insert it
+            module_config.insert(
+                module.into(),
+                serde_json::json!({
+                    key: value,
+                }),
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -244,6 +480,12 @@ pub struct ConductorTuningParams {
     ///
     /// Default: 5 minutes
     pub min_publish_interval: Option<std::time::Duration>,
+    /// How often the publish workflow should be triggered.
+    ///
+    /// This should only be set in tests and will not be respected in production.
+    ///
+    /// Default: None
+    pub publish_trigger_interval: Option<std::time::Duration>,
 }
 
 impl ConductorTuningParams {
@@ -254,6 +496,7 @@ impl ConductorTuningParams {
             countersigning_resolution_retry_delay: None,
             countersigning_resolution_retry_limit: None,
             min_publish_interval: None,
+            publish_trigger_interval: None,
         }
     }
 
@@ -285,6 +528,7 @@ impl Default for ConductorTuningParams {
                 empty.countersigning_resolution_retry_delay(),
             ),
             countersigning_resolution_retry_limit: None,
+            publish_trigger_interval: None,
             min_publish_interval: None,
         }
     }
@@ -294,7 +538,6 @@ impl Default for ConductorTuningParams {
 mod tests {
     use super::*;
     use holochain_types::websocket::AllowedOrigins;
-    use kitsune_p2p_types::config::TransportConfig;
     use matches::assert_matches;
     use std::path::Path;
     use std::path::PathBuf;
@@ -321,9 +564,6 @@ mod tests {
     fn test_config_complete_minimal_config() {
         let yaml = r#"---
     data_root_path: /path/to/env
-    network:
-      transport_pool:
-        - type: mem
     keystore:
       type: danger_test_keystore
     "#;
@@ -335,7 +575,7 @@ mod tests {
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
-                network: KitsuneP2pConfig::mem(),
+                network: NetworkConfig::default(),
                 dpki: DpkiConfig::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
@@ -343,6 +583,7 @@ mod tests {
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
+                tracing_scope: None,
             }
         );
     }
@@ -374,56 +615,48 @@ mod tests {
           allowed_origins: "*"
 
     network:
-      bootstrap_service: https://bootstrap-staging.holo.host
-      transport_pool:
-        - type: webrtc
-          signal_url: wss://sbd-0.main.infra.holo.host
-          webrtc_config: {
-            "iceServers": [
-              { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
-              { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
-            ]
+      bootstrap_url: https://test-boot.tld
+      signal_url: wss://test-sig.tld
+      webrtc_config: {
+        "iceServers": [
+          { "urls": ["stun:test-stun.tld:443"] },
+        ]
+      }
+      advanced: {
+        "my": {
+          "totally": {
+            "random": {
+              "advanced": {
+                "config": true
+              }
+            }
           }
-      tuning_params:
-        gossip_loop_iteration_delay_ms: 42
-        default_rpc_single_timeout_ms: 42
-        default_rpc_multi_remote_agent_count: 42
-        default_rpc_multi_remote_request_grace_ms: 42
-        agent_info_expires_after_ms: 42
-        tls_in_mem_session_storage: 42
-        proxy_keepalive_ms: 42
-        proxy_to_expire_ms: 42
-        tx5_min_ephemeral_udp_port: 40000
-        tx5_max_ephemeral_udp_port: 40255
-      network_type: quic_bootstrap
+        }
+      }
 
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let mut network_config = KitsuneP2pConfig::mem();
-        network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-        network_config.transport_pool = vec![TransportConfig::WebRTC {
-            signal_url: "wss://sbd-0.main.infra.holo.host".into(),
-            webrtc_config: Some(serde_json::json!({
-              "iceServers": [
-                { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
-                { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
-              ]
-            })),
-        }];
-        let mut tuning_params =
-            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-        tuning_params.gossip_loop_iteration_delay_ms = 42;
-        tuning_params.default_rpc_single_timeout_ms = 42;
-        tuning_params.default_rpc_multi_remote_agent_count = 42;
-        tuning_params.default_rpc_multi_remote_request_grace_ms = 42;
-        tuning_params.agent_info_expires_after_ms = 42;
-        tuning_params.tls_in_mem_session_storage = 42;
-        tuning_params.proxy_keepalive_ms = 42;
-        tuning_params.proxy_to_expire_ms = 42;
-        tuning_params.tx5_min_ephemeral_udp_port = 40000;
-        tuning_params.tx5_max_ephemeral_udp_port = 40255;
-        network_config.tuning_params = std::sync::Arc::new(tuning_params);
+        let mut network_config = NetworkConfig::default();
+        network_config.bootstrap_url = url2::url2!("https://test-boot.tld");
+        network_config.signal_url = url2::url2!("wss://test-sig.tld");
+        network_config.webrtc_config = Some(serde_json::json!({
+            "iceServers": [
+                { "urls": ["stun:test-stun.tld:443"] },
+            ]
+        }));
+        network_config.advanced = Some(serde_json::json!({
+            "my": {
+                "totally": {
+                    "random": {
+                        "advanced": {
+                            "config": true,
+                        }
+                    }
+                }
+            }
+        }));
+
         pretty_assertions::assert_eq!(
             result.unwrap(),
             ConductorConfig {
@@ -444,6 +677,7 @@ mod tests {
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
+                tracing_scope: None,
             }
         );
     }
@@ -474,57 +708,17 @@ mod tests {
           allowed_origins: "*"
 
     network:
-      bootstrap_service: https://bootstrap-staging.holo.host
-      transport_pool:
-        - type: webrtc
-          signal_url: wss://sbd-0.main.infra.holo.host
-          webrtc_config: {
-            "iceServers": [
-              { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
-              { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
-            ]
-          }
-      tuning_params:
-        gossip_loop_iteration_delay_ms: 42
-        default_rpc_single_timeout_ms: 42
-        default_rpc_multi_remote_agent_count: 42
-        default_rpc_multi_remote_request_grace_ms: 42
-        agent_info_expires_after_ms: 42
-        tls_in_mem_session_storage: 42
-        proxy_keepalive_ms: 42
-        proxy_to_expire_ms: 42
-        tx5_min_ephemeral_udp_port: 40000
-        tx5_max_ephemeral_udp_port: 40255
-      network_type: quic_bootstrap
+      bootstrap_url: https://test-boot.tld
+      signal_url: wss://test-sig.tld
 
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let mut network_config = KitsuneP2pConfig::mem();
-        network_config.bootstrap_service = Some(url2::url2!("https://bootstrap-staging.holo.host"));
-        network_config.transport_pool.clear();
-        network_config.transport_pool.push(TransportConfig::WebRTC {
-            signal_url: "wss://sbd-0.main.infra.holo.host".into(),
-            webrtc_config: Some(serde_json::json!({
-              "iceServers": [
-                { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
-                { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
-              ]
-            })),
-        });
-        let mut tuning_params =
-            kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-        tuning_params.gossip_loop_iteration_delay_ms = 42;
-        tuning_params.default_rpc_single_timeout_ms = 42;
-        tuning_params.default_rpc_multi_remote_agent_count = 42;
-        tuning_params.default_rpc_multi_remote_request_grace_ms = 42;
-        tuning_params.agent_info_expires_after_ms = 42;
-        tuning_params.tls_in_mem_session_storage = 42;
-        tuning_params.proxy_keepalive_ms = 42;
-        tuning_params.proxy_to_expire_ms = 42;
-        tuning_params.tx5_min_ephemeral_udp_port = 40000;
-        tuning_params.tx5_max_ephemeral_udp_port = 40255;
-        network_config.tuning_params = std::sync::Arc::new(tuning_params);
+        let network_config = NetworkConfig {
+            bootstrap_url: url2::url2!("https://test-boot.tld"),
+            signal_url: url2::url2!("wss://test-sig.tld"),
+            ..Default::default()
+        };
         pretty_assertions::assert_eq!(
             result.unwrap(),
             ConductorConfig {
@@ -545,6 +739,7 @@ mod tests {
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
+                tracing_scope: None,
             }
         );
     }
@@ -554,9 +749,6 @@ mod tests {
         let yaml = r#"---
     data_root_path: /path/to/env
     keystore_path: /path/to/keystore
-    network:
-      transport_pool:
-        - type: mem
     keystore:
       type: lair_server
       connection_url: "unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"
@@ -569,7 +761,7 @@ mod tests {
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 device_seed_lair_tag: None,
                 danger_generate_throwaway_device_seed: false,
-                network: KitsuneP2pConfig::mem(),
+                network: NetworkConfig::default(),
                 dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
@@ -579,24 +771,132 @@ mod tests {
                 #[cfg(feature = "chc")]
                 chc_url: None,
                 tuning_params: None,
+                tracing_scope: None,
             }
         );
     }
 
     #[test]
-    #[cfg(not(feature = "unstable-sharding"))]
-    fn test_config_default_network_config_no_sharding() {
-        let config = ConductorConfig::default();
-        assert_eq!(
-            config.network.tuning_params.arc_clamping(),
-            Some(kitsune_p2p::dht::arq::ArqClamping::Full)
-        );
+    fn default_network_config_accepted_by_k2() {
+        let network_config = NetworkConfig::default();
+        let k2_config = network_config.to_k2_config().unwrap();
+
+        let builder = kitsune2_core::default_test_builder()
+            .with_default_config()
+            .unwrap();
+        builder.config.set_module_config(&k2_config).unwrap();
+        builder.validate_config().unwrap();
     }
 
     #[test]
-    #[cfg(feature = "unstable-sharding")]
-    fn test_config_default_network_config_sharding() {
-        let config = ConductorConfig::default();
-        assert_eq!(config.network.tuning_params.arc_clamping(), None);
+    fn network_config_preserves_advanced_overrides() {
+        let network_config = NetworkConfig {
+            advanced: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "backoffMinMs": "3500",
+                },
+                "tx5Transport": {
+                    "timeoutS": "10",
+                },
+                "coreSpace": {
+                    "reSignFreqMs": "1000",
+                }
+            })),
+            ..Default::default()
+        };
+
+        let k2_config = network_config.to_k2_config().unwrap();
+
+        let builder = kitsune2_core::default_test_builder()
+            .with_default_config()
+            .unwrap();
+        builder.config.set_module_config(&k2_config).unwrap();
+        builder.validate_config().unwrap();
+        assert_eq!(
+            k2_config,
+            serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
+                    "backoffMinMs": "3500",
+                },
+                "tx5Transport": {
+                    "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
+                    "timeoutS": "10",
+                },
+                "coreSpace": {
+                    "reSignFreqMs": "1000",
+                }
+            })
+        )
+    }
+
+    #[test]
+    fn network_config_overrides_conflicting_advanced_fields() {
+        let network_config = NetworkConfig {
+            advanced: Some(serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://something-else.net",
+                },
+                "tx5Transport": {
+                    "serverUrl": "wss://sbd.nowhere.net",
+                },
+            })),
+            ..Default::default()
+        };
+
+        let k2_config = network_config.to_k2_config().unwrap();
+
+        let builder = kitsune2_core::default_test_builder()
+            .with_default_config()
+            .unwrap();
+        builder.config.set_module_config(&k2_config).unwrap();
+        builder.validate_config().unwrap();
+
+        assert_eq!(
+            k2_config,
+            serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
+                },
+                "tx5Transport": {
+                    "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
+                },
+            })
+        )
+    }
+
+    #[test]
+    fn tune_kitsune_params_for_testing() {
+        let network_config = NetworkConfig::default()
+            .with_gossip_round_timeout_ms(100)
+            .with_gossip_initiate_interval_ms(200)
+            .with_gossip_initiate_jitter_ms(50)
+            .with_gossip_min_initiate_interval_ms(300);
+
+        let k2_config = network_config.to_k2_config().unwrap();
+
+        let builder = kitsune2_core::default_test_builder()
+            .with_default_config()
+            .unwrap();
+        builder.config.set_module_config(&k2_config).unwrap();
+        builder.validate_config().unwrap();
+
+        assert_eq!(
+            k2_config,
+            serde_json::json!({
+                "coreBootstrap": {
+                    "serverUrl": "https://dev-test-bootstrap2.holochain.org/",
+                },
+                "tx5Transport": {
+                    "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
+                },
+                "k2Gossip": {
+                    "roundTimeoutMs": 100,
+                    "initiateIntervalMs": 200,
+                    "initiateJitterMs": 50,
+                    "minInitiateIntervalMs": 300,
+                }
+            })
+        )
     }
 }

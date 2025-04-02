@@ -184,7 +184,8 @@ pub trait CellConductorReadHandleT: Send + Sync {
     async fn unblock(&self, input: Block) -> DatabaseResult<()>;
 
     /// Expose is_blocked functionality to zomes.
-    async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool>;
+    async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp)
+        -> ConductorResult<bool>;
 
     /// Find an installed app by one of its [CellId]s.
     async fn find_app_containing_cell(
@@ -287,7 +288,11 @@ impl CellConductorReadHandleT for CellConductorApi {
         self.conductor_handle.unblock(input).await
     }
 
-    async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool> {
+    async fn is_blocked(
+        &self,
+        input: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> ConductorResult<bool> {
         self.conductor_handle.is_blocked(input, timestamp).await
     }
 

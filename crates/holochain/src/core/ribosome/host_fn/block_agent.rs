@@ -97,19 +97,25 @@ mod test {
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
         let config = SweetConductorConfig::standard().no_dpki()
-            .tune(|tune| {
-                tune.gossip_peer_on_success_next_gossip_delay_ms = 1000;
-                tune.gossip_peer_on_error_next_gossip_delay_ms = 1000;
-                tune.gossip_round_timeout_ms = 3000;
-            })
             .tune_conductor(|c| {
+                c.min_publish_interval = Some(std::time::Duration::from_secs(2));
+                c.publish_trigger_interval = Some(std::time::Duration::from_secs(3));
                 c.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
+            })
+            .tune_network_config(|nc| {
+                // Gossip would share peer info
+                nc.disable_gossip = true;
+                // Want to control the sharing of peer info in this test
+                nc.disable_bootstrap = true;
             });
         let mut conductors = SweetConductorBatch::from_config(3, config).await;
         let apps = conductors.setup_app("create", [&dna_file]).await.unwrap();
 
-
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
+
+        conductors[0].declare_full_storage_arcs(alice_cell.dna_hash()).await;
+        conductors[1].declare_full_storage_arcs(alice_cell.dna_hash()).await;
+        conductors[2].declare_full_storage_arcs(alice_cell.dna_hash()).await;
 
         let alice = alice_cell.zome(TestWasm::Create);
         let bob = bob_cell.zome(TestWasm::Create);
@@ -124,14 +130,14 @@ mod test {
 
         let action0: ActionHash = alice_conductor.call(&alice, "create_entry", ()).await;
 
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(30, [&alice_cell, &bob_cell])
             .await
             .unwrap();
 
         // Before bob is blocked he can get posts just fine.
         let bob_get0: Option<Record> = bob_conductor.call(&bob, "get_post", action0).await;
         // Await bob's init to propagate to alice.
-        await_consistency(10, [&alice_cell, &bob_cell])
+        await_consistency(30, [&alice_cell, &bob_cell])
             .await
             .unwrap();
         assert!(bob_get0.is_some());

@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - develop-*
+      - feat/integrate-k2
 
 concurrency:
   group: test-${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -25,6 +26,12 @@ jobs:
 
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
+
+      # we cannot use cmake 4 until openssl-src is updated
+      - name: cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.x'
 
       - name: static-fmt
         run: make static-fmt
@@ -73,6 +80,12 @@ jobs:
       - name: "Common Test Setup Actions"
         uses: ./.github/actions/common-pre
 
+      # we cannot use cmake 4 until openssl-src is updated
+      - name: cmake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.31.x'
+
       - name: install build dependencies (macos-latest, wasmer_wamr)
         if: matrix.os == 'macos-latest' && matrix.target == 'wasmer_wamr'
         shell: bash
@@ -81,8 +94,6 @@ jobs:
       - name: build (windows-latest)
         if: matrix.os == 'windows-latest'
         run: |-
-          $env:OPENSSL_NO_VENDOR="1"
-          $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
           make build-workspace-${{ matrix.target }}
 
@@ -93,8 +104,6 @@ jobs:
       - name: test (windows-latest)
         if: matrix.os == 'windows-latest'
         run: |-
-          $env:OPENSSL_NO_VENDOR="1"
-          $env:OPENSSL_DIR="$(pwd)\vcpkg\packages\openssl_x64-windows-release"
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
           make test-workspace-${{ matrix.target }}
 

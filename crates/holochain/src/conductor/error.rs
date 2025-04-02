@@ -118,9 +118,6 @@ pub enum ConductorError {
     KeystoreError(#[from] holochain_keystore::KeystoreError),
 
     #[error(transparent)]
-    KitsuneP2pError(#[from] kitsune_p2p::KitsuneP2pError),
-
-    #[error(transparent)]
     MrBundleError(#[from] mr_bundle::error::MrBundleError),
 
     #[error(transparent)]

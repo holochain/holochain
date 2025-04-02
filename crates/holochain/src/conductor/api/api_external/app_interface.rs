@@ -157,12 +157,28 @@ impl AppInterfaceApi {
                     .await?;
                 Ok(AppResponse::CloneCellEnabled(enabled_cell))
             }
-            AppRequest::NetworkInfo(payload) => {
+            AppRequest::DumpNetworkMetrics {
+                dna_hash,
+                include_dht_summary,
+            } => {
                 let info = self
                     .conductor_handle
-                    .network_info(&installed_app_id, &payload)
+                    .dump_network_metrics_for_app(
+                        &installed_app_id,
+                        Kitsune2NetworkMetricsRequest {
+                            dna_hash,
+                            include_dht_summary,
+                        },
+                    )
                     .await?;
-                Ok(AppResponse::NetworkInfo(info))
+                Ok(AppResponse::NetworkMetricsDumped(info))
+            }
+            AppRequest::DumpNetworkStats => {
+                let stats = self
+                    .conductor_handle
+                    .dump_network_stats_for_app(&installed_app_id)
+                    .await?;
+                Ok(AppResponse::NetworkStatsDumped(stats))
             }
             AppRequest::ListWasmHostFunctions => Ok(AppResponse::ListWasmHostFunctions(
                 self.conductor_handle.list_wasm_host_functions().await?,

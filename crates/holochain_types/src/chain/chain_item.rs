@@ -186,8 +186,6 @@ pub enum PrevActionErrorKind {
     HashMismatch(u32),
     #[error("Root of source chain must be Dna")]
     InvalidRoot,
-    #[error("Root of source chain must have a timestamp greater than the Dna's origin_time")]
-    InvalidRootOriginTime,
     #[error("No more actions are allowed after a chain close")]
     ActionAfterChainClose,
     #[error("Previous action sequence number {1} != ({0} - 1)")]

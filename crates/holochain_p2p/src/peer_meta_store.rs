@@ -6,7 +6,51 @@ use holochain_sqlite::prelude::DbKindPeerMetaStore;
 use holochain_sqlite::rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef};
 use holochain_sqlite::rusqlite::{named_params, ToSql};
 use holochain_sqlite::sql::sql_peer_meta_store;
-use kitsune2_api::{K2Error, K2Result, PeerMetaStore, Timestamp, Url};
+use kitsune2_api::{BoxFut, K2Error, K2Result, PeerMetaStore, Timestamp, Url};
+use std::sync::Arc;
+
+/// Holochain implementation of the Kitsune2 [kitsune2_api::OpStoreFactory].
+pub struct HolochainPeerMetaStoreFactory {
+    /// The database connection getter.
+    pub getter: crate::GetDbPeerMeta,
+}
+
+impl std::fmt::Debug for HolochainPeerMetaStoreFactory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HolochainPeerMetaStoreFactory").finish()
+    }
+}
+
+impl kitsune2_api::PeerMetaStoreFactory for HolochainPeerMetaStoreFactory {
+    fn default_config(&self, _config: &mut kitsune2_api::Config) -> kitsune2_api::K2Result<()> {
+        Ok(())
+    }
+
+    fn validate_config(&self, _config: &kitsune2_api::Config) -> kitsune2_api::K2Result<()> {
+        Ok(())
+    }
+
+    fn create(
+        &self,
+        _builder: Arc<kitsune2_api::Builder>,
+        space: kitsune2_api::SpaceId,
+    ) -> BoxFut<'static, kitsune2_api::K2Result<kitsune2_api::DynPeerMetaStore>> {
+        let getter = self.getter.clone();
+        Box::pin(async move {
+            let db = getter(holo_hash::DnaHash::from_k2_space(&space))
+                .await
+                .map_err(|err| {
+                    kitsune2_api::K2Error::other_src("failed to get peer_meta_store db", err)
+                })?;
+            let peer_meta_store: kitsune2_api::DynPeerMetaStore =
+                Arc::new(HolochainPeerMetaStore::create(db).await.map_err(|err| {
+                    K2Error::other_src("failed to connect to peer store database", err)
+                })?);
+
+            Ok(peer_meta_store)
+        })
+    }
+}
 
 /// Holochain implementation of a Kitsune2 [PeerMetaStore].
 #[derive(Debug)]

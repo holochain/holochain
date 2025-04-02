@@ -1,10 +1,9 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
 
 use crate::{AppInfo, FullStateDump, RevokeAgentKeyPayload, StorageInfo};
 
@@ -276,10 +275,22 @@ pub enum AdminRequest {
     /// [`AdminResponse::NetworkMetricsDumped`]
     DumpNetworkMetrics {
         /// If set, limits the metrics dumped to a single DNA hash space.
+        #[serde(default)]
         dna_hash: Option<DnaHash>,
+
+        /// Whether to include a DHT summary.
+        ///
+        /// You need a dump from multiple nodes in order to make a comparison, so this is not
+        /// requested by default.
+        #[serde(default)]
+        include_dht_summary: bool,
     },
 
-    /// Dump raw json network statistics from the backend networking lib.
+    /// Dump network statistics from the Kitsune2 networking transport module.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::NetworkStatsDumped`]
     DumpNetworkStats,
 
     /// Add a list of agents to this conductor's peer store.
@@ -295,10 +306,10 @@ pub enum AdminRequest {
     /// [`AdminResponse::AgentInfoAdded`]
     AddAgentInfo {
         /// list of signed agent info to add to peer store
-        agent_infos: Vec<AgentInfoSigned>,
+        agent_infos: Vec<String>,
     },
 
-    /// Request the [`AgentInfoSigned`] stored in this conductor's
+    /// Request the [`kitsune2_api::AgentInfoSigned`] stored in this conductor's
     /// peer store.
     ///
     /// You can:
@@ -536,15 +547,10 @@ pub enum AdminResponse {
     ConductorStateDumped(String),
 
     /// The successful result of a call to [`AdminRequest::DumpNetworkMetrics`].
-    ///
-    /// The string is a JSON blob of the metrics results.
-    NetworkMetricsDumped(String),
+    NetworkMetricsDumped(HashMap<DnaHash, Kitsune2NetworkMetrics>),
 
     /// The successful result of a call to [`AdminRequest::DumpNetworkStats`].
-    ///
-    /// The string is a raw JSON blob returned directly from the backend
-    /// networking library.
-    NetworkStatsDumped(String),
+    NetworkStatsDumped(kitsune2_api::TransportStats),
 
     /// The successful response to an [`AdminRequest::AddAgentInfo`].
     ///
@@ -554,7 +560,7 @@ pub enum AdminResponse {
     /// The successful response to an [`AdminRequest::AgentInfo`].
     ///
     /// This is all the agent info that was found for the request.
-    AgentInfo(Vec<AgentInfoSigned>),
+    AgentInfo(Vec<String>),
 
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,

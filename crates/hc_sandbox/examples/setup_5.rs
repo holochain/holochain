@@ -8,7 +8,6 @@ use holochain_conductor_api::AdminRequest;
 use holochain_conductor_api::AdminResponse;
 use holochain_types::prelude::AppBundleSource;
 use holochain_types::prelude::InstallAppPayload;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use clap::Parser;
 
@@ -25,9 +24,6 @@ async fn main() -> anyhow::Result<()> {
     let input = Input::parse();
     let happ = hc_sandbox::bundles::parse_happ(input.happ)?;
 
-    // Using the default mem network.
-    let network = KitsuneP2pConfig::mem();
-
     // Choose an app id and properties.
     let app_id = "my-cool-app".to_string();
 
@@ -36,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
 
         // Create a conductor config with the network.
         let path = holochain_conductor_config::generate::generate(
-            Some(network.clone()),
+            Some(Default::default()),
             None,
             None,
             false,

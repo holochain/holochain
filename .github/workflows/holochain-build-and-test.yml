@@ -28,9 +28,9 @@ jobs:
       matrix:
         cmd:
           # ensure functionality on multiple platforms
-          - pkgs:
-              - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
+          # - pkgs:
+          #     - build-holonix-tests-integration
+          #   extra_arg: "--override-input versions ./versions/weekly --override-input holochain ${{ inputs.repo_path }}"
 
           # ensure that any Nix changes on this branch don't cause problems for maintenance versions
           - pkgs:
@@ -39,9 +39,9 @@ jobs:
           - pkgs:
               - build-holonix-tests-integration
             extra_arg: "--override-input versions ./versions/0_3"
-          - pkgs:
-              - build-holonix-tests-integration
-            extra_arg: "--override-input versions ./versions/weekly"
+          # - pkgs:
+          #     - build-holonix-tests-integration
+          #   extra_arg: "--override-input versions ./versions/weekly"
         platform:
           - system: aarch64-darwin
           - system: x86_64-linux

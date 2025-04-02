@@ -64,7 +64,6 @@ mod tests {
     use crate::fixt::ZomeCallHostAccessFixturator;
     use crate::fixt::ZomeFixturator;
     use holochain_types::prelude::*;
-    use kitsune_p2p_types::box_fut;
     use mockall::predicate::*;
     use mockall::Sequence;
     use tokio_stream::StreamExt;
@@ -122,9 +121,9 @@ mod tests {
                     .times(1)
                     .in_sequence(&mut sequence)
                     .returning(|_, _, _, _| {
-                        box_fut(Ok(Some(
-                            ExternIO::encode(InitCallbackResult::Pass).unwrap(),
-                        )))
+                        must_future::MustBoxFuture::new(async {
+                            Ok(Some(ExternIO::encode(InitCallbackResult::Pass).unwrap()))
+                        })
                     });
             }
         }

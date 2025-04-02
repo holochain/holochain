@@ -17,3 +17,6 @@ WHERE
       AND seq <= :seq_end
       AND author = :author
   )
+RETURNING
+  hash,
+  authored_timestamp

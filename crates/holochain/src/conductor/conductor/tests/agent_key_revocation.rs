@@ -1,5 +1,4 @@
 use holo_hash::{ActionHash, AgentPubKey, DnaHash, EntryHash};
-use holochain_p2p::actor::HolochainP2pRefToDna;
 use holochain_state::source_chain::{SourceChain, SourceChainError};
 use holochain_types::app::{AppError, CreateCloneCellPayload};
 use holochain_types::dna::DnaFile;
@@ -305,11 +304,13 @@ mod single_conductor {
         .await
         .unwrap();
         source_chain_1.delete_valid_agent_pub_key().await.unwrap();
-        let network = conductor
-            .holochain_p2p()
-            .to_dna(cell_id_1.dna_hash().clone(), conductor.get_chc(&cell_id_1));
+        let network = holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            cell_id_1.dna_hash().clone(),
+            conductor.get_chc(&cell_id_1),
+        );
         source_chain_1
-            .flush(network.storage_arcs().await.unwrap(), network.chc())
+            .flush(network.target_arcs().await.unwrap(), network.chc())
             .await
             .unwrap();
 
@@ -401,11 +402,13 @@ mod single_conductor {
         .await
         .unwrap();
         source_chain_1.delete_valid_agent_pub_key().await.unwrap();
-        let network = conductor
-            .holochain_p2p()
-            .to_dna(cell_id_1.dna_hash().clone(), conductor.get_chc(&cell_id_1));
+        let network = holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            cell_id_1.dna_hash().clone(),
+            conductor.get_chc(&cell_id_1),
+        );
         source_chain_1
-            .flush(network.storage_arcs().await.unwrap(), network.chc())
+            .flush(network.target_arcs().await.unwrap(), network.chc())
             .await
             .unwrap();
 
@@ -972,11 +975,13 @@ async fn delete_agent_key_from_source_chain(
     cell_id: &CellId,
 ) {
     source_chain.delete_valid_agent_pub_key().await.unwrap();
-    let network = conductor
-        .holochain_p2p()
-        .to_dna(cell_id.dna_hash().clone(), conductor.get_chc(cell_id));
+    let network = holochain_p2p::HolochainP2pDna::new(
+        conductor.holochain_p2p().clone(),
+        cell_id.dna_hash().clone(),
+        conductor.get_chc(cell_id),
+    );
     source_chain
-        .flush(network.storage_arcs().await.unwrap(), network.chc())
+        .flush(network.target_arcs().await.unwrap(), network.chc())
         .await
         .unwrap();
     conductor

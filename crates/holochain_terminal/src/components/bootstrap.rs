@@ -3,25 +3,15 @@ use crate::components::common::show_message;
 use crate::event::ScreenEvent;
 use chrono::{DateTime, Utc};
 use holo_hash::AgentPubKey;
-use holochain_util::tokio_helper::block_on;
-use kitsune_p2p_bin_data::KitsuneAgent;
-use kitsune_p2p_bin_data::{KitsuneBinType, KitsuneSpace};
-use kitsune_p2p_bootstrap_client::{random, BootstrapNet};
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
-use kitsune_p2p_types::bootstrap::{RandomLimit, RandomQuery};
+use kitsune2_api::AgentInfoSigned;
+use kitsune2_core::Ed25519Verifier;
 use ratatui::{prelude::*, widgets::*};
 use std::sync::OnceLock;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
-fn get_network_type() -> &'static RwLock<BootstrapNet> {
-    static NETWORK_TYPE: OnceLock<RwLock<BootstrapNet>> = OnceLock::new();
-
-    NETWORK_TYPE.get_or_init(|| RwLock::new(BootstrapNet::Tx5))
-}
-
-fn get_agents() -> &'static RwLock<Vec<AgentInfoSigned>> {
-    static AGENTS: OnceLock<RwLock<Vec<AgentInfoSigned>>> = OnceLock::new();
+fn get_agents() -> &'static RwLock<Vec<Arc<AgentInfoSigned>>> {
+    static AGENTS: OnceLock<RwLock<Vec<Arc<AgentInfoSigned>>>> = OnceLock::new();
 
     AGENTS.get_or_init(|| RwLock::new(vec![]))
 }
@@ -68,7 +58,6 @@ impl Widget for BootstrapWidget {
         };
 
         let mut refresh = false;
-        let mut switch_network = false;
 
         for event in self.events {
             match event {
@@ -89,12 +78,6 @@ impl Widget for BootstrapWidget {
                         *last_refresh = Some(Instant::now());
                     }
                 }
-                ScreenEvent::SwitchNetwork => {
-                    switch_network = true;
-                    refresh = true; // Always refresh when switching network
-                    *get_last_refresh_at().write().unwrap() = Some(Instant::now());
-                    // Reset the refresh timer
-                }
                 ScreenEvent::NavDown => {
                     let mut selected = get_selected().write().unwrap();
                     let agents = get_agents().read().unwrap();
@@ -113,52 +96,24 @@ impl Widget for BootstrapWidget {
             }
         }
 
-        if switch_network {
-            let mut network_type = get_network_type()
-                .write()
-                .expect("Should have been able to read network type");
-
-            let new_net = match *network_type {
-                // Places this peer info in the `tx5` bucket. There are currently no other buckets.
-                BootstrapNet::Tx5 => BootstrapNet::Tx5,
-            };
-
-            *network_type = new_net;
-        }
-
         if refresh {
             *get_selected().write().unwrap() = 0;
 
-            let query_random_result = block_on(
-                async {
-                    let network_type = { *get_network_type().read().unwrap() };
-                    random(
-                        Some(bootstrap_url.into()),
-                        RandomQuery {
-                            // TODO This conversion is defined but it's in holochain_p2p which shouldn't be a dep of this crate.
-                            space: Arc::new(KitsuneSpace::new(dna_hash.get_raw_36().to_vec())),
-                            limit: RandomLimit(30),
-                        },
-                        network_type,
-                    )
-                    .await
-                },
-                std::time::Duration::from_secs(10),
+            let result = kitsune2_bootstrap_client::blocking_get(
+                bootstrap_url.clone(),
+                dna_hash.to_k2_space(),
+                Arc::new(Ed25519Verifier),
             );
-            match query_random_result {
-                Ok(Ok(agents)) => {
+            match result {
+                Ok(agents) => {
                     *get_agents().write().unwrap() = agents;
                 }
-                Ok(Err(e)) => {
+                Err(e) => {
                     show_message(
                         format!("Error fetching agents - {:?}", e).as_str(),
                         area,
                         buf,
                     );
-                    return;
-                }
-                Err(_) => {
-                    show_message("Timeout while fetching agents", area, buf);
                     return;
                 }
             };
@@ -180,7 +135,7 @@ impl Widget for BootstrapWidget {
 
         let list_items: Vec<ListItem> = agents
             .iter()
-            .map(|a| ListItem::new(format!("{:?}", kitsune_agent_to_pub_key(a.agent.clone()))))
+            .map(|a| ListItem::new(format!("{:?}", AgentPubKey::from_k2_agent(&a.agent))))
             .collect();
 
         let list = List::new(list_items)
@@ -193,17 +148,14 @@ impl Widget for BootstrapWidget {
             let detail_line = List::new(vec![
                 ListItem::new(format!(
                     "agent       : {:?}",
-                    kitsune_agent_to_pub_key(agents[selected].agent.clone())
+                    AgentPubKey::from_k2_agent(&agents[selected].agent)
                 )),
-                ListItem::new(format!(
-                    "storage arc : {:?}",
-                    agents[selected].storage_arc()
-                )),
-                ListItem::new(format!("url list    : {:?}", agents[selected].url_list)),
+                ListItem::new(format!("storage arc : {:?}", agents[selected].storage_arc)),
+                ListItem::new(format!("url list    : {:?}", agents[selected].url)),
                 ListItem::new(format!(
                     "signed at   : {:?}",
                     DateTime::<Utc>::from_timestamp(
-                        (agents[selected].signed_at_ms / 1000) as i64,
+                        agents[selected].created_at.as_micros() / 1000,
                         0
                     )
                     .unwrap_or_default()
@@ -211,7 +163,7 @@ impl Widget for BootstrapWidget {
                 ListItem::new(format!(
                     "expires at  : {:?}",
                     DateTime::<Utc>::from_timestamp(
-                        (agents[selected].expires_at_ms / 1000) as i64,
+                        agents[selected].expires_at.as_micros() / 1000,
                         0
                     )
                     .unwrap_or_default()
@@ -246,17 +198,6 @@ impl Widget for BootstrapWidget {
 
         let menu_line = Line::from(vec![
             Span::styled(
-                "n",
-                Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            ),
-            Span::raw(format!(
-                ": network type ({:?})",
-                get_network_type()
-                    .read()
-                    .expect("Should have been able to read network type")
-            )),
-            Span::raw("    "),
-            Span::styled(
                 "r",
                 Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
             ),
@@ -269,8 +210,4 @@ impl Widget for BootstrapWidget {
             buf,
         );
     }
-}
-
-fn kitsune_agent_to_pub_key(agent: Arc<KitsuneAgent>) -> AgentPubKey {
-    AgentPubKey::from_raw_36((*agent).clone().into())
 }
