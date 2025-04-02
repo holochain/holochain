@@ -794,6 +794,10 @@ impl HolochainP2pActor {
         let mut builder = if config.k2_test_builder {
             let mut builder = kitsune2_core::default_test_builder();
 
+            if config.disable_bootstrap {
+                builder.bootstrap = Arc::new(test::NoopBootstrapFactory);
+            }
+
             // Make it possible to disable the gossip module for testing.
             if !config.disable_gossip {
                 // Still want the real gossip module to be used. The test builder comes with a stub

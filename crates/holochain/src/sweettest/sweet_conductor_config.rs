@@ -45,6 +45,7 @@ impl From<NetworkConfig> for SweetConductorConfig {
                 sys_validation_retry_delay: Some(std::time::Duration::from_secs(1)),
                 countersigning_resolution_retry_delay: Some(std::time::Duration::from_secs(3)),
                 countersigning_resolution_retry_limit: None,
+                publish_trigger_interval: None,
                 min_publish_interval: None,
             }),
             ..Default::default()

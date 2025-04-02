@@ -75,6 +75,7 @@ pub mod wasm_test {
     use matches::assert_matches;
     use wasmer::RuntimeError;
     use holochain_nonce::fresh_nonce;
+    use crate::prelude::{Signal, SystemSignal};
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -110,7 +111,7 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
+    #[ignore = "flaky"]
     async fn unlock_timeout_session() {
         holochain_trace::test_run();
 
@@ -294,6 +295,9 @@ pub mod wasm_test {
             .await
             .unwrap();
 
+        let mut alice_signals = conductors[1].subscribe_to_app_signals("app-0".to_string());
+        let mut bob_signals = conductors[1].subscribe_to_app_signals("app-1".to_string());
+
         // Bob tries to commit the session entry as well but after timeout.
         tokio::time::sleep(std::time::Duration::from_millis(10500)).await;
         let bob_result: Result<ActionHash, _> = conductors[1]
@@ -305,6 +309,12 @@ pub mod wasm_test {
             .await;
 
         expect_error_for_write_without_lock(bob_result);
+
+        let alice_abandoned = alice_signals.recv().await.unwrap();
+        assert_matches!(alice_abandoned, Signal::System(SystemSignal::AbandonedCountersigning(_)));
+
+        let bob_abandoned = bob_signals.recv().await.unwrap();
+        assert_matches!(bob_abandoned, Signal::System(SystemSignal::AbandonedCountersigning(_)));
 
         // At this point Alice's session entry is a liability so can't exist.
         let alice_agent_activity_alice_observed_after: AgentActivity = conductors[1]

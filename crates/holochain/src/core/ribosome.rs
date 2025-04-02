@@ -56,10 +56,18 @@ pub mod real_ribosome;
 
 mod check_clone_access;
 
+use self::guest_callback::{
+    entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
+};
+use self::{
+    error::RibosomeError,
+    guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
+};
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::DpkiApi;
 use crate::conductor::api::ZomeCallParamsSigned;
+use crate::conductor::error::ConductorResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
@@ -93,14 +101,6 @@ use must_future::MustBoxFuture;
 use std::iter::Iterator;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-
-use self::guest_callback::{
-    entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
-};
-use self::{
-    error::RibosomeError,
-    guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
-};
 
 #[derive(Clone)]
 pub struct CallContext {
@@ -417,7 +417,7 @@ impl ZomeCallInvocation {
     pub async fn verify_blocked_provenance(
         &self,
         host_access: &ZomeCallHostAccess,
-    ) -> RibosomeResult<ZomeCallAuthorization> {
+    ) -> ConductorResult<ZomeCallAuthorization> {
         if host_access
             .call_zome_handle
             .is_blocked(
@@ -446,7 +446,7 @@ impl ZomeCallInvocation {
     pub async fn is_authorized<'a>(
         &self,
         host_access: &ZomeCallHostAccess,
-    ) -> RibosomeResult<ZomeCallAuthorization> {
+    ) -> ConductorResult<ZomeCallAuthorization> {
         Ok(match self.verify_nonce(host_access).await? {
             ZomeCallAuthorization::Authorized => match self.verify_grant(host_access).await? {
                 ZomeCallAuthorization::Authorized => {
