@@ -228,24 +228,36 @@ async fn test_block_invalid_receipt() {
     for now in [Timestamp::now(), Timestamp::MIN, Timestamp::MAX] {
         assert!(!alice_conductor
             .spaces
-            .is_blocked(alice_block_target.clone(), now)
+            .is_blocked(
+                alice_block_target.clone(),
+                now,
+                alice_conductor.holochain_p2p().clone()
+            )
             .await
             .unwrap());
         assert!(!alice_conductor
             .spaces
-            .is_blocked(bob_block_target.clone(), now)
+            .is_blocked(
+                bob_block_target.clone(),
+                now,
+                alice_conductor.holochain_p2p().clone()
+            )
             .await
             .unwrap());
         assert!(!bob_conductor
             .spaces
-            .is_blocked(bob_block_target.clone(), now)
+            .is_blocked(
+                bob_block_target.clone(),
+                now,
+                bob_conductor.holochain_p2p().clone()
+            )
             .await
             .unwrap());
 
         // It can take a little more than consistency to have the receipts
         // processed.
         wait_until!(
-            bob_conductor.spaces.is_blocked(alice_block_target.clone(), now).await.unwrap();
+            bob_conductor.spaces.is_blocked(alice_block_target.clone(), now, bob_conductor.holochain_p2p().clone()).await.unwrap();
             1_000;
             20_000;
             "waiting for block due to warrant";
