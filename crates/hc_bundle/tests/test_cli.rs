@@ -7,9 +7,9 @@ use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
     process::Command,
+    str::FromStr,
+    time::Duration,
 };
-#[cfg(not(feature = "unstable-migration"))]
-use std::{str::FromStr, time::Duration};
 use walkdir::WalkDir;
 
 fn read_app(path: &Path) -> anyhow::Result<AppBundle> {
