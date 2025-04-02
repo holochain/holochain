@@ -74,6 +74,7 @@ pub mod wasm_test {
     use holochain_zome_types::zome_io::ZomeCallParams;
     use matches::assert_matches;
     use wasmer::RuntimeError;
+    use holochain_nonce::fresh_nonce;
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(
@@ -110,61 +111,79 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
-    #[ignore = "K2 INTEGRATION--UNSTABLE IGNORED TEST FAILURE"]
     async fn unlock_timeout_session() {
         holochain_trace::test_run();
-        let RibosomeTestFixture {
-            conductor,
-            alice,
-            alice_pubkey,
-            bob,
-            bob_pubkey,
-            ..
-        } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+
+        let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
+
+        // Use the first conductor as a witness.
+        conductors[0].setup_app("app", [&dna_file]).await.unwrap();
+
+        // Install apps for Bob and Alice on the second conductor
+        let apps = conductors[1].setup_apps("app-", 2, [&dna_file]).await.unwrap();
+
+        let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
+        let alice = alice_cell.zome(TestWasm::CounterSigning);
+        let bob = bob_cell.zome(TestWasm::CounterSigning);
+
+        // Before the preflight creation of things should work.
+        let _: ActionHash = conductors[1].call(&alice, "create_a_thing", ()).await;
+
+        // Bob's zome must be initialized for countersigning to work.
+        let _: ActionHash = conductors[1].call(&bob, "create_a_thing", ()).await;
+
+        // Wait for everyone to declare full arcs
+        conductors[0].declare_full_storage_arcs(alice_cell.dna_hash()).await;
+        conductors[1].declare_full_storage_arcs(alice_cell.dna_hash()).await;
+
+        // Force exchanging latest agent infos
+        conductors.exchange_peer_info().await;
 
         // Before preflight everyone commits some stuff.
-        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
-        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
+        let _: ActionHash = conductors[1].call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductors[1].call(&bob, "create_a_thing", ()).await;
 
-        let alice_agent_activity_alice_observed_before: AgentActivity = conductor
+        let alice_agent_activity_alice_observed_before: AgentActivity = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: alice_pubkey.clone(),
+                    agent_pubkey: alice_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
             )
             .await;
-        let alice_agent_activity_bob_observed_before: AgentActivity = conductor
+        let alice_agent_activity_bob_observed_before: AgentActivity = conductors[1]
             .call(
                 &bob,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: alice_pubkey.clone(),
+                    agent_pubkey: alice_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
             )
             .await;
-        let bob_agent_activity_alice_observed_before: AgentActivity = conductor
+        let bob_agent_activity_alice_observed_before: AgentActivity = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: bob_pubkey.clone(),
+                    agent_pubkey: bob_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
             )
             .await;
-        let bob_agent_activity_bob_observed_before: AgentActivity = conductor
+        let bob_agent_activity_bob_observed_before: AgentActivity = conductors[1]
             .call(
                 &bob,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: bob_pubkey.clone(),
+                    agent_pubkey: bob_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
@@ -172,17 +191,17 @@ pub mod wasm_test {
             .await;
 
         // Everyone accepts a short-lived session.
-        let preflight_request: PreflightRequest = conductor
+        let preflight_request: PreflightRequest = conductors[1]
             .call(
                 &alice,
                 "generate_countersigning_preflight_request_fast",
                 vec![
-                    (alice_pubkey.clone(), vec![Role(0)]),
-                    (bob_pubkey.clone(), vec![]),
+                    (alice_cell.agent_pubkey().clone(), vec![Role(0)]),
+                    (bob_cell.agent_pubkey().clone(), vec![]),
                 ],
             )
             .await;
-        let alice_acceptance: PreflightRequestAcceptance = conductor
+        let alice_acceptance: PreflightRequestAcceptance = conductors[1]
             .call(
                 &alice,
                 "accept_countersigning_preflight_request",
@@ -195,7 +214,7 @@ pub mod wasm_test {
             } else {
                 unreachable!();
             };
-        let bob_acceptance: PreflightRequestAcceptance = conductor
+        let bob_acceptance: PreflightRequestAcceptance = conductors[1]
             .call(
                 &bob,
                 "accept_countersigning_preflight_request",
@@ -213,7 +232,7 @@ pub mod wasm_test {
         let (countersigned_action_hash_alice, countersigned_entry_hash_alice): (
             ActionHash,
             EntryHash,
-        ) = conductor
+        ) = conductors[1]
             .call(
                 &alice,
                 "create_a_countersigned_thing_with_entry_hash",
@@ -249,7 +268,7 @@ pub mod wasm_test {
         // headers created it?
         //
         // etc. etc. I'm just leaving this commentary here to germinate future headaches and self doubt.
-        conductor
+        conductors[1]
             .call_fallible::<_, SignedActionHashed>(
                 &alice,
                 "must_get_action",
@@ -258,7 +277,7 @@ pub mod wasm_test {
             .await
             .unwrap();
 
-        conductor
+        conductors[1]
             .call_fallible::<_, Record>(
                 &alice,
                 "must_get_valid_record",
@@ -266,7 +285,7 @@ pub mod wasm_test {
             )
             .await
             .unwrap();
-        conductor
+        conductors[1]
             .call_fallible::<_, EntryHashed>(
                 &alice,
                 "must_get_entry",
@@ -277,7 +296,7 @@ pub mod wasm_test {
 
         // Bob tries to commit the session entry as well but after timeout.
         tokio::time::sleep(std::time::Duration::from_millis(10500)).await;
-        let bob_result: Result<ActionHash, _> = conductor
+        let bob_result: Result<ActionHash, _> = conductors[1]
             .call_fallible(
                 &bob,
                 "create_a_countersigned_thing",
@@ -288,45 +307,45 @@ pub mod wasm_test {
         expect_error_for_write_without_lock(bob_result);
 
         // At this point Alice's session entry is a liability so can't exist.
-        let alice_agent_activity_alice_observed_after: AgentActivity = conductor
+        let alice_agent_activity_alice_observed_after: AgentActivity = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: alice_pubkey.clone(),
+                    agent_pubkey: alice_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
             )
             .await;
-        let alice_agent_activity_bob_observed_after: AgentActivity = conductor
+        let alice_agent_activity_bob_observed_after: AgentActivity = conductors[1]
             .call(
                 &bob,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: alice_pubkey.clone(),
+                    agent_pubkey: alice_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
             )
             .await;
-        let bob_agent_activity_alice_observed_after: AgentActivity = conductor
+        let bob_agent_activity_alice_observed_after: AgentActivity = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: bob_pubkey.clone(),
+                    agent_pubkey: bob_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
             )
             .await;
-        let bob_agent_activity_bob_observed_after: AgentActivity = conductor
+        let bob_agent_activity_bob_observed_after: AgentActivity = conductors[1]
             .call(
                 &bob,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: bob_pubkey.clone(),
+                    agent_pubkey: bob_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
@@ -354,9 +373,8 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg_attr(target_os = "macos", ignore = "flaky")]
     async fn unlock_invalid_session() {
-        use holochain_nonce::fresh_nonce;
-
         holochain_trace::test_run();
+
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -458,41 +476,52 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     #[cfg_attr(target_os = "windows", ignore = "stack overflow on windows")]
-    #[ignore = "K2 INTEGRATION--UNSTABLE IGNORED TEST FAILURE"]
     async fn lock_chain() {
-        use holochain_nonce::fresh_nonce;
         holochain_trace::test_run();
-        let RibosomeTestFixture {
-            conductor,
-            alice,
-            alice_cell,
-            alice_pubkey,
-            bob,
-            bob_cell,
-            bob_pubkey,
-            ..
-        } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+
+        let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
+
+        // Use the first conductor as a witness.
+        let witness = conductors[0].setup_app("app", [&dna_file]).await.unwrap();
+        let (witness_cell,) = witness.into_tuple();
+
+        // Install apps for Bob and Alice on the second conductor
+        let apps = conductors[1].setup_apps("app-", 2, [&dna_file]).await.unwrap();
+
+        let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
+        let alice = alice_cell.zome(TestWasm::CounterSigning);
+        let bob = bob_cell.zome(TestWasm::CounterSigning);
+
         let now = Timestamp::now();
         // Before the preflight creation of things should work.
-        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductors[1].call(&alice, "create_a_thing", ()).await;
 
         // Bob's zome must be initialized for countersigning to work.
-        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
+        let _: ActionHash = conductors[1].call(&bob, "create_a_thing", ()).await;
+
+        // Wait for everyone to declare full arcs
+        conductors[0].declare_full_storage_arcs(alice_cell.dna_hash()).await;
+        conductors[1].declare_full_storage_arcs(alice_cell.dna_hash()).await;
+
+        // Force exchanging latest agent infos
+        conductors.exchange_peer_info().await;
 
         // Alice can create a preflight request.
-        let preflight_request: PreflightRequest = conductor
+        let preflight_request: PreflightRequest = conductors[1]
             .call(
                 &alice,
                 "generate_countersigning_preflight_request",
                 vec![
-                    (alice_pubkey.clone(), vec![Role(0)]),
-                    (bob_pubkey.clone(), vec![]),
+                    (alice_cell.agent_pubkey().clone(), vec![Role(0)]),
+                    (bob_cell.agent_pubkey().clone(), vec![]),
                 ],
             )
             .await;
 
         // Alice can accept the preflight request.
-        let alice_acceptance: PreflightRequestAcceptance = conductor
+        let alice_acceptance: PreflightRequestAcceptance = conductors[1]
             .call(
                 &alice,
                 "accept_countersigning_preflight_request",
@@ -507,13 +536,13 @@ pub mod wasm_test {
             };
 
         // Alice can create a second preflight request.
-        let preflight_request_2: PreflightRequest = conductor
+        let preflight_request_2: PreflightRequest = conductors[1]
             .call(
                 &alice,
                 "generate_countersigning_preflight_request",
                 vec![
-                    (alice_pubkey.clone(), vec![Role(1)]),
-                    (bob_pubkey.clone(), vec![]),
+                    (alice_cell.agent_pubkey().clone(), vec![Role(1)]),
+                    (bob_cell.agent_pubkey().clone(), vec![]),
                 ],
             )
             .await;
@@ -521,14 +550,14 @@ pub mod wasm_test {
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         // Can't accept a second preflight request while the first is active.
-        let preflight_acceptance_fail = conductor
+        let preflight_acceptance_fail = conductors[1]
             .raw_handle()
             .call_zome(ZomeCallParams {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "accept_countersigning_preflight_request".into(),
                 cap_secret: None,
-                provenance: alice_pubkey.clone(),
+                provenance: alice_cell.agent_pubkey().clone(),
                 payload: ExternIO::encode(&preflight_request_2).unwrap(),
                 nonce,
                 expires_at,
@@ -540,7 +569,7 @@ pub mod wasm_test {
         );
 
         // Bob can also accept the preflight request.
-        let bob_acceptance: PreflightRequestAcceptance = conductor
+        let bob_acceptance: PreflightRequestAcceptance = conductors[1]
             .call(
                 &bob,
                 "accept_countersigning_preflight_request",
@@ -557,14 +586,14 @@ pub mod wasm_test {
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         // With an accepted preflight creations must fail for alice.
-        let thing_fail_create_alice = conductor
+        let thing_fail_create_alice = conductors[1]
             .raw_handle()
             .call_zome(ZomeCallParams {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
-                provenance: alice_pubkey.clone(),
+                provenance: alice_cell.agent_pubkey().clone(),
                 payload: ExternIO::encode(()).unwrap(),
                 nonce,
                 expires_at,
@@ -574,14 +603,14 @@ pub mod wasm_test {
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
-        let thing_fail_create_bob = conductor
+        let thing_fail_create_bob = conductors[1]
             .raw_handle()
             .call_zome(ZomeCallParams {
                 cell_id: bob.cell_id().clone(),
                 zome_name: bob.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
-                provenance: bob_pubkey.clone(),
+                provenance: bob_cell.agent_pubkey().clone(),
                 payload: ExternIO::encode(()).unwrap(),
                 nonce,
                 expires_at,
@@ -591,7 +620,7 @@ pub mod wasm_test {
 
         // Creating the correct countersigned entry will NOT immediately unlock
         // the chain (it needs Bob to countersign).
-        let countersigned_action_hash_alice: ActionHash = conductor
+        let countersigned_action_hash_alice: ActionHash = conductors[1]
             .call(
                 &alice,
                 "create_a_countersigned_thing",
@@ -601,14 +630,14 @@ pub mod wasm_test {
 
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
-        let thing_fail_create_alice = conductor
+        let thing_fail_create_alice = conductors[1]
             .raw_handle()
             .call_zome(ZomeCallParams {
                 cell_id: alice.cell_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
-                provenance: alice_pubkey.clone(),
+                provenance: alice_cell.agent_pubkey().clone(),
                 payload: ExternIO::encode(()).unwrap(),
                 nonce,
                 expires_at,
@@ -620,12 +649,12 @@ pub mod wasm_test {
         expect_chain_locked(thing_fail_create_alice);
 
         // The countersigned entry does NOT appear in alice's activity yet.
-        let alice_activity_pre: AgentActivity = conductor
+        let alice_activity_pre: AgentActivity = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: alice_pubkey.clone(),
+                    agent_pubkey: alice_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
@@ -636,14 +665,14 @@ pub mod wasm_test {
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
 
         // Creation will still fail for bob.
-        let thing_fail_create_bob = conductor
+        let thing_fail_create_bob = conductors[1]
             .raw_handle()
             .call_zome(ZomeCallParams {
                 cell_id: bob.cell_id().clone(),
                 zome_name: bob.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
-                provenance: bob_pubkey.clone(),
+                provenance: bob_cell.agent_pubkey().clone(),
                 payload: ExternIO::encode(()).unwrap(),
                 nonce,
                 expires_at,
@@ -652,25 +681,25 @@ pub mod wasm_test {
         expect_chain_locked(thing_fail_create_bob);
 
         // After bob commits the same countersigned entry he can unlock his chain.
-        let countersigned_action_hash_bob: ActionHash = conductor
+        let countersigned_action_hash_bob: ActionHash = conductors[1]
             .call(
                 &bob,
                 "create_a_countersigned_thing",
                 vec![alice_response, bob_response],
             )
             .await;
-        let _: ActionHash = conductor.call(&alice, "create_a_thing", ()).await;
-        let _: ActionHash = conductor.call(&bob, "create_a_thing", ()).await;
+        let _: ActionHash = conductors[1].call(&alice, "create_a_thing", ()).await;
+        let _: ActionHash = conductors[1].call(&bob, "create_a_thing", ()).await;
 
         // Action get must not error.
-        let countersigned_action_bob: SignedActionHashed = conductor
+        let countersigned_action_bob: SignedActionHashed = conductors[1]
             .call(
                 &bob,
                 "must_get_action",
                 countersigned_action_hash_bob.clone(),
             )
             .await;
-        let countersigned_action_alice: SignedActionHashed = conductor
+        let countersigned_action_alice: SignedActionHashed = conductors[1]
             .call(
                 &alice,
                 "must_get_action",
@@ -682,7 +711,7 @@ pub mod wasm_test {
         if let Some((countersigned_entry_hash_bob, _)) =
             countersigned_action_bob.action().entry_data()
         {
-            let _countersigned_entry_bob: EntryHashed = conductor
+            let _countersigned_entry_bob: EntryHashed = conductors[1]
                 .call(&bob, "must_get_entry", countersigned_entry_hash_bob)
                 .await;
         } else {
@@ -690,23 +719,23 @@ pub mod wasm_test {
         }
 
         // Record get must not error.
-        let _countersigned_record_bob: Record = conductor
+        let _countersigned_record_bob: Record = conductors[1]
             .call(&bob, "must_get_valid_record", countersigned_action_hash_bob)
             .await;
 
-        let alice_activity: AgentActivity = conductor
+        let alice_activity: AgentActivity = conductors[1]
             .call(
                 &alice,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: alice_pubkey.clone(),
+                    agent_pubkey: alice_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
             )
             .await;
 
-        await_consistency(60, [&alice_cell, &bob_cell])
+        await_consistency(60, [&alice_cell, &bob_cell, &witness_cell])
             .await
             .unwrap();
 
@@ -716,12 +745,12 @@ pub mod wasm_test {
             countersigned_action_alice.action_address(),
         );
 
-        let bob_activity: AgentActivity = conductor
+        let bob_activity: AgentActivity = conductors[1]
             .call(
                 &bob,
                 "get_agent_activity",
                 GetAgentActivityInput {
-                    agent_pubkey: bob_pubkey.clone(),
+                    agent_pubkey: bob_cell.agent_pubkey().clone(),
                     chain_query_filter: ChainQueryFilter::new(),
                     activity_request: ActivityRequest::Full,
                 },
@@ -737,8 +766,8 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "countersigning_an_entry_before_bobs_zome_initialized_fails"]
     async fn lock_chain_failure() {
-        use holochain_nonce::fresh_nonce;
         holochain_trace::test_run();
+
         let RibosomeTestFixture {
             conductor,
             alice,
@@ -1022,7 +1051,6 @@ pub mod wasm_test {
 
     #[tokio::test(flavor = "multi_thread")]
     #[cfg(feature = "slow_tests")]
-    #[ignore = "K2 INTEGRATION--UNSTABLE IGNORED TEST FAILURE"]
     async fn enzymatic_session_success_forced_init() {
         enzymatic_session_success(true).await
     }
@@ -1039,6 +1067,8 @@ pub mod wasm_test {
             bob_pubkey,
             ..
         } = RibosomeTestFixture::new(TestWasm::CounterSigning).await;
+
+        conductor.declare_full_storage_arcs(alice_cell.dna_hash()).await;
 
         if force_init {
             // Run any arbitrary zome call for bob to force him to run init
