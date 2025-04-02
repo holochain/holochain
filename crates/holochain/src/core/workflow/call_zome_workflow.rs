@@ -225,7 +225,11 @@ pub async fn call_zome_function_authorized<R>(
 where
     R: RibosomeT + 'static,
 {
-    match invocation.is_authorized(&host_access).await? {
+    match invocation
+        .is_authorized(&host_access)
+        .await
+        .map_err(WorkflowError::other)?
+    {
         ZomeCallAuthorization::Authorized => {
             let r = ribosome.call_zome_function(host_access, invocation).await;
             Ok((ribosome, r))

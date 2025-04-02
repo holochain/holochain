@@ -8,8 +8,8 @@ use holo_hash::DnaHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::fixt::ActionFixturator;
 use kitsune2_api::{
-    Builder, Config, DhtArc, DynFetch, DynPeerStore, DynPublish, DynTransport, K2Result, OpId,
-    Publish, PublishFactory, SpaceId, Url,
+    Bootstrap, BootstrapFactory, Builder, Config, DhtArc, DynBootstrap, DynFetch, DynPeerStore,
+    DynPublish, DynTransport, K2Result, OpId, Publish, PublishFactory, SpaceId, Url,
 };
 
 /// Spawn a stub network that doesn't respond to any messages.
@@ -76,6 +76,40 @@ impl PublishFactory for NoopPublishFactory {
     ) -> BoxFut<'static, K2Result<DynPublish>> {
         Box::pin(async {
             let instance: DynPublish = Arc::new(NoopPublish);
+            Ok(instance)
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct NoopBootstrap;
+
+impl Bootstrap for NoopBootstrap {
+    fn put(&self, _info: Arc<AgentInfoSigned>) {
+        // Do nothing
+    }
+}
+
+#[derive(Debug)]
+pub struct NoopBootstrapFactory;
+
+impl BootstrapFactory for NoopBootstrapFactory {
+    fn default_config(&self, _config: &mut Config) -> K2Result<()> {
+        Ok(())
+    }
+
+    fn validate_config(&self, _config: &Config) -> K2Result<()> {
+        Ok(())
+    }
+
+    fn create(
+        &self,
+        _builder: Arc<Builder>,
+        _peer_store: DynPeerStore,
+        _space_id: SpaceId,
+    ) -> BoxFut<'static, K2Result<DynBootstrap>> {
+        Box::pin(async {
+            let instance: DynBootstrap = Arc::new(NoopBootstrap);
             Ok(instance)
         })
     }

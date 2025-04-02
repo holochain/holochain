@@ -930,8 +930,10 @@ mod network_impls {
             &self,
             input: BlockTargetId,
             timestamp: Timestamp,
-        ) -> DatabaseResult<bool> {
-            self.spaces.is_blocked(input, timestamp).await
+        ) -> ConductorResult<bool> {
+            self.spaces
+                .is_blocked(input, timestamp, self.holochain_p2p.clone())
+                .await
         }
 
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]

@@ -4,6 +4,7 @@ use crate::sweettest::*;
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
+use kitsune2_api::LocalAgent;
 use std::path::PathBuf;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
@@ -229,6 +230,69 @@ impl SweetConductorBatch {
         })
         .await
         .expect("Timeout while exchanging peer info");
+    }
+
+    /// Let a conductor know about all agents on some other conductor.
+    ///
+    /// Copies from seen to observer.
+    pub async fn reveal_peer_info(&self, observer: usize, seen: usize) {
+        let observer_conductor = &self.0[observer];
+        let mut observer_dna_hashes = Vec::new();
+        for env in observer_conductor
+            .spaces
+            .get_from_spaces(|s| s.dna_hash.clone())
+        {
+            observer_dna_hashes.push(env.clone());
+        }
+
+        let seen_conductor = &self.0[seen];
+        let mut seen_dna_hashes = Vec::new();
+        for env in seen_conductor
+            .spaces
+            .get_from_spaces(|s| s.dna_hash.clone())
+        {
+            seen_dna_hashes.push(env.clone());
+        }
+
+        for dna_hash in seen_dna_hashes {
+            let from_local_agents = seen_conductor
+                .holochain_p2p()
+                .test_kitsune()
+                .space(dna_hash.to_k2_space())
+                .await
+                .unwrap()
+                .local_agent_store()
+                .get_all()
+                .await
+                .unwrap();
+
+            let from_peer_store = seen_conductor
+                .holochain_p2p()
+                .peer_store((*dna_hash).clone())
+                .await
+                .unwrap();
+
+            let mut agent_infos_for_local_agents = Vec::with_capacity(from_local_agents.len());
+            for local_agent in from_local_agents {
+                let agent_info = from_peer_store
+                    .get(local_agent.agent().clone())
+                    .await
+                    .unwrap();
+
+                if let Some(agent_info) = agent_info {
+                    agent_infos_for_local_agents.push(agent_info);
+                }
+            }
+
+            observer_conductor
+                .holochain_p2p()
+                .peer_store((*dna_hash).clone())
+                .await
+                .unwrap()
+                .insert(agent_infos_for_local_agents)
+                .await
+                .unwrap();
+        }
     }
 
     /// Get the DPKI cell for each conductor, if applicable
