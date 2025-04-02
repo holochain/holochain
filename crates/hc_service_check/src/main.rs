@@ -2,8 +2,6 @@ use clap::{Parser, Subcommand};
 use std::io::{Error, Result};
 use std::sync::Arc;
 
-const ONE_KB: [u8; 1024] = [0xdb; 1024];
-
 #[derive(Subcommand, Debug)]
 enum Cmd {
     /// Check the health of a bootstrap server.
