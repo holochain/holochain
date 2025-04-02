@@ -46,10 +46,6 @@ use {
 };
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(
-    feature = "unstable-sharding",
-    ignore = "K2 INTEGRATION--UNSTABLE IGNORED TEST FAILURE"
-)]
 async fn main_workflow() {
     holochain_trace::test_run();
 
@@ -78,7 +74,8 @@ async fn main_workflow() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor =
+        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
@@ -141,6 +138,9 @@ async fn main_workflow() {
         .expect_get()
         .times(1)
         .return_once(|_, _, _| Box::pin(async { Ok(vec![]) }));
+    hc_p2p
+        .expect_target_arcs()
+        .returning(|_| Box::pin(async move { Ok(vec![]) }));
     let network = HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone(), None);
 
     // run validation workflow
