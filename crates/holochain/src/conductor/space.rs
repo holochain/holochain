@@ -1,13 +1,6 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
-use std::{
-    cell::Cell,
-    collections::{hash_map, HashMap},
-    sync::Arc,
-    //time::Duration,
-};
-
 use super::{conductor::RwShare, error::ConductorResult};
 use crate::conductor::{error::ConductorError, state::ConductorState};
 use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
@@ -28,16 +21,16 @@ use holochain_sqlite::prelude::{
     DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindWasm,
     DbSyncLevel, DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
 };
-use holochain_state::{
-    host_fn_workspace::SourceChainWorkspace,
-    mutations,
-    prelude::*,
-    //query::{map_sql_dht_op_common, StateQueryError},
-};
+use holochain_state::{host_fn_workspace::SourceChainWorkspace, mutations, prelude::*};
 use holochain_util::timed;
-use rusqlite::{/*named_params, */ OptionalExtension};
+use rusqlite::OptionalExtension;
 use std::convert::TryInto;
 use std::path::PathBuf;
+use std::{
+    cell::Cell,
+    collections::{hash_map, HashMap},
+    sync::Arc,
+};
 
 #[derive(Clone)]
 /// This is the set of all current
@@ -428,228 +421,6 @@ impl Spaces {
     ) -> DatabaseResult<DbWrite<DbKindPeerMetaStore>> {
         self.get_or_create_space_ref(dna_hash, |space| space.peer_meta_store_db.clone())
     }
-
-    /*
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    /// the network module is requesting a list of dht op hashes
-    /// Get the [`DhtOpHash`]es and authored timestamps for a given time window.
-    pub async fn handle_query_op_hashes(
-        &self,
-        dna_hash: &DnaHash,
-        dht_arc_set: DhtArcSet,
-        window: TimeWindow,
-        max_ops: usize,
-        include_limbo: bool,
-    ) -> ConductorResult<Option<(Vec<DhtOpHash>, TimeWindowInclusive)>> {
-        // The exclusive window bounds.
-        let start = window.start;
-        let end = window.end;
-        let max_ops: u32 = max_ops.try_into().unwrap_or(u32::MAX);
-
-        let db = self.dht_db(dna_hash)?;
-
-        let include_limbo = if include_limbo {
-            "\n"
-        } else {
-            "AND DhtOp.when_integrated IS NOT NULL\n"
-        };
-
-        let intervals = dht_arc_set.intervals();
-        let sql = if let Some(DhtArcRange::Full) = intervals.first() {
-            format!(
-                "{} {} {}",
-                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
-                include_limbo,
-                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P2,
-            )
-        } else {
-            let sql_ranges = intervals
-                .into_iter()
-                .filter(|i| matches!(i, &DhtArcRange::Bounded(_, _)))
-                .map(|interval| match interval {
-                    DhtArcRange::Bounded(start_loc, end_loc) => {
-                        if start_loc <= end_loc {
-                            format!(
-                                "AND storage_center_loc >= {} AND storage_center_loc <= {} \n ",
-                                start_loc, end_loc
-                            )
-                        } else {
-                            format!(
-                                "AND (storage_center_loc < {} OR storage_center_loc > {}) \n ",
-                                end_loc, start_loc
-                            )
-                        }
-                    }
-                    _ => unreachable!(),
-                })
-                .collect::<String>();
-            format!(
-                "{} {} {} {}",
-                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
-                include_limbo,
-                sql_ranges,
-                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P2,
-            )
-        };
-        let results = db
-            .read_async(move |txn| {
-                let mut stmt = txn.prepare_cached(&sql)?;
-                let hashes = stmt
-                    .query_map(
-                        named_params! {
-                            ":from": start,
-                            ":to": end,
-                            ":limit": max_ops,
-                        },
-                        |row| row.get("hash"),
-                    )?
-                    .collect::<rusqlite::Result<Vec<DhtOpHash>>>()?;
-                let range = hashes.first().and_then(|s| hashes.last().map(|e| (s, e)));
-                match range {
-                    Some((start, end)) => {
-                        let start: Timestamp = txn.query_row(
-                            "SELECT authored_timestamp FROM DhtOp WHERE hash = ?",
-                            [start],
-                            |row| row.get(0),
-                        )?;
-                        let end: Timestamp = txn.query_row(
-                            "SELECT authored_timestamp FROM DhtOp WHERE hash = ?",
-                            [end],
-                            |row| row.get(0),
-                        )?;
-                        DatabaseResult::Ok(Some((
-                            hashes,
-                            Timestamp::from_micros(start.0)
-                                ..=Timestamp::from_micros(end.0),
-                        )))
-                    }
-                    None => Ok(None),
-                }
-            })
-            .await?;
-
-        Ok(results)
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, query)))]
-    /// The network module is requesting the content for dht ops
-    pub async fn handle_fetch_op_data(
-        &self,
-        dna_hash: &DnaHash,
-        query: FetchOpDataQuery,
-    ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
-        match query {
-            FetchOpDataQuery::Hashes {
-                op_hash_list,
-                include_limbo,
-            } => {
-                self.handle_fetch_op_data_by_hashes(dna_hash, op_hash_list, include_limbo)
-                    .await
-            }
-            FetchOpDataQuery::Regions(regions) => {
-                self.handle_fetch_op_data_by_regions(dna_hash, regions)
-                    .await
-            }
-        }
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, regions)))]
-    /// The network module is requesting the content for dht ops
-    pub async fn handle_fetch_op_data_by_regions(
-        &self,
-        dna_hash: &DnaHash,
-        regions: Vec<RegionBounds>,
-    ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
-        let sql = holochain_sqlite::sql::sql_cell::FETCH_OPS_BY_REGION;
-        Ok(self
-            .dht_db(dna_hash)?
-            .read_async(move |txn| {
-                let mut stmt = txn.prepare_cached(sql).map_err(StateQueryError::from)?;
-                let results = regions
-                    .into_iter()
-                    .map(|bounds| {
-                        let (x0, x1) = bounds.x;
-                        let (t0, t1) = bounds.t;
-                        stmt.query_and_then(
-                            named_params! {
-                                ":storage_start_loc": x0,
-                                ":storage_end_loc": x1,
-                                ":timestamp_min": t0,
-                                ":timestamp_max": t1,
-                            },
-                            |row| {
-                                let hash: DhtOpHash =
-                                    row.get("hash").map_err(StateQueryError::from)?;
-                                Ok(map_sql_dht_op_common(false, false, "type", row)?
-                                    .map(|op| (hash, op)))
-                            },
-                        )
-                        .map_err(StateQueryError::from)?
-                        .collect::<Result<Vec<Option<_>>, StateQueryError>>()
-                    })
-                    .collect::<Result<Vec<Vec<Option<_>>>, _>>()?
-                    .into_iter()
-                    .flatten()
-                    .flatten()
-                    .collect();
-                StateQueryResult::Ok(results)
-            })
-            .await?)
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, op_hashes)))]
-    /// The network module is requesting the content for dht ops
-    pub async fn handle_fetch_op_data_by_hashes(
-        &self,
-        dna_hash: &DnaHash,
-        op_hashes: Vec<holo_hash::DhtOpHash>,
-        include_limbo: bool,
-    ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
-        let mut sql = "
-            SELECT DhtOp.hash, DhtOp.type AS dht_type,
-            Action.blob AS action_blob,
-            Action.author as author,
-            Entry.blob AS entry_blob
-            FROM DHtOp
-            JOIN Action ON DhtOp.action_hash = Action.hash
-            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
-            WHERE
-            DhtOp.hash = ?
-        "
-        .to_string();
-
-        if !include_limbo {
-            sql.push_str(
-                "
-                AND
-                DhtOp.when_integrated IS NOT NULL
-            ",
-            );
-        }
-
-        let db = self.dht_db(dna_hash)?;
-        let results = db
-            .read_async(move |txn| {
-                let mut out = Vec::with_capacity(op_hashes.len());
-                for hash in op_hashes {
-                    let mut stmt = txn.prepare_cached(&sql)?;
-                    let mut rows = stmt.query([hash])?;
-                    if let Some(row) = rows.next()? {
-                        let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
-                        let hash: DhtOpHash = row.get("hash")?;
-                        out.push((hash, op));
-                    } else {
-                        return Err(holochain_state::query::StateQueryError::Sql(
-                            rusqlite::Error::QueryReturnedNoRows,
-                        ));
-                    }
-                }
-                StateQueryResult::Ok(out)
-            })
-            .await?;
-        Ok(results)
-    }
-    */
 
     /// we are receiving a "publish" event from the network.
     #[cfg_attr(
