@@ -85,7 +85,10 @@ async fn test_new_lair_conductor_integration() {
     stdin.write_all(b"passphrase").await.unwrap();
     drop(stdin);
 
-    let (mut client, rx) = retry_websocket_client_by_port(ADMIN_PORT, 10, std::time::Duration::from_secs(1)).await.unwrap();
+    let (mut client, rx) =
+        retry_websocket_client_by_port(ADMIN_PORT, 10, std::time::Duration::from_secs(1))
+            .await
+            .unwrap();
     let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
     let agent_key = generate_agent_pub_key(&mut client, 15_000).await.unwrap();
