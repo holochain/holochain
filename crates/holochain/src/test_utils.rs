@@ -699,18 +699,21 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
 }
 
 /// Helper for displaying agent infos stored on a conductor
-pub async fn display_agent_infos(_conductor: &ConductorHandle) {
-    todo!()
-    /*
-    for cell_id in conductor.running_cell_ids() {
-        let space = cell_id.dna_hash();
-        let db = conductor.get_p2p_db(space);
-        let info = p2p_agent_store::dump_state(db.into(), Some(cell_id))
+pub async fn display_agent_infos(conductor: &ConductorHandle) {
+    let all_dna_hashes = conductor.spaces.get_from_spaces(|s| (*s.dna_hash).clone());
+
+    for dna_hash in all_dna_hashes {
+        let peer_store = conductor
+            .holochain_p2p()
+            .peer_store(dna_hash.clone())
             .await
             .unwrap();
-        tracing::debug!(%info);
+        let all_peers = peer_store.get_all().await.unwrap();
+
+        for peer in all_peers {
+            tracing::debug!(dna_hash = %dna_hash, ?peer);
+        }
     }
-    */
 }
 
 /// Helper to create a signed zome invocation for tests
