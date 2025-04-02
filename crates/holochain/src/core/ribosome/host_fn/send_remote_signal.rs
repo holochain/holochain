@@ -33,7 +33,7 @@ pub fn send_remote_signal(
         } => {
             const FN_NAME: &str = "recv_remote_signal";
             let from_agent = super::agent_info::agent_info(_ribosome, call_context.clone(), ())?
-                .agent_latest_pubkey;
+                .agent_initial_pubkey;
             // Timeouts and errors are ignored,
             // this is a send and forget operation.
             let network = call_context.host_context().network().clone();

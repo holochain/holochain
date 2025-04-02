@@ -127,6 +127,8 @@ sqlite = [
   "holochain_timestamp/sqlite",
 ]
 
+unstable-dpki = []
+
 unstable-functions = []
 
 unstable-countersigning = []

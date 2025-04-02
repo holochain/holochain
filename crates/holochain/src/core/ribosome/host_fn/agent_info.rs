@@ -34,8 +34,9 @@ pub fn agent_info(
                 .chain_head_nonempty()
                 .map_err(|e| wasm_error!(WasmErrorInner::Host(e.to_string())))?;
             Ok(AgentInfo {
-                agent_initial_pubkey: agent_pubkey.clone(),
-                agent_latest_pubkey: agent_pubkey,
+                #[cfg(feature = "unstable-dpki")]
+                agent_latest_pubkey: agent_pubkey.clone(),
+                agent_initial_pubkey: agent_pubkey,
                 chain_head: head.into_tuple(),
             })
         }
@@ -71,6 +72,7 @@ pub mod test {
         let call_info: CallInfo = conductor.call(&alice, "call_info", ()).await;
         let agent_info: AgentInfo = conductor.call(&alice, "agent_info", ()).await;
         assert_eq!(agent_info.agent_initial_pubkey, alice_pubkey);
+        #[cfg(feature = "unstable-dpki")]
         assert_eq!(agent_info.agent_latest_pubkey, alice_pubkey);
 
         assert_eq!(agent_info.chain_head.1, call_info.as_at.1 + 1,);
