@@ -5,6 +5,7 @@
 use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holochain::sweettest::SweetConductorBatch;
+use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::SweetInlineZomes;
 use holochain::sweettest::{await_consistency, SweetConductor, SweetDnaFile};
 use holochain::test_utils::inline_zomes::simple_crud_zome;
@@ -18,7 +19,16 @@ async fn get_with_zero_arc_2_way() {
     holochain_trace::test_run();
 
     // Standard config with arc clamped to zero and publishing off
-    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+    let empty_arc_conductor_config = SweetConductorConfig::rendezvous(false)
+        .no_dpki_mustfix()
+        .tune_network_config(|nc| {
+            nc.disable_publish = true;
+            nc.target_arc_factor = 0;
+        });
+    let standard_config = SweetConductorConfig::rendezvous(false);
+    let mut conductors =
+        SweetConductorBatch::from_configs_rendezvous([standard_config, empty_arc_conductor_config])
+            .await;
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
     let apps = conductors.setup_app("app", [&dna_file]).await.unwrap();
