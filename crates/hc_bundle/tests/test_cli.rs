@@ -431,7 +431,20 @@ fn test_all_dna_manifests_match_schema() {
         .filter_map(|e| e.ok())
     {
         let file_name = entry.file_name().to_string_lossy();
-        if file_name.eq("dna.yaml") {
+        let should_check = if cfg!(feature = "unstable-migration") {
+            entry
+                .path()
+                .parent()
+                .unwrap()
+                .ends_with("dna-unstable-migration")
+        } else {
+            !entry
+                .path()
+                .parent()
+                .unwrap()
+                .ends_with("dna-unstable-migration")
+        };
+        if file_name.eq("dna.yaml") && should_check {
             let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
             let manifest: Value = serde_yaml::from_str(manifest_content.as_str()).unwrap();
 
