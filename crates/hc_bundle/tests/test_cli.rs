@@ -415,9 +415,9 @@ async fn test_hash_dna_function() {
 #[test]
 fn test_all_dna_manifests_match_schema() {
     let schema = if cfg!(feature = "unstable-migration") {
-        load_schema("dna-manifest-unstable-migration");
+        load_schema("dna-manifest-unstable-migration")
     } else {
-        load_schema("dna-manifest");
+        load_schema("dna-manifest")
     };
 
     for entry in WalkDir::new("./tests/fixtures")
