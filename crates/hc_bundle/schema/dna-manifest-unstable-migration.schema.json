@@ -19,7 +19,6 @@
       "type": "object",
       "description": "Specification of integrity zomes and properties",
       "additionalProperties": false,
-      "required": ["origin_time"],
       "properties": {
         "network_seed": {
           "type": ["string", "null"]
@@ -27,9 +26,6 @@
         "properties": {
           "type": ["object", "null"],
           "additionalProperties": true
-        },
-        "origin_time": {
-          "type": ["string", "null"]
         },
         "zomes": {
           "type": "array",
