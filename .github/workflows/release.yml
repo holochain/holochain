@@ -21,9 +21,8 @@
 name: release holochain
 
 on:
-# TODO re-enabled after K2 integration
-#  schedule:
-#    - cron: "0 0 * * 3" # At 12:00am on Wednesday
+  schedule:
+    - cron: "0 0 * * 3" # At 12:00am on Wednesday
   workflow_dispatch:
     inputs:
       # holochain_url:
