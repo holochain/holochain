@@ -2,7 +2,6 @@ use bytes::Bytes;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use kitsune2_api::{AgentId, AgentInfo, BoxFut, DhtArc, K2Error, K2Result, LocalAgent, Signer};
-use lair_keystore_api::dependencies::parking_lot;
 use parking_lot::Mutex;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;

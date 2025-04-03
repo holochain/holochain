@@ -2368,9 +2368,9 @@ dependencies = [
 
 [[package]]
 name = "hc_seed_bundle"
-version = "0.2.5"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f930e251000e258ff14c36c4d045c9ec1dcbf2a6fff53b1432342b9a34df5ae"
+checksum = "366f0b5b1e9bb9a40de0b44d1bb43da92f86fd94394744fb21dda333291b7f67"
 dependencies = [
  "futures",
  "one_err",
@@ -2378,7 +2378,8 @@ dependencies = [
  "rmpv",
  "serde",
  "serde_bytes",
- "sodoken 0.0.11",
+ "sodoken 0.0.904-alpha",
+ "tokio",
 ]
 
 [[package]]
@@ -2652,7 +2653,7 @@ dependencies = [
  "serde_yaml",
  "sha3",
  "shrinkwraprs",
- "sodoken 0.0.11",
+ "sodoken 0.0.904-alpha",
  "structopt",
  "strum 0.18.0",
  "subtle-encoding",
@@ -2801,7 +2802,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "sodoken 0.0.11",
+ "sodoken 0.0.904-alpha",
  "tokio",
  "tracing",
  "url2",
@@ -2851,7 +2852,7 @@ dependencies = [
  "nanoid",
  "serde",
  "serde_yaml",
- "sodoken 0.0.11",
+ "sodoken 0.0.904-alpha",
  "tempfile",
  "url2",
 ]
@@ -2930,7 +2931,7 @@ dependencies = [
  "serde_bytes",
  "serde_yaml",
  "shrinkwraprs",
- "sodoken 0.0.11",
+ "sodoken 0.0.904-alpha",
  "tempdir",
  "thiserror 1.0.69",
  "tokio",
@@ -3079,7 +3080,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shrinkwraprs",
- "sodoken 0.0.11",
+ "sodoken 0.0.904-alpha",
  "sqlformat",
  "tempfile",
  "thiserror 1.0.69",
@@ -3252,7 +3253,7 @@ dependencies = [
  "once_cell",
  "rpassword",
  "schemars",
- "sodoken 0.0.11",
+ "sodoken 0.0.904-alpha",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -4065,9 +4066,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2"
-version = "0.0.1-alpha.17"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1289faa08072bde9c43df083724f808fe67602fdad29c1755fc4c557123b5cec"
+checksum = "68c32effb9aa3210522c3224857e2e77e3f8f3284108a5b7d488e31f88c4e4f7"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4078,9 +4079,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_api"
-version = "0.0.1-alpha.17"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0227fd771efb86f3d51edc15d102c47bc46c92096170341dff05610cb08d2c51"
+checksum = "61d9cd85d168fa3b51b9a0271b66a2f6c0def47fb6e06483a60878e6448e0c3c"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4095,9 +4096,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_client"
-version = "0.0.1-alpha.17"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66b2b912e3f637df58850fecb40518027633a5748cc27926721ac420c25013a3"
+checksum = "19ab1d19bf878db3a294e3943a861c2c59358761deb8ecbf1d2faa6fbcdb4893"
 dependencies = [
  "base64 0.22.1",
  "kitsune2_api",
@@ -4108,9 +4109,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_srv"
-version = "0.0.1-alpha.17"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e587cd6fa54e3a453823a690d04b099150464a511daca8b03836bd8eb4aa857c"
+checksum = "8cd942ce74cf3de34974d5c54e92f28599dbec3d7392292651c8f7ea09ce45dc"
 dependencies = [
  "async-channel",
  "axum",
@@ -4135,9 +4136,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_core"
-version = "0.0.1-alpha.17"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06c76dee50207b699ad914d85e17025279311c98b2b8d54215ecc5a3ea2da95b"
+checksum = "acddf481b33f8591e2b8bc3c1670f0afd54a3ff7107ae558809256ad387af1d3"
 dependencies = [
  "backon",
  "bytes",
@@ -4157,9 +4158,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_dht"
-version = "0.0.1-alpha.17"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8bd25f9de522dad2c3486fdfecf2e21fee8add4960da6a7f011255c5dcd2437"
+checksum = "68ff45bee96156f69db7bdb50620d63296b6cfd8962b66a8980f9f55a8c6c81d"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4168,9 +4169,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_gossip"
-version = "0.0.1-alpha.17"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3d82334f5cb68b35b26b7d7e2952c1381b30a23d5eb1878b857d8ce1a5ab42e"
+checksum = "9212bfa16f9a4162ba194c144d4f3c33588dbb918a568ad817caea8f39957647"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4187,9 +4188,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_transport_tx5"
-version = "0.0.1-alpha.17"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ede922705ace5a45d66f429cab93b23f8c3e9e4a42890f5cf5d2fe226da44e45"
+checksum = "c67297d662fb4a961155f618a8638f7415131a87ed5215e2526f849b20c0eb5a"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4203,9 +4204,9 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9b6f792c308afb82ceac6035fcf0ad321eaf271b892d08789d822e78b112a4d"
+checksum = "c955e67bb0658a68d59279a610145ee7e7a71d71f2571fa8328af87169c232bd"
 dependencies = [
  "lair_keystore_api",
  "pretty_assertions",
@@ -4219,17 +4220,17 @@ dependencies = [
 
 [[package]]
 name = "lair_keystore_api"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5d6aa053bddb4e4c36652217349511ea9c51f1bdaf60530a7013d2d4c91204e"
+checksum = "b766807d78bd0838c5765d78f96b691df635649c9ef0c39b213d0494cac26623"
 dependencies = [
  "base64 0.22.1",
  "dunce",
  "hc_seed_bundle",
- "lru",
+ "lru 0.13.0",
  "nanoid",
  "once_cell",
- "parking_lot",
+ "one_err",
  "rcgen",
  "serde",
  "serde_json",
@@ -4422,6 +4423,15 @@ name = "lru"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "234cf4f4a04dc1f57e24b96cc0cd600cf2af460d4161ac5ecdd0af8e1f3b2a38"
+dependencies = [
+ "hashbrown 0.15.2",
+]
+
+[[package]]
+name = "lru"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "227748d55f2f0ab4735d87fd623798cb6b664512fe979705f829c9f81c934465"
 dependencies = [
  "hashbrown 0.15.2",
 ]
@@ -4822,6 +4832,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.100",
+]
+
+[[package]]
+name = "objc2-core-foundation"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daeaf60f25471d26948a1c2f840e3f7d86f4109e3af4e8e4b5cd70c39690d925"
+dependencies = [
+ "bitflags 2.9.0",
 ]
 
 [[package]]
@@ -5698,7 +5717,7 @@ dependencies = [
  "indoc",
  "instability",
  "itertools 0.13.0",
- "lru",
+ "lru 0.12.5",
  "paste",
  "strum 0.26.3",
  "unicode-segmentation",
@@ -6754,27 +6773,23 @@ dependencies = [
 
 [[package]]
 name = "sodoken"
-version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "907e0ea9699b846c2586ea5685e9abf5963fca64a5179a406e6ac02b94564e30"
-dependencies = [
- "libc",
- "libsodium-sys-stable",
- "num_cpus",
- "once_cell",
- "one_err",
- "parking_lot",
- "tokio",
-]
-
-[[package]]
-name = "sodoken"
 version = "0.0.901-alpha"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "888b6eb6ff4b987cd894f90d396562c9f332dfa3ab27a00c9cbc798d2f402037"
 dependencies = [
  "libc",
  "libsodium-sys-stable",
+]
+
+[[package]]
+name = "sodoken"
+version = "0.0.904-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52b966ca637336703b722a90be2e5271f4d42ac8785b1efbbcdc3f5b34999148"
+dependencies = [
+ "libc",
+ "libsodium-sys-stable",
+ "zeroize",
 ]
 
 [[package]]
@@ -7010,15 +7025,14 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.32.1"
+version = "0.34.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c33cd241af0f2e9e3b5c32163b873b29956890b5342e6745b917ce9d490f4af"
+checksum = "a4b93974b3d3aeaa036504b8eefd4c039dced109171c1ae973f1dc63b2c7e4b2"
 dependencies = [
- "core-foundation-sys",
  "libc",
  "memchr",
  "ntapi",
- "rayon",
+ "objc2-core-foundation",
  "windows 0.57.0",
 ]
 

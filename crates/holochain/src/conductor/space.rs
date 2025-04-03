@@ -24,6 +24,7 @@ use holochain_sqlite::prelude::{
 };
 use holochain_state::{host_fn_workspace::SourceChainWorkspace, mutations, prelude::*};
 use holochain_util::timed;
+use lair_keystore_api::prelude::SharedLockedArray;
 use rusqlite::OptionalExtension;
 use std::convert::TryInto;
 use std::path::PathBuf;
@@ -128,7 +129,7 @@ impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub async fn new(
         config: Arc<ConductorConfig>,
-        passphrase: sodoken::BufRead,
+        passphrase: SharedLockedArray,
     ) -> ConductorResult<Self> {
         // do this before any awaits
         let danger_print_db_secrets = DANGER_PRINT_DB_SECRETS.get();
@@ -143,7 +144,7 @@ impl Spaces {
 
         let db_key_path = root_db_dir.join("db.key");
         let db_key = match tokio::fs::read_to_string(db_key_path.clone()).await {
-            Ok(locked) => DbKey::load(locked, passphrase).await?,
+            Ok(locked) => DbKey::load(locked, passphrase.clone()).await?,
             Err(_) => {
                 let db_key = DbKey::generate(passphrase).await?;
                 tokio::fs::write(db_key_path, db_key.locked.clone()).await?;
@@ -154,7 +155,7 @@ impl Spaces {
         if danger_print_db_secrets {
             eprintln!(
                 "--beg-db-secrets--{}--end-db-secrets--",
-                &String::from_utf8_lossy(&db_key.unlocked.read_lock())
+                &String::from_utf8_lossy(&*db_key.unlocked.lock().unwrap().lock())
             );
         }
 
@@ -679,7 +680,9 @@ impl TestSpaces {
                 ..Default::default()
             }
             .into(),
-            sodoken::BufRead::new_no_lock(b"passphrase"),
+            Arc::new(std::sync::Mutex::new(sodoken::LockedArray::from(
+                b"passphrase".to_vec(),
+            ))),
         )
         .await
         .unwrap();

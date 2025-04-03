@@ -1,8 +1,9 @@
 //! Helpers for running the conductor.
 
-use std::path::Path;
-use std::process::Stdio;
-
+use crate::calls::attach_app_interface;
+use crate::calls::AddAppWs;
+use crate::cli::LaunchInfo;
+use crate::CmdRunner;
 use anyhow::anyhow;
 use holochain_conductor_api::conductor::paths::ConfigFilePath;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
@@ -14,15 +15,13 @@ use holochain_conductor_config::config::write_config;
 use holochain_conductor_config::ports::set_admin_port;
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
+use std::path::Path;
+use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
-
-use crate::calls::attach_app_interface;
-use crate::calls::AddAppWs;
-use crate::cli::LaunchInfo;
-use crate::CmdRunner;
 
 // MAYBE: Export these strings from their respective repos
 //        so that we can be sure to keep them in sync.
@@ -149,12 +148,12 @@ async fn start_holochain(
     tx_config: oneshot::Sender<u16>,
 ) -> anyhow::Result<(Child, Option<Child>)> {
     use tokio::io::AsyncWriteExt;
-    let passphrase = holochain_util::pw::pw_get()?.read_lock().to_vec();
+    let passphrase = holochain_util::pw::pw_get()?;
 
     let lair = match config.keystore {
         KeystoreConfig::LairServer { .. } => {
             let lair = start_lair(
-                passphrase.as_slice(),
+                passphrase.clone(),
                 config_root_path.is_also_data_root_path().try_into()?,
             )
             .await?;
@@ -177,7 +176,8 @@ async fn start_holochain(
     let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
 
     let mut stdin = holochain.stdin.take().unwrap();
-    stdin.write_all(&passphrase).await?;
+    let pass = (*passphrase.lock().unwrap().lock()).to_vec();
+    stdin.write_all(&pass).await?;
     stdin.shutdown().await?;
     drop(stdin);
 
@@ -186,7 +186,10 @@ async fn start_holochain(
     Ok((holochain, lair))
 }
 
-async fn start_lair(passphrase: &[u8], lair_path: KeystorePath) -> anyhow::Result<Child> {
+async fn start_lair(
+    passphrase: Arc<Mutex<sodoken::LockedArray>>,
+    lair_path: KeystorePath,
+) -> anyhow::Result<Child> {
     use tokio::io::AsyncWriteExt;
 
     tracing::info!("\n\n----\nstarting lair\n----\n\n");
@@ -205,7 +208,8 @@ async fn start_lair(passphrase: &[u8], lair_path: KeystorePath) -> anyhow::Resul
     let mut lair = cmd.spawn().expect("Failed to spawn lair-keystore");
 
     let mut stdin = lair.stdin.take().unwrap();
-    stdin.write_all(passphrase).await?;
+    let pass = (*passphrase.lock().unwrap().lock()).to_vec();
+    stdin.write_all(&pass).await?;
     stdin.shutdown().await?;
     drop(stdin);
 
