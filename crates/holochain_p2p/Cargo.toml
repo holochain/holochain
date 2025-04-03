@@ -40,13 +40,13 @@ tokio-stream = "0.1"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = "0.1.0"
-kitsune2_api = "0.1.0"
-kitsune2_core = "0.1.0"
-kitsune2_gossip = "0.1.0"
+kitsune2 = "0.1.1"
+kitsune2_api = "0.1.1"
+kitsune2_core = "0.1.1"
+kitsune2_gossip = "0.1.1"
 bytes = "1.10"
 holochain_sqlite = { version = "^0.5.0-dev.20", path = "../holochain_sqlite" }
-lair_keystore_api = "=0.6.0"
+lair_keystore_api = "=0.6.1"
 parking_lot = "0.12.3"
 holochain_state = { version = "^0.5.0-dev.22", path = "../holochain_state" }
 holochain_timestamp = { version = "0.5.0-dev.1", path = "../timestamp" }
