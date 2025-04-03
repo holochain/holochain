@@ -150,8 +150,10 @@ async fn zero_arc_can_link_to_uncached_base() {
     conductors.exchange_peer_info().await;
 
     let alice_pk = alice.cell_id().agent_pubkey().clone();
+    let carol_pk = carol_empty_arc.cell_id().agent_pubkey().clone();
 
     println!("@!@!@ alice_pk: {alice_pk:?}");
+    println!("@!@!@ carol_pk: {carol_pk:?}");
 
     let action_hash: ActionHash = conductors[0]
         .call(
@@ -207,9 +209,9 @@ async fn zero_arc_can_link_to_uncached_base() {
         )
         .await;
 
-    retry_until_timeout!(60_000, 500, {
+    retry_until_timeout!(5000, 500, {
         if conductors[0]
-            .all_ops_integrated(dna_file.dna_hash())
+            .all_ops_of_author_integrated(dna_file.dna_hash(), alice.agent_pubkey())
             .unwrap()
         {
             break;
