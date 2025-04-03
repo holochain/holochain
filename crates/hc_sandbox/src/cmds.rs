@@ -1,8 +1,7 @@
+use holochain_conductor_api::conductor::NetworkConfig;
 use std::path::PathBuf;
 
 use clap::Parser;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
-use kitsune_p2p_types::config::TransportConfig;
 use url2::Url2;
 
 // This creates a new Holochain sandbox
@@ -182,7 +181,7 @@ Run `hc sandbox generate --help` for more options."
 }
 
 impl Network {
-    pub async fn to_kitsune(this: &Option<&Self>) -> Option<KitsuneP2pConfig> {
+    pub async fn to_kitsune(this: &Option<&Self>) -> Option<NetworkConfig> {
         let Network {
             transport,
             bootstrap,
@@ -191,8 +190,10 @@ impl Network {
             Some(n) => (*n).clone(),
         };
 
-        let mut kit = KitsuneP2pConfig::mem();
-        kit.bootstrap_service = bootstrap;
+        let mut kit = NetworkConfig::default();
+        if let Some(bootstrap) = bootstrap {
+            kit.bootstrap_url = bootstrap;
+        }
 
         match transport {
             NetworkType::Mem => (),
@@ -211,11 +212,8 @@ impl Network {
                     }
                     None => None,
                 };
-                let transport = TransportConfig::WebRTC {
-                    signal_url,
-                    webrtc_config,
-                };
-                kit.transport_pool = vec![transport];
+                kit.signal_url = url2::url2!("{}", signal_url);
+                kit.webrtc_config = webrtc_config;
             }
         }
         Some(kit)

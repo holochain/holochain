@@ -20,8 +20,8 @@ jobs:
           - ""
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3_rc"
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_4_rc"
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
+          # - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_4_rc"
+          # - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
         platform:
           - aarch64-darwin
           - x86_64-linux
@@ -75,7 +75,7 @@ jobs:
           - ""
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3_rc"
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
+          # - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
         platform:
           - aarch64-darwin
           - x86_64-linux

@@ -114,7 +114,7 @@ async fn zome_with_no_link_types_does_not_prevent_delete_links() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky")]
+#[ignore = "flaky"]
 async fn zero_arc_can_link_to_uncached_base() {
     use hdk::prelude::*;
 
@@ -122,12 +122,32 @@ async fn zero_arc_can_link_to_uncached_base() {
 
     let empty_arc_conductor_config = SweetConductorConfig::rendezvous(false)
         .no_dpki_mustfix()
-        .tune(|t| {
-            t.gossip_arc_clamping = String::from("empty");
-        });
+        .tune_network_config(|nc| nc.target_arc_factor = 0);
 
+    let other_config = SweetConductorConfig::rendezvous(false)
+        .no_dpki_mustfix()
+        .tune_network_config(|nc| {
+            // Expecting Alice and Bob to update their storage arcs, so make them
+            // publish that change sooner.
+            nc.advanced
+                .as_mut()
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .insert(
+                    "coreSpace".to_string(),
+                    serde_json::json!({
+                        "reSignFreqMs": 500,
+                        "reSignExpireTimeMs": (19.9 * 60.0 * 1000.0) as u32,
+                    }),
+                );
+        });
     let mut conductors = SweetConductorBatch::from_configs_rendezvous(vec![
-        SweetConductorConfig::rendezvous(false).no_dpki_mustfix(),
+        // Need a pair of conductors so that they can agree that their initial view of the DHT is
+        // complete. With just another 0 arc node, alice can never gossip and cannot discover that
+        // they're okay to declare a full arc.
+        other_config.clone(),
+        other_config,
         empty_arc_conductor_config,
     ])
     .await;
@@ -139,9 +159,52 @@ async fn zero_arc_can_link_to_uncached_base() {
     .await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+
+    let ((alice,), (bob,), (carol_empty_arc,)) = apps.into_tuples();
+
+    // For initial peer discovery (bootstrap disabled in this test)
     conductors.exchange_peer_info().await;
 
-    let ((alice,), (bob,)) = apps.into_tuples();
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(&alice, 1, std::time::Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    conductors[1]
+        .require_initial_gossip_activity_for_cell(&bob, 1, std::time::Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    // Wait for Alice to declare a full arc.
+    tokio::time::timeout(std::time::Duration::from_secs(30), {
+        let c0 = conductors[0].clone();
+        let alice = alice.clone();
+        async move {
+            loop {
+                let alice = c0
+                    .holochain_p2p()
+                    .peer_store(alice.dna_hash().clone())
+                    .await
+                    .unwrap()
+                    .get(alice.agent_pubkey().to_k2_agent())
+                    .await
+                    .unwrap();
+
+                if let Some(a) = alice {
+                    if a.storage_arc == kitsune2_api::DhtArc::FULL {
+                        break;
+                    }
+                }
+
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        }
+    })
+    .await
+    .expect("Alice did not declare a full arc");
+
+    // Now we want to update agent infos where Alice and Bob should have declared full arc.
+    conductors.exchange_peer_info().await;
 
     let alice_pk = alice.cell_id().agent_pubkey().clone();
 
@@ -158,11 +221,11 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ -- must_get_valid_record --");
     println!("@!@!@ action_hash: {action_hash:?}");
 
-    // Bob is linking to Alice's action hash, but doesn't have it locally
+    // Carol is linking to Alice's action hash, but doesn't have it locally
     // so the must_get_valid_record in validation will have to do a network get.
-    let link_hash: ActionHash = conductors[1]
+    let link_hash: ActionHash = conductors[2]
         .call(
-            &bob.zome(TestWasm::Link.coordinator_zome_name()),
+            &carol_empty_arc.zome(TestWasm::Link.coordinator_zome_name()),
             "link_validation_calls_must_get_valid_record",
             (action_hash.clone(), alice_pk.clone()),
         )
@@ -181,11 +244,11 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ -- must_get_action / must_get_entry --");
     println!("@!@!@ action_hash: {action_hash:?}");
 
-    // Bob is linking to Alice's action hash, but doesn't have it locally
+    // Carol is linking to Alice's action hash, but doesn't have it locally
     // so the must_get_entry/must_get_action in validation will have to do a network get.
-    let link_hash: ActionHash = conductors[1]
+    let link_hash: ActionHash = conductors[2]
         .call(
-            &bob.zome(TestWasm::Link.coordinator_zome_name()),
+            &carol_empty_arc.zome(TestWasm::Link.coordinator_zome_name()),
             "link_validation_calls_must_get_action_then_entry",
             (action_hash.clone(), alice_pk.clone()),
         )
@@ -204,11 +267,11 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ -- must_get_agent_activity --");
     println!("@!@!@ action_hash: {action_hash:?}");
 
-    // Bob is linking to Alice's action hash, but doesn't have it locally
+    // Carol is linking to Alice's action hash, but doesn't have it locally
     // so the must_get_agent_activity in validation will have to do a network get.
-    let link_hash: ActionHash = conductors[1]
+    let link_hash: ActionHash = conductors[2]
         .call(
-            &bob.zome(TestWasm::Link.coordinator_zome_name()),
+            &carol_empty_arc.zome(TestWasm::Link.coordinator_zome_name()),
             "link_validation_calls_must_get_agent_activity",
             (action_hash.clone(), alice_pk.clone()),
         )

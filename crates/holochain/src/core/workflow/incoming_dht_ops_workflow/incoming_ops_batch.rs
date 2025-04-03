@@ -8,7 +8,6 @@ type InOpBatchRcv = tokio::sync::oneshot::Receiver<WorkflowResult<()>>;
 #[derive(Debug)]
 pub struct InOpBatchEntry {
     pub snd: InOpBatchSnd,
-    pub request_validation_receipt: bool,
     pub ops: Vec<DhtOpHashed>,
 }
 
@@ -25,15 +24,10 @@ impl IncomingOpsBatch {
     /// if result.0.is_some() -- the batch should be run now
     pub fn check_insert(
         &self,
-        request_validation_receipt: bool,
         ops: Vec<DhtOpHashed>,
     ) -> (Option<Vec<InOpBatchEntry>>, InOpBatchRcv) {
         let (snd, rcv) = tokio::sync::oneshot::channel();
-        let entry = InOpBatchEntry {
-            snd,
-            request_validation_receipt,
-            ops,
-        };
+        let entry = InOpBatchEntry { snd, ops };
         self.0.share_mut(|batch| {
             if batch.is_running {
                 // there is already a batch running, just queue this
@@ -87,7 +81,7 @@ mod tests {
         let batch = IncomingOpsBatch::default();
         assert!(!batch.is_running());
 
-        batch.check_insert(false, vec![]);
+        batch.check_insert(vec![]);
         assert!(batch.is_running());
 
         let next_content = batch.check_end();
@@ -97,10 +91,10 @@ mod tests {
     #[test]
     fn adds_to_pending_while_running() {
         let batch = IncomingOpsBatch::default();
-        batch.check_insert(false, vec![]);
+        batch.check_insert(vec![]);
         assert!(batch.is_running());
 
-        batch.check_insert(false, vec![]);
+        batch.check_insert(vec![]);
         assert!(batch.is_running()); // stays running, just to be sure
 
         let next_content = batch.check_end();
@@ -113,7 +107,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn batches_can_await_completion() {
         let batch = IncomingOpsBatch::default();
-        let (mut batch_entry, first_recv) = batch.check_insert(false, vec![]);
+        let (mut batch_entry, first_recv) = batch.check_insert(vec![]);
         assert!(batch.is_running());
 
         tokio::spawn({
@@ -128,7 +122,7 @@ mod tests {
             }
         });
 
-        let (no_content, second_recv) = batch.check_insert(false, vec![]);
+        let (no_content, second_recv) = batch.check_insert(vec![]);
         assert!(no_content.is_none());
 
         first_recv.await.unwrap().unwrap();

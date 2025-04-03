@@ -61,7 +61,7 @@ where
     if result == InitResult::Pass {
         let flushed_actions = workspace
             .source_chain()
-            .flush(network.storage_arcs().await?, network.chc())
+            .flush(network.target_arcs().await?, network.chc())
             .await?;
 
         send_post_commit(
@@ -117,20 +117,14 @@ where
     };
 
     // Insert the init marker
-    // FIXME: For some reason if we don't spawn here
-    // this future never gets polled again.
     let ws = workspace.clone();
-
-    tokio::task::spawn(async move {
-        ws.source_chain()
-            .put(
-                builder::InitZomesComplete {},
-                None,
-                ChainTopOrdering::Strict,
-            )
-            .await
-    })
-    .await??;
+    ws.source_chain()
+        .put(
+            builder::InitZomesComplete {},
+            None,
+            ChainTopOrdering::Strict,
+        )
+        .await?;
 
     // TODO: Validate scratch items
     super::inline_validation(workspace, network, conductor_handle, ribosome).await?;

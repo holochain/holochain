@@ -66,14 +66,10 @@ use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
-use holochain_conductor_api::JsonDump;
 pub use holochain_conductor_services::*;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::event::HolochainP2pEvent;
-use holochain_p2p::DnaHashExt;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::sql::sql_cell::state_dump;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -83,17 +79,13 @@ use holochain_state::prelude::*;
 use holochain_state::source_chain;
 pub use holochain_types::share;
 use holochain_zome_types::prelude::{AppCapGrantInfo, ClonedCell, Signature, Timestamp};
-use kitsune_p2p::agent_store::AgentInfoSigned;
+use kitsune2_api::AgentInfoSigned;
 
 use crate::conductor::cell::Cell;
 use crate::conductor::conductor::app_auth_token_store::AppAuthTokenStore;
 use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::error::ConductorResult;
-use crate::conductor::metrics::create_p2p_event_duration_metric;
-use crate::conductor::p2p_agent_store::get_single_agent_info;
-use crate::conductor::p2p_agent_store::list_all_agent_info;
-use crate::conductor::p2p_agent_store::query_peer_density;
 use crate::core::queue_consumer::InitialQueueTriggers;
 use crate::core::queue_consumer::QueueConsumerMap;
 #[cfg(any(test, feature = "test_utils"))]
@@ -118,9 +110,6 @@ use super::interface::websocket::spawn_admin_interface_tasks;
 use super::interface::websocket::spawn_app_interface_task;
 use super::interface::websocket::spawn_websocket_listener;
 use super::manager::TaskManagerResult;
-use super::p2p_agent_store;
-use super::p2p_agent_store::P2pBatch;
-use super::p2p_agent_store::*;
 use super::ribosome_store::RibosomeStore;
 use super::space::Space;
 use super::space::Spaces;
@@ -137,6 +126,10 @@ mod chc;
 mod graft_records_onto_source_chain;
 
 mod app_auth_token_store;
+
+mod hc_p2p_handler_impl;
+
+mod state_dump_helpers;
 
 /// Verify signature of a signed zome call.
 ///
@@ -258,7 +251,7 @@ pub struct Conductor {
     keystore: MetaLairClient,
 
     /// Handle to the network actor.
-    holochain_p2p: holochain_p2p::HolochainP2pRef,
+    holochain_p2p: holochain_p2p::actor::DynHcP2p,
 
     post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
 
@@ -283,6 +276,12 @@ pub struct Conductor {
     app_broadcast: AppBroadcast,
 }
 
+impl std::fmt::Debug for Conductor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Conductor").finish()
+    }
+}
+
 impl Conductor {
     /// Create a conductor builder.
     pub fn builder() -> ConductorBuilder {
@@ -292,7 +291,6 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
-
     use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
 
     use super::*;
@@ -306,7 +304,7 @@ mod startup_shutdown_impls {
             config: Arc<ConductorConfig>,
             ribosome_store: RwShare<RibosomeStore>,
             keystore: MetaLairClient,
-            holochain_p2p: holochain_p2p::HolochainP2pRef,
+            holochain_p2p: holochain_p2p::actor::DynHcP2p,
             spaces: Spaces,
             post_commit: tokio::sync::mpsc::Sender<PostCommitArgs>,
             outcome_sender: OutcomeSender,
@@ -373,13 +371,11 @@ mod startup_shutdown_impls {
             self.shutting_down
                 .store(true, std::sync::atomic::Ordering::Relaxed);
 
-            use ghost_actor::GhostControlSender;
-            let ghost_shutdown = self.holochain_p2p.ghost_actor_shutdown_immediate();
             let mut tm = self.task_manager();
             let task = self.detach_task_management().expect("Attempting to shut down after already detaching task management or previous shutdown");
             tokio::task::spawn(async move {
                 tracing::info!("Sending shutdown signal to all managed tasks.");
-                let (_, _, r) = futures::join!(ghost_shutdown, tm.shutdown().boxed(), task,);
+                let (_, r) = futures::join!(tm.shutdown().boxed(), task,);
                 r?
             })
         }
@@ -728,7 +724,7 @@ mod dna_impls {
         }
 
         /// Get a reference to the conductor's HolochainP2p.
-        pub fn holochain_p2p(&self) -> &holochain_p2p::HolochainP2pRef {
+        pub fn holochain_p2p(&self) -> &holochain_p2p::actor::DynHcP2p {
             &self.holochain_p2p
         }
 
@@ -852,50 +848,51 @@ mod dna_impls {
 
 /// Network-related methods
 mod network_impls {
-    use std::time::Duration;
-
-    use futures::future::join_all;
-    use holochain_conductor_api::ZomeCallParamsSigned;
-    use rusqlite::params;
-
-    use holochain_conductor_api::{
-        CellInfo, DnaStorageInfo, NetworkInfo, StorageBlob, StorageInfo,
-    };
-    use holochain_p2p::HolochainP2pSender;
-    use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
-    use holochain_zome_types::block::Block;
-    use holochain_zome_types::block::BlockTargetId;
-    use kitsune_p2p::KitsuneAgent;
-    use kitsune_p2p::KitsuneBinType;
-    use zome_call_signature_verification::is_valid_signature;
-
+    use super::*;
     use crate::conductor::api::error::{
         zome_call_response_to_conductor_api_result, ConductorApiError,
     };
-
-    use super::*;
+    use futures::future::join_all;
+    use holochain_conductor_api::ZomeCallParamsSigned;
+    use holochain_conductor_api::{DnaStorageInfo, StorageBlob, StorageInfo};
+    use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
+    use holochain_zome_types::block::Block;
+    use holochain_zome_types::block::BlockTargetId;
+    use zome_call_signature_verification::is_valid_signature;
 
     impl Conductor {
         /// Get signed agent info from the conductor
         pub async fn get_agent_infos(
             &self,
             cell_id: Option<CellId>,
-        ) -> ConductorApiResult<Vec<AgentInfoSigned>> {
+        ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
             match cell_id {
                 Some(c) => {
-                    let (d, a) = c.into_dna_and_agent();
-                    let db = self.p2p_agents_db(&d);
-                    Ok(get_single_agent_info(db.into(), d, a)
+                    let (dna_hash, agent_key) = c.into_dna_and_agent();
+                    let peer_store = self
+                        .holochain_p2p
+                        .peer_store(dna_hash)
+                        .await
+                        .map_err(|err| ConductorApiError::CellError(err.into()))?;
+                    Ok(peer_store
+                        .get(agent_key.to_k2_agent())
                         .await?
-                        .map(|a| vec![a])
+                        .map(|agent_info| vec![agent_info])
                         .unwrap_or_default())
                 }
                 None => {
+                    let dna_hashes = self
+                        .spaces
+                        .get_from_spaces(|space| (*space.dna_hash).clone());
                     let mut out = Vec::new();
-                    // collecting so the mutex lock can close
-                    let envs = self.spaces.get_from_spaces(|s| s.p2p_agents_db.clone());
-                    for db in envs {
-                        out.append(&mut all_agent_infos(db.into()).await?);
+                    for dna_hash in dna_hashes {
+                        let peer_store = self
+                            .holochain_p2p
+                            .peer_store(dna_hash)
+                            .await
+                            .map_err(|err| ConductorApiError::CellError(err.into()))?;
+                        let all_peers = peer_store.get_all().await?;
+                        out.extend(all_peers);
                     }
                     Ok(out)
                 }
@@ -933,179 +930,10 @@ mod network_impls {
             &self,
             input: BlockTargetId,
             timestamp: Timestamp,
-        ) -> DatabaseResult<bool> {
-            self.spaces.is_blocked(input, timestamp).await
-        }
-
-        pub(crate) async fn prune_p2p_agents_db(&self) -> ConductorResult<()> {
-            use holochain_p2p::AgentPubKeyExt;
-
-            let mut space_to_agents = HashMap::new();
-
-            for cell in self.running_cells.share_ref(|c| {
-                <Result<_, one_err::OneErr>>::Ok(c.keys().cloned().collect::<Vec<_>>())
-            })? {
-                space_to_agents
-                    .entry(cell.dna_hash().clone())
-                    .or_insert_with(Vec::new)
-                    .push(cell.agent_pubkey().to_kitsune());
-            }
-
-            for (space, agents) in space_to_agents {
-                let db = self.spaces.p2p_agents_db(&space)?;
-                p2p_prune(&db, agents).await?;
-            }
-
-            Ok(())
-        }
-
-        pub(crate) async fn network_info(
-            &self,
-            installed_app_id: &InstalledAppId,
-            payload: &NetworkInfoRequestPayload,
-        ) -> ConductorResult<Vec<NetworkInfo>> {
-            use holochain_sqlite::sql::sql_cell::SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP;
-
-            let NetworkInfoRequestPayload {
-                agent_pub_key,
-                dnas,
-                last_time_queried,
-            } = payload;
-
-            let app_info = self
-                .get_app_info(installed_app_id)
-                .await?
-                .ok_or_else(|| ConductorError::AppNotInstalled(installed_app_id.clone()))?;
-
-            if agent_pub_key != &app_info.agent_pub_key
-                && !app_info
-                    .cell_info
-                    .values()
-                    .flatten()
-                    .any(|cell_info| match cell_info {
-                        CellInfo::Provisioned(cell) => cell.cell_id.agent_pubkey() == agent_pub_key,
-                        _ => false,
-                    })
-            {
-                return Err(ConductorError::AppAccessError(
-                    installed_app_id.clone(),
-                    Box::new(agent_pub_key.clone()),
-                ));
-            }
-
-            futures::future::join_all(dnas.iter().map(|dna| async move {
-                let diagnostics = self.holochain_p2p.get_diagnostics(dna.clone()).await?;
-                let fetch_pool_info = diagnostics
-                    .fetch_pool
-                    .info([dna.to_kitsune()].into_iter().collect());
-
-                // query number of agents from peer db
-                let db = { self.p2p_agents_db(dna) };
-
-                let (current_number_of_peers, arc_size, total_network_peers) = db
-                    .read_async({
-                        let agent_pub_key = agent_pub_key.clone();
-                        let space = dna.clone().into_kitsune();
-                        move |txn| -> DatabaseResult<(u32, f64, u32)> {
-                            let current_number_of_peers = txn.p2p_count_agents(space.clone())?;
-
-                            // query arc size and extrapolated coverage and estimate total peers
-                            let (arc_size, total_network_peers) = match txn.p2p_get_agent(
-                                space.clone(),
-                                &KitsuneAgent::new(agent_pub_key.get_raw_36().to_vec()),
-                            )? {
-                                None => (0.0, 0),
-                                Some(agent) => {
-                                    let arc_size = agent.storage_arc().coverage();
-                                    let agents_in_arc = txn.p2p_gossip_query_agents(
-                                        space.clone(),
-                                        u64::MIN,
-                                        u64::MAX,
-                                        agent.storage_arc().inner().into(),
-                                    )?;
-                                    let number_of_agents_in_arc = agents_in_arc.len();
-                                    let total_network_peers = if number_of_agents_in_arc == 0 {
-                                        0
-                                    } else {
-                                        (number_of_agents_in_arc as f64 / arc_size) as u32
-                                    };
-                                    (arc_size, total_network_peers)
-                                }
-                            };
-
-                            Ok((current_number_of_peers, arc_size, total_network_peers))
-                        }
-                    })
-                    .await?;
-
-                // get sum of bytes from dht and cache db since last time
-                // request was made or since the beginning of time
-                let last_time_queried = match last_time_queried {
-                    Some(timestamp) => *timestamp,
-                    None => Timestamp::ZERO,
-                };
-                let sum_of_bytes_row_fn = |row: &Row| {
-                    row.get(0)
-                        .map(|maybe_bytes_received: Option<u64>| maybe_bytes_received.unwrap_or(0))
-                        .map_err(DatabaseError::SqliteError)
-                };
-                let dht_db = self
-                    .get_or_create_dht_db(dna)
-                    .map_err(|err| ConductorError::Other(Box::new(err)))?;
-                let dht_bytes_received = dht_db
-                    .read_async({
-                        move |txn| {
-                            txn.query_row_and_then(
-                                SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
-                                params![last_time_queried.as_micros()],
-                                sum_of_bytes_row_fn,
-                            )
-                        }
-                    })
-                    .await?;
-
-                let cache_db = self
-                    .get_or_create_cache_db(dna)
-                    .map_err(|err| ConductorError::Other(Box::new(err)))?;
-                let cache_bytes_received = cache_db
-                    .read_async(move |txn| {
-                        txn.query_row_and_then(
-                            SUM_OF_RECEIVED_BYTES_SINCE_TIMESTAMP,
-                            params![last_time_queried.as_micros()],
-                            sum_of_bytes_row_fn,
-                        )
-                    })
-                    .await?;
-                let bytes_since_last_time_queried = dht_bytes_received + cache_bytes_received;
-
-                // calculate open peer connections based on current gossip sessions
-                let completed_rounds_since_last_time_queried = diagnostics
-                    .metrics
-                    .read()
-                    .peer_node_histories()
-                    .iter()
-                    .flat_map(|(_, node_history)| node_history.completed_rounds.clone())
-                    .filter(|completed_round| {
-                        let now = tokio::time::Instant::now();
-                        let round_start_time_diff = now - completed_round.start_time;
-                        let round_start_timestamp =
-                            Timestamp::from_micros(round_start_time_diff.as_micros() as i64);
-                        round_start_timestamp > last_time_queried
-                    })
-                    .count() as u32;
-
-                ConductorResult::Ok(NetworkInfo {
-                    fetch_pool_info,
-                    current_number_of_peers,
-                    arc_size,
-                    total_network_peers,
-                    bytes_since_last_time_queried,
-                    completed_rounds_since_last_time_queried,
-                })
-            }))
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
+        ) -> ConductorResult<bool> {
+            self.spaces
+                .is_blocked(input, timestamp, self.holochain_p2p.clone())
+                .await
         }
 
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -1188,201 +1016,6 @@ mod network_impls {
                 dna_hash: dna_hash.clone(),
                 used_by: used_by.clone(),
             }))
-        }
-
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-        pub(crate) async fn dispatch_holochain_p2p_event(
-            &self,
-            event: holochain_p2p::event::HolochainP2pEvent,
-        ) -> ConductorApiResult<()> {
-            use HolochainP2pEvent::*;
-            let dna_hash = event.dna_hash().clone();
-            trace!(dispatch_event = ?event);
-            match event {
-                PutAgentInfoSigned {
-                    peer_data, respond, ..
-                } => {
-                    let sender = self.p2p_batch_sender(&dna_hash);
-                    let (result_sender, response) = tokio::sync::oneshot::channel();
-                    let _ = sender
-                        .send_timeout(
-                            P2pBatch {
-                                peer_data,
-                                result_sender,
-                            },
-                            Duration::from_secs(10),
-                        )
-                        .await;
-                    let res = match response.await {
-                        Ok(r) => r.map_err(holochain_p2p::HolochainP2pError::other),
-                        Err(e) => Err(holochain_p2p::HolochainP2pError::other(e)),
-                    };
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                QueryAgentInfoSigned {
-                    kitsune_space,
-                    agents,
-                    respond,
-                    ..
-                } => {
-                    let db = { self.p2p_agents_db(&dna_hash) };
-                    let res = list_all_agent_info(db.into(), kitsune_space)
-                        .await
-                        .map(|infos| match agents {
-                            Some(agents) => infos
-                                .into_iter()
-                                .filter(|info| agents.contains(&info.agent))
-                                .collect(),
-                            None => infos,
-                        })
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                QueryGossipAgents {
-                    since_ms,
-                    until_ms,
-                    arc_set,
-                    respond,
-                    ..
-                } => {
-                    let db = { self.p2p_agents_db(&dna_hash) };
-                    let res = db
-                        .p2p_gossip_query_agents(since_ms, until_ms, (*arc_set).clone())
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                QueryAgentInfoSignedNearBasis {
-                    kitsune_space,
-                    basis_loc,
-                    limit,
-                    respond,
-                    ..
-                } => {
-                    let db = { self.p2p_agents_db(&dna_hash) };
-                    let res = list_all_agent_info_signed_near_basis(
-                        db.into(),
-                        kitsune_space,
-                        basis_loc,
-                        limit,
-                    )
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                QueryPeerDensity {
-                    kitsune_space,
-                    dht_arc,
-                    respond,
-                    ..
-                } => {
-                    let cutoff = self
-                        .get_config()
-                        .network
-                        .tuning_params
-                        .danger_gossip_recent_threshold();
-                    let topo = self
-                        .get_dna_def(&dna_hash)
-                        .ok_or_else(|| DnaError::DnaMissing(dna_hash.clone()))?
-                        .topology(cutoff);
-                    let tuning = self.get_config().kitsune_tuning_params();
-                    let db = { self.p2p_agents_db(&dna_hash) };
-                    let res = query_peer_density(
-                        db.into(),
-                        topo,
-                        tuning.to_arq_strat().into(),
-                        kitsune_space,
-                        dht_arc,
-                    )
-                    .await
-                    .map_err(holochain_p2p::HolochainP2pError::other);
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-                SignNetworkData {
-                    respond,
-                    to_agent,
-                    data,
-                    ..
-                } => {
-                    let signature = to_agent.sign_raw(self.keystore(), data.into()).await?;
-                    respond.respond(Ok(async move { Ok(signature) }.boxed().into()));
-                }
-                HolochainP2pEvent::CallRemote { .. }
-                | CountersigningSessionNegotiation { .. }
-                | Get { .. }
-                | GetMeta { .. }
-                | GetLinks { .. }
-                | CountLinks { .. }
-                | GetAgentActivity { .. }
-                | MustGetAgentActivity { .. }
-                | ValidationReceiptsReceived { .. } => {
-                    let cell_id =
-                        CellId::new(event.dna_hash().clone(), event.target_agents().clone());
-                    let cell = self.cell_by_id(&cell_id).await?;
-                    cell.handle_holochain_p2p_event(event).await?;
-                }
-                Publish {
-                    dna_hash,
-                    respond,
-                    request_validation_receipt,
-                    countersigning_session,
-                    ops,
-                    ..
-                } => {
-                    async {
-                        let res = self
-                            .spaces
-                            .handle_publish(
-                                &dna_hash,
-                                request_validation_receipt,
-                                countersigning_session,
-                                ops,
-                            )
-                            .await
-                            .map_err(holochain_p2p::HolochainP2pError::other);
-                        respond.respond(Ok(async move { res }.boxed().into()));
-                    }
-                    .instrument(debug_span!("handle_publish"))
-                    .await;
-                }
-                FetchOpData {
-                    respond,
-                    query,
-                    dna_hash,
-                    ..
-                } => {
-                    async {
-                        let res = self
-                            .spaces
-                            .handle_fetch_op_data(&dna_hash, query)
-                            .await
-                            .map_err(holochain_p2p::HolochainP2pError::other);
-                        respond.respond(Ok(async move { res }.boxed().into()));
-                    }
-                    .instrument(debug_span!("handle_fetch_op_data"))
-                    .await;
-                }
-
-                HolochainP2pEvent::QueryOpHashes {
-                    dna_hash,
-                    window,
-                    max_ops,
-                    include_limbo,
-                    arc_set,
-                    respond,
-                    ..
-                } => {
-                    let res = self
-                        .spaces
-                        .handle_query_op_hashes(&dna_hash, arc_set, window, max_ops, include_limbo)
-                        .await
-                        .map_err(holochain_p2p::HolochainP2pError::other);
-
-                    respond.respond(Ok(async move { res }.boxed().into()));
-                }
-            }
-            Ok(())
         }
 
         /// List all host functions provided by this conductor for wasms.
@@ -1490,7 +1123,6 @@ pub struct InstallAppCommonFlags {
 /// Tests related to app installation can be found in ../../tests/tests/app_installation/mod.rs
 mod app_impls {
     use holochain_types::deepkey_roundtrip_backward;
-    use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::LairEntryInfo;
 
     use crate::conductor::state::is_app;
 
@@ -2071,7 +1703,7 @@ mod app_impls {
                 .get_entry(dst_tag.clone().into())
                 .await;
             let seed_info = match entry_info {
-                Ok(LairEntryInfo::Seed { seed_info, .. }) => {
+                Ok(lair_keystore_api::lair_store::LairEntryInfo::Seed { seed_info, .. }) => {
                     // If the seed already exists, we don't need to create it again.
                     seed_info
                 }
@@ -2244,8 +1876,7 @@ mod clone_cell_impls {
 
             if !modifiers.has_some_option_set() {
                 return Err(ConductorError::CloneCellError(
-                    "neither network_seed nor properties nor origin_time provided for clone cell"
-                        .to_string(),
+                    "neither network_seed nor properties provided for clone cell".to_string(),
                 ));
             }
 
@@ -2394,8 +2025,6 @@ mod clone_cell_impls {
 
 /// Methods related to management of app and cell status
 mod app_status_impls {
-    use holochain_p2p::AgentPubKeyExt;
-
     use super::*;
 
     impl Conductor {
@@ -2536,19 +2165,14 @@ mod app_status_impls {
 
             future::join_all(new_cells.iter().enumerate().map(|(i, (cell, _))| {
                 async move {
-                    let p2p_agents_db = cell.p2p_agents_db().clone();
                     let cell_id = cell.id().clone();
-                    let kagent = cell_id.agent_pubkey().to_kitsune();
-                    let maybe_agent_info = p2p_agents_db.p2p_get_agent(&kagent).await.ok().flatten();
-                    let maybe_initial_arq = maybe_agent_info.clone().map(|i| i.storage_arq);
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
                     let res = tokio::time::timeout(
                         JOIN_NETWORK_WAITING_PERIOD,
                         cell.holochain_p2p_dna().clone().join(
                             agent_pubkey,
-                            maybe_agent_info,
-                            maybe_initial_arq,
+                            None,
                         ),
                     )
                         .await;
@@ -2742,7 +2366,7 @@ mod service_impls {
                 self.keystore().new_sign_keypair_random().await?
             } else {
                 return Err(ConductorError::other(
-"DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config.
+                    "DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config.
 If using DPKI, a device seed must be created in lair, and the tag specified in the conductor config.
 
 (If this is a throwaway test environment, you can also set the config `dpki.allow_throwaway_random_dpki_agent_key`
@@ -2912,10 +2536,11 @@ mod scheduler_impls {
 
 /// Miscellaneous methods
 mod misc_impls {
-    use holochain_zome_types::action::builder;
+    use super::{state_dump_helpers::peer_store_dump, *};
+    use holochain_conductor_api::JsonDump;
+    use holochain_zome_types::{action::builder, Entry};
+    use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
-
-    use super::*;
 
     impl Conductor {
         /// Grant a zome call capability for a cell
@@ -2961,7 +2586,7 @@ mod misc_impls {
             source_chain
                 .flush(
                     cell.holochain_p2p_dna()
-                        .storage_arcs()
+                        .target_arcs()
                         .await
                         .map_err(ConductorApiError::other)?,
                     cell.holochain_p2p_dna().chc(),
@@ -3063,16 +2688,10 @@ mod misc_impls {
             let cell = self.cell_by_id(cell_id).await?;
             let authored_db = cell.get_or_create_authored_db()?;
             let dht_db = cell.dht_db();
-            let space = cell_id.dna_hash();
-            let p2p_agents_db = self.p2p_agents_db(space);
-
-            let peer_dump =
-                p2p_agent_store::dump_state(p2p_agents_db.into(), Some(cell_id.clone())).await?;
-            let source_chain_dump = source_chain::dump_state(
-                authored_db.clone().into(),
-                cell_id.agent_pubkey().clone(),
-            )
-            .await?;
+            let agent_pub_key = cell_id.agent_pubkey().clone();
+            let peer_dump = peer_store_dump(self, cell_id).await?;
+            let source_chain_dump =
+                source_chain::dump_state(authored_db.clone().into(), agent_pub_key).await?;
 
             let out = JsonDump {
                 peer_dump,
@@ -3082,7 +2701,7 @@ mod misc_impls {
             // Add summary
             let summary = out.to_string();
             let out = (out, summary);
-            Ok(serde_json::to_string_pretty(&out)?)
+            Ok(serde_json::to_string(&out)?)
         }
 
         /// Create a JSON dump of the conductor's state
@@ -3137,11 +2756,7 @@ mod misc_impls {
             let authored_db =
                 self.get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
             let dht_db = self.get_or_create_dht_db(cell_id.dna_hash())?;
-            let dna_hash = cell_id.dna_hash();
-            let p2p_agents_db = self.spaces.p2p_agents_db(dna_hash)?;
-
-            let peer_dump =
-                p2p_agent_store::dump_state(p2p_agents_db.into(), Some(cell_id.clone())).await?;
+            let peer_dump = peer_store_dump(self, cell_id).await?;
             let source_chain_dump =
                 source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
                     .await?;
@@ -3154,43 +2769,159 @@ mod misc_impls {
             Ok(out)
         }
 
-        /// JSON dump of network metrics
+        /// Dump of network metrics from Kitsune2.
         pub async fn dump_network_metrics(
             &self,
-            dna_hash: Option<DnaHash>,
-        ) -> ConductorApiResult<String> {
-            use holochain_p2p::HolochainP2pSender;
-            self.holochain_p2p()
-                .dump_network_metrics(dna_hash)
-                .await
-                .map_err(crate::conductor::api::error::ConductorApiError::other)
+            request: Kitsune2NetworkMetricsRequest,
+        ) -> ConductorApiResult<HashMap<DnaHash, Kitsune2NetworkMetrics>> {
+            Ok(self.holochain_p2p.dump_network_metrics(request).await?)
         }
 
-        /// JSON dump of backend network stats
-        pub async fn dump_network_stats(&self) -> ConductorApiResult<String> {
-            use holochain_p2p::HolochainP2pSender;
-            self.holochain_p2p()
-                .dump_network_stats()
-                .await
-                .map_err(crate::conductor::api::error::ConductorApiError::other)
+        /// Dump of network metrics from Kitsune2.
+        ///
+        /// This version of the function filters the metrics to only include connections
+        /// relevant to the specified app.
+        pub async fn dump_network_metrics_for_app(
+            &self,
+            installed_app_id: &InstalledAppId,
+            request: Kitsune2NetworkMetricsRequest,
+        ) -> ConductorApiResult<HashMap<DnaHash, Kitsune2NetworkMetrics>> {
+            let all_dna_hashes = {
+                let state = self.get_state().await?;
+                let installed_app = state.get_app(installed_app_id)?;
+
+                installed_app
+                    .role_assignments
+                    .values()
+                    .flat_map(|r| match r {
+                        AppRoleAssignment::Primary(p) if p.is_provisioned => {
+                            vec![p.base_dna_hash.clone()]
+                        }
+                        AppRoleAssignment::Primary(p) => {
+                            p.clones.values().cloned().collect::<Vec<_>>()
+                        }
+                        AppRoleAssignment::Dependency(d) => vec![d.cell_id.dna_hash().clone()],
+                    })
+                    .collect::<Vec<_>>()
+            };
+
+            Ok(if let Some(ref dna_hash) = request.dna_hash {
+                if !all_dna_hashes.contains(dna_hash) {
+                    return Err(ConductorApiError::Other("DNA hash not found in app".into()));
+                }
+
+                self.holochain_p2p.dump_network_metrics(request).await?
+            } else {
+                let mut out = HashMap::new();
+                for dna_hash in all_dna_hashes {
+                    match self
+                        .holochain_p2p
+                        .dump_network_metrics(Kitsune2NetworkMetricsRequest {
+                            dna_hash: Some(dna_hash.clone()),
+                            ..request.clone()
+                        })
+                        .await
+                    {
+                        Ok(metrics) => {
+                            out.extend(metrics);
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to get network metrics for dna_hash: {:?}, error: {:?}",
+                                dna_hash,
+                                e
+                            );
+                        }
+                    }
+                }
+
+                out
+            })
+        }
+
+        /// Dump of backend network stats from the Kitsune2 network transport.
+        pub async fn dump_network_stats(&self) -> ConductorApiResult<kitsune2_api::TransportStats> {
+            Ok(self.holochain_p2p.dump_network_stats().await?)
+        }
+
+        /// Dump of backend network stats from the Kitsune2 network transport.
+        ///
+        /// This version of the function filters the stats to only include connections
+        /// relevant to the specified app.
+        pub async fn dump_network_stats_for_app(
+            &self,
+            installed_app_id: &InstalledAppId,
+        ) -> ConductorApiResult<kitsune2_api::TransportStats> {
+            let all_dna_hashes = {
+                let state = self.get_state().await?;
+                let installed_app = state.get_app(installed_app_id)?;
+
+                installed_app
+                    .role_assignments
+                    .values()
+                    .flat_map(|r| match r {
+                        AppRoleAssignment::Primary(p) if p.is_provisioned => {
+                            vec![p.base_dna_hash.clone()]
+                        }
+                        AppRoleAssignment::Primary(p) => {
+                            p.clones.values().cloned().collect::<Vec<_>>()
+                        }
+                        AppRoleAssignment::Dependency(d) => vec![d.cell_id.dna_hash().clone()],
+                    })
+                    .collect::<Vec<_>>()
+            };
+
+            let mut keep_peer_ids = HashSet::new();
+            for dna_hash in all_dna_hashes {
+                let peer_store = self.holochain_p2p.peer_store(dna_hash).await?;
+                keep_peer_ids.extend(peer_store.get_all().await?.into_iter().filter_map(|p| {
+                    p.url
+                        .as_ref()
+                        .and_then(|u| u.peer_id())
+                        .map(|id| id.to_string())
+                }));
+            }
+
+            let stats = self.holochain_p2p.dump_network_stats().await?;
+            Ok(TransportStats {
+                // Common information, fine to return
+                backend: stats.backend,
+                // These are our peer URLs, always give this back
+                peer_urls: stats.peer_urls,
+                // This contains connections for the whole conductor, filter it down
+                // to only the connections that are relevant to the current app
+                connections: stats
+                    .connections
+                    .into_iter()
+                    .filter(|s| keep_peer_ids.contains(&s.pub_key))
+                    .collect(),
+            })
         }
 
         /// Add signed agent info to the conductor
-        pub async fn add_agent_infos(
-            &self,
-            agent_infos: Vec<AgentInfoSigned>,
-        ) -> ConductorApiResult<()> {
-            let mut space_map = HashMap::new();
-            for agent_info_signed in agent_infos {
-                let space = agent_info_signed.space.clone();
-                space_map
-                    .entry(space)
-                    .or_insert_with(Vec::new)
-                    .push(agent_info_signed);
+        pub async fn add_agent_infos(&self, agent_infos: Vec<String>) -> ConductorApiResult<()> {
+            let mut parsed_by_space: HashMap<SpaceId, Vec<Arc<AgentInfoSigned>>> = HashMap::new();
+            // Parse agent infos and add them to a map indexed by space id.
+            for info in agent_infos {
+                let parsed_info = kitsune2_api::AgentInfoSigned::decode(
+                    &kitsune2_core::Ed25519Verifier,
+                    info.as_bytes(),
+                )?;
+                let space_id = parsed_info.space.clone();
+                parsed_by_space
+                    .entry(space_id)
+                    .or_default()
+                    .push(parsed_info);
             }
-            for (space, agent_infos) in space_map {
-                let db = self.p2p_agents_db(&DnaHash::from_kitsune(&space));
-                inject_agent_infos(db, agent_infos.iter()).await?;
+
+            // Add agent infos of a space to the space's peer store.
+            for (space_id, agent_infos) in parsed_by_space {
+                self.holochain_p2p
+                    .peer_store(DnaHash::from_k2_space(&space_id))
+                    .await
+                    .map_err(|err| ConductorApiError::CellError(err.into()))?
+                    .insert(agent_infos)
+                    .await?;
             }
             Ok(())
         }
@@ -3288,35 +3019,6 @@ mod accessor_impls {
             dna_hash: &DnaHash,
         ) -> DatabaseResult<DbWrite<DbKindDht>> {
             self.spaces.dht_db(dna_hash)
-        }
-
-        pub(crate) fn get_or_create_cache_db(
-            &self,
-            dna_hash: &DnaHash,
-        ) -> DatabaseResult<DbWrite<DbKindCache>> {
-            self.spaces.cache(dna_hash)
-        }
-
-        pub(crate) fn p2p_agents_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pAgents> {
-            self.spaces
-                .p2p_agents_db(hash)
-                .expect("failed to open p2p_agent_store database")
-        }
-
-        pub(crate) fn p2p_batch_sender(
-            &self,
-            hash: &DnaHash,
-        ) -> tokio::sync::mpsc::Sender<P2pBatch> {
-            self.spaces
-                .p2p_batch_sender(hash)
-                .expect("failed to get p2p_batch_sender")
-        }
-
-        #[cfg(feature = "test_utils")]
-        pub(crate) fn p2p_metrics_db(&self, hash: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
-            self.spaces
-                .p2p_metrics_db(hash)
-                .expect("failed to open p2p_metrics_store database")
         }
 
         /// Get the post commit sender.
@@ -3752,8 +3454,11 @@ impl Conductor {
             let handle = self.clone();
             let chc = handle.get_chc(cell_id);
             async move {
-                let holochain_p2p_cell =
-                    handle.holochain_p2p.to_dna(cell_id.dna_hash().clone(), chc);
+                let holochain_p2p_cell = holochain_p2p::HolochainP2pDna::new(
+                    handle.holochain_p2p.clone(),
+                    cell_id.dna_hash().clone(),
+                    chc,
+                );
 
                 let space = handle
                     .get_or_create_space(cell_id.dna_hash())
@@ -3982,14 +3687,6 @@ mod test_utils_impls {
             Ok(cell.cache().clone())
         }
 
-        pub fn get_p2p_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pAgents> {
-            self.p2p_agents_db(space)
-        }
-
-        pub fn get_p2p_metrics_db(&self, space: &DnaHash) -> DbWrite<DbKindP2pMetrics> {
-            self.p2p_metrics_db(space)
-        }
-
         pub fn get_spaces(&self) -> Spaces {
             self.spaces.clone()
         }
@@ -4213,70 +3910,6 @@ fn query_dht_ops_from_statement(
         })?
         .collect::<StateQueryResult<Vec<_>>>()?;
     Ok(r)
-}
-
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(p2p_evt, handle)))]
-async fn p2p_event_task(
-    p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
-    handle: ConductorHandle,
-) {
-    /// The number of events we allow to run in parallel before
-    /// starting to await on the join handles.
-    const NUM_PARALLEL_EVTS: usize = 512;
-    let num_tasks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let max_time = Arc::new(std::sync::atomic::AtomicU64::new(0));
-    let duration_metric = create_p2p_event_duration_metric();
-    p2p_evt
-        .for_each_concurrent(NUM_PARALLEL_EVTS, |evt| {
-            let handle = handle.clone();
-            let num_tasks = num_tasks.clone();
-            let max_time = max_time.clone();
-            let duration_metric = duration_metric.clone();
-            async move {
-                // Track whether the concurrency limit has been reached and keep the start time for reporting if so.
-                let start = Instant::now();
-                let current_num_tasks = num_tasks.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-
-                let evt_dna_hash = evt.dna_hash().clone();
-
-                // This loop is critical, ensure that nothing in the dispatch kills it by blocking permanently
-                match tokio::time::timeout(std::time::Duration::from_secs(30), handle.dispatch_holochain_p2p_event(evt)).await {
-                    Ok(Ok(())) => {}
-                    Ok(Err(e)) => {
-                        tracing::error!(
-                                message = "error dispatching network event",
-                                error = ?e,
-                            );
-                    }
-                    Err(_) => {
-                        tracing::error!("timeout while dispatching network event");
-                    }
-                }
-
-                if current_num_tasks >= NUM_PARALLEL_EVTS {
-                    let el = start.elapsed();
-                    let us = el.as_micros() as u64;
-                    let max_us = max_time
-                        .fetch_max(us, std::sync::atomic::Ordering::Relaxed)
-                        .max(us);
-
-                    let s = tracing::info_span!("holochain_perf", this_event_time = ?el, max_event_micros = %max_us);
-                    s.in_scope(|| tracing::info!("dispatch_holochain_p2p_event is saturated"))
-                } else {
-                    max_time.store(0, std::sync::atomic::Ordering::Relaxed);
-                }
-
-                duration_metric.record(start.elapsed().as_secs_f64(), &[
-                    opentelemetry_api::KeyValue::new("dna_hash", format!("{:?}", evt_dna_hash)),
-                ]);
-
-                num_tasks.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
-            }
-                .in_current_span()
-        })
-        .await;
-
-    tracing::info!("p2p_event_task has ended");
 }
 
 /// Extract the modifiers from the RoleSettingsMap into their own HashMap

@@ -22,10 +22,7 @@ pub async fn authored_ops_to_dht_db(
     let mut should_hold_hashes = Vec::new();
 
     for (op_hash, basis) in hashes {
-        if storage_arcs
-            .iter()
-            .any(|arc| arc.contains(basis.get_loc().as_u32()))
-        {
+        if storage_arcs.iter().any(|arc| arc.contains(basis.get_loc())) {
             should_hold_hashes.push(op_hash);
         }
     }
@@ -98,8 +95,20 @@ fn insert_locally_validated_op(
 
     let op_type = op.get_type();
 
+    let serialized_size = op
+        .as_content()
+        .as_chain_op()
+        .and_then(|op| {
+            holochain_serialized_bytes::encode(&op)
+                .map(|e| e.len())
+                .ok()
+        })
+        // Note that is it safe to cast because the entry size will have been checked by sys
+        // validation.
+        .unwrap_or_default() as u32;
+
     // Insert the op.
-    insert_op_dht(txn, &op, None)?;
+    insert_op_dht(txn, &op, serialized_size, None)?;
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 

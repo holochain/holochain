@@ -164,7 +164,6 @@ async fn gen_dna_file(output: std::path::PathBuf) {
         .modifiers(
             DnaModifiersBuilder::default()
                 .network_seed(network_seed.into())
-                .origin_time(Timestamp::now())
                 .build()
                 .unwrap(),
         )
@@ -247,6 +246,8 @@ async fn run(
     };
 
     let config = holochain::sweettest::SweetConductorConfig::rendezvous(true);
+
+    tracing::info!("Using config: {:?}", *config);
 
     let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
 

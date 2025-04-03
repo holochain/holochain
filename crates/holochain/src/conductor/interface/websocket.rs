@@ -2,23 +2,22 @@
 //! i.e. those configured with `InterfaceDriver::Websocket`
 
 use super::error::InterfaceResult;
+use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi};
 use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::manager::TaskManagerClient;
+use holochain_conductor_api::{
+    AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse,
+};
 use holochain_serialized_bytes::SerializedBytes;
+use holochain_types::app::InstalledAppId;
 use holochain_types::signal::Signal;
+use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::WebsocketConfig;
 use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 use holochain_websocket::{ReceiveMessage, WebsocketError};
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
-
-use crate::conductor::api::{AdminInterfaceApi, AppAuthentication, AppInterfaceApi};
-use holochain_conductor_api::{
-    AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse,
-};
-use holochain_types::app::InstalledAppId;
-use holochain_types::websocket::AllowedOrigins;
 use std::sync::Arc;
 use tokio::pin;
 use tokio::sync::broadcast;
@@ -495,8 +494,9 @@ mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::retry_until_timeout;
     use crate::sweettest::websocket_client_by_port;
-    use crate::sweettest::SweetConductorConfig;
+    use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::WsPollRecv;
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
@@ -507,19 +507,15 @@ mod test {
     use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_conductor_api::*;
     use holochain_keystore::test_keystore;
-    use holochain_p2p::{AgentPubKeyExt, DnaHashExt};
     use holochain_serialized_bytes::prelude::*;
     use holochain_state::prelude::*;
     use holochain_trace;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_wasm_test_utils::TestZomes;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use kitsune_p2p::agent_store::AgentInfoSigned;
-    use kitsune_p2p::dependencies::kitsune_p2p_types::fetch_pool::FetchPoolInfo;
-    use kitsune_p2p::{KitsuneAgent, KitsuneSpace};
-    use kitsune_p2p_types::fixt::*;
+    use kitsune2_api::AgentInfoSigned;
+    use kitsune2_api::{AgentId, SpaceId};
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
     use std::collections::HashSet;
@@ -824,56 +820,6 @@ mod test {
         )
         .await;
 
-        // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
-        // the overhead of a websocket request locally is small
-
-        handle.shutdown().await.unwrap().unwrap();
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn gossip_info_request() {
-        holochain_trace::test_run();
-        let uuid = Uuid::new_v4();
-        let dna = fake_dna_zomes(
-            &uuid.to_string(),
-            vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-        );
-
-        // warm the zome
-        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
-            .next()
-            .unwrap();
-
-        let dna_hash = dna.dna_hash().clone();
-
-        let (_tmpdir, app_api, handle, agent_pub_key) =
-            setup_app_in_new_conductor("test app".to_string(), None, vec![(dna, None)]).await;
-        let request = NetworkInfoRequestPayload {
-            agent_pub_key,
-            dnas: vec![dna_hash],
-            last_time_queried: None,
-        };
-
-        let msg = AppRequest::NetworkInfo(Box::new(request));
-        let respond = |response: AppResponse| match response {
-            AppResponse::NetworkInfo(info) => {
-                assert_eq!(
-                    info,
-                    vec![NetworkInfo {
-                        fetch_pool_info: FetchPoolInfo::default(),
-                        current_number_of_peers: 1,
-                        arc_size: 1.0,
-                        total_network_peers: 1,
-                        bytes_since_last_time_queried: 1838,
-                        completed_rounds_since_last_time_queried: 0,
-                    }]
-                )
-            }
-            other => panic!("unexpected response {:?}", other),
-        };
-        test_handle_incoming_app_message("test app".to_string(), msg, respond, app_api)
-            .await
-            .unwrap();
         // the time here should be almost the same (about +0.1ms) vs. the raw real_ribosome call
         // the overhead of a websocket request locally is small
 
@@ -1291,116 +1237,60 @@ mod test {
         conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
-    async fn make_dna(network_seed: &str, zomes: Vec<TestWasm>) -> DnaFile {
-        DnaFile::new(
-            DnaDef {
-                name: "conductor_test".to_string(),
-                modifiers: DnaModifiers {
-                    network_seed: network_seed.to_string(),
-                    properties: SerializedBytes::try_from(()).unwrap(),
-                    origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                    quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
-                },
-                integrity_zomes: zomes
-                    .clone()
-                    .into_iter()
-                    .map(TestZomes::from)
-                    .map(|z| z.integrity.into_inner())
-                    .collect(),
-                coordinator_zomes: zomes
-                    .clone()
-                    .into_iter()
-                    .map(TestZomes::from)
-                    .map(|z| z.coordinator.into_inner())
-                    .collect(),
-                lineage: Default::default(),
-            },
-            zomes.into_iter().flat_map(Vec::<DnaWasm>::from),
-        )
-        .await
-    }
-
     /// Check that we can add and get agent info for a conductor
     /// across the admin websocket.
     #[tokio::test(flavor = "multi_thread")]
     async fn add_agent_info_via_admin() {
         holochain_trace::test_run();
-        let dnas = vec![
-            make_dna("1", vec![TestWasm::Anchor]).await,
-            make_dna("2", vec![TestWasm::Anchor]).await,
-        ];
-
-        let mut conductor = SweetConductorConfig::standard()
-            .no_dpki()
-            .build_conductor()
-            .await;
-
-        let agent = conductor.setup_app("app", &dnas).await.unwrap().cells()[0]
-            .agent_pubkey()
-            .clone();
-
-        let handle = conductor.raw_handle();
-        let spaces = handle.get_spaces();
-        let dnas = dnas
-            .into_iter()
-            .map(|d| d.dna_hash().clone())
-            .collect::<Vec<_>>();
-
-        // - Give time for the agents to join the network.
-        crate::assert_eq_retry_10s!(
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let admin_api = AdminInterfaceApi::new(conductor.clone());
+        let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentInfo])
+            .await
+            .0;
+        let app = conductor.setup_app("1", &[dna_file.clone()]).await.unwrap();
+        // Await agent to be added to peer store.
+        retry_until_timeout!({
+            if conductor
+                .holochain_p2p()
+                .peer_store(dna_file.dna_hash().clone())
+                .await
+                .unwrap()
+                .get(app.agent().to_k2_agent())
+                .await
+                .unwrap()
+                .is_some()
             {
-                let mut count = 0;
-                for env in spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                    let space = env.kind().0.clone();
-                    count += env.test_read(move |txn| txn.p2p_list_agents(space).unwrap().len())
-                }
-                count
-            },
-            2
+                break;
+            }
+        });
+
+        // Request all infos
+        let req = AdminRequest::AgentInfo { cell_id: None };
+        let r = make_req(admin_api.clone(), req).await.await.unwrap();
+        let agent_infos = unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone();
+        let results = to_key(agent_infos.clone()).clone();
+        let expected_space_id = app.cells()[0].dna_hash().to_k2_space();
+        let expected_agent_id = app.cells()[0].agent_pubkey().to_k2_agent();
+        assert_eq!(
+            results,
+            vec![(expected_space_id.clone(), expected_agent_id.clone())]
         );
 
-        // - Get agents and space
-        let agent_infos = AgentInfoSignedFixturator::new(Unpredictable)
-            .take(5)
-            .collect::<Vec<_>>();
-
-        let mut expect = to_key(agent_infos.clone());
-        let k0 = (dnas[0].to_kitsune(), agent.to_kitsune());
-        let k1 = (dnas[1].to_kitsune(), agent.to_kitsune());
-        expect.push(k0.clone());
-        expect.push(k1.clone());
-        expect.sort();
-
-        let admin_api = AdminInterfaceApi::new(handle.clone());
-
-        // - Add the agent infos
+        // Create new conductor and add agent info to it.
+        drop(admin_api);
+        drop(conductor);
+        let conductor = SweetConductor::from_standard_config().await;
+        let admin_api = AdminInterfaceApi::new(conductor.clone());
+        // Add agent info to new conductor.
         let req = AdminRequest::AddAgentInfo { agent_infos };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
         assert_matches!(r, AdminResponse::AgentInfoAdded);
 
-        // - Request all the infos
+        // Infos should contain new agent info.
         let req = AdminRequest::AgentInfo { cell_id: None };
         let r = make_req(admin_api.clone(), req).await.await.unwrap();
         let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
-        assert_eq!(expect, results);
-
-        // - Request the first cell
-        let req = AdminRequest::AgentInfo {
-            cell_id: Some(CellId::new(dnas[0].clone(), agent.clone())),
-        };
-        let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
-
-        assert_eq!(vec![k0], results);
-
-        // - Request the second cell
-        let req = AdminRequest::AgentInfo {
-            cell_id: Some(CellId::new(dnas[1].clone(), agent.clone())),
-        };
-        let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
-
-        assert_eq!(vec![k1], results);
+        assert_eq!(results, vec![(expected_space_id, expected_agent_id)]);
     }
 
     async fn make_req(
@@ -1419,10 +1309,14 @@ mod test {
         rx
     }
 
-    fn to_key(r: Vec<AgentInfoSigned>) -> Vec<(Arc<KitsuneSpace>, Arc<KitsuneAgent>)> {
+    fn to_key(r: Vec<String>) -> Vec<(SpaceId, AgentId)> {
         let mut results = r
             .into_iter()
-            .map(|a| (a.space.clone(), a.agent.clone()))
+            .map(|a| {
+                let parsed_info =
+                    AgentInfoSigned::decode(&kitsune2_core::Ed25519Verifier, a.as_bytes()).unwrap();
+                (parsed_info.space.clone(), parsed_info.agent.clone())
+            })
             .collect::<Vec<_>>();
         results.sort();
         results

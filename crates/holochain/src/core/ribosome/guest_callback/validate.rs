@@ -36,6 +36,9 @@ pub struct ValidateHostAccess {
     pub workspace: HostFnWorkspaceRead,
     pub network: GenericNetwork,
     pub dpki: DpkiApi,
+    /// Whether this is an inline validation call.
+    ///
+    /// I.e. are we validating data that is being authored locally.
     pub is_inline: bool,
 }
 

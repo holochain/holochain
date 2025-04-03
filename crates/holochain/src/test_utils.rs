@@ -4,31 +4,20 @@ use crate::conductor::config::AdminInterfaceConfig;
 use crate::conductor::config::ConductorConfig;
 use crate::conductor::config::InterfaceDriver;
 use crate::conductor::integration_dump;
-use crate::conductor::p2p_agent_store;
 use crate::conductor::ConductorBuilder;
 use crate::conductor::ConductorHandle;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::ZomeCallInvocation;
 use ::fixt::prelude::*;
 use hdk::prelude::ZomeName;
-use holo_hash::fixt::*;
 use holo_hash::*;
 use holochain_conductor_api::conductor::paths::DataRootPath;
+use holochain_conductor_api::conductor::NetworkConfig;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
 use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::fresh_nonce;
-use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::dht::prelude::Topology;
-use holochain_p2p::dht::ArqStrat;
-use holochain_p2p::dht::PeerViewQ;
-use holochain_p2p::event::HolochainP2pEvent;
-use holochain_p2p::spawn_holochain_p2p;
-use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pRef;
-use holochain_p2p::HolochainP2pSender;
-use holochain_p2p::NetworkCompatParams;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_state::prelude::test_db_dir;
@@ -40,8 +29,6 @@ use holochain_types::prelude::*;
 use holochain_types::test_utils::fake_dna_file;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
-use kitsune_p2p_types::ok_fut;
 use rusqlite::named_params;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -49,7 +36,6 @@ use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
-use tokio::sync::mpsc;
 
 pub use itertools;
 
@@ -57,7 +43,6 @@ pub mod consistency;
 pub mod hc_stress_test;
 pub mod host_fn_caller;
 pub mod inline_zomes;
-pub mod network_simulation;
 
 mod wait_for;
 pub use wait_for::*;
@@ -76,238 +61,29 @@ macro_rules! here {
     };
 }
 
-/// Create metadata mocks easily by passing in
-/// expected functions, return data and with_f checks
+/// Retry a code block with an exit condition and then pause, until a timeout has elapsed.
+/// The default timeout is 5 s.
+/// The default pause is 500 ms.
 #[macro_export]
-macro_rules! meta_mock {
-    () => {{
-        holochain_state::metadata::MockMetadataBuf::new()
-    }};
-    ($fun:ident) => {{
-        let d: Vec<holochain_types::metadata::TimedActionHash> = Vec::new();
-        meta_mock!($fun, d)
-    }};
-    ($fun:ident, $data:expr) => {{
-        let mut metadata = holochain_state::metadata::MockMetadataBuf::new();
-        metadata.$fun().returning({
-            move |_| {
-                Ok(Box::new(fallible_iterator::convert(
-                    $data
-                        .clone()
-                        .into_iter()
-                        .map(holochain_types::metadata::TimedActionHash::from)
-                        .map(Ok),
-                )))
+macro_rules! retry_until_timeout {
+    ($timeout_ms:literal, $sleep_ms:literal, $code:block) => {
+        tokio::time::timeout(std::time::Duration::from_millis($timeout_ms), async {
+            loop {
+                $code
+                tokio::time::sleep(std::time::Duration::from_millis($sleep_ms)).await;
             }
-        });
-        metadata
-    }};
-    ($fun:ident, $data:expr, $match_fn:expr) => {{
-        let mut metadata = holochain_state::metadata::MockMetadataBuf::new();
-        metadata.$fun().returning({
-            move |a| {
-                if $match_fn(a) {
-                    Ok(Box::new(fallible_iterator::convert(
-                        $data
-                            .clone()
-                            .into_iter()
-                            .map(holochain_types::metadata::TimedActionHash::from)
-                            .map(Ok),
-                    )))
-                } else {
-                    let mut data = $data.clone();
-                    data.clear();
-                    Ok(Box::new(fallible_iterator::convert(
-                        data.into_iter()
-                            .map(holochain_types::metadata::TimedActionHash::from)
-                            .map(Ok),
-                    )))
-                }
-            }
-        });
-        metadata
-    }};
-}
-
-/// A running test network with a joined cell.
-/// Will shutdown on drop.
-pub struct TestNetwork {
-    network: Option<HolochainP2pRef>,
-    respond_task: Option<tokio::task::JoinHandle<()>>,
-    dna_network: HolochainP2pDna,
-
-    /// List of arguments used for `check_op_data` calls
-    #[allow(clippy::type_complexity)]
-    pub check_op_data_calls: Arc<
-        std::sync::Mutex<
-            Vec<(
-                kitsune_p2p_types::KSpace,
-                Vec<kitsune_p2p_types::KOpHash>,
-                Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
-            )>,
-        >,
-    >,
-}
-
-impl TestNetwork {
-    /// Create a new test network
-    #[allow(clippy::type_complexity)]
-    fn new(
-        network: HolochainP2pRef,
-        respond_task: tokio::task::JoinHandle<()>,
-        dna_network: HolochainP2pDna,
-        check_op_data_calls: Arc<
-            std::sync::Mutex<
-                Vec<(
-                    kitsune_p2p_types::KSpace,
-                    Vec<kitsune_p2p_types::KOpHash>,
-                    Option<kitsune_p2p::dependencies::kitsune_p2p_fetch::FetchContext>,
-                )>,
-            >,
-        >,
-    ) -> Self {
-        Self {
-            network: Some(network),
-            respond_task: Some(respond_task),
-            dna_network,
-            check_op_data_calls,
-        }
-    }
-
-    /// Get the holochain p2p network
-    pub fn network(&self) -> HolochainP2pRef {
-        self.network
-            .as_ref()
-            .expect("Tried to use network while it was shutting down")
-            .clone()
-    }
-
-    /// Get the cell network
-    pub fn dna_network(&self) -> HolochainP2pDna {
-        self.dna_network.clone()
-    }
-}
-
-impl Drop for TestNetwork {
-    fn drop(&mut self) {
-        use ghost_actor::GhostControlSender;
-        let network = self.network.take().unwrap();
-        let respond_task = self.respond_task.take().unwrap();
-        tokio::task::spawn(async move {
-            network.ghost_actor_shutdown_immediate().await.ok();
-            respond_task.await.ok();
-        });
-    }
-}
-
-/// Convenience constructor for cell networks
-pub async fn test_network(
-    dna_hash: Option<DnaHash>,
-    agent_key: Option<AgentPubKey>,
-) -> TestNetwork {
-    test_network_inner::<fn(&HolochainP2pEvent) -> bool>(dna_hash, agent_key, None).await
-}
-
-/// Convenience constructor for cell networks
-/// where you need to filter some events into a channel
-pub async fn test_network_with_events<F>(
-    dna_hash: Option<DnaHash>,
-    agent_key: Option<AgentPubKey>,
-    filter: F,
-    evt_send: mpsc::Sender<HolochainP2pEvent>,
-) -> TestNetwork
-where
-    F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
-{
-    test_network_inner(dna_hash, agent_key, Some((filter, evt_send))).await
-}
-
-async fn test_network_inner<F>(
-    dna_hash: Option<DnaHash>,
-    agent_key: Option<AgentPubKey>,
-    mut events: Option<(F, mpsc::Sender<HolochainP2pEvent>)>,
-) -> TestNetwork
-where
-    F: Fn(&HolochainP2pEvent) -> bool + Send + 'static,
-{
-    let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv().await;
-    let mut config = holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::config::KitsuneP2pConfig::from_signal_addr(signal_url);
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.tx5_implicit_timeout_ms = 500;
-    let tuning = std::sync::Arc::new(tuning);
-    let cutoff = tuning.danger_gossip_recent_threshold();
-    config.tuning_params = tuning;
-
-    let check_op_data_calls = Arc::new(std::sync::Mutex::new(Vec::new()));
-
-    let test_host = {
-        let check_op_data_calls = check_op_data_calls.clone();
-        kitsune_p2p::HostStub::with_check_op_data(Box::new(move |space, list, ctx| {
-            let out = list.iter().map(|_| false).collect();
-            check_op_data_calls.lock().unwrap().push((space, list, ctx));
-            futures::FutureExt::boxed(async move { Ok(out) }).into()
-        }))
-    };
-
-    let (network, mut recv) = spawn_holochain_p2p(
-        config,
-        holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral(
-        )
-        .await
-        .unwrap(),
-        test_host,
-        NetworkCompatParams::default(),
-    )
-    .await
-    .unwrap();
-    let respond_task = tokio::task::spawn(async move {
-        use tokio_stream::StreamExt;
-        while let Some(evt) = recv.next().await {
-            if let Some((filter, tx)) = &mut events {
-                if filter(&evt) {
-                    tx.send(evt).await.unwrap();
-                    continue;
-                }
-            }
-            use holochain_p2p::event::HolochainP2pEvent::*;
-            match evt {
-                SignNetworkData { respond, .. } => {
-                    respond.r(ok_fut(Ok([0; 64].into())));
-                }
-                PutAgentInfoSigned { respond, .. } => {
-                    respond.r(ok_fut(Ok(vec![])));
-                }
-                QueryAgentInfoSigned { respond, .. } => {
-                    respond.r(ok_fut(Ok(vec![])));
-                }
-                QueryAgentInfoSignedNearBasis { respond, .. } => {
-                    respond.r(ok_fut(Ok(vec![])));
-                }
-                QueryGossipAgents { respond, .. } => {
-                    respond.r(ok_fut(Ok(vec![])));
-                }
-                QueryPeerDensity { respond, .. } => {
-                    respond.r(ok_fut(Ok(PeerViewQ::new(
-                        Topology::standard_epoch(cutoff),
-                        ArqStrat::default(),
-                        vec![],
-                    )
-                    .into())));
-                }
-                oth => tracing::warn!(?oth, "UnhandledEvent"),
-            }
-        }
-    });
-    let dna = dna_hash.unwrap_or_else(|| fixt!(DnaHash));
-    let mut key_fixt = AgentPubKeyFixturator::new(Predictable);
-    let agent_key = agent_key.unwrap_or_else(|| key_fixt.next().unwrap());
-    let dna_network = network.to_dna(dna.clone(), None);
-    network
-        .join(dna.clone(), agent_key, None, None)
+        })
         .await
         .unwrap();
-    TestNetwork::new(network, respond_task, dna_network, check_op_data_calls)
+    };
+
+    ($timeout_ms:literal, $code:block) => {
+        retry_until_timeout!($timeout_ms, 500, $code)
+    };
+
+    ($code:block) => {
+        retry_until_timeout!(5_000, $code)
+    };
 }
 
 /// Do what's necessary to install an app
@@ -420,7 +196,7 @@ pub async fn setup_app_with_names(
 pub async fn setup_app_with_network(
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
-    network: KitsuneP2pConfig,
+    network: NetworkConfig,
 ) -> (TempDir, AppInterfaceApi, ConductorHandle) {
     let dir = test_db_dir();
     let (iface, handle) = setup_app_inner(
@@ -438,7 +214,7 @@ pub async fn setup_app_inner(
     data_root_path: DataRootPath,
     agent: AgentPubKey,
     apps_data: Vec<(&str, DnasWithProofs)>,
-    network: Option<KitsuneP2pConfig>,
+    _network: Option<NetworkConfig>,
 ) -> (AppInterfaceApi, ConductorHandle) {
     let config = ConductorConfig {
         data_root_path: Some(data_root_path.clone()),
@@ -448,7 +224,6 @@ pub async fn setup_app_inner(
                 allowed_origins: AllowedOrigins::Any,
             },
         }]),
-        network: network.unwrap_or_else(KitsuneP2pConfig::mem),
         ..Default::default()
     };
     let conductor_handle = ConductorBuilder::new()
@@ -925,13 +700,19 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
 
 /// Helper for displaying agent infos stored on a conductor
 pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    for cell_id in conductor.running_cell_ids() {
-        let space = cell_id.dna_hash();
-        let db = conductor.get_p2p_db(space);
-        let info = p2p_agent_store::dump_state(db.into(), Some(cell_id))
+    let all_dna_hashes = conductor.spaces.get_from_spaces(|s| (*s.dna_hash).clone());
+
+    for dna_hash in all_dna_hashes {
+        let peer_store = conductor
+            .holochain_p2p()
+            .peer_store(dna_hash.clone())
             .await
             .unwrap();
-        tracing::debug!(%info);
+        let all_peers = peer_store.get_all().await.unwrap();
+
+        for peer in all_peers {
+            tracing::debug!(dna_hash = %dna_hash, ?peer);
+        }
     }
 }
 

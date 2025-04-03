@@ -5,7 +5,6 @@ use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::dependencies::*;
 use lair_keystore_api::in_proc_keystore::*;
 use lair_keystore_api::prelude::*;

@@ -3,7 +3,6 @@ use std::{io, path::PathBuf};
 
 use holochain_types::prelude::{
     AppBundle, AppManifest, AppManifestCurrentBuilder, AppRoleManifest, DnaBundle, DnaManifest,
-    Timestamp,
 };
 use holochain_types::web_app::{WebAppBundle, WebAppManifest};
 
@@ -46,15 +45,7 @@ fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
         "network_seed:",
         "00000000-0000-0000-0000-000000000000",
     )?);
-    let manifest = DnaManifest::current(
-        name,
-        network_seed,
-        None,
-        Timestamp::now().into(),
-        vec![],
-        vec![],
-        vec![],
-    );
+    let manifest = DnaManifest::current(name, network_seed, None, vec![], vec![], vec![]);
     Ok(DnaBundle::new(manifest.try_into()?, vec![], root_dir)?)
 }
 
