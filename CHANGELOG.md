@@ -14,6 +14,86 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250403.155950
+
+## [hc\_service\_check-0.2.0-dev.13](crates/hc_service_check/CHANGELOG.md#0.2.0-dev.13)
+
+## [hcterm-0.5.0-dev.22](crates/hcterm/CHANGELOG.md#0.5.0-dev.22)
+
+## [holochain\_cli-0.5.0-dev.22](crates/holochain_cli/CHANGELOG.md#0.5.0-dev.22)
+
+## [holochain-0.5.0-dev.22](crates/holochain/CHANGELOG.md#0.5.0-dev.22)
+
+- Update to Lair 0.6.0
+- Changed the response format for `DumpNetworkMetrics` and `DumpNetworkStats` to provide information from Kitsune2. \#4816
+- Added a new option to the `DumpNetworkMetrics` on the admin interface. That is `include_dht_summary` which will return a summary of the DHT state. \#4816
+- Added `DumpNetworkMetrics` and `DumpNetworkStats` to the app interface. Please see the Rust docs for usage. \#4816
+- Removed `NetworkInfo` from the app interface, please use `DumpNetworkMetrics` or `DumpNetworkStats` instead. \#4816
+- Update `hcterm` to work with bootstrap2 bootstrap servers. By default, it uses `https://dev-test-bootstrap2.holochain.org` as the bootstrap2 server. \#4767
+- Update `hc-service-check` to check bootstrap2 servers. By default, it uses `https://dev-test-bootstrap2.holochain.org` as the bootstrap2 server. \#4767
+- Remove `hc-run-local-services`, please use `kitsune2-bootstrap-srv` instead.
+- Handle empty databases in `StorageInfo` request. Previously, if the database was empty, the request would return an error. \#4756
+- Add `DnaHash` to the `DnaStorageInfo` which is part of the `StorageInfo` response.
+- The `agent_latest_pubkey` field of `AgentInfo` is put behind the `unstable-dpki` feature flag ([\#4815](https://github.com/holochain/holochain/pull/4815)).
+
+## [holochain\_cli\_bundle-0.5.0-dev.22](crates/holochain_cli_bundle/CHANGELOG.md#0.5.0-dev.22)
+
+## [holochain\_cli\_sandbox-0.5.0-dev.22](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.0-dev.22)
+
+## [holochain\_cascade-0.5.0-dev.22](crates/holochain_cascade/CHANGELOG.md#0.5.0-dev.22)
+
+## [holochain\_conductor\_config-0.5.0-dev.9](crates/holochain_conductor_config/CHANGELOG.md#0.5.0-dev.9)
+
+## [holochain\_conductor\_services-0.4.0-dev.22](crates/holochain_conductor_services/CHANGELOG.md#0.4.0-dev.22)
+
+## [holochain\_metrics-0.5.0-dev.2](crates/holochain_metrics/CHANGELOG.md#0.5.0-dev.2)
+
+## [holochain\_test\_wasm\_common-0.5.0-dev.20](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.0-dev.20)
+
+## [holochain\_wasm\_test\_utils-0.5.0-dev.22](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.0-dev.22)
+
+## [holochain\_websocket-0.5.0-dev.22](crates/holochain_websocket/CHANGELOG.md#0.5.0-dev.22)
+
+## [hc\_deepkey\_sdk-0.8.0-dev.20](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.0-dev.20)
+
+## [holochain\_conductor\_api-0.5.0-dev.22](crates/holochain_conductor_api/CHANGELOG.md#0.5.0-dev.22)
+
+- Remove unused public type `ScottyPanel`.
+
+## [holochain\_p2p-0.5.0-dev.22](crates/holochain_p2p/CHANGELOG.md#0.5.0-dev.22)
+
+## [hc\_deepkey\_types-0.9.0-dev.16](crates/hc_deepkey_types/CHANGELOG.md#0.9.0-dev.16)
+
+## [hdk-0.5.0-dev.20](crates/hdk/CHANGELOG.md#0.5.0-dev.20)
+
+## [holochain\_state-0.5.0-dev.22](crates/holochain_state/CHANGELOG.md#0.5.0-dev.22)
+
+## [hdi-0.6.0-dev.16](crates/hdi/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_chc-0.2.0-dev.22](crates/holochain_chc/CHANGELOG.md#0.2.0-dev.22)
+
+## [holochain\_state\_types-0.5.0-dev.13](crates/holochain_state_types/CHANGELOG.md#0.5.0-dev.13)
+
+## [hdk\_derive-0.5.0-dev.15](crates/hdk_derive/CHANGELOG.md#0.5.0-dev.15)
+
+## [holochain\_types-0.5.0-dev.22](crates/holochain_types/CHANGELOG.md#0.5.0-dev.22)
+
+## [holochain\_keystore-0.5.0-dev.21](crates/holochain_keystore/CHANGELOG.md#0.5.0-dev.21)
+
+## [holochain\_sqlite-0.5.0-dev.20](crates/holochain_sqlite/CHANGELOG.md#0.5.0-dev.20)
+
+## [mr\_bundle-0.5.0-dev.6](crates/mr_bundle/CHANGELOG.md#0.5.0-dev.6)
+
+## [holochain\_zome\_types-0.5.0-dev.18](crates/holochain_zome_types/CHANGELOG.md#0.5.0-dev.18)
+
+## [holochain\_integrity\_types-0.5.0-dev.13](crates/holochain_integrity_types/CHANGELOG.md#0.5.0-dev.13)
+
+## [holo\_hash-0.5.0-dev.8](crates/holo_hash/CHANGELOG.md#0.5.0-dev.8)
+
+## [fixt-0.5.0-dev.2](crates/fixt/CHANGELOG.md#0.5.0-dev.2)
+
+## [holochain\_util-0.5.0-dev.2](crates/holochain_util/CHANGELOG.md#0.5.0-dev.2)
+
 # 20250303.125144
 
 ## [hcterm-0.5.0-dev.21](crates/hcterm/CHANGELOG.md#0.5.0-dev.21)
