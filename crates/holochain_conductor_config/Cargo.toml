@@ -26,7 +26,7 @@ holochain_util = { version = "^0.5.0-dev.2", path = "../holochain_util", default
 nanoid = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
-sodoken = "=0.0.904-alpha"
+sodoken = "0.1.0"
 url2 = "0.0.6"
 
 [dev-dependencies]
