@@ -1,18 +1,7 @@
 //! This module contains data and functions for running operations
 //! at the level of a [`DnaHash`] space.
 //! Multiple [`Cell`](crate::conductor::Cell)'s could share the same space.
-use std::{
-    cell::Cell,
-    collections::{hash_map, HashMap},
-    sync::Arc,
-    time::Duration,
-};
-
-use super::{
-    conductor::RwShare,
-    error::ConductorResult,
-    p2p_agent_store::{self, P2pBatch},
-};
+use super::{conductor::RwShare, error::ConductorResult};
 use crate::conductor::{error::ConductorError, state::ConductorState};
 use crate::core::workflow::countersigning_workflow::CountersigningWorkspace;
 use crate::core::{
@@ -28,31 +17,22 @@ use holo_hash::{AgentPubKey, DhtOpHash, DnaHash};
 use holochain_conductor_api::conductor::paths::DatabasesRootPath;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::AgentPubKeyExt;
-use holochain_p2p::DnaHashExt;
-use holochain_p2p::{
-    dht::region::RegionBounds,
-    dht_arc::{DhtArcRange, DhtArcSet},
-    event::FetchOpDataQuery,
-};
+use holochain_p2p::actor::DynHcP2p;
 use holochain_sqlite::prelude::{
-    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht,
-    DbKindP2pAgents, DbKindP2pMetrics, DbKindWasm, DbSyncLevel, DbSyncStrategy, DbWrite,
-    PoolConfig, ReadAccess,
+    DatabaseResult, DbKey, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindWasm,
+    DbSyncLevel, DbSyncStrategy, DbWrite, PoolConfig, ReadAccess,
 };
-use holochain_state::{
-    host_fn_workspace::SourceChainWorkspace,
-    mutations,
-    prelude::*,
-    query::{map_sql_dht_op_common, StateQueryError},
-};
+use holochain_state::{host_fn_workspace::SourceChainWorkspace, mutations, prelude::*};
 use holochain_util::timed;
-use kitsune_p2p::event::{TimeWindow, TimeWindowInclusive};
-use kitsune_p2p_block::NodeId;
-use kitsune_p2p_types::agent_info::AgentInfoSigned;
-use rusqlite::{named_params, OptionalExtension};
+use lair_keystore_api::prelude::SharedLockedArray;
+use rusqlite::OptionalExtension;
 use std::convert::TryInto;
 use std::path::PathBuf;
+use std::{
+    cell::Cell,
+    collections::{hash_map, HashMap},
+    sync::Arc,
+};
 
 #[derive(Clone)]
 /// This is the set of all current
@@ -93,14 +73,8 @@ pub struct Space {
     /// There is one per unique Dna.
     pub dht_db: DbWrite<DbKindDht>,
 
-    /// The database for storing AgentInfoSigned
-    pub p2p_agents_db: DbWrite<DbKindP2pAgents>,
-
-    /// The database for storing p2p MetricDatum(s)
-    pub p2p_metrics_db: DbWrite<DbKindP2pMetrics>,
-
-    /// The batch sender for writes to the p2p database.
-    pub p2p_batch_sender: tokio::sync::mpsc::Sender<P2pBatch>,
+    /// The peer meta store database. One per unique Dna.
+    pub peer_meta_store_db: DbWrite<DbKindPeerMetaStore>,
 
     /// A cache for slow database queries.
     pub dht_query_cache: DhtDbQueryCache,
@@ -155,7 +129,7 @@ impl Spaces {
     /// Create a new empty set of [`DnaHash`] spaces.
     pub async fn new(
         config: Arc<ConductorConfig>,
-        passphrase: sodoken::BufRead,
+        passphrase: SharedLockedArray,
     ) -> ConductorResult<Self> {
         // do this before any awaits
         let danger_print_db_secrets = DANGER_PRINT_DB_SECRETS.get();
@@ -170,7 +144,7 @@ impl Spaces {
 
         let db_key_path = root_db_dir.join("db.key");
         let db_key = match tokio::fs::read_to_string(db_key_path.clone()).await {
-            Ok(locked) => DbKey::load(locked, passphrase).await?,
+            Ok(locked) => DbKey::load(locked, passphrase.clone()).await?,
             Err(_) => {
                 let db_key = DbKey::generate(passphrase).await?;
                 tokio::fs::write(db_key_path, db_key.locked.clone()).await?;
@@ -181,7 +155,7 @@ impl Spaces {
         if danger_print_db_secrets {
             eprintln!(
                 "--beg-db-secrets--{}--end-db-secrets--",
-                &String::from_utf8_lossy(&db_key.unlocked.read_lock())
+                &String::from_utf8_lossy(&*db_key.unlocked.lock().unwrap().lock())
             );
         }
 
@@ -224,6 +198,9 @@ impl Spaces {
 
     /// Block some target.
     pub async fn block(&self, input: Block) -> DatabaseResult<()> {
+        tracing::warn!(
+            "Creating block, but this is currently not being respected by holochain_p2p!"
+        );
         holochain_state::block::block(&self.conductor_db, input).await
     }
 
@@ -234,31 +211,40 @@ impl Spaces {
 
     async fn node_agents_in_spaces(
         &self,
-        node_id: NodeId,
+        node_id: &str,
         dnas: Vec<DnaHash>,
-    ) -> DatabaseResult<Vec<CellId>> {
-        let mut agent_lists: Vec<Vec<AgentInfoSigned>> = vec![];
+        holochain_p2p: DynHcP2p,
+    ) -> ConductorResult<Vec<CellId>> {
+        let mut agents = Vec::new();
         for dna in dnas {
-            // @todo join_all for these awaits
-            agent_lists.push(self.p2p_agents_db(&dna)?.p2p_list_agents().await?);
+            let dna_agents = holochain_p2p
+                .peer_store(dna)
+                .await?
+                .get_all()
+                .await
+                .map_err(ConductorError::other)?;
+
+            agents.extend(dna_agents);
         }
 
-        Ok(agent_lists
+        Ok(agents
             .into_iter()
-            .flatten()
-            .filter(|agent| {
-                agent.url_list.iter().any(|url| {
-                    kitsune_p2p_types::tx_utils::ProxyUrl::from(url.as_str())
-                        .digest()
-                        .map(|u| u.0 == *node_id)
-                        .unwrap_or(false)
-                })
-            })
-            .map(|agent_info| {
-                CellId::new(
-                    DnaHash::from_kitsune(&agent_info.space),
-                    AgentPubKey::from_kitsune(&agent_info.agent),
-                )
+            .filter_map(|agent| {
+                let is_matching_node_id = agent
+                    .url
+                    .as_ref()
+                    .and_then(|url| url.peer_id())
+                    .map(|peer_id| peer_id == node_id)
+                    .unwrap_or_default();
+
+                if is_matching_node_id {
+                    Some(CellId::new(
+                        DnaHash::from_k2_space(&agent.space),
+                        AgentPubKey::from_k2_agent(&agent.agent),
+                    ))
+                } else {
+                    None
+                }
             })
             .collect())
     }
@@ -268,18 +254,20 @@ impl Spaces {
         &self,
         target_id: BlockTargetId,
         timestamp: Timestamp,
-    ) -> DatabaseResult<bool> {
+        holochain_p2p: DynHcP2p,
+    ) -> ConductorResult<bool> {
         let cell_ids = match &target_id {
             BlockTargetId::Cell(cell_id) => vec![cell_id.to_owned()],
             BlockTargetId::NodeDna(node_id, dna_hash) => {
-                self.node_agents_in_spaces((*node_id).clone(), vec![dna_hash.clone()])
+                self.node_agents_in_spaces(node_id, vec![dna_hash.clone()], holochain_p2p)
                     .await?
             }
             BlockTargetId::Node(node_id) => {
                 self.node_agents_in_spaces(
-                    (*node_id).clone(),
+                    node_id,
                     self.map
                         .share_ref(|m| m.keys().cloned().collect::<Vec<DnaHash>>()),
+                    holochain_p2p,
                 )
                 .await?
             }
@@ -439,315 +427,73 @@ impl Spaces {
         self.get_or_create_space_ref(dna_hash, |space| space.dht_db.clone())
     }
 
-    /// Get the peer database (this will create the space if it doesn't already exist).
-    pub fn p2p_agents_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindP2pAgents>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.p2p_agents_db.clone())
-    }
-
-    /// Get the peer database (this will create the space if it doesn't already exist).
-    pub fn p2p_metrics_db(&self, dna_hash: &DnaHash) -> DatabaseResult<DbWrite<DbKindP2pMetrics>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.p2p_metrics_db.clone())
-    }
-
-    /// Get the batch sender (this will create the space if it doesn't already exist).
-    pub fn p2p_batch_sender(
+    /// Get the peer_meta_store database.
+    pub fn peer_meta_store_db(
         &self,
         dna_hash: &DnaHash,
-    ) -> DatabaseResult<tokio::sync::mpsc::Sender<P2pBatch>> {
-        self.get_or_create_space_ref(dna_hash, |space| space.p2p_batch_sender.clone())
+    ) -> DatabaseResult<DbWrite<DbKindPeerMetaStore>> {
+        self.get_or_create_space_ref(dna_hash, |space| space.peer_meta_store_db.clone())
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    /// the network module is requesting a list of dht op hashes
-    /// Get the [`DhtOpHash`]es and authored timestamps for a given time window.
-    pub async fn handle_query_op_hashes(
-        &self,
-        dna_hash: &DnaHash,
-        dht_arc_set: DhtArcSet,
-        window: TimeWindow,
-        max_ops: usize,
-        include_limbo: bool,
-    ) -> ConductorResult<Option<(Vec<DhtOpHash>, TimeWindowInclusive)>> {
-        // The exclusive window bounds.
-        let start = window.start;
-        let end = window.end;
-        let max_ops: u32 = max_ops.try_into().unwrap_or(u32::MAX);
-
-        let db = self.dht_db(dna_hash)?;
-
-        let include_limbo = if include_limbo {
-            "\n"
-        } else {
-            "AND DhtOp.when_integrated IS NOT NULL\n"
-        };
-
-        let intervals = dht_arc_set.intervals();
-        let sql = if let Some(DhtArcRange::Full) = intervals.first() {
-            format!(
-                "{} {} {}",
-                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
-                include_limbo,
-                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P2,
-            )
-        } else {
-            let sql_ranges = intervals
-                .into_iter()
-                .filter(|i| matches!(i, &DhtArcRange::Bounded(_, _)))
-                .map(|interval| match interval {
-                    DhtArcRange::Bounded(start_loc, end_loc) => {
-                        if start_loc <= end_loc {
-                            format!(
-                                "AND storage_center_loc >= {} AND storage_center_loc <= {} \n ",
-                                start_loc, end_loc
-                            )
-                        } else {
-                            format!(
-                                "AND (storage_center_loc < {} OR storage_center_loc > {}) \n ",
-                                end_loc, start_loc
-                            )
-                        }
-                    }
-                    _ => unreachable!(),
-                })
-                .collect::<String>();
-            format!(
-                "{} {} {} {}",
-                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P1,
-                include_limbo,
-                sql_ranges,
-                holochain_sqlite::sql::sql_cell::FETCH_OP_HASHES_P2,
-            )
-        };
-        let results = db
-            .read_async(move |txn| {
-                let mut stmt = txn.prepare_cached(&sql)?;
-                let hashes = stmt
-                    .query_map(
-                        named_params! {
-                            ":from": start,
-                            ":to": end,
-                            ":limit": max_ops,
-                        },
-                        |row| row.get("hash"),
-                    )?
-                    .collect::<rusqlite::Result<Vec<DhtOpHash>>>()?;
-                let range = hashes.first().and_then(|s| hashes.last().map(|e| (s, e)));
-                match range {
-                    Some((start, end)) => {
-                        let start: Timestamp = txn.query_row(
-                            "SELECT authored_timestamp FROM DhtOp WHERE hash = ?",
-                            [start],
-                            |row| row.get(0),
-                        )?;
-                        let end: Timestamp = txn.query_row(
-                            "SELECT authored_timestamp FROM DhtOp WHERE hash = ?",
-                            [end],
-                            |row| row.get(0),
-                        )?;
-                        DatabaseResult::Ok(Some((
-                            hashes,
-                            kitsune_p2p_types::Timestamp::from_micros(start.0)
-                                ..=kitsune_p2p_types::Timestamp::from_micros(end.0),
-                        )))
-                    }
-                    None => Ok(None),
-                }
-            })
-            .await?;
-
-        Ok(results)
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, query)))]
-    /// The network module is requesting the content for dht ops
-    pub async fn handle_fetch_op_data(
-        &self,
-        dna_hash: &DnaHash,
-        query: FetchOpDataQuery,
-    ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
-        match query {
-            FetchOpDataQuery::Hashes {
-                op_hash_list,
-                include_limbo,
-            } => {
-                self.handle_fetch_op_data_by_hashes(dna_hash, op_hash_list, include_limbo)
-                    .await
-            }
-            FetchOpDataQuery::Regions(regions) => {
-                self.handle_fetch_op_data_by_regions(dna_hash, regions)
-                    .await
-            }
-        }
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, regions)))]
-    /// The network module is requesting the content for dht ops
-    pub async fn handle_fetch_op_data_by_regions(
-        &self,
-        dna_hash: &DnaHash,
-        regions: Vec<RegionBounds>,
-    ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
-        let sql = holochain_sqlite::sql::sql_cell::FETCH_OPS_BY_REGION;
-        Ok(self
-            .dht_db(dna_hash)?
-            .read_async(move |txn| {
-                let mut stmt = txn.prepare_cached(sql).map_err(StateQueryError::from)?;
-                let results = regions
-                    .into_iter()
-                    .map(|bounds| {
-                        let (x0, x1) = bounds.x;
-                        let (t0, t1) = bounds.t;
-                        stmt.query_and_then(
-                            named_params! {
-                                ":storage_start_loc": x0,
-                                ":storage_end_loc": x1,
-                                ":timestamp_min": t0,
-                                ":timestamp_max": t1,
-                            },
-                            |row| {
-                                let hash: DhtOpHash =
-                                    row.get("hash").map_err(StateQueryError::from)?;
-                                Ok(map_sql_dht_op_common(false, false, "type", row)?
-                                    .map(|op| (hash, op)))
-                            },
-                        )
-                        .map_err(StateQueryError::from)?
-                        .collect::<Result<Vec<Option<_>>, StateQueryError>>()
-                    })
-                    .collect::<Result<Vec<Vec<Option<_>>>, _>>()?
-                    .into_iter()
-                    .flatten()
-                    .flatten()
-                    .collect();
-                StateQueryResult::Ok(results)
-            })
-            .await?)
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, op_hashes)))]
-    /// The network module is requesting the content for dht ops
-    pub async fn handle_fetch_op_data_by_hashes(
-        &self,
-        dna_hash: &DnaHash,
-        op_hashes: Vec<holo_hash::DhtOpHash>,
-        include_limbo: bool,
-    ) -> ConductorResult<Vec<(holo_hash::DhtOpHash, holochain_types::dht_op::DhtOp)>> {
-        let mut sql = "
-            SELECT DhtOp.hash, DhtOp.type AS dht_type,
-            Action.blob AS action_blob, 
-            Action.author as author,
-            Entry.blob AS entry_blob
-            FROM DHtOp
-            JOIN Action ON DhtOp.action_hash = Action.hash
-            LEFT JOIN Entry ON Action.entry_hash = Entry.hash
-            WHERE
-            DhtOp.hash = ?
-        "
-        .to_string();
-
-        if !include_limbo {
-            sql.push_str(
-                "
-                AND
-                DhtOp.when_integrated IS NOT NULL
-            ",
-            );
-        }
-
-        let db = self.dht_db(dna_hash)?;
-        let results = db
-            .read_async(move |txn| {
-                let mut out = Vec::with_capacity(op_hashes.len());
-                for hash in op_hashes {
-                    let mut stmt = txn.prepare_cached(&sql)?;
-                    let mut rows = stmt.query([hash])?;
-                    if let Some(row) = rows.next()? {
-                        let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
-                        let hash: DhtOpHash = row.get("hash")?;
-                        out.push((hash, op));
-                    } else {
-                        return Err(holochain_state::query::StateQueryError::Sql(
-                            rusqlite::Error::QueryReturnedNoRows,
-                        ));
-                    }
-                }
-                StateQueryResult::Ok(out)
-            })
-            .await?;
-        Ok(results)
-    }
-
+    /// we are receiving a "publish" event from the network.
     #[cfg_attr(
         feature = "instrument",
         tracing::instrument(skip(self, request_validation_receipt, ops))
     )]
-    /// we are receiving a "publish" event from the network
     pub async fn handle_publish(
         &self,
         dna_hash: &DnaHash,
         request_validation_receipt: bool,
-        countersigning_session: bool,
         ops: Vec<DhtOp>,
     ) -> ConductorResult<()> {
-        // If this is a countersigning session then
-        // send it to the countersigning workflow otherwise
-        // send it to the incoming ops workflow.
-        if countersigning_session {
-            use futures::StreamExt;
-            let ops = futures::stream::iter(ops.into_iter().filter_map(|op| match op {
-                DhtOp::ChainOp(op) => {
-                    let hash = DhtOpHash::with_data_sync(&*op);
-                    Some((hash, *op))
-                }
-                _ => {
-                    tracing::warn!(
-                        ?op,
-                        "Invalid DhtOp in countersigning session, only ChainOps will be handled"
-                    );
-                    None
-                }
-            }))
-            .collect()
-            .await;
+        let space = self.get_or_create_space(dna_hash)?;
+        let trigger = match self
+            .queue_consumer_map
+            .sys_validation_trigger(space.dna_hash.clone())
+        {
+            Some(t) => t,
+            // If the workflow has not been spawned yet we can't handle incoming messages.
+            // Note this is not an error because only a validation receipt is proof of a publish.
+            None => {
+                tracing::warn!("No sys validation trigger yet for space: {}", dna_hash);
+                return Ok(());
+            }
+        };
 
-            let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
-                (
-                    space.witnessing_workspace.clone(),
-                    self.queue_consumer_map
-                        .witnessing_trigger(space.dna_hash.clone()),
-                )
-            })?;
-            let trigger = match trigger {
-                Some(t) => t,
-                // If the workflow has not been spawned yet, we can't handle incoming messages.
-                None => return Ok(()),
-            };
-            receive_incoming_countersigning_ops(ops, &workspace, trigger)?;
-        } else {
-            let space = self.get_or_create_space(dna_hash)?;
-            let trigger = match self
-                .queue_consumer_map
-                .sys_validation_trigger(space.dna_hash.clone())
-            {
-                Some(t) => t,
-                // If the workflow has not been spawned yet we can't handle incoming messages.
-                // Note this is not an error because only a validation receipt is proof of a publish.
-                None => {
-                    tracing::warn!("No sys validation trigger yet for space: {}", dna_hash);
-                    return Ok(());
-                }
-            };
-            incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
-        }
+        incoming_dht_ops_workflow(space, trigger, ops, request_validation_receipt).await?;
+
         Ok(())
     }
 
-    /// Get the recent_threshold based on the kitsune network config
-    pub fn recent_threshold(&self) -> Duration {
-        self.config
-            .network
-            .tuning_params
-            .danger_gossip_recent_threshold()
+    /// Receive a publish countersign event from the network.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, ops)))]
+    pub async fn handle_publish_countersign(
+        &self,
+        dna_hash: &DnaHash,
+        op: ChainOp,
+    ) -> ConductorResult<()> {
+        let hash = DhtOpHash::with_data_sync(&op);
+
+        let (workspace, trigger) = self.get_or_create_space_ref(dna_hash, |space| {
+            (
+                space.witnessing_workspace.clone(),
+                self.queue_consumer_map
+                    .witnessing_trigger(space.dna_hash.clone()),
+            )
+        })?;
+
+        let trigger = match trigger {
+            Some(t) => t,
+            // If the workflow has not been spawned yet, we can't handle incoming messages.
+            None => {
+                tracing::warn!("No witnessing trigger yet for space: {}", dna_hash);
+                return Ok(());
+            }
+        };
+
+        receive_incoming_countersigning_ops(vec![(hash, op)], &workspace, trigger)?;
+
+        Ok(())
     }
 }
 
@@ -758,13 +504,12 @@ impl Space {
         db_sync_strategy: DbSyncStrategy,
         db_key: DbKey,
     ) -> DatabaseResult<Self> {
-        let space = dna_hash.to_kitsune();
         let db_sync_level = match db_sync_strategy {
             DbSyncStrategy::Fast => DbSyncLevel::Off,
             DbSyncStrategy::Resilient => DbSyncLevel::Normal,
         };
 
-        let (cache, dht_db, p2p_agents_db, p2p_metrics_db, conductor_db) =
+        let (cache, dht_db, peer_meta_store_db, conductor_db) =
             tokio::task::block_in_place(|| {
                 let cache = DbWrite::open_with_pool_config(
                     root_db_dir.as_ref(),
@@ -782,17 +527,9 @@ impl Space {
                         key: db_key.clone(),
                     },
                 )?;
-                let p2p_agents_db = DbWrite::open_with_pool_config(
+                let peer_meta_store_db = DbWrite::open_with_pool_config(
                     root_db_dir.as_ref(),
-                    DbKindP2pAgents(space.clone()),
-                    PoolConfig {
-                        synchronous_level: db_sync_level,
-                        key: db_key.clone(),
-                    },
-                )?;
-                let p2p_metrics_db = DbWrite::open_with_pool_config(
-                    root_db_dir.as_ref(),
-                    DbKindP2pMetrics(space),
+                    DbKindPeerMetaStore(dna_hash.clone()),
                     PoolConfig {
                         synchronous_level: db_sync_level,
                         key: db_key.clone(),
@@ -806,15 +543,8 @@ impl Space {
                         key: db_key.clone(),
                     },
                 )?;
-                DatabaseResult::Ok((cache, dht_db, p2p_agents_db, p2p_metrics_db, conductor_db))
+                DatabaseResult::Ok((cache, dht_db, peer_meta_store_db, conductor_db))
             })?;
-
-        let (tx, rx) = tokio::sync::mpsc::channel(100);
-        tokio::spawn(p2p_agent_store::p2p_put_all_batch(
-            p2p_agents_db.clone(),
-            rx,
-        ));
-        let p2p_batch_sender = tx;
 
         let witnessing_workspace = WitnessingWorkspace::default();
         let incoming_op_hashes = IncomingOpHashes::default();
@@ -825,9 +555,7 @@ impl Space {
             cache_db: cache,
             authored_dbs: Arc::new(parking_lot::Mutex::new(HashMap::new())),
             dht_db,
-            p2p_agents_db,
-            p2p_metrics_db,
-            p2p_batch_sender,
+            peer_meta_store_db,
             countersigning_workspaces: Default::default(),
             witnessing_workspace,
             incoming_op_hashes,
@@ -952,7 +680,9 @@ impl TestSpaces {
                 ..Default::default()
             }
             .into(),
-            sodoken::BufRead::new_no_lock(b"passphrase"),
+            Arc::new(std::sync::Mutex::new(sodoken::LockedArray::from(
+                b"passphrase".to_vec(),
+            ))),
         )
         .await
         .unwrap();

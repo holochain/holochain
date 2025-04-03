@@ -23,19 +23,18 @@ pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
         M::initial(include_str!("sql/cell/schema/0.sql")),
         M {
             forward: include_str!("sql/cell/schema/1-up.sql").into(),
-            _schema: include_str!("sql/cell/schema/1.sql").into(),
         },
         M {
             forward: include_str!("sql/cell/schema/2-up.sql").into(),
-            _schema: include_str!("sql/cell/schema/2.sql").into(),
         },
         M {
             forward: include_str!("sql/cell/schema/3-up.sql").into(),
-            _schema: include_str!("sql/cell/schema/3.sql").into(),
         },
         M {
             forward: include_str!("sql/cell/schema/4-up.sql").into(),
-            _schema: include_str!("sql/cell/schema/4.sql").into(),
+        },
+        M {
+            forward: include_str!("sql/cell/schema/5-up.sql").into(),
         },
     ],
 });
@@ -45,21 +44,12 @@ pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| Schema {
         M::initial(include_str!("sql/conductor/schema/0.sql")),
         M {
             forward: include_str!("sql/conductor/schema/1-up.sql").into(),
-            _schema: "".into(),
         },
     ],
 });
 
 pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| Schema {
     migrations: vec![M::initial(include_str!("sql/wasm/schema/0.sql"))],
-});
-
-pub static SCHEMA_P2P_STATE: Lazy<Schema> = Lazy::new(|| Schema {
-    migrations: vec![M::initial(include_str!("sql/p2p_agent_store/schema/0.sql"))],
-});
-
-pub static SCHEMA_P2P_METRICS: Lazy<Schema> = Lazy::new(|| Schema {
-    migrations: vec![M::initial(include_str!("sql/p2p_metrics/schema/0.sql"))],
 });
 
 pub static SCHEMA_PEER_META_STORE: Lazy<Schema> = Lazy::new(|| Schema {
@@ -124,7 +114,6 @@ impl Schema {
 
 #[derive(Clone, Debug)]
 pub struct Migration {
-    _schema: Sql,
     forward: Sql,
 }
 
@@ -132,7 +121,6 @@ impl Migration {
     /// The initial migration's forward migration is the entire schema
     pub fn initial(schema: &str) -> Self {
         Self {
-            _schema: schema.into(),
             forward: schema.into(),
         }
     }
@@ -157,7 +145,6 @@ mod tests {
                 M::initial("CREATE TABLE Numbers (num INTEGER);"),
                 M {
                     forward: "CREATE TABLE Names (name TEXT);".into(),
-                    _schema: "n/a".into(),
                 },
             ],
         };
@@ -202,7 +189,6 @@ mod tests {
             M::initial("This bad SQL won't run, phew!"),
             M {
                 forward: "CREATE TABLE Names (name TEXT);".into(),
-                _schema: "n/a".into(),
             },
         ];
         schema.initialize(&mut conn, None).unwrap();

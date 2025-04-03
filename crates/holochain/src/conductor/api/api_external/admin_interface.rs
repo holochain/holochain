@@ -83,7 +83,7 @@ impl AdminInterfaceApi {
                     DnaSource::Hash(ref hash) => {
                         if !modifiers.has_some_option_set() {
                             return Err(ConductorApiError::DnaReadError(
-                                "DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
+                                "DnaSource::Hash requires `properties` or `network_seed` to create a derived Dna"
                                     .to_string(),
                             ));
                         }
@@ -281,8 +281,17 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::FullStateDumped(state))
             }
-            DumpNetworkMetrics { dna_hash } => {
-                let dump = self.conductor_handle.dump_network_metrics(dna_hash).await?;
+            DumpNetworkMetrics {
+                dna_hash,
+                include_dht_summary,
+            } => {
+                let dump = self
+                    .conductor_handle
+                    .dump_network_metrics(Kitsune2NetworkMetricsRequest {
+                        dna_hash,
+                        include_dht_summary,
+                    })
+                    .await?;
                 Ok(AdminResponse::NetworkMetricsDumped(dump))
             }
             DumpNetworkStats => {
@@ -295,7 +304,11 @@ impl AdminInterfaceApi {
             }
             AgentInfo { cell_id } => {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
-                Ok(AdminResponse::AgentInfo(r))
+                let mut encoded = Vec::with_capacity(r.len());
+                for info in r {
+                    encoded.push(info.encode()?);
+                }
+                Ok(AdminResponse::AgentInfo(encoded))
             }
             GraftRecords {
                 cell_id,
@@ -433,7 +446,7 @@ mod test {
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == *"DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == *"DnaSource::Hash requires `properties` or `network_seed` to create a derived Dna"
         );
 
         // with a property should install and produce a different hash

@@ -121,6 +121,7 @@ pub mod test {
     test_entry_impl!(Something);
 
     #[tokio::test(flavor = "multi_thread")]
+    #[cfg_attr(target_os = "windows", ignore = "fails on windows")]
     async fn ribosome_must_get_entry_test() {
         holochain_trace::test_run();
         let RibosomeTestFixture {

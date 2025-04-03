@@ -50,14 +50,13 @@ impl DnaManifest {
         name: String,
         network_seed: Option<String>,
         properties: Option<YamlProperties>,
-        origin_time: HumanTimestamp,
         integrity_zomes: Vec<ZomeManifest>,
         coordinator_zomes: Vec<ZomeManifest>,
         #[cfg(feature = "unstable-migration")] lineage: Vec<DnaHash>,
     ) -> Self {
         DnaManifestCurrent::new(
             name,
-            IntegrityManifest::new(network_seed, properties, origin_time, integrity_zomes),
+            IntegrityManifest::new(network_seed, properties, integrity_zomes),
             CoordinatorManifest {
                 zomes: coordinator_zomes,
             },
@@ -140,7 +139,6 @@ mod tests {
             .name("my_dna".to_owned())
             .integrity(IntegrityManifest {
                 network_seed: None,
-                origin_time: HumanTimestamp::Micros(Timestamp::now()),
                 properties: None,
                 zomes: vec![],
             })

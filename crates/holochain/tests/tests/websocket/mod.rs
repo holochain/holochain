@@ -289,6 +289,19 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
 
+    let mut apps_iter = apps.iter();
+    for i in 0..NUM_CONDUCTORS {
+        let app = apps_iter.next().unwrap();
+        conductors[i]
+            .require_initial_gossip_activity_for_cell(
+                app.cells().first().unwrap(),
+                NUM_CONDUCTORS as u32 - 1,
+                std::time::Duration::from_secs(30),
+            )
+            .await
+            .unwrap();
+    }
+
     let all_agents: HashSet<_> = apps
         .cells_flattened()
         .into_iter()
@@ -795,17 +808,15 @@ async fn network_stats() {
         .admin_ws_client::<AdminResponse>()
         .await;
 
-    const EXPECT: &str = "backendGoPion";
+    const EXPECT: &str = "kitsune2-core-mem";
 
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();
     match res {
-        AdminResponse::NetworkStatsDumped(json) => {
-            println!("{json}");
+        AdminResponse::NetworkStatsDumped(stats) => {
+            println!("{stats:?}");
 
-            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-            let backend = parsed.as_object().unwrap().get("backend").unwrap();
-            assert_eq!(EXPECT, backend);
+            assert_eq!(EXPECT, stats.backend);
         }
         _ => panic!("unexpected"),
     }

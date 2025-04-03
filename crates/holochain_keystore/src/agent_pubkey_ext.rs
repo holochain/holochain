@@ -1,6 +1,6 @@
 use crate::*;
+use ::lair_keystore::dependencies::lair_keystore_api;
 use holochain_zome_types::prelude::*;
-use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::LairResult;
 use must_future::MustBoxFuture;
 use std::sync::Arc;
@@ -108,11 +108,6 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         let pub_key = <lair_keystore_api::prelude::BinDataSized<32>>::from(pub_key);
         let sig = signature.0;
 
-        MustBoxFuture::new(async move {
-            pub_key
-                .verify_detached(sig.into(), data)
-                .await
-                .map_err(KeystoreError::LairError)
-        })
+        MustBoxFuture::new(async move { Ok(pub_key.verify_detached(sig.into(), data).await) })
     }
 }

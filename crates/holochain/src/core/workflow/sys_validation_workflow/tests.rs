@@ -18,7 +18,6 @@ use {
 };
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn sys_validation_workflow_test() {
     holochain_trace::test_run();
 
@@ -82,7 +81,7 @@ async fn sys_validation_produces_invalid_chain_warrant() {
     let op = DhtOpHashed::from_content_sync(op);
     let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op_dht(txn, &op, None).unwrap();
+        insert_op_dht(txn, &op, 0, None).unwrap();
     });
 
     //- Trigger sys validation
@@ -177,7 +176,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let forked_op = DhtOpHashed::from_content_sync(forked_op);
     let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op_dht(txn, &forked_op, None).unwrap();
+        insert_op_dht(txn, &forked_op, 0, None).unwrap();
     });
 
     //- Check that bob authored a chain fork warrant
@@ -395,6 +394,9 @@ async fn bob_links_in_a_legit_way(
     triggers
         .publish_dht_ops
         .trigger(&"bob_links_in_a_legit_way");
+    triggers
+        .integrate_dht_ops
+        .trigger(&"bob_links_in_a_legit_way");
     link_add_address
 }
 
@@ -460,6 +462,9 @@ async fn bob_makes_a_large_link(
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"bob_makes_a_large_link");
+    triggers
+        .integrate_dht_ops
+        .trigger(&"bob_makes_a_large_link");
     (bad_update_action, bad_update_entry_hash, link_add_address)
 }
 

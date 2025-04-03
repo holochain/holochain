@@ -11,9 +11,7 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-kitsune_p2p_dht = { version = "^0.5.0-dev.3", path = "../kitsune_p2p/dht", optional = true }
 holochain_timestamp = { version = "^0.5.0-dev.1", path = "../timestamp" }
-kitsune_p2p_block = { version = "^0.5.0-dev.5", path = "../kitsune_p2p/block" }
 holo_hash = { version = "^0.5.0-dev.7", path = "../holo_hash", features = [
   "encoding",
 ] }
@@ -71,7 +69,6 @@ full-dna-def = [
   "nanoid",
   "shrinkwraprs",
   "holochain_integrity_types/full-dna-def",
-  "kitsune_p2p_dht",
 ]
 
 full = [
@@ -109,7 +106,6 @@ test_utils = [
   "fuzzing",
   "fixturators",
   "once_cell",
-  "kitsune_p2p_block/sqlite",
   "holo_hash/hashing",
   "holo_hash/test_utils",
   "full-dna-def",
@@ -122,17 +118,13 @@ sqlite-encrypted = [
   "rusqlite",
   "rusqlite/bundled-sqlcipher-vendored-openssl",
   "holo_hash/sqlite-encrypted",
-  "kitsune_p2p_dht/sqlite-encrypted",
   "holochain_timestamp/sqlite-encrypted",
-  "kitsune_p2p_block/sqlite-encrypted",
 ]
 sqlite = [
   "rusqlite",
   "rusqlite/bundled",
   "holo_hash/sqlite",
-  "kitsune_p2p_dht/sqlite",
   "holochain_timestamp/sqlite",
-  "kitsune_p2p_block/sqlite",
 ]
 
 unstable-dpki = []

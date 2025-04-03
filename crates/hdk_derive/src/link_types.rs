@@ -7,7 +7,7 @@ use syn::Item;
 use syn::ItemEnum;
 
 #[derive(Debug, FromMeta)]
-/// Optional attribute for skipping `#[no_mangle].
+/// Optional attribute for skipping `#[no_mangle]`.
 /// Useful for testing.
 pub struct MacroArgs {
     #[darling(default)]

@@ -20,18 +20,29 @@ use tokio::sync::broadcast::Receiver;
 mod session_interaction_over_websocket;
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn listen_for_countersigning_completion() {
     holochain_trace::test_run();
 
     let config = SweetConductorConfig::rendezvous(true).no_dpki();
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let cells = apps.cells_flattened();
     let alice = &cells[0];
     let bob = &cells[1];
+
+    // Ensure conductors are declaring full storage arcs and know about each other's arcs.
+    conductors[0]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[2]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
 
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
@@ -45,7 +56,9 @@ async fn listen_for_countersigning_completion() {
         .await
         .unwrap();
 
-    await_consistency(30, vec![alice, bob]).await.unwrap();
+    await_consistency(30, vec![alice, bob, &cells[2]])
+        .await
+        .unwrap();
 
     // Set up the session and accept it for both agents
     let preflight_request: PreflightRequest = conductors[0]
@@ -119,7 +132,7 @@ async fn retry_countersigning_commit_on_missing_deps() {
     holochain_trace::test_run();
 
     let config = SweetConductorConfig::rendezvous(true).no_dpki();
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
     for conductor in conductors.iter_mut() {
         conductor.shutdown().await;
     }
@@ -127,7 +140,14 @@ async fn retry_countersigning_commit_on_missing_deps() {
     // but before creating any data, disable publish and recent gossip.
     // Now the only way peers can get data is through get requests!
     for conductor in conductors.iter_mut() {
-        conductor.update_config(|c| SweetConductorConfig::from(c).historical_only().into());
+        conductor.update_config(|c| {
+            SweetConductorConfig::from(c)
+                .tune_network_config(|nc| {
+                    nc.disable_publish = true;
+                    nc.disable_gossip = true;
+                })
+                .into()
+        });
         conductor.startup().await;
     }
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -135,6 +155,18 @@ async fn retry_countersigning_commit_on_missing_deps() {
     let cells = apps.cells_flattened();
     let alice = &cells[0];
     let bob = &cells[1];
+
+    // Ensure conductors are declaring full storage arcs and know about each other's arcs.
+    conductors[0]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[2]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
 
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
@@ -241,28 +273,50 @@ async fn retry_countersigning_commit_on_missing_deps() {
     // Bring Bob's app back online
     conductors[1].enable_app("app".into()).await.unwrap();
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    // Ensure conductors are declaring full storage arcs and know about each other's arcs.
+    conductors[0]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[2]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
 
     // Bob should be able to get Alice's chain head when we commit, so let's do that.
-    let (_, _): (ActionHash, EntryHash) = conductors[1]
-        .call_fallible(
-            &bob_zome,
-            "create_a_countersigned_thing_with_entry_hash",
-            vec![alice_response.clone(), bob_response.clone()],
-        )
-        .await
-        .unwrap();
+    for _ in 0..5 {
+        let ok = conductors[1]
+            .call_fallible::<_, (ActionHash, EntryHash)>(
+                &bob_zome,
+                "create_a_countersigned_thing_with_entry_hash",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await
+            .is_ok();
+
+        if ok {
+            break;
+        }
+    }
 
     // Now that Bob is available again, Alice should also be able to get his chain head and complete
     // her commit
-    let (_, _): (ActionHash, EntryHash) = conductors[0]
-        .call_fallible(
-            &alice_zome,
-            "create_a_countersigned_thing_with_entry_hash",
-            vec![alice_response.clone(), bob_response.clone()],
-        )
-        .await
-        .unwrap();
+    for _ in 0..5 {
+        let ok = conductors[0]
+            .call_fallible::<_, (ActionHash, EntryHash)>(
+                &alice_zome,
+                "create_a_countersigned_thing_with_entry_hash",
+                vec![alice_response.clone(), bob_response.clone()],
+            )
+            .await
+            .is_ok();
+
+        if ok {
+            break;
+        }
+    }
 
     // Listen for the session to complete, which it should in spite of the error that
     // Alice had initially.
@@ -291,6 +345,20 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
     let alice = &cells[0];
     let bob = &cells[1];
     let carol = &cells[2];
+
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[2]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
 
     // Subscribe early in the test to avoid missing signals later
     let alice_signal_rx = conductors[0].subscribe_to_app_signals("app".into());
@@ -399,11 +467,17 @@ async fn alice_can_recover_from_a_session_timeout() {
     let bob = &cells[1];
     let carol = &cells[2];
 
-    // Make sure the conductors are gossiping before creating posts
+    // Ensure conductors are declaring full storage arcs and know about each other's arcs.
     conductors[0]
-        .require_initial_gossip_activity_for_cell(alice, 3, Duration::from_secs(30))
-        .await
-        .unwrap();
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[2]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
 
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
@@ -531,7 +605,7 @@ async fn complete_session_with_chc_enabled() {
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
 
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
@@ -539,10 +613,17 @@ async fn complete_session_with_chc_enabled() {
     let alice = &cells[0];
     let bob = &cells[1];
 
+    // Ensure conductors are declaring full storage arcs and know about each other's arcs.
     conductors[0]
-        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
-        .await
-        .unwrap();
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[2]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
 
     let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
 
@@ -558,7 +639,9 @@ async fn complete_session_with_chc_enabled() {
         .await
         .unwrap();
 
-    await_consistency(60, vec![alice, bob]).await.unwrap();
+    await_consistency(60, vec![alice, bob, &cells[2]])
+        .await
+        .unwrap();
 
     // Set up the session and accept it for both agents
     let preflight_request: PreflightRequest = conductors[0]
@@ -655,13 +738,16 @@ async fn session_rollback_with_chc_enabled() {
     let alice = &cells[0];
     let bob = &cells[1];
 
-    let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
-
-    // Make sure the conductors are gossiping before continuing
+    // Ensure conductors are declaring full storage arcs and know about each other's arcs.
     conductors[0]
-        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
-        .await
-        .unwrap();
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
+
+    let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
 
     // Subscribe early in the test to avoid missing signals later
     let alice_signal_rx = conductors[0].subscribe_to_app_signals("app".into());
@@ -785,7 +871,7 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
 
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
     let apps = conductors.setup_app("app", &[dna.clone()]).await.unwrap();
@@ -797,11 +883,17 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
     let carol_app = conductors[0].setup_app("app2", &[dna]).await.unwrap();
     let carol = &carol_app.cells()[0];
 
-    // Make sure the conductors are gossiping before continuing
+    // Ensure conductors are declaring full storage arcs and know about each other's arcs.
     conductors[0]
-        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
-        .await
-        .unwrap();
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[2]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
 
     let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
     let carol_chc = conductors[0].get_chc(carol.cell_id()).unwrap();
@@ -823,7 +915,7 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
         .await
         .unwrap();
 
-    await_consistency(60, vec![alice, bob, carol])
+    await_consistency(60, vec![alice, bob, &cells[2], carol])
         .await
         .unwrap();
 
@@ -903,7 +995,7 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
     // Should appear in the CHC after publish
     assert_eq!(before_chain.len() + 1, after_chain.len());
 
-    await_consistency(30, vec![alice, bob, carol])
+    await_consistency(30, vec![alice, bob, &cells[2], carol])
         .await
         .unwrap();
 
@@ -996,13 +1088,25 @@ async fn chc_should_respect_chain_lock() {
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
-    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
     let apps = conductors.setup_app("app", &[dna]).await.unwrap();
     let cells = apps.cells_flattened();
     let alice = &cells[0];
     let bob = &cells[1];
+
+    // Ensure conductors are declaring full storage arcs and know about each other's arcs.
+    conductors[0]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[2]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
 
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
@@ -1016,7 +1120,9 @@ async fn chc_should_respect_chain_lock() {
         .await
         .unwrap();
 
-    await_consistency(30, vec![alice, bob]).await.unwrap();
+    await_consistency(30, vec![alice, bob, &cells[2]])
+        .await
+        .unwrap();
 
     // Set up the session and accept it for both agents
     let preflight_request: PreflightRequest = conductors[0]
@@ -1118,7 +1224,7 @@ async fn should_be_able_to_schedule_functions_during_session() {
 
     // Make sure the conductors are gossiping before creating posts
     conductors[0]
-        .require_initial_gossip_activity_for_cell(alice, 2, Duration::from_secs(30))
+        .require_initial_gossip_activity_for_cell(alice, 1, Duration::from_secs(30))
         .await
         .unwrap();
 
@@ -1215,10 +1321,20 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
             c.countersigning_resolution_retry_limit = Some(3);
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
-        .tune(|params| {
-            // Incredible, but true: set the timeout for a network
-            params.tx5_implicit_timeout_ms = 3_000;
+        .tune_network_config(|nc| {
+            nc.advanced
+                .as_mut()
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .insert(
+                    "tx5Transport".to_string(),
+                    serde_json::json!({
+                        "timeoutS": 3
+                    }),
+                );
         });
+
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -1240,7 +1356,26 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
         .await
         .unwrap();
 
+    // Ensure conductors are declaring full storage arcs and know about each other's arcs.
+    conductors[0]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
+
     await_consistency(30, vec![alice, bob]).await.unwrap();
+
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
 
     // Set up the session and accept it for both agents.
     let preflight_request: PreflightRequest = conductors[0]
@@ -1362,13 +1497,23 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
 
     let config = SweetConductorConfig::rendezvous(true)
         .tune_conductor(|c| {
-            c.countersigning_resolution_retry_limit = Some(3);
+            c.countersigning_resolution_retry_limit = Some(5);
             c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
         })
-        .tune(|params| {
-            // Incredible, but true: set the timeout for a network
-            params.tx5_implicit_timeout_ms = 3_000;
+        .tune_network_config(|nc| {
+            nc.advanced
+                .as_mut()
+                .unwrap()
+                .as_object_mut()
+                .unwrap()
+                .insert(
+                    "tx5Transport".to_string(),
+                    serde_json::json!({
+                        "timeoutS": 3
+                    }),
+                );
         });
+
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -1377,6 +1522,25 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
     let cells = apps.cells_flattened();
     let alice = &cells[0];
     let bob = &cells[1];
+
+    // Ensure conductors are declaring full storage arcs and know about each other's arcs.
+    conductors[0]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
+
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
 
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
@@ -1460,6 +1624,25 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
     // Bob comes back online too.
     conductors[1].startup().await;
 
+    // Need authority logic to work, so force setting full arcs.
+    conductors[0]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+    conductors[1]
+        .holochain_p2p()
+        .test_set_full_arcs(alice.dna_hash().to_k2_space())
+        .await;
+
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(alice, 1, Duration::from_secs(30))
+        .await
+        .unwrap();
+    conductors[1]
+        .require_initial_gossip_activity_for_cell(bob, 1, Duration::from_secs(30))
+        .await
+        .unwrap();
+
     // Wait until Alice's session has been attempted to be resolved.
     tokio::time::timeout(Duration::from_secs(30), async {
         loop {
@@ -1494,7 +1677,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         Signal::System(SystemSignal::SuccessfulCountersigning(entry_hash)) => {
             assert_eq!(entry_hash, preflight_request.app_entry_hash.clone());
         }
-        _ => panic!("Expected System signal"),
+        s => panic!("Expected successful countersigning signal but got: {:?}", s),
     }
     // Alice's session should be gone from memory.
     let alice_state = conductors[0]
@@ -1509,7 +1692,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         Signal::System(SystemSignal::SuccessfulCountersigning(entry_hash)) => {
             assert_eq!(entry_hash, preflight_request.app_entry_hash.clone());
         }
-        _ => panic!("Expected System signal"),
+        s => panic!("Expected successful countersigning signal but got: {:?}", s),
     }
     // Bob's session should be gone from memory.
     let bob_state = conductors[1]

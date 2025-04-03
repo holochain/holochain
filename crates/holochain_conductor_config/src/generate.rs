@@ -1,11 +1,14 @@
 //! Helpers for generating new directories and `ConductorConfig`.
 
+use holochain_conductor_api::conductor::{
+    paths::{ConfigRootPath, KeystorePath},
+    NetworkConfig,
+};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
-use holochain_conductor_api::conductor::paths::{ConfigRootPath, KeystorePath};
 #[cfg(feature = "unstable-dpki")]
 use holochain_conductor_api::conductor::DpkiConfig;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use crate::config::create_config;
 use crate::config::write_config;
@@ -17,7 +20,7 @@ use crate::ports::set_admin_port;
 /// a keystore, and a database root directory.
 #[allow(clippy::too_many_arguments)]
 pub fn generate(
-    network: Option<KitsuneP2pConfig>,
+    network: Option<NetworkConfig>,
     root: Option<PathBuf>,
     directory: Option<PathBuf>,
     in_process_lair: bool,
@@ -40,7 +43,7 @@ pub fn generate(
     };
 
     let mut config = create_config(dir.clone(), lair_connection_url)?;
-    config.network = network.unwrap_or_else(KitsuneP2pConfig::mem);
+    config.network = network.unwrap_or_default();
     #[cfg(feature = "chc")]
     {
         config.chc_url = chc_url;
@@ -83,7 +86,10 @@ pub fn generate_config_directory(
     Ok(dir.into())
 }
 
-pub fn init_lair(dir: &KeystorePath, passphrase: sodoken::BufRead) -> anyhow::Result<url2::Url2> {
+pub fn init_lair(
+    dir: &KeystorePath,
+    passphrase: Arc<Mutex<sodoken::LockedArray>>,
+) -> anyhow::Result<url2::Url2> {
     match init_lair_inner(dir, passphrase) {
         Ok(url) => Ok(url),
         Err(err) => Err(std::io::Error::new(
@@ -96,7 +102,7 @@ pub fn init_lair(dir: &KeystorePath, passphrase: sodoken::BufRead) -> anyhow::Re
 
 pub(crate) fn init_lair_inner(
     dir: &KeystorePath,
-    passphrase: sodoken::BufRead,
+    passphrase: Arc<Mutex<sodoken::LockedArray>>,
 ) -> anyhow::Result<url2::Url2> {
     let mut cmd = std::process::Command::new("lair-keystore");
 
@@ -108,7 +114,7 @@ pub(crate) fn init_lair_inner(
     let mut stdin = proc.stdin.take().unwrap();
 
     use std::io::Write;
-    stdin.write_all(&passphrase.read_lock()[..])?;
+    stdin.write_all(&passphrase.lock().unwrap().lock())?;
     stdin.flush()?;
     drop(stdin);
 
@@ -141,7 +147,6 @@ mod test {
         AdminInterfaceConfig, InterfaceDriver,
     };
     use holochain_types::websocket::AllowedOrigins;
-    use kitsune_p2p_types::config::{KitsuneP2pConfig, KitsuneP2pTuningParams, TransportConfig};
     use tempfile::tempdir;
 
     #[test]
@@ -177,7 +182,7 @@ mod test {
 
         let expected_config = ConductorConfig {
             data_root_path: Some(config_root.is_also_data_root_path()),
-            network: KitsuneP2pConfig::mem(),
+            network: NetworkConfig::default(),
             keystore: KeystoreConfig::LairServerInProc {
                 lair_root: Some(config_root.join(KEYSTORE_DIRECTORY).into()),
             },
@@ -201,14 +206,10 @@ mod test {
         let root = Some(temp_dir.path().to_path_buf());
         let directory = Some("test-config".into());
 
-        let network_config = KitsuneP2pConfig {
-            transport_pool: vec![TransportConfig::WebRTC {
-                signal_url: "wss://signal.holo.host".to_string(),
-                webrtc_config: None,
-            }],
-            bootstrap_service: Some(url2::url2!("https://bootstrap.holo.host")),
-            tuning_params: KitsuneP2pTuningParams::default(),
-            tracing_scope: None,
+        let network_config = NetworkConfig {
+            bootstrap_url: url2::url2!("test-boot:"),
+            signal_url: url2::url2!("test-sig:"),
+            ..Default::default()
         };
 
         let config_root = generate(

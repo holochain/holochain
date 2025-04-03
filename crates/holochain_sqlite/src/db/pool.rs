@@ -1,5 +1,4 @@
 use crate::db::key::DbKey;
-use crate::functions::add_custom_functions;
 use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
@@ -110,7 +109,9 @@ pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) 
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
     #[cfg(feature = "sqlite-encrypted")]
-    conn.execute_batch(&String::from_utf8_lossy(&config.key.unlocked.read_lock()))?;
+    conn.execute_batch(&String::from_utf8_lossy(
+        &*config.key.unlocked.lock().unwrap().lock(),
+    ))?;
 
     // this is recommended to always be off:
     // https://sqlite.org/pragma.html#pragma_trusted_schema
@@ -125,7 +126,7 @@ pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) 
         DbSyncLevel::Off => conn.pragma_update(None, "synchronous", "0".to_string())?,
     }
 
-    add_custom_functions(conn)?;
+    vtab::array::load_module(conn)?;
 
     Ok(())
 }

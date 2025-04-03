@@ -23,8 +23,6 @@ async fn test_dna_properties_macro() {
     let dnas = &[dna_file.update_modifiers(DnaModifiersOpt {
         network_seed: None,
         properties: Some(properties_sb),
-        origin_time: None,
-        quantum_time: None,
     })];
 
     // Create a Conductor
@@ -56,8 +54,6 @@ async fn test_dna_properties_fails_with_invalid_properties() {
     let modifiers = DnaModifiersOpt {
         network_seed: None,
         properties: Some(properties_sb),
-        origin_time: None,
-        quantum_time: None,
     };
     let dnas = &[dna_file.update_modifiers(modifiers)];
 

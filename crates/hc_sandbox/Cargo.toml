@@ -46,13 +46,14 @@ holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util", feature
   "pw",
 ] }
 holochain_nonce = { version = "^0.5.0-dev.2", path = "../holochain_nonce" }
-kitsune_p2p_types = { version = "^0.5.0-dev.9", path = "../kitsune_p2p/types" }
-nanoid = "0.4"
 holochain_trace = { version = "^0.5.0-dev.1", path = "../holochain_trace" }
+kitsune2_api = "0.1.0"
+kitsune2_core = "0.1.0"
+nanoid = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
-sodoken = "=0.0.11"
+sodoken = "=0.0.904-alpha"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1"
 url2 = "0.0.6"

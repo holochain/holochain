@@ -3,7 +3,6 @@ use std::{io, path::PathBuf};
 
 use holochain_types::prelude::{
     AppBundle, AppManifest, AppManifestCurrentBuilder, AppRoleManifest, DnaBundle, DnaManifest,
-    Timestamp,
 };
 use holochain_types::web_app::{WebAppBundle, WebAppManifest};
 
@@ -50,7 +49,6 @@ fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
         name,
         network_seed,
         None,
-        Timestamp::now().into(),
         vec![],
         vec![],
         #[cfg(feature = "unstable-migration")]

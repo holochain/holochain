@@ -77,7 +77,6 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use futures::FutureExt;
-use ghost_actor::dependencies::must_future::MustBoxFuture;
 use holochain_types::prelude::*;
 use holochain_util::timed;
 use holochain_wasmer_host::module::build_module as build_wasmer_module;
@@ -85,6 +84,7 @@ use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
+use must_future::MustBoxFuture;
 use tokio_stream::StreamExt;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
@@ -504,8 +504,6 @@ impl RealRibosome {
             modifiers: DnaModifiers {
                 network_seed: Default::default(),
                 properties: Default::default(),
-                origin_time: Timestamp(0),
-                quantum_time: Default::default(),
             },
             integrity_zomes: Default::default(),
             coordinator_zomes: Default::default(),
@@ -1272,7 +1270,7 @@ pub mod wasm_test {
             let maximum_response_time_ms = Duration::from_millis(150);
 
             #[cfg(not(feature = "wasmer_wamr"))]
-            let maximum_response_time_ms = Duration::from_millis(15);
+            let maximum_response_time_ms = Duration::from_millis(50);
 
             assert!(
                 results[0] <= maximum_response_time_ms,

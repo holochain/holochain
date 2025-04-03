@@ -5,12 +5,11 @@ use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AdminResponse};
 use holochain_types::websocket::AllowedOrigins;
-use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::dependencies::*;
 use lair_keystore_api::ipc_keystore::*;
 use lair_keystore_api::mem_store::*;
 use lair_keystore_api::prelude::*;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::test_utils::*;
 
@@ -26,7 +25,9 @@ async fn test_new_lair_conductor_integration() {
     let tmp = tempfile::tempdir().unwrap();
 
     // set up new lair keystore config
-    let passphrase = sodoken::BufRead::from(&b"passphrase"[..]);
+    let passphrase = Arc::new(Mutex::new(sodoken::LockedArray::from(
+        b"passphrase".to_vec(),
+    )));
     let config = Arc::new(
         hc_seed_bundle::PwHashLimits::Minimum
             .with_exec(|| LairServerConfigInner::new(tmp.path(), passphrase.clone()))
@@ -86,13 +87,10 @@ async fn test_new_lair_conductor_integration() {
     stdin.write_all(b"passphrase").await.unwrap();
     drop(stdin);
 
-    // cribbed this from test_utils... probably something better would be better
-    if let Ok(status) = tokio::time::timeout(std::time::Duration::from_secs(1), child.wait()).await
-    {
-        panic!("failed to start holochain: {:?}", status);
-    }
-
-    let (mut client, rx) = websocket_client_by_port(ADMIN_PORT).await.unwrap();
+    let (mut client, rx) =
+        retry_websocket_client_by_port(ADMIN_PORT, 10, std::time::Duration::from_secs(1))
+            .await
+            .unwrap();
     let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
     let agent_key = generate_agent_pub_key(&mut client, 15_000).await.unwrap();

@@ -46,6 +46,7 @@ pub mod fixt;
 
 #[cfg(feature = "test_utils")]
 pub mod inline_zome;
+pub mod network;
 #[cfg(feature = "test_utils")]
 pub mod test_utils;
 pub mod websocket;

@@ -15,8 +15,6 @@ use holochain_sqlite::rusqlite::types::FromSql;
 use holochain_sqlite::rusqlite::ToSql;
 use holochain_zome_types::action;
 use holochain_zome_types::prelude::*;
-use kitsune_p2p_dht::region::RegionData;
-use kitsune_p2p_dht::Loc;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -35,7 +33,6 @@ pub enum DhtOp {
     /// An op representing storage of some record information.
     ChainOp(Box<ChainOp>),
     /// A op representing storage of a claim that a ChainOp was invalid
-    // TODO, new type of op
     WarrantOp(Box<WarrantOp>),
 }
 
@@ -135,24 +132,6 @@ impl From<WarrantOp> for DhtOp {
 impl From<SignedWarrant> for DhtOp {
     fn from(op: SignedWarrant) -> Self {
         DhtOp::WarrantOp(Box::new(WarrantOp::from(op)))
-    }
-}
-
-impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
-    fn loc(&self) -> Loc {
-        self.dht_basis().get_loc()
-    }
-
-    fn timestamp(&self) -> kitsune_p2p_dht::Timestamp {
-        kitsune_p2p_dht::Timestamp::from_micros(self.timestamp().0)
-    }
-
-    fn region_data(&self) -> RegionData {
-        unimplemented!()
-    }
-
-    fn bound(_timestamp: kitsune_p2p_dht::Timestamp, _loc: kitsune_p2p_dht::Loc) -> Self {
-        unimplemented!()
     }
 }
 

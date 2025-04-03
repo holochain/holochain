@@ -5,12 +5,11 @@ use holochain_conductor_api::config::conductor::ConductorConfig;
 use holochain_conductor_api::config::conductor::KeystoreConfig;
 use holochain_keystore::MetaLairClient;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune_p2p_types::dependencies::lair_keystore_api;
 use lair_keystore_api::dependencies::*;
 use lair_keystore_api::in_proc_keystore::*;
 use lair_keystore_api::prelude::*;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// Written for https://github.com/holochain/lair/issues/120 to verify
 /// that InProcKeystore still works after conductor restart
@@ -20,7 +19,9 @@ async fn lair_in_proc_sql_pool_factory_restart() {
     let tmp = tempfile::tempdir().unwrap();
 
     // set up new lair keystore config
-    let passphrase = sodoken::BufRead::from(&b"passphrase"[..]);
+    let passphrase = Arc::new(Mutex::new(sodoken::LockedArray::from(
+        b"passphrase".to_vec(),
+    )));
     let config = Arc::new(
         hc_seed_bundle::PwHashLimits::Minimum
             .with_exec(|| LairServerConfigInner::new(tmp.path(), passphrase.clone()))

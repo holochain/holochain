@@ -18,14 +18,10 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
     let manifest_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
         "some properties in the manifest",
     )));
-    let manifest_origin_time = Timestamp::now().saturating_sub(&std::time::Duration::from_secs(1));
-    let manifest_quantum_time = std::time::Duration::from_secs(60);
 
     let modifiers = DnaModifiersOpt::default()
         .with_network_seed(manifest_network_seed.clone())
-        .with_properties(manifest_properties.clone())
-        .with_origin_time(manifest_origin_time)
-        .with_quantum_time(manifest_quantum_time);
+        .with_properties(manifest_properties.clone());
 
     let role_name_1 = String::from("role1");
     let role_name_2 = String::from("role2");
@@ -74,13 +70,9 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
     let custom_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
         "some properties provided at install time",
     )));
-    let custom_origin_time = Timestamp::now();
-    let custom_quantum_time = std::time::Duration::from_secs(5 * 60);
 
     let custom_modifiers = DnaModifiersOpt::default()
         .with_network_seed(custom_network_seed.clone())
-        .with_origin_time(custom_origin_time)
-        .with_quantum_time(custom_quantum_time)
         .with_properties(custom_properties.clone());
 
     let role_settings = (
@@ -186,14 +178,6 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         installed_app_role_1.dna.modifiers.properties,
         Some(custom_properties)
     );
-    assert_eq!(
-        installed_app_role_1.dna.modifiers.origin_time,
-        Some(custom_origin_time)
-    );
-    assert_eq!(
-        installed_app_role_1.dna.modifiers.quantum_time,
-        Some(custom_quantum_time)
-    );
 
     assert_eq!(
         installed_app_role_2.dna.modifiers.network_seed,
@@ -202,14 +186,6 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
     assert_eq!(
         installed_app_role_2.dna.modifiers.properties,
         Some(manifest_properties.clone())
-    );
-    assert_eq!(
-        installed_app_role_2.dna.modifiers.origin_time,
-        Some(manifest_origin_time)
-    );
-    assert_eq!(
-        installed_app_role_2.dna.modifiers.quantum_time,
-        Some(manifest_quantum_time)
     );
 }
 
@@ -224,14 +200,10 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
     let manifest_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
         "some properties in the manifest",
     )));
-    let manifest_origin_time = Timestamp::now().saturating_sub(&std::time::Duration::from_secs(1));
-    let manifest_quantum_time = std::time::Duration::from_secs(60);
 
     let modifiers = DnaModifiersOpt::default()
         .with_network_seed(manifest_network_seed.clone())
-        .with_properties(manifest_properties.clone())
-        .with_origin_time(manifest_origin_time)
-        .with_quantum_time(manifest_quantum_time);
+        .with_properties(manifest_properties.clone());
 
     let role_name = String::from("role");
 
@@ -308,14 +280,6 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
     assert_eq!(
         installed_app_role_1.dna.modifiers.properties,
         Some(manifest_properties.clone())
-    );
-    assert_eq!(
-        installed_app_role_1.dna.modifiers.origin_time,
-        Some(manifest_origin_time)
-    );
-    assert_eq!(
-        installed_app_role_1.dna.modifiers.quantum_time,
-        Some(manifest_quantum_time)
     );
 }
 

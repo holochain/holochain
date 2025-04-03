@@ -10,7 +10,7 @@
 //!
 //! For example:
 //!
-//! ```
+//! ```ignore
 //! #[serde(rename_all = "snake_case")]
 //! pub enum AppStatusFilter {
 //!     Enabled,
@@ -23,7 +23,7 @@
 //!
 //! would lead to the following associated TypeScript type
 //!
-//! ```
+//! ```ignore
 //! type AppStatusFilter = "enabled" | "disabled" | "running" | "stopped" | "paused";
 //! ```
 //!
@@ -32,7 +32,7 @@
 //!
 //! For example:
 //!
-//! ```
+//! ```ignore
 //! #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 //! pub enum Signal {
 //!     App {
@@ -46,7 +46,7 @@
 //!
 //! would lead to the following associated TypeScript type
 //!
-//! ```
+//! ```ignore
 //! type Signal =
 //!   | {
 //!       type: "app",

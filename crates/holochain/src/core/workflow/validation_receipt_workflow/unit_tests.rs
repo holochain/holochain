@@ -284,8 +284,13 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 
     assert_eq!(WorkComplete::Complete, work_complete);
 
-    // Should no longer require a receipt for either
-    assert!(!get_requires_receipt(vault.clone(), op_hash1).await);
+    // Sending the receipt to this author returned an error,
+    // so we did NOT clear the wants receipt flag.
+    assert!(get_requires_receipt(vault.clone(), op_hash1).await);
+
+    // But even after we got the above error, we proceeded to
+    // send the receipt for the second author which DID work,
+    // so its flag is cleared.
     assert!(!get_requires_receipt(vault.clone(), op_hash2).await);
 }
 
@@ -308,7 +313,7 @@ async fn create_op_with_status(
         .write_async({
             let test_op_hash = test_op_hash.clone();
             move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_dht(txn, &op, None)?;
+                holochain_state::mutations::insert_op_dht(txn, &op, 0, None)?;
                 set_require_receipt(txn, &test_op_hash, true)?;
                 set_when_integrated(txn, &test_op_hash, Timestamp::now())?;
                 set_validation_status(txn, &test_op_hash, validation_status)?;

@@ -7,8 +7,6 @@ use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
     process::Command,
-    str::FromStr,
-    time::Duration,
 };
 use walkdir::WalkDir;
 
@@ -189,15 +187,11 @@ async fn test_multi_integrity() {
     ]);
 
     // Create the expected dependencies on the coordinator zomes.
-    let s = "2022-02-11T23:05:19.470323Z";
-    let origin_time = Timestamp::from_str(s).unwrap();
     let expected = DnaDef {
         name: "multi integrity dna".into(),
         modifiers: DnaModifiers {
             network_seed: "00000000-0000-0000-0000-000000000000".into(),
             properties: ().try_into().unwrap(),
-            origin_time,
-            quantum_time: Duration::from_secs(5 * 60),
         },
         integrity_zomes: vec![
             (
@@ -305,8 +299,6 @@ async fn test_multi_integrity() {
     ]);
 
     // Create the expected dependencies on the coordinator zomes.
-    let s = "2022-02-11T23:05:19.470323Z";
-    let origin_time = Timestamp::from_str(s).unwrap();
     let lineage = vec![
         DnaHash::try_from_raw_39(
             holo_hash_decode_unchecked("uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm")
@@ -324,8 +316,6 @@ async fn test_multi_integrity() {
         modifiers: DnaModifiers {
             network_seed: "00000000-0000-0000-0000-000000000000".into(),
             properties: ().try_into().unwrap(),
-            origin_time,
-            quantum_time: Duration::from_secs(5 * 60),
         },
         integrity_zomes: vec![
             (
@@ -413,7 +403,7 @@ async fn test_hash_dna_function() {
         let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
         let stdout = cmd.assert().success().get_output().stdout.clone();
         let actual = String::from_utf8_lossy(&stdout).replace(['\r', '\n'], ""); // Normalize Windows/linux
-        let expected = "uhC0klkazCjMK-V3HooCgXVCB7OGhGEplGD-UWFgCIeXGZfRB7ORO";
+        let expected = "uhC0kJA4rjFsKZ2vYFafDNV1otPe16wsjlePUwudzUd4DJdpl1lBj";
         assert_eq!(
             expected, actual,
             "Expected: {}\nActual: {}",
@@ -460,7 +450,6 @@ fn test_default_dna_manifest_matches_schema() {
         "test-dna".to_string(),
         Some("00000000-0000-0000-0000-000000000000".to_string()),
         None,
-        Timestamp::now().into(),
         vec![],
         vec![],
     );

@@ -1,9 +1,8 @@
 use assert_cmd::cargo::CommandCargoExt;
 use holochain_keystore::lair_keystore::*;
 use holochain_keystore::MetaLairClient;
-use kitsune_p2p_types::dependencies::url2;
 use std::io::BufRead;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 struct Proc(std::process::Child);
 
@@ -64,7 +63,9 @@ fn run_test_keystore(dir: &std::path::Path) -> (Proc, url2::Url2) {
 }
 
 async fn connect_cli(connection_url: url2::Url2) -> Cli {
-    let passphrase = sodoken::BufRead::from(&b"passphrase"[..]);
+    let passphrase = Arc::new(Mutex::new(sodoken::LockedArray::from(
+        b"passphrase".to_vec(),
+    )));
     let cli = spawn_lair_keystore(connection_url, passphrase)
         .await
         .unwrap();

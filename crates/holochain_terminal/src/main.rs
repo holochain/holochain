@@ -39,6 +39,7 @@ fn main() -> anyhow::Result<()> {
                 };
 
                 let mut admin_client = AdminClient::connect(addr).await?;
+
                 let app_client = if let Some(app_id) = &args.app_id {
                     Some(admin_client.connect_app_client(app_id.clone()).await?)
                 } else {

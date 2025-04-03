@@ -1,10 +1,11 @@
 use super::*;
-
 use crate::core::queue_consumer::TriggerSender;
-use crate::test_utils::test_network;
 use ::fixt::prelude::*;
+use holo_hash::fixt::DnaHashFixturator;
+use holochain_p2p::actor::MockHcP2p;
 use holochain_state::mutations;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
+use std::sync::Arc;
 
 #[derive(Clone)]
 struct TestData {
@@ -22,7 +23,7 @@ struct TestData {
 }
 
 impl TestData {
-    async fn new() -> Self {
+    fn new() -> Self {
         // original entry
         let original_entry = EntryFixturator::new(AppEntry).next().unwrap();
         // New entry
@@ -318,7 +319,7 @@ impl Db {
                     Db::Integrated(op) => {
                         let op = DhtOpHashed::from_content_sync(op.clone());
                         let hash = op.as_hash().clone();
-                        mutations::insert_op_dht(txn, &op, None).unwrap();
+                        mutations::insert_op_dht(txn, &op, 0, None).unwrap();
                         mutations::set_when_integrated(txn, &hash, Timestamp::now()).unwrap();
                         mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                             .unwrap();
@@ -326,7 +327,7 @@ impl Db {
                     Db::IntQueue(op) => {
                         let op = DhtOpHashed::from_content_sync(op.clone());
                         let hash = op.as_hash().clone();
-                        mutations::insert_op_dht(txn, &op, None).unwrap();
+                        mutations::insert_op_dht(txn, &op, 0, None).unwrap();
                         mutations::set_validation_stage(
                             txn,
                             &hash,
@@ -348,18 +349,21 @@ impl Db {
     }
 }
 
-#[allow(unused)]
 async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
-    let test_network = test_network(None, None).await;
-    let holochain_p2p_cell = test_network.dna_network();
-    integrate_dht_ops_workflow(env.clone(), env.clone().into(), qt, holochain_p2p_cell)
+
+    let mut mock_hc_p2p = MockHcP2p::new();
+    mock_hc_p2p
+        .expect_new_integrated_data()
+        .returning(move |_, _| Box::pin(async move { Ok(()) }));
+
+    let mock_network = HolochainP2pDna::new(Arc::new(mock_hc_p2p), fixt!(DnaHash), None);
+    integrate_dht_ops_workflow(env.clone(), env.clone().into(), qt, mock_network)
         .await
         .unwrap();
 }
 
 // Need to clear the data from the previous test
-#[allow(unused)]
 async fn clear_dbs(env: DbWrite<DbKindDht>) {
     env.write_async(move |txn| -> StateMutationResult<()> {
         txn.execute("DELETE FROM DhtOp", []).unwrap();
@@ -376,8 +380,7 @@ async fn clear_dbs(env: DbWrite<DbKindDht>) {
 // with a desired pre-state that you want the database in
 // and the expected state of the database after the workflow is run
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_store_record(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_store_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     let op: DhtOp = ChainOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
@@ -386,11 +389,10 @@ fn register_store_record(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     .into();
     let pre_state = vec![Db::IntQueue(op.clone())];
     let expect = vec![Db::Integrated(op.clone())];
-    (pre_state, expect, "store record")
+    (pre_state, expect, "store record", op)
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_store_entry(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_store_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     let op: DhtOp = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
@@ -399,22 +401,26 @@ fn register_store_entry(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
     .into();
     let pre_state = vec![Db::IntQueue(op.clone())];
     let expect = vec![Db::Integrated(op.clone())];
-    (pre_state, expect, "store entry")
+    (pre_state, expect, "store entry", op)
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_agent_activity_dna(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let mut new_action = fixt!(Dna);
+fn register_agent_activity_dna(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
+    let new_action = fixt!(Dna);
     let op: DhtOp = ChainOp::RegisterAgentActivity(a.signature.clone(), new_action.into()).into();
     let pre_state = vec![Db::IntQueue(op.clone())];
     let expect = vec![Db::Integrated(op.clone())];
-    (pre_state, expect, "register agent activity for dna action")
+    (
+        pre_state,
+        expect,
+        "register agent activity for dna action",
+        op,
+    )
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+#[allow(unused)] // Due to unusual calling pattern
 fn register_agent_activity_agent_validation_pkg(
-    mut a: TestData,
-) -> (Vec<Db>, Vec<Db>, &'static str) {
+    a: TestData,
+) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     // Previous op to depend on
     let mut prev_create_action = fixt!(Create);
     prev_create_action.action_seq = 10;
@@ -444,13 +450,14 @@ fn register_agent_activity_agent_validation_pkg(
         pre_state,
         expect,
         "register agent activity for agent validation pkg",
+        new_dht_op,
     )
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
+#[allow(unused)] // Due to unusual calling pattern
 fn register_agent_activity_init_zomes_complete(
-    mut a: TestData,
-) -> (Vec<Db>, Vec<Db>, &'static str) {
+    a: TestData,
+) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     // Previous op to depend on
     let mut prev_create_action = fixt!(Create);
     prev_create_action.action_seq = 10;
@@ -480,11 +487,11 @@ fn register_agent_activity_init_zomes_complete(
         pre_state,
         expect,
         "register agent activity for init zomes complete action",
+        new_dht_op,
     )
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_agent_activity_create_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_agent_activity_create_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     a.link_add.action_seq = 5;
     let previous_op: DhtOp =
         ChainOp::RegisterAgentActivity(a.signature.clone(), a.link_add.clone().into()).into();
@@ -506,14 +513,16 @@ fn register_agent_activity_create_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'
         pre_state,
         expect,
         "register agent activity for create link action",
+        op,
     )
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_agent_activity_delete_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_agent_activity_delete_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
+    a.link_remove.action_seq = 5;
     let previous_op: DhtOp =
         ChainOp::RegisterAgentActivity(a.signature.clone(), a.link_remove.clone().into()).into();
     let mut new_action = a.link_remove.clone();
+    new_action.action_seq += 1;
     let new_op: DhtOp =
         ChainOp::RegisterAgentActivity(a.signature.clone(), new_action.clone().into()).into();
     let pre_state = vec![
@@ -530,11 +539,12 @@ fn register_agent_activity_delete_link(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'
         pre_state,
         expect,
         "register agent activity for delete link action",
+        new_op,
     )
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_agent_activity_close_chain(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+#[allow(unused)] // Due to unusual calling pattern
+fn register_agent_activity_close_chain(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     // Previous op to depend on
     let mut prev_create_action = fixt!(Create);
     prev_create_action.action_seq = 10;
@@ -562,11 +572,12 @@ fn register_agent_activity_close_chain(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'
         pre_state,
         expect,
         "register agent activity for close chain action",
+        new_dht_op,
     )
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_agent_activity_open_chain(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+#[allow(unused)] // Due to unusual calling pattern
+fn register_agent_activity_open_chain(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     // Previous op to depend on
     let mut prev_create_action = fixt!(Create);
     prev_create_action.action_seq = 10;
@@ -594,11 +605,12 @@ fn register_agent_activity_open_chain(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'s
         pre_state,
         expect,
         "register agent activity for open chain action",
+        new_dht_op,
     )
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_agent_activity_create(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+#[allow(unused)] // Due to unusual calling pattern
+fn register_agent_activity_create(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     // Previous op to depend on
     let mut prev_create_action = fixt!(Create);
     prev_create_action.action_seq = 10;
@@ -625,11 +637,12 @@ fn register_agent_activity_create(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'stati
         pre_state,
         expect,
         "register agent activity for create action",
+        new_dht_op,
     )
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_agent_activity_update(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+#[allow(unused)] // Due to unusual calling pattern
+fn register_agent_activity_update(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     // Previous op to depend on
     let mut prev_create_action = fixt!(Create);
     prev_create_action.action_seq = 10;
@@ -656,11 +669,12 @@ fn register_agent_activity_update(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'stati
         pre_state,
         expect,
         "register agent activity for update action",
+        new_dht_op,
     )
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_agent_activity_delete(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+#[allow(unused)] // Due to unusual calling pattern
+fn register_agent_activity_delete(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     // Previous op to depend on
     let mut prev_create_action = fixt!(Create);
     prev_create_action.action_seq = 10;
@@ -687,11 +701,11 @@ fn register_agent_activity_delete(mut a: TestData) -> (Vec<Db>, Vec<Db>, &'stati
         pre_state,
         expect,
         "register agent activity for delete action",
+        new_dht_op,
     )
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     let original_op = ChainOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
@@ -712,12 +726,11 @@ fn register_updated_record(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             a.entry_update_action.clone().into(),
         ),
     ];
-    (pre_state, expect, "register updated record")
+    (pre_state, expect, "register updated record", op)
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
-    let original_op = ChainOp::StoreEntry(
+fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
+    let original_op: DhtOp = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
         a.original_entry.clone(),
@@ -737,11 +750,10 @@ fn register_replaced_by_for_entry(a: TestData) -> (Vec<Db>, Vec<Db>, &'static st
             a.entry_update_entry.clone().into(),
         ),
     ];
-    (pre_state, expect, "register replaced by for entry")
+    (pre_state, expect, "register replaced by for entry", op)
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
@@ -759,11 +771,10 @@ fn register_deleted_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             a.entry_delete.clone().into(),
         ),
     ];
-    (pre_state, expect, "register deleted by")
+    (pre_state, expect, "register deleted by", op)
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     let original_op = ChainOp::StoreRecord(
         a.signature.clone(),
         a.original_action.clone().into(),
@@ -779,19 +790,17 @@ fn register_deleted_action_by(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
             a.entry_delete.clone().into(),
         ),
     ];
-    (pre_state, expect, "register deleted action by")
+    (pre_state, expect, "register deleted action by", op)
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_create_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_create_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     let op: DhtOp = ChainOp::RegisterAddLink(a.signature.clone(), a.link_add.clone()).into();
     let pre_state = vec![Db::IntQueue(op.clone())];
     let expect = vec![Db::Integrated(op.clone())];
-    (pre_state, expect, "register link create")
+    (pre_state, expect, "register link create", op)
 }
 
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     let original_op = ChainOp::StoreEntry(
         a.signature.clone(),
         a.original_action.clone(),
@@ -809,12 +818,11 @@ fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
         Db::Integrated(op.clone()),
         Db::MetaLinkEmpty(a.link_add.clone()),
     ];
-    (pre_state, expect, "register link remove")
+    (pre_state, expect, "register link remove", op)
 }
 
 // Link remove when not an author
-#[allow(unused)] // Wrong detection by Clippy, due to unusual calling pattern
-fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str) {
+fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
     let op: DhtOp = ChainOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone()).into();
     let pre_state = vec![Db::IntQueue(op.clone())];
     let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
@@ -822,6 +830,7 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
         pre_state,
         expect,
         "register remove link remove missing base",
+        op,
     )
 }
 
@@ -829,8 +838,7 @@ fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
     holochain_trace::test_run();
-    let test_db = test_dht_db();
-    let env = test_db.to_db();
+    let env = test_dht_db().to_db();
 
     let tests = [
         register_store_record,
@@ -856,9 +864,9 @@ async fn test_ops_state() {
 
     for t in tests.iter() {
         clear_dbs(env.clone()).await;
-        println!("test_ops_state on function {:?}", t);
-        let td = TestData::new().await;
-        let (pre_state, expect, name) = t(td);
+        let td = TestData::new();
+        let (pre_state, expect, name, _) = t(td);
+        println!("test_ops_state on function {name}");
         Db::set(pre_state, env.clone()).await;
         call_workflow(env.clone()).await;
         Db::check(
@@ -868,4 +876,79 @@ async fn test_ops_state() {
         )
         .await;
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn inform_kitsune_about_integrated_ops() {
+    let tests = [
+        register_store_entry,
+        register_store_record,
+        // These are not distinct cases, because all agent activity is treated equally,
+        // but they're cheap to run and were already written.
+        register_agent_activity_dna,
+        register_agent_activity_agent_validation_pkg,
+        register_agent_activity_init_zomes_complete,
+        register_agent_activity_create_link,
+        register_agent_activity_delete_link,
+        register_agent_activity_close_chain,
+        register_agent_activity_open_chain,
+        register_agent_activity_create,
+        register_agent_activity_update,
+        register_agent_activity_delete,
+        register_replaced_by_for_entry,
+        register_updated_record,
+        register_deleted_by,
+        register_deleted_action_by,
+        register_create_link,
+        register_delete_link,
+        // Not including register_delete_link_missing_base because it does not integrate ops,
+        // only tests the query cache state.
+    ];
+    for test in tests.iter() {
+        let env = test_dht_db().to_db();
+        let test_data = TestData::new();
+        let (pre_state, _, test_name, op) = test(test_data);
+        println!("inform_kitsune_about {test_name}");
+        Db::set(pre_state, env.clone()).await;
+
+        let (tx, _rx) = TriggerSender::new();
+        let dna_hash = fixt!(DnaHash);
+        let dna_hash2 = dna_hash.clone();
+        let mut hc_p2p = MockHcP2p::new();
+        hc_p2p
+            .expect_new_integrated_data()
+            .times(1)
+            .return_once(move |space_id, ops| {
+                assert_eq!(space_id, dna_hash2.to_k2_space());
+                let expected_op = StoredOp {
+                    op_id: op.to_hash().to_k2_op(),
+                    created_at: kitsune2_api::Timestamp::from_micros(op.timestamp().as_micros()),
+                };
+                assert_eq!(ops, vec![expected_op]);
+                Box::pin(async { Ok(()) })
+            });
+        let hc_p2p = Arc::new(hc_p2p);
+        let p2p_dna = HolochainP2pDna::new(hc_p2p, dna_hash, None);
+        integrate_dht_ops_workflow(env.clone(), env.into(), tx, p2p_dna)
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn kitsune_not_informed_when_no_ops_integrated() {
+    let env = test_dht_db().to_db();
+    let test_data = TestData::new();
+    let (pre_state, _, _, _) = register_delete_link_missing_base(test_data);
+    Db::set(pre_state, env.clone()).await;
+
+    let (tx, _rx) = TriggerSender::new();
+    let dna_hash = fixt!(DnaHash);
+    let mut hc_p2p = MockHcP2p::new();
+    hc_p2p.expect_new_integrated_data().never();
+    let hc_p2p = Arc::new(hc_p2p);
+    let p2p_dna = HolochainP2pDna::new(hc_p2p, dna_hash, None);
+    integrate_dht_ops_workflow(env.clone(), env.into(), tx, p2p_dna)
+        .await
+        .unwrap();
 }
