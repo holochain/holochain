@@ -131,8 +131,6 @@ impl DnaBundle {
                         properties: SerializedBytes::try_from(
                             manifest.integrity.properties.clone().unwrap_or_default(),
                         )?,
-                        origin_time: manifest.integrity.origin_time.into(),
-                        quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
                     },
                     integrity_zomes,
                     coordinator_zomes,
@@ -224,7 +222,6 @@ impl DnaBundle {
                         e
                     ))
                 })?),
-                origin_time: dna_def.modifiers.origin_time.into(),
                 zomes: integrity,
             },
             coordinator: CoordinatorManifest { zomes: coordinator },
@@ -287,7 +284,6 @@ mod tests {
             integrity: IntegrityManifest {
                 network_seed: Some("original network seed".to_string()),
                 properties: Some(serde_yaml::Value::Null.into()),
-                origin_time: Timestamp::HOLOCHAIN_EPOCH.into(),
                 zomes: vec![
                     ZomeManifest {
                         name: "zome1".into(),

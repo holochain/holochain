@@ -8,18 +8,83 @@ use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_nonce::Nonce256Bits;
 use holochain_sqlite::prelude::DatabaseResult;
+use holochain_sqlite::rusqlite;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::*;
 use holochain_types::sql::AsSql;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 use std::str::FromStr;
 
 pub use error::*;
 
 mod error;
+
+/// Gossip has two distinct variants which share a lot of similarities but
+/// are fundamentally different and serve different purposes
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub enum GossipType {
+    /// The Recent gossip type is aimed at rapidly syncing the most recent
+    /// data. It runs frequently and expects frequent diffs at each round.
+    Recent,
+    /// The Historical gossip type is aimed at comprehensively syncing the
+    /// entire common history of two nodes, filling in gaps in the historical
+    /// data. It runs less frequently, and expects diffs to be infrequent
+    /// at each round.
+    Historical,
+}
+
+/// The possible methods of transferring op hashes
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub enum TransferMethod {
+    /// Transfer by publishing
+    Publish,
+    /// Transfer by gossiping
+    Gossip(GossipType),
+}
+
+impl rusqlite::ToSql for TransferMethod {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        let stage = match self {
+            TransferMethod::Publish => 1,
+            TransferMethod::Gossip(GossipType::Recent) => 2,
+            TransferMethod::Gossip(GossipType::Historical) => 3,
+        };
+        Ok(rusqlite::types::ToSqlOutput::Owned(stage.into()))
+    }
+}
+
+impl rusqlite::types::FromSql for TransferMethod {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        i32::column_result(value).and_then(|int| match int {
+            1 => Ok(TransferMethod::Publish),
+            2 => Ok(TransferMethod::Gossip(GossipType::Recent)),
+            3 => Ok(TransferMethod::Gossip(GossipType::Historical)),
+            _ => Err(rusqlite::types::FromSqlError::InvalidType),
+        })
+    }
+}
 
 #[macro_export]
 macro_rules! sql_insert {
@@ -95,7 +160,7 @@ pub fn insert_op_authored(
     txn: &mut Txn<DbKindAuthored>,
     op: &DhtOpHashed,
 ) -> StateMutationResult<()> {
-    insert_op_when(txn, op, None, Timestamp::now())
+    insert_op_when(txn, op, 0, None, Timestamp::now())
 }
 
 /// Insert a [DhtOp] into the DHT database.
@@ -105,9 +170,10 @@ pub fn insert_op_authored(
 pub fn insert_op_dht(
     txn: &mut Txn<DbKindDht>,
     op: &DhtOpHashed,
+    serialized_size: u32,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
-    insert_op_when(txn, op, transfer_data, Timestamp::now())
+    insert_op_when(txn, op, serialized_size, transfer_data, Timestamp::now())
 }
 
 /// Insert a [DhtOp] into the Cache database.
@@ -117,7 +183,7 @@ pub fn insert_op_dht(
 /// - perhaps a TransferMethod could include the method used to get the data, e.g. `get` vs `get_links`
 /// - timestamp is probably unnecessary since `when_stored` will suffice
 pub fn insert_op_cache(txn: &mut Txn<DbKindCache>, op: &DhtOpHashed) -> StateMutationResult<()> {
-    insert_op_when(txn, op, None, Timestamp::now())
+    insert_op_when(txn, op, 0, None, Timestamp::now())
 }
 
 /// Marker for the cases where we could include some transfer data, but this is currently
@@ -132,14 +198,19 @@ pub fn todo_no_cache_transfer_data() -> Option<(AgentPubKey, TransferMethod, Tim
 /// Insert a [DhtOp] into any Op database.
 /// The type is not checked, and transfer data is not set.
 #[cfg(feature = "test_utils")]
-pub fn insert_op_untyped(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
-    insert_op_when(txn, op, None, Timestamp::now())
+pub fn insert_op_untyped(
+    txn: &mut Transaction,
+    op: &DhtOpHashed,
+    serialized_size: u32,
+) -> StateMutationResult<()> {
+    insert_op_when(txn, op, serialized_size, None, Timestamp::now())
 }
 
 /// Insert a [DhtOp] into the database.
 pub fn insert_op_when(
     txn: &mut Transaction,
     op: &DhtOpHashed,
+    serialized_size: u32,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
     when_stored: Timestamp,
 ) -> StateMutationResult<()> {
@@ -188,6 +259,7 @@ pub fn insert_op_when(
             hash,
             &op_order,
             &timestamp,
+            serialized_size,
             transfer_data,
             when_stored,
         )?;
@@ -209,7 +281,7 @@ pub fn insert_op_lite_into_authored(
     order: &OpOrder,
     authored_timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    insert_op_lite(txn, op_lite, hash, order, authored_timestamp, None)?;
+    insert_op_lite(txn, op_lite, hash, order, authored_timestamp, 0, None)?;
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
     set_when_sys_validated(txn, hash, Timestamp::now())?;
     set_when_app_validated(txn, hash, Timestamp::now())?;
@@ -224,6 +296,7 @@ pub fn insert_op_lite(
     hash: &DhtOpHash,
     order: &OpOrder,
     authored_timestamp: &Timestamp,
+    serialized_size: u32,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
     insert_op_lite_when(
@@ -232,18 +305,21 @@ pub fn insert_op_lite(
         hash,
         order,
         authored_timestamp,
+        serialized_size,
         transfer_data,
         Timestamp::now(),
     )
 }
 
 /// Insert a [`DhtOpLite`] into the database.
+#[allow(clippy::too_many_arguments)]
 pub fn insert_op_lite_when(
     txn: &mut Transaction,
     op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
     authored_timestamp: &Timestamp,
+    serialized_size: u32,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
     when_stored: Timestamp,
 ) -> StateMutationResult<()> {
@@ -267,6 +343,7 @@ pub fn insert_op_lite_when(
                 "transfer_time": transfer_time,
                 "require_receipt": 0,
                 "op_order": order,
+                "serialized_size": serialized_size,
             })?;
         }
         DhtOpLite::Warrant(op) => {

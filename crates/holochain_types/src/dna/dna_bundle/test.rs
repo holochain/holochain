@@ -2,33 +2,12 @@ use super::*;
 use matches::assert_matches;
 
 #[test]
-fn missing_origin_time_is_an_error() {
-    let manifest_yaml = r#"
----
-manifest_version: "1"
-name: test_dna
-integrity:
-  zomes:
-    - name: zome1
-      bundled: zome-1.wasm
-coordinator:
-  zomes:
-    - name: zome4
-      bundled: zome-4.wasm
-        "#;
-
-    let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml);
-    assert!(manifest.is_err());
-}
-
-#[test]
 fn duplicate_zome_names_is_an_error() {
     let manifest_yaml = r#"
 ---
 manifest_version: "1"
 name: test_dna
 integrity:
-  origin_time: 2022-02-11T23:05:19.470323Z
   zomes:
     - name: zome1
       bundled: zome-1.wasm
@@ -54,7 +33,6 @@ fn dependency_not_pointing_at_integrity_zome_is_error() {
 manifest_version: "1"
 name: test_dna
 integrity:
-  origin_time: 2022-02-11T23:05:19.470323Z
   zomes:
     - name: zome1
       bundled: zome-1.wasm
@@ -84,7 +62,6 @@ coordinator:
 manifest_version: "1"
 name: test_dna
 integrity:
-  origin_time: 2022-02-11T23:05:19.470323Z
   zomes:
     - name: zome1
       bundled: zome-1.wasm
@@ -115,7 +92,6 @@ coordinator:
 manifest_version: "1"
 name: test_dna
 integrity:
-  origin_time: 2022-02-11T23:05:19.470323Z
   zomes:
     - name: zome1
       bundled: zome-1.wasm

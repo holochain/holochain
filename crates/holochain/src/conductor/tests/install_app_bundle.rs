@@ -258,9 +258,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let path = PathBuf::from(format!("{}", dna.dna_hash()));
-    let modifiers = DnaModifiersOpt::default()
-        .with_network_seed("initial seed".into())
-        .with_origin_time(Timestamp::now());
+    let modifiers = DnaModifiersOpt::default().with_network_seed("initial seed".into());
 
     let roles = vec![AppRoleManifest {
         name: "name".into(),

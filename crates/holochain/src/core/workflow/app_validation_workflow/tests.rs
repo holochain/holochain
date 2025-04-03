@@ -19,7 +19,8 @@ use holo_hash::fixt::ActionHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::{fixt::AgentPubKeyFixturator, ActionHash, AnyDhtHash, DhtOpHash, EntryHash};
 use holochain_conductor_api::conductor::paths::DataRootPath;
-use holochain_p2p::actor::HolochainP2pRefToDna;
+use holochain_p2p::actor::MockHcP2p;
+use holochain_p2p::HolochainP2pDna;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::mutations::insert_op_dht;
 use holochain_state::prelude::{from_blob, insert_op_cache, StateQueryResult};
@@ -73,7 +74,8 @@ async fn main_workflow() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
     let dna_hash = dna_file.dna_hash().clone();
 
-    let mut conductor = SweetConductor::from_standard_config().await;
+    let mut conductor =
+        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
     let cell_id = app.cells()[0].cell_id().clone();
 
@@ -118,7 +120,7 @@ async fn main_workflow() {
 
     // insert op to validate in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_delete_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
     });
 
@@ -130,13 +132,24 @@ async fn main_workflow() {
             .len();
     assert_eq!(ops_to_validate, 1);
 
+    let mut hc_p2p = MockHcP2p::new();
+    // Cascade should attempt once to get the missing create op from the network.
+    hc_p2p
+        .expect_get()
+        .times(1)
+        .return_once(|_, _, _| Box::pin(async { Ok(vec![]) }));
+    hc_p2p
+        .expect_target_arcs()
+        .returning(|_| Box::pin(async move { Ok(vec![]) }));
+    let network = HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone(), None);
+
     // run validation workflow
     // outcome should be incomplete - delete op is missing the dependent create op
     let outcome_summary = app_validation_workflow_inner(
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &network,
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -177,7 +190,11 @@ async fn main_workflow() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -303,9 +320,9 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
 
     // insert create and delete op in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_delete_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
-        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(
             txn,
             &dht_create_op_hashed.hash,
@@ -328,7 +345,11 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -442,9 +463,9 @@ async fn validate_ops_in_sequence_must_get_action() {
 
     // insert create and delete op in dht db and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_delete_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_delete_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_delete_op_hash, ValidationStage::SysValidated).unwrap();
-        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(
             txn,
             &dht_create_op_hashed.hash,
@@ -467,7 +488,11 @@ async fn validate_ops_in_sequence_must_get_action() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -501,9 +526,8 @@ async fn validate_ops_in_sequence_must_get_action() {
 async fn multi_create_link_validation() {
     holochain_trace::test_run();
 
-    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
     pub struct Post(String);
-    holochain_serial!(Post);
     app_entry!(Post);
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AppValidation]).await;
@@ -515,7 +539,7 @@ async fn multi_create_link_validation() {
 
     // Make sure the conductors are gossiping before creating posts
     conductors[0]
-        .require_initial_gossip_activity_for_cell(&alice, 2, Duration::from_secs(30))
+        .require_initial_gossip_activity_for_cell(&alice, 1, Duration::from_secs(30))
         .await
         .unwrap();
 
@@ -607,9 +631,9 @@ async fn handle_error_in_op_validation() {
     // insert both ops in dht db and mark ready for app validation
     let expected_failed_dht_op_hash = dht_create_op_hash.clone();
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
-        insert_op_dht(txn, &dht_store_entry_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_store_entry_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_store_entry_op_hash, ValidationStage::SysValidated).unwrap();
     });
 
@@ -628,7 +652,11 @@ async fn handle_error_in_op_validation() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -857,8 +885,6 @@ async fn check_app_entry_def_test() {
             modifiers: DnaModifiers {
                 network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                 properties: SerializedBytes::try_from(()).unwrap(),
-                origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
             },
             integrity_zomes: vec![TestZomes::from(TestWasm::EntryDefs).integrity.into_inner()],
             coordinator_zomes: vec![TestZomes::from(TestWasm::EntryDefs)
@@ -980,7 +1006,7 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
 
     // Insert op to validate in DHT DB and mark ready for app validation
     app_validation_workspace.dht_db.test_write(move |txn| {
-        insert_op_dht(txn, &dht_create_op_hashed, None).unwrap();
+        insert_op_dht(txn, &dht_create_op_hashed, 0, None).unwrap();
         put_validation_limbo(txn, &dht_create_op_hash, ValidationStage::SysValidated).unwrap();
     });
 
@@ -1003,7 +1029,11 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &conductor.holochain_p2p().to_dna(dna_hash.clone(), None),
+        &holochain_p2p::HolochainP2pDna::new(
+            conductor.holochain_p2p().clone(),
+            dna_hash.clone(),
+            None,
+        ),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()

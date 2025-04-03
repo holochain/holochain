@@ -153,18 +153,6 @@
                       "null"
                     ],
                     "additionalProperties": true
-                  },
-                  "origin_time": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "quantum_time": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
                   }
                 }
               },

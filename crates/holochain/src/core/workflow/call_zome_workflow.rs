@@ -26,6 +26,8 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 #[cfg(test)]
+mod unit_tests;
+#[cfg(test)]
 mod validation_test;
 
 /// Placeholder for the return value of a zome invocation
@@ -84,7 +86,7 @@ where
         let countersigning_op = workspace.source_chain().countersigning_op()?;
         match workspace
             .source_chain()
-            .flush(network.storage_arcs().await?, network.chc())
+            .flush(network.target_arcs().await?, network.chc())
             .await
         {
             Ok(flushed_actions) => {
@@ -93,15 +95,8 @@ where
                     match countersigning_op {
                         Some(op) => {
                             if let Err(error_response) =
-                                super::countersigning_workflow::countersigning_publish(
-                                    &network,
-                                    op,
-                                    (*workspace.author().ok_or_else(|| {
-                                        WorkflowError::Other("author required".into())
-                                    })?)
-                                    .clone(),
-                                )
-                                .await
+                                super::countersigning_workflow::countersigning_publish(&network, op)
+                                    .await
                             {
                                 return Ok(Ok(error_response));
                             }
@@ -230,7 +225,11 @@ pub async fn call_zome_function_authorized<R>(
 where
     R: RibosomeT + 'static,
 {
-    match invocation.is_authorized(&host_access).await? {
+    match invocation
+        .is_authorized(&host_access)
+        .await
+        .map_err(WorkflowError::other)?
+    {
         ZomeCallAuthorization::Authorized => {
             let r = ribosome.call_zome_function(host_access, invocation).await;
             Ok((ribosome, r))

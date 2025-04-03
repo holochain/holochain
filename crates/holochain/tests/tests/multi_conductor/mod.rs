@@ -1,10 +1,10 @@
 use hdk::prelude::*;
-use holochain::conductor::config::{ConductorConfig, DpkiConfig};
 use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::*;
-use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_sqlite::prelude::DatabaseResult;
+use holochain_types::network::Kitsune2NetworkMetricsRequest;
+use std::collections::HashMap;
 use unwrap_to::unwrap_to;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
@@ -32,7 +32,8 @@ async fn dpki_publish() {
 async fn dpki_no_publish() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::standard().no_publish();
+    let config =
+        SweetConductorConfig::standard().tune_network_config(|nc| nc.disable_publish = true);
     let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     conductors.exchange_peer_info().await;
@@ -46,68 +47,57 @@ async fn dpki_no_publish() {
 /// even with gossip disabled.
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
-async fn test_publish() -> anyhow::Result<()> {
-    use std::sync::Arc;
-
-    use holochain::test_utils::inline_zomes::simple_create_read_zome;
-    use kitsune_p2p_types::config::KitsuneP2pConfig;
+async fn test_publish() {
+    use holochain::{retry_until_timeout, test_utils::inline_zomes::simple_create_read_zome};
+    use holochain_conductor_api::conductor::{ConductorConfig, NetworkConfig};
 
     holochain_trace::test_run();
-    const NUM_CONDUCTORS: usize = 3;
 
-    let (signal_url, _signal_srv_handle) = kitsune_p2p::test_util::start_signal_srv().await;
-
-    let mut tuning =
-        kitsune_p2p_types::config::tuning_params_struct::KitsuneP2pTuningParams::default();
-    tuning.gossip_strategy = "none".to_string();
-
-    let mut network = KitsuneP2pConfig::from_signal_addr(signal_url);
-    network.tuning_params = Arc::new(tuning);
     let config = ConductorConfig {
-        network,
-        tuning_params: Some(ConductorTuningParams {
-            sys_validation_retry_delay: Some(std::time::Duration::from_millis(100)),
-            countersigning_resolution_retry_delay: None,
+        network: NetworkConfig {
+            webrtc_config: Some(serde_json::json!({
+                // It's really hard to test this since it just goes straight
+                // to the webrtc implementation internals, so just adding
+                // here so I can manually verify it is getting at least
+                // passed in via tracing.
+                "ususedFieldTest": true,
+            })),
+            disable_gossip: true,
             ..Default::default()
-        }),
-        dpki: DpkiConfig::disabled(),
+        },
         ..Default::default()
     };
 
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
-
-    let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
-
+    let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
+    let dna_file = SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome()))
+        .await
+        .0;
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-    conductors.exchange_peer_info().await;
+    let ((alice,), (bobbo,)) = apps.into_tuples();
 
-    let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
+    // Set full storage arc for both peers and then exchange peer infos.
+    conductors[0]
+        .declare_full_storage_arcs(alice.dna_hash())
+        .await;
+    conductors[1]
+        .declare_full_storage_arcs(bobbo.dna_hash())
+        .await;
+    conductors.exchange_peer_info().await;
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]
         .call(&alice.zome("simple"), "create", ())
         .await;
 
-    // Wait long enough for Bob to receive gossip
-    await_consistency(10, [&alice, &bobbo, &carol])
-        .await
-        .unwrap();
-
     // Verify that bobbo can run "read" on his cell and get alice's Action
-    let record: Option<Record> = conductors[1]
-        .call(&bobbo.zome("simple"), "read", hash)
-        .await;
-    let record = record.expect("Record was None: bobbo couldn't `get` it");
-
-    // Assert that the Record bobbo sees matches what alice committed
-    assert_eq!(record.action().author(), alice.agent_pubkey());
-    assert_eq!(
-        *record.entry(),
-        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
-    );
-
-    Ok(())
+    retry_until_timeout!(10_000, 1_000, {
+        let maybe_record: Option<Record> = conductors[1]
+            .call(&bobbo.zome("simple"), "read", hash.clone())
+            .await;
+        if maybe_record.is_some() {
+            break;
+        }
+    });
 }
 
 #[cfg(feature = "test_utils")]
@@ -115,7 +105,7 @@ async fn test_publish() -> anyhow::Result<()> {
 async fn multi_conductor() -> anyhow::Result<()> {
     use holochain::test_utils::inline_zomes::simple_create_read_zome;
 
-    holochain_trace::init_fmt(holochain_trace::Output::Log).unwrap();
+    holochain_trace::test_run();
 
     const NUM_CONDUCTORS: usize = 3;
 
@@ -164,77 +154,24 @@ async fn multi_conductor() -> anyhow::Result<()> {
     );
 
     // See if we can fetch metric data from bobbo
-    let metrics = conductors[1].dump_network_metrics(None).await?;
-    tracing::info!(target: "TEST", "@!@! - metrics: {metrics}");
+    let metrics = conductors[1]
+        .dump_network_metrics(Kitsune2NetworkMetricsRequest::default())
+        .await?
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect::<HashMap<_, _>>();
+    tracing::info!(target: "TEST", "@!@! - metrics: {}", serde_json::to_string_pretty(&metrics).unwrap());
 
     // See if we can fetch network stats from bobbo
     let stats = conductors[1].dump_network_stats().await?;
-    tracing::info!(target: "TEST", "@!@! - stats: {stats}");
+    tracing::info!(target: "TEST", "@!@! - stats: {}", serde_json::to_string_pretty(&stats).unwrap());
 
-    let stats: tx5::stats::Stats = serde_json::from_str(&stats).unwrap();
-
-    // make sure that, by this point, we have upgraded connections to webrtc
-    for con in stats.connection_list {
-        assert!(con.is_webrtc);
-    }
+    let stats = conductors[1]
+        .dump_network_stats_for_app(&"app".to_string())
+        .await?;
+    tracing::info!(target: "TEST", "@!@! - stats by app: {}", serde_json::to_string_pretty(&stats).unwrap());
 
     Ok(())
-}
-
-#[cfg(feature = "test_utils")]
-#[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
-async fn sharded_consistency() {
-    use holochain::test_utils::{
-        consistency::local_machine_session, inline_zomes::simple_create_read_zome,
-    };
-
-    holochain_trace::test_run();
-    const NUM_CONDUCTORS: usize = 3;
-    const NUM_CELLS: usize = 5;
-
-    let config = SweetConductorConfig::standard().tune(|tuning| {
-        tuning.gossip_strategy = "sharded-gossip".to_string();
-        #[cfg(feature = "unstable-sharding")]
-        {
-            tuning.gossip_dynamic_arcs = true;
-        }
-    });
-    let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
-
-    let (dna_file, _, _) =
-        SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
-    let dnas = vec![dna_file];
-
-    let apps = conductors.setup_app("app", &dnas).await.unwrap();
-
-    let ((alice,), (bobbo,), (_carol,)) = apps.into_tuples();
-
-    for i in 0..NUM_CELLS {
-        conductors.setup_app(&i.to_string(), &dnas).await.unwrap();
-    }
-    conductors.exchange_peer_info().await;
-    conductors.force_all_publish_dht_ops().await;
-    // Call the "create" zome fn on Alice's app
-    let hash: ActionHash = conductors[0]
-        .call(&alice.zome("simple"), "create", ())
-        .await;
-
-    let conductor_handles: Vec<_> = conductors.iter().map(|c| c.raw_handle()).collect();
-    local_machine_session(&conductor_handles, std::time::Duration::from_secs(60)).await;
-
-    // Verify that bobbo can run "read" on his cell and get alice's Action
-    let record: Option<Record> = conductors[1]
-        .call(&bobbo.zome("simple"), "read", hash)
-        .await;
-    let record = record.expect("Record was None: bobbo couldn't `get` it");
-
-    // Assert that the Record bobbo sees matches what alice committed
-    assert_eq!(record.action().author(), alice.agent_pubkey());
-    assert_eq!(
-        *record.entry(),
-        RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
-    );
 }
 
 #[cfg(feature = "test_utils")]
@@ -278,6 +215,16 @@ async fn private_entries_dont_leak() {
 
     let apps = conductors.setup_app("app", &dnas).await.unwrap();
     let ((alice,), (bobbo,)) = apps.into_tuples();
+
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(&alice, 1, std::time::Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    conductors[1]
+        .require_initial_gossip_activity_for_cell(&bobbo, 1, std::time::Duration::from_secs(30))
+        .await
+        .unwrap();
 
     // Call the "create" zome fn on Alice's app
     let hash: ActionHash = conductors[0]

@@ -16,8 +16,8 @@ pub use access::{DbRead, DbWrite, ReadAccess, Txn};
 pub use guard::PTxnGuard;
 pub use key::DbKey;
 pub use kind::{
-    DbKind, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindOp, DbKindP2pAgents,
-    DbKindP2pMetrics, DbKindPeerMetaStore, DbKindT, DbKindWasm,
+    DbKind, DbKindAuthored, DbKindCache, DbKindConductor, DbKindDht, DbKindOp, DbKindPeerMetaStore,
+    DbKindT, DbKindWasm,
 };
 pub use pool::{DbSyncLevel, DbSyncStrategy, PoolConfig};
 

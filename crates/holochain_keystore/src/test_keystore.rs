@@ -1,9 +1,10 @@
 //! DANGER! This is an in-memory keystore for testing, DO NOT USE THIS IN PRODUCTION!
 
 use crate::*;
+use ::lair_keystore::dependencies::lair_keystore_api;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use kitsune_p2p_types::dependencies::lair_keystore_api;
+use lair_keystore_api::prelude::*;
 use std::sync::Arc;
 
 /// First Test Agent Pub Key

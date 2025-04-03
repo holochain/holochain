@@ -732,8 +732,6 @@ fixturator!(
             properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
                 .next()
                 .unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
@@ -755,8 +753,6 @@ fixturator!(
             properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
                 .next()
                 .unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
@@ -779,8 +775,6 @@ fixturator!(
             properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
@@ -811,8 +805,6 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
         .next()
         .unwrap(),
-        origin_time: TimestampFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
-        quantum_time: DurationFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
     };
 
     curve Unpredictable DnaModifiers {
@@ -820,8 +812,6 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
         .next()
         .unwrap(),
-        origin_time: TimestampFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
-        quantum_time: DurationFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
     };
 
     curve Predictable DnaModifiers {
@@ -829,8 +819,6 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
         .next()
         .unwrap(),
-        origin_time: TimestampFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
-        quantum_time: DurationFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
     };
 );
 

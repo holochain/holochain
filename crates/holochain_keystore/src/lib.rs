@@ -45,7 +45,6 @@ pub use meta_lair_client::*;
 
 mod agent_pubkey_ext;
 pub use agent_pubkey_ext::*;
-use kitsune_p2p_types::dependencies::lair_keystore_api::prelude::PwHashLimits;
 
 pub mod lair_keystore;
 
@@ -86,6 +85,7 @@ pub mod crude_mock_keystore;
 #[cfg(feature = "test_utils")]
 pub async fn spawn_mem_keystore() -> LairResult<MetaLairClient> {
     use ::lair_keystore::dependencies::lair_keystore_api;
+    use lair_keystore_api::prelude::*;
     use std::sync::Arc;
 
     // in-memory secure random passphrase

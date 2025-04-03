@@ -6,7 +6,10 @@ F=RUSTFLAGS="-Dwarnings"
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
 DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
-UNSTABLE_FEATURES=chc,unstable-dpki,unstable-sharding,unstable-warrants,unstable-functions,unstable-countersigning,$(DEFAULT_FEATURES)
+UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-countersigning,$(DEFAULT_FEATURES)
+
+# TODO - removed `unstable-dpki` from the UNSTABLE_FEATURES list
+#        this is temporary until dpki dep is rebuilt without origin_time
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
@@ -14,7 +17,8 @@ UNSTABLE_FEATURES=chc,unstable-dpki,unstable-sharding,unstable-warrants,unstable
 	static-doc build-workspace-wasmer_sys build-workspace-wasmer_wamr \
 	test-workspace-wasmer_sys test-workspace-wasmer_wamr \
 	build-workspace-wasmer_sys-unstable \
-	test-workspace-wasmer_sys-unstable
+	test-workspace-wasmer_sys-unstable \
+	toml-fix
 
 # default to running everything (first rule)
 default: build-workspace-wasmer_sys \
@@ -34,6 +38,12 @@ static-toml:
 	cargo install taplo-cli@0.9.0
 	$(F) taplo format --check ./*.toml
 	$(F) taplo format --check ./crates/**/*.toml
+
+# fix our toml files
+toml-fix:
+	cargo install taplo-cli@0.9.0
+	$(F) taplo format ./*.toml
+	$(F) taplo format ./crates/**/*.toml
 
 # ensure our chosen style lints are followed
 static-clippy:

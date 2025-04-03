@@ -155,7 +155,6 @@ pub(crate) async fn inner_countersigning_session_complete(
     )
     .await?;
 
-    // TODO This should be in the publish workflow
     // Publish other signers agent activity ops to their agent activity authorities.
     for sa in signed_actions {
         let (action, signature) = sa.into();
@@ -164,8 +163,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         }
         let op = ChainOp::RegisterAgentActivity(signature, action);
         let basis = op.dht_basis();
-        // TODO this is what flag is for, whether to witness or store - document and rename me
-        if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
+        if let Err(e) = network.publish_countersign(basis, op).await {
             tracing::error!(
                 "Failed to publish to other counter-signers agent authorities because of: {:?}",
                 e

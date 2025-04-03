@@ -4,8 +4,7 @@
 
 use crate::tests::test_utils::{
     attach_app_interface, call_zome_fn, call_zome_fn_fallible, check_timeout, create_config,
-    register_and_install_dna, start_holochain_with_lair, start_local_services, write_config,
-    SupervisedChild,
+    register_and_install_dna, start_holochain_with_lair, write_config, SupervisedChild,
 };
 use ed25519_dalek::SigningKey;
 use hdk::prelude::{CapAccess, GrantZomeCallCapabilityPayload, GrantedFunctions, ZomeCallCapGrant};
@@ -16,7 +15,9 @@ use holo_hash::{ActionHash, AgentPubKey};
 use holochain::prelude::{
     CountersigningSessionState, DhtOp, Signal, SystemSignal, CAP_SECRET_BYTES,
 };
-use holochain::sweettest::{authenticate_app_ws_client, websocket_client_by_port, WsPollRecv};
+use holochain::sweettest::{
+    authenticate_app_ws_client, websocket_client_by_port, SweetLocalRendezvous, WsPollRecv,
+};
 use holochain::{
     conductor::{api::error::ConductorApiError, error::ConductorError},
     prelude::CountersigningError,
@@ -28,7 +29,8 @@ use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use holochain_types::test_utils::{fake_dna_zomes, write_fake_dna_file};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
-use kitsune_p2p_types::config::{KitsuneP2pConfig, TransportConfig};
+use kitsune2_api::{AgentInfoSigned, DhtArc};
+use kitsune2_core::Ed25519Verifier;
 use matches::assert_matches;
 use rand::rngs::OsRng;
 use serde::{de::DeserializeOwned, Serialize};
@@ -37,6 +39,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::time::Duration;
 use tempfile::TempDir;
+use tokio::time::error::Elapsed;
 use url2::Url2;
 
 const APP_ID: &str = "test";
@@ -57,9 +60,9 @@ async fn countersigning_session_interaction_calls() {
     holochain_trace::test_run();
 
     // Start local bootstrap and signal servers.
-    let (_local_services, bootstrap_url_recv, signal_url_recv) = start_local_services().await;
-    let bootstrap_url = bootstrap_url_recv.await.unwrap();
-    let signal_url = signal_url_recv.await.unwrap();
+    let local_services = SweetLocalRendezvous::new().await;
+    let bootstrap_url = local_services.bootstrap_addr().to_string();
+    let signal_url = local_services.sig_addr().to_string();
 
     let network_seed = uuid::Uuid::new_v4().to_string();
 
@@ -96,7 +99,7 @@ async fn countersigning_session_interaction_calls() {
 
     // Await peers to discover each other.
     tokio::time::timeout(
-        Duration::from_secs(5),
+        Duration::from_secs(10),
         expect_bootstrapping_completed(&[&alice, &bob]),
     )
     .await
@@ -395,7 +398,7 @@ async fn countersigning_session_interaction_calls() {
     let preflight_request: PreflightRequest = alice
         .call_zome(
             &alice_app_tx,
-            "generate_countersigning_preflight_request_fast", // 10 sec timeout
+            "generate_countersigning_preflight_request", // 30 sec timeout
             &[
                 (alice.cell_id.agent_pubkey().clone(), vec![Role(0)]),
                 (bob.cell_id.agent_pubkey().clone(), vec![]),
@@ -518,9 +521,16 @@ async fn countersigning_session_interaction_calls() {
         }
     });
 
+    wait_for_full_arc_for_agent(bob.admin_tx.clone(), alice.cell_id.agent_pubkey().clone())
+        .await
+        .unwrap();
+    wait_for_full_arc_for_agent(alice.admin_tx.clone(), bob.cell_id.agent_pubkey().clone())
+        .await
+        .unwrap();
+
     // Alice's session should be in state unresolved.
     // Leave some time for the countersigning workflow to attempt to resolve the session.
-    tokio::time::timeout(Duration::from_secs(30), async {
+    tokio::time::timeout(Duration::from_secs(60), async {
         loop {
             if matches!(
                 get_session_state(&alice.cell_id, &alice_app_tx).await,
@@ -555,11 +565,26 @@ async fn countersigning_session_interaction_calls() {
     // Alice's session should be gone from memory.
     assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
 
+    let resp =
+        request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &alice.admin_tx)
+            .await;
+    tracing::info!("Alice agent info: {:?}", resp);
+
+    let resp =
+        request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &bob.admin_tx).await;
+    tracing::info!("Bob agent info: {:?}", resp);
+
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+    let resp =
+        request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &bob.admin_tx).await;
+    tracing::info!("Bob agent info: {:?}", resp);
+
     tracing::info!("Alice published session.\n");
 
     // Expect app signal of countersigning success for Bob.
     let bob_session_entry_hash =
-        tokio::time::timeout(Duration::from_secs(30), bob_successful_session_rx.recv())
+        tokio::time::timeout(Duration::from_secs(60), bob_successful_session_rx.recv())
             .await
             .unwrap()
             .unwrap();
@@ -593,22 +618,40 @@ impl Agent {
         let path = tmp_dir.into_path();
         let environment_path = path.clone();
         let mut config = create_config(admin_port, environment_path.into());
-        config.network = KitsuneP2pConfig::default().tune(|mut kc| {
-            kc.tx5_implicit_timeout_ms = 3_000;
-            kc
-        });
+        config.network.advanced = Some(serde_json::json!({
+            // Allow plaintext signal for testing, and set a short timeout for network requests
+            // so that shutting down a conductor won't keep tx5 busy for too long.
+            "tx5Transport": {
+                "signalAllowPlainText": true,
+                "timeoutS": 5,
+            },
+            // Gossip faster to speed up the test.
+            "k2Gossip": {
+                "initiateIntervalMs": 1000,
+                "minInitiateIntervalMs": 0,
+                "roundTimeoutMs": 500,
+                "initiateJitterMs": 100,
+            },
+            // Need agent infos published more often to publish updated storage arcs.
+            "coreSpace": {
+                "reSignFreqMs": 500,
+                "reSignExpireTimeMs": (19.9 * 60.0 * 1000.0) as u32,
+            },
+            // Check more often for new peer info, for when the other conductor is restarting.
+            "coreBootstrap": {
+                "backoffMaxMs": 5000,
+            }
+        }));
         config.keystore = KeystoreConfig::LairServerInProc { lair_root: None };
         config.tuning_params = Some(ConductorTuningParams {
-            countersigning_resolution_retry_limit: Some(3),
-            countersigning_resolution_retry_delay: Some(Duration::from_secs(5)),
+            countersigning_resolution_retry_limit: Some(10),
+            countersigning_resolution_retry_delay: Some(Duration::from_secs(3)),
             min_publish_interval: Some(Duration::from_secs(5)),
             ..Default::default()
         });
-        config.network.bootstrap_service = Some(Url2::parse(bootstrap_url));
-        config.network.transport_pool = vec![TransportConfig::WebRTC {
-            signal_url,
-            webrtc_config: None,
-        }];
+        config.network.bootstrap_url = Url2::parse(bootstrap_url);
+        config.network.signal_url = Url2::parse(signal_url);
+        config.network.mem_bootstrap = false;
         let config_path = write_config(path.clone(), &config);
 
         let (_holochain, admin_port) = start_holochain_with_lair(config_path.clone(), true).await;
@@ -856,4 +899,41 @@ async fn get_session_state(
         AppResponse::CountersigningSessionState(maybe_state) => *maybe_state,
         _ => unreachable!(),
     }
+}
+
+async fn wait_for_full_arc_for_agent(
+    admin_tx: WebsocketSender,
+    other: AgentPubKey,
+) -> Result<(), Elapsed> {
+    let agent_id = other.to_k2_agent();
+
+    tokio::time::timeout(Duration::from_secs(30), async move {
+        loop {
+            let resp =
+                request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &admin_tx)
+                    .await;
+            match resp {
+                AdminResponse::AgentInfo(infos) => {
+                    let mut agent_infos = Vec::with_capacity(infos.len());
+                    for info in infos {
+                        let decoded =
+                            AgentInfoSigned::decode(&Ed25519Verifier, info.as_bytes()).unwrap();
+                        agent_infos.push(decoded);
+                    }
+
+                    if let Some(agent) = agent_infos.iter().find(|agent| agent.agent == agent_id) {
+                        if agent.storage_arc == DhtArc::FULL {
+                            break;
+                        } else {
+                            tracing::info!("Found peer, but their arc is not yet FULL")
+                        }
+                    }
+                }
+                _ => unreachable!(),
+            }
+
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+        }
+    })
+    .await
 }

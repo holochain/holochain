@@ -1,4 +1,4 @@
-use kitsune_p2p_types::dependencies::lair_keystore_api;
+use ::lair_keystore::dependencies::lair_keystore_api;
 use lair_keystore_api::dependencies::hc_seed_bundle;
 use lair_keystore_api::ipc_keystore::*;
 use lair_keystore_api::prelude::*;
