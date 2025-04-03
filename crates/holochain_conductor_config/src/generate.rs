@@ -1,11 +1,11 @@
 //! Helpers for generating new directories and `ConductorConfig`.
 
-use std::path::PathBuf;
-
 use holochain_conductor_api::conductor::{
     paths::{ConfigRootPath, KeystorePath},
     NetworkConfig,
 };
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "unstable-dpki")]
 use holochain_conductor_api::conductor::DpkiConfig;
@@ -86,7 +86,10 @@ pub fn generate_config_directory(
     Ok(dir.into())
 }
 
-pub fn init_lair(dir: &KeystorePath, passphrase: sodoken::BufRead) -> anyhow::Result<url2::Url2> {
+pub fn init_lair(
+    dir: &KeystorePath,
+    passphrase: Arc<Mutex<sodoken::LockedArray>>,
+) -> anyhow::Result<url2::Url2> {
     match init_lair_inner(dir, passphrase) {
         Ok(url) => Ok(url),
         Err(err) => Err(std::io::Error::new(
@@ -99,7 +102,7 @@ pub fn init_lair(dir: &KeystorePath, passphrase: sodoken::BufRead) -> anyhow::Re
 
 pub(crate) fn init_lair_inner(
     dir: &KeystorePath,
-    passphrase: sodoken::BufRead,
+    passphrase: Arc<Mutex<sodoken::LockedArray>>,
 ) -> anyhow::Result<url2::Url2> {
     let mut cmd = std::process::Command::new("lair-keystore");
 
@@ -111,7 +114,7 @@ pub(crate) fn init_lair_inner(
     let mut stdin = proc.stdin.take().unwrap();
 
     use std::io::Write;
-    stdin.write_all(&passphrase.read_lock()[..])?;
+    stdin.write_all(&passphrase.lock().unwrap().lock())?;
     stdin.flush()?;
     drop(stdin);
 

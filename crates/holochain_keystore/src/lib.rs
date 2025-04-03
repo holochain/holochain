@@ -13,14 +13,17 @@
 //! use holochain_keystore::*;
 //! use holochain_keystore::lair_keystore::*;
 //! use holochain_serialized_bytes::prelude::*;
+//! use std::sync::{Arc, Mutex};
 //!
 //! #[tokio::main(flavor = "multi_thread")]
 //! async fn main() {
 //!     tokio::task::spawn(async move {
-//!         let mut passphrase = sodoken::BufWrite::new_mem_locked(32).unwrap();
-//!         passphrase.write_lock().copy_from_slice(b"passphrase");
+//!         let mut passphrase = sodoken::LockedArray::new(32).unwrap();
+//!         passphrase.lock().copy_from_slice(b"passphrase");
 //!
-//!         let keystore = spawn_lair_keystore_in_proc(&PathBuf::from("/"), passphrase.to_read()).await.unwrap();
+//!         let passphrase = Arc::new(Mutex::new(passphrase));
+//!
+//!         let keystore = spawn_lair_keystore_in_proc(&PathBuf::from("/"), passphrase).await.unwrap();
 //!         let agent_pubkey = AgentPubKey::new_random(&keystore).await.unwrap();
 //!
 //!         #[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
@@ -86,12 +89,12 @@ pub mod crude_mock_keystore;
 pub async fn spawn_mem_keystore() -> LairResult<MetaLairClient> {
     use ::lair_keystore::dependencies::lair_keystore_api;
     use lair_keystore_api::prelude::*;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     // in-memory secure random passphrase
-    let passphrase = sodoken::BufWrite::new_mem_locked(32)?;
-    sodoken::random::bytes_buf(passphrase.clone()).await?;
-    let passphrase = passphrase.to_read();
+    let mut passphrase = sodoken::LockedArray::new(32)?;
+    sodoken::random::randombytes_buf(&mut passphrase.lock())?;
+    let passphrase = Arc::new(Mutex::new(passphrase));
 
     // in-mem / in-proc config
     let config = Arc::new(

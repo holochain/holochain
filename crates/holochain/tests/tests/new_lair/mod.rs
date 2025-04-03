@@ -9,7 +9,7 @@ use lair_keystore_api::dependencies::*;
 use lair_keystore_api::ipc_keystore::*;
 use lair_keystore_api::mem_store::*;
 use lair_keystore_api::prelude::*;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use super::test_utils::*;
 
@@ -25,7 +25,9 @@ async fn test_new_lair_conductor_integration() {
     let tmp = tempfile::tempdir().unwrap();
 
     // set up new lair keystore config
-    let passphrase = sodoken::BufRead::from(&b"passphrase"[..]);
+    let passphrase = Arc::new(Mutex::new(sodoken::LockedArray::from(
+        b"passphrase".to_vec(),
+    )));
     let config = Arc::new(
         hc_seed_bundle::PwHashLimits::Minimum
             .with_exec(|| LairServerConfigInner::new(tmp.path(), passphrase.clone()))
