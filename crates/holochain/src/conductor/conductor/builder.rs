@@ -6,6 +6,8 @@ use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_p2p::NetworkCompatParams;
+use lair_keystore_api::types::SharedLockedArray;
+use std::sync::Mutex;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
 #[derive(Default)]
@@ -17,7 +19,7 @@ pub struct ConductorBuilder {
     pub ribosome_store: RibosomeStore,
 
     /// For new lair, passphrase is required
-    pub passphrase: Option<sodoken::BufRead>,
+    pub passphrase: Option<SharedLockedArray>,
 
     /// Optional keystore override
     pub keystore: Option<MetaLairClient>,
@@ -62,7 +64,7 @@ impl ConductorBuilder {
     }
 
     /// Set the passphrase for use in keystore initialization
-    pub fn passphrase(mut self, passphrase: Option<sodoken::BufRead>) -> Self {
+    pub fn passphrase(mut self, passphrase: Option<SharedLockedArray>) -> Self {
         self.passphrase = passphrase;
         self
     }
@@ -118,7 +120,7 @@ impl ConductorBuilder {
 
         let passphrase = match &builder.passphrase {
             Some(p) => p.clone(),
-            None => sodoken::BufRead::new_no_lock(&[]),
+            None => Arc::new(Mutex::new(sodoken::LockedArray::from(vec![]))),
         };
 
         let keystore = if let Some(keystore) = builder.keystore.clone() {
@@ -133,7 +135,7 @@ impl ConductorBuilder {
                     tracing::warn!("{}", MSG);
                 }
             }
-            let get_passphrase = || -> ConductorResult<sodoken::BufRead> {
+            let get_passphrase = || -> ConductorResult<SharedLockedArray> {
                 match builder.passphrase.as_ref() {
                     None => Err(
                         one_err::OneErr::new("passphrase required for lair keystore api").into(),
@@ -456,8 +458,13 @@ impl ConductorBuilder {
             .await?;
 
         let config = Arc::new(builder.config);
-        let spaces =
-            Spaces::new(config.clone(), sodoken::BufRead::new_no_lock(b"passphrase")).await?;
+        let spaces = Spaces::new(
+            config.clone(),
+            Arc::new(Mutex::new(sodoken::LockedArray::from(
+                b"passphrase".to_vec(),
+            ))),
+        )
+        .await?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();

@@ -5,13 +5,13 @@
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
+use crate::spawn_test_keystore;
+use crate::MetaLairClient;
 use futures::FutureExt;
 use lair_keystore::dependencies::lair_keystore_api::lair_client::client_traits::AsLairClient;
 use lair_keystore::dependencies::lair_keystore_api::prelude::{LairApiEnum, LairClient};
+use lair_keystore::dependencies::lair_keystore_api::types::SharedSizedLockedArray;
 use lair_keystore::dependencies::lair_keystore_api::LairResult;
-
-use crate::spawn_test_keystore;
-use crate::MetaLairClient;
 
 /// Spawn a test keystore which always returns the same LairError for every call.
 pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> MetaLairClient
@@ -86,11 +86,11 @@ impl MockLairControl {
 struct CrudeMockKeystore(Arc<dyn Fn() -> one_err::OneErr + Send + Sync + 'static>);
 
 impl AsLairClient for CrudeMockKeystore {
-    fn get_enc_ctx_key(&self) -> sodoken::BufReadSized<32> {
+    fn get_enc_ctx_key(&self) -> SharedSizedLockedArray<32> {
         unimplemented!()
     }
 
-    fn get_dec_ctx_key(&self) -> sodoken::BufReadSized<32> {
+    fn get_dec_ctx_key(&self) -> SharedSizedLockedArray<32> {
         unimplemented!()
     }
 
@@ -108,11 +108,11 @@ impl AsLairClient for CrudeMockKeystore {
 }
 
 impl AsLairClient for RealOrMockKeystore {
-    fn get_enc_ctx_key(&self) -> sodoken::BufReadSized<32> {
+    fn get_enc_ctx_key(&self) -> SharedSizedLockedArray<32> {
         self.real.cli().0.get_enc_ctx_key()
     }
 
-    fn get_dec_ctx_key(&self) -> sodoken::BufReadSized<32> {
+    fn get_dec_ctx_key(&self) -> SharedSizedLockedArray<32> {
         self.real.cli().0.get_dec_ctx_key()
     }
 

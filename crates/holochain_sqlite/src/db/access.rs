@@ -504,7 +504,8 @@ pub fn encrypt_unencrypted_database(path: &Path, pool_config: &PoolConfig) -> Da
         conn.execute("BEGIN EXCLUSIVE", ())?;
 
         {
-            let lock = pool_config.key.unlocked.read_lock();
+            let mut mutex_guard = pool_config.key.unlocked.lock().unwrap();
+            let lock = mutex_guard.lock();
             conn.execute(
                 "ATTACH DATABASE :db_name AS encrypted KEY :key",
                 rusqlite::named_params! {
@@ -518,7 +519,7 @@ pub fn encrypt_unencrypted_database(path: &Path, pool_config: &PoolConfig) -> Da
         }
 
         let mut batch = "PRAGMA encrypted.cipher_salt = \"x'".to_string();
-        for b in &*pool_config.key.salt.read_lock() {
+        for b in &pool_config.key.salt {
             batch.push_str(&format!("{b:02X}"));
         }
         batch.push_str("'\";\n");

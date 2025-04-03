@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update to Lair 0.6.0
 - Changed the response format for `DumpNetworkMetrics` and `DumpNetworkStats` to provide information from Kitsune2. #4816
 - Added a new option to the `DumpNetworkMetrics` on the admin interface. That is `include_dht_summary` which will return
   a summary of the DHT state. #4816

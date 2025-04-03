@@ -5,7 +5,7 @@ use ::lair_keystore::dependencies::lair_keystore_api;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use lair_keystore_api::prelude::*;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// First Test Agent Pub Key
 pub const TEST_AGENT_PK_1: &str = "uhCAkJCuynkgVdMn_bzZ2ZYaVfygkn0WCuzfFspczxFnZM1QAyXoo";
@@ -27,24 +27,27 @@ fn r(s: &str) -> Vec<u8> {
     URL_SAFE_NO_PAD.decode(s).unwrap()
 }
 
-fn s(s: &str) -> [u8; 32] {
+fn s(s: &str) -> SharedSizedLockedArray<32> {
     let r_ = r(s);
-    let mut o = [0; 32];
-    o.copy_from_slice(&r_);
-    o
+    let mut o = sodoken::SizedLockedArray::<32>::new().unwrap();
+    o.lock().copy_from_slice(&r_);
+
+    Arc::new(Mutex::new(o))
 }
 
 /// Construct a new test keystore with the new lair api.
 pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
     // in-memory secure random passphrase
-    let passphrase = sodoken::BufWrite::new_mem_locked(32)?;
-    sodoken::random::bytes_buf(passphrase.clone()).await?;
+    let mut passphrase = sodoken::LockedArray::new(32)?;
+    sodoken::random::randombytes_buf(&mut passphrase.lock())?;
+
+    let passphrase = Arc::new(Mutex::new(passphrase));
 
     // in-mem / in-proc config
     let config = Arc::new(
         PwHashLimits::Minimum
             .with_exec(|| {
-                lair_keystore_api::config::LairServerConfigInner::new("/", passphrase.to_read())
+                lair_keystore_api::config::LairServerConfigInner::new("/", passphrase.clone())
             })
             .await?,
     );
@@ -53,23 +56,23 @@ pub async fn spawn_test_keystore() -> LairResult<MetaLairClient> {
     let keystore = lair_keystore_api::in_proc_keystore::InProcKeystore::new(
         config,
         lair_keystore_api::mem_store::create_mem_store_factory(),
-        passphrase.to_read(),
+        passphrase,
     )
     .await?;
 
     // get the store and inject test seeds
     let store = keystore.store().await?;
     store
-        .insert_seed(s(SEED_1).into(), TEST_AGENT_PK_1.into(), false)
+        .insert_seed(s(SEED_1), TEST_AGENT_PK_1.into(), false)
         .await?;
     store
-        .insert_seed(s(SEED_2).into(), TEST_AGENT_PK_2.into(), false)
+        .insert_seed(s(SEED_2), TEST_AGENT_PK_2.into(), false)
         .await?;
     store
-        .insert_seed(s(SEED_3).into(), TEST_AGENT_PK_3.into(), false)
+        .insert_seed(s(SEED_3), TEST_AGENT_PK_3.into(), false)
         .await?;
     store
-        .insert_seed(s(SEED_4).into(), TEST_AGENT_PK_4.into(), false)
+        .insert_seed(s(SEED_4), TEST_AGENT_PK_4.into(), false)
         .await?;
 
     // return the client

@@ -2,6 +2,7 @@
 
 use once_cell::sync::Lazy;
 use std::io::Result;
+use std::sync::{Arc, Mutex};
 
 static PIPED: Lazy<std::sync::Mutex<bool>> = Lazy::new(|| std::sync::Mutex::new(false));
 
@@ -16,54 +17,38 @@ fn get_piped() -> bool {
     *PIPED.lock().unwrap()
 }
 
-static PASSPHRASE: Lazy<std::result::Result<sodoken::BufRead, String>> = Lazy::new(|| {
-    if get_piped() {
-        read_piped_passphrase().map_err(|e| e.to_string())
-    } else {
-        read_interactive_passphrase("# passphrase> ").map_err(|e| e.to_string())
-    }
-});
+static PASSPHRASE: Lazy<std::result::Result<Arc<Mutex<sodoken::LockedArray>>, String>> =
+    Lazy::new(|| {
+        if get_piped() {
+            read_piped_passphrase().map_err(|e| e.to_string())
+        } else {
+            read_interactive_passphrase("# passphrase> ").map_err(|e| e.to_string())
+        }
+    });
 
 /// Capture a passphrase from the user. Either captures from tty, or
 /// reads stdin if [pw_set_piped] was called with `true`.
-pub fn pw_get() -> Result<sodoken::BufRead> {
+pub fn pw_get() -> Result<Arc<Mutex<sodoken::LockedArray>>> {
     PASSPHRASE
         .clone()
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
 }
 
-fn vec_to_locked(mut pass_tmp: Vec<u8>) -> Result<sodoken::BufRead> {
-    match sodoken::BufWrite::new_mem_locked(pass_tmp.len()) {
-        Err(e) => {
-            pass_tmp.fill(0);
-            Err(e.into())
-        }
-        Ok(p) => {
-            {
-                let mut lock = p.write_lock();
-                lock.copy_from_slice(&pass_tmp);
-                pass_tmp.fill(0);
-            }
-            Ok(p.to_read())
-        }
-    }
-}
-
-fn read_interactive_passphrase(prompt: &str) -> Result<sodoken::BufRead> {
+fn read_interactive_passphrase(prompt: &str) -> Result<Arc<Mutex<sodoken::LockedArray>>> {
     let prompt = prompt.to_owned();
     let pass_tmp = rpassword::prompt_password(prompt)?;
-    vec_to_locked(pass_tmp.into_bytes())
+    Ok(Arc::new(Mutex::new(pass_tmp.into_bytes().into())))
 }
 
-fn read_piped_passphrase() -> Result<sodoken::BufRead> {
+fn read_piped_passphrase() -> Result<Arc<Mutex<sodoken::LockedArray>>> {
     use std::io::Read;
 
     let stdin = std::io::stdin();
     let mut stdin = stdin.lock();
-    let passphrase = <sodoken::BufWriteSized<512>>::new_mem_locked()?;
+    let mut passphrase = sodoken::LockedArray::new(512)?;
     let mut next_char = 0;
     loop {
-        let mut lock = passphrase.write_lock();
+        let mut lock = passphrase.lock();
         let done = match stdin.read_exact(&mut lock[next_char..next_char + 1]) {
             Ok(_) => {
                 if lock[next_char] == 10 {
@@ -78,17 +63,17 @@ fn read_piped_passphrase() -> Result<sodoken::BufRead> {
         };
         if done {
             if next_char == 0 {
-                return Ok(sodoken::BufWrite::new_no_lock(0).to_read());
+                return Ok(Arc::new(Mutex::new(sodoken::LockedArray::new(0)?)));
             }
             if lock[next_char - 1] == 13 {
                 next_char -= 1;
             }
-            let out = sodoken::BufWrite::new_mem_locked(next_char)?;
+            let mut out = sodoken::LockedArray::new(next_char)?;
             {
-                let mut out_lock = out.write_lock();
+                let mut out_lock = out.lock();
                 out_lock.copy_from_slice(&lock[..next_char]);
             }
-            return Ok(out.to_read());
+            return Ok(Arc::new(Mutex::new(out)));
         }
     }
 }

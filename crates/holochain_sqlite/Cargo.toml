@@ -36,7 +36,7 @@ scheduled-thread-pool = "0.2"
 serde = "1.0"
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
 shrinkwraprs = "0.3.0"
-sodoken = "=0.0.11"
+sodoken = "=0.0.904-alpha"
 tempfile = "3.3"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = [
@@ -51,7 +51,7 @@ getrandom = "0.2.7"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 schemars = "0.8.21"
 
-kitsune2_api = "=0.0.1-alpha.17"
+kitsune2_api = "0.1.0"
 bytes = "1.10"
 
 rusqlite = { version = "0.32.1", features = [
