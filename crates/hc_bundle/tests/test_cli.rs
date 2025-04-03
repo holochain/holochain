@@ -286,7 +286,7 @@ async fn test_multi_integrity() {
             .unwrap()
     };
 
-    let (dna, _) = pack_dna("tests/fixtures/my-app/dnas/dna6").await;
+    let (dna, _) = pack_dna("tests/fixtures/my-app/dnas/dna-unstable-migration").await;
 
     // The actual wasm hashes of the fake zomes.
     let wasm_hash = WasmHash::from_raw_39(vec![
