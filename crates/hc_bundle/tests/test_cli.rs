@@ -468,7 +468,6 @@ fn test_default_dna_manifest_matches_schema() {
         "test-dna".to_string(),
         Some("00000000-0000-0000-0000-000000000000".to_string()),
         None,
-        Timestamp::now().into(),
         vec![],
         vec![],
         vec![],
