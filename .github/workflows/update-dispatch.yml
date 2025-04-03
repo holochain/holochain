@@ -5,11 +5,8 @@
 
 name: "trigger source updates"
 on:
-  # push:
-  #   branches: [pr-periodic-updates]
-  # TODO Disabled during K2 integration, re-enable once done
-  #schedule:
-  #  - cron: "0 0 * * 1" # run once a week, at 12:00am on Monday
+  schedule:
+    - cron: "0 0 * * 1" # run once a week, at 12:00am on Monday
   workflow_dispatch:
     inputs:
       only-base-ref:
