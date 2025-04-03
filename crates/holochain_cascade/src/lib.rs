@@ -549,7 +549,7 @@ impl CascadeImpl {
         {
             Ok(ops) => ops,
             Err(e @ HolochainP2pError::NoPeersForLocation(_, _)) => {
-                tracing::debug!(?e, "No peers to fetch record from");
+                tracing::info!(?e, "No peers to fetch record from");
                 vec![]
             }
             Err(e) => return Err(e.into()),
