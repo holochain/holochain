@@ -1,6 +1,3 @@
-#[cfg(feature = "unstable-migration")]
-use std::collections::BTreeSet;
-
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
@@ -585,7 +582,8 @@ pub enum AdminResponse {
 }
 
 #[cfg(feature = "unstable-migration")]
-pub type CompatibleCells = BTreeSet<(InstalledAppId, BTreeSet<CellId>)>;
+pub type CompatibleCells =
+    std::collections::BTreeSet<(InstalledAppId, std::collections::BTreeSet<CellId>)>;
 
 /// Error type that goes over the websocket wire.
 /// This intends to be application developer facing
