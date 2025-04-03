@@ -312,7 +312,7 @@ async fn test_multi_integrity() {
         .unwrap(),
     ];
     let expected = DnaDef {
-        name: "multi integrity dna".into(),
+        name: "multi integrity dna unstable-migration".into(),
         modifiers: DnaModifiers {
             network_seed: "00000000-0000-0000-0000-000000000000".into(),
             properties: ().try_into().unwrap(),
