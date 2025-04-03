@@ -90,10 +90,9 @@ use holochain_types::prelude::{
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketReceiver};
 use serde::{Deserialize, Serialize};
-use sodoken::BufRead;
 use std::collections::HashSet;
 use std::net::ToSocketAddrs;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Parser)]
 pub struct ConnectArgs {
@@ -290,30 +289,29 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
 }
 
 async fn generate_signing_credentials(
-    passphrase: BufRead,
+    passphrase: Arc<Mutex<sodoken::LockedArray>>,
 ) -> anyhow::Result<(Auth, ed25519_dalek::SigningKey)> {
     let auth = load_or_create_auth().await?;
 
-    let salt =
-        sodoken::BufReadSized::<{ sodoken::hash::argon2id::SALTBYTES }>::from(auth.salt.as_ref());
+    let mut salt = [0; sodoken::argon2::ARGON2_ID_SALTBYTES];
+    salt.copy_from_slice(&auth.salt);
 
-    let hash = <sodoken::BufWriteSized<32>>::new_no_lock();
-    {
-        let read_guard = passphrase.read_lock();
-        sodoken::hash::argon2id::hash(
-            hash.clone(),
-            read_guard.to_vec(),
-            salt,
-            sodoken::hash::argon2id::OPSLIMIT_INTERACTIVE,
-            sodoken::hash::argon2id::MEMLIMIT_INTERACTIVE,
-        )
-        .await?;
-    }
+    let hash = tokio::task::spawn_blocking(move || -> std::io::Result<[u8; 32]> {
+        let mut hash = [0; 32];
 
-    Ok((
-        auth,
-        ed25519_dalek::SigningKey::from_bytes(hash.try_unwrap().unwrap().as_ref().try_into()?),
-    ))
+        sodoken::argon2::blocking_argon2id(
+            &mut hash,
+            &passphrase.lock().unwrap().lock(),
+            &salt,
+            sodoken::argon2::ARGON2_ID_OPSLIMIT_INTERACTIVE,
+            sodoken::argon2::ARGON2_ID_MEMLIMIT_INTERACTIVE,
+        )?;
+
+        Ok(hash)
+    })
+    .await??;
+
+    Ok((auth, ed25519_dalek::SigningKey::from_bytes(&hash)))
 }
 
 async fn admin_port_from_connect_args(
@@ -484,17 +482,15 @@ struct Auth {
 }
 
 async fn create_auth() -> anyhow::Result<Auth> {
-    let salt = <sodoken::BufWriteSized<{ sodoken::hash::argon2id::SALTBYTES }>>::new_no_lock();
-    sodoken::random::bytes_buf(salt.clone()).await?;
-    let salt = salt.to_read_sized();
+    let mut salt = [0; sodoken::argon2::ARGON2_ID_SALTBYTES];
+    sodoken::random::randombytes_buf(&mut salt)?;
 
-    let cap_secret = <sodoken::BufWriteSized<CAP_SECRET_BYTES>>::new_no_lock();
-    sodoken::random::bytes_buf(cap_secret.clone()).await?;
-    let cap_secret = cap_secret.to_read_sized();
+    let mut cap_secret = [0; CAP_SECRET_BYTES];
+    sodoken::random::randombytes_buf(&mut cap_secret)?;
 
     let auth = Auth {
-        salt: salt.read_lock().as_ref().to_vec(),
-        cap_secret: CapSecret::try_from(cap_secret.read_lock().as_ref().to_vec())?,
+        salt: salt.to_vec(),
+        cap_secret: CapSecret::from(cap_secret),
     };
     std::fs::write(".hc_auth", serde_json::to_vec(&auth)?)
         .context("Failed to write .hc_auth file")?;

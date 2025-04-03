@@ -108,11 +108,6 @@ impl AgentPubKeyExt for holo_hash::AgentPubKey {
         let pub_key = <lair_keystore_api::prelude::BinDataSized<32>>::from(pub_key);
         let sig = signature.0;
 
-        MustBoxFuture::new(async move {
-            pub_key
-                .verify_detached(sig.into(), data)
-                .await
-                .map_err(KeystoreError::LairError)
-        })
+        MustBoxFuture::new(async move { Ok(pub_key.verify_detached(sig.into(), data).await) })
     }
 }

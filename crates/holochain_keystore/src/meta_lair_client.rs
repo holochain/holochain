@@ -37,7 +37,7 @@ macro_rules! echk {
 impl MetaLairClient {
     pub(crate) async fn new(
         connection_url: url2::Url2,
-        passphrase: sodoken::BufRead,
+        passphrase: SharedLockedArray,
     ) -> LairResult<Self> {
         use lair_keystore_api::ipc_keystore::*;
         let opts = IpcKeystoreClientOptions {
@@ -378,7 +378,7 @@ impl MetaLairClient {
     pub fn get_or_create_tls_cert_by_tag(
         &self,
         tag: Arc<str>,
-    ) -> impl Future<Output = LairResult<(CertDigest, Arc<[u8]>, sodoken::BufRead)>> + 'static + Send
+    ) -> impl Future<Output = LairResult<(CertDigest, Arc<[u8]>, sodoken::LockedArray)>> + 'static + Send
     {
         let (client, esnd) = self.cli();
         async move {

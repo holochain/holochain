@@ -1,8 +1,3 @@
-use holo_hash::fixt::AgentPubKeyFixturator;
-use holo_hash::fixt::DnaHashFixturator;
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::Ordering;
-
 use super::Conductor;
 use super::ConductorState;
 use super::*;
@@ -15,6 +10,8 @@ use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
 use ::fixt::prelude::*;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::DnaHashFixturator;
 use holochain_conductor_api::AppInfoStatus;
 use holochain_conductor_api::CellInfo;
 use holochain_keystore::crude_mock_keystore::*;
@@ -25,6 +22,9 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::op::Op;
 use maplit::hashset;
 use matches::assert_matches;
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 
 mod add_agent_infos;
 mod state_dump;
@@ -54,7 +54,9 @@ async fn can_update_state() {
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(
         config.clone().into(),
-        sodoken::BufRead::new_no_lock(b"passphrase"),
+        Arc::new(Mutex::new(sodoken::LockedArray::from(
+            b"passphrase".to_vec(),
+        ))),
     )
     .await
     .unwrap();
@@ -110,7 +112,9 @@ async fn app_ids_are_unique() {
     };
     let spaces = Spaces::new(
         config.clone().into(),
-        sodoken::BufRead::new_no_lock(b"passphrase"),
+        Arc::new(Mutex::new(sodoken::LockedArray::from(
+            b"passphrase".to_vec(),
+        ))),
     )
     .await
     .unwrap();
