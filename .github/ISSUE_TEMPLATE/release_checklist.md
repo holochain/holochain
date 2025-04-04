@@ -7,13 +7,17 @@ assignees: ''
 
 ---
 
-- [ ] check for regressions or unexpected behavior by testing with an app that's in active use, in the field: @
-- [ ] confirm launcher build: @
-- [ ] confirm with manual runs of a test app: @
-- [ ] confirm scaffolding works: @
 - [ ] confirm holonix branch `main-0.x`: @
+- [ ] confirm JS client: @
+- [ ] confirm Rust client: @
+- [ ] confirm hc-spin: @
+- [ ] confirm hc-launch: @
+- [ ] confirm launcher build: @
+- [ ] confirm scaffolding works: @
 - [ ] migration guide written to help users move to the new release: @
 - [ ] confirm any docs/updates ready to publish after release lands: @ 
+- [ ] confirm with manual runs of a ziptest app, following [release protocol}(https://github.com/holochain/holochain/blob/develop/RELEASE.md): @
+- [ ] update app store & devhub
 
 **Assignment**
 
