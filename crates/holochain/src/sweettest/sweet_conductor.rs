@@ -24,6 +24,7 @@ use holochain_websocket::*;
 use kitsune2_api::DhtArc;
 use nanoid::nanoid;
 use rand::Rng;
+use rusqlite::named_params;
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 use std::path::Path;
@@ -920,6 +921,33 @@ impl SweetConductor {
                 .query_row(
                     "SELECT NOT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
                     [],
+                    |row| row.get::<_, bool>(0),
+                )
+                .unwrap();
+            Ok(all_integrated)
+        })
+    }
+
+    /// Check if all ops of a specific author have been integrated in the DHT database.
+    pub fn all_ops_of_author_integrated(
+        &self,
+        dna_hash: &DnaHash,
+        author: &AgentPubKey,
+    ) -> ConductorApiResult<bool> {
+        let dht_db = self.get_dht_db(dna_hash)?;
+        let author = author.clone();
+        dht_db.test_read(move |txn| {
+            let all_integrated = txn
+                .query_row(
+                    "SELECT NOT EXISTS(
+                            SELECT 1
+                            FROM DhtOp
+                            JOIN Action
+                            ON Action.hash = DhtOp.action_hash
+                            WHERE Action.author = :author
+                            AND DhtOp.when_integrated IS NULL
+                        )",
+                    named_params! {":author": author},
                     |row| row.get::<_, bool>(0),
                 )
                 .unwrap();

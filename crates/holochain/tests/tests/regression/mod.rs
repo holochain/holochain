@@ -1,7 +1,7 @@
 use holo_hash::ActionHash;
 #[cfg(not(feature = "wasmer_wamr"))]
 use holochain::conductor::conductor::WASM_CACHE;
-use holochain::sweettest::*;
+use holochain::{retry_until_timeout, sweettest::*};
 use holochain_wasm_test_utils::TestWasm;
 
 // Make sure the wasm cache at least creates files.
@@ -114,39 +114,15 @@ async fn zome_with_no_link_types_does_not_prevent_delete_links() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "flaky"]
 async fn zero_arc_can_link_to_uncached_base() {
-    use hdk::prelude::*;
-
     holochain_trace::test_run();
 
     let empty_arc_conductor_config = SweetConductorConfig::rendezvous(false)
         .no_dpki_mustfix()
         .tune_network_config(|nc| nc.target_arc_factor = 0);
 
-    let other_config = SweetConductorConfig::rendezvous(false)
-        .no_dpki_mustfix()
-        .tune_network_config(|nc| {
-            // Expecting Alice and Bob to update their storage arcs, so make them
-            // publish that change sooner.
-            nc.advanced
-                .as_mut()
-                .unwrap()
-                .as_object_mut()
-                .unwrap()
-                .insert(
-                    "coreSpace".to_string(),
-                    serde_json::json!({
-                        "reSignFreqMs": 500,
-                        "reSignExpireTimeMs": (19.9 * 60.0 * 1000.0) as u32,
-                    }),
-                );
-        });
+    let other_config = SweetConductorConfig::rendezvous(false).no_dpki_mustfix();
     let mut conductors = SweetConductorBatch::from_configs_rendezvous(vec![
-        // Need a pair of conductors so that they can agree that their initial view of the DHT is
-        // complete. With just another 0 arc node, alice can never gossip and cannot discover that
-        // they're okay to declare a full arc.
-        other_config.clone(),
         other_config,
         empty_arc_conductor_config,
     ])
@@ -158,57 +134,26 @@ async fn zero_arc_can_link_to_uncached_base() {
     ])
     .await;
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors
+        .setup_app("app", &[dna_file.clone()])
+        .await
+        .unwrap();
 
-    let ((alice,), (bob,), (carol_empty_arc,)) = apps.into_tuples();
-
-    // For initial peer discovery (bootstrap disabled in this test)
-    conductors.exchange_peer_info().await;
+    let ((alice,), (carol_empty_arc,)) = apps.into_tuples();
 
     conductors[0]
-        .require_initial_gossip_activity_for_cell(&alice, 1, std::time::Duration::from_secs(30))
-        .await
-        .unwrap();
+        .declare_full_storage_arcs(dna_file.dna_hash())
+        .await;
 
-    conductors[1]
-        .require_initial_gossip_activity_for_cell(&bob, 1, std::time::Duration::from_secs(30))
-        .await
-        .unwrap();
-
-    // Wait for Alice to declare a full arc.
-    tokio::time::timeout(std::time::Duration::from_secs(30), {
-        let c0 = conductors[0].clone();
-        let alice = alice.clone();
-        async move {
-            loop {
-                let alice = c0
-                    .holochain_p2p()
-                    .peer_store(alice.dna_hash().clone())
-                    .await
-                    .unwrap()
-                    .get(alice.agent_pubkey().to_k2_agent())
-                    .await
-                    .unwrap();
-
-                if let Some(a) = alice {
-                    if a.storage_arc == kitsune2_api::DhtArc::FULL {
-                        break;
-                    }
-                }
-
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            }
-        }
-    })
-    .await
-    .expect("Alice did not declare a full arc");
-
-    // Now we want to update agent infos where Alice and Bob should have declared full arc.
+    // For initial peer discovery (bootstrap disabled in this test).
+    // Now we want to update agent infos where Alice has declared full arc.
     conductors.exchange_peer_info().await;
 
     let alice_pk = alice.cell_id().agent_pubkey().clone();
+    let carol_pk = carol_empty_arc.cell_id().agent_pubkey().clone();
 
     println!("@!@!@ alice_pk: {alice_pk:?}");
+    println!("@!@!@ carol_pk: {carol_pk:?}");
 
     let action_hash: ActionHash = conductors[0]
         .call(
@@ -223,7 +168,7 @@ async fn zero_arc_can_link_to_uncached_base() {
 
     // Carol is linking to Alice's action hash, but doesn't have it locally
     // so the must_get_valid_record in validation will have to do a network get.
-    let link_hash: ActionHash = conductors[2]
+    let link_hash: ActionHash = conductors[1]
         .call(
             &carol_empty_arc.zome(TestWasm::Link.coordinator_zome_name()),
             "link_validation_calls_must_get_valid_record",
@@ -246,7 +191,7 @@ async fn zero_arc_can_link_to_uncached_base() {
 
     // Carol is linking to Alice's action hash, but doesn't have it locally
     // so the must_get_entry/must_get_action in validation will have to do a network get.
-    let link_hash: ActionHash = conductors[2]
+    let link_hash: ActionHash = conductors[1]
         .call(
             &carol_empty_arc.zome(TestWasm::Link.coordinator_zome_name()),
             "link_validation_calls_must_get_action_then_entry",
@@ -264,12 +209,21 @@ async fn zero_arc_can_link_to_uncached_base() {
         )
         .await;
 
+    retry_until_timeout!(5000, 500, {
+        if conductors[0]
+            .all_ops_of_author_integrated(dna_file.dna_hash(), alice.agent_pubkey())
+            .unwrap()
+        {
+            break;
+        }
+    });
+
     println!("@!@!@ -- must_get_agent_activity --");
     println!("@!@!@ action_hash: {action_hash:?}");
 
     // Carol is linking to Alice's action hash, but doesn't have it locally
     // so the must_get_agent_activity in validation will have to do a network get.
-    let link_hash: ActionHash = conductors[2]
+    let link_hash: ActionHash = conductors[1]
         .call(
             &carol_empty_arc.zome(TestWasm::Link.coordinator_zome_name()),
             "link_validation_calls_must_get_agent_activity",

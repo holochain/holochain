@@ -68,13 +68,8 @@ pub mod test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
     async fn dna_info_test_2() {
         holochain_trace::test_run();
-        // let RibosomeTestFixture {
-        //     conductor, alice, ..
-        // } = RibosomeTestFixture::new(TestWasm::ZomeInfo).await;
-
         let (conductor, alice) = test_conductor(SerializedBytes::default()).await;
 
         let dna_info: DnaInfo = conductor.call(&alice, "dna_info", ()).await;

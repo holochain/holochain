@@ -92,36 +92,21 @@ impl HolochainOpStore {
 impl OpStore for HolochainOpStore {
     fn process_incoming_ops(&self, op_list: Vec<Bytes>) -> BoxFut<'_, K2Result<Vec<OpId>>> {
         Box::pin(async move {
-            let dht_ops = op_list
-                .into_iter()
-                // Filter to make casting the size below safe
-                .filter(|op| op.len() <= u32::MAX as usize)
-                .map(|op| {
-                    Ok((
-                        op.len() as u32,
-                        decode::<_, DhtOp>(op.as_ref())
-                            .map_err(|e| K2Error::other_src("Could not decode op", e))?,
-                    ))
-                })
-                .collect::<K2Result<Vec<(u32, DhtOp)>>>()?;
-
-            let ids = dht_ops
-                .iter()
-                .map(|(_, op)| {
-                    let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                    op_hashed.hash.to_k2_op()
-                })
-                .collect();
+            let mut dht_ops = Vec::with_capacity(op_list.len());
+            let mut ids = Vec::with_capacity(op_list.len());
+            for op_bytes in op_list {
+                let op = decode::<_, DhtOp>(&op_bytes)
+                    .map_err(|e| K2Error::other_src("Could not decode op", e))?;
+                let op_hashed = DhtOpHashed::from_content_sync(op.clone());
+                ids.push(op_hashed.hash.to_k2_op());
+                dht_ops.push(op);
+            }
 
             use crate::types::event::HcP2pHandler;
             self.sender
                 .get()
                 .ok_or_else(|| K2Error::other("event handler not registered"))?
-                .handle_publish(
-                    self.dna_hash.clone(),
-                    false,
-                    dht_ops.into_iter().map(|(_, op)| op).collect(),
-                )
+                .handle_publish(self.dna_hash.clone(), false, dht_ops)
                 .await
                 .map_err(|e| K2Error::other_src("Failed to publish incoming ops", e))?;
 
