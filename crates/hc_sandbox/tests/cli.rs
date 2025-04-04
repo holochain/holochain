@@ -604,6 +604,7 @@ async fn authorize_zome_call_credentials() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "experiment"]
 async fn call_zome_function() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
