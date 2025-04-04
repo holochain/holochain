@@ -60,10 +60,10 @@ jobs:
         include:
           - os: ubuntu-latest
             target: wasmer_sys
-          # - os: macos-latest
-          #   target: wasmer_sys
-          # - os: macos-13
-          #   target: wasmer_sys
+          - os: macos-latest
+            target: wasmer_sys
+          - os: macos-13
+            target: wasmer_sys
           # - os: windows-latest
           #   target: wasmer_sys
           # - os: ubuntu-latest
