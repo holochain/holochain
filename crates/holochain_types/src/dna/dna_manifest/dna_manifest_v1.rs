@@ -104,6 +104,7 @@ pub struct DnaManifestV1 {
     ///
     /// Holochain does nothing to ensure the correctness of the lineage, it is up to
     /// the app developer to make the necessary guarantees.
+    #[cfg(feature = "unstable-migration")]
     #[serde(default)]
     #[builder(default)]
     pub lineage: Vec<DnaHashB64>,

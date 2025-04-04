@@ -291,6 +291,14 @@ unstable-dpki = [
   "holochain_conductor_config/unstable-dpki",
   "holochain_zome_types/unstable-dpki",
   "holochain_wasm_test_utils/unstable-dpki",
+  # the deepkey dna is built with the lineage field
+  "unstable-migration",
+]
+
+# Enable the unstable migration feature
+unstable-migration = [
+  "holochain_types/unstable-migration",
+  "holochain_conductor_api/unstable-migration",
 ]
 
 # Enables unstable warrants feature.

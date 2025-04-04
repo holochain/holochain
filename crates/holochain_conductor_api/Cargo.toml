@@ -50,6 +50,7 @@ workspace = true
 [features]
 chc = []
 unstable-dpki = []
+unstable-migration = []
 unstable-sharding = []
 unstable-countersigning = []
 sqlite-encrypted = [

@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Moves the `lineage` field of the dna manifest behind an `unstable-migration` feature.
+- The Admin Api call `GetCompatibleCells` is now only available with the `unstable-migration` feature.
+
 ## 0.5.0-dev.22
 
 - Update to Lair 0.6.0

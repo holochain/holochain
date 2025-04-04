@@ -1,10 +1,13 @@
-use std::collections::{BTreeSet, HashMap};
+#[cfg(feature = "unstable-migration")]
+use std::collections::BTreeSet;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::{conductor::error::ConductorError, sweettest::*};
 use holo_hash::DnaHash;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+#[cfg(feature = "unstable-migration")]
 use maplit::btreeset;
 use matches::assert_matches;
 
@@ -346,6 +349,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
         .unwrap();
 }
 
+#[cfg(feature = "unstable-migration")]
 #[tokio::test(flavor = "multi_thread")]
 async fn cells_by_dna_lineage() {
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -587,16 +591,12 @@ async fn use_existing_integration() {
         ));
     }
 
-    // Get the existing cell id through the normal means
-    let appmap = conductor
-        .cells_by_dna_lineage(dna1.dna_hash())
-        .await
-        .unwrap();
-    assert_eq!(appmap.len(), 1);
-    let (app_name, cells) = appmap.first().unwrap();
-    assert_eq!(app_name, "app_1");
-    assert_eq!(cells.len(), 1);
-    let cell_id = cells.first().unwrap().clone();
+    let cell_id = app_1
+        .all_cells()
+        .collect::<Vec<CellId>>()
+        .first()
+        .unwrap()
+        .to_owned();
 
     let role_settings = ("extant".into(), RoleSettings::UseExisting { cell_id });
 
