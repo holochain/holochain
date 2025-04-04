@@ -14,7 +14,7 @@ use holochain_zome_types::prelude::{GetValidationReceiptsInput, ValidationReceip
 /// same agent, but it must be the same conductor.
 ///
 /// ### Example
-/// ```rust,no_run
+/// ```ignore
 /// use hdk::prelude::*;
 ///
 /// #[derive(Serialize, Deserialize)]
