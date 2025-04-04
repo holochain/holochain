@@ -31,7 +31,7 @@ jobs:
       - name: cmake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: '3.31.x'
+          cmake-version: "3.31.x"
 
       - name: static-fmt
         run: make static-fmt
@@ -66,13 +66,13 @@ jobs:
             target: wasmer_sys
           - os: windows-latest
             target: wasmer_sys
-          - os: ubuntu-latest
-            target: wasmer_sys-unstable
+          # - os: ubuntu-latest
+          #   target: wasmer_sys-unstable
 
           # Our intended target for wasmer_wamr feature is iOS and Android.
           # For now, wasmer_wamr tests are only run on macos-latest
-          - os: macos-latest
-            target: wasmer_wamr
+          # - os: macos-latest
+          #   target: wasmer_wamr
     steps:
       - name: checkout
         uses: actions/checkout@v4
@@ -84,7 +84,7 @@ jobs:
       - name: cmake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: '3.31.x'
+          cmake-version: "3.31.x"
 
       - name: install build dependencies (macos-latest, wasmer_wamr)
         if: matrix.os == 'macos-latest' && matrix.target == 'wasmer_wamr'

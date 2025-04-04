@@ -87,8 +87,7 @@ build-workspace-wasmer_wamr:
 
 # execute tests on all crates with wasmer compiler
 test-workspace-wasmer_sys:
-	cargo install cargo-nextest
-	$(F) RUST_BACKTRACE=1 cargo nextest run \
+	$(F) RUST_BACKTRACE=1 cargo test \
 		--workspace \
 		--locked \
 		--no-default-features \
