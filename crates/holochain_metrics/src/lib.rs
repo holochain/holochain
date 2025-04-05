@@ -58,7 +58,7 @@
 //!   For example, a "request" may have two separate metrics, "duration", and
 //!   "byte.count", which both may have the filtering attribute "remote_id".
 //!   - Examples
-//!     - ```
+//!     - ```ignore
 //!         use opentelemetry_api::{Context, KeyValue, metrics::Unit};
 //!         let req_dur = opentelemetry_api::global::meter("tx5")
 //!             .f64_histogram("tx5.signal.request.duration")
@@ -69,7 +69,7 @@
 //!             KeyValue::new("remote_id", "abcd"),
 //!         ]);
 //!       ```
-//!     - ```
+//!     - ```ignore
 //!         use opentelemetry_api::{Context, KeyValue, metrics::Unit};
 //!         let req_size = opentelemetry_api::global::meter("tx5")
 //!             .u64_histogram("tx5.signal.request.byte.count")

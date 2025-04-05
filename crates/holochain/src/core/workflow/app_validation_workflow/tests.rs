@@ -1019,6 +1019,12 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             .len();
     assert_eq!(ops_to_validate, 1);
 
+    // The op should not be marked as valid yet
+    assert_eq!(
+        get_valid_and_not_integrated_count(&app_validation_workspace.dht_db).await,
+        0
+    );
+
     // Check that genesis ops are currently validated and integrated
     assert_eq!(
         get_valid_and_integrated_count(&app_validation_workspace.dht_db).await,
