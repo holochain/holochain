@@ -2654,6 +2654,7 @@ dependencies = [
  "regex",
  "reqwest 0.12.15",
  "rusqlite",
+ "rustls 0.23.25",
  "schemars",
  "sd-notify",
  "serde",

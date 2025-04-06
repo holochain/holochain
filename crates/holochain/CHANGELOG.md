@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Set crypto provider for TLS connections in Holochain binary. This used to produce error when running the binary.
+
 ## 0.5.0-rc.0
 
 - Moves the `lineage` field of the dna manifest behind an `unstable-migration` feature.
