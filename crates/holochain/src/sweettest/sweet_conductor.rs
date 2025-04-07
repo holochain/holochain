@@ -210,7 +210,13 @@ impl SweetConductor {
 
         let keystore = keystore.unwrap_or_else(holochain_keystore::test_keystore);
 
-        let handle = Self::handle_from_existing(keystore, &config, &[], test_builder_uses_production_k2_builder).await;
+        let handle = Self::handle_from_existing(
+            keystore,
+            &config,
+            &[],
+            test_builder_uses_production_k2_builder,
+        )
+        .await;
 
         tracing::info!("Starting with config: {:?}", config);
 
@@ -246,7 +252,7 @@ impl SweetConductor {
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
-        test_builder_uses_production_k2_builder: bool
+        test_builder_uses_production_k2_builder: bool,
     ) -> ConductorHandle {
         NUM_CREATED.fetch_add(1, Ordering::SeqCst);
 
