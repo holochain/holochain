@@ -604,7 +604,7 @@ async fn authorize_zome_call_credentials() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "experiment"]
+// #[ignore = "experiment: zome call not authorized due to bad cap grant"]
 async fn call_zome_function() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
@@ -674,6 +674,7 @@ async fn call_zome_function() {
 
     let exit_code = child.wait().await.unwrap();
     assert!(exit_code.success(), "Failed with exit code {:?}", exit_code);
+    assert!(PathBuf::from(".hc_auth").exists());
 
     // Make the call
     let mut cmd = get_sandbox_command();
