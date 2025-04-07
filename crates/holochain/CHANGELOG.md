@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- ***BREAKING*** Holochain has now transitioned from the legacy Kitsune networking implementation, to the new [Kitsune2](https://crates.io/crates/kitsune2). This brings with it changes that you can read about in the migration guide from Holochain 0.4.x --> 0.5.x. Among these changes are: breaking protocol changes, differences in the networking section of the conductor config, canges to agent info encoding, a transition from hc run-local-services to kitsune2 bootstrap server, and a switch from go pion as the backend to libdatachannel meaning holochain no longer depends on the go compiler. [\#4791](https://github.com/holochain/holochain/pull/4791)
 - Set crypto provider for TLS connections in Holochain binary. This used to produce error when running the binary.
 
 ## 0.5.0-rc.0
