@@ -138,7 +138,7 @@ impl SweetConductor {
         C: Into<SweetConductorConfig>,
         R: Into<DynSweetRendezvous> + Clone,
     {
-        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false).await
+        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false, false).await
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
@@ -148,6 +148,7 @@ impl SweetConductor {
         keystore: Option<MetaLairClient>,
         rendezvous: Option<R>,
         with_metrics: bool,
+        test_builder_uses_production_k2_builder: bool,
     ) -> SweetConductor
     where
         C: Into<SweetConductorConfig>,
@@ -209,7 +210,7 @@ impl SweetConductor {
 
         let keystore = keystore.unwrap_or_else(holochain_keystore::test_keystore);
 
-        let handle = Self::handle_from_existing(keystore, &config, &[]).await;
+        let handle = Self::handle_from_existing(keystore, &config, &[], test_builder_uses_production_k2_builder).await;
 
         tracing::info!("Starting with config: {:?}", config);
 
@@ -245,6 +246,7 @@ impl SweetConductor {
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
+        test_builder_uses_production_k2_builder: bool
     ) -> ConductorHandle {
         NUM_CREATED.fetch_add(1, Ordering::SeqCst);
 
@@ -252,6 +254,7 @@ impl SweetConductor {
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
+            .test_builder_uses_production_k2_builder(test_builder_uses_production_k2_builder)
             .test(extra_dnas)
             .await
             .unwrap()
@@ -663,6 +666,7 @@ impl SweetConductor {
                     self.keystore.clone(),
                     &self.config,
                     self.dnas.as_slice(),
+                    false,
                 )
                 .await,
             ));
