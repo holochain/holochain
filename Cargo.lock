@@ -1512,7 +1512,8 @@ checksum = "575f75dfd25738df5b91b8e43e14d44bda14637a58fae779fd2b064f8bf3e010"
 [[package]]
 name = "datachannel"
 version = "0.14.0"
-source = "git+https://github.com/ThetaSinner/datachannel-rs.git?branch=find-libs-on-windows-not-just-msvc#f170739eaf418adc4f2d08609714b3b981bee9c8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a9104be65808f5ba4cae77831aa5b1874a64de31ceed449db37897910d0d72e"
 dependencies = [
  "datachannel-sys",
  "derivative",
@@ -1525,7 +1526,8 @@ dependencies = [
 [[package]]
 name = "datachannel-sys"
 version = "0.22.2"
-source = "git+https://github.com/ThetaSinner/datachannel-rs.git?branch=find-libs-on-windows-not-just-msvc#f170739eaf418adc4f2d08609714b3b981bee9c8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ead19df10c4e46d8d4b33de06c6224dcafc98bad666ac62629d363675866cae"
 dependencies = [
  "bindgen 0.69.5",
  "cmake",
