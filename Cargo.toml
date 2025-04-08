@@ -110,3 +110,5 @@ lto = true
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
 # lair_keystore = { path = "../lair/crates/lair_keystore" }
 # r2d2_sqlite = { path = "../r2d2-sqlite" }
+
+datachannel = { git = "https://github.com/ThetaSinner/datachannel-rs.git", branch = "find-libs-on-windows-not-just-msvc" }
