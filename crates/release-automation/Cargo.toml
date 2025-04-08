@@ -53,7 +53,7 @@ serde_json = "1.0"
 serde_with = "1.9.4"
 
 # used for the example cleanup-gh-workflow-runs
-tokio = { version = "1.27", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.38", features = ["rt-multi-thread", "macros"] }
 octocrab = "0.19.0"
 gh-config = "0.2"
 
