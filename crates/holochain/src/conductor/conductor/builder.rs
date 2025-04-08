@@ -70,8 +70,11 @@ impl ConductorBuilder {
             ribosome_store: Default::default(),
             passphrase: None,
             keystore: None,
+            #[cfg(any(test, feature = "test_utils"))]
             state: None,
+            #[cfg(any(test, feature = "test_utils"))]
             dpki: None,
+            #[cfg(any(test, feature = "test_utils"))]
             generate_test_device_seed: false,
             no_print_setup: false,
             test_builder_uses_production_k2_builder: false,
