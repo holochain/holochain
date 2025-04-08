@@ -30,6 +30,9 @@ chrono = { version = "0.4.22", default-features = false, features = [
 ] }
 clap = { version = "4.0", features = ["derive", "env"] }
 futures = "0.3"
+holo_hash = { version = "^0.5.0-rc.0", path = "../holo_hash", features = [
+  "kitsune2",
+] }
 holochain_chc = { version = "^0.2.0-rc.0", path = "../holochain_chc", optional = true }
 holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.5.0-rc.0", features = [
   "sqlite",
@@ -39,9 +42,6 @@ holochain_types = { path = "../holochain_types", version = "^0.5.0-rc.0", featur
 ] }
 holochain_conductor_config = { version = "^0.5.0-rc.0", path = "../holochain_conductor_config" }
 holochain_websocket = { path = "../holochain_websocket", version = "^0.5.0-rc.0" }
-holochain_p2p = { path = "../holochain_p2p", version = "^0.5.0-rc.0", features = [
-  "sqlite",
-] }
 holochain_util = { version = "^0.5.0-rc.0", path = "../holochain_util", features = [
   "pw",
 ] }
