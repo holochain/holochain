@@ -202,6 +202,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run(
     dna: std::path::PathBuf,
     outbox: std::path::PathBuf,
