@@ -90,7 +90,17 @@ pub async fn run_demo(opts: RunOpts) {
             signal_url,
             bootstrap_url,
         } => {
-            run(dna, outbox, inbox, signal_url, bootstrap_url, None, None).await;
+            run(
+                dna,
+                outbox,
+                inbox,
+                signal_url,
+                bootstrap_url,
+                None,
+                None,
+                true,
+            )
+            .await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
@@ -121,6 +131,7 @@ pub async fn run_test_demo(
                 bootstrap_url,
                 Some(ready),
                 Some(rendezvous),
+                false,
             )
             .await;
         }
@@ -199,6 +210,7 @@ async fn run(
     bootstrap_url: String,
     ready: Option<tokio::sync::oneshot::Sender<()>>,
     rendezvous: Option<holochain::sweettest::DynSweetRendezvous>,
+    prod: bool,
 ) {
     let _ = tokio::fs::create_dir_all(&outbox).await;
     let _ = tokio::fs::create_dir_all(&inbox).await;
@@ -256,7 +268,7 @@ async fn run(
         Some(keystore),
         Some(rendezvous),
         true,
-        true,
+        prod,
     )
     .await;
 
