@@ -2357,6 +2357,7 @@ dependencies = [
  "holochain_types",
  "rand 0.8.5",
  "rand-utf8",
+ "rustls 0.23.25",
  "serde",
  "tempfile",
  "tokio",
