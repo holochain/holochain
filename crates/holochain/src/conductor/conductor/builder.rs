@@ -10,7 +10,6 @@ use lair_keystore_api::types::SharedLockedArray;
 use std::sync::Mutex;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
-#[derive(Default)]
 pub struct ConductorBuilder {
     /// The configuration
     pub config: ConductorConfig,
@@ -56,7 +55,28 @@ pub struct ConductorBuilder {
 impl ConductorBuilder {
     /// Default ConductorBuilder.
     pub fn new() -> Self {
-        Self::default()
+        static CRYPTO: std::sync::Once = std::sync::Once::new();
+        CRYPTO.call_once(|| {
+            if rustls::crypto::aws_lc_rs::default_provider()
+                .install_default()
+                .is_ok()
+            {
+                tracing::warn!("Defaulting to aws-lc as the rustls crypto provider. Please set this in your binary before invoking the ConductorBuilder. https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html#using-the-per-process-default-cryptoprovider");
+            }
+        });
+
+        Self {
+            config: Default::default(),
+            ribosome_store: Default::default(),
+            passphrase: None,
+            keystore: None,
+            state: None,
+            dpki: None,
+            generate_test_device_seed: false,
+            no_print_setup: false,
+            test_builder_uses_production_k2_builder: false,
+            danger_print_db_secrets: false,
+        }
     }
 }
 
