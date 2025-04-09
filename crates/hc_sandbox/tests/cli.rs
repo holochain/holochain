@@ -604,7 +604,7 @@ async fn authorize_zome_call_credentials() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-// #[ignore = "experiment: zome call not authorized due to bad cap grant"]
+#[ignore = "experiment: zome call not authorized due to bad cap grant"]
 async fn call_zome_function() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;

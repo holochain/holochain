@@ -92,7 +92,7 @@ test-workspace-wasmer_sys:
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
-		-- --test-threads 2
+		-- --test-threads 1
 
 # executes tests on all crates with wasmer compiler and unstable dpki feature
 test-workspace-wasmer_sys-unstable:
@@ -102,6 +102,7 @@ test-workspace-wasmer_sys-unstable:
 		--locked \
 		--no-default-features \
 		--features $(UNSTABLE_FEATURES),wasmer_sys
+		-- --test-threads 1
 
 # execute tests on all crates with wasmer interpreter
 test-workspace-wasmer_wamr:
@@ -111,3 +112,4 @@ test-workspace-wasmer_wamr:
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
+		-- --test-threads 1
