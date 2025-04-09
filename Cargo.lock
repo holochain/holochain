@@ -2406,7 +2406,7 @@ dependencies = [
 
 [[package]]
 name = "hcterm"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2575,7 +2575,7 @@ dependencies = [
 
 [[package]]
 name = "holochain"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "anyhow",
  "assert2",
@@ -2690,7 +2690,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cascade"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "async-trait",
  "fixt",
@@ -2722,7 +2722,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_chc"
-version = "0.2.0-rc.0"
+version = "0.2.0-rc.1"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2751,7 +2751,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "anyhow",
  "clap 4.5.35",
@@ -2764,7 +2764,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_bundle"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2790,7 +2790,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_cli_sandbox"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -2823,7 +2823,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_api"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "cfg-if 1.0.0",
  "derive_more",
@@ -2854,7 +2854,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_config"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -2871,7 +2871,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_conductor_services"
-version = "0.4.0-rc.0"
+version = "0.4.0-rc.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2922,7 +2922,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_keystore"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "assert_cmd",
  "base64 0.22.1",
@@ -2979,7 +2979,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_p2p"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "async-trait",
  "blake2b_simd",
@@ -3056,7 +3056,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_sqlite"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3103,7 +3103,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_state"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3193,7 +3193,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_types"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3232,7 +3232,7 @@ dependencies = [
  "parking_lot",
  "pretty_assertions",
  "proptest",
- "proptest-derive 0.5.1",
+ "proptest-derive 0.4.0",
  "rand 0.8.5",
  "regex",
  "rusqlite",
@@ -3273,7 +3273,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasm_test_utils"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "holochain_types",
  "holochain_util",
@@ -3329,7 +3329,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_websocket"
-version = "0.5.0-rc.0"
+version = "0.5.0-rc.1"
 dependencies = [
  "async-trait",
  "criterion",
