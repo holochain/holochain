@@ -5,7 +5,6 @@ use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::fixt::EntryHashFixturator;
 use holo_hash::*;
 use holochain_sqlite::prelude::*;
-use holochain_state::mutations;
 use holochain_state::prelude::*;
 use pretty_assertions::assert_eq;
 use std::collections::HashMap;
@@ -23,8 +22,8 @@ fn insert_action_and_op(txn: &mut Txn<DbKindDht>, action: &Action) -> DhtOpHash 
     );
     let hash = action.as_hash().clone();
     let op_hash = fixt!(DhtOpHash);
-    mutations::insert_action(txn, &action).unwrap();
-    mutations::insert_op_lite(
+    insert_action(txn, &action).unwrap();
+    insert_op_lite(
         txn,
         &ChainOpLite::RegisterAgentActivity(hash, basis_hash.clone()).into(),
         &op_hash,
@@ -42,17 +41,16 @@ fn set_integrated(db: &DbWrite<DbKindDht>, op_hash: DhtOpHash) {
     db.test_write({
         let op_hash = op_hash.clone();
         move |txn| {
-            mutations::set_validation_stage(txn, &op_hash, ValidationStage::Pending).unwrap();
-            mutations::set_when_integrated(txn, &op_hash, Timestamp::now()).unwrap();
+            set_validation_stage(txn, &op_hash, ValidationStage::Pending).unwrap();
+            set_when_integrated(txn, &op_hash, Timestamp::now()).unwrap();
         }
     });
 }
 
 fn set_ready_to_integrate(db: &DbWrite<DbKindDht>, op_hash: DhtOpHash) {
     db.test_write(move |txn| {
-        mutations::set_validation_stage(txn, &op_hash, ValidationStage::AwaitingIntegration)
-            .unwrap();
-        mutations::set_validation_status(txn, &op_hash, ValidationStatus::Valid).unwrap();
+        set_validation_stage(txn, &op_hash, ValidationStage::AwaitingIntegration).unwrap();
+        set_validation_status(txn, &op_hash, ValidationStatus::Valid).unwrap();
     });
 }
 
@@ -65,7 +63,7 @@ async fn check_state(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cache_inits_correctly() {
-    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let db = test_dht_db_with_id(0).to_db();
     let cache = DhtDbQueryCache::new(db.clone().into());
     check_state(&cache, |activity| assert!(activity.is_empty())).await;
 
@@ -165,7 +163,7 @@ async fn cache_inits_correctly() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cache_init_catches_gaps() {
-    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let db = test_dht_db_with_id(0);
 
     let action = Action::Dna(Dna {
         author: fixt!(AgentPubKey),
@@ -262,7 +260,7 @@ async fn cache_init_catches_gaps() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cache_set_integrated() {
-    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let db = test_dht_db_with_id(0);
 
     let action = Action::Dna(fixt!(Dna));
     let author = action.author().clone();
@@ -355,7 +353,7 @@ async fn cache_set_all_integrated() {
     let test_activity: Vec<_> = std::iter::repeat_with(|| (Arc::new(fixt!(AgentPubKey)), 0..=100))
         .take(1000)
         .collect();
-    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let db = test_dht_db_with_id(0);
     let cache = DhtDbQueryCache::new(db.clone().into());
     cache
         .set_all_activity_to_integrated(test_activity.clone())
@@ -379,9 +377,10 @@ async fn cache_set_all_integrated() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_none_integrated_with_awaiting_deps() {
-    let author = Arc::new(fixt!(AgentPubKey));
-    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let db = test_dht_db_with_id(0);
     let cache = DhtDbQueryCache::new(db.clone().into());
+
+    let author = Arc::new(fixt!(AgentPubKey));
     cache
         .set_activity_ready_to_integrate(author.as_ref(), Some(3))
         .await
@@ -399,7 +398,7 @@ async fn check_none_integrated_with_awaiting_deps() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn no_activities_to_integrate_when_nothing_waiting() {
-    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let db = test_dht_db_with_id(0);
     let cache = DhtDbQueryCache::new(db.clone().into());
 
     let to_integrate = cache.get_activity_to_integrate().await.unwrap();
@@ -409,7 +408,7 @@ async fn no_activities_to_integrate_when_nothing_waiting() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn no_activities_to_integrate_when_everything_already_integrated() {
-    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let db = test_dht_db_with_id(0);
     let cache = DhtDbQueryCache::new(db.clone().into());
     let agent_key = Arc::new(fixt!(AgentPubKey));
 
@@ -437,7 +436,7 @@ async fn range_of_activities_to_integrate_for_single_agent(
     action_count: u32,
     expected_range: RangeInclusive<u32>,
 ) {
-    let db = test_in_mem_db(DbKindDht(Arc::new(DnaHash::from_raw_32(vec![0; 32]))));
+    let db = test_dht_db_with_id(0);
     let cache = DhtDbQueryCache::new(db.clone().into());
     let agent_key = Arc::new(fixt!(AgentPubKey));
 

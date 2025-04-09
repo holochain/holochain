@@ -132,7 +132,7 @@ pub fn insert_op_scratch(
             entry.clone(),
             action
                 .entry_hash()
-                .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?
+                .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?
                 .clone(),
         );
         scratch.add_entry(entry_hashed, chain_top_ordering);
@@ -234,7 +234,7 @@ pub fn insert_op_when(
             if let Some(entry) = op.entry().into_option() {
                 let entry_hash = action
                     .entry_hash()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 insert_entry(txn, entry_hash, entry)?;
             }
             let action_hashed = ActionHashed::from_content_sync(action);

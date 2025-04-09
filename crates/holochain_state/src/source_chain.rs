@@ -374,8 +374,8 @@ impl SourceChain {
 
                 if persisted_head != latest_head {
                     return Err(SourceChainError::HeadMoved(
-                        actions,
-                        entries,
+                        Box::new(actions),
+                        Box::new(entries),
                         persisted_head,
                         head_info,
                     ));
@@ -419,12 +419,12 @@ impl SourceChain {
                     )
                     .await?;
                     let rebased_actions =
-                        rebase_actions_on(&keystore, actions, new_head_info).await?;
+                        rebase_actions_on(&keystore, *actions, new_head_info).await?;
                     child_chain.scratch.apply(move |scratch| {
                         for action in rebased_actions {
                             scratch.add_action(action, ChainTopOrdering::Relaxed);
                         }
-                        for entry in entries {
+                        for entry in *entries {
                             scratch.add_entry(entry, ChainTopOrdering::Relaxed);
                         }
                     })?;
@@ -773,7 +773,7 @@ where
                 || query.entry_hashes.is_some()
                 || query.include_entries)
         {
-            return Err(SourceChainError::UnsupportedQuery(query));
+            return Err(SourceChainError::UnsupportedQuery(Box::new(query)));
         }
         let author = self.author.clone();
         let public_only = self.public_only;
@@ -1334,8 +1334,8 @@ async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
                     _ => vec![],
                 };
                 return Err(SourceChainError::HeadMoved(
-                    vec![action],
-                    entries,
+                    Box::new(vec![action]),
+                    Box::new(entries),
                     Some(prev_action),
                     Some(head_info),
                 ));
