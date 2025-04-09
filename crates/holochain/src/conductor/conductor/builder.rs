@@ -292,6 +292,7 @@ impl ConductorBuilder {
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             compat,
+            ..Default::default()
         };
 
         let holochain_p2p =
