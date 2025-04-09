@@ -54,6 +54,7 @@ pub struct ConductorBuilder {
 
 impl ConductorBuilder {
     /// Default ConductorBuilder.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         static CRYPTO: std::sync::Once = std::sync::Once::new();
         CRYPTO.call_once(|| {
@@ -291,7 +292,6 @@ impl ConductorBuilder {
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             compat,
-            ..Default::default()
         };
 
         let holochain_p2p =
