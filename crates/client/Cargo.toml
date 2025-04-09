@@ -3,8 +3,8 @@ name = "holochain_client"
 version = "0.7.0-rc.0"
 description = "A Rust client for the Holochain Conductor API"
 authors = [
-    "Holochain Core Dev Team <devcore@holochain.org>",
-    "Guillem Cordoba <guillem.cordoba@gmail.com>",
+  "Holochain Core Dev Team <devcore@holochain.org>",
+  "Guillem Cordoba <guillem.cordoba@gmail.com>",
 ]
 license = "MIT"
 edition = "2021"
@@ -19,7 +19,9 @@ anyhow = "1.0"
 async-trait = "0.1"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 event-emitter-rs = "0.1"
-holo_hash = { version = "0.5.0-rc.0", path = "../holo_hash", features = ["encoding"] }
+holo_hash = { version = "0.5.0-rc.0", path = "../holo_hash", features = [
+  "encoding",
+] }
 holochain_conductor_api = { version = "0.5.0-rc.1", path = "../holochain_conductor_api" }
 holochain_nonce = { version = "0.5.0-rc.0", path = "../holochain_nonce" }
 holochain_types = { version = "0.5.0-rc.1", path = "../holochain_types" }
@@ -37,7 +39,9 @@ tokio = { version = "1.36", features = ["rt"] }
 bytes = "1.10.1"
 fixt = "0.5.0-rc.0"
 futures = "0.3.31"
-holochain = { version = "0.5.0-rc.1", path = "../holochain", features = ["test_utils"] }
+holochain = { version = "0.5.0-rc.1", path = "../holochain", features = [
+  "test_utils",
+] }
 
 kitsune2_core = "0.1.1"
 serde_yaml = "0.9"
