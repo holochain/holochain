@@ -136,7 +136,6 @@ where
                 .ok_or_else(|| BundleError::BundledResourceMissing(path.clone()))?
                 .clone(),
             Location::Path(path) => crate::location::resolve_local(path).await?,
-            Location::Url(url) => crate::location::resolve_remote(url).await?,
         };
         Ok(bytes)
     }
@@ -220,7 +219,6 @@ impl<M: serde::de::DeserializeOwned> RawBundle<M> {
 #[cfg(test)]
 mod tests {
     use crate::error::MrBundleError;
-
     use super::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -241,9 +239,6 @@ mod tests {
             unimplemented!()
         }
     }
-
-    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-    struct Thing(u32);
 
     #[tokio::test]
     async fn bundle_validation() {

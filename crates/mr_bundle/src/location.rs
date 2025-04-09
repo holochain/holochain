@@ -12,16 +12,12 @@ use std::path::{Path, PathBuf};
 /// being flattened.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-#[allow(missing_docs)]
 pub enum Location {
     /// Expect file to be part of this bundle
     Bundled(PathBuf),
 
     /// Get file from local filesystem (not bundled)
     Path(PathBuf),
-
-    /// Get file from URL
-    Url(String),
 }
 
 impl Location {
@@ -43,34 +39,8 @@ impl Location {
     }
 }
 
-#[cfg(feature = "fuzzing")]
-impl proptest::arbitrary::Arbitrary for Location {
-    type Parameters = ();
-    type Strategy = proptest::strategy::BoxedStrategy<Self>;
-
-    // XXX: this is a bad arbitrary impl, could be derived automatically when
-    // https://github.com/proptest-rs/proptest/pull/362 lands
-    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-        use proptest::strategy::Strategy;
-
-        proptest::prelude::any::<String>()
-            .prop_map(|s| Self::Path(s.into()))
-            .boxed()
-    }
-}
-
 pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> {
     Ok(ffs::read(path).await?.into())
-}
-
-pub(crate) async fn resolve_remote(url: &str) -> MrBundleResult<ResourceBytes> {
-    Ok(reqwest::get(url)
-        .await?
-        .bytes()
-        .await?
-        .into_iter()
-        .collect::<Vec<_>>()
-        .into())
 }
 
 #[cfg(test)]
@@ -97,7 +67,7 @@ mod tests {
     /// celery:
     ///   - !bundled: b
     ///   - !path: p
-    /// url: "http://r.co"
+    /// path: "./my-path"
     /// ```
     #[test]
     fn location_flattening() {
@@ -105,7 +75,7 @@ mod tests {
 
         let tuna = TunaSalad {
             celery: vec![Location::Bundled("b".into()), Location::Path("p".into())],
-            mayo: Location::Url("http://r.co".into()),
+            mayo: Location::Path("./my-path".into()),
         };
         let val = serde_yaml::to_value(&tuna).unwrap();
         println!("yaml produced:\n{}", serde_yaml::to_string(&tuna).unwrap());
@@ -124,6 +94,6 @@ mod tests {
                 value: Value::from("p")
             }))
         );
-        assert_eq!(val["url"], Value::from("http://r.co"));
+        assert_eq!(val["path"], Value::from("./my-path"));
     }
 }
