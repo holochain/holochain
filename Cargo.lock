@@ -455,6 +455,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
 
 [[package]]
+name = "bincode"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.69.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1854,6 +1863,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-emitter-rs"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dccdd0a59457ba353cc44c26d431ca5089f2cf93035c780a1b3f2814a017ebd"
+dependencies = [
+ "bincode",
+ "lazy_static",
+ "serde",
+ "uuid 0.8.2",
+]
+
+[[package]]
 name = "event-listener"
 version = "5.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1928,6 +1949,23 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "fixt"
+version = "0.5.0-rc.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a7160144f252417c3b3c6dcd37c0d979ae8cb4aef505228b1d1b29cfb2f35b"
+dependencies = [
+ "holochain_serialized_bytes",
+ "lazy_static",
+ "parking_lot",
+ "paste",
+ "rand 0.8.5",
+ "rand_core 0.6.4",
+ "serde",
+ "strum 0.18.0",
+ "strum_macros 0.18.0",
+]
+
+[[package]]
+name = "fixt"
 version = "0.5.0"
 dependencies = [
  "holochain_serialized_bytes",
@@ -1945,7 +1983,7 @@ dependencies = [
 name = "fixt_test"
 version = "0.0.1"
 dependencies = [
- "fixt",
+ "fixt 0.5.0",
  "paste",
 ]
 
@@ -2395,7 +2433,7 @@ checksum = "7f4044c2cadf3d960fa91a7ef91590da202797fe82cf687b029235f98be5ff49"
 dependencies = [
  "r2d2",
  "rusqlite",
- "uuid",
+ "uuid 1.16.0",
 ]
 
 [[package]]
@@ -2451,7 +2489,7 @@ dependencies = [
 name = "hdi"
 version = "0.6.0"
 dependencies = [
- "fixt",
+ "fixt 0.5.0",
  "getrandom 0.2.15",
  "hdi",
  "hdk_derive",
@@ -2472,7 +2510,7 @@ dependencies = [
 name = "hdk"
 version = "0.5.0"
 dependencies = [
- "fixt",
+ "fixt 0.5.0",
  "getrandom 0.2.15",
  "hdi",
  "hdk_derive",
@@ -2575,7 +2613,7 @@ dependencies = [
  "blake2b_simd",
  "bytes",
  "derive_more 0.99.19",
- "fixt",
+ "fixt 0.5.0",
  "futures",
  "holochain_serialized_bytes",
  "holochain_util",
@@ -2616,7 +2654,7 @@ dependencies = [
  "ed25519-dalek",
  "either",
  "fallible-iterator",
- "fixt",
+ "fixt 0.5.0",
  "futures",
  "get_if_addrs",
  "getrandom 0.2.15",
@@ -2704,7 +2742,7 @@ dependencies = [
  "unwrap_to",
  "url",
  "url2",
- "uuid",
+ "uuid 1.16.0",
  "wasmer",
  "wasmer-middlewares",
 ]
@@ -2714,7 +2752,7 @@ name = "holochain_cascade"
 version = "0.5.0"
 dependencies = [
  "async-trait",
- "fixt",
+ "fixt 0.5.0",
  "futures",
  "holo_hash",
  "holochain_cascade",
@@ -2747,7 +2785,7 @@ version = "0.2.0"
 dependencies = [
  "async-trait",
  "derive_more 0.99.19",
- "fixt",
+ "fixt 0.5.0",
  "futures",
  "getrandom 0.2.15",
  "holo_hash",
@@ -2843,6 +2881,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_client"
+version = "0.7.0-rc.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "ed25519-dalek",
+ "event-emitter-rs",
+ "fixt 0.5.0-rc.0",
+ "futures",
+ "holo_hash",
+ "holochain",
+ "holochain_conductor_api",
+ "holochain_nonce",
+ "holochain_types",
+ "holochain_websocket",
+ "holochain_zome_types",
+ "kitsune2_api",
+ "kitsune2_core",
+ "lair_keystore_api",
+ "parking_lot",
+ "rand 0.8.5",
+ "serde",
+ "serde_yaml",
+ "thiserror 2.0.12",
+ "tokio",
+]
+
+[[package]]
 name = "holochain_conductor_api"
 version = "0.5.0"
 dependencies = [
@@ -2924,7 +2991,7 @@ name = "holochain_integrity_types"
 version = "0.5.0"
 dependencies = [
  "derive_builder",
- "fixt",
+ "fixt 0.5.0",
  "holo_hash",
  "holochain_integrity_types",
  "holochain_secure_primitive",
@@ -3006,7 +3073,7 @@ dependencies = [
  "blake2b_simd",
  "bytes",
  "derive_more 0.99.19",
- "fixt",
+ "fixt 0.5.0",
  "futures",
  "holo_hash",
  "holochain_chc",
@@ -3133,7 +3200,7 @@ dependencies = [
  "cron",
  "derive_more 2.0.1",
  "fallible-iterator",
- "fixt",
+ "fixt 0.5.0",
  "holo_hash",
  "holochain_chc",
  "holochain_keystore",
@@ -3223,7 +3290,7 @@ dependencies = [
  "contrafact",
  "derive_builder",
  "derive_more 0.99.19",
- "fixt",
+ "fixt 0.5.0",
  "flate2",
  "futures",
  "getrandom 0.2.15",
@@ -3370,7 +3437,7 @@ dependencies = [
  "contrafact",
  "derive_builder",
  "derive_more 0.99.19",
- "fixt",
+ "fixt 0.5.0",
  "holo_hash",
  "holochain_integrity_types",
  "holochain_nonce",
@@ -3497,7 +3564,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "toml",
- "uuid",
+ "uuid 1.16.0",
 ]
 
 [[package]]
@@ -4082,7 +4149,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid",
+ "uuid 1.16.0",
 ]
 
 [[package]]
@@ -6033,7 +6100,7 @@ dependencies = [
  "rend",
  "rkyv_derive",
  "tinyvec",
- "uuid",
+ "uuid 1.16.0",
 ]
 
 [[package]]
@@ -7896,6 +7963,15 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom 0.2.15",
+]
 
 [[package]]
 name = "uuid"
