@@ -209,7 +209,7 @@ fn default_mem_bootstrap() -> bool {
 
 /// All the network config information for the conductor.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub struct NetworkConfig {
     /// The Kitsune2 bootstrap server to use for WAN discovery.
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
