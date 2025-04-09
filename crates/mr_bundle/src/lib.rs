@@ -12,7 +12,7 @@
 //! Unpacking is done by specifying a target directory and creating a new file
 //! for each resource at a relative path specified by the Manifest.
 
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 mod bundle;
 mod encoding;
