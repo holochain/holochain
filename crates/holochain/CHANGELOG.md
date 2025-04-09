@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_minor dev
+default_semver_increment_mode: !pre_minor rc
 ---
 # Changelog
 
@@ -7,18 +7,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.5.0-rc.1
+
+- ***BREAKING*** Kitsune2 Integrated: Holochain has now transitioned from the legacy Kitsune networking implementation, to the new [Kitsune2](https://crates.io/crates/kitsune2). [\#4791](https://github.com/holochain/holochain/pull/4791)
+  - breaking protocol changes
+  - differences in the networking section of the conductor config
+  - changes to agent info encoding
+  - transition from hc run-local-services to kitsune2 bootstrap server
+  - switch from go pion to libdatachannel as the WebRTC backend. Holochain no longer depends on the go compiler, but has some additional c++ toolchain dependencies (such as cmake).
+- Set crypto provider for TLS connections in Holochain binary. This used to produce error when running the binary.
+
+## 0.5.0-rc.0
+
+- Moves the `lineage` field of the dna manifest behind an `unstable-migration` feature.
+- The Admin Api call `GetCompatibleCells` is now only available with the `unstable-migration` feature.
+
+## 0.5.0-dev.22
+
 - Update to Lair 0.6.0
-- Changed the response format for `DumpNetworkMetrics` and `DumpNetworkStats` to provide information from Kitsune2. #4816
-- Added a new option to the `DumpNetworkMetrics` on the admin interface. That is `include_dht_summary` which will return
-  a summary of the DHT state. #4816
-- Added `DumpNetworkMetrics` and `DumpNetworkStats` to the app interface. Please see the Rust docs for usage. #4816
-- Removed `NetworkInfo` from the app interface, please use `DumpNetworkMetrics` or `DumpNetworkStats` instead. #4816
-- Update `hcterm` to work with bootstrap2 bootstrap servers. By default, it uses `https://dev-test-bootstrap2.holochain.org` as the bootstrap2 server. #4767
-- Update `hc-service-check` to check bootstrap2 servers. By default, it uses `https://dev-test-bootstrap2.holochain.org` as the bootstrap2 server. #4767
+- Changed the response format for `DumpNetworkMetrics` and `DumpNetworkStats` to provide information from Kitsune2. \#4816
+- Added a new option to the `DumpNetworkMetrics` on the admin interface. That is `include_dht_summary` which will return a summary of the DHT state. \#4816
+- Added `DumpNetworkMetrics` and `DumpNetworkStats` to the app interface. Please see the Rust docs for usage. \#4816
+- Removed `NetworkInfo` from the app interface, please use `DumpNetworkMetrics` or `DumpNetworkStats` instead. \#4816
+- Update `hcterm` to work with bootstrap2 bootstrap servers. By default, it uses `https://dev-test-bootstrap2.holochain.org` as the bootstrap2 server. \#4767
+- Update `hc-service-check` to check bootstrap2 servers. By default, it uses `https://dev-test-bootstrap2.holochain.org` as the bootstrap2 server. \#4767
 - Remove `hc-run-local-services`, please use `kitsune2-bootstrap-srv` instead.
-- Handle empty databases in `StorageInfo` request. Previously, if the database was empty, the request would return an error. #4756
+- Handle empty databases in `StorageInfo` request. Previously, if the database was empty, the request would return an error. \#4756
 - Add `DnaHash` to the `DnaStorageInfo` which is part of the `StorageInfo` response.
-- The `agent_latest_pubkey` field of `AgentInfo` is put behind the `unstable-dpki` feature flag ([#4815](https://github.com/holochain/holochain/pull/4815)).
+- The `agent_latest_pubkey` field of `AgentInfo` is put behind the `unstable-dpki` feature flag ([\#4815](https://github.com/holochain/holochain/pull/4815)).
 
 ## 0.5.0-dev.21
 

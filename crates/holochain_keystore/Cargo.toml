@@ -1,6 +1,6 @@
 [package]
 name = "holochain_keystore"
-version = "0.5.0-dev.20"
+version = "0.5.0-rc.1"
 description = "keystore for libsodium keypairs"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -15,14 +15,14 @@ edition = "2021"
 base64 = "0.22"
 derive_more = "0.99"
 futures = "0.3"
-holo_hash = { version = "^0.5.0-dev.7", path = "../holo_hash", features = [
+holo_hash = { version = "^0.5.0-rc.0", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_serialized_bytes = "=0.0.55"
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.0-dev.17" }
-holochain_secure_primitive = { version = "^0.5.0-dev.1", path = "../holochain_secure_primitive" }
-holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util" }
-lair_keystore = { version = "0.6.0", default-features = false }
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.0-rc.0" }
+holochain_secure_primitive = { version = "^0.5.0-rc.0", path = "../holochain_secure_primitive" }
+holochain_util = { version = "^0.5.0-rc.0", path = "../holochain_util" }
+lair_keystore = { version = "0.6.1", default-features = false }
 must_future = "0.1.2"
 nanoid = "0.4"
 one_err = "0.0.8"
@@ -31,7 +31,7 @@ schemars = "0.8.21"
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 shrinkwraprs = "0.3"
-sodoken = "=0.0.904-alpha"
+sodoken = "0.1.0"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"

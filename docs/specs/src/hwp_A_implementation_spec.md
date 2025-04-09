@@ -2543,10 +2543,6 @@ struct DnaManifestV1 {
     name: String,
     integrity: IntegrityManifest,
     coordinator: CoordinatorManifest,
-    // A list of ancestors of this DNA, used for satisfying dependencies on
-    // prior versions of this DNA. The application's Coordinator interface is
-    // expected to be compatible across the list of ancestors.
-    lineage: Vec<DnaHashB64>,
 }
 
 struct IntegrityManifest {
@@ -2784,7 +2780,6 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             modifiers: DnaModifiers,
             integrity_zomes: Vec<ZomeName>,
             coordinator_zomes: Vec<ZomeName>,
-            lineage: HashSet<DnaHash>,
         }
         ```
 
@@ -3145,8 +3140,6 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
 * `RevokeAppAuthenticationToken(AppAuthenticationToken) -> AppAuthenticationTokenRevoked`: Revoke a previously issued app interface authentication token.
     * **Notes**: Implementations MUST reject all WebSocket connection attempts using this token after the call has completed.
 
-* `GetCompatibleCells(DnaHash) -> CompatibleCellsReturned(BTreeSet<(InstalledAppId, BTreeSet<CellId>)>)`: Find installed cells which use a DNA that is forward-compatible with the given DNA hash, as defined in the contents of the `lineage` field in the DNA manifest.
-    * **Notes**: Implementations SHOULD search DNAs installed by all applications, as well as DNAs installed ad-hoc via `RegisterDna`.
 
 #### App API
 

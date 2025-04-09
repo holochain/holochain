@@ -42,6 +42,10 @@ pub struct ConductorBuilder {
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
 
+    /// By default the test builder also uses a test kitsune2 builder.
+    /// You can override that by setting this to true.
+    pub test_builder_uses_production_k2_builder: bool,
+
     /// WARNING!! DANGER!! This exposes your database decryption secrets!
     /// Print the database decryption secrets to stderr.
     /// With these PRAGMA commands, you'll be able to run sqlcipher
@@ -81,6 +85,13 @@ impl ConductorBuilder {
     /// directly to manipulate holochain databases.
     pub fn danger_print_db_secrets(mut self, v: bool) -> Self {
         self.danger_print_db_secrets = v;
+        self
+    }
+
+    /// By default the test builder also uses a test kitsune2 builder.
+    /// You can override that by setting this to true.
+    pub fn test_builder_uses_production_k2_builder(mut self, v: bool) -> Self {
+        self.test_builder_uses_production_k2_builder = v;
         self
     }
 
@@ -523,7 +534,7 @@ impl ConductorBuilder {
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             compat,
-            k2_test_builder: true,
+            k2_test_builder: !builder.test_builder_uses_production_k2_builder,
             #[cfg(feature = "test_utils")]
             disable_bootstrap: config.network.disable_bootstrap,
             #[cfg(feature = "test_utils")]

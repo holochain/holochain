@@ -40,10 +40,10 @@ impl RunOpts {
 }
 
 /// The default configured signal server url.
-pub const DEF_SIGNAL_URL: &str = "wss://sbd-0.main.infra.holo.host";
+pub const DEF_SIGNAL_URL: &str = "wss://dev-test-bootstrap2.holochain.org ";
 
 /// The default configured bootstrap server url.
-pub const DEF_BOOTSTRAP_URL: &str = "https://bootstrap.holo.host";
+pub const DEF_BOOTSTRAP_URL: &str = "https://dev-test-bootstrap2.holochain.org";
 
 /// hc_demo_cli run command.
 #[derive(Debug, clap::Subcommand, serde::Serialize, serde::Deserialize)]
@@ -90,7 +90,17 @@ pub async fn run_demo(opts: RunOpts) {
             signal_url,
             bootstrap_url,
         } => {
-            run(dna, outbox, inbox, signal_url, bootstrap_url, None, None).await;
+            run(
+                dna,
+                outbox,
+                inbox,
+                signal_url,
+                bootstrap_url,
+                None,
+                None,
+                true,
+            )
+            .await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
@@ -121,6 +131,7 @@ pub async fn run_test_demo(
                 bootstrap_url,
                 Some(ready),
                 Some(rendezvous),
+                false,
             )
             .await;
         }
@@ -191,6 +202,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run(
     dna: std::path::PathBuf,
     outbox: std::path::PathBuf,
@@ -199,6 +211,7 @@ async fn run(
     bootstrap_url: String,
     ready: Option<tokio::sync::oneshot::Sender<()>>,
     rendezvous: Option<holochain::sweettest::DynSweetRendezvous>,
+    prod: bool,
 ) {
     let _ = tokio::fs::create_dir_all(&outbox).await;
     let _ = tokio::fs::create_dir_all(&inbox).await;
@@ -256,6 +269,7 @@ async fn run(
         Some(keystore),
         Some(rendezvous),
         true,
+        prod,
     )
     .await;
 
@@ -282,7 +296,24 @@ async fn run(
         let _ = ready.send(());
     }
 
+    let mut last_peer_dump = std::time::Instant::now();
+
     loop {
+        if last_peer_dump.elapsed() > std::time::Duration::from_secs(60) {
+            let known_peers = handle
+                .holochain_p2p()
+                .peer_store(cell.dna_hash().clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap();
+
+            println!("#KNOWN_PEERS#{known_peers:?}#");
+
+            last_peer_dump = std::time::Instant::now();
+        }
+
         let mut dir = tokio::fs::read_dir(&outbox).await.unwrap();
 
         while let Ok(Some(i)) = dir.next_entry().await {

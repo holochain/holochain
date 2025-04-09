@@ -1,11 +1,9 @@
-use std::collections::{BTreeSet, HashMap};
-
+use crate::{AppInfo, FullStateDump, RevokeAgentKeyPayload, StorageInfo};
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
-
-use crate::{AppInfo, FullStateDump, RevokeAgentKeyPayload, StorageInfo};
+use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an admin interface.
 ///
@@ -426,6 +424,7 @@ pub enum AdminRequest {
 
     /// Find installed cells which use a DNA that's forward-compatible with the given DNA hash.
     /// Namely, this finds cells with DNAs whose manifest lists the given DNA hash in its `lineage` field.
+    #[cfg(feature = "unstable-migration")]
     GetCompatibleCells(DnaHash),
 }
 
@@ -584,10 +583,13 @@ pub enum AdminResponse {
     AppAuthenticationTokenRevoked,
 
     /// The successful response to an [`AdminRequest::GetCompatibleCells`].
+    #[cfg(feature = "unstable-migration")]
     CompatibleCells(CompatibleCells),
 }
 
-pub type CompatibleCells = BTreeSet<(InstalledAppId, BTreeSet<CellId>)>;
+#[cfg(feature = "unstable-migration")]
+pub type CompatibleCells =
+    std::collections::BTreeSet<(InstalledAppId, std::collections::BTreeSet<CellId>)>;
 
 /// Error type that goes over the websocket wire.
 /// This intends to be application developer facing

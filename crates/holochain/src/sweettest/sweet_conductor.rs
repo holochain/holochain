@@ -24,6 +24,7 @@ use holochain_websocket::*;
 use kitsune2_api::DhtArc;
 use nanoid::nanoid;
 use rand::Rng;
+use rusqlite::named_params;
 use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 use std::path::Path;
@@ -137,7 +138,7 @@ impl SweetConductor {
         C: Into<SweetConductorConfig>,
         R: Into<DynSweetRendezvous> + Clone,
     {
-        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false).await
+        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false, false).await
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
@@ -147,6 +148,7 @@ impl SweetConductor {
         keystore: Option<MetaLairClient>,
         rendezvous: Option<R>,
         with_metrics: bool,
+        test_builder_uses_production_k2_builder: bool,
     ) -> SweetConductor
     where
         C: Into<SweetConductorConfig>,
@@ -208,7 +210,13 @@ impl SweetConductor {
 
         let keystore = keystore.unwrap_or_else(holochain_keystore::test_keystore);
 
-        let handle = Self::handle_from_existing(keystore, &config, &[]).await;
+        let handle = Self::handle_from_existing(
+            keystore,
+            &config,
+            &[],
+            test_builder_uses_production_k2_builder,
+        )
+        .await;
 
         tracing::info!("Starting with config: {:?}", config);
 
@@ -244,6 +252,7 @@ impl SweetConductor {
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
+        test_builder_uses_production_k2_builder: bool,
     ) -> ConductorHandle {
         NUM_CREATED.fetch_add(1, Ordering::SeqCst);
 
@@ -251,6 +260,7 @@ impl SweetConductor {
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
+            .test_builder_uses_production_k2_builder(test_builder_uses_production_k2_builder)
             .test(extra_dnas)
             .await
             .unwrap()
@@ -662,6 +672,7 @@ impl SweetConductor {
                     self.keystore.clone(),
                     &self.config,
                     self.dnas.as_slice(),
+                    false,
                 )
                 .await,
             ));
@@ -920,6 +931,33 @@ impl SweetConductor {
                 .query_row(
                     "SELECT NOT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
                     [],
+                    |row| row.get::<_, bool>(0),
+                )
+                .unwrap();
+            Ok(all_integrated)
+        })
+    }
+
+    /// Check if all ops of a specific author have been integrated in the DHT database.
+    pub fn all_ops_of_author_integrated(
+        &self,
+        dna_hash: &DnaHash,
+        author: &AgentPubKey,
+    ) -> ConductorApiResult<bool> {
+        let dht_db = self.get_dht_db(dna_hash)?;
+        let author = author.clone();
+        dht_db.test_read(move |txn| {
+            let all_integrated = txn
+                .query_row(
+                    "SELECT NOT EXISTS(
+                            SELECT 1
+                            FROM DhtOp
+                            JOIN Action
+                            ON Action.hash = DhtOp.action_hash
+                            WHERE Action.author = :author
+                            AND DhtOp.when_integrated IS NULL
+                        )",
+                    named_params! {":author": author},
                     |row| row.get::<_, bool>(0),
                 )
                 .unwrap();

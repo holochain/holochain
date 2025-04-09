@@ -1766,10 +1766,6 @@ mod app_impls {
 
 /// Methods related to cell access
 mod cell_impls {
-    use std::collections::BTreeSet;
-
-    use holochain_conductor_api::CompatibleCells;
-
     use super::*;
 
     impl Conductor {
@@ -1812,11 +1808,13 @@ mod cell_impls {
         /// with the DNAs specified in its lineage. If the DnaHash parameter is contained within the lineage of any
         /// installed cell's DNA, that cell will be returned in the result set, since it has declared
         /// itself forward-compatible.
+        #[cfg(feature = "unstable-migration")]
         pub async fn cells_by_dna_lineage(
             &self,
             dna_hash: &DnaHash,
-        ) -> ConductorResult<CompatibleCells> {
+        ) -> ConductorResult<holochain_conductor_api::CompatibleCells> {
             // TODO: OPTIMIZE: cache the DNA lineages
+            use std::collections::BTreeSet;
             Ok(self
                 .get_state()
                 .await?

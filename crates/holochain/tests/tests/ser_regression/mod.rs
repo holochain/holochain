@@ -54,6 +54,7 @@ async fn ser_regression_test() {
             coordinator_zomes: vec![TestZomes::from(TestWasm::SerRegression)
                 .coordinator
                 .into_inner()],
+            #[cfg(feature = "unstable-migration")]
             lineage: HashSet::new(),
         },
         <Vec<DnaWasm>>::from(TestWasm::SerRegression),

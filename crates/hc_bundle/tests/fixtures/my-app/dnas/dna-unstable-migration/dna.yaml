@@ -1,6 +1,6 @@
 ---
 manifest_version: "1"
-name: multi integrity dna
+name: multi integrity dna unstable-migration
 integrity:
   network_seed: 00000000-0000-0000-0000-000000000000
   properties: ~
@@ -20,3 +20,6 @@ coordinator:
       dependencies:
         - name: zome1
         - name: zome2
+lineage:
+  - uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm
+  - uhC0k39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH

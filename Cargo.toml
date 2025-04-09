@@ -107,12 +107,6 @@ lto = true
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
-#ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
-#lair_keystore = { path = "../lair/crates/lair_keystore" }
-#lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
-#lair_keystore_client_0_0 = { path = "../lair_0_0/crates/lair_keystore_client", package = "lair_keystore_client" }
-#lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "secretbox" }
-#lair_keystore_api_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_api" }
-#lair_keystore_client_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_client" }
+# lair_keystore = { path = "../lair/crates/lair_keystore" }
 # r2d2_sqlite = { path = "../r2d2-sqlite" }

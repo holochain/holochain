@@ -12,5 +12,12 @@ fn init_tracing() {
 async fn main() {
     init_tracing();
 
+    if rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .is_err()
+    {
+        tracing::error!("could not set cyrpto provider for tls");
+    }
+
     hc_demo_cli::run_demo(hc_demo_cli::RunOpts::parse()).await;
 }

@@ -5,10 +5,7 @@
   "description": "Holochain DNA manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "manifest_version",
-    "name"
-  ],
+  "required": ["manifest_version", "name"],
   "properties": {
     "manifest_version": {
       "type": "string",
@@ -24,16 +21,10 @@
       "additionalProperties": false,
       "properties": {
         "network_seed": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "properties": {
-          "type": [
-            "object",
-            "null"
-          ],
+          "type": ["object", "null"],
           "additionalProperties": true
         },
         "zomes": {
@@ -48,9 +39,7 @@
       "type": "object",
       "description": "Coordinator zomes to install with this DNA",
       "additionalProperties": false,
-      "required": [
-        "zomes"
-      ],
+      "required": ["zomes"],
       "properties": {
         "zomes": {
           "type": "array",
@@ -59,15 +48,21 @@
           }
         }
       }
+    },
+    "lineage": {
+      "type": "array",
+      "description": "List of DNA hashes of previous versions of this DNA which declares forward and backward compatibility between versions",
+      "items": {
+        "type": "string",
+        "description": "A DNA hash of a previous version"
+      }
     }
   },
   "definitions": {
     "ZomeManifest": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "properties": {
         "name": {
           "type": "string",
@@ -95,9 +90,7 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": [
-              "name"
-            ],
+            "required": ["name"],
             "properties": {
               "name": {
                 "type": "string"

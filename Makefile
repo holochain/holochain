@@ -6,7 +6,7 @@ F=RUSTFLAGS="-Dwarnings"
 
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
 DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
-UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-countersigning,$(DEFAULT_FEATURES)
+UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-countersigning,unstable-migration,$(DEFAULT_FEATURES)
 
 # TODO - removed `unstable-dpki` from the UNSTABLE_FEATURES list
 #        this is temporary until dpki dep is rebuilt without origin_time

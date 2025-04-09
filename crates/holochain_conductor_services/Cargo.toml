@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_services"
-version = "0.4.0-dev.21"
+version = "0.4.0-rc.1"
 description = "Holochain Conductor Services types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -24,15 +24,15 @@ thiserror = "1.0"
 tokio = "1"
 tracing = "0.1"
 
-hc_deepkey_sdk = { version = "^0.8.0-dev.19", path = "../hc_deepkey_sdk" }
-holochain_keystore = { version = "^0.5.0-dev.20", path = "../holochain_keystore" }
-holochain_types = { version = "^0.5.0-dev.21", path = "../holochain_types" }
-holochain_util = { version = "^0.5.0-dev.1", path = "../holochain_util", features = [
+hc_deepkey_sdk = { version = "^0.8.0-rc.0", path = "../hc_deepkey_sdk" }
+holochain_keystore = { version = "^0.5.0-rc.1", path = "../holochain_keystore" }
+holochain_types = { version = "^0.5.0-rc.1", path = "../holochain_types" }
+holochain_util = { version = "^0.5.0-rc.0", path = "../holochain_util", features = [
   "time",
 ] }
 
 [dev-dependencies]
-hdk = { version = "^0.5.0-dev.19", path = "../hdk" }
+hdk = { version = "^0.5.0-rc.0", path = "../hdk" }
 
 [features]
 test_utils = ["fuzzing"]

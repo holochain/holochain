@@ -347,7 +347,13 @@ impl HcDnaBundleSubcommand {
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
             Self::Schema => {
+                #[cfg(not(feature = "unstable-migration"))]
                 println!("{}", include_str!("../schema/dna-manifest.schema.json"));
+                #[cfg(feature = "unstable-migration")]
+                println!(
+                    "{}",
+                    include_str!("../schema/dna-manifest-unstable-migration.schema.json")
+                );
             }
             Self::Hash { path } => {
                 let bundle = DnaBundle::read_from_file(path.as_path()).await?;
