@@ -29,7 +29,7 @@ use std::{collections::HashMap, path::PathBuf};
 pub type InstalledAppId = String;
 
 /// The source of the DNA to be installed, either as binary data, or from a path
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum DnaSource {
     /// register the dna loaded from a bundle file on disk
@@ -41,7 +41,7 @@ pub enum DnaSource {
 }
 
 /// The source of coordinators to be installed, either as binary data, or from a path
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CoordinatorSource {
     /// Coordinators loaded from a bundle file on disk
@@ -51,7 +51,7 @@ pub enum CoordinatorSource {
 }
 
 /// The instructions on how to get the DNA to be registered
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
     /// Modifier overrides
     #[serde(default)]
@@ -60,7 +60,7 @@ pub struct RegisterDnaPayload {
     pub source: DnaSource,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 /// The instructions on how to update coordinators for a dna file.
 pub struct UpdateCoordinatorsPayload {
     /// The hash of the dna to swap coordinators for.
@@ -105,7 +105,7 @@ pub struct DeleteCloneCellPayload {
 }
 
 /// All the information necessary to install an app
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppPayload {
     /// Where to obtain the AppBundle, which contains the app manifest and DNA bundles
     /// to be installed. This is the main payload of app installation.
@@ -181,7 +181,7 @@ pub type RoleSettingsMap = HashMap<RoleName, RoleSettings>;
 pub type RoleSettingsMapYaml = HashMap<RoleName, RoleSettingsYaml>;
 
 /// Settings for a Role that may be passed on installation of an app
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum RoleSettings {
     /// If the role has the UseExisting strategy defined in the app manifest
@@ -229,7 +229,7 @@ impl From<RoleSettingsYaml> for RoleSettings {
 }
 
 /// A version of RoleSettings that serializes to YAML without the content attribute
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RoleSettingsYaml {
     /// If the role has the UseExisting strategy defined in the app manifest
@@ -253,7 +253,7 @@ pub enum RoleSettingsYaml {
 }
 
 /// The possible locations of an AppBundle
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppBundleSource {
     /// The raw bytes of an app bundle

@@ -13,6 +13,7 @@ mod test;
 
 /// A bundle of Wasm zomes, respresented as a file.
 #[derive(
+    Clone,
     Debug,
     PartialEq,
     Eq,
