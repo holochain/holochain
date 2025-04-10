@@ -3259,7 +3259,6 @@ name = "holochain_util"
 version = "0.5.0-rc.0"
 dependencies = [
  "backtrace",
- "bytes",
  "cfg-if 1.0.0",
  "colored",
  "dunce",
