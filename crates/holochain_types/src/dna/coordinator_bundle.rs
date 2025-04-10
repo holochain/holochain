@@ -9,6 +9,7 @@ use super::hash_bytes;
 use super::CoordinatorManifest;
 
 #[derive(
+    Clone,
     Debug,
     PartialEq,
     Eq,
