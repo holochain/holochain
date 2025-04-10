@@ -169,7 +169,7 @@ where
 
     /// An arbitrary and opaque encoding of the bundle data into a byte array
     pub fn encode(&self) -> MrBundleResult<bytes::Bytes> {
-        Ok(crate::encode(self)?.into())
+        crate::encode(self)
     }
 
     /// Decode bytes produced by [`encode`](Bundle::encode)
