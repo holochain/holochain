@@ -51,9 +51,5 @@ default = ["lair_signing", "wasmer_sys"]
 
 lair_signing = ["dep:lair_keystore_api"]
 
-wasmer_sys = [
-  "holochain/wasmer_sys"
-]
-wasmer_wamr = [
-  "holochain/wasmer_wamr"
-]
+wasmer_sys = ["holochain/wasmer_sys"]
+wasmer_wamr = ["holochain/wasmer_wamr"]
