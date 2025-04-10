@@ -39,14 +39,21 @@ tokio = { version = "1.36", features = ["rt"] }
 bytes = "1.10.1"
 fixt = { version = "0.5.0-rc.0", path = "../fixt" }
 futures = "0.3.31"
-holochain = { version = "0.5.0-rc.1", path = "../holochain", features = [
-  "test_utils",
+holochain = { version = "0.5.0-rc.1", path = "../holochain", default-features = false, features = [
+  "sweettest",
 ] }
 
 kitsune2_core = "0.1.1"
 serde_yaml = "0.9"
 
 [features]
-default = ["lair_signing"]
+default = ["lair_signing", "wasmer_sys"]
 
 lair_signing = ["dep:lair_keystore_api"]
+
+wasmer_sys = [
+  "holochain/wasmer_sys"
+]
+wasmer_wamr = [
+  "holochain/wasmer_wamr"
+]
