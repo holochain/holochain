@@ -1,6 +1,6 @@
 [package]
 name = "holochain_cli_sandbox"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_sandbox"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
@@ -30,23 +30,23 @@ chrono = { version = "0.4.22", default-features = false, features = [
 ] }
 clap = { version = "4.0", features = ["derive", "env"] }
 futures = "0.3"
-holo_hash = { version = "^0.5.0", path = "../holo_hash", features = [
+holo_hash = { version = "^0.6.0-dev.0", path = "../holo_hash", features = [
   "kitsune2",
 ] }
-holochain_chc = { version = "^0.2.0", path = "../holochain_chc", optional = true }
-holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.5.0", features = [
+holochain_chc = { version = "^0.3.0-dev.0", path = "../holochain_chc", optional = true }
+holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.6.0-dev.0", features = [
   "sqlite",
 ] }
-holochain_types = { path = "../holochain_types", version = "^0.5.0", features = [
+holochain_types = { path = "../holochain_types", version = "^0.6.0-dev.0", features = [
   "sqlite",
 ] }
-holochain_conductor_config = { version = "^0.5.0", path = "../holochain_conductor_config" }
-holochain_websocket = { path = "../holochain_websocket", version = "^0.5.0" }
-holochain_util = { version = "^0.5.0", path = "../holochain_util", features = [
+holochain_conductor_config = { version = "^0.6.0-dev.0", path = "../holochain_conductor_config" }
+holochain_websocket = { path = "../holochain_websocket", version = "^0.6.0-dev.0"}
+holochain_util = { version = "^0.6.0-dev.0", path = "../holochain_util", features = [
   "pw",
 ] }
-holochain_nonce = { version = "^0.5.0", path = "../holochain_nonce" }
-holochain_trace = { version = "^0.5.0", path = "../holochain_trace" }
+holochain_nonce = { version = "^0.6.0-dev.0", path = "../holochain_nonce" }
+holochain_trace = { version = "^0.6.0-dev.0", path = "../holochain_trace" }
 kitsune2_api = "0.1.1"
 kitsune2_core = "0.1.1"
 nanoid = "0.4"
