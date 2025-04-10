@@ -130,11 +130,11 @@ where
     /// necessary
     pub async fn resolve(&self, location: &Location) -> MrBundleResult<ResourceBytes> {
         let bytes = match &location.normalize(self.root_dir.as_ref())? {
-            Location::Bundled(path) => 
-                self.resources
-                    .get(path)
-                    .ok_or_else(|| BundleError::BundledResourceMissing(path.clone()))?
-                    .clone(),
+            Location::Bundled(path) => self
+                .resources
+                .get(path)
+                .ok_or_else(|| BundleError::BundledResourceMissing(path.clone()))?
+                .clone(),
             Location::Path(path) => crate::location::resolve_local(path).await?,
             Location::Url(url) => crate::location::resolve_remote(url).await?,
         };

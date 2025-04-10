@@ -4,16 +4,16 @@ use super::*;
 async fn test_update_coordinators() {
     let dna_wasms = vec![
         DnaWasm {
-            code: vec![0].into()
+            code: vec![0].into(),
         },
         DnaWasm {
-            code: vec![1].into()
+            code: vec![1].into(),
         },
         DnaWasm {
-            code: vec![2].into()
+            code: vec![2].into(),
         },
         DnaWasm {
-            code: vec![3].into()
+            code: vec![3].into(),
         },
     ];
     let init_integrity = vec![
@@ -58,7 +58,7 @@ async fn test_update_coordinators() {
 
     // Replace coordinator "c".
     let new_dna_wasms = vec![DnaWasm {
-        code: vec![4].into()
+        code: vec![4].into(),
     }];
     let new_coordinators = vec![(
         "c".into(),
@@ -257,7 +257,7 @@ async fn test_update_coordinators_checks_deps() {
 
     // Replace coordinator "c" with coordinator that has a dangling reference.
     let new_dna_wasms = vec![DnaWasm {
-        code: vec![4].into()
+        code: vec![4].into(),
     }];
     let new_coordinators = vec![(
         "c".into(),

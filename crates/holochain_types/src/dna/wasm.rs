@@ -15,7 +15,7 @@ use tracing::*;
 #[derive(Serialize, Deserialize, Clone, Eq)]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
-    pub code: bytes::Bytes
+    pub code: bytes::Bytes,
 }
 
 /// A DnaWasm paired with its WasmHash
@@ -55,7 +55,7 @@ impl TryFrom<SerializedBytes> for DnaWasm {
     type Error = SerializedBytesError;
     fn try_from(serialized_bytes: SerializedBytes) -> Result<Self, Self::Error> {
         Ok(DnaWasm {
-            code: bytes::Bytes::from_owner(serialized_bytes.bytes().to_owned())
+            code: bytes::Bytes::from_owner(serialized_bytes.bytes().to_owned()),
         })
     }
 }
@@ -68,7 +68,7 @@ impl DnaWasm {
             Backtrace::new()
         );
         DnaWasm {
-            code: bytes::Bytes::new()
+            code: bytes::Bytes::new(),
         }
     }
 
@@ -98,9 +98,7 @@ impl Hash for DnaWasm {
 
 impl From<bytes::Bytes> for DnaWasm {
     fn from(value: bytes::Bytes) -> Self {
-        Self {
-            code: value,
-        }
+        Self { code: value }
     }
 }
 

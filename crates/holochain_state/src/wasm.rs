@@ -23,10 +23,7 @@ pub fn get(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<Option<Dn
         )
         .optional()?;
     match item {
-        Some((hash, wasm)) => Ok(Some(DnaWasmHashed::with_pre_hashed(
-            wasm.into(),
-            hash,
-        ))),
+        Some((hash, wasm)) => Ok(Some(DnaWasmHashed::with_pre_hashed(wasm.into(), hash))),
         None => Ok(None),
     }
 }

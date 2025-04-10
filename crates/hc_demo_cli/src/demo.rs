@@ -150,7 +150,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     .unwrap();
 
     let i_wasm = DnaWasmHashed::from_content(DnaWasm {
-        code: i_wasm.into()
+        code: i_wasm.into(),
     })
     .await;
     let i_zome = IntegrityZomeDef::from(ZomeDef::Wasm(WasmZome::new(i_wasm.hash.clone())));
@@ -163,7 +163,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     .unwrap();
 
     let c_wasm = DnaWasmHashed::from_content(DnaWasm {
-        code: c_wasm.into()
+        code: c_wasm.into(),
     })
     .await;
     let c_zome = CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome::new(c_wasm.hash.clone())));
