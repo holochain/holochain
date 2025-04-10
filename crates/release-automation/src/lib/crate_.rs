@@ -466,6 +466,7 @@ pub fn apply_dev_vesrions_to_selection<'a>(
             continue;
         }
 
+        info!("Increment semver for {}", crt.name());
         increment_semver(&mut version, SemverIncrementMode::Patch)?;
         version = semver::Version::parse(&format!("{}-{}", version, dev_suffix))?;
 

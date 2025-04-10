@@ -1,5 +1,5 @@
 ---
-default_semver_increment_mode: !pre_minor rc
+default_semver_increment_mode: !pre_minor dev
 ---
 # Changelog
 
@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **BREAKING CHANGE** `Bundle::encode` now takes `bytes::Bytes` as input, and `Bundle::decode` now returns `bytes::Bytes`.
 - **BREAKING CHANGE** `ResourceBytes(Vec<u8>)` is now `ResourceBytes(bytes::Bytes)`.
+
+## 0.5.0
 
 ## 0.5.0-rc.0
 
