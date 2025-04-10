@@ -373,14 +373,21 @@ impl NetworkConfig {
                 serde_json::Value::String(self.signal_url.as_str().into()),
             )?;
 
-            if let Some(webrtc_config) = &self.webrtc_config {
-                Self::insert_module_config(
-                    module_config,
-                    "tx5Transport",
-                    "webrtcConfig",
-                    webrtc_config.clone(),
-                )?;
-            }
+            let webrtc_config = self.webrtc_config.clone().unwrap_or_else(|| {
+                serde_json::json!({
+                  "iceServers": [
+                    { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+                    { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
+                  ]
+                })
+            });
+
+            Self::insert_module_config(
+                module_config,
+                "tx5Transport",
+                "webrtcConfig",
+                webrtc_config,
+            )?;
         } else {
             return Err(ConductorConfigError::InvalidNetworkConfig(
                 "advanced field must be an object".to_string(),
@@ -822,6 +829,12 @@ mod tests {
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
                     "timeoutS": "10",
+                    "webrtcConfig": {
+                      "iceServers": [
+                        { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+                        { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
+                      ]
+                    },
                 },
                 "coreSpace": {
                     "reSignFreqMs": "1000",
@@ -860,6 +873,12 @@ mod tests {
                 },
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
+                    "webrtcConfig": {
+                      "iceServers": [
+                        { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+                        { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
+                      ]
+                    },
                 },
             })
         )
@@ -889,6 +908,12 @@ mod tests {
                 },
                 "tx5Transport": {
                     "serverUrl": "wss://dev-test-bootstrap2.holochain.org/",
+                    "webrtcConfig": {
+                      "iceServers": [
+                        { "urls": ["stun:stun-0.main.infra.holo.host:443"] },
+                        { "urls": ["stun:stun-1.main.infra.holo.host:443"] }
+                      ]
+                    },
                 },
                 "k2Gossip": {
                     "roundTimeoutMs": 100,
