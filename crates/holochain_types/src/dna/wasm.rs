@@ -55,7 +55,7 @@ impl TryFrom<SerializedBytes> for DnaWasm {
     type Error = SerializedBytesError;
     fn try_from(serialized_bytes: SerializedBytes) -> Result<Self, Self::Error> {
         Ok(DnaWasm {
-            code: bytes::Bytes::from_owner(serialized_bytes.bytes().to_owned()),
+            code: serialized_bytes.bytes().into(),
         })
     }
 }
@@ -104,8 +104,6 @@ impl From<bytes::Bytes> for DnaWasm {
 
 impl From<Vec<u8>> for DnaWasm {
     fn from(value: Vec<u8>) -> Self {
-        Self {
-            code: bytes::Bytes::from_owner(value),
-        }
+        Self { code: value.into() }
     }
 }

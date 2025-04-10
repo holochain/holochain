@@ -1,5 +1,5 @@
 /// Arbitrary opaque bytes representing a Resource in a [`Bundle`](crate::Bundle)
-#[derive(Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, derive_more::Deref)]
+#[derive(Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ResourceBytes(bytes::Bytes);
 
 impl ResourceBytes {
@@ -31,6 +31,6 @@ impl From<bytes::Bytes> for ResourceBytes {
 
 impl From<Vec<u8>> for ResourceBytes {
     fn from(value: Vec<u8>) -> Self {
-        Self(bytes::Bytes::from_owner(value))
+        Self(value.into())
     }
 }

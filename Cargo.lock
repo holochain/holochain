@@ -4609,7 +4609,6 @@ version = "0.5.0-rc.0"
 dependencies = [
  "anyhow",
  "bytes",
- "derive_more",
  "flate2",
  "futures",
  "holochain_util",

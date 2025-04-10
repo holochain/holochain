@@ -118,7 +118,7 @@ where
 
     /// Load a Bundle into memory from a file
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Self::decode(bytes::Bytes::from_owner(ffs::read(path).await?))
+        Self::decode(ffs::read(path).await?.into())
     }
 
     /// Write a Bundle to a file
@@ -157,12 +157,7 @@ where
 
     /// Resolve all resources, but with fully owned references
     pub async fn resolve_all_cloned(&self) -> MrBundleResult<HashMap<Location, ResourceBytes>> {
-        Ok(self
-            .resolve_all()
-            .await?
-            .into_iter()
-            .map(|(k, v)| (k, v))
-            .collect())
+        Ok(self.resolve_all().await?.into_iter().collect())
     }
 
     /// Access the map of resources included in this bundle
