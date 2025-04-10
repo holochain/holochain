@@ -30,7 +30,7 @@ pub(super) async fn build_preserialized_wasm<M: Manifest>(
                     ffs::create_dir_all(ios_folder_path).await?;
                     ffs::write(&resource_path_adjoined, vec![].as_slice()).await?;
                     let resource_path = ffs::canonicalize(resource_path_adjoined).await?;
-                    match build_ios_module(bytes.as_slice()) {
+                    match build_ios_module(bytes.inner()) {
                         Ok(module) => match module.serialize_to_file(resource_path.clone()) {
                             Ok(()) => {
                                 info!("wrote ios dylib to {:?}", resource_path);

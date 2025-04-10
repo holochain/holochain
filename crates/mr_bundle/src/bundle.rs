@@ -7,7 +7,6 @@ use crate::{
 use holochain_util::ffs;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
-    borrow::Cow,
     collections::{BTreeMap, HashMap, HashSet},
     path::{Path, PathBuf},
 };
@@ -119,7 +118,7 @@ where
 
     /// Load a Bundle into memory from a file
     pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Self::decode(&ffs::read(path).await?)
+        Self::decode(bytes::Bytes::from_owner(ffs::read(path).await?))
     }
 
     /// Write a Bundle to a file
@@ -129,15 +128,15 @@ where
 
     /// Retrieve the bytes for a resource at a Location, downloading it if
     /// necessary
-    pub async fn resolve(&self, location: &Location) -> MrBundleResult<Cow<'_, ResourceBytes>> {
+    pub async fn resolve(&self, location: &Location) -> MrBundleResult<ResourceBytes> {
         let bytes = match &location.normalize(self.root_dir.as_ref())? {
-            Location::Bundled(path) => Cow::Borrowed(
+            Location::Bundled(path) => 
                 self.resources
                     .get(path)
-                    .ok_or_else(|| BundleError::BundledResourceMissing(path.clone()))?,
-            ),
-            Location::Path(path) => Cow::Owned(crate::location::resolve_local(path).await?),
-            Location::Url(url) => Cow::Owned(crate::location::resolve_remote(url).await?),
+                    .ok_or_else(|| BundleError::BundledResourceMissing(path.clone()))?
+                    .clone(),
+            Location::Path(path) => crate::location::resolve_local(path).await?,
+            Location::Url(url) => crate::location::resolve_remote(url).await?,
         };
         Ok(bytes)
     }
@@ -145,7 +144,7 @@ where
     /// Return the full set of resources specified by this bundle's manifest.
     /// References to bundled resources can be returned directly, while all
     /// others will be fetched from the filesystem or the network.
-    pub async fn resolve_all(&self) -> MrBundleResult<HashMap<Location, Cow<'_, ResourceBytes>>> {
+    pub async fn resolve_all(&self) -> MrBundleResult<HashMap<Location, ResourceBytes>> {
         futures::future::join_all(
             self.manifest.locations().into_iter().map(|loc| async move {
                 MrBundleResult::Ok((loc.clone(), self.resolve(&loc).await?))
@@ -153,7 +152,7 @@ where
         )
         .await
         .into_iter()
-        .collect::<MrBundleResult<HashMap<Location, Cow<'_, ResourceBytes>>>>()
+        .collect::<MrBundleResult<HashMap<Location, ResourceBytes>>>()
     }
 
     /// Resolve all resources, but with fully owned references
@@ -162,7 +161,7 @@ where
             .resolve_all()
             .await?
             .into_iter()
-            .map(|(k, v)| (k, v.into_owned()))
+            .map(|(k, v)| (k, v))
             .collect())
     }
 
@@ -174,13 +173,13 @@ where
     }
 
     /// An arbitrary and opaque encoding of the bundle data into a byte array
-    pub fn encode(&self) -> MrBundleResult<Vec<u8>> {
-        crate::encode(self)
+    pub fn encode(&self) -> MrBundleResult<bytes::Bytes> {
+        Ok(crate::encode(self)?.into())
     }
 
     /// Decode bytes produced by [`encode`](Bundle::encode)
-    pub fn decode(bytes: &[u8]) -> MrBundleResult<Self> {
-        crate::decode(bytes)
+    pub fn decode(bytes: bytes::Bytes) -> MrBundleResult<Self> {
+        crate::decode(&bytes)
     }
 
     /// Given that the Manifest is located at the given absolute `path`, find

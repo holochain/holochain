@@ -9,15 +9,13 @@ use serde::Serialize;
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
-use std::sync::Arc;
 use tracing::*;
 
 /// Represents web assembly code.
 #[derive(Serialize, Deserialize, Clone, Eq)]
 pub struct DnaWasm {
     /// the wasm bytes from a .wasm file
-    #[allow(clippy::redundant_allocation)]
-    pub code: Arc<Box<[u8]>>,
+    pub code: bytes::Bytes
 }
 
 /// A DnaWasm paired with its WasmHash
@@ -57,7 +55,7 @@ impl TryFrom<SerializedBytes> for DnaWasm {
     type Error = SerializedBytesError;
     fn try_from(serialized_bytes: SerializedBytes) -> Result<Self, Self::Error> {
         Ok(DnaWasm {
-            code: Arc::new(serialized_bytes.bytes().to_owned().into_boxed_slice()),
+            code: bytes::Bytes::from_owner(serialized_bytes.bytes().to_owned())
         })
     }
 }
@@ -70,14 +68,13 @@ impl DnaWasm {
             Backtrace::new()
         );
         DnaWasm {
-            code: Arc::new(Box::new([])),
+            code: bytes::Bytes::new()
         }
     }
 
-    /// get a new Arc to the `Vec<u8>` bytes for the wasm
-    #[allow(clippy::redundant_allocation)]
-    pub fn code(&self) -> Arc<Box<[u8]>> {
-        Arc::clone(&self.code)
+    /// Accessor
+    pub fn code(self) -> bytes::Bytes {
+        self.code
     }
 }
 
@@ -99,10 +96,18 @@ impl Hash for DnaWasm {
     }
 }
 
-impl From<Vec<u8>> for DnaWasm {
-    fn from(wasm: Vec<u8>) -> Self {
+impl From<bytes::Bytes> for DnaWasm {
+    fn from(value: bytes::Bytes) -> Self {
         Self {
-            code: Arc::new(wasm.into_boxed_slice()),
+            code: value,
+        }
+    }
+}
+
+impl From<Vec<u8>> for DnaWasm {
+    fn from(value: Vec<u8>) -> Self {
+        Self {
+            code: bytes::Bytes::from_owner(value),
         }
     }
 }

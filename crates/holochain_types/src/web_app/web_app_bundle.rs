@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use mr_bundle::{error::MrBundleResult, ResourceBytes};
 
 use super::WebAppManifest;
@@ -12,12 +10,12 @@ pub struct WebAppBundle(Bundle<WebAppManifest>);
 
 impl WebAppBundle {
     /// Construct from raw bytes
-    pub fn decode(bytes: &[u8]) -> MrBundleResult<Self> {
+    pub fn decode(bytes: bytes::Bytes) -> MrBundleResult<Self> {
         Bundle::decode(bytes).map(WebAppBundle)
     }
 
     /// Returns the bytes of the zip file containing the Web UI contained inside this WebAppBundle
-    pub async fn web_ui_zip_bytes(&self) -> MrBundleResult<Cow<'_, ResourceBytes>> {
+    pub async fn web_ui_zip_bytes(&self) -> MrBundleResult<ResourceBytes> {
         let manifest = self.0.manifest();
 
         self.0.resolve(&manifest.web_ui_location()).await
@@ -28,7 +26,7 @@ impl WebAppBundle {
         let manifest = self.0.manifest();
 
         let bytes = self.0.resolve(&manifest.happ_bundle_location()).await?;
-        let bundle = AppBundle::from(Bundle::decode(&bytes)?);
+        let bundle = AppBundle::from(Bundle::decode(bytes.into_inner())?);
         Ok(bundle)
     }
 }

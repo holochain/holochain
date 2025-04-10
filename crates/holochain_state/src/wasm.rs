@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use holo_hash::WasmHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
@@ -26,9 +24,7 @@ pub fn get(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<Option<Dn
         .optional()?;
     match item {
         Some((hash, wasm)) => Ok(Some(DnaWasmHashed::with_pre_hashed(
-            DnaWasm {
-                code: Arc::new(wasm.into_boxed_slice()),
-            },
+            wasm.into(),
             hash,
         ))),
         None => Ok(None),

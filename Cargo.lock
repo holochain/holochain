@@ -3200,6 +3200,7 @@ dependencies = [
  "automap",
  "backtrace",
  "base64 0.13.1",
+ "bytes",
  "cfg-if 0.1.10",
  "chrono",
  "contrafact",
@@ -3258,6 +3259,7 @@ name = "holochain_util"
 version = "0.5.0-rc.0"
 dependencies = [
  "backtrace",
+ "bytes",
  "cfg-if 1.0.0",
  "colored",
  "dunce",
@@ -4606,6 +4608,7 @@ name = "mr_bundle"
 version = "0.5.0-rc.0"
 dependencies = [
  "anyhow",
+ "bytes",
  "derive_more",
  "flate2",
  "futures",
