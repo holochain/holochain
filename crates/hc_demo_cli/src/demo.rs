@@ -311,6 +311,14 @@ async fn run(
 
             println!("#KNOWN_PEERS#{known_peers:?}#");
 
+            let stats = handle
+                .holochain_p2p()
+                .dump_network_stats()
+                .await
+                .unwrap();
+
+            println!("#NET_STATS#{stats:?}#");
+
             last_peer_dump = std::time::Instant::now();
         }
 
