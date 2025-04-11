@@ -1949,23 +1949,6 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "fixt"
-version = "0.5.0-rc.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77a7160144f252417c3b3c6dcd37c0d979ae8cb4aef505228b1d1b29cfb2f35b"
-dependencies = [
- "holochain_serialized_bytes",
- "lazy_static",
- "parking_lot",
- "paste",
- "rand 0.8.5",
- "rand_core 0.6.4",
- "serde",
- "strum 0.18.0",
- "strum_macros 0.18.0",
-]
-
-[[package]]
-name = "fixt"
 version = "0.5.0"
 dependencies = [
  "holochain_serialized_bytes",
@@ -1983,7 +1966,7 @@ dependencies = [
 name = "fixt_test"
 version = "0.0.1"
 dependencies = [
- "fixt 0.5.0",
+ "fixt",
  "paste",
 ]
 
@@ -2489,7 +2472,7 @@ dependencies = [
 name = "hdi"
 version = "0.6.0"
 dependencies = [
- "fixt 0.5.0",
+ "fixt",
  "getrandom 0.2.15",
  "hdi",
  "hdk_derive",
@@ -2510,7 +2493,7 @@ dependencies = [
 name = "hdk"
 version = "0.5.0"
 dependencies = [
- "fixt 0.5.0",
+ "fixt",
  "getrandom 0.2.15",
  "hdi",
  "hdk_derive",
@@ -2613,7 +2596,7 @@ dependencies = [
  "blake2b_simd",
  "bytes",
  "derive_more 0.99.19",
- "fixt 0.5.0",
+ "fixt",
  "futures",
  "holochain_serialized_bytes",
  "holochain_util",
@@ -2654,7 +2637,7 @@ dependencies = [
  "ed25519-dalek",
  "either",
  "fallible-iterator",
- "fixt 0.5.0",
+ "fixt",
  "futures",
  "get_if_addrs",
  "getrandom 0.2.15",
@@ -2752,7 +2735,7 @@ name = "holochain_cascade"
 version = "0.5.0"
 dependencies = [
  "async-trait",
- "fixt 0.5.0",
+ "fixt",
  "futures",
  "holo_hash",
  "holochain_cascade",
@@ -2785,7 +2768,7 @@ version = "0.2.0"
 dependencies = [
  "async-trait",
  "derive_more 0.99.19",
- "fixt 0.5.0",
+ "fixt",
  "futures",
  "getrandom 0.2.15",
  "holo_hash",
@@ -2889,7 +2872,7 @@ dependencies = [
  "bytes",
  "ed25519-dalek",
  "event-emitter-rs",
- "fixt 0.5.0-rc.0",
+ "fixt",
  "futures",
  "holo_hash",
  "holochain",
@@ -2991,7 +2974,7 @@ name = "holochain_integrity_types"
 version = "0.5.0"
 dependencies = [
  "derive_builder",
- "fixt 0.5.0",
+ "fixt",
  "holo_hash",
  "holochain_integrity_types",
  "holochain_secure_primitive",
@@ -3073,7 +3056,7 @@ dependencies = [
  "blake2b_simd",
  "bytes",
  "derive_more 0.99.19",
- "fixt 0.5.0",
+ "fixt",
  "futures",
  "holo_hash",
  "holochain_chc",
@@ -3200,7 +3183,7 @@ dependencies = [
  "cron",
  "derive_more 2.0.1",
  "fallible-iterator",
- "fixt 0.5.0",
+ "fixt",
  "holo_hash",
  "holochain_chc",
  "holochain_keystore",
@@ -3290,7 +3273,7 @@ dependencies = [
  "contrafact",
  "derive_builder",
  "derive_more 0.99.19",
- "fixt 0.5.0",
+ "fixt",
  "flate2",
  "futures",
  "getrandom 0.2.15",
@@ -3437,7 +3420,7 @@ dependencies = [
  "contrafact",
  "derive_builder",
  "derive_more 0.99.19",
- "fixt 0.5.0",
+ "fixt",
  "holo_hash",
  "holochain_integrity_types",
  "holochain_nonce",
