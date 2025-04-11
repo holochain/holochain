@@ -28,5 +28,6 @@ mod signals;
 mod test_cli;
 mod test_utils;
 mod validate;
+mod webrtc;
 mod websocket;
 mod websocket_stress;
