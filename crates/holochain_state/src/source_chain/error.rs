@@ -26,8 +26,8 @@ pub enum SourceChainError {
         "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {2:?}, Current head: {3:?}"
     )]
     HeadMoved(
-        Vec<SignedActionHashed>,
-        Vec<EntryHashed>,
+        Box<Vec<SignedActionHashed>>,
+        Box<Vec<EntryHashed>>,
         Option<ActionHash>,
         Option<HeadInfo>,
     ),
@@ -128,7 +128,7 @@ pub enum SourceChainError {
     #[error("The supplied query parameters contains filters that are mutually incompatible.
              In particular, `sequence_range` cannot currently be used with any other filter.
              In the future, all filters will be compatible with each other and this will not be an error.")]
-    UnsupportedQuery(ChainQueryFilter),
+    UnsupportedQuery(Box<ChainQueryFilter>),
 
     /// Other
     #[error("Other: {0}")]

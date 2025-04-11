@@ -13,7 +13,6 @@ use holochain_keystore::KeystoreError;
 use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
-use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use thiserror::Error;
 
@@ -39,9 +38,6 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     DpkiServiceError(#[from] DpkiServiceError),
-
-    #[error("Workspace error: {0}")]
-    WorkspaceError(#[from] WorkspaceError),
 
     #[error("Database error: {0}")]
     DatabaseError(#[from] DatabaseError),

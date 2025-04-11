@@ -295,7 +295,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b99d887f4066f8a1b4a713a8121fab07ff543863ac86177ebdee6b5cb18acf12"
 dependencies = [
  "cfg-if 1.0.0",
- "derive_more",
+ "derive_more 0.99.19",
  "serde",
  "shrinkwraprs",
 ]
@@ -453,6 +453,15 @@ name = "bimap"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230c5f1ca6a325a32553f8640d31ac9b49f2411e901e427570154868b46da4f7"
+
+[[package]]
+name = "bincode"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "bindgen"
@@ -944,7 +953,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65bfae7a2ef93841d7e9e5ef69e387b26e70f7b156434b6b95714006cc00e1f9"
 dependencies = [
  "arbitrary",
- "derive_more",
+ "derive_more 0.99.19",
  "either",
  "itertools 0.10.5",
  "num",
@@ -1224,13 +1233,13 @@ dependencies = [
 
 [[package]]
 name = "cron"
-version = "0.12.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f8c3e73077b4b4a6ab1ea5047c37c57aee77657bc8ecd6f29b0af082d0b0c07"
+checksum = "5877d3fbf742507b66bc2a1945106bd30dd8504019d596901ddd012a4dd01740"
 dependencies = [
  "chrono",
- "nom 7.1.3",
  "once_cell",
+ "winnow 0.6.26",
 ]
 
 [[package]]
@@ -1629,6 +1638,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_more"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "093242cf7570c207c83073cf82f79706fe7b8317e98620a47d5be7c3d8497678"
+dependencies = [
+ "derive_more-impl",
+]
+
+[[package]]
+name = "derive_more-impl"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+ "unicode-xid",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1830,6 +1860,18 @@ checksum = "976dd42dc7e85965fe702eb8164f21f450704bdde31faefd6471dba214cb594e"
 dependencies = [
  "libc",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "event-emitter-rs"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7dccdd0a59457ba353cc44c26d431ca5089f2cf93035c780a1b3f2814a017ebd"
+dependencies = [
+ "bincode",
+ "lazy_static",
+ "serde",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -2374,7 +2416,7 @@ checksum = "7f4044c2cadf3d960fa91a7ef91590da202797fe82cf687b029235f98be5ff49"
 dependencies = [
  "r2d2",
  "rusqlite",
- "uuid",
+ "uuid 1.16.0",
 ]
 
 [[package]]
@@ -2553,7 +2595,7 @@ dependencies = [
  "base64 0.22.1",
  "blake2b_simd",
  "bytes",
- "derive_more",
+ "derive_more 0.99.19",
  "fixt",
  "futures",
  "holochain_serialized_bytes",
@@ -2590,7 +2632,7 @@ dependencies = [
  "clap 4.5.35",
  "contrafact",
  "criterion",
- "derive_more",
+ "derive_more 0.99.19",
  "diff",
  "ed25519-dalek",
  "either",
@@ -2683,7 +2725,7 @@ dependencies = [
  "unwrap_to",
  "url",
  "url2",
- "uuid",
+ "uuid 1.16.0",
  "wasmer",
  "wasmer-middlewares",
 ]
@@ -2725,7 +2767,7 @@ name = "holochain_chc"
 version = "0.2.0"
 dependencies = [
  "async-trait",
- "derive_more",
+ "derive_more 0.99.19",
  "fixt",
  "futures",
  "getrandom 0.2.15",
@@ -2822,11 +2864,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "holochain_client"
+version = "0.7.0-rc.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "ed25519-dalek",
+ "event-emitter-rs",
+ "fixt",
+ "futures",
+ "holo_hash",
+ "holochain",
+ "holochain_conductor_api",
+ "holochain_nonce",
+ "holochain_types",
+ "holochain_websocket",
+ "holochain_zome_types",
+ "kitsune2_api",
+ "kitsune2_core",
+ "lair_keystore_api",
+ "parking_lot",
+ "rand 0.8.5",
+ "serde",
+ "serde_yaml",
+ "thiserror 2.0.12",
+ "tokio",
+]
+
+[[package]]
 name = "holochain_conductor_api"
 version = "0.5.0"
 dependencies = [
  "cfg-if 1.0.0",
- "derive_more",
+ "derive_more 0.99.19",
  "holo_hash",
  "holochain_conductor_api",
  "holochain_keystore",
@@ -2875,7 +2946,7 @@ version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "derive_more",
+ "derive_more 0.99.19",
  "futures",
  "hc_deepkey_sdk",
  "hdk",
@@ -2926,7 +2997,7 @@ version = "0.5.0"
 dependencies = [
  "assert_cmd",
  "base64 0.22.1",
- "derive_more",
+ "derive_more 0.99.19",
  "futures",
  "holo_hash",
  "holochain_secure_primitive",
@@ -2984,7 +3055,7 @@ dependencies = [
  "async-trait",
  "blake2b_simd",
  "bytes",
- "derive_more",
+ "derive_more 0.99.19",
  "fixt",
  "futures",
  "holo_hash",
@@ -3062,7 +3133,7 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "bytes",
- "derive_more",
+ "derive_more 0.99.19",
  "fallible-iterator",
  "futures",
  "getrandom 0.2.15",
@@ -3105,13 +3176,12 @@ dependencies = [
 name = "holochain_state"
 version = "0.5.0"
 dependencies = [
- "anyhow",
  "async-recursion",
  "base64 0.22.1",
  "chrono",
  "contrafact",
  "cron",
- "derive_more",
+ "derive_more 2.0.1",
  "fallible-iterator",
  "fixt",
  "holo_hash",
@@ -3127,18 +3197,16 @@ dependencies = [
  "holochain_wasm_test_utils",
  "holochain_zome_types",
  "kitsune2_api",
- "maplit",
  "matches",
  "nanoid",
  "one_err",
- "parking_lot",
  "pretty_assertions",
  "serde",
  "serde_json",
  "shrinkwraprs",
  "tempfile",
  "test-case",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
  "tracing",
 ]
@@ -3175,7 +3243,7 @@ name = "holochain_trace"
 version = "0.5.0"
 dependencies = [
  "chrono",
- "derive_more",
+ "derive_more 0.99.19",
  "holochain_serialized_bytes",
  "inferno",
  "once_cell",
@@ -3205,7 +3273,7 @@ dependencies = [
  "chrono",
  "contrafact",
  "derive_builder",
- "derive_more",
+ "derive_more 0.99.19",
  "fixt",
  "flate2",
  "futures",
@@ -3351,7 +3419,7 @@ version = "0.5.0"
 dependencies = [
  "contrafact",
  "derive_builder",
- "derive_more",
+ "derive_more 0.99.19",
  "fixt",
  "holo_hash",
  "holochain_integrity_types",
@@ -3479,7 +3547,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "toml",
- "uuid",
+ "uuid 1.16.0",
 ]
 
 [[package]]
@@ -4064,7 +4132,7 @@ dependencies = [
  "serde_json",
  "time",
  "url",
- "uuid",
+ "uuid 1.16.0",
 ]
 
 [[package]]
@@ -6014,7 +6082,7 @@ dependencies = [
  "rend",
  "rkyv_derive",
  "tinyvec",
- "uuid",
+ "uuid 1.16.0",
 ]
 
 [[package]]
@@ -6270,7 +6338,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58c4eb8a81997cf040a091d1f7e1938aeab6749d3a0dfa73af43cdc32393483d"
 dependencies = [
  "byteorder",
- "derive_more",
+ "derive_more 0.99.19",
  "twox-hash",
 ]
 
@@ -7418,7 +7486,7 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "winnow",
+ "winnow 0.7.6",
 ]
 
 [[package]]
@@ -7877,6 +7945,15 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom 0.2.15",
+]
 
 [[package]]
 name = "uuid"
@@ -8799,6 +8876,15 @@ name = "windows_x86_64_msvc"
 version = "0.53.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "271414315aff87387382ec3d271b52d7ae78726f5d44ac98b4f4030c91880486"
+
+[[package]]
+name = "winnow"
+version = "0.6.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e90edd2ac1aa278a5c4599b1d89cf03074b610800f866d4026dc199d7929a28"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "winnow"

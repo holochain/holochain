@@ -34,6 +34,7 @@ members = [
   "crates/hc_deepkey_sdk",
   "crates/hc_deepkey_types",
 
+  "crates/client",
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
