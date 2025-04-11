@@ -386,7 +386,7 @@ impl RealRibosome {
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn build_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
-        let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
+        let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.clone().code();
 
         if self.wasmer_module_cache.is_some() {
             let cache_key = self.get_module_cache_key(zome_name)?;

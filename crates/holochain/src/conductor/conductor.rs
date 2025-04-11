@@ -3775,7 +3775,7 @@ pub(crate) async fn get_dpki_dna(config: &DpkiConfig) -> DnaResult<DnaBundle> {
     if let Some(dna_path) = config.dna_path.as_ref() {
         DnaBundle::read_from_file(dna_path).await
     } else {
-        DnaBundle::decode(holochain_deepkey_dna::DEEPKEY_DNA_BUNDLE_BYTES)
+        DnaBundle::decode(holochain_deepkey_dna::DEEPKEY_DNA_BUNDLE_BYTES.into())
     }
 }
 

@@ -57,7 +57,7 @@ impl DnaBundle {
     }
 
     /// Construct from raw bytes
-    pub fn decode(bytes: &[u8]) -> DnaResult<Self> {
+    pub fn decode(bytes: bytes::Bytes) -> DnaResult<Self> {
         mr_bundle::Bundle::decode(bytes)
             .map(Into::into)
             .map_err(Into::into)

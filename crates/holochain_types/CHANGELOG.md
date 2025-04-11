@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- **BREAKING CHANGE** `AppBundleSource` variant `Bytes(Vec<u8>)` is now `Bytes(bytes::Bytes)`.
+- **BREAKING CHANGE** `WebAppBundle::decode`, `DnaBundle::decode`, and `AppBundle::decode` all take a `bytes::Bytes` as input.
+
 ## 0.5.0
 
 ## 0.5.0-rc.1

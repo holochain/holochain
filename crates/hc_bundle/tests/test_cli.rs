@@ -11,15 +11,15 @@ use std::{
 use walkdir::WalkDir;
 
 fn read_app(path: &Path) -> anyhow::Result<AppBundle> {
-    Ok(AppBundle::decode(&ffs::sync::read(path).unwrap())?)
+    Ok(AppBundle::decode(ffs::sync::read(path).unwrap().into())?)
 }
 
 fn read_dna(path: &Path) -> anyhow::Result<DnaBundle> {
-    Ok(DnaBundle::decode(&ffs::sync::read(path).unwrap())?)
+    Ok(DnaBundle::decode(ffs::sync::read(path).unwrap().into())?)
 }
 
 fn read_web_app(path: &Path) -> anyhow::Result<WebAppBundle> {
-    Ok(WebAppBundle::decode(&ffs::sync::read(path).unwrap())?)
+    Ok(WebAppBundle::decode(ffs::sync::read(path).unwrap().into())?)
 }
 
 #[tokio::test]

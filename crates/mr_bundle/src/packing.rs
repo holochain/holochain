@@ -93,7 +93,7 @@ async fn unpack_yaml<M: serde::Serialize>(
             .parent()
             .ok_or_else(|| UnpackingError::ParentlessPath(path.clone()))?;
         ffs::create_dir_all(&parent).await?;
-        ffs::write(&path, resource).await?;
+        ffs::write(&path, resource.inner()).await?;
     }
     let yaml_str = serde_yaml::to_string(manifest)?;
     let manifest_path = base_path.join(manifest_path);

@@ -3268,6 +3268,7 @@ dependencies = [
  "automap",
  "backtrace",
  "base64 0.13.1",
+ "bytes",
  "cfg-if 0.1.10",
  "chrono",
  "contrafact",
@@ -3306,7 +3307,6 @@ dependencies = [
  "rusqlite",
  "schemars",
  "serde",
- "serde_bytes",
  "serde_derive",
  "serde_json",
  "serde_with",
@@ -4674,7 +4674,7 @@ name = "mr_bundle"
 version = "0.5.0"
 dependencies = [
  "anyhow",
- "derive_more 0.99.19",
+ "bytes",
  "flate2",
  "futures",
  "holochain_util",
@@ -4685,7 +4685,6 @@ dependencies = [
  "reqwest 0.12.15",
  "rmp-serde",
  "serde",
- "serde_bytes",
  "serde_yaml",
  "tempfile",
  "test-strategy",

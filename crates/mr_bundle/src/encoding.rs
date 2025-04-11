@@ -5,11 +5,11 @@ use std::io::Read;
 use std::io::Write;
 
 /// Get compressed bytes from some serializable data
-pub fn encode<T: serde::ser::Serialize>(data: &T) -> MrBundleResult<Vec<u8>> {
+pub fn encode<T: serde::ser::Serialize>(data: &T) -> MrBundleResult<bytes::Bytes> {
     let bytes = rmp_serde::to_vec_named(data)?;
     let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
     enc.write_all(&bytes)?;
-    Ok(enc.finish()?)
+    Ok(enc.finish()?.into())
 }
 
 /// Decompress and deserialize some bytes (inverse of `encode`)

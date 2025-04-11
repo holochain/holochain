@@ -106,7 +106,8 @@ async fn resource_resolution() {
     std::fs::write(&bundled_path, bundle_bytes).unwrap();
 
     // Ensure that it is also readable and deserializable
-    let decoded_bundle: Bundle<_> = Bundle::decode(&std::fs::read(bundled_path).unwrap()).unwrap();
+    let decoded_bundle: Bundle<_> =
+        Bundle::decode(std::fs::read(bundled_path).unwrap().into()).unwrap();
     assert_eq!(bundle, decoded_bundle);
 
     // Ensure that bundle writing and reading are inverses
