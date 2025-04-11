@@ -43,8 +43,6 @@ pub enum CellError {
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
-    WorkspaceError(#[from] holochain_state::workspace::WorkspaceError),
-    #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),

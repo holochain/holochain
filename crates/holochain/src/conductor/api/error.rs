@@ -8,7 +8,6 @@ use holo_hash::DnaHash;
 use holochain_chc::ChcError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
-use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use mr_bundle::error::MrBundleError;
@@ -48,10 +47,6 @@ pub enum ConductorApiError {
     /// Database error
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
-
-    /// Workspace error.
-    #[error(transparent)]
-    WorkspaceError(#[from] WorkspaceError),
 
     /// Workflow error.
     #[error(transparent)]

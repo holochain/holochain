@@ -7,12 +7,10 @@ use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::validation::OutcomeOrError;
 use crate::core::workflow::WorkflowError;
-use crate::from_sub_error;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreError;
 use holochain_sqlite::error::DatabaseError;
-use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use holochain_zome_types::countersigning::CounterSigningError;
 use holochain_zome_types::countersigning::CounterSigningSessionData;
@@ -49,8 +47,6 @@ pub enum SysValidationError {
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
-    WorkspaceError(#[from] WorkspaceError),
-    #[error(transparent)]
     DpkiServiceError(#[from] DpkiServiceError),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
@@ -74,8 +70,6 @@ pub type SysValidationResult<T> = Result<T, SysValidationError>;
 /// - ValidationOutcome
 /// - SysValidationError
 pub type SysValidationOutcome<T> = Result<T, OutcomeOrError<ValidationOutcome, SysValidationError>>;
-
-from_sub_error!(SysValidationError, WorkspaceError);
 
 impl<T> From<SysValidationError> for OutcomeOrError<T, SysValidationError> {
     fn from(e: SysValidationError) -> Self {

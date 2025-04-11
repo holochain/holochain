@@ -611,7 +611,7 @@ impl ChainOp {
             ChainOpType::StoreEntry => {
                 let entry = entry
                     .into_option()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 let action = match action {
                     Action::Create(c) => NewEntryAction::Create(c),
                     Action::Update(c) => NewEntryAction::Update(c),
@@ -845,7 +845,7 @@ impl ChainOpLite {
                 let entry_hash = action
                     .entry_hash()
                     .cloned()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 Self::StoreEntry(action_hash, entry_hash.clone(), entry_hash.into())
             }
             ChainOpType::RegisterAgentActivity => {
@@ -855,7 +855,7 @@ impl ChainOpLite {
                 let entry_hash = action
                     .entry_hash()
                     .cloned()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 let basis = match action {
                     Action::Update(update) => update.original_entry_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),
@@ -866,7 +866,7 @@ impl ChainOpLite {
                 let entry_hash = action
                     .entry_hash()
                     .cloned()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 let basis = match action {
                     Action::Update(update) => update.original_entry_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),

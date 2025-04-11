@@ -150,10 +150,9 @@ impl Query for GetEntryDetailsQuery {
             .next();
         match action {
             Some(action) => {
-                let entry_hash = action
-                    .action()
-                    .entry_hash()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.action().clone()))?;
+                let entry_hash = action.action().entry_hash().ok_or_else(|| {
+                    DhtOpError::ActionWithoutEntry(Box::new(action.action().clone()))
+                })?;
                 let author = self.1.as_ref().map(|a| a.as_ref());
                 let details = stores
                     .get_public_or_authored_entry(entry_hash, author)?

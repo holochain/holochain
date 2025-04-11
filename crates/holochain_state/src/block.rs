@@ -1,3 +1,7 @@
+//! Block and unblock targets, and check for blocked targets.
+//!
+//! A block target is a [`BlockTarget`](holochain_zome_types::block::BlockTarget).
+
 use crate::mutations;
 use crate::query::prelude::named_params;
 use holochain_sqlite::prelude::DatabaseResult;
@@ -9,20 +13,23 @@ use holochain_types::prelude::Timestamp;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
 
+/// Insert a block into the database.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn block(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
-    tracing::warn!(?input, "blocking node!");
+    tracing::info!(?input, "blocking node!");
 
     db.write_async(move |txn| mutations::insert_block(txn, input))
         .await
 }
 
+/// Insert an unblock into the database.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn unblock(db: &DbWrite<DbKindConductor>, input: Block) -> DatabaseResult<()> {
     db.write_async(move |txn| mutations::insert_unblock(txn, input))
         .await
 }
 
+/// Check whether a given target is blocked at the given time.
 pub fn query_is_blocked(
     txn: &Transaction<'_>,
     target_id: BlockTargetId,
@@ -42,6 +49,7 @@ pub fn query_is_blocked(
 mod test {
     use crate::prelude::*;
     use crate::test_utils::test_conductor_db;
+    use ::fixt::fixt;
 
     // More complex setups.
     #[tokio::test(flavor = "multi_thread")]
@@ -81,7 +89,7 @@ mod test {
                     (5, false),
                 ],
             ),
-            // block later then earlier with gap
+            // block later, then earlier with gap
             (
                 vec![(3, 4, true), (0, 1, true)],
                 vec![
@@ -115,8 +123,8 @@ mod test {
         ] {
             let db = test_conductor_db();
 
-            let control = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
-            let target = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let control = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
+            let target = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
 
             for (start, end, op) in &setup {
                 let block = Block::new(
@@ -165,7 +173,7 @@ mod test {
     async fn block_unblock_per_reason() {
         let db = test_conductor_db();
 
-        let cell_id = ::fixt::fixt!(CellId);
+        let cell_id = fixt!(CellId);
         let target0 = BlockTarget::Cell(cell_id.clone(), CellBlockReason::BadCrypto);
         let target1 = BlockTarget::Cell(cell_id, CellBlockReason::App(vec![1, 2, 3]));
 
@@ -239,8 +247,8 @@ mod test {
         ] {
             let db = test_conductor_db();
 
-            let control = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
-            let target = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let control = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
+            let target = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
 
             let control0 = control.clone();
             assert!(!db
@@ -341,8 +349,8 @@ mod test {
         ] {
             let db = test_conductor_db();
 
-            let control = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
-            let target = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let control = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
+            let target = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
 
             let control0 = control.clone();
             assert!(!db
@@ -420,14 +428,10 @@ mod test {
     #[tokio::test(flavor = "multi_thread")]
     async fn block_empty_db_is_not_blocked() {
         let db = test_conductor_db();
-        let target = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+        let target = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
 
         assert!(!db
-            .read_async(move |txn| super::query_is_blocked(
-                txn,
-                target.into(),
-                ::fixt::fixt!(Timestamp)
-            ))
+            .read_async(move |txn| super::query_is_blocked(txn, target.into(), fixt!(Timestamp)))
             .await
             .unwrap());
     }
@@ -442,8 +446,8 @@ mod test {
         ] {
             let db = test_conductor_db();
 
-            let control = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
-            let target = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let control = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
+            let target = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
 
             let control0 = control.clone();
             assert!(!db
@@ -510,9 +514,9 @@ mod test {
             let db = test_conductor_db();
 
             // control
-            let target0 = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let target0 = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
             // to block
-            let target1 = BlockTarget::Cell(::fixt::fixt!(CellId), CellBlockReason::BadCrypto);
+            let target1 = BlockTarget::Cell(fixt!(CellId), CellBlockReason::BadCrypto);
 
             let target00 = target0.clone();
             assert!(!db

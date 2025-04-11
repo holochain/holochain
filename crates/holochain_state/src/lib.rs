@@ -24,10 +24,6 @@
 //! The Query trait allows combining arbitrary database SQL queries with
 //! the scratch space so reads can union across the database and in-memory data.
 
-// TODO - address the underlying issue:
-#![allow(clippy::result_large_err)]
-
-#[allow(missing_docs)]
 pub mod block;
 pub mod chain_lock;
 #[allow(missing_docs)]
@@ -48,7 +44,6 @@ pub mod validation_db;
 pub mod validation_receipts;
 #[allow(missing_docs)]
 pub mod wasm;
-pub mod workspace;
 
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "test_utils"))]

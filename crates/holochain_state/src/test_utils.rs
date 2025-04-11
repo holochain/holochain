@@ -16,60 +16,12 @@ use tempfile::TempDir;
 
 pub mod mutations_helpers;
 
-#[cfg(test)]
-mod tests {
-    use holochain_sqlite::error::DatabaseResult;
-    use holochain_sqlite::rusqlite::Transaction;
-
-    fn _dbg_db_schema(db_name: &str, conn: &Transaction) {
-        #[allow(dead_code)]
-        #[derive(Debug)]
-        pub struct Schema {
-            pub ty: String,
-            pub name: String,
-            pub tbl_name: String,
-            pub rootpage: u64,
-            pub sql: Option<String>,
-        }
-
-        let mut statement = conn.prepare("select * from sqlite_schema").unwrap();
-        let iter = statement
-            .query_map([], |row| {
-                Ok(Schema {
-                    ty: row.get(0)?,
-                    name: row.get(1)?,
-                    tbl_name: row.get(2)?,
-                    rootpage: row.get(3)?,
-                    sql: row.get(4)?,
-                })
-            })
-            .unwrap();
-
-        println!("~~~ {} START ~~~", &db_name);
-        for i in iter {
-            dbg!(&i);
-        }
-        println!("~~~ {} END ~~~", &db_name);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    pub async fn dbg_db_schema() {
-        super::test_conductor_db()
-            .db
-            .read_async(move |txn| -> DatabaseResult<()> {
-                _dbg_db_schema("conductor", txn);
-                Ok(())
-            })
-            .await
-            .unwrap();
-    }
-}
-
 /// Create a [`TestDb`] of [`DbKindAuthored`], backed by a temp directory.
 pub fn test_authored_db() -> TestDb<DbKindAuthored> {
     test_authored_db_with_id(1)
 }
 
+/// Create a test authored database with a DNA hash and agent key based on the input `id`.
 pub fn test_authored_db_with_id(id: u8) -> TestDb<DbKindAuthored> {
     test_db(DbKindAuthored(Arc::new(CellId::new(
         fake_dna_hash(id),
@@ -362,4 +314,53 @@ pub fn dump_db(txn: &Transaction) {
     tracing::debug!("DhtOps:");
     let stmt = txn.prepare("SELECT * FROM DhtOp").unwrap();
     dump(stmt);
+}
+
+#[cfg(test)]
+mod tests {
+    use holochain_sqlite::error::DatabaseResult;
+    use holochain_sqlite::rusqlite::Transaction;
+
+    fn _dbg_db_schema(db_name: &str, conn: &Transaction) {
+        #[allow(dead_code)]
+        #[derive(Debug)]
+        pub struct Schema {
+            pub ty: String,
+            pub name: String,
+            pub tbl_name: String,
+            pub rootpage: u64,
+            pub sql: Option<String>,
+        }
+
+        let mut statement = conn.prepare("select * from sqlite_schema").unwrap();
+        let iter = statement
+            .query_map([], |row| {
+                Ok(Schema {
+                    ty: row.get(0)?,
+                    name: row.get(1)?,
+                    tbl_name: row.get(2)?,
+                    rootpage: row.get(3)?,
+                    sql: row.get(4)?,
+                })
+            })
+            .unwrap();
+
+        println!("~~~ {} START ~~~", &db_name);
+        for i in iter {
+            dbg!(&i);
+        }
+        println!("~~~ {} END ~~~", &db_name);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn dbg_db_schema() {
+        super::test_conductor_db()
+            .db
+            .read_async(move |txn| -> DatabaseResult<()> {
+                _dbg_db_schema("conductor", txn);
+                Ok(())
+            })
+            .await
+            .unwrap();
+    }
 }
