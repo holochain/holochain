@@ -3,7 +3,6 @@ use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
-use holochain_conductor_services::DpkiServiceError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmErrorInner;
@@ -55,9 +54,6 @@ pub enum ConductorError {
 
     #[error(transparent)]
     CountersigningError(#[from] CountersigningError),
-
-    #[error("DPKI service error: {0}")]
-    DpkiError(#[from] DpkiServiceError),
 
     #[error("Config deserialization error: {0}")]
     SerializationError(#[from] serde_yaml::Error),

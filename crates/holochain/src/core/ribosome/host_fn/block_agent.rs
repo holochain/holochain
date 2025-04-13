@@ -96,7 +96,7 @@ mod test {
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-        let config = SweetConductorConfig::standard().no_dpki()
+        let config = SweetConductorConfig::standard()
             .tune_conductor(|c| {
                 c.min_publish_interval = Some(std::time::Duration::from_secs(2));
                 c.publish_trigger_interval = Some(std::time::Duration::from_secs(3));
@@ -113,9 +113,15 @@ mod test {
 
         let ((alice_cell,), (bob_cell,), (carol_cell,)) = apps.into_tuples();
 
-        conductors[0].declare_full_storage_arcs(alice_cell.dna_hash()).await;
-        conductors[1].declare_full_storage_arcs(alice_cell.dna_hash()).await;
-        conductors[2].declare_full_storage_arcs(alice_cell.dna_hash()).await;
+        conductors[0]
+            .declare_full_storage_arcs(alice_cell.dna_hash())
+            .await;
+        conductors[1]
+            .declare_full_storage_arcs(alice_cell.dna_hash())
+            .await;
+        conductors[2]
+            .declare_full_storage_arcs(alice_cell.dna_hash())
+            .await;
 
         let alice = alice_cell.zome(TestWasm::Create);
         let bob = bob_cell.zome(TestWasm::Create);

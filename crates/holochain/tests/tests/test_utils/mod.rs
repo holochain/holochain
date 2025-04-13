@@ -2,13 +2,38 @@
 
 use ::fixt::*;
 use anyhow::Result;
+use assert_cmd::prelude::*;
 use ed25519_dalek::{Signer, SigningKey};
+use futures::Future;
+use hdk::prelude::*;
 use holochain::conductor::ConductorHandle;
+use holochain::{
+    conductor::api::ZomeCallParamsSigned,
+    conductor::api::{AdminRequest, AdminResponse, AppRequest},
+};
 use holochain_conductor_api::conductor::paths::DataRootPath;
-use holochain_conductor_api::conductor::DpkiConfig;
+use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_conductor_api::conductor::KeystoreConfig;
+use holochain_conductor_api::AdminInterfaceConfig;
+use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::FullStateDump;
+use holochain_conductor_api::InterfaceDriver;
+use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
+use holochain_util::tokio_helper;
 use holochain_websocket::WebsocketSender;
 use holochain_websocket::{WebsocketReceiver, WebsocketResult};
+use matches::assert_matches;
+use serde::Serialize;
+use std::time::Duration;
+use std::{path::PathBuf, process::Stdio};
+use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::io::BufReader;
+use tokio::process::Child;
+use tokio::process::Command;
+
+pub use holochain::sweettest::websocket_client_by_port;
 
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
@@ -22,34 +47,6 @@ pub async fn websocket_client(
     let port = admin_port(conductor).await;
     Ok(websocket_client_by_port(port).await?)
 }
-
-pub use holochain::sweettest::websocket_client_by_port;
-
-use assert_cmd::prelude::*;
-use futures::Future;
-use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_api::conductor::KeystoreConfig;
-use holochain_conductor_api::AdminInterfaceConfig;
-use holochain_conductor_api::InterfaceDriver;
-use matches::assert_matches;
-use serde::Serialize;
-use std::time::Duration;
-use std::{path::PathBuf, process::Stdio};
-use tokio::io::AsyncBufReadExt;
-use tokio::io::AsyncWriteExt;
-use tokio::io::BufReader;
-use tokio::process::Child;
-use tokio::process::Command;
-
-use hdk::prelude::*;
-use holochain::{
-    conductor::api::ZomeCallParamsSigned,
-    conductor::api::{AdminRequest, AdminResponse, AppRequest},
-};
-use holochain_conductor_api::AppResponse;
-use holochain_types::prelude::*;
-use holochain_types::websocket::AllowedOrigins;
-use holochain_util::tokio_helper;
 
 /// Wrapper that synchronously waits for the Child to terminate on drop.
 pub struct SupervisedChild(String, Child);
@@ -320,7 +317,6 @@ pub async fn register_and_install_dna_named(
         network_seed: None,
         roles_settings: Default::default(),
         ignore_genesis_failure: false,
-        allow_throwaway_random_agent_key: true,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
@@ -373,7 +369,7 @@ pub async fn check_started(holochain: &mut Child) {
     }
 }
 
-/// Create test config with test keystore and DPKI disabled
+/// Create test config with test keystore.
 pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
     ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -384,7 +380,6 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         }]),
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
-        dpki: DpkiConfig::disabled(),
         ..Default::default()
     }
 }

@@ -16,7 +16,6 @@ path = "./src/lib.rs"
 default = []
 build = []
 only_check = []
-unstable-dpki = []
 unstable-functions = []
 
 # reminder - do not use workspace deps

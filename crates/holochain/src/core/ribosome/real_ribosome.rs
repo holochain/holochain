@@ -105,8 +105,6 @@ use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::acc
 #[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::block_agent::block_agent;
 #[cfg(feature = "unstable-functions")]
-use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
-#[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::schedule::schedule;
 #[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::sleep::sleep;
@@ -666,7 +664,6 @@ impl RealRibosome {
                 "__hc__get_agent_key_lineage_1",
                 get_agent_key_lineage,
             )
-            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
@@ -1388,8 +1385,6 @@ pub mod wasm_test {
                 "__hc__get_links_1",
                 "__hc__get_validation_receipts_1",
                 "__hc__hash_1",
-                #[cfg(feature = "unstable-functions")]
-                "__hc__is_same_agent_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
                 "__hc__must_get_entry_1",

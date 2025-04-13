@@ -87,7 +87,6 @@ use futures::StreamExt;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
-use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::GenericNetwork;
 use holochain_p2p::HolochainP2pDnaT;
@@ -282,18 +281,12 @@ async fn sys_validation_workflow_inner(
 
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
     for hashed_op in sorted_ops {
-        let dpki = workspace
-            .dpki
-            .clone()
-            .filter(|dpki| !dpki.is_deepkey_dna(workspace.dna_def_hashed().as_hash()));
-
         // Note that this is async only because of the signature checks done during countersigning.
         // In most cases this will be a fast synchronous call.
         let r = validate_op(
             hashed_op.as_content(),
             &dna_def,
             current_validation_dependencies.clone(),
-            dpki,
         )
         .await;
 
@@ -627,10 +620,9 @@ pub(crate) async fn validate_op(
     op: &DhtOp,
     dna_def: &DnaDefHashed,
     validation_dependencies: SysValDeps,
-    dpki: Option<DpkiImpl>,
 ) -> WorkflowResult<Outcome> {
     let result = match op {
-        DhtOp::ChainOp(op) => validate_chain_op(op, dna_def, validation_dependencies, dpki).await,
+        DhtOp::ChainOp(op) => validate_chain_op(op, dna_def, validation_dependencies).await,
         DhtOp::WarrantOp(op) => validate_warrant_op(op, dna_def, validation_dependencies).await,
     };
     match result {
@@ -686,17 +678,8 @@ async fn validate_chain_op(
     op: &ChainOp,
     dna_def: &DnaDefHashed,
     validation_dependencies: SysValDeps,
-    dpki: Option<DpkiImpl>,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
-    // Check agent validity in Deepkey first
-    if let Some(dpki) = dpki {
-        // Don't run DPKI agent validity checks on the DPKI service itself
-        if !dpki.is_deepkey_dna(dna_def.as_hash()) {
-            check_dpki_agent_validity_for_op(&dpki, op).await?;
-        }
-    }
-
     match op {
         ChainOp::StoreRecord(_, action, entry) => {
             check_prev_action(action)?;
@@ -810,7 +793,6 @@ fn check_agent_validity(agent: &AgentPubKey, prev_action: &Action) -> SysValidat
     Ok(())
 }
 
-// TODO: should this check DPKI for agent validity?
 async fn validate_warrant_op(
     op: &WarrantOp,
     _dna_def: &DnaDefHashed,
@@ -1023,7 +1005,6 @@ pub async fn counterfeit_check_action(
 /// Check if the warrant op has valid signature and author.
 pub async fn counterfeit_check_warrant(warrant_op: &WarrantOp) -> SysValidationResult<()> {
     verify_warrant_signature(warrant_op).await?;
-    author_key_is_valid(&warrant_op.author).await?;
     Ok(())
 }
 
@@ -1232,7 +1213,6 @@ pub struct SysValidationWorkspace {
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
     sys_validation_retry_delay: Duration,
-    dpki: Option<DpkiImpl>,
 }
 
 impl SysValidationWorkspace {
@@ -1242,7 +1222,6 @@ impl SysValidationWorkspace {
         dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         dna_def: Arc<DnaDef>,
-        dpki: Option<DpkiImpl>,
         sys_validation_retry_delay: Duration,
     ) -> Self {
         Self {
@@ -1252,7 +1231,6 @@ impl SysValidationWorkspace {
             dht_query_cache: Some(dht_query_cache),
             cache,
             dna_def,
-            dpki,
             sys_validation_retry_delay,
         }
     }

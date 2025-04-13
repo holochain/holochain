@@ -1,5 +1,3 @@
-#[cfg(feature = "unstable-functions")]
-pub use crate::agent::is_same_agent;
 pub use crate::app_entry;
 pub use crate::chain::must_get_agent_activity;
 pub use crate::ed25519::verify_signature;
@@ -95,11 +93,6 @@ macro_rules! holochain_externs {
             x_salsa20_poly1305_decrypt:1,
             x_25519_x_salsa20_poly1305_decrypt:1,
             ed_25519_x_salsa20_poly1305_decrypt:1
-        );
-
-        #[cfg(feature = "unstable-functions")]
-        holochain_wasmer_guest::host_externs!(
-            is_same_agent:1
         );
     };
 }

@@ -6,9 +6,6 @@
 
 use std::sync::Arc;
 
-mod dpki_service;
-pub use dpki_service::*;
-
 mod app_store_service;
 pub use app_store_service::*;
 
@@ -30,16 +27,12 @@ pub trait CellRunner: Send + Sync + 'static {
 /// The set of all Conductor Services available to the conductor
 #[derive(Clone, Default)]
 pub struct ConductorServices {
-    /// The DPKI service
-    pub dpki: Option<DpkiImpl>,
     /// The AppStore service
     pub app_store: Option<Arc<dyn AppStoreService>>,
 }
 
 /// Initialized for ConductorService: just the CellIds that are used for each service
 pub struct ConductorServiceCells {
-    /// The CellId to use for DPKI
-    pub dpki: CellId,
     /// The CellId to use for the AppStore
     pub app_store: CellId,
 }

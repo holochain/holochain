@@ -48,7 +48,6 @@ async fn signed_zome_call() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -124,7 +123,6 @@ async fn storage_info() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -159,7 +157,6 @@ async fn dump_network_stats() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -186,7 +183,6 @@ async fn revoke_agent_key() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -248,7 +244,6 @@ async fn agent_info() {
             network_seed: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -294,7 +289,6 @@ async fn list_cell_ids() {
             network_seed: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -307,8 +301,8 @@ async fn list_cell_ids() {
         };
 
     let cell_ids = admin_ws.list_cell_ids().await.unwrap();
-    // Check if list includes cell id. Not checking for equality to a vector of just the one cell id,
-    // because the DPKI cell is included too.
+    // Check if list includes cell id.
+    assert_eq!(cell_ids.len(), 1);
     assert!(cell_ids.contains(&cell_id));
 }
 
@@ -347,7 +341,6 @@ async fn install_app_with_roles_settings() {
             network_seed: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();

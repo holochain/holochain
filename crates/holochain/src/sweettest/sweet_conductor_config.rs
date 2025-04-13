@@ -79,32 +79,9 @@ impl SweetConductorConfig {
             .with_gossip_min_initiate_interval_ms(1000)
             .with_gossip_round_timeout_ms(10_000);
 
-        let mut c = SweetConductorConfig::from(network_config).tune_conductor(|tune| {
+        SweetConductorConfig::from(network_config).tune_conductor(|tune| {
             tune.sys_validation_retry_delay = Some(std::time::Duration::from_secs(1));
-        });
-
-        // Allow device seed generation to exercise key derivation in sweettests.
-        c.device_seed_lair_tag = Some("sweet-conductor-device-seed".to_string());
-        c.danger_generate_throwaway_device_seed = true;
-        c
-    }
-
-    /// Disable DPKI, which is on by default.
-    /// You would want to disable DPKI in situations where you're testing unusual situations
-    /// such as tests which disable networking, tests which use pregenerated agent keys,
-    /// or any situation where it's known that DPKI is irrelevant.
-    pub fn no_dpki(mut self) -> Self {
-        self.dpki = holochain_conductor_api::conductor::DpkiConfig::disabled();
-        self
-    }
-
-    /// Disable DPKI in a situation where we would like to run DPKI in a test, but the test
-    /// only passes if it's disabled and we can't figure out why.
-    #[cfg(feature = "test_utils")]
-    pub fn no_dpki_mustfix(mut self) -> Self {
-        tracing::warn!("Disabling DPKI for a test which should pass with DPKI enabled. TODO: fix");
-        self.dpki = holochain_conductor_api::conductor::DpkiConfig::disabled();
-        self
+        })
     }
 
     /// Rendezvous config for SweetConductors

@@ -172,11 +172,6 @@ host_fn_api_impls! {
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
-    // Check if agent key 2 is of the same lineage as agent key 2.
-    // TODO: This HDI function can't be easily removed, even though it's considered an
-    // unstable function.
-    fn is_same_agent ((AgentPubKey, AgentPubKey)) -> bool;
-
     // Retreive a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> Record;
 

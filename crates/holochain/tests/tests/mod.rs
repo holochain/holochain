@@ -4,8 +4,6 @@ mod app_installation;
 mod app_interface_security;
 mod authored_test;
 mod clone_cell;
-#[cfg(feature = "unstable-dpki")]
-mod conductor_services;
 // Countersigning HDK functions needed
 #[cfg(feature = "unstable-countersigning")]
 mod countersigning;

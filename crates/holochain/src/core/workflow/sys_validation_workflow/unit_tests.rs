@@ -404,7 +404,6 @@ impl TestCase {
             self.test_space.space.dht_query_cache.clone(),
             self.test_space.space.cache_db.clone(),
             Arc::new(self.dna_def.clone()),
-            None,
             std::time::Duration::from_secs(10),
         );
 

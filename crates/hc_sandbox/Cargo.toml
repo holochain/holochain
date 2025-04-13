@@ -69,11 +69,6 @@ workspace = true
 [features]
 default = []
 
-unstable-dpki = [
-  "holochain_conductor_api/unstable-dpki",
-  "holochain_conductor_config/unstable-dpki",
-]
-
 chc = [
   "dep:holochain_chc",
   "holochain_conductor_api/chc",

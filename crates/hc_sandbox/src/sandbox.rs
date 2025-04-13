@@ -30,10 +30,6 @@ pub async fn default_with_network(
         network,
         root,
         in_process_lair,
-        #[cfg(feature = "unstable-dpki")]
-        no_dpki,
-        #[cfg(feature = "unstable-dpki")]
-        dpki_network_seed,
         #[cfg(feature = "chc")]
         chc_url,
         ..
@@ -45,10 +41,6 @@ pub async fn default_with_network(
         directory,
         in_process_lair,
         0,
-        #[cfg(feature = "unstable-dpki")]
-        no_dpki,
-        #[cfg(feature = "unstable-dpki")]
-        dpki_network_seed,
         #[cfg(feature = "chc")]
         chc_url,
     )?;

@@ -36,11 +36,7 @@ async fn test_cell_handle_publish() {
     let db_dir = test_db_dir().path().to_path_buf();
     let data_root_path: DataRootPath = db_dir.clone().into();
     let handle = Conductor::builder()
-        .config(
-            crate::sweettest::SweetConductorConfig::standard()
-                .no_dpki()
-                .into(),
-        )
+        .config(crate::sweettest::SweetConductorConfig::standard().into())
         .with_keystore(keystore.clone())
         .with_data_root_path(data_root_path.clone())
         .test(&[])

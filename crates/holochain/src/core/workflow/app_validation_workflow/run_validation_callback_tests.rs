@@ -75,7 +75,6 @@ async fn validation_callback_must_get_action() {
     } = TestCase::new(zomes).await;
 
     let network = Arc::new(fixt!(HolochainP2pDna));
-    let dpki = None;
 
     // a create by alice
     let mut create = fixt!(Create);
@@ -98,7 +97,6 @@ async fn validation_callback_must_get_action() {
         &ribosome,
         workspace.clone(),
         network.clone(),
-        dpki.clone(),
         false,
     )
     .await
@@ -113,7 +111,7 @@ async fn validation_callback_must_get_action() {
     });
 
     // the same validation should now successfully validate the op
-    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, dpki, false)
+    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, false)
         .await
         .unwrap();
     assert_matches!(outcome, Outcome::Accepted);
@@ -190,7 +188,6 @@ async fn validation_callback_awaiting_deps_hashes() {
     });
 
     let network = Arc::new(network);
-    let dpki = None;
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
@@ -198,7 +195,6 @@ async fn validation_callback_awaiting_deps_hashes() {
         &ribosome,
         workspace.clone(),
         network.clone(),
-        dpki.clone(),
         false,
     )
     .await
@@ -214,7 +210,7 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     // app validation outcome should be accepted, now that the missing record
     // has been fetched
-    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, dpki, false)
+    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, false)
         .await
         .unwrap();
     assert_matches!(outcome, Outcome::Accepted)
@@ -316,15 +312,12 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     });
     let network = Arc::new(network);
 
-    let dpki = None;
-
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
         invocation.clone(),
         &ribosome,
         workspace.clone(),
         network.clone(),
-        dpki.clone(),
         false,
     )
     .await
@@ -343,7 +336,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
     // app validation outcome should be accepted, now that bob's missing agent
     // activity is available in alice's cache
-    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, dpki, false)
+    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, false)
         .await
         .unwrap();
     assert_matches!(outcome, Outcome::Accepted);

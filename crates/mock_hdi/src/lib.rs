@@ -54,9 +54,6 @@ use hdi::prelude::*;
             &self,
             input: MustGetAgentActivityInput,
         ) -> ExternResult<Vec<RegisterAgentActivity>>;
-        // DPKI
-        #[cfg(feature = "unstable-functions")]
-        fn is_same_agent(&self, key_1: AgentPubKey, key_2: AgentPubKey) -> ExternResult<bool>;
         // Info
         fn dna_info(&self, dna_info_input: ()) -> ExternResult<DnaInfo>;
         fn zome_info(&self, zome_info_input: ()) -> ExternResult<ZomeInfo>;

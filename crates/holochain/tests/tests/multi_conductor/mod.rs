@@ -12,37 +12,6 @@ use unwrap_to::unwrap_to;
 #[repr(transparent)]
 struct AppString(String);
 
-#[cfg(feature = "test_utils")]
-#[tokio::test(flavor = "multi_thread")]
-async fn dpki_publish() {
-    holochain_trace::test_run();
-
-    let config = SweetConductorConfig::standard();
-    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
-
-    conductors.exchange_peer_info().await;
-
-    await_consistency(10, conductors.dpki_cells().as_slice())
-        .await
-        .unwrap();
-}
-
-#[cfg(feature = "test_utils")]
-#[tokio::test(flavor = "multi_thread")]
-async fn dpki_no_publish() {
-    holochain_trace::test_run();
-
-    let config =
-        SweetConductorConfig::standard().tune_network_config(|nc| nc.disable_publish = true);
-    let conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
-
-    conductors.exchange_peer_info().await;
-
-    await_consistency(10, conductors.dpki_cells().as_slice())
-        .await
-        .unwrap();
-}
-
 /// Test that op publishing is sufficient for bobbo to get alice's op
 /// even with gossip disabled.
 #[cfg(feature = "test_utils")]
@@ -109,13 +78,11 @@ async fn multi_conductor() -> anyhow::Result<()> {
 
     const NUM_CONDUCTORS: usize = 3;
 
-    let config = SweetConductorConfig::rendezvous(true)
-        .tune_conductor(|config| {
-            // The default is 10s which makes the test very slow in the case that get requests in the sys validation workflow
-            // hit a conductor which isn't serving that data yet. Speed up by retrying more quickly.
-            config.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
-        })
-        .no_dpki_mustfix();
+    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|config| {
+        // The default is 10s which makes the test very slow in the case that get requests in the sys validation workflow
+        // hit a conductor which isn't serving that data yet. Speed up by retrying more quickly.
+        config.sys_validation_retry_delay = Some(std::time::Duration::from_millis(100));
+    });
 
     let mut conductors = SweetConductorBatch::from_config_rendezvous(NUM_CONDUCTORS, config).await;
 
@@ -123,10 +90,6 @@ async fn multi_conductor() -> anyhow::Result<()> {
         SweetDnaFile::unique_from_inline_zomes(("simple", simple_create_read_zome())).await;
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
-
-    let dpki_cells = conductors.dpki_cells();
-
-    await_consistency(20, dpki_cells.as_slice()).await.unwrap();
 
     let ((alice,), (bobbo,), (carol,)) = apps.into_tuples();
 

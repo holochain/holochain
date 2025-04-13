@@ -2400,7 +2400,7 @@ async fn crash_case() {
             .boxed()
         });
 
-    let validation_outcome = validate_op(&op, &dna_def, SysValDeps::default(), None)
+    let validation_outcome = validate_op(&op, &dna_def, SysValDeps::default())
         .await
         .unwrap();
 
@@ -2501,7 +2501,6 @@ impl TestCase {
             self.op.as_ref().expect("No op set, invalid test case"),
             &dna_def,
             self.current_validation_dependencies.clone(),
-            None,
         )
         .await
     }

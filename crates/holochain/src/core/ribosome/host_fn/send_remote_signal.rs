@@ -171,7 +171,7 @@ mod tests {
 
         let num_signals = Arc::new(AtomicUsize::new(0));
 
-        let config = SweetConductorConfig::standard().no_dpki();
+        let config = SweetConductorConfig::standard();
         let mut conductors = SweetConductorBatch::from_config(NUM_CONDUCTORS, config).await;
 
         let agents =

@@ -8,9 +8,6 @@ F=RUSTFLAGS="-Dwarnings"
 DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
 UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-countersigning,unstable-migration,$(DEFAULT_FEATURES)
 
-# TODO - removed `unstable-dpki` from the UNSTABLE_FEATURES list
-#        this is temporary until dpki dep is rebuilt without origin_time
-
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
 	static-all static-fmt static-toml static-clippy static-clippy-unstable \
@@ -94,7 +91,7 @@ test-workspace-wasmer_sys:
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
-# executes tests on all crates with wasmer compiler and unstable dpki feature
+# executes tests on all crates with wasmer compiler
 test-workspace-wasmer_sys-unstable:
 	cargo install cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \

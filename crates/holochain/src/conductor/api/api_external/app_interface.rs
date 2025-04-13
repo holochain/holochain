@@ -212,15 +212,7 @@ impl AppInterfaceApi {
                         "app not in correct state to enable".to_string(),
                     )),
                 }
-            } //
-              // TODO: implement after DPKI lands
-              // AppRequest::RotateAppAgentKey => {
-              //     let new_key = self
-              //         .conductor_handle
-              //         .rotate_app_agent_key(&installed_app_id)
-              //         .await?;
-              //     Ok(AppResponse::AppAgentKeyRotated(new_key))
-              // }
+            }
         }
     }
 }

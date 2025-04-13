@@ -1,7 +1,6 @@
 pub mod curve;
 
 use crate::conductor::api::CellConductorReadHandle;
-use crate::conductor::api::DpkiApi;
 use crate::conductor::api::MockCellConductorReadHandleT;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
@@ -336,8 +335,6 @@ fixturator!(
     ZomeCallHostAccess;
     curve Empty ZomeCallHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
-        // No DPKI fixturator
-        dpki: None,
         keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
         network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
         signal_tx: broadcast::channel(50).0,
@@ -345,8 +342,6 @@ fixturator!(
     };
     curve Unpredictable ZomeCallHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
-        // No DPKI fixturator
-        dpki: None,
         keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
         network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
         signal_tx: broadcast::channel(50).0,
@@ -356,8 +351,6 @@ fixturator!(
         workspace: HostFnWorkspaceFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        // No DPKI fixturator
-        dpki: None,
         keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
@@ -391,8 +384,6 @@ fixturator!(
     curve Empty InitHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
         keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
-        // DPKI cannot be fixturated.
-        dpki: None,
         network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
         signal_tx: broadcast::channel(50).0,
         call_zome_handle: CellConductorReadHandleFixturator::new(Empty).next().unwrap(),
@@ -400,8 +391,6 @@ fixturator!(
     curve Unpredictable InitHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
         keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
-        // DPKI cannot be fixturated.
-        dpki: None,
         network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
         signal_tx: broadcast::channel(50).0,
         call_zome_handle: CellConductorReadHandleFixturator::new(Unpredictable).next().unwrap(),
@@ -413,8 +402,6 @@ fixturator!(
         keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        // DPKI cannot be fixturated.
-        dpki: None,
         network: HolochainP2pDnaFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
@@ -463,18 +450,9 @@ fixturator!(
     constructor fn one(Zome);
 );
 
-// DPKI service itself cannot be fixturated. This is just needed for the ValidateHostAccess
-// fixturator.
-fixturator!(
-    DpkiApi;
-    curve Empty None;
-    curve Unpredictable None;
-    curve Predictable None;
-);
-
 fixturator!(
     ValidateHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pDna, DpkiApi, bool);
+    constructor fn new(HostFnWorkspace, HolochainP2pDna, bool);
 );
 
 fixturator!(

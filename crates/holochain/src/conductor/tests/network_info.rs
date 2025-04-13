@@ -10,7 +10,7 @@ async fn network_metrics() {
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let number_of_peers = 3;
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::standard();
     let mut conductors = SweetConductorBatch::from_config(number_of_peers, config).await;
     let app_id: InstalledAppId = "app".into();
     conductors.setup_app(&app_id, &[dna.clone()]).await.unwrap();

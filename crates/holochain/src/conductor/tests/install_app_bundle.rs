@@ -1,8 +1,3 @@
-#[cfg(feature = "unstable-migration")]
-use std::collections::BTreeSet;
-use std::collections::HashMap;
-use std::path::PathBuf;
-
 use crate::{conductor::error::ConductorError, sweettest::*};
 use holo_hash::DnaHash;
 use holochain_types::prelude::*;
@@ -10,6 +5,10 @@ use holochain_wasm_test_utils::TestWasm;
 #[cfg(feature = "unstable-migration")]
 use maplit::btreeset;
 use matches::assert_matches;
+#[cfg(feature = "unstable-migration")]
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
@@ -58,7 +57,6 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         }
     }
 
@@ -180,7 +178,6 @@ async fn reject_duplicate_app_for_same_agent() {
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -201,7 +198,6 @@ async fn reject_duplicate_app_for_same_agent() {
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
             network_seed: None,
         })
         .await;
@@ -226,7 +222,6 @@ async fn reject_duplicate_app_for_same_agent() {
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
             network_seed: None,
         })
         .await;
@@ -248,7 +243,6 @@ async fn reject_duplicate_app_for_same_agent() {
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
             network_seed: Some("network".into()),
         })
         .await;
@@ -298,7 +292,6 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             network_seed: Some("final seed".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -343,7 +336,6 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -543,7 +535,6 @@ async fn use_existing_integration() {
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -559,7 +550,6 @@ async fn use_existing_integration() {
                 network_seed: None,
                 roles_settings: Default::default(),
                 ignore_genesis_failure: false,
-                allow_throwaway_random_agent_key: true,
             })
             .await
             .unwrap_err();
@@ -580,7 +570,6 @@ async fn use_existing_integration() {
                 network_seed: None,
                 roles_settings: Default::default(),
                 ignore_genesis_failure: false,
-                allow_throwaway_random_agent_key: true,
             })
             .await
             .unwrap_err();
@@ -609,7 +598,6 @@ async fn use_existing_integration() {
             network_seed: None,
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();

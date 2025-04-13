@@ -36,7 +36,6 @@ async fn clone_cell_management() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -188,7 +187,6 @@ pub async fn app_info_refresh() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();

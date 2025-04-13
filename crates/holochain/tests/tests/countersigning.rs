@@ -23,7 +23,7 @@ mod session_interaction_over_websocket;
 async fn listen_for_countersigning_completion() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true).no_dpki();
+    let config = SweetConductorConfig::rendezvous(true);
     let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -131,12 +131,12 @@ async fn listen_for_countersigning_completion() {
 async fn retry_countersigning_commit_on_missing_deps() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true).no_dpki();
+    let config = SweetConductorConfig::rendezvous(true);
     let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
     for conductor in conductors.iter_mut() {
         conductor.shutdown().await;
     }
-    // Allow bootstrapping and network comms so that peers can find each other, and exchange DPKI info,
+    // Allow bootstrapping and network comms so that peers can find each other,
     // but before creating any data, disable publish and recent gossip.
     // Now the only way peers can get data is through get requests!
     for conductor in conductors.iter_mut() {
@@ -332,11 +332,9 @@ async fn retry_countersigning_commit_on_missing_deps() {
 async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true)
-        .no_dpki()
-        .tune_conductor(|c| {
-            c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
-        });
+    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|c| {
+        c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
+    });
     let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -452,12 +450,10 @@ async fn alice_can_recover_when_bob_abandons_a_countersigning_session() {
 async fn alice_can_recover_from_a_session_timeout() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true)
-        .no_dpki()
-        .tune_conductor(|c| {
-            c.countersigning_resolution_retry_limit = Some(3);
-            c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
-        });
+    let config = SweetConductorConfig::rendezvous(true).tune_conductor(|c| {
+        c.countersigning_resolution_retry_limit = Some(3);
+        c.countersigning_resolution_retry_delay = Some(Duration::from_secs(3));
+    });
     let mut conductors = SweetConductorBatch::from_config_rendezvous(3, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;
@@ -600,7 +596,7 @@ async fn alice_can_recover_from_a_session_timeout() {
 async fn complete_session_with_chc_enabled() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
+    let mut config = SweetConductorConfig::rendezvous(true);
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
@@ -725,7 +721,7 @@ async fn complete_session_with_chc_enabled() {
 async fn session_rollback_with_chc_enabled() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
+    let mut config = SweetConductorConfig::rendezvous(true);
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
@@ -850,13 +846,6 @@ async fn session_rollback_with_chc_enabled() {
     await_consistency(60, [alice, bob]).await.unwrap();
 }
 
-// This test is flaky on macos (locally?).
-// The problem only occurs when DPKI is enabled. The app is slow to react on the websocket, and therefore
-// the ws is closed and kept closed for 5 mins before it's re-connected.
-// As this is exclusive to DPKI, it's got something to do with DPKI execution, perhaps init or wasm
-// compilation, and is unrelated to websockets or kitsune.
-// When work on DPKI is resumed and this test is still flaky, this could serve as starting point for further
-// investigation.
 #[cfg(feature = "chc")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(
@@ -866,7 +855,7 @@ async fn session_rollback_with_chc_enabled() {
 async fn multiple_agents_on_same_conductor_with_chc_enabled() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
+    let mut config = SweetConductorConfig::rendezvous(true);
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
@@ -1084,7 +1073,7 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
 async fn chc_should_respect_chain_lock() {
     holochain_trace::test_run();
 
-    let mut config = SweetConductorConfig::rendezvous(true).no_dpki();
+    let mut config = SweetConductorConfig::rendezvous(true);
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));
@@ -1213,7 +1202,7 @@ async fn chc_should_respect_chain_lock() {
 async fn should_be_able_to_schedule_functions_during_session() {
     holochain_trace::test_run();
 
-    let config = SweetConductorConfig::rendezvous(true).no_dpki();
+    let config = SweetConductorConfig::rendezvous(true);
     let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::CounterSigning]).await;

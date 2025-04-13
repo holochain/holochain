@@ -44,32 +44,25 @@
 //! ```
 
 use crate::conductor::process::ERROR_CODE;
+use crate::config::conductor::paths::DataRootPath;
 use holochain_types::prelude::DbSyncStrategy;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
+use std::path::Path;
 
 mod admin_interface_config;
-mod dpki_config;
 #[allow(missing_docs)]
 mod error;
 mod keystore_config;
 /// Defines subdirectories of the config directory.
 pub mod paths;
 pub mod process;
-//mod logger_config;
-//mod signal_config;
 
 pub use super::*;
-pub use dpki_config::DpkiConfig;
-//pub use logger_config::LoggerConfig;
 pub use error::*;
 pub use keystore_config::KeystoreConfig;
-//pub use signal_config::SignalConfig;
-use std::path::Path;
-
-use crate::config::conductor::paths::DataRootPath;
 
 /// All the config information for the conductor
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default, JsonSchema)]
@@ -84,32 +77,9 @@ pub struct ConductorConfig {
     /// The database and compiled wasm directories are derived from this path.
     pub data_root_path: Option<DataRootPath>,
 
-    /// The lair tag used to refer to the "device seed" which was used to generate
-    /// the AgentPubKey for the DPKI cell.
-    ///
-    /// This must not be changed once the conductor has been started for the first time.
-    pub device_seed_lair_tag: Option<String>,
-
-    /// If set, and if there is no seed in lair at the tag specified in `device_seed_lair_tag`,
-    /// the conductor will create a random seed and store it in lair at the specified tag.
-    /// This should only be used for test or throwaway environments, because this device seed
-    /// can never be regenerated, which defeats the purpose of having a device seed in the first place.
-    ///
-    /// If `device_seed_lair_tag` is not set, this setting has no effect.
-    #[serde(default)]
-    pub danger_generate_throwaway_device_seed: bool,
-
     /// Define how Holochain conductor will connect to a keystore.
     #[serde(default)]
     pub keystore: KeystoreConfig,
-
-    /// DPKI config for this conductor. This setting must not change once the conductor has been
-    /// started for the first time.
-    ///
-    /// If `dna_path` is present, the DNA file at this path will be used to install the DPKI service upon first conductor startup.
-    /// If not present, the Deepkey DNA specified by the `holochain_deepkey_dna` crate and built into Holochain, will be used instead.
-    #[serde(default)]
-    pub dpki: DpkiConfig,
 
     /// Setup admin interfaces to control this conductor through a websocket connection.
     pub admin_interfaces: Option<Vec<AdminInterfaceConfig>>,
@@ -573,10 +543,7 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                device_seed_lair_tag: None,
-                danger_generate_throwaway_device_seed: false,
                 network: NetworkConfig::default(),
-                dpki: DpkiConfig::default(),
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
@@ -588,7 +555,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(feature = "unstable-dpki"))]
     #[test]
     #[allow(clippy::field_reassign_with_default)]
     fn test_config_complete_config() {
@@ -602,11 +568,6 @@ mod tests {
 
     keystore:
       type: lair_server_in_proc
-
-    dpki:
-      dna_path: ~
-      network_seed: ""
-      no_dpki: true
 
     admin_interfaces:
       - driver:
@@ -662,71 +623,6 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                device_seed_lair_tag: None,
-                danger_generate_throwaway_device_seed: false,
-                dpki: DpkiConfig::disabled(),
-                keystore: KeystoreConfig::LairServerInProc { lair_root: None },
-                admin_interfaces: Some(vec![AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket {
-                        port: 1234,
-                        allowed_origins: AllowedOrigins::Any
-                    }
-                }]),
-                network: network_config,
-                db_sync_strategy: DbSyncStrategy::Fast,
-                #[cfg(feature = "chc")]
-                chc_url: None,
-                tuning_params: None,
-                tracing_scope: None,
-            }
-        );
-    }
-
-    #[cfg(feature = "unstable-dpki")]
-    #[test]
-    fn test_config_complete_config() {
-        holochain_trace::test_run();
-
-        let yaml = r#"---
-    data_root_path: /path/to/env
-    signing_service_uri: ws://localhost:9001
-    encryption_service_uri: ws://localhost:9002
-    decryption_service_uri: ws://localhost:9003
-
-    keystore:
-      type: lair_server_in_proc
-
-    dpki:
-      dna_path: path/to/dna.dna
-      network_seed: "deepkey-main"
-      device_seed_lair_tag: "device-seed"
-
-    admin_interfaces:
-      - driver:
-          type: websocket
-          port: 1234
-          allowed_origins: "*"
-
-    network:
-      bootstrap_url: https://test-boot.tld
-      signal_url: wss://test-sig.tld
-
-    db_sync_strategy: Fast
-    "#;
-        let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
-        let network_config = NetworkConfig {
-            bootstrap_url: url2::url2!("https://test-boot.tld"),
-            signal_url: url2::url2!("wss://test-sig.tld"),
-            ..Default::default()
-        };
-        pretty_assertions::assert_eq!(
-            result.unwrap(),
-            ConductorConfig {
-                tracing_override: None,
-                data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                device_seed_lair_tag: None,
-                danger_generate_throwaway_device_seed: false,
-                dpki: DpkiConfig::production(Some("path/to/dna.dna".into())),
                 keystore: KeystoreConfig::LairServerInProc { lair_root: None },
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket {
@@ -759,10 +655,7 @@ mod tests {
             ConductorConfig {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
-                device_seed_lair_tag: None,
-                danger_generate_throwaway_device_seed: false,
                 network: NetworkConfig::default(),
-                dpki: Default::default(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },

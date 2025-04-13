@@ -19,9 +19,8 @@ async fn get_with_zero_arc_2_way() {
     holochain_trace::test_run();
 
     // Standard config with arc clamped to zero and publishing off
-    let empty_arc_conductor_config = SweetConductorConfig::rendezvous(false)
-        .no_dpki_mustfix()
-        .tune_network_config(|nc| {
+    let empty_arc_conductor_config =
+        SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
             nc.disable_publish = true;
             nc.target_arc_factor = 0;
         });

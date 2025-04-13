@@ -15,17 +15,7 @@ pub fn get_agent_key_lineage(
         HostFnAccess {
             agent_info: Permission::Allow,
             ..
-        } => match call_context.host_context.maybe_dpki() {
-            // If DPKI is not installed, agents cannot update keys. The lineage is just the one agent key.
-            None => Ok(vec![input]),
-            Some(dpki) => tokio_helper::block_forever_on(async move {
-                let state = dpki.state().await;
-                state
-                    .get_agent_key_lineage(input)
-                    .await
-                    .map_err(|error| RuntimeError::new(error.to_string()))
-            }),
-        },
+        } => Ok(vec![input]),
         _ => Err(wasm_error!(WasmErrorInner::Host(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),

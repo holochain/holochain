@@ -1,7 +1,5 @@
 //! Tests related to key revocation are located under [tests/agent_key_revocation](tests).
 
-use holochain_types::deepkey_roundtrip_backward;
-
 use super::*;
 
 /// The result type of an agent key revocation for an app.
@@ -11,8 +9,6 @@ impl Conductor {
     /// Revoke an agent's key pair for all cells of an app.
     ///
     /// Writes a `Delete` action to the source chain of all cells of the app, which renders them read-only.
-    /// If DPKI is installed as conductor service, the agent key will be revoked there too and becomes
-    /// invalid.
     pub async fn revoke_agent_key_for_app(
         self: Arc<Self>,
         agent_key: AgentPubKey,
@@ -23,8 +19,7 @@ impl Conductor {
             .disable_app(app_id.clone(), DisabledAppReason::DeletingAgentKey)
             .await?;
 
-        // Revoke key in DPKI first, if installed, and then in cells' source chains.
-        // Call separate function so that in case a part of key revocation fails, the app is still enabled again.
+        // Call separate function so that in case a part of key revocation fails, the app is enabled again before the call returns.
         let revocation_per_cell_results =
             Conductor::revoke_agent_key_for_app_inner(self.clone(), agent_key, app_id.clone())
                 .await;
@@ -71,47 +66,6 @@ impl Conductor {
         agent_key: AgentPubKey,
         app_id: InstalledAppId,
     ) -> ConductorResult<RevokeAgentKeyForAppResult> {
-        // If DPKI service is installed, revoke agent key there first
-        if let Some(dpki_service) = conductor.running_services().dpki {
-            let dpki_state = dpki_service.state().await;
-            let timestamp = Timestamp::now();
-            let key_state = dpki_state.key_state(agent_key.clone(), timestamp).await?;
-            match key_state {
-                KeyState::NotFound => {
-                    return Err(ConductorError::DpkiError(
-                        DpkiServiceError::DpkiAgentMissing(agent_key.clone()),
-                    ))
-                }
-                // If the key already is invalid, do nothing. Operation should be idempotent to allow for
-                // retries if agent key of some source chain could not be deleted successfully.
-                KeyState::Invalid(_) => (),
-                KeyState::Valid(_) => {
-                    // Get action hash of key registration
-                    let key_meta = dpki_state.query_key_meta(agent_key.clone()).await?;
-                    // Sign revocation request
-                    let signature = dpki_service
-                        .cell_id
-                        .agent_pubkey()
-                        .sign_raw(
-                            &conductor.keystore,
-                            key_meta.key_registration_addr.get_raw_39().into(),
-                        )
-                        .await
-                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
-                    let signature = deepkey_roundtrip_backward!(Signature, &signature);
-                    // Revoke key in DPKI
-                    let _revocation = dpki_state
-                        .revoke_key(RevokeKeyInput {
-                            key_revocation: KeyRevocation {
-                                prior_key_registration: key_meta.key_registration_addr,
-                                revocation_authorization: vec![(0, signature)],
-                            },
-                        })
-                        .await?;
-                }
-            };
-        }
-
         // Write 'Delete' action to source chains of all cells of the app
         let state = conductor.get_state().await?;
         let app = state.get_app(&app_id)?;

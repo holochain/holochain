@@ -25,12 +25,10 @@ either = "1.5.0"
 fallible-iterator = "0.3.0"
 futures = "0.3"
 getrandom = "0.2.7"
-hc_deepkey_sdk = { version = "^0.8.0", path = "../hc_deepkey_sdk" }
 holo_hash = { version = "^0.5.0", path = "../holo_hash", features = ["full"] }
 holochain_cascade = { version = "^0.5.0", path = "../holochain_cascade" }
 holochain_chc = { version = "^0.2.0", path = "../holochain_chc", default-features = false }
 holochain_conductor_api = { version = "^0.5.0", path = "../holochain_conductor_api" }
-holochain_deepkey_dna = "0.0.8-dev.2"
 holochain_keystore = { version = "^0.5.0", path = "../holochain_keystore", default-features = false }
 holochain_p2p = { version = "^0.5.0", path = "../holochain_p2p" }
 holochain_sqlite = { version = "^0.5.0", path = "../holochain_sqlite" }
@@ -133,7 +131,6 @@ holochain = { path = ".", default-features = false, features = [
   "test_utils",
   "slow_tests",
   "metrics_influxive",
-  "deepkey-wasm-cache",
 ] }
 
 anyhow = "1.0"
@@ -196,7 +193,6 @@ metrics_influxive = ["holochain_metrics/influxive"]
 test_utils = [
   "fixt",
   "contrafact",
-  "deepkey-wasm-cache",
   "diff",
   "hdk/test_utils",
   "holochain_sqlite/test_utils",
@@ -205,7 +201,6 @@ test_utils = [
   "holochain_zome_types/test_utils",
   "holochain_cascade/test_utils",
   "holochain_conductor_api/test-utils",
-  "holochain_conductor_services/test_utils",
   "holochain_p2p/mock_network",
   "matches",
   "holochain_test_wasm_common",
@@ -285,16 +280,6 @@ chc = [
   "holochain_chc/http",
 ]
 
-# Enable unstable DPKI feature.
-unstable-dpki = [
-  "holochain_conductor_api/unstable-dpki",
-  "holochain_conductor_config/unstable-dpki",
-  "holochain_zome_types/unstable-dpki",
-  "holochain_wasm_test_utils/unstable-dpki",
-  # the deepkey dna is built with the lineage field
-  "unstable-migration",
-]
-
 # Enable the unstable migration feature
 unstable-migration = [
   "holochain_types/unstable-migration",
@@ -313,8 +298,6 @@ unstable-warrants = [
 unstable-sharding = []
 
 sweettest = ["test_utils", "sqlite"]
-
-deepkey-wasm-cache = []
 
 # Enables tracing instrumentation
 # (we experience segfaults in some tests if there is too much instrumentation)
