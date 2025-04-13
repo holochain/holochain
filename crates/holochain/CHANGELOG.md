@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   disproportionately difficult to debug. If Holochain will be enhanced by agent key management in the future, it will be reimplemented from the
   ground up.
 - Remove all references to Deepkey DNA.
+- Remove call to revoke an agent key from the Conductor API. There was no way to update an agent key or create a new key for an agent. The
+  call was a remnant of the intended DPKI feature.
 
 ## 0.5.0
 
