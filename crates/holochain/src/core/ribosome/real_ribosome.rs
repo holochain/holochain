@@ -98,8 +98,6 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
-#[cfg(feature = "unstable-functions")]
-use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
 #[cfg(feature = "unstable-countersigning")]
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 #[cfg(feature = "unstable-functions")]
@@ -659,11 +657,6 @@ impl RealRibosome {
         );
         #[cfg(feature = "unstable-functions")]
         host_fn_builder
-            .with_host_function(
-                &mut ns,
-                "__hc__get_agent_key_lineage_1",
-                get_agent_key_lineage,
-            )
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
@@ -1378,8 +1371,6 @@ pub mod wasm_test {
                 "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
-                #[cfg(feature = "unstable-functions")]
-                "__hc__get_agent_key_lineage_1",
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",

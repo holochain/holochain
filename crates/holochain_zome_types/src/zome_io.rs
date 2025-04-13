@@ -89,10 +89,6 @@ wasm_io_types! {
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    // DPKI
-    #[cfg(feature = "unstable-functions")]
-    fn get_agent_key_lineage (AgentPubKey) -> Vec<AgentPubKey>;
-
     fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
     fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;

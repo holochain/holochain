@@ -42,9 +42,6 @@ pub trait HdkT: HdiT {
         &self,
         preflight_request: PreflightRequest,
     ) -> ExternResult<PreflightRequestAcceptance>;
-    // DPKI
-    #[cfg(feature = "unstable-functions")]
-    fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>>;
     // Info
     fn agent_info(&self, agent_info_input: ()) -> ExternResult<AgentInfo>;
     fn call_info(&self, call_info_input: ()) -> ExternResult<CallInfo>;
@@ -193,7 +190,6 @@ mockall::mock! {
         fn close_chain(&self, input: CloseChainInput) -> ExternResult<ActionHash>;
         fn open_chain(&self, input: OpenChainInput) -> ExternResult<ActionHash>;
         fn get_validation_receipts(&self, input: GetValidationReceiptsInput) -> ExternResult<Vec<ValidationReceiptSet>>;
-        fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>>;
     }
 
     impl HdiT for HdkT {
@@ -359,11 +355,6 @@ impl HdkT for ErrHdk {
         Self::err()
     }
     fn call_info(&self, _: ()) -> ExternResult<CallInfo> {
-        Self::err()
-    }
-    // DPKI
-    #[cfg(feature = "unstable-functions")]
-    fn get_agent_key_lineage(&self, _: AgentPubKey) -> ExternResult<Vec<AgentPubKey>> {
         Self::err()
     }
     // Link
@@ -611,11 +602,6 @@ impl HdkT for HostHdk {
             __hc__accept_countersigning_preflight_request_1,
             preflight_request,
         )
-    }
-    // DPKI
-    #[cfg(feature = "unstable-functions")]
-    fn get_agent_key_lineage(&self, agent_key: AgentPubKey) -> ExternResult<Vec<AgentPubKey>> {
-        host_call::<AgentPubKey, Vec<AgentPubKey>>(__hc__get_agent_key_lineage_1, agent_key)
     }
     fn agent_info(&self, _: ()) -> ExternResult<AgentInfo> {
         host_call::<(), AgentInfo>(__hc__agent_info_1, ())
