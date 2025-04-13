@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Remove unstable feature DPKI and all references to it, including the DPKI conductor service. DPKI was introduced to the codebase prematurely,
+  largely untested, provided only a minimal set of calls to query agent keys and revoke an agent key, and kept causing problems that were
+  disproportionately difficult to debug. If Holochain will be enhanced by agent key management in the future, it will be reimplemented from the
+  ground up.
+- Remove all references to Deepkey DNA.
+
 ## 0.5.0
 
 ## 0.5.0-rc.1
