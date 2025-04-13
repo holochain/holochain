@@ -29,10 +29,6 @@ use std::sync::Mutex;
 mod add_agent_infos;
 mod state_dump;
 
-// Module with tests for agent key revocation. An agent can revoke their key,
-// which prevents further modifications of the source chain.
-mod agent_key_revocation;
-
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
     let db_dir = test_db_dir();

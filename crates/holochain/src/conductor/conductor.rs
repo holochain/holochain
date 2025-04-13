@@ -57,7 +57,6 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tracing::*;
 
-pub use agent_key_operations::RevokeAgentKeyForAppResult;
 pub use builder::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
@@ -135,13 +134,6 @@ mod state_dump_helpers;
 ///
 /// [Signature verification](holochain_conductor_api::AppRequest::CallZome)
 pub(crate) mod zome_call_signature_verification;
-
-/// Operations to manipulate agent keys.
-///
-/// When revoking a key, it becomes invalid and the source chain can no longer be written to.
-/// Clone cells can not be created any more either. This source chain state if final and can not
-/// be reverted or changed.
-mod agent_key_operations;
 
 pub(crate) mod app_broadcast;
 

@@ -4,7 +4,7 @@ use holo_hash::DnaHash;
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationToken, AppAuthenticationTokenIssued, AppInfo,
     AppInterfaceInfo, AppStatusFilter, FullStateDump, IssueAppAuthenticationTokenPayload,
-    RevokeAgentKeyPayload, StorageInfo,
+    StorageInfo,
 };
 use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
@@ -208,22 +208,6 @@ impl AdminWebsocket {
         let response = self.send(AdminRequest::GenerateAgentPubKey).await?;
         match response {
             AdminResponse::AgentPubKeyGenerated(key) => Ok(key),
-            _ => unreachable!("Unexpected response {:?}", response),
-        }
-    }
-
-    pub async fn revoke_agent_key(
-        &self,
-        app_id: String,
-        agent_key: AgentPubKey,
-    ) -> ConductorApiResult<Vec<(CellId, String)>> {
-        let response = self
-            .send(AdminRequest::RevokeAgentKey(Box::new(
-                RevokeAgentKeyPayload { app_id, agent_key },
-            )))
-            .await?;
-        match response {
-            AdminResponse::AgentKeyRevoked(errors) => Ok(errors),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }
