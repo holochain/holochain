@@ -60,7 +60,7 @@ impl Conductor {
         Ok(revocation_per_cell_results)
     }
 
-    /// Revoke agent key in Deepkey first, if installed, and then write a [`Delete`] of the key to the source chain.
+    /// Revoke agent key and write a [`Delete`] of the key to the source chain.
     async fn revoke_agent_key_for_app_inner(
         conductor: Arc<Conductor>,
         agent_key: AgentPubKey,

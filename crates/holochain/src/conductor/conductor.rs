@@ -138,10 +138,6 @@ pub(crate) mod zome_call_signature_verification;
 
 /// Operations to manipulate agent keys.
 ///
-/// Agent keys are handled in 2 places in Holochain, on the source chain of a cell and in the
-/// Deepkey service, should it be installed. Operations to manipulate these keys include key
-/// revocation and key update.
-///
 /// When revoking a key, it becomes invalid and the source chain can no longer be written to.
 /// Clone cells can not be created any more either. This source chain state if final and can not
 /// be reverted or changed.

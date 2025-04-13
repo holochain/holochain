@@ -31,9 +31,6 @@ members = [
   "crates/holochain_conductor_config",
   "crates/timestamp",
 
-  "crates/hc_deepkey_sdk",
-  "crates/hc_deepkey_types",
-
   "crates/client",
   "crates/hc",
   "crates/hc_bundle",
@@ -98,7 +95,6 @@ lto = true
 # kitsune2_gossip = { path = "../kitsune2/crates/gossip" }
 # kitsune2_bootstrap_srv = { path = "../kitsune2/crates/bootstrap_srv" }
 # kitsune2_bootstrap_client = { path = "../kitsune2/crates/bootstrap_client" }
-# holochain_deepkey_dna = { path = "../deepkey/crates/holochain_deepkey_dna" }
 # task-motel = { path = "../task-motel" }
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }

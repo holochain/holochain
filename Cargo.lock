@@ -2384,27 +2384,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc_deepkey_sdk"
-version = "0.8.0"
-dependencies = [
- "hc_deepkey_types",
- "hdk",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
-name = "hc_deepkey_types"
-version = "0.9.0"
-dependencies = [
- "hdi",
- "holo_hash",
- "holochain_integrity_types",
- "rmpv",
- "serde",
-]
-
-[[package]]
 name = "hc_demo_cli"
 version = "0.2.0-beta-rc.0"
 dependencies = [

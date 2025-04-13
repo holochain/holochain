@@ -111,8 +111,8 @@ pub enum AdminRequest {
     /// Revoke an agent key for an app.
     ///
     /// When an agent key is revoked, it becomes invalid and can no longer be used to author
-    /// actions for that app. The key is revoked in the Deepkey service if installed and deleted on
-    /// the source chains of all cells of the app, making them read-only. Cloning a cell of this app will fail.
+    /// actions for that app. The key is revoked and deleted on the source chains of all cells
+    /// of the app, making them read-only. Cloning a cell of this app will fail.
     ///
     /// If the key could not be deleted from all cells, this call can be re-attempted to delete the key from the remaining cells.
     ///

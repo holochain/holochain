@@ -120,7 +120,6 @@ use once_cell::sync::Lazy;
 use opentelemetry_api::global::meter_with_version;
 use opentelemetry_api::metrics::Counter;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
@@ -156,10 +155,6 @@ pub struct RealRibosome {
 
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
-
-    #[cfg(test)]
-    /// Wasm cache for Deepkey wasm in a temporary directory to be shared across all tests.
-    pub shared_test_module_cache: Arc<ModuleCacheLock>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -262,24 +257,12 @@ impl RealRibosome {
         dna_file: DnaFile,
         wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
     ) -> RibosomeResult<Self> {
-        let mut _shared_test_module_cache: Option<PathBuf> = None;
-        #[cfg(test)]
-        {
-            // Create this temporary directory only in tests.
-            let shared_test_module_cache_dir = std::env::temp_dir().join("deepkey_wasm_cache");
-            let _ = std::fs::create_dir_all(shared_test_module_cache_dir.clone());
-            _shared_test_module_cache = Some(shared_test_module_cache_dir);
-        }
         let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
-            #[cfg(test)]
-            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
-                _shared_test_module_cache,
-            ))),
         };
 
         // Collect the number of entry and link types
@@ -375,8 +358,6 @@ impl RealRibosome {
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
-            #[cfg(test)]
-            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
     }
 
@@ -386,10 +367,6 @@ impl RealRibosome {
 
         if self.wasmer_module_cache.is_some() {
             let cache_key = self.get_module_cache_key(zome_name)?;
-            // When running tests, use cache folder accessible to all tests.
-            #[cfg(test)]
-            let cache_lock = self.shared_test_module_cache.clone();
-            #[cfg(not(test))]
             let cache_lock = self.wasmer_module_cache.clone().unwrap();
 
             tokio::task::spawn_blocking(move || {
@@ -1277,8 +1254,6 @@ pub mod wasm_test {
         }
 
         // Make sure the context map does not retain items.
-        // Zome `deepkey_csr`` does a post_commit call which takes some time to complete,
-        // before it is removed from the context map.
         wait_for_10s!(
             CONTEXT_MAP.clone(),
             |context_map: &Arc<Mutex<HashMap<u64, Arc<_>>>>| context_map.lock().is_empty(),
