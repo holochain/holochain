@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Update to Kitsune2 0.1.2 to get some UX improvements and bug fixes.
+
 ## 0.5.0-rc.2
 
 ## 0.5.0-rc.1
