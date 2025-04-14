@@ -2,10 +2,11 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use holo_hash::{DhtOpHash, DnaHash};
 use holochain_serialized_bytes::prelude::decode;
-use holochain_sqlite::db::{DbKindDht, DbWrite};
+use holochain_sqlite::db::{DbKindDht, DbWrite, ReadAccess};
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_dht::{
-    EARLIEST_TIMESTAMP, OPS_BY_ID, OP_HASHES_IN_TIME_SLICE, OP_HASHES_SINCE_TIME_BATCH,
+    CHECK_OP_IDS_PRESENT, EARLIEST_TIMESTAMP, OPS_BY_ID, OP_HASHES_IN_TIME_SLICE,
+    OP_HASHES_SINCE_TIME_BATCH,
 };
 use holochain_state::prelude::{named_params, StateMutationResult};
 use holochain_types::dht_op::DhtOpHashed;
@@ -197,6 +198,39 @@ impl OpStore for HolochainOpStore {
                 })
                 .await
                 .map_err(|e| K2Error::other_src("Failed to retrieve ops", e))?;
+
+            Ok(out)
+        })
+    }
+
+    fn filter_out_existing_ops(&self, op_ids: Vec<OpId>) -> BoxFuture<'_, K2Result<Vec<OpId>>> {
+        let db = self.db.clone();
+
+        Box::pin(async move {
+            let out = db
+                .read_async(move |txn| -> StateMutationResult<Vec<OpId>> {
+                    let mut stmt = txn.prepare(CHECK_OP_IDS_PRESENT)?;
+
+                    let mut rows = stmt.query([Rc::new(
+                        op_ids
+                            .iter()
+                            .map(|id| {
+                                let hash = DhtOpHash::from_k2_op(id);
+                                Value::from(hash.into_inner())
+                            })
+                            .collect::<Vec<_>>(),
+                    )])?;
+
+                    let mut out = op_ids.into_iter().collect::<HashSet<_>>();
+                    while let Some(row) = rows.next()? {
+                        let op_hash: DhtOpHash = row.get(0)?;
+                        out.remove(&op_hash.to_k2_op());
+                    }
+
+                    Ok(out.into_iter().collect())
+                })
+                .await
+                .map_err(|e| K2Error::other_src("Failed to filter out existing ops", e))?;
 
             Ok(out)
         })
