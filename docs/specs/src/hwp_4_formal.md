@@ -565,15 +565,3 @@ Note: Beyond Warrants, blocking can also theoretically be used by apps or agents
 ## Cross-DNA Composability
 
 Holochain is designed to be used to build micro-services that can be assembled into applications. We expect DNAs to be written that assume the existence of other long-running DNAs and make calls to them via the agency of a user having installed both DNAs on their node. The Capabilities security model described above makes sure this kind of calling is safe and can only happen when permissions to do so have been explicitly granted in a given context. The HDK `call` function provides an affordance to allow specification of the DNA by hash when making the call, so the Holochain node can make a zome call to that DNA and return the result to the calling node.
-
-## Holochain Implementation
-
-Given the above formal description of our local state model (Source Chain) and shared data model (Graph DHT) we can now present a high-level implementation specification of different components of the Holochain architecture. The components include:
-
-* App Virtual Machine (Ribosome)
-* State Management (Workflows)
-* P2P Networking (Kitsune and Holochain P2P)
-* Application Interface (Conductor API)
-* Secure Private Key Management (lair-keystore)
-
-Please see the [Implementation Spec (Appendix A)](hwp_A_implementation_spec.md) for details.
