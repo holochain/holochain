@@ -198,6 +198,34 @@ async fn process_incoming_ops_and_retrieve() {
 }
 
 #[tokio::test]
+async fn filter_out_existing_ops() {
+    let (_, op_store) = setup_test().await;
+
+    let dht_op_1 = test_dht_op(Timestamp::now());
+    let dht_op_2 = test_dht_op(Timestamp::now());
+
+    op_store
+        .process_incoming_ops(vec![
+            Bytes::from(holochain_serialized_bytes::encode(dht_op_1.as_content()).unwrap()),
+            Bytes::from(holochain_serialized_bytes::encode(dht_op_2.as_content()).unwrap()),
+        ])
+        .await
+        .unwrap();
+
+    let to_check = vec![dht_op_1.as_hash().to_k2_op(), dht_op_2.as_hash().to_k2_op()];
+    let all_exist_filtered = op_store.filter_out_existing_ops(to_check).await.unwrap();
+
+    assert!(all_exist_filtered.is_empty());
+
+    let non_existent_op_id = OpId::from(Bytes::from_static(&[5; 32]));
+    let to_check = vec![dht_op_1.as_hash().to_k2_op(), non_existent_op_id.clone()];
+    let some_exists_filtered = op_store.filter_out_existing_ops(to_check).await.unwrap();
+
+    assert_eq!(1, some_exists_filtered.len());
+    assert_eq!(non_existent_op_id, some_exists_filtered[0]);
+}
+
+#[tokio::test]
 async fn retrieve_in_time_slice() {
     let (db, op_store) = setup_test().await;
 

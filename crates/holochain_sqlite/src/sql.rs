@@ -73,6 +73,8 @@ pub mod sql_dht {
 
     pub const OPS_BY_ID: &str = include_str!("sql/dht/ops_by_id.sql");
 
+    pub const CHECK_OP_IDS_PRESENT: &str = include_str!("sql/dht/check_op_ids_present.sql");
+
     pub const EARLIEST_TIMESTAMP: &str = include_str!("sql/dht/earliest_timestamp.sql");
 }
 
