@@ -17,7 +17,6 @@ use hdk::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
-use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
@@ -89,7 +88,6 @@ pub struct HostFnCaller {
     pub dht_db: DbWrite<DbKindDht>,
     pub dht_db_cache: DhtDbQueryCache,
     pub cache: DbWrite<DbKindCache>,
-    pub dpki: Option<DpkiImpl>,
     pub ribosome: RealRibosome,
     pub zome_path: ZomePath,
     pub network: HolochainP2pDna,
@@ -149,7 +147,6 @@ impl HostFnCaller {
             dht_db,
             dht_db_cache,
             cache,
-            dpki: None,
             ribosome,
             zome_path,
             network,
@@ -173,7 +170,6 @@ impl HostFnCaller {
             authored_db,
             dht_db,
             cache,
-            dpki,
             network,
             keystore,
             ribosome,
@@ -199,7 +195,6 @@ impl HostFnCaller {
         let host_access = ZomeCallHostAccess::new(
             workspace.clone().into(),
             keystore,
-            dpki,
             network,
             signal_tx,
             call_zome_handle,

@@ -41,7 +41,6 @@ async fn handle_signal() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -137,7 +136,6 @@ async fn close_on_drop_is_clone_safe() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -206,7 +204,6 @@ async fn deferred_memproof_installation() {
             roles_settings: None,
             source: AppBundleSource::Bytes(app_bundle_bytes),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -288,7 +285,6 @@ async fn connect_multiple_addresses() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -344,7 +340,6 @@ async fn connect_with_custom_origin() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -398,7 +393,6 @@ async fn dump_network_stats() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -452,7 +446,6 @@ async fn dump_network_metrics() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();

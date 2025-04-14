@@ -48,7 +48,6 @@ async fn signed_zome_call() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -124,7 +123,6 @@ async fn storage_info() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -159,7 +157,6 @@ async fn dump_network_stats() {
             roles_settings: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -168,49 +165,6 @@ async fn dump_network_stats() {
     let network_stats = admin_ws.dump_network_stats().await.unwrap();
 
     assert_eq!("kitsune2-core-mem", network_stats.backend);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn revoke_agent_key() {
-    let conductor = SweetConductor::from_standard_config().await;
-    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port))
-        .await
-        .unwrap();
-
-    let app_info = admin_ws
-        .install_app(InstallAppPayload {
-            agent_key: None,
-            installed_app_id: None,
-            network_seed: None,
-            roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
-            ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
-        })
-        .await
-        .unwrap();
-    let app_id = app_info.installed_app_id.clone();
-    admin_ws.enable_app(app_id.clone()).await.unwrap();
-
-    let agent_key = app_info.agent_pub_key.clone();
-    let response = admin_ws
-        .revoke_agent_key(app_id.clone(), agent_key.clone())
-        .await
-        .unwrap();
-    assert_eq!(response, vec![]);
-    let response = admin_ws
-        .revoke_agent_key(app_id, agent_key.clone())
-        .await
-        .unwrap();
-    let cell_id = if let CellInfo::Provisioned(provisioned_cell) =
-        &app_info.cell_info.get(ROLE_NAME).unwrap()[0]
-    {
-        provisioned_cell.cell_id.clone()
-    } else {
-        panic!("expected provisioned cell")
-    };
-    assert!(matches!(&response[0], (cell, error) if *cell == cell_id && error.contains("invalid")));
 }
 
 fn make_agent(space: kitsune2_api::SpaceId) -> String {
@@ -248,7 +202,6 @@ async fn agent_info() {
             network_seed: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -294,7 +247,6 @@ async fn list_cell_ids() {
             network_seed: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();
@@ -307,8 +259,8 @@ async fn list_cell_ids() {
         };
 
     let cell_ids = admin_ws.list_cell_ids().await.unwrap();
-    // Check if list includes cell id. Not checking for equality to a vector of just the one cell id,
-    // because the DPKI cell is included too.
+    // Check if list includes cell id.
+    assert_eq!(cell_ids.len(), 1);
     assert!(cell_ids.contains(&cell_id));
 }
 
@@ -347,7 +299,6 @@ async fn install_app_with_roles_settings() {
             network_seed: None,
             source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: false,
         })
         .await
         .unwrap();

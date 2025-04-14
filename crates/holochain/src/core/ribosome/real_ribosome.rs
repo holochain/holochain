@@ -98,14 +98,10 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
-#[cfg(feature = "unstable-functions")]
-use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
 #[cfg(feature = "unstable-countersigning")]
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 #[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::block_agent::block_agent;
-#[cfg(feature = "unstable-functions")]
-use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
 #[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::schedule::schedule;
 #[cfg(feature = "unstable-functions")]
@@ -124,7 +120,6 @@ use once_cell::sync::Lazy;
 use opentelemetry_api::global::meter_with_version;
 use opentelemetry_api::metrics::Counter;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
@@ -160,10 +155,6 @@ pub struct RealRibosome {
 
     /// File system and in-memory cache for wasm modules.
     pub wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
-
-    #[cfg(test)]
-    /// Wasm cache for Deepkey wasm in a temporary directory to be shared across all tests.
-    pub shared_test_module_cache: Arc<ModuleCacheLock>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -266,24 +257,12 @@ impl RealRibosome {
         dna_file: DnaFile,
         wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
     ) -> RibosomeResult<Self> {
-        let mut _shared_test_module_cache: Option<PathBuf> = None;
-        #[cfg(test)]
-        {
-            // Create this temporary directory only in tests.
-            let shared_test_module_cache_dir = std::env::temp_dir().join("deepkey_wasm_cache");
-            let _ = std::fs::create_dir_all(shared_test_module_cache_dir.clone());
-            _shared_test_module_cache = Some(shared_test_module_cache_dir);
-        }
         let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
-            #[cfg(test)]
-            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
-                _shared_test_module_cache,
-            ))),
         };
 
         // Collect the number of entry and link types
@@ -379,8 +358,6 @@ impl RealRibosome {
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
-            #[cfg(test)]
-            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
         }
     }
 
@@ -390,10 +367,6 @@ impl RealRibosome {
 
         if self.wasmer_module_cache.is_some() {
             let cache_key = self.get_module_cache_key(zome_name)?;
-            // When running tests, use cache folder accessible to all tests.
-            #[cfg(test)]
-            let cache_lock = self.shared_test_module_cache.clone();
-            #[cfg(not(test))]
             let cache_lock = self.wasmer_module_cache.clone().unwrap();
 
             tokio::task::spawn_blocking(move || {
@@ -661,12 +634,6 @@ impl RealRibosome {
         );
         #[cfg(feature = "unstable-functions")]
         host_fn_builder
-            .with_host_function(
-                &mut ns,
-                "__hc__get_agent_key_lineage_1",
-                get_agent_key_lineage,
-            )
-            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
@@ -1287,8 +1254,6 @@ pub mod wasm_test {
         }
 
         // Make sure the context map does not retain items.
-        // Zome `deepkey_csr`` does a post_commit call which takes some time to complete,
-        // before it is removed from the context map.
         wait_for_10s!(
             CONTEXT_MAP.clone(),
             |context_map: &Arc<Mutex<HashMap<u64, Arc<_>>>>| context_map.lock().is_empty(),
@@ -1381,15 +1346,11 @@ pub mod wasm_test {
                 "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
-                #[cfg(feature = "unstable-functions")]
-                "__hc__get_agent_key_lineage_1",
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",
                 "__hc__get_validation_receipts_1",
                 "__hc__hash_1",
-                #[cfg(feature = "unstable-functions")]
-                "__hc__is_same_agent_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
                 "__hc__must_get_entry_1",

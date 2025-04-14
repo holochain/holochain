@@ -2384,27 +2384,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hc_deepkey_sdk"
-version = "0.8.0"
-dependencies = [
- "hc_deepkey_types",
- "hdk",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
-name = "hc_deepkey_types"
-version = "0.9.0"
-dependencies = [
- "hdi",
- "holo_hash",
- "holochain_integrity_types",
- "rmpv",
- "serde",
-]
-
-[[package]]
 name = "hc_demo_cli"
 version = "0.2.0-beta-rc.0"
 dependencies = [
@@ -2661,7 +2640,6 @@ dependencies = [
  "futures",
  "get_if_addrs",
  "getrandom 0.2.15",
- "hc_deepkey_sdk",
  "hdk",
  "holo_hash",
  "holochain",
@@ -2670,7 +2648,6 @@ dependencies = [
  "holochain_conductor_api",
  "holochain_conductor_config",
  "holochain_conductor_services",
- "holochain_deepkey_dna",
  "holochain_keystore",
  "holochain_metrics",
  "holochain_nonce",
@@ -2968,7 +2945,6 @@ dependencies = [
  "async-trait",
  "derive_more 0.99.19",
  "futures",
- "hc_deepkey_sdk",
  "hdk",
  "holochain_keystore",
  "holochain_types",
@@ -2982,12 +2958,6 @@ dependencies = [
  "tokio",
  "tracing",
 ]
-
-[[package]]
-name = "holochain_deepkey_dna"
-version = "0.0.8-dev.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be0aa773b74c40ef5e4e02f414d8cbfc4e92520a93511055a3fbccc12d2dd045"
 
 [[package]]
 name = "holochain_integrity_types"

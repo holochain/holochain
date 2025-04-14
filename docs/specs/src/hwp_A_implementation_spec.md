@@ -2647,7 +2647,7 @@ enum CellProvisioning {
 
     // Require that a Cell be already installed which matches the DNA
     // `installed_hash` spec, and which has an Agent that's associated with
-    // this App's agent via DPKI. If no such Cell exists, *app installation MUST
+    // this App's agent. If no such Cell exists, *app installation MUST
     // fail*. The `protected` flag indicates that the Conductor SHOULD NOT allow
     // the dependency to be disabled or uninstalled until all cells using this
     // DNA are uninstalled.

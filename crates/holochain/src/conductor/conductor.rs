@@ -57,10 +57,9 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tracing::*;
 
-pub use agent_key_operations::RevokeAgentKeyForAppResult;
 pub use builder::*;
 use holo_hash::DnaHash;
-use holochain_conductor_api::conductor::{DpkiConfig, KeystoreConfig};
+use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
@@ -135,17 +134,6 @@ mod state_dump_helpers;
 ///
 /// [Signature verification](holochain_conductor_api::AppRequest::CallZome)
 pub(crate) mod zome_call_signature_verification;
-
-/// Operations to manipulate agent keys.
-///
-/// Agent keys are handled in 2 places in Holochain, on the source chain of a cell and in the
-/// Deepkey service, should it be installed. Operations to manipulate these keys include key
-/// revocation and key update.
-///
-/// When revoking a key, it becomes invalid and the source chain can no longer be written to.
-/// Clone cells can not be created any more either. This source chain state if final and can not
-/// be reverted or changed.
-mod agent_key_operations;
 
 pub(crate) mod app_broadcast;
 
@@ -573,15 +561,7 @@ mod dna_impls {
     impl Conductor {
         /// Get the list of hashes of installed Dnas in this Conductor
         pub fn list_dnas(&self) -> Vec<DnaHash> {
-            let dpki_dna_hash = self
-                .running_services()
-                .dpki
-                .map(|dpki| dpki.cell_id.dna_hash().clone());
-            let mut hashes = self.ribosome_store().share_ref(|ds| ds.list());
-            if let Some(dpki_dna_hash) = dpki_dna_hash {
-                hashes.retain(|h| *h != dpki_dna_hash);
-            }
-            hashes
+            self.ribosome_store().share_ref(|ds| ds.list())
         }
 
         /// Get a [`DnaDef`] from the [`RibosomeStore`]
@@ -941,18 +921,19 @@ mod network_impls {
             let state = self.get_state().await?;
 
             let all_dna: HashMap<DnaHash, Vec<InstalledAppId>> = HashMap::new();
-            let all_dna = state.installed_apps_and_services().iter().fold(
-                all_dna,
-                |mut acc, (installed_app_id, app)| {
-                    for cell_id in app.all_cells() {
-                        acc.entry(cell_id.dna_hash().clone())
-                            .or_default()
-                            .push(installed_app_id.clone());
-                    }
+            let all_dna =
+                state
+                    .installed_apps()
+                    .iter()
+                    .fold(all_dna, |mut acc, (installed_app_id, app)| {
+                        for cell_id in app.all_cells() {
+                            acc.entry(cell_id.dna_hash().clone())
+                                .or_default()
+                                .push(installed_app_id.clone());
+                        }
 
-                    acc
-                },
-            );
+                        acc
+                    });
 
             let app_data_blobs =
                 futures::future::join_all(all_dna.iter().map(|(dna_hash, used_by)| async {
@@ -1114,24 +1095,18 @@ pub struct InstallAppCommonFlags {
     pub defer_memproofs: bool,
     /// From [`InstallAppPayload::ignore_genesis_failure`]
     pub ignore_genesis_failure: bool,
-    /// From [`InstallAppPayload::allow_throwaway_random_agent_key`]
-    pub allow_throwaway_random_agent_key: bool,
 }
 
 /// Methods related to app installation and management
 ///
 /// Tests related to app installation can be found in ../../tests/tests/app_installation/mod.rs
 mod app_impls {
-    use holochain_types::deepkey_roundtrip_backward;
-
-    use crate::conductor::state::is_app;
-
     use super::*;
 
     impl Conductor {
-        /// Install an app from minimal elements, without needing construct a whole AppBundle.
-        /// (This function constructs a bundle under the hood.)
-        /// This is just a convenience for testing.
+        /// Install an app from minimal elements, without needing to construct a whole AppBundle.
+        // (This function constructs a bundle under the hood.)
+        // This is just a convenience for testing.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn install_app_minimal(
             self: Arc<Self>,
@@ -1169,7 +1144,6 @@ mod app_impls {
                     InstallAppCommonFlags {
                         defer_memproofs: false,
                         ignore_genesis_failure: false,
-                        allow_throwaway_random_agent_key: true,
                     },
                 )
                 .await?;
@@ -1186,58 +1160,20 @@ mod app_impls {
             ops: AppRoleResolution,
             flags: InstallAppCommonFlags,
         ) -> ConductorResult<InstalledApp> {
-            let (agent_key, derivation_details): (AgentPubKey, Option<DerivationDetailsInput>) =
-                if let Some(agent_key) = agent_key {
-                    // Key doesn't need to be generated: it will be registered later
-                    (agent_key, None)
-                } else if let Some(lair_tag) = self.get_config().device_seed_lair_tag.clone() {
-                    // no agent key given, we must derive a new one
-
-                    let (_, app_index) = self
-                        .update_state_prime(|mut state| {
-                            let index = state.derived_agent_key_count;
-                            state.derived_agent_key_count += 1;
-                            Ok((state, index))
-                        })
-                        .await?;
-
-                    // register a new key derivation for this app
-                    let derivation_details = DerivationDetails {
-                        app_index,
-                        key_index: 0,
-                    };
-
-                    let derivation_path = derivation_details.to_derivation_path();
-                    let derivation_bytes = derivation_path
-                        .iter()
-                        .flat_map(|c| c.to_be_bytes())
-                        .collect();
-
-                    let seed = self
-                        .derive_from_device_seed_and_create_if_allowed(lair_tag, derivation_path)
-                        .await?;
-
-                    let derivation = DerivationDetailsInput {
-                        app_index: derivation_details.app_index,
-                        key_index: derivation_details.key_index,
-                        derivation_seed: seed.clone(),
-                        derivation_bytes,
-                    };
-
-                    (AgentPubKey::from_raw_32(seed), Some(derivation))
-                } else if flags.allow_throwaway_random_agent_key {
-                    // no agent key given, we generate a random throwaway one
-                    (self.keystore.new_sign_keypair_random().await?, None)
-                } else {
-                    return Err(ConductorError::other("Unable to install app. If `device_seed_lair_tag` is not specified in config, an agent key must be provided when installing an app."));
-                };
+            let agent_key = match agent_key {
+                Some(key) => key,
+                None => {
+                    // No agent key given. Generate a new key.
+                    self.keystore.new_sign_keypair_random().await?
+                }
+            };
 
             let cells_to_create = ops.cells_to_create(agent_key.clone());
 
             // check if cells_to_create contains a cell identical to an existing one
             let state = self.get_state().await?;
             let all_cells: HashSet<_> = state
-                .installed_apps_and_services()
+                .installed_apps()
                 .values()
                 .flat_map(|app| app.all_cells())
                 .collect();
@@ -1259,7 +1195,7 @@ mod app_impls {
                 .map(|(cell_id, _)| cell_id.clone())
                 .collect();
 
-            let app_result = if flags.defer_memproofs {
+            if flags.defer_memproofs {
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(
                     installed_app_id.clone(),
@@ -1302,48 +1238,7 @@ mod app_impls {
                 } else {
                     unreachable!()
                 }
-            };
-
-            if app_result.is_ok() {
-                // Register initial agent key in DPKI
-                if let Some(dpki) = self.running_services().dpki.clone() {
-                    let dpki_agent = dpki.cell_id.agent_pubkey();
-
-                    // This is the signature Deepkey requires
-                    let signature = agent_key
-                        .sign_raw(&self.keystore, dpki_agent.get_raw_39().into())
-                        .await
-                        .map_err(|e| DpkiServiceError::Lair(e.into()))?;
-
-                    let signature = deepkey_roundtrip_backward!(Signature, &signature);
-
-                    let dna_hashes = cell_ids
-                        .iter()
-                        .map(|c| deepkey_roundtrip_backward!(DnaHash, c.dna_hash()))
-                        .collect();
-
-                    let agent_key = deepkey_roundtrip_backward!(AgentPubKey, &agent_key);
-
-                    let input = CreateKeyInput {
-                        key_generation: KeyGeneration {
-                            new_key: agent_key,
-                            new_key_signing_of_author: signature,
-                        },
-                        app_binding: AppBindingInput {
-                            app_name: installed_app_id.clone(),
-                            installed_app_id,
-                            dna_hashes,
-                            metadata: Default::default(), // TODO: pass in necessary metadata
-                        },
-                        derivation_details,
-                        create_only: false,
-                    };
-
-                    dpki.state().await.register_key(input).await?;
-                }
             }
-
-            app_result
         }
 
         /// Install DNAs and set up Cells as specified by an AppBundle
@@ -1359,7 +1254,6 @@ mod app_impls {
                 network_seed,
                 roles_settings,
                 ignore_genesis_failure,
-                allow_throwaway_random_agent_key,
             } = payload;
 
             let modifiers = get_modifiers_map_from_role_settings(&roles_settings);
@@ -1388,19 +1282,10 @@ mod app_impls {
             let flags = InstallAppCommonFlags {
                 defer_memproofs,
                 ignore_genesis_failure,
-                allow_throwaway_random_agent_key,
             };
 
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
-
-            if installed_app_id == DPKI_APP_ID {
-                return Err(ConductorError::Other(
-                    "Can't install app with reserved id 'DPKI'"
-                        .to_string()
-                        .into(),
-                ));
-            }
 
             // NOTE: for testing with inline zomes when the conductor is restarted, it's
             //       essential that the installed_hash is included in the app manifest,
@@ -1450,9 +1335,8 @@ mod app_impls {
                 let installed_app_ids = self
                     .get_state()
                     .await?
-                    .installed_apps_and_services()
+                    .installed_apps()
                     .iter()
-                    .filter(|(app_id, _)| is_app(app_id))
                     .map(|(app_id, _)| app_id.clone())
                     .collect::<HashSet<_>>();
                 self.app_broadcast.retain(installed_app_ids);
@@ -1469,12 +1353,7 @@ mod app_impls {
         /// List active AppIds
         pub async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
             let state = self.get_state().await?;
-            Ok(state
-                .running_apps()
-                .filter(|(id, _)| is_app(id))
-                .map(|(id, _)| id)
-                .cloned()
-                .collect())
+            Ok(state.running_apps().map(|(id, _)| id).cloned().collect())
         }
 
         /// List Apps with their information,
@@ -1488,36 +1367,12 @@ mod app_impls {
             let conductor_state = self.get_state().await?;
 
             let apps_ids: Vec<&String> = match status_filter {
-                Some(Enabled) => conductor_state
-                    .enabled_apps()
-                    .filter(|(id, _)| is_app(id))
-                    .map(|(id, _)| id)
-                    .collect(),
-                Some(Disabled) => conductor_state
-                    .disabled_apps()
-                    .filter(|(id, _)| is_app(id))
-                    .map(|(id, _)| id)
-                    .collect(),
-                Some(Running) => conductor_state
-                    .running_apps()
-                    .filter(|(id, _)| is_app(id))
-                    .map(|(id, _)| id)
-                    .collect(),
-                Some(Stopped) => conductor_state
-                    .stopped_apps()
-                    .filter(|(id, _)| is_app(id))
-                    .map(|(id, _)| id)
-                    .collect(),
-                Some(Paused) => conductor_state
-                    .paused_apps()
-                    .filter(|(id, _)| is_app(id))
-                    .map(|(id, _)| id)
-                    .collect(),
-                None => conductor_state
-                    .installed_apps_and_services()
-                    .keys()
-                    .filter(|id| is_app(id))
-                    .collect(),
+                Some(Enabled) => conductor_state.enabled_apps().map(|(id, _)| id).collect(),
+                Some(Disabled) => conductor_state.disabled_apps().map(|(id, _)| id).collect(),
+                Some(Running) => conductor_state.running_apps().map(|(id, _)| id).collect(),
+                Some(Stopped) => conductor_state.stopped_apps().map(|(id, _)| id).collect(),
+                Some(Paused) => conductor_state.paused_apps().map(|(id, _)| id).collect(),
+                None => conductor_state.installed_apps().keys().collect(),
             };
 
             let mut app_infos: Vec<AppInfo> = apps_ids
@@ -1641,29 +1496,6 @@ mod app_impls {
             Ok(())
         }
 
-        /// Update the agent key for an installed app
-        // TODO: fully implement after DPKI is available
-        #[allow(unused)]
-        pub async fn rotate_app_agent_key(
-            &self,
-            installed_app_id: &InstalledAppId,
-        ) -> ConductorResult<AgentPubKey> {
-            // TODO: use key derivation for DPKI
-            let new_agent_key = self.keystore().new_sign_keypair_random().await?;
-            let ret = new_agent_key.clone();
-            self.update_state({
-                let installed_app_id = installed_app_id.clone();
-                move |mut state| {
-                    let app = state.get_app_mut(&installed_app_id)?;
-                    app.agent_key = new_agent_key;
-                    // TODO: update all cell IDs in the roles
-                    Ok(state)
-                }
-            })
-            .await?;
-            unimplemented!("this is a partial implementation for reference only")
-        }
-
         fn get_app_info_inner(
             &self,
             app_id: &InstalledAppId,
@@ -1676,90 +1508,6 @@ mod app_impls {
                     Ok(Some(AppInfo::from_installed_app(app, &dna_definitions)))
                 }
             }
-        }
-
-        /// Derive a new key from a device seed, or create a new seed from randomness
-        /// if no device seed is specified and
-        /// [`ConductorConfig::danger_generate_throwaway_device_seed`] is set
-        pub async fn derive_from_device_seed_and_create_if_allowed(
-            &self,
-            lair_tag: String,
-            derivation_path: Vec<u32>,
-        ) -> ConductorResult<Vec<u8>> {
-            let config = self.get_config();
-
-            // if derivation_path is [1, 2, 3], this will be "1.2.3"
-            let dst_tag_suffix = derivation_path
-                .iter()
-                .map(|b| format!("{b}"))
-                .collect::<Vec<String>>()
-                .join(".");
-
-            let dst_tag = format!("{lair_tag}.{dst_tag_suffix}");
-
-            let entry_info = self
-                .keystore()
-                .lair_client()
-                .get_entry(dst_tag.clone().into())
-                .await;
-            let seed_info = match entry_info {
-                Ok(lair_keystore_api::lair_store::LairEntryInfo::Seed { seed_info, .. }) => {
-                    // If the seed already exists, we don't need to create it again.
-                    seed_info
-                }
-                Ok(_) => {
-                    return Err(ConductorError::other(
-                        "DPKI could not be installed because the device seed points to an entry in lair that is not a seed.",
-                    ));
-                }
-                // Errors on not found, so try to create the seed and if that fails because there's
-                // some issue connecting to Lair then we'll get the error from trying to derive the seed.
-                Err(_) => {
-                    let result = self
-                        .keystore()
-                        .lair_client()
-                        .derive_seed(
-                            lair_tag.clone().into(),
-                            None,
-                            dst_tag.clone().into(),
-                            None,
-                            derivation_path.clone().into_boxed_slice(),
-                        )
-                        .await;
-
-                    match result {
-                        Ok(info) => info,
-                        Err(err) => {
-                            // If the seed could not be derived, assume that this is because there was no device seed
-                            // to derive from and attempt to create a throwaway seed if that was set in the config
-                            if config.danger_generate_throwaway_device_seed {
-                                tracing::info!("Failed to derive seed from lair, falling back to random seed. This is to be expected. Error: {:?}", err);
-
-                                self.keystore()
-                                    .lair_client()
-                                    .new_seed(lair_tag.clone().into(), None, false)
-                                    .await?;
-
-                                self.keystore()
-                                    .lair_client()
-                                    .derive_seed(
-                                        lair_tag.into(),
-                                        None,
-                                        dst_tag.into(),
-                                        None,
-                                        derivation_path.into_boxed_slice(),
-                                    )
-                                    .await?
-                            } else {
-                                return Err(err.into());
-                            }
-                        }
-                    }
-                }
-            };
-
-            let seed = seed_info.ed25519_pub_key.0.to_vec();
-            Ok(seed)
         }
     }
 }
@@ -1779,7 +1527,7 @@ mod cell_impls {
                 let present = self
                     .get_state()
                     .await?
-                    .installed_apps_and_services()
+                    .installed_apps()
                     .values()
                     .flat_map(|app| app.all_cells())
                     .any(|id| id == *cell_id);
@@ -1819,7 +1567,7 @@ mod cell_impls {
                 .get_state()
                 .await?
                 // Look in all installed apps
-                .installed_apps_and_services()
+                .installed_apps()
                 .values()
                 .filter_map(|app| {
                     let cells_in_lineage: BTreeSet<_> = app
@@ -1881,24 +1629,7 @@ mod clone_cell_impls {
             let state = self.get_state().await?;
             let app = state.get_app(installed_app_id)?;
             let app_role = app.primary_role(&role_name)?;
-            // If base cell has been provisioned, check first in Deepkey if agent key is valid
             if app_role.is_provisioned {
-                if let Some(dpki) = self.running_services().dpki {
-                    let agent_key = app.agent_key().clone();
-                    let key_state = dpki
-                        .state()
-                        .await
-                        .key_state(agent_key.clone(), Timestamp::now())
-                        .await?;
-                    if let KeyState::Invalid(_) = key_state {
-                        return Err(DpkiServiceError::DpkiAgentInvalid(
-                            agent_key,
-                            Timestamp::now(),
-                        )
-                        .into());
-                    }
-                }
-
                 // Check source chain if agent key is valid
                 let source_chain = SourceChain::new(
                     self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
@@ -2235,16 +1966,12 @@ mod app_status_impls {
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
-                    let apps =
-                        state
-                            .installed_apps_and_services_mut()
-                            .iter_mut()
-                            .filter(|(id, _)| {
-                                app_ids
-                                    .as_ref()
-                                    .map(|ids| ids.contains(&**id))
-                                    .unwrap_or(true)
-                            });
+                    let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
+                        app_ids
+                            .as_ref()
+                            .map(|ids| ids.contains(&**id))
+                            .unwrap_or(true)
+                    });
                     let delta = apps
                         .into_iter()
                         .map(|(_app_id, app)| {
@@ -2307,114 +2034,6 @@ mod service_impls {
 
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn initialize_services(self: Arc<Self>) -> ConductorResult<()> {
-            self.initialize_service_dpki().await?;
-            Ok(())
-        }
-
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub(crate) async fn initialize_service_dpki(self: Arc<Self>) -> ConductorResult<()> {
-            if let Some(installation) = self.get_state().await?.conductor_services.dpki {
-                self.running_services.share_mut(|s| {
-                    s.dpki = Some(Arc::new(DpkiService::new_deepkey(
-                        installation,
-                        self.clone(),
-                    )));
-                });
-            }
-            Ok(())
-        }
-
-        /// Install the DPKI service using the given Deepkey DNA.
-        /// Note, this currently is done automatically when the conductor is first initialized,
-        /// using the DpkiConfig in the conductor config. We may also provide this as an admin
-        /// method some day.
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub async fn install_dpki(
-            self: Arc<Self>,
-            dna: DnaFile,
-            enable: bool,
-        ) -> ConductorResult<()> {
-            // Don't install twice
-            if self.running_services().dpki.is_some() {
-                return Ok(());
-            }
-
-            let dna_hash = dna.dna_hash().clone();
-
-            self.register_dna(dna.clone()).await?;
-
-            let config = self.get_config();
-
-            let agent = if let Some(device_seed_lair_tag) = config.device_seed_lair_tag.clone() {
-                // Derive the DPKI agent key from the device seed.
-                // The initial agent key is the first derivation from the device seed.
-                // Updated DPKI agent keys (currently unsupported) would be sequential derivations
-                // from the same device seed.
-                let derivation_path = [0].into();
-
-                let seed = self
-                    .derive_from_device_seed_and_create_if_allowed(
-                        device_seed_lair_tag,
-                        derivation_path,
-                    )
-                    .await?;
-
-                holo_hash::AgentPubKey::from_raw_32(seed)
-            } else if config.dpki.allow_throwaway_random_dpki_agent_key {
-                self.keystore().new_sign_keypair_random().await?
-            } else {
-                return Err(ConductorError::other(
-                    "DPKI could not be installed because `device_seed_lair_tag` is not set in the conductor config.
-If using DPKI, a device seed must be created in lair, and the tag specified in the conductor config.
-
-(If this is a throwaway test environment, you can also set the config `dpki.allow_throwaway_random_dpki_agent_key`
-to `true` instead of instead of setting up a `device_seed_lair_tag`, but then you will lose the ability to recover
-your agent keys if you lose access to your device. This is not recommended!!)
-"));
-            };
-
-            let cell_id = CellId::new(dna_hash.clone(), agent.clone());
-
-            self.clone()
-                .install_app_minimal(
-                    DPKI_APP_ID.into(),
-                    Some(agent),
-                    &[(dna, None)],
-                    Some(config.dpki.network_seed.clone()),
-                )
-                .await?;
-
-            // In multi-conductor tests, we often want to delay enabling DPKI until all conductors
-            // have exchanged peer info, so that the initial DPKI publish can go more smoothly.
-            if enable {
-                self.clone().enable_app(DPKI_APP_ID.into()).await?;
-            }
-
-            // Ensure that the space is created for DPKI, in case it's not enabled
-            self.spaces.get_or_create_space(&dna_hash)?;
-
-            assert!(self
-                .spaces
-                .get_from_spaces(|s| (*s.dna_hash).clone())
-                .contains(&dna_hash));
-
-            let installation = DeepkeyInstallation { cell_id };
-            self.update_state(move |mut state| {
-                state.conductor_services.dpki = Some(installation);
-                Ok(state)
-            })
-            .await?;
-
-            self.clone().initialize_service_dpki().await?;
-
-            if enable {
-                if let Ok(Some(info)) = self.get_app_info(&DPKI_APP_ID.into()).await {
-                    assert_eq!(info.status, holochain_conductor_api::AppInfoStatus::Running);
-                } else {
-                    panic!("DPKI service not installed!");
-                }
-            }
-
             Ok(())
         }
     }
@@ -3302,7 +2921,7 @@ impl Conductor {
             .collect();
 
         let all_cells: HashSet<CellId> = state
-            .installed_apps_and_services()
+            .installed_apps()
             .iter()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
@@ -3434,7 +3053,7 @@ impl Conductor {
             // Collect all CellIds across all apps, deduped
             {
                 state
-                    .installed_apps_and_services()
+                    .installed_apps()
                     .iter()
                     .filter(|(_, app)| app.status().is_running())
                     .flat_map(|(_id, app)| app.all_enabled_cells())
@@ -3605,7 +3224,7 @@ impl Conductor {
 
                 // if cell id of new clone cell already exists, reject as duplicate
                 if state_copy
-                    .installed_apps_and_services()
+                    .installed_apps()
                     .iter()
                     .flat_map(|(_, app)| app.all_cells())
                     .any(|cell_id| cell_id == clone_cell_id)
@@ -3767,15 +3386,6 @@ pub(crate) async fn genesis_cells(
         Err(ConductorError::GenesisFailed { errors })
     } else {
         Ok(())
-    }
-}
-
-/// Get the DPKI DNA from the filesystem or use the built-in one.
-pub(crate) async fn get_dpki_dna(config: &DpkiConfig) -> DnaResult<DnaBundle> {
-    if let Some(dna_path) = config.dna_path.as_ref() {
-        DnaBundle::read_from_file(dna_path).await
-    } else {
-        DnaBundle::decode(holochain_deepkey_dna::DEEPKEY_DNA_BUNDLE_BYTES.into())
     }
 }
 

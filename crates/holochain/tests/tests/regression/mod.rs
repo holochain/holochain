@@ -11,8 +11,7 @@ use holochain_wasm_test_utils::TestWasm;
 #[cfg(not(feature = "wasmer_wamr"))]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
-    let mut conductor =
-        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
+    let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
 
     let mut cache_dir = conductor.db_path().to_owned();
     cache_dir.push(WASM_CACHE);
@@ -117,11 +116,10 @@ async fn zome_with_no_link_types_does_not_prevent_delete_links() {
 async fn zero_arc_can_link_to_uncached_base() {
     holochain_trace::test_run();
 
-    let empty_arc_conductor_config = SweetConductorConfig::rendezvous(false)
-        .no_dpki_mustfix()
-        .tune_network_config(|nc| nc.target_arc_factor = 0);
+    let empty_arc_conductor_config =
+        SweetConductorConfig::rendezvous(false).tune_network_config(|nc| nc.target_arc_factor = 0);
 
-    let other_config = SweetConductorConfig::rendezvous(false).no_dpki_mustfix();
+    let other_config = SweetConductorConfig::rendezvous(false);
     let mut conductors = SweetConductorBatch::from_configs_rendezvous(vec![
         other_config,
         empty_arc_conductor_config,

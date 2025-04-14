@@ -504,7 +504,6 @@ mod test {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_conductor_api::conductor::ConductorConfig;
-    use holochain_conductor_api::conductor::DpkiConfig;
     use holochain_conductor_api::*;
     use holochain_keystore::test_keystore;
     use holochain_serialized_bytes::prelude::*;
@@ -580,7 +579,6 @@ mod test {
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         }));
         let response: AdminResponse = admin_tx.request(request).await.unwrap();
         let app_info = match response {
@@ -686,9 +684,7 @@ mod test {
         dnas_with_proofs: Vec<(DnaFile, Option<MembraneProof>)>,
     ) -> (Arc<TempDir>, ConductorHandle) {
         let db_dir = test_db_dir();
-        let config = holochain::sweettest::SweetConductorConfig::standard()
-            .no_dpki()
-            .into();
+        let config = holochain::sweettest::SweetConductorConfig::standard().into();
         let conductor_handle = ConductorBuilder::new()
             .config(config)
             .with_data_root_path(db_dir.path().to_path_buf().into())
@@ -855,10 +851,7 @@ mod test {
         let db_dir = test_db_dir();
 
         let handle = ConductorBuilder::new()
-            .config(ConductorConfig {
-                dpki: DpkiConfig::disabled(),
-                ..Default::default()
-            })
+            .config(ConductorConfig::default())
             .with_data_root_path(db_dir.path().to_path_buf().into())
             .test(&[])
             .await
@@ -1202,19 +1195,7 @@ mod test {
             state: ConductorState,
         }
 
-        let dpki_cell_id = conductor_handle
-            .running_services()
-            .dpki
-            .map(|dpki| dpki.cell_id.clone());
-        let mut running_cells = vec![];
-        if let Some(cell_id) = dpki_cell_id {
-            running_cells.push((
-                cell_id.dna_hash().clone().into(),
-                cell_id.agent_pubkey().clone().into(),
-            ));
-        }
-        running_cells.push((dna_hash.clone().into(), agent_pubkey.clone().into()));
-
+        let running_cells = vec![(dna_hash.clone().into(), agent_pubkey.clone().into())];
         let expected = ConductorDump {
             conductor: ConductorSerialized {
                 running_cells,

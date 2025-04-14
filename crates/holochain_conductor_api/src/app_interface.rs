@@ -223,20 +223,6 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::Ok`]
     EnableApp,
-    //
-    // TODO: implement after DPKI lands
-    // /// Replace the agent key associated with this app with a new one.
-    // /// The new key will be created using the same method which is used
-    // /// when installing an app with no agent key provided.
-    // ///
-    // /// This method is only available if this app was installed using `allow_deferred_memproofs`,
-    // /// and can only be called before [`AppRequest::ProvideMemproofs`] has been called.
-    // /// Until then, it can be called as many times as needed.
-    // ///
-    // /// # Returns
-    // ///
-    // /// [`AppResponse::AppAgentKeyRotated`]
-    // RotateAppAgentKey,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
@@ -522,13 +508,6 @@ impl AppInfo {
             installed_at,
         }
     }
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-/// The parameters to revoke an agent for an app.
-pub struct RevokeAgentKeyPayload {
-    pub agent_key: AgentPubKey,
-    pub app_id: InstalledAppId,
 }
 
 /// A flat, slightly more API-friendly representation of [`AppInfo`]

@@ -127,19 +127,12 @@ pub struct NetworkCompatParams {
     /// any breaking protocol changes are made to prevent incompatible
     /// nodes from talking to each other.
     pub proto_ver: u32,
-
-    /// The UUID of the installed DPKI service.
-    /// If the service is backed by a Dna, this is the core 32 bytes of the DnaHash.
-    /// If not, set this to all zeroes.
-    pub dpki_uuid: [u8; 32],
 }
 
 impl std::fmt::Debug for NetworkCompatParams {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let dna_hash = DnaHash::from_raw_32(self.dpki_uuid.to_vec());
         f.debug_struct("NetworkCompatParams")
             .field("proto_ver", &self.proto_ver)
-            .field("dpki_uuid", &dna_hash)
             .finish()
     }
 }
@@ -148,7 +141,6 @@ impl Default for NetworkCompatParams {
     fn default() -> Self {
         Self {
             proto_ver: HCP2P_PROTO_VER,
-            dpki_uuid: [0; 32],
         }
     }
 }

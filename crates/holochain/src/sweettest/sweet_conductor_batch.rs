@@ -38,23 +38,13 @@ impl SweetConductorBatch {
         C: Into<SweetConductorConfig>,
         I: IntoIterator<Item = C>,
     {
-        let conductors = Self::new(
+        Self::new(
             future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c))).await,
-        );
-
-        let dpki_cells = conductors.dpki_cells();
-        if !dpki_cells.is_empty() {
-            conductors.exchange_peer_info().await;
-            await_consistency(10, dpki_cells.as_slice()).await.unwrap();
-        }
-
-        conductors
+        )
     }
 
     /// Create SweetConductors from the given ConductorConfigs, each with its own new TestEnvironments,
     /// using a "rendezvous" bootstrap server for peer discovery.
-    ///
-    /// Also await consistency for DPKI cells, if DPKI is enabled.
     #[allow(clippy::let_and_return)]
     pub async fn from_configs_rendezvous<C, I>(configs: I) -> SweetConductorBatch
     where
@@ -62,31 +52,14 @@ impl SweetConductorBatch {
         I: IntoIterator<Item = C>,
     {
         let rendezvous = SweetLocalRendezvous::new().await;
-        let conductors = Self::new(
+        Self::new(
             future::join_all(
                 configs
                     .into_iter()
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
             .await,
-        );
-
-        let not_full_bootstrap = conductors
-            .iter()
-            .any(|c| !c.get_config().has_rendezvous_bootstrap());
-
-        let dpki_cells = conductors.dpki_cells();
-        if !dpki_cells.is_empty() {
-            // Typically we expect either all nodes are using a rendezvous bootstrap, or none are.
-            // To cover all cases, we say if any are not using bootstrap, we'll exchange peer info
-            // for everyone, even though this may be incorrect.
-            if not_full_bootstrap {
-                conductors.exchange_peer_info().await;
-            }
-            await_consistency(15, dpki_cells.as_slice()).await.unwrap();
-        }
-
-        conductors
+        )
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
@@ -100,8 +73,6 @@ impl SweetConductorBatch {
 
     /// Create a number of SweetConductors from the given ConductorConfig, each with its own new TestEnvironments.
     /// using a "rendezvous" bootstrap server for peer discovery.
-    ///
-    /// Also await consistency for DPKI cells, if DPKI is enabled.
     pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig> + Clone,
@@ -293,11 +264,6 @@ impl SweetConductorBatch {
                 .await
                 .unwrap();
         }
-    }
-
-    /// Get the DPKI cell for each conductor, if applicable
-    pub fn dpki_cells(&self) -> Vec<SweetCell> {
-        self.0.iter().filter_map(|c| c.dpki_cell()).collect()
     }
 
     /// Make the temp db dir persistent

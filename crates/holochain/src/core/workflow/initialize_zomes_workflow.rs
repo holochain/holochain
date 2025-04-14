@@ -100,14 +100,12 @@ where
     } = args;
     let call_zome_handle =
         CellConductorApi::new(conductor_handle.clone(), cell_id.clone()).into_call_zome_handle();
-    let dpki = conductor_handle.running_services().dpki;
 
     // Call the init callback
     let result = {
         let host_access = InitHostAccess::new(
             workspace.clone().into(),
             keystore,
-            dpki,
             network.clone(),
             signal_tx,
             call_zome_handle,
@@ -209,7 +207,7 @@ mod tests {
 
         let db_dir = test_db_dir();
         let conductor_handle = Conductor::builder()
-            .config(SweetConductorConfig::standard().no_dpki().into())
+            .config(SweetConductorConfig::standard().into())
             .with_data_root_path(db_dir.path().to_path_buf().into())
             .test(&[])
             .await

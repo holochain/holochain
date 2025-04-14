@@ -29,16 +29,6 @@ use std::sync::Mutex;
 mod add_agent_infos;
 mod state_dump;
 
-// Module with tests for agent key revocation. With or without DPKI, an agent can revoke their key,
-// which prevents further modifications of the source chain.
-mod agent_key_revocation;
-// Module with tests related to an agent's key lineage. Agents can update their key. Both old and new
-// key belong to the same key lineage, they belong to the same agent.
-#[cfg(feature = "unstable-functions")]
-pub mod agent_lineage;
-#[cfg(feature = "unstable-dpki")]
-mod test_dpki;
-
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
     let db_dir = test_db_dir();
@@ -175,7 +165,7 @@ async fn can_set_fake_state() {
     let db_dir = test_db_dir();
     let expected = ConductorState::default();
     let conductor = ConductorBuilder::new()
-        .config(SweetConductorConfig::standard().no_dpki().into())
+        .config(SweetConductorConfig::standard().into())
         .fake_state(expected.clone())
         .with_data_root_path(db_dir.path().to_path_buf().into())
         .test(&[])
@@ -412,8 +402,6 @@ async fn test_signing_error_during_genesis() {
     let db_dir = test_db_dir();
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
-        dpki: DpkiConfig::disabled(),
-        device_seed_lair_tag: Some("nonexistent-tag".to_string()),
         ..Default::default()
     };
     let mut conductor = SweetConductor::new(
@@ -767,10 +755,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
                 Ok(hash)
             });
 
-    let mut conductor = SweetConductorConfig::standard()
-        .no_dpki()
-        .build_conductor()
-        .await;
+    let mut conductor = SweetConductorConfig::standard().build_conductor().await;
     let app = common_genesis_test_app(&mut conductor, bad_zome)
         .await
         .unwrap();
@@ -938,7 +923,7 @@ async fn test_cell_and_app_status_reconciliation() {
         mk_dna(mk_zome()).await.0,
     ];
     let app_id = "app".to_string();
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::standard();
     let mut conductor = SweetConductor::from_config(config).await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
@@ -1120,7 +1105,6 @@ async fn test_deferred_memproof_provisioning() {
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -1249,7 +1233,6 @@ async fn test_deferred_memproof_provisioning_uninstall() {
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();

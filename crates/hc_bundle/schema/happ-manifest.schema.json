@@ -67,7 +67,7 @@
                 }
               },
               {
-                "description": "**NOT YET IMPLEMENTED**: Require that a Cell is already installed which matches the DNA version spec, and which has an Agent that's associated with this App's agent via DPKI. If no such Cell exists, *app installation fails*.",
+                "description": "**NOT YET IMPLEMENTED**: Require that a Cell is already installed which matches the DNA version spec, and which has an Agent that's associated with this App's agent. If no such Cell exists, *app installation fails*.",
                 "type": "object",
                 "required": [
                   "deferred",

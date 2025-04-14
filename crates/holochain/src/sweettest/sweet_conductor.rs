@@ -479,7 +479,6 @@ impl SweetConductor {
         installed_app_id: &str,
         dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetApp> {
-        // If DPKI is in use, we must let DPKI generate the agent key
         self.setup_app_for_optional_agent(installed_app_id, None, dnas_with_roles)
             .await
     }
@@ -550,25 +549,6 @@ impl SweetConductor {
         }
 
         Ok(SweetAppBatch(apps))
-    }
-
-    /// Install DPKI a bit more concisely
-    pub async fn install_dpki(&self) {
-        let dpki_config = self.config.dpki.clone();
-        let (dna, _) = crate::conductor::conductor::get_dpki_dna(&dpki_config)
-            .await
-            .unwrap()
-            .into_dna_file(Default::default())
-            .await
-            .unwrap();
-        self.raw_handle().install_dpki(dna, true).await.unwrap()
-    }
-
-    /// Get the cell providing the DPKI service, if applicable
-    pub fn dpki_cell(&self) -> Option<SweetCell> {
-        let dpki = self.raw_handle().running_services().dpki?;
-        let cell_id = dpki.cell_id.clone();
-        Some(self.get_sweet_cell(cell_id).unwrap())
     }
 
     /// Call into the underlying create_clone_cell function, and register the
@@ -722,15 +702,6 @@ impl SweetConductor {
                 );
             }
 
-            if let Some(dpki_dna_hash) = c
-                .running_services()
-                .dpki
-                .as_ref()
-                .map(|dpki| dpki.cell_id.dna_hash())
-            {
-                // Ensure the space is created for DPKI so the agent db exists
-                c.spaces.get_or_create_space(dpki_dna_hash).unwrap();
-            }
             for dna_hash in c.spaces.get_from_spaces(|s| s.dna_hash.clone()) {
                 let agent_infos = c
                     .holochain_p2p()

@@ -1,6 +1,3 @@
-use holochain_conductor_services::DpkiServiceError;
-use std::convert::TryFrom;
-
 use super::SourceChainError;
 use super::MAX_ENTRY_SIZE;
 use crate::conductor::api::error::ConductorApiError;
@@ -14,6 +11,7 @@ use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_zome_types::countersigning::CounterSigningError;
 use holochain_zome_types::countersigning::CounterSigningSessionData;
+use std::convert::TryFrom;
 use thiserror::Error;
 
 /// Validation can result in either
@@ -46,8 +44,6 @@ pub enum SysValidationError {
     ValidationOutcome(#[from] ValidationOutcome),
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
-    #[error(transparent)]
-    DpkiServiceError(#[from] DpkiServiceError),
     #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
     #[error("Expected Entry-based Action, but got: {0:?}")]
@@ -110,10 +106,6 @@ pub enum ValidationOutcome {
     CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
-    #[error("The agent {0:?} could not be found in DPKI")]
-    DpkiAgentMissing(AgentPubKey),
-    #[error("The agent {0:?} was found to be invalid at {1:?} according to the DPKI service")]
-    DpkiAgentInvalid(AgentPubKey, Timestamp),
     #[error("Agent key {0} invalid")]
     InvalidAgentKey(AgentPubKey),
     #[error("The entry def index for {0:?} was out of range")]
@@ -178,6 +170,6 @@ impl ValidationOutcome {
             // Just a helpful assertion for us
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
-        matches!(self, Self::DepMissingFromDht(_) | Self::DpkiAgentMissing(_))
+        matches!(self, Self::DepMissingFromDht(_))
     }
 }

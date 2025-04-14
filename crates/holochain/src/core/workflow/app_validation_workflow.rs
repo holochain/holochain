@@ -94,7 +94,6 @@
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
 
-use crate::conductor::api::DpkiApi;
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
@@ -493,15 +492,12 @@ async fn validate_op_outer(
         .get_ribosome(dna_hash.as_ref())
         .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
-    let dpki = conductor_handle.running_services().dpki;
-
     validate_op(
         op,
         host_fn_workspace,
         network,
         &ribosome,
         conductor_handle,
-        dpki,
         false, // is_inline
     )
     .await
@@ -514,7 +510,6 @@ pub async fn validate_op(
     network: &HolochainP2pDna,
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
-    dpki: DpkiApi,
     is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
@@ -532,7 +527,7 @@ pub async fn validate_op(
         .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
 
     let outcome =
-        run_validation_callback(invocation, ribosome, workspace, network, dpki, is_inline).await?;
+        run_validation_callback(invocation, ribosome, workspace, network, is_inline).await?;
 
     Ok(outcome)
 }
@@ -719,12 +714,11 @@ async fn run_validation_callback(
     ribosome: &impl RibosomeT,
     workspace: HostFnWorkspaceRead,
     network: GenericNetwork,
-    dpki: DpkiApi,
     is_inline: bool,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome
         .run_validate(
-            ValidateHostAccess::new(workspace.clone(), network.clone(), dpki, is_inline),
+            ValidateHostAccess::new(workspace.clone(), network.clone(), is_inline),
             invocation.clone(),
         )
         .await?;

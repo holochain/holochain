@@ -89,10 +89,6 @@ wasm_io_types! {
 
     fn get_agent_activity (zt::agent_activity::GetAgentActivityInput) -> zt::query::AgentActivity;
 
-    // DPKI
-    #[cfg(feature = "unstable-functions")]
-    fn get_agent_key_lineage (AgentPubKey) -> Vec<AgentPubKey>;
-
     fn get_details (Vec<zt::entry::GetInput>) -> Vec<Option<zt::metadata::Details>>;
 
     fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
@@ -107,11 +103,6 @@ wasm_io_types! {
 
     // Hash data on the host.
     fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
-
-    // Check if agent key 2 is of the same lineage as agent key 2.
-    // TODO: This HDI function can't be easily removed, even though it's considered an
-    // unstable function.
-    fn is_same_agent ((AgentPubKey, AgentPubKey)) -> bool;
 
     // Retreive a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> zt::record::Record;

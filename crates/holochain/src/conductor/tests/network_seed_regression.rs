@@ -71,7 +71,6 @@ async fn network_seed_regression() {
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -85,7 +84,6 @@ async fn network_seed_regression() {
             network_seed: Some("seed".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -322,7 +320,6 @@ impl TestCase {
                 network_seed,
                 roles_settings: Default::default(),
                 ignore_genesis_failure: false,
-                allow_throwaway_random_agent_key: true,
             })
             .await
             .unwrap();

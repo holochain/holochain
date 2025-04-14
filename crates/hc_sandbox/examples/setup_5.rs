@@ -37,10 +37,6 @@ async fn main() -> anyhow::Result<()> {
             None,
             false,
             0,
-            #[cfg(feature = "unstable-dpki")]
-            false,
-            #[cfg(feature = "unstable-dpki")]
-            None,
             #[cfg(feature = "chc")]
             None,
         )?;
@@ -62,7 +58,6 @@ async fn main() -> anyhow::Result<()> {
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         };
 
         let r = AdminRequest::InstallApp(Box::new(payload));

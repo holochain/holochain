@@ -23,7 +23,7 @@ async fn sys_validation_workflow_test() {
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let config = SweetConductorConfig::standard().no_dpki_mustfix();
+    let config = SweetConductorConfig::standard();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
@@ -71,7 +71,6 @@ async fn sys_validation_produces_invalid_chain_warrant() {
         &op,
         &dna_def,
         Default::default(),
-        None,
     )
     .await
     .unwrap();
@@ -156,7 +155,6 @@ async fn sys_validation_produces_forked_chain_warrant() {
         &forked_op.clone().into(),
         &dna_def,
         Default::default(),
-        None,
     )
     .await
     .unwrap();

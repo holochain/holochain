@@ -28,11 +28,6 @@ pub struct ConductorBuilder {
     #[cfg(any(test, feature = "test_utils"))]
     pub state: Option<ConductorState>,
 
-    /// Optional DPKI service implementation, used to override the service specified in the config,
-    /// especially for testing with a mock
-    #[cfg(any(test, feature = "test_utils"))]
-    pub dpki: Option<DpkiImpl>,
-
     /// If specified here and a device seed is not already specified in the config,
     /// a new seed will be generated in lair with a random unique tag, and the conductor config
     /// will be updated to use this seed.
@@ -99,28 +94,6 @@ impl ConductorBuilder {
     pub fn with_data_root_path(mut self, data_root_path: DataRootPath) -> Self {
         self.config.data_root_path = Some(data_root_path);
         self
-    }
-
-    /// If a device seed is not already specified in the config, one will
-    /// be generated and used for the test keystore.
-    #[cfg(any(test, feature = "test_utils"))]
-    pub fn with_test_device_seed(mut self) -> Self {
-        self.generate_test_device_seed = true;
-        self
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    async fn setup_test_device_seed(mut self, keystore: MetaLairClient) -> ConductorResult<Self> {
-        // Set up device seed if specified
-        if self.generate_test_device_seed && self.config.device_seed_lair_tag.is_none() {
-            let tag = format!("_hc_test_device_seed_{}", nanoid::nanoid!());
-            keystore
-                .lair_client()
-                .new_seed(tag.clone().into(), None, false)
-                .await?;
-            self.config.device_seed_lair_tag = Some(tag);
-        }
-        Ok(self)
     }
 
     /// Initialize a "production" Conductor
@@ -200,9 +173,6 @@ impl ConductorBuilder {
 
         info!("Conductor startup: passphrase obtained.");
 
-        #[cfg(any(test, feature = "test_utils"))]
-        let builder = builder.setup_test_device_seed(keystore.clone()).await?;
-
         let Self {
             ribosome_store,
             config,
@@ -223,34 +193,7 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
-        let dpki_config = Some(config.dpki.clone());
-
-        let dpki_dna_to_install = match &dpki_config {
-            Some(config) => {
-                if config.no_dpki {
-                    None
-                } else {
-                    let dna = get_dpki_dna(config)
-                        .await?
-                        .into_dna_file(Default::default())
-                        .await?
-                        .0;
-
-                    Some(dna)
-                }
-            }
-            _ => unreachable!(
-                "We currently require DPKI to be used, but this may change in the future"
-            ),
-        };
-
-        let dpki_uuid = dpki_dna_to_install
-            .as_ref()
-            .map(|dna| dna.dna_hash().get_raw_32().try_into().expect("32 bytes"))
-            .unwrap_or_default();
         let compat = NetworkCompatParams {
-            dpki_uuid,
             ..Default::default()
         };
 
@@ -308,7 +251,6 @@ impl ConductorBuilder {
         Self::finish(
             handle,
             config,
-            dpki_dna_to_install,
             post_commit_receiver,
             outcome_rx,
             builder.no_print_setup,
@@ -368,7 +310,6 @@ impl ConductorBuilder {
     pub(crate) async fn finish(
         conductor: ConductorHandle,
         config: Arc<ConductorConfig>,
-        dpki_dna_to_install: Option<DnaFile>,
         post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         outcome_receiver: OutcomeReceiver,
         no_print_setup: bool,
@@ -405,18 +346,6 @@ impl ConductorBuilder {
                 msg = "Failed to create the following active apps",
                 ?cell_startup_errors
             );
-        }
-
-        // Install DPKI from DNA
-        if let Some(dna) = dpki_dna_to_install {
-            let dna_hash = dna.dna_hash().clone();
-            match conductor.clone().install_dpki(dna, true).await {
-                Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
-                Err(ConductorError::AppAlreadyInstalled(_)) => {
-                    tracing::debug!("DPKI already installed, skipping installation")
-                }
-                Err(e) => return Err(e),
-            }
         }
 
         if !no_print_setup {
@@ -463,11 +392,6 @@ impl ConductorBuilder {
             .clone()
             .unwrap_or_else(holochain_keystore::test_keystore);
 
-        let builder = builder
-            .with_test_device_seed()
-            .setup_test_device_seed(keystore.clone())
-            .await?;
-
         let config = Arc::new(builder.config);
         let spaces = Spaces::new(
             config.clone(),
@@ -486,39 +410,7 @@ impl ConductorBuilder {
 
         let ribosome_store = RwShare::new(builder.ribosome_store);
 
-        // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
-        let dpki_config = Some(config.dpki.clone());
-
-        let (dpki_uuid, dpki_dna_to_install) = match (&builder.dpki, &dpki_config) {
-            // If a DPKI impl was provided to the builder, use that
-            (Some(dpki_impl), _) => (Some(dpki_impl.uuid()), None),
-
-            // Otherwise load the DNA from config if specified
-            (None, Some(dpki_config)) => {
-                if dpki_config.no_dpki {
-                    (None, None)
-                } else {
-                    let dna = get_dpki_dna(dpki_config)
-                        .await?
-                        .into_dna_file(Default::default())
-                        .await?
-                        .0;
-                    (
-                        Some(dna.dna_hash().get_raw_32().try_into().expect("32 bytes")),
-                        Some(dna),
-                    )
-                }
-            }
-
-            (None, None) => unreachable!(
-                "We currently require DPKI to be used, but this may change in the future"
-            ),
-        };
-
-        let compat = NetworkCompatParams {
-            dpki_uuid: dpki_uuid.unwrap_or_default(),
-            ..Default::default()
-        };
+        let compat = NetworkCompatParams::default();
 
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
@@ -570,14 +462,6 @@ impl ConductorBuilder {
 
         holochain_p2p.register_handler(handle.clone()).await?;
 
-        // Install DPKI from DNA or mock
-        if let Some(dpki_impl) = builder.dpki {
-            // This is a mock DPKI impl, so inject it into the conductor directly
-            handle.running_services_mutex().share_mut(|s| {
-                s.dpki = Some(dpki_impl);
-            });
-        }
-
         // Install extra DNAs, in particular:
         // the ones with InlineZomes will not be registered in the Wasm DB
         // and cannot be automatically loaded on conductor restart.
@@ -592,7 +476,6 @@ impl ConductorBuilder {
         Self::finish(
             handle,
             config,
-            dpki_dna_to_install,
             post_commit_receiver,
             outcome_rx,
             builder.no_print_setup,

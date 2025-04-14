@@ -113,9 +113,6 @@ where
         return Err(WorkflowError::GenesisFailure(reason));
     }
 
-    // NOTE: we could check the key against DPKI state here, but the key hasn't even been
-    //       registered at this point, so we can't.
-
     source_chain::genesis(
         workspace.vault.clone(),
         workspace.dht_db.clone(),
@@ -172,17 +169,13 @@ impl GenesisWorkspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::conductor::api::MockCellConductorApiT;
     use crate::conductor::conductor::{mock_app_store, ConductorServices};
     use crate::core::ribosome::MockRibosomeT;
-    use futures::FutureExt;
-    use holochain_conductor_services::{DpkiService, KeyState, MockDpkiState};
     use holochain_keystore::test_keystore;
     use holochain_state::prelude::test_dht_db;
     use holochain_state::{prelude::test_authored_db, source_chain::SourceChain};
     use holochain_trace;
-    use holochain_types::deepkey_roundtrip_backward;
     use holochain_types::test_utils::fake_agent_pubkey_1;
     use holochain_types::test_utils::fake_dna_file;
     use holochain_zome_types::Action;
@@ -199,23 +192,12 @@ mod tests {
         let dna = fake_dna_file("a");
         let author = fake_agent_pubkey_1();
 
-        let mut mock_dpki = MockDpkiState::new();
-        let action =
-            deepkey_roundtrip_backward!(SignedActionHashed, &::fixt::fixt!(SignedActionHashed));
-        mock_dpki.expect_key_state().returning(move |_, _| {
-            let action = action.clone();
-            async move { Ok(KeyState::Valid(action)) }.boxed()
-        });
-
-        let dpki = DpkiService::new(::fixt::fixt!(CellId), mock_dpki);
-
         {
             let workspace = GenesisWorkspace::new(vault.clone(), dht_db.to_db());
 
             let mut api = MockCellConductorApiT::new();
             api.expect_conductor_services()
                 .return_const(ConductorServices {
-                    dpki: Some(Arc::new(dpki)),
                     app_store: Some(Arc::new(mock_app_store())),
                 });
             api.expect_keystore().return_const(keystore.clone());
@@ -265,86 +247,3 @@ mod tests {
         }
     }
 }
-
-/* TODO: update and rewrite as proper rust docs
-
-Called from:
-
- - Conductor upon first ACTIVATION of an installed DNA (trace: follow)
-
-
-
-Parameters (expected types/structures):
-
-- DNA hash to pull from path to file (or HCHC [FUTURE] )
-
-- AgentID [SEEDLING] (already registered in DeepKey [LEAPFROG])
-
-- Membrane Access Payload (optional invitation code / to validate agent join) [possible for LEAPFROG]
-
-
-
-Data X (data & structure) from Store Y:
-
-- Get DNA from HCHC by DNA hash
-
-- or Get DNA from filesystem by filename
-
-
-
-----
-
-Functions / Workflows:
-
-- check that agent key is valid [MOCKED dpki] (via real dpki [LEAPFROG])
-
-- retrieve DNA from file path [in the future from HCHC]
-
-- initialize databases, save to conductor runtime config.
-
-- commit DNA entry (w/ special enum action with NULL  prev_action)
-
-- commit CapGrant for author (agent key) (w/ normal action)
-
-
-
-    fn commit_DNA
-
-    fn produce_action
-
-
-
-Examples / Tests / Acceptance Criteria:
-
-- check hash of DNA =
-
-
-
-----
-
-
-
-Persisted X Changes to Store Y (data & structure):
-
-- source chain HEAD 2 new actions
-
-- CAS commit actions and genesis entries: DNA & Author Capabilities Grant (Agent Key)
-
-
-
-- bootstrapped peers from attempt to publish key and join network
-
-
-
-Spawned Tasks (don't wait for result -signals/log/tracing=follow):
-
-- ZomeCall:init (for processing app initialization with bridges & networking)
-
-- DHT transforms of genesis entries in CAS
-
-
-
-Returned Results (type & structure):
-
-- None
-*/

@@ -66,17 +66,6 @@ pub fn build_chc(
 #[cfg(test)]
 mod tests {
 
-    use std::sync::atomic::Ordering::SeqCst;
-    use std::sync::{atomic::AtomicBool, Arc};
-
-    use hdk::prelude::*;
-    use holochain_chc::*;
-    use holochain_conductor_api::conductor::{ConductorConfig, DpkiConfig};
-    use holochain_keystore::MetaLairClient;
-    use holochain_state::prelude::SourceChainError;
-    use holochain_types::record::SignedActionHashedExt;
-    use holochain_wasm_test_utils::TestWasm;
-
     use crate::conductor::CellError;
     use crate::core::workflow::WorkflowError;
     use crate::{
@@ -87,6 +76,15 @@ mod tests {
         },
         sweettest::*,
     };
+    use hdk::prelude::*;
+    use holochain_chc::*;
+    use holochain_conductor_api::conductor::ConductorConfig;
+    use holochain_keystore::MetaLairClient;
+    use holochain_state::prelude::SourceChainError;
+    use holochain_types::record::SignedActionHashedExt;
+    use holochain_wasm_test_utils::TestWasm;
+    use std::sync::atomic::Ordering::SeqCst;
+    use std::sync::{atomic::AtomicBool, Arc};
 
     /// A CHC implementation that can be set up to error
     struct FlakyChc {
@@ -199,7 +197,6 @@ mod tests {
 
         let config = ConductorConfig {
             chc_url: Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL)),
-            dpki: DpkiConfig::disabled(),
             ..Default::default()
         };
         let mut conductor = SweetConductor::from_config(config).await;
@@ -259,7 +256,7 @@ mod tests {
     async fn multi_conductor_chc_sync() {
         holochain_trace::test_run();
 
-        let mut config = SweetConductorConfig::standard().no_dpki();
+        let mut config = SweetConductorConfig::standard();
         // config.chc_url = Some(url2::Url2::parse("http://127.0.0.1:40845/"));
         config.chc_url = Some(url2::Url2::parse(CHC_LOCAL_MAGIC_URL));
         let mut conductors = SweetConductorBatch::from_config(4, config).await;

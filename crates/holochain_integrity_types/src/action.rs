@@ -313,8 +313,6 @@ impl Action {
             // NOTE: We make an awkward special case for CloseChain actions during agent migrations,
             // signing using the updated key rather than the author key. There are several reasons for this:
             // - In order for CloseChain to be effective at all, the new key must be known, because the new key is pointed to from the CloseChain. A good way to prove that the forward reference is correct is to sign it with the forward reference.
-            // - We know that if the user is going to revoke/update their key in DPKI, it's likely that they don't even have access to their app chain, so they will want to revoke in DPKI before even modifying the app chain, especially if they're in a race with an attacker
-            // - Moreover, we don't want an attacker to close the chain on behalf of the user, because they would be pointing to some key that doesn't match the DPKI state.
             // - We should let the author be the old key and make a special case for the signature check, because that prevents special cases in other areas, such as determining the agent activity basis hash (should be the old key), running sys validation for prev_action (prev and next author must match) and probably more.
             Action::CloseChain(CloseChain {
                 new_target: Some(MigrationTarget::Agent(agent)),

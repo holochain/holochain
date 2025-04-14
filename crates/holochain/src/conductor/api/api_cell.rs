@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
-use super::DpkiApi;
 use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::ConductorHandle;
@@ -158,9 +157,6 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Get a [`EntryDef`] from the [`EntryDefBufferKey`]
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
 
-    /// Call into DPKI
-    fn get_dpki(&self) -> DpkiApi;
-
     /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
     async fn witness_nonce_from_calling_agent(
         &self,
@@ -252,10 +248,6 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         CellConductorApiT::get_entry_def(self, key)
-    }
-
-    fn get_dpki(&self) -> DpkiApi {
-        CellConductorApiT::conductor_services(self).dpki
     }
 
     async fn witness_nonce_from_calling_agent(

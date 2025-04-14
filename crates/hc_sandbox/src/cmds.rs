@@ -39,16 +39,6 @@ pub struct Create {
     #[arg(long)]
     pub in_process_lair: bool,
 
-    /// Launch Holochain with the DPKI service disabled.
-    #[cfg(feature = "unstable-dpki")]
-    #[arg(long)]
-    pub no_dpki: bool,
-
-    /// Set the network seed for the DPKI service.
-    #[cfg(feature = "unstable-dpki")]
-    #[arg(long, conflicts_with = "no_dpki")]
-    pub dpki_network_seed: Option<String>,
-
     /// Set the conductor config CHC (Chain Head Coordinator) URL
     #[cfg(feature = "chc")]
     #[arg(long, value_parser=try_parse_url2)]
@@ -228,10 +218,6 @@ impl Default for Create {
             root: None,
             directories: Vec::with_capacity(0),
             in_process_lair: false,
-            #[cfg(feature = "unstable-dpki")]
-            no_dpki: false,
-            #[cfg(feature = "unstable-dpki")]
-            dpki_network_seed: None,
             #[cfg(feature = "chc")]
             chc_url: None,
         }

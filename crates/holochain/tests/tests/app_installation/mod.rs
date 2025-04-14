@@ -95,7 +95,6 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
             network_seed: Some(network_seed_override.into()),
             roles_settings: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -109,7 +108,6 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
             network_seed: Some(network_seed_override.into()),
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -254,7 +252,6 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
             network_seed: None,
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -308,7 +305,6 @@ async fn installing_with_modifiers_for_non_existing_role_fails() {
             network_seed: Some("final seed".into()),
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await;
 
@@ -345,7 +341,6 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
             roles_settings: Some(HashMap::from([role_settings])),
             network_seed: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();

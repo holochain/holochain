@@ -185,7 +185,6 @@ macro_rules! holochain_externs {
 
         #[cfg(feature = "unstable-functions")]
         holochain_wasmer_guest::host_externs!(
-            get_agent_key_lineage:1,
             block_agent:1,
             unblock_agent:1,
             schedule:1

@@ -19,7 +19,7 @@ use holochain_types::record::SignedActionHashedExt;
 #[tokio::test(flavor = "multi_thread")]
 async fn grafting() {
     let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
-    let mut config = SweetConductorConfig::standard().no_dpki();
+    let mut config = SweetConductorConfig::standard();
     config.chc_url = Some(url2::Url2::parse(
         holochain::conductor::chc::CHC_LOCAL_MAGIC_URL,
     ));

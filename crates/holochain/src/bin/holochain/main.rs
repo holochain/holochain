@@ -105,10 +105,6 @@ async fn async_main() {
             None,
             true,
             0,
-            #[cfg(feature = "unstable-dpki")]
-            true,
-            #[cfg(feature = "unstable-dpki")]
-            None,
             #[cfg(feature = "chc")]
             None,
         )

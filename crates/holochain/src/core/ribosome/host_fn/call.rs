@@ -250,14 +250,10 @@ pub mod wasm_test {
                 .call(&zome1, "who_are_they_local", cell2.cell_id())
                 .await;
             assert_eq!(agent_info.agent_initial_pubkey, agent_pubkey);
-            #[cfg(feature = "unstable-dpki")]
-            assert_eq!(agent_info.agent_latest_pubkey, agent_pubkey);
         }
         {
             let agent_info: AgentInfo = conductor.call(&zome1, "who_are_they_role", "role2").await;
             assert_eq!(agent_info.agent_initial_pubkey, agent_pubkey);
-            #[cfg(feature = "unstable-dpki")]
-            assert_eq!(agent_info.agent_latest_pubkey, agent_pubkey);
         }
     }
 
@@ -375,7 +371,5 @@ pub mod wasm_test {
             .call(&alice, "whoarethey", bob_pubkey.clone())
             .await;
         assert_eq!(agent_info.agent_initial_pubkey, bob_pubkey);
-        #[cfg(feature = "unstable-dpki")]
-        assert_eq!(agent_info.agent_latest_pubkey, bob_pubkey);
     }
 }

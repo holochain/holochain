@@ -91,6 +91,5 @@ pub async fn get_install_app_payload_from_dnas(
         network_seed: None,
         roles_settings,
         ignore_genesis_failure: false,
-        allow_throwaway_random_agent_key: false,
     }
 }

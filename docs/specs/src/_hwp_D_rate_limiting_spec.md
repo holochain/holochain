@@ -118,11 +118,6 @@ Note: This is only true of the special case of cap entries as it is invalid for 
 
 Many Agents can be created unlike the other Class A entries.
 
-The rate limiting here is implied because all Agent keys are referencing entries in the `deepkey` happ.
-
-Deepkey itself uses rate limiting as specced in this document to limit the rate of Agent entries, so implicitly this is Class A _and_ has rate limit logic.
-
-
 #### B: System priority: Security
 
 Class B elements are access control so considered critical to the system and have high priority but are abusable.

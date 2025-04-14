@@ -147,11 +147,7 @@ Application developers can take steps to further protect their users by providin
 
 #### Human Error
 
-There are some aspects of security, especially those of human error, that all systems are subject to. People​ ​will​ ​still​ ​lose​ ​their​ ​keys,​ ​use​ ​weak​ ​passwords,​ ​get​ ​computer​ ​viruses, etc. But, crucially, in the realm of "System Correctness" and "confidence,"​ the question that needs addressing is how the system interfaces with mechanisms to mitigate against human error. Holochain provides significant tooling to support key management in the form of its ​core​ ​Distributed​ ​Public Key​ ​Infrastructure (DPKI) and DeepKey app built on that infrastructure. Among other things, this tooling ​provides​ ​assistance​ ​in​ ​managing​ ​keys,​ ​managing​ ​revocation​ ​methods,​ ​and reclaiming​ ​control​ ​of​ ​applications​ ​when​ ​keys​ ​or​ ​devices​ ​have​ ​become​ ​compromised.
-
-A definition and specification of a DPKI system is outside of the scope of this paper; see the DeepKey design specification[^deepkey-spec] for a more thorough exploration.
-
-[^deepkey-spec]: See <https://github.com/holochain/deepkey/blob/main/docs/2023/README.md>.
+There are some aspects of security, especially those of human error, that all systems are subject to. People​ ​will​ ​still​ ​lose​ ​their​ ​keys,​ ​use​ ​weak​ ​passwords,​ ​get​ ​computer​ ​viruses, etc. But, crucially, in the realm of "System Correctness" and "confidence,"​ the question that needs addressing is how the system interfaces with mechanisms to mitigate against human error.
 
 ## Evolvability
 
