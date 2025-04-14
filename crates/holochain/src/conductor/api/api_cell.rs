@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
-use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
@@ -54,12 +53,6 @@ impl CellConductorApiT for CellConductorApi {
         &self.cell_id
     }
 
-    fn conductor_services(&self) -> ConductorServices {
-        self.conductor_handle
-            .running_services
-            .share_ref(|s| s.clone())
-    }
-
     fn keystore(&self) -> &MetaLairClient {
         self.conductor_handle.keystore()
     }
@@ -107,9 +100,6 @@ impl CellConductorApiT for CellConductorApi {
 pub trait CellConductorApiT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
-
-    /// Access to the conductor services
-    fn conductor_services(&self) -> ConductorServices;
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &MetaLairClient;

@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Remove all references to Deepkey DNA.
 - Remove call to revoke an agent key from the Conductor API. There was no way to update an agent key or create a new key for an agent. The
   call was a remnant of the intended DPKI feature.
+- Remove conductor service interface and app store service stub. The conductor service interface was added primarily to allow DPKI to run
+  as a DNA internal to the conductor.
 
 ## 0.5.0
 

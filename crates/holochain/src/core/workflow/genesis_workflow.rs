@@ -170,7 +170,6 @@ impl GenesisWorkspace {
 mod tests {
     use super::*;
     use crate::conductor::api::MockCellConductorApiT;
-    use crate::conductor::conductor::{mock_app_store, ConductorServices};
     use crate::core::ribosome::MockRibosomeT;
     use holochain_keystore::test_keystore;
     use holochain_state::prelude::test_dht_db;
@@ -196,10 +195,6 @@ mod tests {
             let workspace = GenesisWorkspace::new(vault.clone(), dht_db.to_db());
 
             let mut api = MockCellConductorApiT::new();
-            api.expect_conductor_services()
-                .return_const(ConductorServices {
-                    app_store: Some(Arc::new(mock_app_store())),
-                });
             api.expect_keystore().return_const(keystore.clone());
             let mut ribosome = MockRibosomeT::new();
             ribosome
