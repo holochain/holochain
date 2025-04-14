@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.5.0-rc.2
+
 ## 0.5.0-rc.1
 
 - ***BREAKING*** Kitsune2 Integrated: Holochain has now transitioned from the legacy Kitsune networking implementation, to the new [Kitsune2](https://crates.io/crates/kitsune2). [\#4791](https://github.com/holochain/holochain/pull/4791)
