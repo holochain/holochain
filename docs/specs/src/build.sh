@@ -1,5 +1,5 @@
 #!/bin/bash
-sed -e '$s/$/\n/' -s hwp_*.md > holochain-white-paper-2.0.md
+sed -e '$s/$/\n/' -s hwp_*.md > holochain-white-paper-2.1.md
 pandoc -L diagram-1.0.0/diagram.lua --extract-media media/ -f markdown -t latex holochain-white-paper-2.1.md --template ./pandoc-template.latex > holochain-white-paper-2.1.tex
 pdflatex --shell-escape holochain-white-paper-2.1.tex
 pdflatex --shell-escape holochain-white-paper-alpha.tex
