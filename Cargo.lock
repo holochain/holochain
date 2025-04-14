@@ -2633,7 +2633,6 @@ dependencies = [
  "holochain_chc",
  "holochain_conductor_api",
  "holochain_conductor_config",
- "holochain_conductor_services",
  "holochain_keystore",
  "holochain_metrics",
  "holochain_nonce",
@@ -2921,28 +2920,6 @@ dependencies = [
  "sodoken",
  "tempfile",
  "url2",
-]
-
-[[package]]
-name = "holochain_conductor_services"
-version = "0.4.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "derive_more 0.99.19",
- "futures",
- "hdk",
- "holochain_keystore",
- "holochain_types",
- "holochain_util",
- "mockall",
- "must_future",
- "nanoid",
- "serde",
- "serde_bytes",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
 ]
 
 [[package]]

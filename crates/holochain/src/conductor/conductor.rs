@@ -65,7 +65,6 @@ use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
-pub use holochain_conductor_services::*;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
 use holochain_keystore::MetaLairClient;
@@ -245,8 +244,6 @@ pub struct Conductor {
 
     scheduler: Arc<parking_lot::Mutex<Option<tokio::task::JoinHandle<()>>>>,
 
-    pub(crate) running_services: RwShare<ConductorServices>,
-
     /// Cache for wasmer modules, both on disk and in memory.
     ///
     /// This cache serves as a central storage location for wasmer modules,
@@ -322,7 +319,6 @@ mod startup_shutdown_impls {
                 keystore,
                 holochain_p2p,
                 post_commit,
-                running_services: RwShare::new(ConductorServices::default()),
                 #[cfg(feature = "wasmer_sys")]
                 wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(
                     maybe_data_root_path.map(|p| p.join(WASM_CACHE)),
@@ -387,7 +383,6 @@ mod startup_shutdown_impls {
                 *lock = Some(task);
             });
 
-            self.clone().initialize_services().await?;
             self.clone().add_admin_interfaces(admin_configs).await?;
 
             info!("Conductor startup: admin interface(s) added.");
@@ -2017,29 +2012,6 @@ mod app_status_impls {
 }
 
 /// Methods related to management of Conductor state
-mod service_impls {
-    use super::*;
-
-    impl Conductor {
-        /// Access the current conductor services
-        pub fn running_services(&self) -> ConductorServices {
-            self.running_services.share_ref(|s| s.clone())
-        }
-
-        #[cfg(feature = "test_utils")]
-        /// Access the current conductor services mutably
-        pub fn running_services_mutex(&self) -> &RwShare<ConductorServices> {
-            &self.running_services
-        }
-
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub(crate) async fn initialize_services(self: Arc<Self>) -> ConductorResult<()> {
-            Ok(())
-        }
-    }
-}
-
-/// Methods related to management of Conductor state
 mod state_impls {
     use super::*;
 
@@ -2839,40 +2811,6 @@ mod countersigning_impls {
                     }
                 }
             }
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl holochain_conductor_services::CellRunner for Conductor {
-    async fn call_zome(
-        &self,
-        provenance: &AgentPubKey,
-        cap_secret: Option<CapSecret>,
-        cell_id: CellId,
-        zome_name: ZomeName,
-        fn_name: FunctionName,
-        payload: ExternIO,
-    ) -> anyhow::Result<ExternIO> {
-        let now = Timestamp::now();
-        let (nonce, expires_at) =
-            holochain_nonce::fresh_nonce(now).map_err(ConductorApiError::Other)?;
-        let call_params = ZomeCallParams {
-            cell_id,
-            zome_name,
-            fn_name,
-            cap_secret,
-            provenance: provenance.clone(),
-            payload,
-            nonce,
-            expires_at,
-        };
-        let response = self.call_zome(call_params).await;
-        match response {
-            Ok(Ok(ZomeCallResponse::Ok(bytes))) => Ok(bytes),
-            Ok(Ok(other)) => Err(anyhow::anyhow!(other.clone())),
-            Ok(Err(error)) => Err(error.into()),
-            Err(error) => Err(error.into()),
         }
     }
 }
