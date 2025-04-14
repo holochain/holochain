@@ -1,7 +1,7 @@
 use holo_hash::ActionHash;
 #[cfg(not(feature = "wasmer_wamr"))]
 use holochain::conductor::conductor::WASM_CACHE;
-use holochain::{retry_until_timeout, sweettest::*};
+use holochain::{sweettest::*, test_utils::retry_fn_until_timeout};
 use holochain_wasm_test_utils::TestWasm;
 
 // Make sure the wasm cache at least creates files.
@@ -207,14 +207,17 @@ async fn zero_arc_can_link_to_uncached_base() {
         )
         .await;
 
-    retry_until_timeout!(5000, 500, {
-        if conductors[0]
-            .all_ops_of_author_integrated(dna_file.dna_hash(), alice.agent_pubkey())
-            .unwrap()
-        {
-            break;
-        }
-    });
+    retry_fn_until_timeout(
+        || async {
+            conductors[0]
+                .all_ops_of_author_integrated(dna_file.dna_hash(), alice.agent_pubkey())
+                .unwrap()
+        },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     println!("@!@!@ -- must_get_agent_activity --");
     println!("@!@!@ action_hash: {action_hash:?}");

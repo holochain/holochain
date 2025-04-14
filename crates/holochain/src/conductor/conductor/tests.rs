@@ -3,9 +3,9 @@ use super::ConductorState;
 use super::*;
 use crate::conductor::api::error::ConductorApiError;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
-use crate::retry_until_timeout;
 use crate::sweettest::*;
 use crate::test_utils::inline_zomes::simple_crud_zome;
+use crate::test_utils::retry_fn_until_timeout;
 use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
@@ -278,11 +278,13 @@ async fn uninstall_app() {
         .await;
 
     // Await integration of both actions.
-    retry_until_timeout!(1_000, 10, {
-        if conductor.all_ops_integrated(dna.dna_hash()).unwrap() {
-            break;
-        }
-    });
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     assert!(conductor
         .call::<_, Option<Record>>(&app1.cells()[0].zome("coordinator"), "read", hash2.clone())
