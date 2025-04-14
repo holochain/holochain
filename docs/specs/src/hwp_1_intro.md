@@ -5,7 +5,7 @@ author:
  - Eric Harris-Braun
  - Arthur Brock
  - Paul d'Aoust
-date: '2024-11-08 — v2.0'
+date: '2025-04-14 — v2.1'
 abstract: |
  We present a generalized system for large-scale distributed coordination that does not rely
  on global consensus, explicating the problem instead through the lens of scaling consent. After
