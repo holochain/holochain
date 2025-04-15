@@ -89,7 +89,7 @@ pub async fn pack<M: Manifest>(
     serialize_wasm: bool,
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
     let dir_path = ffs::canonicalize(dir_path).await?;
-    let manifest_path = dir_path.join(M::path());
+    let manifest_path = dir_path.join(M::file_name());
     let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path).await?;
     let target_path = match target_path {
         Some(target_path) => {
@@ -169,7 +169,7 @@ integrity:
         assert_eq!(bundle_path, dir.join("test_dna.dna"));
 
         // Ensure we can resolve all files, including the local one
-        assert_eq!(bundle.resolve_all().await.unwrap().values().len(), 3);
+        assert_eq!(bundle.get_all_resources().await.unwrap().values().len(), 3);
 
         // Unpack without forcing, which will fail
         matches::assert_matches!(

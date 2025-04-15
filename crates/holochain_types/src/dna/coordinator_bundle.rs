@@ -23,7 +23,7 @@ use super::CoordinatorManifest;
 pub struct CoordinatorBundle(mr_bundle::Bundle<CoordinatorManifest>);
 
 impl Manifest for CoordinatorManifest {
-    fn locations(&self) -> Vec<mr_bundle::Location> {
+    fn resource_ids(&self) -> Vec<mr_bundle::Location> {
         self.zomes
             .iter()
             .map(|zome| zome.location.clone())

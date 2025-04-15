@@ -19,7 +19,7 @@ impl<M: Manifest> Bundle<M> {
             self.manifest(),
             self.bundled_resources(),
             base_path,
-            M::path().as_ref(),
+            M::file_name().as_ref(),
             force,
         )
         .await
@@ -35,9 +35,9 @@ impl<M: Manifest> Bundle<M> {
             PackingError::BadManifestPath(manifest_path.clone(), err.into_inner())
         })?;
         let manifest: M = serde_yaml::from_str(&manifest_yaml).map_err(UnpackingError::from)?;
-        let manifest_relative_path = M::path();
+        let manifest_relative_path = M::file_name();
         let base_path = prune_path(manifest_path.clone(), &manifest_relative_path)?;
-        let resources = futures::future::join_all(manifest.bundled_paths().into_iter().map(
+        let resources = futures::future::join_all(manifest.resource_ids().into_iter().map(
             |relative_path| async {
                 let resource_path = ffs::canonicalize(base_path.join(&relative_path)).await?;
                 ffs::read(&resource_path)

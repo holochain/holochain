@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use crate::location::Location;
 
+pub type ResourceIdentifier = String;
+
 /// A Manifest describes the resources in a [`Bundle`](crate::Bundle) and how
 /// to pack and unpack them.
 ///
@@ -16,29 +18,15 @@ pub trait Manifest:
 {
     /// The list of Locations referenced in the manifest data. This must be
     /// correctly implemented to enable resource resolution.
-    fn locations(&self) -> Vec<Location>;
+    fn resource_ids(&self) -> Vec<ResourceIdentifier>;
 
-    /// When unpacking the bundle into a directory structure, this becomes
-    /// the relative path of the manifest file.
+    /// The file name of the manifest, to be used when unpacking a bundle and as a default when
+    /// packing a bundle.
     #[cfg(feature = "packing")]
-    fn path() -> PathBuf;
+    fn file_name() -> String;
 
     /// When packing a bundle from a directory structure, the bundle file gets
     /// this extension.
     #[cfg(feature = "packing")]
     fn bundle_extension() -> &'static str;
-
-    /// Get only the Bundled locations
-    fn bundled_paths(&self) -> Vec<PathBuf> {
-        self.locations()
-            .into_iter()
-            .filter_map(|loc| {
-                if let Location::Bundled(path) = loc {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
 }

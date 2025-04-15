@@ -1,6 +1,7 @@
 //! Custom error types for the mr_bundle crate
 
 use holochain_util::ffs::IoError;
+use crate::manifest::ResourceIdentifier;
 
 /// Any error which can occur in this crate
 #[derive(Debug, thiserror::Error)]
@@ -46,6 +47,14 @@ pub type MrBundleResult<T> = Result<T, MrBundleError>;
 /// Errors which can occur while constructing a Bundle
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum BundleError {
+    /// A manifest references resources that were not provided when attempting to create a bundle.
+    #[error("Manifest references resources that were not provided when attempting to create a bundle: {0}")]
+    MissingResources(Vec<ResourceIdentifier>),
+
+    /// Resources were provided when attempting to create a bundle that were not referenced in the manifest.
+    #[error("Resources were provided when attempting to create a bundle that were not referenced in the manifest: {0}")]
+    UnusedResources(Vec<ResourceIdentifier>),
+
     /// A resource was provided that is not used in the manifest.
     #[error(
         "The bundled resource path '{0}' is not mentioned in the manifest.
@@ -97,6 +106,7 @@ pub enum UnpackingError {
     ManifestPathSuffixMismatch(std::path::PathBuf, std::path::PathBuf),
 }
 
+/// Custom result type with the error type [`UnpackingError`].
 #[cfg(feature = "packing")]
 pub type UnpackingResult<T> = Result<T, UnpackingError>;
 

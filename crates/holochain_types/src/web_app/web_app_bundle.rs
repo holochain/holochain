@@ -18,14 +18,14 @@ impl WebAppBundle {
     pub async fn web_ui_zip_bytes(&self) -> MrBundleResult<ResourceBytes> {
         let manifest = self.0.manifest();
 
-        self.0.resolve(&manifest.web_ui_location()).await
+        self.0.get_resource(&manifest.web_ui_location()).await
     }
 
     /// Returns the hApp bundle contained inside this WebAppBundle
     pub async fn happ_bundle(&self) -> MrBundleResult<AppBundle> {
         let manifest = self.0.manifest();
 
-        let bytes = self.0.resolve(&manifest.happ_bundle_location()).await?;
+        let bytes = self.0.get_resource(&manifest.happ_bundle_location()).await?;
         let bundle = AppBundle::from(Bundle::decode(bytes.into_inner())?);
         Ok(bundle)
     }
