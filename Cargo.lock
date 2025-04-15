@@ -4611,22 +4611,21 @@ checksum = "7843ec2de400bcbc6a6328c958dc38e5359da6e93e72e37bc5246bf1ae776389"
 name = "mr_bundle"
 version = "0.6.0-dev.0"
 dependencies = [
- "anyhow",
  "bytes",
  "flate2",
  "futures",
  "holochain_util",
  "maplit",
  "matches",
+ "mr_bundle",
  "proptest",
  "proptest-derive 0.5.1",
- "reqwest 0.12.15",
  "rmp-serde",
  "serde",
  "serde_yaml",
  "tempfile",
  "test-strategy",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tokio",
 ]
 

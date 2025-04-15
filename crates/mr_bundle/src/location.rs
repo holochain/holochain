@@ -45,7 +45,6 @@ pub(crate) async fn resolve_local(path: &Path) -> MrBundleResult<ResourceBytes> 
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use serde::{Deserialize, Serialize};
     use serde_yaml::value::{Tag, TaggedValue};

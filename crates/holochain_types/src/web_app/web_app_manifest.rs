@@ -21,7 +21,7 @@ pub enum WebAppManifest {
 }
 
 impl Manifest for WebAppManifest {
-    fn locations(&self) -> Vec<Location> {
+    fn resource_ids(&self) -> Vec<Location> {
         match self {
             WebAppManifest::V1(m) => vec![m.ui.location.clone(), m.happ_manifest.location.clone()],
         }
@@ -100,7 +100,7 @@ mod tests {
 
         assert_eq!(
             vec![ui_location.clone(), happ_location.clone()],
-            web_app_manifest.locations()
+            web_app_manifest.resource_ids()
         );
         assert_eq!(app_name, web_app_manifest.app_name());
         assert_eq!(ui_location, web_app_manifest.web_ui_location());

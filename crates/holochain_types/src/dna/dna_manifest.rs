@@ -28,7 +28,7 @@ pub enum DnaManifest {
 pub struct ValidatedDnaManifest(pub DnaManifest);
 
 impl mr_bundle::Manifest for ValidatedDnaManifest {
-    fn locations(&self) -> Vec<mr_bundle::Location> {
+    fn resource_ids(&self) -> Vec<mr_bundle::Location> {
         match &self.0 {
             DnaManifest::V1(m) => m.all_zomes().map(|zome| zome.location.clone()).collect(),
         }

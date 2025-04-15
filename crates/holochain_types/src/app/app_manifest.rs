@@ -64,7 +64,7 @@ pub enum AppManifest {
 }
 
 impl Manifest for AppManifest {
-    fn locations(&self) -> Vec<Location> {
+    fn resource_ids(&self) -> Vec<Location> {
         match self {
             AppManifest::V1(m) => m
                 .roles
@@ -185,7 +185,7 @@ mod tests {
                 .location
                 .clone()
                 .unwrap()],
-            sample_app_manifest.locations()
+            sample_app_manifest.resource_ids()
         );
     }
 }

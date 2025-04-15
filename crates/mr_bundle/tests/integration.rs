@@ -11,7 +11,7 @@ enum TestManifest {
 }
 
 impl Manifest for TestManifest {
-    fn locations(&self) -> Vec<Location> {
+    fn resource_ids(&self) -> Vec<Location> {
         match self {
             Self::V1(mani) => mani.things.iter().map(|b| b.location.clone()).collect(),
         }
