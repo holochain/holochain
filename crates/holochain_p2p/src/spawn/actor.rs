@@ -6,6 +6,7 @@ const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 use crate::metrics::create_p2p_request_duration_metric;
 use crate::*;
 use kitsune2_api::*;
+use kitsune2_core::get_remote_agents_near_location;
 use std::collections::HashMap;
 use std::sync::{Mutex, Weak};
 
@@ -899,14 +900,13 @@ impl HolochainP2pActor {
         space: &DynSpace,
         loc: u32,
     ) -> HolochainP2pResult<Vec<(AgentPubKey, Url)>> {
-        let agent_list = space.peer_store().get_near_location(loc, 1024).await?;
-        let local_agents = space
-            .local_agent_store()
-            .get_all()
-            .await?
-            .into_iter()
-            .map(|a| a.agent().clone())
-            .collect::<Vec<_>>();
+        let agent_list = get_remote_agents_near_location(
+            space.peer_store().clone(),
+            space.local_agent_store().clone(),
+            loc,
+            1024,
+        )
+        .await?;
 
         Ok(agent_list
             .into_iter()
@@ -917,9 +917,6 @@ impl HolochainP2pActor {
                     return None;
                 }
                 if !a.storage_arc.contains(loc) {
-                    return None;
-                }
-                if local_agents.contains(&a.agent) {
                     return None;
                 }
                 Some((
@@ -1123,9 +1120,19 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let byte_count = zome_call_params_serialized.0.len();
 
+            let agent_id = to_agent.to_k2_agent();
+            if space
+                .local_agent_store()
+                .is_agent_local(agent_id.clone())
+                .await?
+            {
+                tracing::info!(?agent_id, "ignoring call_remote to local agent");
+                return Ok(SerializedBytes::default());
+            }
+
             let to_url = space
                 .peer_store()
-                .get(to_agent.to_k2_agent())
+                .get(agent_id)
                 .await?
                 .and_then(|i| i.url.clone())
                 .ok_or_else(|| HolochainP2pError::other("call_remote: no url for peer"))?;
@@ -1175,9 +1182,19 @@ impl actor::HcP2p for HolochainP2pActor {
             let mut all = Vec::new();
 
             for (to_agent, payload, signature) in target_payload_list {
+                let to_agent_id = to_agent.to_k2_agent();
+                if space
+                    .local_agent_store()
+                    .is_agent_local(to_agent_id.clone())
+                    .await?
+                {
+                    tracing::info!(?to_agent_id, "ignoring send_remote_signal to local agent");
+                    continue;
+                }
+
                 let to_url = match space
                     .peer_store()
-                    .get(to_agent.to_k2_agent())
+                    .get(to_agent_id)
                     .await?
                     .and_then(|i| i.url.clone())
                 {
@@ -1185,11 +1202,7 @@ impl actor::HcP2p for HolochainP2pActor {
                     None => continue,
                 };
 
-                let req = crate::wire::WireMessage::remote_signal_evt(
-                    to_agent.clone(),
-                    payload,
-                    signature,
-                );
+                let req = WireMessage::remote_signal_evt(to_agent.clone(), payload, signature);
 
                 all.push(async {
                     if let Err(err) = self.send_notify(&space, to_url, req).await {
@@ -1256,18 +1269,21 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let op_hash_list: Vec<OpId> = op_hash_list.into_iter().map(|h| h.to_k2_op()).collect();
 
-            let urls: std::collections::HashSet<Url> = space
-                .peer_store()
-                .get_near_location(basis_hash.get_loc(), usize::MAX)
-                .await?
-                .into_iter()
-                .filter_map(|info| {
-                    if info.is_tombstone {
-                        return None;
-                    }
-                    info.url.clone()
-                })
-                .collect();
+            let urls: std::collections::HashSet<Url> = get_remote_agents_near_location(
+                space.peer_store().clone(),
+                space.local_agent_store().clone(),
+                basis_hash.get_loc(),
+                usize::MAX,
+            )
+            .await?
+            .into_iter()
+            .filter_map(|info| {
+                if info.is_tombstone {
+                    return None;
+                }
+                info.url.clone()
+            })
+            .collect();
 
             for url in urls {
                 space
@@ -1597,9 +1613,22 @@ impl actor::HcP2p for HolochainP2pActor {
             let space_id = dna_hash.to_k2_space();
             let space = self.kitsune.space(space_id.clone()).await?;
 
+            let agent_id = to_agent.to_k2_agent();
+
+            // Ideally this would be filtered before here, but to protect against connecting to
+            // ourselves, we want a check here.
+            if space
+                .local_agent_store()
+                .is_agent_local(agent_id.clone())
+                .await?
+            {
+                tracing::info!("ignoring send_validation_receipts to local agent");
+                return Ok(());
+            }
+
             let to_url = match space
                 .peer_store()
-                .get(to_agent.to_k2_agent())
+                .get(agent_id)
                 .await?
                 .and_then(|i| i.url.clone())
             {
@@ -1671,9 +1700,22 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let mut peer_urls = Vec::with_capacity(agents.len());
             for agent in agents {
+                let agent_id = agent.to_k2_agent();
+                if space
+                    .local_agent_store()
+                    .is_agent_local(agent_id.clone())
+                    .await?
+                {
+                    tracing::info!(
+                        ?agent_id,
+                        "ignoring countersigning session negotiation to local agent"
+                    );
+                    continue;
+                }
+
                 if let Some(agent_info) = space
                     .peer_store()
-                    .get(agent.to_k2_agent())
+                    .get(agent_id)
                     .await
                     .inspect_err(|e| {
                         tracing::error!(
