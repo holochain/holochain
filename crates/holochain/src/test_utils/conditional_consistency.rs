@@ -1,292 +1,18 @@
-//! Utils for Holochain tests
-use crate::conductor::api::AppInterfaceApi;
-use crate::conductor::config::AdminInterfaceConfig;
-use crate::conductor::config::ConductorConfig;
-use crate::conductor::config::InterfaceDriver;
 use crate::conductor::integration_dump;
-use crate::conductor::ConductorBuilder;
-use crate::conductor::ConductorHandle;
-use crate::core::queue_consumer::TriggerSender;
-use crate::core::ribosome::ZomeCallInvocation;
-use ::fixt::prelude::*;
-use hdk::prelude::ZomeName;
+use crate::sweettest::DurationOrSeconds;
+use crate::sweettest::SweetCell;
+use crate::test_utils::consistency::request_published_ops;
 use holo_hash::*;
-use holochain_conductor_api::conductor::paths::DataRootPath;
-use holochain_conductor_api::conductor::NetworkConfig;
 use holochain_conductor_api::IntegrationStateDump;
 use holochain_conductor_api::IntegrationStateDumps;
-use holochain_conductor_api::ZomeCallParamsSigned;
-use holochain_keystore::MetaLairClient;
-use holochain_nonce::fresh_nonce;
-use holochain_serialized_bytes::SerializedBytesError;
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_state::prelude::test_db_dir;
-use holochain_state::prelude::SourceChainResult;
 use holochain_state::prelude::StateQueryResult;
-use holochain_state::source_chain;
-use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
-use holochain_types::test_utils::fake_dna_file;
-use holochain_types::test_utils::fake_dna_zomes;
-use holochain_wasm_test_utils::TestWasm;
 use rusqlite::named_params;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write;
-use std::sync::Arc;
 use std::time::Duration;
-use tempfile::TempDir;
-use tokio::time::error::Elapsed;
-
-pub use itertools;
-
-pub mod consistency;
-pub mod hc_stress_test;
-pub mod host_fn_caller;
-pub mod inline_zomes;
-
-mod wait_for;
-pub use wait_for::*;
-
-/// Await consistency for warrants.
-#[cfg(any(feature = "unstable-functions", feature = "unstable-warrants"))]
-pub mod conditional_consistency;
-
-mod big_stack_test;
-
-use holochain_types::websocket::AllowedOrigins;
-
-use self::consistency::request_published_ops;
-
-/// Produce file and line number info at compile-time
-#[macro_export]
-macro_rules! here {
-    ($test: expr) => {
-        concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
-    };
-}
-
-/// Try a function, with pauses between retries, until it returns `true` or the timeout duration elapses.
-/// The default timeout is 5 s.
-/// The default pause is 500 ms.
-pub async fn retry_fn_until_timeout<F, Fut>(
-    try_fn: F,
-    timeout_ms: Option<u64>,
-    sleep_ms: Option<u64>,
-) -> Result<(), Elapsed>
-where
-    F: Fn() -> Fut,
-    Fut: core::future::Future<Output = bool>,
-{
-    tokio::time::timeout(
-        std::time::Duration::from_millis(timeout_ms.unwrap_or(5000)),
-        async {
-            loop {
-                if try_fn().await {
-                    break;
-                }
-                tokio::time::sleep(std::time::Duration::from_millis(sleep_ms.unwrap_or(500))).await;
-            }
-        },
-    )
-    .await
-}
-
-/// Retry a code block with an exit condition and then pause, until a timeout has elapsed.
-/// The default timeout is 5 s.
-/// The default pause is 500 ms.
-#[macro_export]
-macro_rules! retry_until_timeout {
-    ($timeout_ms:literal, $sleep_ms:literal, $code:block) => {
-        tokio::time::timeout(std::time::Duration::from_millis($timeout_ms), async {
-            loop {
-                $code
-                tokio::time::sleep(std::time::Duration::from_millis($sleep_ms)).await;
-            }
-        })
-        .await
-        .unwrap();
-    };
-
-    ($timeout_ms:literal, $code:block) => {
-        retry_until_timeout!($timeout_ms, 500, $code)
-    };
-
-    ($code:block) => {
-        retry_until_timeout!(5_000, $code)
-    };
-}
-
-/// Do what's necessary to install an app
-pub async fn install_app(
-    name: &str,
-    agent: AgentPubKey,
-    data: &[(DnaFile, Option<MembraneProof>)],
-    conductor_handle: ConductorHandle,
-) {
-    for (dna, _) in data.iter() {
-        conductor_handle.register_dna(dna.clone()).await.unwrap();
-    }
-    conductor_handle
-        .clone()
-        .install_app_minimal(name.to_string(), Some(agent), data, None)
-        .await
-        .unwrap();
-
-    conductor_handle
-        .clone()
-        .enable_app(name.to_string())
-        .await
-        .unwrap();
-
-    let errors = conductor_handle
-        .reconcile_cell_status_with_app_status()
-        .await
-        .unwrap();
-
-    assert!(errors.is_empty(), "{:?}", errors);
-}
-
-/// Payload for installing cells
-pub type DnasWithProofs = Vec<(DnaFile, Option<MembraneProof>)>;
-
-/// One of various ways to setup an app, used somewhere...
-pub async fn setup_app_in_new_conductor(
-    installed_app_id: InstalledAppId,
-    agent: Option<AgentPubKey>,
-    dnas: DnasWithProofs,
-) -> (Arc<TempDir>, AppInterfaceApi, ConductorHandle, AgentPubKey) {
-    let db_dir = test_db_dir();
-    let conductor_handle = ConductorBuilder::new()
-        .with_data_root_path(db_dir.path().to_path_buf().into())
-        .test(&[])
-        .await
-        .unwrap();
-
-    let agent =
-        install_app_in_conductor(conductor_handle.clone(), installed_app_id, agent, &dnas).await;
-
-    let handle = conductor_handle.clone();
-
-    (
-        Arc::new(db_dir),
-        AppInterfaceApi::new(conductor_handle),
-        handle,
-        agent,
-    )
-}
-
-/// Install an app into an existing conductor instance
-pub async fn install_app_in_conductor(
-    conductor_handle: ConductorHandle,
-    installed_app_id: InstalledAppId,
-    agent: Option<AgentPubKey>,
-    dnas_with_proofs: &[(DnaFile, Option<MembraneProof>)],
-) -> AgentPubKey {
-    for (dna, _) in dnas_with_proofs {
-        conductor_handle.register_dna(dna.clone()).await.unwrap();
-    }
-
-    let agent = conductor_handle
-        .clone()
-        .install_app_minimal(installed_app_id.clone(), agent, dnas_with_proofs, None)
-        .await
-        .unwrap();
-
-    conductor_handle
-        .clone()
-        .enable_app(installed_app_id)
-        .await
-        .unwrap();
-
-    let errors = conductor_handle
-        .clone()
-        .reconcile_cell_status_with_app_status()
-        .await
-        .unwrap();
-
-    assert!(errors.is_empty());
-
-    agent
-}
-
-/// Setup an app for testing
-/// apps_data is a vec of app nicknames with vecs of their cell data
-pub async fn setup_app_with_names(
-    agent: AgentPubKey,
-    apps_data: Vec<(&str, DnasWithProofs)>,
-) -> (TempDir, AppInterfaceApi, ConductorHandle) {
-    let dir = test_db_dir();
-    let (iface, handle) =
-        setup_app_inner(dir.path().to_path_buf().into(), agent, apps_data, None).await;
-    (dir, iface, handle)
-}
-
-/// Setup an app with a custom network config for testing
-/// apps_data is a vec of app nicknames with vecs of their cell data.
-pub async fn setup_app_with_network(
-    agent: AgentPubKey,
-    apps_data: Vec<(&str, DnasWithProofs)>,
-    network: NetworkConfig,
-) -> (TempDir, AppInterfaceApi, ConductorHandle) {
-    let dir = test_db_dir();
-    let (iface, handle) = setup_app_inner(
-        dir.path().to_path_buf().into(),
-        agent,
-        apps_data,
-        Some(network),
-    )
-    .await;
-    (dir, iface, handle)
-}
-
-/// Setup an app with full configurability
-pub async fn setup_app_inner(
-    data_root_path: DataRootPath,
-    agent: AgentPubKey,
-    apps_data: Vec<(&str, DnasWithProofs)>,
-    _network: Option<NetworkConfig>,
-) -> (AppInterfaceApi, ConductorHandle) {
-    let config = ConductorConfig {
-        data_root_path: Some(data_root_path.clone()),
-        admin_interfaces: Some(vec![AdminInterfaceConfig {
-            driver: InterfaceDriver::Websocket {
-                port: 0,
-                allowed_origins: AllowedOrigins::Any,
-            },
-        }]),
-        ..Default::default()
-    };
-    let conductor_handle = ConductorBuilder::new()
-        .config(config)
-        .test(&[])
-        .await
-        .unwrap();
-
-    for (app_name, cell_data) in apps_data {
-        install_app(
-            app_name,
-            agent.clone(),
-            &cell_data,
-            conductor_handle.clone(),
-        )
-        .await;
-    }
-
-    let handle = conductor_handle.clone();
-
-    (AppInterfaceApi::new(conductor_handle), handle)
-}
-
-/// If HC_WASM_CACHE_PATH is set warm the cache
-pub fn warm_wasm_tests() {
-    if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
-        let wasms: Vec<_> = TestWasm::iter().collect();
-        crate::fixt::RealRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
-            .next()
-            .unwrap();
-    }
-}
 
 /// Consistency was failed to be reached. Here's a report.
 #[derive(derive_more::From)]
@@ -374,9 +100,48 @@ impl ConsistencyConditions {
     }
 }
 
+/// Wait for all cells to reach consistency,
+/// with the option to specify that some cells are offline.
+///
+/// Cells paired with a `false` value will have their authored ops counted towards the total,
+/// but not their integrated ops (since they are not online to integrate things).
+/// This is useful for tests where nodes go offline.
+#[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+pub async fn await_conditional_consistency<'a, I: IntoIterator<Item = (&'a SweetCell, bool)>>(
+    timeout: impl Into<DurationOrSeconds>,
+    conditions: impl Into<ConsistencyConditions>,
+    all_cells: I,
+) -> ConsistencyResult {
+    #[allow(clippy::type_complexity)]
+    let all_cell_dbs: Vec<(
+        AgentPubKey,
+        DbRead<DbKindAuthored>,
+        Option<DbRead<DbKindDht>>,
+    )> = all_cells
+        .into_iter()
+        .map(|(c, online)| {
+            (
+                c.agent_pubkey().clone(),
+                c.authored_db().clone().into(),
+                online.then(|| c.dht_db().clone().into()),
+            )
+        })
+        .collect();
+    let all_cell_dbs: Vec<_> = all_cell_dbs
+        .iter()
+        .map(|c| (&c.0, &c.1, c.2.as_ref()))
+        .collect();
+    wait_for_integration_diff_conditional(
+        &all_cell_dbs[..],
+        timeout.into().into_duration(),
+        conditions.into(),
+    )
+    .await
+}
+
 /// Wait for all cell envs to reach consistency, meaning that every op
 /// published by every cell has been integrated by every node
-pub async fn wait_for_integration_diff<AuthorDb, DhtDb>(
+pub async fn wait_for_integration_diff_conditional<AuthorDb, DhtDb>(
     cells: &[(&AgentPubKey, &AuthorDb, Option<&DhtDb>)],
     timeout: Duration,
     conditions: ConsistencyConditions,
@@ -727,155 +492,4 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
     })
     .await
     .unwrap()
-}
-
-/// Helper for displaying agent infos stored on a conductor
-pub async fn display_agent_infos(conductor: &ConductorHandle) {
-    let all_dna_hashes = conductor.spaces.get_from_spaces(|s| (*s.dna_hash).clone());
-
-    for dna_hash in all_dna_hashes {
-        let peer_store = conductor
-            .holochain_p2p()
-            .peer_store(dna_hash.clone())
-            .await
-            .unwrap();
-        let all_peers = peer_store.get_all().await.unwrap();
-
-        for peer in all_peers {
-            tracing::debug!(dna_hash = %dna_hash, ?peer);
-        }
-    }
-}
-
-/// Helper to create a signed zome invocation for tests
-pub async fn new_zome_call<P, Z: Into<ZomeName>>(
-    keystore: &MetaLairClient,
-    cell_id: &CellId,
-    func: &str,
-    payload: P,
-    zome: Z,
-) -> Result<ZomeCallParamsSigned, SerializedBytesError>
-where
-    P: serde::Serialize + std::fmt::Debug,
-{
-    let zome_call_params = new_zome_call_params(cell_id, func, payload, zome)?;
-    Ok(
-        ZomeCallParamsSigned::try_from_params(keystore, zome_call_params)
-            .await
-            .unwrap(),
-    )
-}
-
-/// Helper to create an unsigned zome invocation for tests
-pub fn new_zome_call_params<P, Z>(
-    cell_id: &CellId,
-    func: &str,
-    payload: P,
-    zome: Z,
-) -> Result<ZomeCallParams, SerializedBytesError>
-where
-    P: serde::Serialize + std::fmt::Debug,
-    Z: Into<ZomeName>,
-{
-    let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-    Ok(ZomeCallParams {
-        cell_id: cell_id.clone(),
-        zome_name: zome.into(),
-        cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
-        fn_name: func.into(),
-        payload: ExternIO::encode(payload)?,
-        provenance: cell_id.agent_pubkey().clone(),
-        nonce,
-        expires_at,
-    })
-}
-
-/// Helper to create a zome invocation for tests
-pub async fn new_invocation<P, Z>(
-    cell_id: &CellId,
-    func: &str,
-    payload: P,
-    zome: Z,
-) -> Result<ZomeCallInvocation, SerializedBytesError>
-where
-    P: serde::Serialize + std::fmt::Debug,
-    Z: Into<Zome> + Clone,
-{
-    let ZomeCallParams {
-        cell_id,
-        cap_secret,
-        fn_name,
-        payload,
-        provenance,
-        nonce,
-        expires_at,
-        ..
-    } = new_zome_call_params(cell_id, func, payload, zome.clone().into())?;
-    Ok(ZomeCallInvocation {
-        cell_id,
-        zome: zome.into(),
-        cap_secret,
-        fn_name,
-        payload,
-        provenance,
-        nonce,
-        expires_at,
-    })
-}
-
-/// A fixture example dna for unit testing.
-pub fn fake_valid_dna_file(network_seed: &str) -> DnaFile {
-    fake_dna_zomes(
-        network_seed,
-        vec![(TestWasm::Foo.into(), TestWasm::Foo.into())],
-    )
-}
-
-/// Run genesis on the source chain for testing.
-pub async fn fake_genesis(
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
-    keystore: MetaLairClient,
-) -> SourceChainResult<()> {
-    fake_genesis_for_agent(vault, dht_db, fake_agent_pubkey_1(), keystore).await
-}
-
-/// Run genesis on the source chain for a specific agent for testing.
-pub async fn fake_genesis_for_agent(
-    vault: DbWrite<DbKindAuthored>,
-    dht_db: DbWrite<DbKindDht>,
-    agent: AgentPubKey,
-    keystore: MetaLairClient,
-) -> SourceChainResult<()> {
-    let dna = fake_dna_file("cool dna");
-    let dna_hash = dna.dna_hash().clone();
-
-    source_chain::genesis(
-        vault,
-        dht_db.clone(),
-        &DhtDbQueryCache::new(dht_db.clone().into()),
-        keystore,
-        dna_hash,
-        agent,
-        None,
-        None,
-    )
-    .await
-}
-
-/// Force all dht ops without enough validation receipts to be published.
-pub async fn force_publish_dht_ops(
-    vault: &DbWrite<DbKindAuthored>,
-    publish_trigger: &mut TriggerSender,
-) -> DatabaseResult<()> {
-    vault
-        .write_async(|txn| {
-            DatabaseResult::Ok(txn.execute(
-                "UPDATE DhtOp SET last_publish_time = NULL WHERE receipts_complete IS NULL",
-                [],
-            )?)
-        })
-        .await?;
-    publish_trigger.trigger(&"force_publish_dht_ops");
-    Ok(())
 }
