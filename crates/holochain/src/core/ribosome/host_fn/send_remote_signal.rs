@@ -190,7 +190,7 @@ mod tests {
         let cells: Vec<_> = apps.cells_flattened();
 
         let mut signals = Vec::new();
-        for h in conductors.iter() {
+        for h in conductors.iter().skip(1) {
             signals.push(h.subscribe_to_app_signals("app".to_string()))
         }
 
@@ -198,7 +198,7 @@ mod tests {
             .call(&cells[0].zome("zome"), "signal_others", ())
             .await;
 
-        crate::assert_eq_retry_10s!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS);
+        crate::assert_eq_retry_10s!(num_signals.load(Ordering::SeqCst), NUM_CONDUCTORS - 1);
 
         for mut signal in signals {
             signal.recv().await.expect("Failed to recv signal");
