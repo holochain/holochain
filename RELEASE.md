@@ -16,8 +16,7 @@
     - Remaining nodes create another 10 entries, 1 rep.
     - Wait for entries to appear again.
     - Offline node goes online and waits for entries to appear.
-    - Repeat with another node going offline.
-    - After 15 minutes create another node and make sure it catches up.
+    - After 15 minutes create another node and make sure it catches up. **15 minutes is the cutoff point for "what's new" to ring/disc sync**
     - One node keeps the conductor running over night and creates 10 entries while other peers are offline.
   - Day 2:
     - All nodes go online and await synchronization.
