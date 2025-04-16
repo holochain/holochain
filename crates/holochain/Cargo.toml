@@ -25,7 +25,9 @@ either = "1.5.0"
 fallible-iterator = "0.3.0"
 futures = "0.3"
 getrandom = "0.2.7"
-holo_hash = { version = "^0.6.0-dev.0", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.6.0-dev.0", path = "../holo_hash", features = [
+  "full",
+] }
 holochain_cascade = { version = "^0.6.0-dev.0", path = "../holochain_cascade" }
 holochain_chc = { version = "^0.3.0-dev.0", path = "../holochain_chc", default-features = false }
 holochain_conductor_api = { version = "^0.6.0-dev.0", path = "../holochain_conductor_api" }

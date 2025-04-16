@@ -35,7 +35,7 @@ holo_hash = { version = "^0.6.0-dev.0", path = "../holo_hash", features = [
 holochain_keystore = { version = "^0.6.0-dev.0", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.6.0-dev.0", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.55"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.6.0-dev.0"}
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.6.0-dev.0" }
 holochain_trace = { version = "^0.6.0-dev.0", path = "../holochain_trace" }
 holochain_util = { version = "^0.6.0-dev.0", path = "../holochain_util", features = [
   "backtrace",
@@ -48,7 +48,7 @@ kitsune2_api = "0.1.2"
 itertools = { version = "0.12" }
 mr_bundle = { path = "../mr_bundle", features = [
   "packing",
-], version = "^0.6.0-dev.0"}
+], version = "^0.6.0-dev.0" }
 must_future = "0.1.1"
 nanoid = "0.4"
 parking_lot = "0.12"
