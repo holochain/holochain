@@ -7,15 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Remove unstable feature DPKI and all references to it, including the DPKI conductor service. DPKI was introduced to the codebase prematurely,
-  largely untested, provided only a minimal set of calls to query agent keys and revoke an agent key, and kept causing problems that were
-  disproportionately difficult to debug. If Holochain will be enhanced by agent key management in the future, it will be reimplemented from the
-  ground up.
+## 0.6.0-dev.0
+
+- Remove unstable feature DPKI and all references to it, including the DPKI conductor service. DPKI was introduced to the codebase prematurely, largely untested, provided only a minimal set of calls to query agent keys and revoke an agent key, and kept causing problems that were disproportionately difficult to debug. If Holochain will be enhanced by agent key management in the future, it will be reimplemented from the ground up.
 - Remove all references to Deepkey DNA.
-- Remove call to revoke an agent key from the Conductor API. There was no way to update an agent key or create a new key for an agent. The
-  call was a remnant of the intended DPKI feature.
-- Remove conductor service interface and app store service stub. The conductor service interface was added primarily to allow DPKI to run
-  as a DNA internal to the conductor.
+- Remove call to revoke an agent key from the Conductor API. There was no way to update an agent key or create a new key for an agent. The call was a remnant of the intended DPKI feature.
+- Remove conductor service interface and app store service stub. The conductor service interface was added primarily to allow DPKI to run as a DNA internal to the conductor.
 
 ## 0.5.0
 

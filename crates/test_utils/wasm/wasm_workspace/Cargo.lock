@@ -342,7 +342,7 @@ dependencies = [
 
 [[package]]
 name = "fixt"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "holochain_serialized_bytes",
  "lazy_static",
@@ -494,7 +494,7 @@ checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
 
 [[package]]
 name = "hdi"
-version = "0.6.0"
+version = "0.7.0-dev.0"
 dependencies = [
  "getrandom",
  "hdk_derive",
@@ -510,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "getrandom",
  "hdi",
@@ -529,7 +529,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "darling 0.14.4",
  "heck 0.5.0",
@@ -558,7 +558,7 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "holo_hash"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "base64",
  "blake2b_simd",
@@ -578,7 +578,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "derive_builder",
  "holo_hash",
@@ -603,7 +603,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_nonce"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "getrandom",
  "holochain_secure_primitive",
@@ -612,7 +612,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_secure_primitive"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "paste",
  "serde",
@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "hdk",
  "serde",
@@ -654,7 +654,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_timestamp"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "chrono",
  "serde",
@@ -662,7 +662,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_util"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "cfg-if",
  "colored",
@@ -698,7 +698,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.5.0"
+version = "0.6.0-dev.0"
 dependencies = [
  "derive_builder",
  "derive_more",

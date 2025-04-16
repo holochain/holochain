@@ -14,6 +14,87 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250416.001135
+
+## [hc\_service\_check-0.3.0-dev.0](crates/hc_service_check/CHANGELOG.md#0.3.0-dev.0)
+
+## [hcterm-0.6.0-dev.0](crates/hcterm/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_cli-0.6.0-dev.0](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain-0.6.0-dev.0](crates/holochain/CHANGELOG.md#0.6.0-dev.0)
+
+- Remove unstable feature DPKI and all references to it, including the DPKI conductor service. DPKI was introduced to the codebase prematurely, largely untested, provided only a minimal set of calls to query agent keys and revoke an agent key, and kept causing problems that were disproportionately difficult to debug. If Holochain will be enhanced by agent key management in the future, it will be reimplemented from the ground up.
+- Remove all references to Deepkey DNA.
+- Remove call to revoke an agent key from the Conductor API. There was no way to update an agent key or create a new key for an agent. The call was a remnant of the intended DPKI feature.
+- Remove conductor service interface and app store service stub. The conductor service interface was added primarily to allow DPKI to run as a DNA internal to the conductor.
+
+## [holochain\_cli\_bundle-0.6.0-dev.0](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_cascade-0.6.0-dev.0](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_conductor\_config-0.6.0-dev.0](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_metrics-0.6.0-dev.0](crates/holochain_metrics/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_test\_wasm\_common-0.6.0-dev.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_websocket-0.6.0-dev.0](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.0)
+
+## [hdk-0.6.0-dev.0](crates/hdk/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_conductor\_api-0.6.0-dev.0](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_p2p-0.6.0-dev.0](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.0)
+
+- Update to Kitsune2 0.1.2 to get some UX improvements and bug fixes.
+
+## [hdi-0.7.0-dev.0](crates/hdi/CHANGELOG.md#0.7.0-dev.0)
+
+## [holochain\_state-0.6.0-dev.0](crates/holochain_state/CHANGELOG.md#0.6.0-dev.0)
+
+## [hdk\_derive-0.6.0-dev.0](crates/hdk_derive/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_chc-0.3.0-dev.0](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.0)
+
+## [holochain\_state\_types-0.6.0-dev.0](crates/holochain_state_types/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_types-0.6.0-dev.0](crates/holochain_types/CHANGELOG.md#0.6.0-dev.0)
+
+- **BREAKING CHANGE** `AppBundleSource` variant `Bytes(Vec<u8>)` is now `Bytes(bytes::Bytes)`.
+- **BREAKING CHANGE** `WebAppBundle::decode`, `DnaBundle::decode`, and `AppBundle::decode` all take a `bytes::Bytes` as input.
+
+## [holochain\_keystore-0.6.0-dev.0](crates/holochain_keystore/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_sqlite-0.6.0-dev.0](crates/holochain_sqlite/CHANGELOG.md#0.6.0-dev.0)
+
+## [mr\_bundle-0.6.0-dev.0](crates/mr_bundle/CHANGELOG.md#0.6.0-dev.0)
+
+- **BREAKING CHANGE** `Bundle::encode` now takes `bytes::Bytes` as input, and `Bundle::decode` now returns `bytes::Bytes`.
+- **BREAKING CHANGE** `ResourceBytes(Vec<u8>)` is now `ResourceBytes(bytes::Bytes)`.
+
+## [holochain\_trace-0.6.0-dev.0](crates/holochain_trace/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_zome\_types-0.6.0-dev.0](crates/holochain_zome_types/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_integrity\_types-0.6.0-dev.0](crates/holochain_integrity_types/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_nonce-0.6.0-dev.0](crates/holochain_nonce/CHANGELOG.md#0.6.0-dev.0)
+
+## [holo\_hash-0.6.0-dev.0](crates/holo_hash/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_secure\_primitive-0.6.0-dev.0](crates/holochain_secure_primitive/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_timestamp-0.6.0-dev.0](crates/holochain_timestamp/CHANGELOG.md#0.6.0-dev.0)
+
+## [fixt-0.6.0-dev.0](crates/fixt/CHANGELOG.md#0.6.0-dev.0)
+
+## [holochain\_util-0.6.0-dev.0](crates/holochain_util/CHANGELOG.md#0.6.0-dev.0)
+
 # 20250409.001112
 
 ## [hcterm-0.5.0-rc.1](crates/hcterm/CHANGELOG.md#0.5.0-rc.1)
