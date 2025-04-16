@@ -36,6 +36,7 @@ use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
+use tokio::time::error::Elapsed;
 
 pub use itertools;
 
@@ -59,6 +60,32 @@ macro_rules! here {
     ($test: expr) => {
         concat!($test, " !!!_LOOK HERE:---> ", file!(), ":", line!())
     };
+}
+
+/// Try a function, with pauses between retries, until it returns `true` or the timeout duration elapses.
+/// The default timeout is 5 s.
+/// The default pause is 500 ms.
+pub async fn retry_fn_until_timeout<F, Fut>(
+    try_fn: F,
+    timeout_ms: Option<u64>,
+    sleep_ms: Option<u64>,
+) -> Result<(), Elapsed>
+where
+    F: Fn() -> Fut,
+    Fut: core::future::Future<Output = bool>,
+{
+    tokio::time::timeout(
+        std::time::Duration::from_millis(timeout_ms.unwrap_or(5000)),
+        async {
+            loop {
+                if try_fn().await {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(sleep_ms.unwrap_or(500))).await;
+            }
+        },
+    )
+    .await
 }
 
 /// Retry a code block with an exit condition and then pause, until a timeout has elapsed.
