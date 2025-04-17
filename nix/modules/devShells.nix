@@ -138,6 +138,8 @@
             )
             ;
 
+            LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
+
             packages = with pkgs; [
               cargo-nextest
               graph-easy
