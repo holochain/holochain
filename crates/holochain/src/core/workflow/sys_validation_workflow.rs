@@ -394,17 +394,14 @@ async fn sys_validation_workflow_inner(
             })
             .await?;
 
-        if let Some(cache) = workspace.dht_query_cache.as_ref() {
-            // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
-            holochain_state::integrate::authored_ops_to_dht_db(
-                _network.target_arcs().await?,
-                warrant_op_hashes,
-                workspace.authored_db.clone().into(),
-                workspace.dht_db.clone(),
-                cache,
-            )
-            .await?;
-        }
+        // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
+        holochain_state::integrate::authored_ops_to_dht_db(
+            _network.target_arcs().await?,
+            warrant_op_hashes,
+            workspace.authored_db.clone().into(),
+            workspace.dht_db.clone(),
+        )
+        .await?;
     }
 
     tracing::debug!(
@@ -1168,8 +1165,6 @@ pub struct SysValidationWorkspace {
     // Authored DB is writeable because warrants may be written.
     authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
-    #[allow(dead_code)]
-    dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
     sys_validation_retry_delay: Duration,
@@ -1179,7 +1174,6 @@ impl SysValidationWorkspace {
     pub fn new(
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
-        dht_query_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         dna_def: Arc<DnaDef>,
         sys_validation_retry_delay: Duration,
@@ -1188,7 +1182,6 @@ impl SysValidationWorkspace {
             scratch: None,
             authored_db,
             dht_db,
-            dht_query_cache: Some(dht_query_cache),
             cache,
             dna_def,
             sys_validation_retry_delay,

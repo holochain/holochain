@@ -647,8 +647,7 @@ async fn test_must_get_agent_activity_inner(
         }
     });
 
-    let dht_cache = DhtDbQueryCache::new(dht.clone().into());
-    authored_ops_to_dht_db_without_check(hashes, authored.clone().into(), dht, &dht_cache)
+    authored_ops_to_dht_db_without_check(hashes, authored.clone().into(), dht)
         .await
         .unwrap();
 

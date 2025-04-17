@@ -13,18 +13,15 @@ mod tests;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(vault, trigger_receipt, network, dht_query_cache))
+    tracing::instrument(skip(vault, trigger_receipt, network))
 )]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
-    dht_query_cache: DhtDbQueryCache,
     trigger_receipt: TriggerSender,
     network: DynHolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
     let time = holochain_zome_types::prelude::Timestamp::now();
-    // Get any activity from the cache that is ready to be integrated.
-    let activity_to_integrate = dht_query_cache.get_activity_to_integrate().await?;
     let stored_ops = vault
         .write_async(move |txn| {
             let mut stored_ops = Vec::new();
@@ -41,11 +38,6 @@ pub async fn integrate_dht_ops_workflow(
 
             WorkflowResult::Ok(stored_ops)
         })
-        .await?;
-    // Once the database transaction is committed, update the cache with the
-    // integrated activity.
-    dht_query_cache
-        .set_all_activity_to_integrated(activity_to_integrate)
         .await?;
     let changed = stored_ops.len();
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;

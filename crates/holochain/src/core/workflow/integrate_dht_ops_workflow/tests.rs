@@ -363,7 +363,7 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
         fixt!(DnaHash),
         None,
     ));
-    integrate_dht_ops_workflow(env.clone(), env.clone().into(), qt, mock_network)
+    integrate_dht_ops_workflow(env, qt, mock_network)
         .await
         .unwrap();
 }
@@ -934,9 +934,7 @@ async fn inform_kitsune_about_integrated_ops() {
             });
         let hc_p2p = Arc::new(hc_p2p);
         let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
-        integrate_dht_ops_workflow(env.clone(), env.into(), tx, p2p_dna)
-            .await
-            .unwrap();
+        integrate_dht_ops_workflow(env, tx, p2p_dna).await.unwrap();
     }
 }
 
@@ -953,7 +951,5 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
     hc_p2p.expect_new_integrated_data().never();
     let hc_p2p = Arc::new(hc_p2p);
     let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
-    integrate_dht_ops_workflow(env.clone(), env.into(), tx, p2p_dna)
-        .await
-        .unwrap();
+    integrate_dht_ops_workflow(env, tx, p2p_dna).await.unwrap();
 }
