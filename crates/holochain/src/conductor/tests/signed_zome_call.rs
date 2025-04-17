@@ -57,12 +57,10 @@ async fn signed_zome_call() {
         .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
         .unwrap();
     let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
-    let dht_db_cache = conductor.get_dht_db_cache(cell_id.dna_hash()).unwrap();
 
     let chain = SourceChainRead::new(
         authored_db.into(),
         dht_db.into(),
-        dht_db_cache,
         conductor.keystore(),
         agent_pub_key.clone(),
     )
@@ -189,12 +187,10 @@ async fn signed_zome_call_wildcard() {
         .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
         .unwrap();
     let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
-    let dht_db_cache = conductor.get_dht_db_cache(cell_id.dna_hash()).unwrap();
 
     let source_chain_read = SourceChainRead::new(
         authored_db.into(),
         dht_db.into(),
-        dht_db_cache,
         conductor.keystore(),
         agent_pub_key.clone(),
     )
@@ -308,12 +304,10 @@ async fn cap_grant_info_call() {
         .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
         .unwrap();
     let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
-    let dht_db_cache = conductor.get_dht_db_cache(cell_id.dna_hash()).unwrap();
 
     let chain = SourceChainRead::new(
         authored_db.into(),
         dht_db.into(),
-        dht_db_cache,
         conductor.keystore(),
         agent_pub_key.clone(),
     )
