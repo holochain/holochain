@@ -2,8 +2,8 @@
 name = "mr_bundle"
 version = "0.6.0-dev.0"
 authors = [
-  "Holochain Core Dev Team <devcore@holochain.org>",
-  "Michael Dougherty <maackle.d@gmail.com>"
+    "Holochain Core Dev Team <devcore@holochain.org>",
+    "Michael Dougherty <maackle.d@gmail.com>"
 ]
 edition = "2021"
 description = "Implements the un-/packing of bundles that either embed or reference a set of resources"
@@ -21,8 +21,10 @@ serde = { version = "1.0", features = ["serde_derive", "derive"] }
 thiserror = "2.0"
 bytes = { version = "1.10.1", features = ["serde"] }
 
-# Feature: packing
+# Feature: fs
 serde_yaml = { version = "0.9", optional = true }
+tokio = { version = "1.44", default-features = false, features = ["fs"], optional = true }
+dunce = { version = "1.0", optional = true }
 
 # Feature: fuzzing
 proptest = { version = "1", optional = true }
@@ -30,7 +32,7 @@ proptest-derive = { version = "0", optional = true }
 test-strategy = { version = "0", optional = true }
 
 [dev-dependencies]
-mr_bundle = { version = "0.6.0-dev.0", path = ".", features = ["packing"] }
+mr_bundle = { version = "0.6.0-dev.0", path = ".", features = ["fs"] }
 
 matches = "0.1"
 maplit = "1"
@@ -42,6 +44,13 @@ tempfile = "3"
 workspace = true
 
 [features]
-packing = ["serde_yaml", "holochain_util/tokio"]
+fs = ["dep:serde_yaml", "dep:tokio", "dep:dunce"]
 
-fuzzing = ["proptest", "proptest-derive", "test-strategy"]
+fuzzing = ["dep:proptest", "dep:proptest-derive", "dep:test-strategy"]
+
+# RUST_FLAGS="--cfg docsrs" cargo +nightly doc --open
+[package.metadata.docs.rs]
+# document all features
+all-features = true
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]

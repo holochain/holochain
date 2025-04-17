@@ -35,7 +35,7 @@ pub async fn unpack<M: Manifest>(
         bundle_path_to_dir(&bundle_path, extension)?
     };
 
-    bundle.unpack_yaml(&target_dir, force).await?;
+    bundle.unpack_to_dir(&target_dir, force).await?;
 
     Ok(target_dir)
 }
@@ -90,7 +90,7 @@ pub async fn pack<M: Manifest>(
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
     let dir_path = ffs::canonicalize(dir_path).await?;
     let manifest_path = dir_path.join(M::file_name());
-    let bundle: Bundle<M> = Bundle::pack_yaml(&manifest_path).await?;
+    let bundle: Bundle<M> = Bundle::pack_from_manifest_path(&manifest_path).await?;
     let target_path = match target_path {
         Some(target_path) => {
             if target_path.is_dir() {

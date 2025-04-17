@@ -82,19 +82,19 @@ fn prompt_web_app_init(root_dir: PathBuf) -> anyhow::Result<WebAppBundle> {
 
 pub async fn init_dna(target: PathBuf) -> anyhow::Result<()> {
     let bundle = prompt_dna_init(target.to_owned())?;
-    bundle.unpack_yaml(&target, false).await?;
+    bundle.unpack_to_dir(&target, false).await?;
     Ok(())
 }
 
 pub async fn init_app(target: PathBuf) -> anyhow::Result<()> {
     let bundle = prompt_app_init(target.to_owned())?;
-    bundle.unpack_yaml(&target, false).await?;
+    bundle.unpack_to_dir(&target, false).await?;
     Ok(())
 }
 
 pub async fn init_web_app(target: PathBuf) -> anyhow::Result<()> {
     let bundle = prompt_web_app_init(target.to_owned())?;
-    bundle.unpack_yaml(&target, false).await?;
+    bundle.unpack_to_dir(&target, false).await?;
     Ok(())
 }
 
