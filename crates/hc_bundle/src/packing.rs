@@ -9,16 +9,6 @@ use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
 
-#[cfg(feature = "wasmer_sys")]
-mod wasmer_sys;
-#[cfg(feature = "wasmer_sys")]
-use wasmer_sys::*;
-
-#[cfg(feature = "wasmer_wamr")]
-mod wasmer_wamr;
-#[cfg(feature = "wasmer_wamr")]
-use wasmer_wamr::*;
-
 /// Unpack a bundle into a working directory, returning the directory path used.
 pub async fn unpack<M: Manifest>(
     extension: &'static str,
@@ -86,7 +76,6 @@ pub async fn pack<M: Manifest>(
     dir_path: &std::path::Path,
     target_path: Option<PathBuf>,
     name: String,
-    serialize_wasm: bool,
 ) -> HcBundleResult<(PathBuf, Bundle<M>)> {
     let dir_path = ffs::canonicalize(dir_path).await?;
     let manifest_path = dir_path.join(M::path());
@@ -102,10 +91,6 @@ pub async fn pack<M: Manifest>(
         None => dir_to_bundle_path(&dir_path, name, M::bundle_extension())?,
     };
     bundle.write_to_file(&target_path).await?;
-    if serialize_wasm {
-        eprintln!("DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.");
-        build_preserialized_wasm(&target_path, &bundle).await?;
-    }
 
     Ok((target_path, bundle))
 }
@@ -161,7 +146,7 @@ integrity:
         std::fs::write(tmpdir.path().join("zome-3.wasm"), [7, 8, 9]).unwrap();
 
         let (bundle_path, bundle) =
-            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string(), false)
+            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string())
                 .await
                 .unwrap();
         // Ensure the bundle path was generated as expected
@@ -198,7 +183,6 @@ integrity:
             &dir,
             Some(dir.parent().unwrap().to_path_buf()),
             "test_dna".to_string(),
-            false,
         )
         .await
         .unwrap();
@@ -217,7 +201,7 @@ integrity:
         assert_eq!(dir.read_dir().unwrap().collect::<Vec<_>>().len(), 3);
 
         // Ensure that we get the same bundle after the roundtrip
-        let (_, bundle2) = pack(&dir, None, "test_dna".to_string(), false)
+        let (_, bundle2) = pack(&dir, None, "test_dna".to_string())
             .await
             .unwrap();
         assert_eq!(bundle, bundle2);

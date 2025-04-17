@@ -152,13 +152,6 @@ pub struct WasmZome {
 
     /// The zome dependencies
     pub dependencies: Vec<ZomeName>,
-
-    /// DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
-    ///
-    /// The path to a preserialized wasmer module used as a "dynamic library" (dylib).
-    /// Useful for iOS and other targets.
-    #[serde(default)]
-    pub preserialized_path: Option<PathBuf>,
 }
 
 /// Just the definition of a Zome, without the name included. This exists
@@ -336,7 +329,6 @@ impl WasmZome {
         Self {
             wasm_hash,
             dependencies: Default::default(),
-            preserialized_path: None,
         }
     }
 }
@@ -347,7 +339,6 @@ impl ZomeDef {
         Self::Wasm(WasmZome {
             wasm_hash,
             dependencies: Default::default(),
-            preserialized_path: None,
         })
     }
 }

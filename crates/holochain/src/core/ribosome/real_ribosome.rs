@@ -422,11 +422,7 @@ impl RealRibosome {
     pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
         match &zome.def {
             ZomeDef::Wasm(wasm_zome) => {
-                if let Some(module) = get_prebuilt_module(wasm_zome)? {
-                    Ok(module)
-                } else {
-                    self.build_module(zome.zome_name()).await
-                }
+                self.build_module(zome.zome_name()).await
             }
             _ => RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
                 ZomeError::NonWasmZome(zome.zome_name().clone()),
@@ -956,11 +952,8 @@ impl RibosomeT for RealRibosome {
             extern_fns: {
                 match zome.zome_def() {
                     ZomeDef::Wasm(wasm_zome) => {
-                        let module = if let Some(module) = get_prebuilt_module(wasm_zome)? {
-                            module
-                        } else {
-                            tokio_helper::block_forever_on(self.build_module(zome.zome_name()))?
-                        };
+                        let module = 
+                            tokio_helper::block_forever_on(self.build_module(zome.zome_name()))?;
                         self.get_extern_fns_for_wasm(module.clone())
                     }
                     ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),

@@ -53,12 +53,9 @@ walkdir = "2"
 workspace = true
 
 [features]
-default = ["wasmer_sys"]
+default = []
 
 sqlite-encrypted = ["holochain_types/sqlite-encrypted"]
 sqlite = ["holochain_types/sqlite"]
 
 unstable-migration = ["holochain_types/unstable-migration"]
-
-wasmer_sys = ["wasmer/default", "holochain_wasmer_host/wasmer_sys_dev"]
-wasmer_wamr = ["wasmer/wamr", "holochain_wasmer_host/wasmer_wamr"]

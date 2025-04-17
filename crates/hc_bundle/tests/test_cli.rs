@@ -199,7 +199,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash.clone(),
                     dependencies: vec![],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -208,7 +207,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash.clone(),
                     dependencies: vec![],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -219,7 +217,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash2.clone(),
                     dependencies: vec!["zome1".into()],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -228,7 +225,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash2.clone(),
                     dependencies: vec!["zome1".into(), "zome2".into()],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -323,7 +319,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash.clone(),
                     dependencies: vec![],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -332,7 +327,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash.clone(),
                     dependencies: vec![],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -343,7 +337,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash2.clone(),
                     dependencies: vec!["zome1".into()],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -352,7 +345,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash2.clone(),
                     dependencies: vec!["zome1".into(), "zome2".into()],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
