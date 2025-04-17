@@ -903,9 +903,6 @@ async fn inform_kitsune_about_integrated_ops() {
 #[tokio::test(flavor = "multi_thread")]
 async fn kitsune_not_informed_when_no_ops_integrated() {
     let env = test_dht_db().to_db();
-    let test_data = TestData::new();
-    let (pre_state, _, _, _) = register_delete_link_missing_base(test_data);
-    Db::set(pre_state, env.clone()).await;
 
     let (tx, _rx) = TriggerSender::new();
     let dna_hash = fixt!(DnaHash);
