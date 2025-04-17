@@ -381,7 +381,6 @@ impl TestCase {
                 .unwrap()
                 .into(),
             test_space.space.dht_db.clone().into(),
-            test_space.space.dht_query_cache.clone(),
             test_space.space.cache_db.clone(),
             fixt!(MetaLairClient),
             None,

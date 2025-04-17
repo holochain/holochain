@@ -76,9 +76,6 @@ pub struct Space {
     /// The peer meta store database. One per unique Dna.
     pub peer_meta_store_db: DbWrite<DbKindPeerMetaStore>,
 
-    /// A cache for slow database queries.
-    pub dht_query_cache: DhtDbQueryCache,
-
     /// Countersigning workspace for session state.
     pub countersigning_workspaces:
         Arc<parking_lot::Mutex<HashMap<CellId, Arc<CountersigningWorkspace>>>>,
@@ -549,7 +546,6 @@ impl Space {
         let witnessing_workspace = WitnessingWorkspace::default();
         let incoming_op_hashes = IncomingOpHashes::default();
         let incoming_ops_batch = IncomingOpsBatch::default();
-        let dht_query_cache = DhtDbQueryCache::new(dht_db.clone().into());
         let r = Self {
             dna_hash,
             cache_db: cache,
@@ -560,7 +556,6 @@ impl Space {
             witnessing_workspace,
             incoming_op_hashes,
             incoming_ops_batch,
-            dht_query_cache,
             conductor_db,
             root_db_dir: Arc::new(root_db_dir),
             db_key,
@@ -577,7 +572,6 @@ impl Space {
         SourceChain::raw_empty(
             self.get_or_create_authored_db(author.clone())?,
             self.dht_db.clone(),
-            self.dht_query_cache.clone(),
             keystore,
             author,
         )
@@ -594,7 +588,6 @@ impl Space {
         Ok(SourceChainWorkspace::new(
             self.get_or_create_authored_db(author.clone())?.clone(),
             self.dht_db.clone(),
-            self.dht_query_cache.clone(),
             self.cache_db.clone(),
             keystore,
             author,

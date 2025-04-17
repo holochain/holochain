@@ -124,7 +124,6 @@ impl Conductor {
                     .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
                     .into(),
                 space.dht_db.clone(),
-                &space.dht_query_cache,
             )
             .await?;
 
@@ -156,7 +155,6 @@ impl Conductor {
         let workspace = SourceChainWorkspace::raw_empty(
             space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?,
             space.dht_db.clone(),
-            space.dht_query_cache.clone(),
             space.cache_db.clone(),
             self.keystore().clone(),
             cell_id.agent_pubkey().clone(),

@@ -84,7 +84,6 @@ async fn main_workflow() {
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
-        conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
         Arc::new(dna_file.dna_def().clone()),
@@ -150,10 +149,6 @@ async fn main_workflow() {
         app_validation_workspace.clone(),
         conductor.raw_handle(),
         &network,
-        conductor
-            .get_or_create_space(&dna_hash)
-            .unwrap()
-            .dht_query_cache,
     )
     .await
     .unwrap();
@@ -195,10 +190,6 @@ async fn main_workflow() {
             dna_hash.clone(),
             None,
         ),
-        conductor
-            .get_or_create_space(&dna_hash)
-            .unwrap()
-            .dht_query_cache,
     )
     .await
     .unwrap();
@@ -303,7 +294,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
-        conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
         Arc::new(dna_file.dna_def().clone()),
@@ -350,10 +340,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             dna_hash.clone(),
             None,
         ),
-        conductor
-            .get_or_create_space(&dna_hash)
-            .unwrap()
-            .dht_query_cache,
     )
     .await
     .unwrap();
@@ -426,7 +412,6 @@ async fn validate_ops_in_sequence_must_get_action() {
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
-        conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
         Arc::new(dna_file.dna_def().clone()),
@@ -493,10 +478,6 @@ async fn validate_ops_in_sequence_must_get_action() {
             dna_hash.clone(),
             None,
         ),
-        conductor
-            .get_or_create_space(&dna_hash)
-            .unwrap()
-            .dht_query_cache,
     )
     .await
     .unwrap();
@@ -597,7 +578,6 @@ async fn handle_error_in_op_validation() {
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
-        conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
         Arc::new(dna_file.dna_def().clone()),
@@ -657,10 +637,6 @@ async fn handle_error_in_op_validation() {
             dna_hash.clone(),
             None,
         ),
-        conductor
-            .get_or_create_space(&dna_hash)
-            .unwrap()
-            .dht_query_cache,
     )
     .await
     .unwrap();
@@ -976,7 +952,6 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
-        conductor.get_dht_db_cache(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
         Arc::new(dna_file.dna_def().clone()),
@@ -1035,10 +1010,6 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             dna_hash.clone(),
             None,
         ),
-        conductor
-            .get_or_create_space(&dna_hash)
-            .unwrap()
-            .dht_query_cache,
     )
     .await
     .unwrap();
