@@ -161,6 +161,29 @@ impl WireMessage {
         rmp_serde::decode::from_slice(data).map_err(HolochainP2pError::other)
     }
 
+    pub fn get_msg_id(&self) -> Option<u64> {
+        match self {
+            WireMessage::ErrorRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::CallRemoteReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::CallRemoteRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetMetaReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetMetaRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetLinksReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetLinksRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::CountLinksReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::CountLinksRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetAgentActivityReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::GetAgentActivityRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::MustGetAgentActivityReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::MustGetAgentActivityRes { msg_id, .. } => Some(*msg_id),
+            WireMessage::SendValidationReceiptsReq { msg_id, .. } => Some(*msg_id),
+            WireMessage::SendValidationReceiptsRes { msg_id, .. } => Some(*msg_id),
+            _ => None,
+        }
+    }
+
     /// Outgoing "CallRemote" request.
     pub fn call_remote_req(
         to_agent: holo_hash::AgentPubKey,
