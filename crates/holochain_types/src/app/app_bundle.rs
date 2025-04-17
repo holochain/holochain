@@ -215,7 +215,7 @@ impl AppBundle {
         modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<(DnaFile, DnaHash)> {
         let bytes = self.get_resource(location).await?;
-        let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(bytes.into_inner())?.into();
+        let dna_bundle: DnaBundle = mr_bundle::Bundle::unpack(bytes.into_inner())?.into();
         let (dna_file, original_hash) = dna_bundle.into_dna_file(modifiers).await?;
         Ok((dna_file, original_hash))
     }

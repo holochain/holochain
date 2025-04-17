@@ -1,10 +1,24 @@
-use super::Bundle;
+use super::{Bundle, ResourceIdentifier};
 use crate::{
     bundle::ResourceMap,
     error::MrBundleResult,
     Manifest, RawBundle,
 };
 use std::path::Path;
+
+/// A recommended conversion from a path to a resource identifier.
+///
+/// Calling this function with its own output will produce the same result.
+#[cfg(feature = "fs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
+pub fn resource_id_for_path(path: impl AsRef<Path>) -> Option<ResourceIdentifier> {
+    let path = path.as_ref();
+    if path.parent().is_some() {
+        path.file_name().and_then(|n| n.to_str()).map(|s| s.to_string())
+    } else {
+        path.to_str().map(|s| s.to_string())
+    }
+}
 
 impl<M: Manifest> Bundle<M> {
     /// Create a directory which contains the manifest as a YAML file,
@@ -23,8 +37,9 @@ impl<M: Manifest> Bundle<M> {
             M::file_name().as_ref(),
             force,
         )
-        .await
-        .map_err(Into::into)
+        .await?;
+
+        Ok(())
     }
 
     /// Reconstruct a `Bundle<M>` from a previously unpacked directory.
@@ -32,19 +47,20 @@ impl<M: Manifest> Bundle<M> {
     /// path relative to the unpacked directory root.
     #[cfg(feature = "fs")]
     #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
-    pub async fn pack_from_manifest_path(manifest_path: &Path) -> MrBundleResult<Self> {
+    pub async fn pack_from_manifest_path(manifest_path: impl AsRef<Path>) -> MrBundleResult<Self> {
         let manifest_path = dunce::canonicalize(manifest_path)?;
         let manifest_yaml = tokio::fs::read_to_string(&manifest_path).await?;
+        let mut manifest: M = serde_yaml::from_str(&manifest_yaml).map_err(crate::error::UnpackingError::from)?;
 
-        let manifest: M = serde_yaml::from_str(&manifest_yaml).map_err(crate::error::UnpackingError::from)?;
-        let manifest_relative_path = M::file_name();
-        let base_path = crate::util::prune_path(manifest_path.clone(), &manifest_relative_path)?;
-        let resources = futures::future::join_all(manifest.resource_ids().into_iter().map(
-            |relative_path| async {
-                let resource_path = dunce::canonicalize(base_path.join(&relative_path))?;
+        let manifest_dir = manifest_path.parent().ok_or_else(|| {
+            crate::error::UnpackingError::ParentlessPath(manifest_path.to_path_buf())
+        })?;
+        let resources = futures::future::join_all(manifest.generate_resource_ids().into_iter().map(
+            |(resource_id, relative_path)| async {
+                let resource_path = dunce::canonicalize(manifest_dir.join(relative_path))?;
                 tokio::fs::read(&resource_path)
                     .await
-                    .map(|resource| (relative_path, resource.into()))
+                    .map(|resource| (resource_id, resource.into()))
             },
         ))
         .await
@@ -61,7 +77,7 @@ impl<M: serde::Serialize> RawBundle<M> {
     /// and each resource written to its own file (as raw bytes)
     /// The paths of the resources are specified by the paths of the bundle,
     /// and the path of the manifest file is specified by the manifest_path parameter.
-    pub async fn unpack_yaml(
+    pub async fn unpack_to_dir(
         &self,
         base_path: &Path,
         manifest_path: &Path,
@@ -96,14 +112,14 @@ async fn unpack_to_dir<M: serde::Serialize>(
     // Create the directory to work into.
     tokio::fs::create_dir_all(&base_path).await?;
 
-    for (relative_path, resource) in resources {
-        let path = base_path.join(relative_path);
+    for (resource_id, resource) in resources {
+        let path = base_path.join(resource_id);
         let path_clone = path.clone();
         let parent = path_clone
             .parent()
             .ok_or_else(|| crate::error::UnpackingError::ParentlessPath(path.clone()))?;
         tokio::fs::create_dir_all(&parent).await?;
-        tokio::fs::write(&path, resource.inner()).await?;
+        tokio::fs::write(&path, resource).await?;
     }
     let yaml_str = serde_yaml::to_string(manifest)?;
     let manifest_path = base_path.join(manifest_path);
@@ -111,27 +127,22 @@ async fn unpack_to_dir<M: serde::Serialize>(
     Ok(())
 }
 
-#[cfg(all(test, feature = "fs"))]
+#[cfg(test)]
 mod tests {
-    use crate::error::UnpackingError;
-    use crate::util::prune_path;
-    use std::path::PathBuf;
+    use super::*;
 
     #[test]
-    fn test_pruning() {
-        let path = PathBuf::from("/a/b/c/d");
-        assert_eq!(
-            prune_path(path.clone(), "d").unwrap(),
-            PathBuf::from("/a/b/c")
-        );
-        assert_eq!(
-            prune_path(path.clone(), "b/c/d").unwrap(),
-            PathBuf::from("/a")
-        );
-        matches::assert_matches!(
-            prune_path(path.clone(), "a/c"),
-            Err(UnpackingError::ManifestPathSuffixMismatch(abs, rel))
-            if abs == path && rel == PathBuf::from("a/c")
-        );
+    fn convert_path_to_resource_id() {
+        // A simple file name should be unchanged
+        assert_eq!("hello.txt", resource_id_for_path("hello.txt").unwrap());
+
+        // Absolute path to file should become the file name
+        assert_eq!("hello.txt", resource_id_for_path("/dir/hello.txt").unwrap());
+
+        // A relative path to a file should become the file name
+        assert_eq!("hello.txt", resource_id_for_path("../../dir/hello.txt").unwrap());
+
+        // Relative file path should become the file name
+        assert_eq!("hello.txt", resource_id_for_path("./hello.txt").unwrap());
     }
 }

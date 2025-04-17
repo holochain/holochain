@@ -42,6 +42,7 @@ impl<M: DeserializeOwned> RawBundle<M> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use super::*;
     use bytes::Buf;
     use serde::{Deserialize, Serialize};
@@ -51,13 +52,17 @@ mod tests {
     struct TestManifest(Vec<ResourceIdentifier>);
 
     impl Manifest for TestManifest {
+        fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
+            self.resource_ids().iter().map(|r| (r.clone(), r.clone())).collect()
+        }
+
         fn resource_ids(&self) -> Vec<ResourceIdentifier> {
             self.0.clone()
         }
 
         #[cfg(feature = "fs")]
         #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
-        fn file_name() -> String {
+        fn file_name() -> &'static str {
             unimplemented!()
         }
 

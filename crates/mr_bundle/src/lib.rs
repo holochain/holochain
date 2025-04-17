@@ -20,8 +20,10 @@ mod encoding;
 pub mod error;
 mod manifest;
 mod fs;
-pub(crate) mod util;
 
 pub use bundle::{raw::RawBundle, resource::ResourceBytes, Bundle, ResourceMap};
 pub use encoding::{pack, unpack};
 pub use manifest::{Manifest, ResourceIdentifier};
+
+#[cfg(feature = "fs")]
+pub use fs::resource_id_for_path;
