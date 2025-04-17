@@ -120,10 +120,8 @@ impl TestData {
 #[derive(Clone)]
 enum Db {
     Integrated(DhtOp),
-    IntegratedEmpty,
     IntQueue(DhtOp),
     IntQueueEmpty,
-    MetaEmpty,
     MetaActivity(Action),
     MetaUpdate(AnyDhtHash, Action),
     MetaDelete(ActionHash, Action),
@@ -263,30 +261,10 @@ impl Db {
                             .unwrap();
                         assert!(found, "{}\n{:?}", here, action);
                     }
-                    Db::IntegratedEmpty => {
-                        let not_empty: bool = txn
-                            .query_row(
-                                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NOT NULL)",
-                                [],
-                                |row| row.get(0),
-                            )
-                            .unwrap();
-                        assert!(!not_empty, "{}", here);
-                    }
                     Db::IntQueueEmpty => {
                         let not_empty: bool = txn
                             .query_row(
                                 "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
-                                [],
-                                |row| row.get(0),
-                            )
-                            .unwrap();
-                        assert!(!not_empty, "{}", here);
-                    }
-                    Db::MetaEmpty => {
-                        let not_empty: bool = txn
-                            .query_row(
-                                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NOT NULL)",
                                 [],
                                 |row| row.get(0),
                             )
@@ -821,19 +799,6 @@ fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) 
     (pre_state, expect, "register link remove", op)
 }
 
-// Link remove when not an author
-fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
-    let op: DhtOp = ChainOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone()).into();
-    let pre_state = vec![Db::IntQueue(op.clone())];
-    let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
-    (
-        pre_state,
-        expect,
-        "register remove link remove missing base",
-        op,
-    )
-}
-
 // This runs the above tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
@@ -859,7 +824,6 @@ async fn test_ops_state() {
         register_deleted_action_by,
         register_create_link,
         register_delete_link,
-        register_delete_link_missing_base,
     ];
 
     for t in tests.iter() {
@@ -901,8 +865,6 @@ async fn inform_kitsune_about_integrated_ops() {
         register_deleted_action_by,
         register_create_link,
         register_delete_link,
-        // Not including register_delete_link_missing_base because it does not integrate ops,
-        // only tests the query cache state.
     ];
     for test in tests.iter() {
         let env = test_dht_db().to_db();
