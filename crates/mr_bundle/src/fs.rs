@@ -1,9 +1,7 @@
 use super::{Bundle, ResourceIdentifier};
-use crate::{
-    bundle::ResourceMap,
-    error::MrBundleResult,
-    Manifest, RawBundle,
-};
+use crate::{error::MrBundleResult, Manifest};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::path::Path;
 
 /// A recommended conversion from a path to a resource identifier.
@@ -14,117 +12,145 @@ use std::path::Path;
 pub fn resource_id_for_path(path: impl AsRef<Path>) -> Option<ResourceIdentifier> {
     let path = path.as_ref();
     if path.parent().is_some() {
-        path.file_name().and_then(|n| n.to_str()).map(|s| s.to_string())
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .map(|s| s.to_string())
     } else {
         path.to_str().map(|s| s.to_string())
     }
 }
 
-impl<M: Manifest> Bundle<M> {
-    /// Create a directory which contains the manifest as a YAML file,
-    /// and each resource written to its own file.
+/// A bundler that uses the filesystem to store resources.
+///
+/// The bundler builds on the [`Manifest`] and [`Bundle`] types and adds file system logic to
+/// provide the ability to read and write bundles to the filesystem.
+#[cfg(feature = "fs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
+pub struct FileSystemBundler;
+
+#[cfg(feature = "fs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
+impl FileSystemBundler {
+    /// Create a bundle from a manifest file.
     ///
-    /// The manifest specifies its own filename with [`Manifest::file_name`]. Resources get a
-    /// [ResourceIdentifier] at the time they are packaged, which will be used as the filename
-    /// when unpacking. The content of each resource is the same as the original.
-    #[cfg(feature = "fs")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
-    pub async fn unpack_to_dir(&self, base_path: &Path, force: bool) -> MrBundleResult<()> {
-        unpack_to_dir(
-            self.manifest(),
-            self.get_all_resources(),
-            base_path,
-            M::file_name().as_ref(),
-            force,
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    /// Reconstruct a `Bundle<M>` from a previously unpacked directory.
-    /// The manifest file itself must be specified, since it may have an arbitrary
-    /// path relative to the unpacked directory root.
-    #[cfg(feature = "fs")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
-    pub async fn pack_from_manifest_path(manifest_path: impl AsRef<Path>) -> MrBundleResult<Self> {
+    /// The provided [`manifest_path`] is expected to be a path to a manifest file. The file is
+    /// expected to be a YAML file that can be deserialized into the [`Manifest`] type.
+    ///
+    /// The resources referenced by the manifest will be loaded from the file system, using
+    /// relative paths from the manifest file.
+    ///
+    /// The resulting [`Bundle`] will contain the manifest and its resources.
+    pub async fn bundle<M: Manifest>(manifest_path: impl AsRef<Path>) -> MrBundleResult<Bundle<M>> {
         let manifest_path = dunce::canonicalize(manifest_path)?;
         let manifest_yaml = tokio::fs::read_to_string(&manifest_path).await?;
-        let mut manifest: M = serde_yaml::from_str(&manifest_yaml).map_err(crate::error::UnpackingError::from)?;
+        let mut manifest: M =
+            serde_yaml::from_str(&manifest_yaml).map_err(crate::error::UnpackingError::from)?;
 
         let manifest_dir = manifest_path.parent().ok_or_else(|| {
             crate::error::UnpackingError::ParentlessPath(manifest_path.to_path_buf())
         })?;
-        let resources = futures::future::join_all(manifest.generate_resource_ids().into_iter().map(
-            |(resource_id, relative_path)| async {
-                let resource_path = dunce::canonicalize(manifest_dir.join(relative_path))?;
-                tokio::fs::read(&resource_path)
-                    .await
-                    .map(|resource| (resource_id, resource.into()))
-            },
-        ))
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
+        let resources =
+            futures::future::join_all(manifest.generate_resource_ids().into_iter().map(
+                |(resource_id, relative_path)| async {
+                    let resource_path = dunce::canonicalize(manifest_dir.join(relative_path))?;
+                    tokio::fs::read(&resource_path)
+                        .await
+                        .map(|resource| (resource_id, resource.into()))
+                },
+            ))
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
         Bundle::new(manifest, resources)
     }
-}
 
-#[cfg(feature = "fs")]
-#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
-impl<M: serde::Serialize> RawBundle<M> {
-    /// Create a directory which contains the manifest as a YAML file,
-    /// and each resource written to its own file (as raw bytes)
-    /// The paths of the resources are specified by the paths of the bundle,
-    /// and the path of the manifest file is specified by the manifest_path parameter.
-    pub async fn unpack_to_dir(
-        &self,
-        base_path: &Path,
-        manifest_path: &Path,
+    /// A convenience function that creates a bundle and writes it to the filesystem.
+    ///
+    /// Uses [`bundle`](FileSystemBundler::bundle) to create the bundle and then writes it to the
+    /// provided [`bundle_path`].
+    pub async fn bundle_to<M: Manifest>(
+        manifest_path: impl AsRef<Path>,
+        bundle_path: impl AsRef<Path>,
+    ) -> MrBundleResult<()> {
+        let bundle = FileSystemBundler::bundle::<M>(manifest_path).await?;
+
+        tokio::fs::create_dir_all(bundle_path.as_ref().parent().ok_or_else(|| {
+            crate::error::UnpackingError::ParentlessPath(bundle_path.as_ref().to_path_buf())
+        })?)
+        .await?;
+
+        let bundle_path = bundle_path.as_ref();
+        tokio::fs::write(bundle_path, bundle.pack()?).await?;
+
+        Ok(())
+    }
+
+    /// Load a bundle from the filesystem.
+    ///
+    /// The bundle is automatically unpacked into a [`Bundle`] object.
+    pub async fn load_from<M: Manifest>(
+        bundle_path: impl AsRef<Path>,
+    ) -> MrBundleResult<Bundle<M>> {
+        let bundle_path = bundle_path.as_ref();
+        let bundle_bytes = tokio::fs::read(bundle_path).await?;
+        Bundle::unpack(&bundle_bytes[..])
+    }
+
+    /// Write the contents of the bundle to the filesystem.
+    ///
+    /// This will create a directory at [`target_dir`] and write the manifest and resources to it.
+    ///
+    /// By default, the function will error if the directory already exists. You can override this
+    /// by passing `force` with the value `true`.
+    pub async fn expand_to<M: Manifest>(
+        bundle: &Bundle<M>,
+        target_dir: impl AsRef<Path>,
         force: bool,
     ) -> MrBundleResult<()> {
-        unpack_to_dir(
-            &self.manifest,
-            &self.resources,
-            base_path,
-            manifest_path,
-            force,
-        )
-        .await
-        .map_err(Into::into)
-    }
-}
-
-#[cfg(feature = "fs")]
-#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
-async fn unpack_to_dir<M: serde::Serialize>(
-    manifest: &M,
-    resources: &ResourceMap,
-    base_path: &Path,
-    manifest_path: &Path,
-    force: bool,
-) -> crate::error::UnpackingResult<()> {
-    // If the directory already exists, and we're not forcing, then we can't continue.
-    if !force && base_path.exists() {
-        return Err(crate::error::UnpackingError::DirectoryExists(base_path.to_owned()));
+        FileSystemBundler::expand_named_to(bundle, M::file_name(), target_dir, force).await
     }
 
-    // Create the directory to work into.
-    tokio::fs::create_dir_all(&base_path).await?;
+    /// Write the contents of the bundle to the filesystem.
+    ///
+    /// This version of the [expand_to](FileSystemBundler::expand_to) has looser constraints on the
+    /// contents of the manifest. As a consequence, the file name for the manifest must be provided.
+    pub async fn expand_named_to<M: Serialize + DeserializeOwned>(
+        bundle: &Bundle<M>,
+        manifest_file_name: &str,
+        target_dir: impl AsRef<Path>,
+        force: bool,
+    ) -> MrBundleResult<()> {
+        let target_dir = target_dir.as_ref();
 
-    for (resource_id, resource) in resources {
-        let path = base_path.join(resource_id);
-        let path_clone = path.clone();
-        let parent = path_clone
-            .parent()
-            .ok_or_else(|| crate::error::UnpackingError::ParentlessPath(path.clone()))?;
-        tokio::fs::create_dir_all(&parent).await?;
-        tokio::fs::write(&path, resource).await?;
+        // If the directory already exists, and we're not forcing, then we can't continue.
+        if !force && target_dir.exists() {
+            return Err(
+                crate::error::UnpackingError::DirectoryExists(target_dir.to_owned()).into(),
+            );
+        }
+
+        // Create the directory to work into.
+        tokio::fs::create_dir_all(&target_dir).await?;
+
+        // Write the manifest to the target directory.
+        let yaml_str = serde_yaml::to_string(bundle.manifest())
+            .map_err(|e| crate::error::UnpackingError::YamlError(e))?;
+        let manifest_path = target_dir.join(manifest_file_name);
+        tokio::fs::write(&manifest_path, yaml_str.as_bytes()).await?;
+
+        // Write the resources to the target directory.
+        for (resource_id, resource) in bundle.get_all_resources() {
+            let path = target_dir.join(resource_id);
+            let path_clone = path.clone();
+            let parent = path_clone
+                .parent()
+                .ok_or_else(|| crate::error::UnpackingError::ParentlessPath(path.clone()))?;
+            tokio::fs::create_dir_all(&parent).await?;
+            tokio::fs::write(&path, resource).await?;
+        }
+
+        Ok(())
     }
-    let yaml_str = serde_yaml::to_string(manifest)?;
-    let manifest_path = base_path.join(manifest_path);
-    tokio::fs::write(&manifest_path, yaml_str.as_bytes()).await?;
-    Ok(())
 }
 
 #[cfg(test)]
@@ -140,7 +166,10 @@ mod tests {
         assert_eq!("hello.txt", resource_id_for_path("/dir/hello.txt").unwrap());
 
         // A relative path to a file should become the file name
-        assert_eq!("hello.txt", resource_id_for_path("../../dir/hello.txt").unwrap());
+        assert_eq!(
+            "hello.txt",
+            resource_id_for_path("../../dir/hello.txt").unwrap()
+        );
 
         // Relative file path should become the file name
         assert_eq!("hello.txt", resource_id_for_path("./hello.txt").unwrap());
