@@ -1,5 +1,5 @@
-use crate::error::MrBundleError;
 use super::error::MrBundleResult;
+use crate::error::MrBundleError;
 use std::io::Read;
 use std::io::Write;
 

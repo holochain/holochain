@@ -5,7 +5,7 @@
 //! opaque resources in the form of [`ResourceBytes`].
 //! A Bundle can be serialized and written to a file.
 //!
-//! A Bundle can also be [packed](Bundle::pack_from_manifest_path) and [unpacked](Bundle::unpack_to_dir),
+//! A Bundle can also be [packed](Bundle::from_manifest_path) and [unpacked](Bundle::dump),
 //! via the `"fs"` feature.
 //! Bundle fs is performed by following the [`Location`]s specified in the
 //! Manifest as "Bundled", and pulling them into the Bundle that way.
@@ -18,12 +18,12 @@
 mod bundle;
 mod encoding;
 pub mod error;
-mod manifest;
 mod fs;
+mod manifest;
 
-pub use bundle::{raw::RawBundle, resource::ResourceBytes, Bundle, ResourceMap};
+pub use bundle::{resource::ResourceBytes, Bundle, ResourceMap};
 pub use encoding::{pack, unpack};
 pub use manifest::{Manifest, ResourceIdentifier};
 
 #[cfg(feature = "fs")]
-pub use fs::resource_id_for_path;
+pub use fs::{resource_id_for_path, FileSystemBundler};

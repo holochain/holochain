@@ -9,7 +9,6 @@ use std::collections::{HashMap, HashSet};
 use std::io::Read;
 
 pub mod resource;
-pub mod raw;
 
 /// A map from resource identifiers to their value as byte arrays.
 pub type ResourceMap = HashMap<ResourceIdentifier, ResourceBytes>;
@@ -21,7 +20,7 @@ pub type ResourceMap = HashMap<ResourceIdentifier, ResourceBytes>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Bundle<M>
 where
-    M: Manifest,
+    M: Serialize + DeserializeOwned,
 {
     /// The manifest describing the resources that compose this bundle.
     #[serde(bound(deserialize = "M: DeserializeOwned"))]
@@ -31,6 +30,43 @@ where
     /// of the Bundled Locations specified by the Manifest. Bundled Locations
     /// are always relative paths (relative to the root_dir).
     resources: ResourceMap,
+}
+
+impl<M> Bundle<M>
+where
+    M: Serialize + DeserializeOwned,
+{
+    /// Accessor for the Manifest
+    pub fn manifest(&self) -> &M {
+        &self.manifest
+    }
+
+    /// Accessor for the map of resources included in this bundle
+    pub fn get_all_resources(&self) -> &ResourceMap {
+        &self.resources
+    }
+
+    /// Retrieve the bytes for a single resource.
+    pub async fn get_resource(
+        &self,
+        resource_identifier: &ResourceIdentifier,
+    ) -> Option<&ResourceBytes> {
+        self.resources.get(resource_identifier)
+    }
+
+    /// Pack this bundle into a byte array.
+    ///
+    /// Uses [`pack`](crate::pack) to produce the byte array.
+    pub fn pack(&self) -> MrBundleResult<bytes::Bytes> {
+        crate::pack(self)
+    }
+
+    /// Unpack bytes produced by [`pack`](Bundle::pack) into a new [Bundle].
+    ///
+    /// Uses [`unpack`](crate::unpack) to produce the new Bundle.
+    pub fn unpack(source: impl Read) -> MrBundleResult<Self> {
+        crate::unpack(source)
+    }
 }
 
 impl<M> Bundle<M>
@@ -86,42 +122,10 @@ where
         })
     }
 
-    /// Accessor for the Manifest
-    pub fn manifest(&self) -> &M {
-        &self.manifest
-    }
-
-    /// Accessor for the map of resources included in this bundle
-    pub fn get_all_resources(&self) -> &ResourceMap {
-        &self.resources
-    }
-
-    /// Retrieve the bytes for a single resource.
-    pub async fn get_resource(
-        &self,
-        resource_identifier: &ResourceIdentifier,
-    ) -> Option<&ResourceBytes> {
-        self.resources.get(resource_identifier)
-    }
-
     /// Return a new Bundle with an updated manifest, subject to the same
     /// validation constraints as creating a new Bundle from scratch.
     pub fn update_manifest(self, manifest: M) -> MrBundleResult<Self> {
         Self::from_parts(manifest, self.resources)
-    }
-
-    /// Pack this bundle into a byte array.
-    ///
-    /// Uses [`pack`](crate::pack) to produce the byte array.
-    pub fn pack(&self) -> MrBundleResult<bytes::Bytes> {
-        crate::pack(self)
-    }
-
-    /// Unpack bytes produced by [`pack`](Bundle::pack) into a new [Bundle].
-    ///
-    /// Uses [`unpack`](crate::unpack) to produce the new Bundle.
-    pub fn unpack(source: impl Read) -> MrBundleResult<Self> {
-        crate::unpack(source)
     }
 }
 
@@ -136,7 +140,10 @@ mod tests {
 
     impl Manifest for TestManifest {
         fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
-            self.resource_ids().iter().map(|r| (r.clone(), r.clone())).collect()
+            self.resource_ids()
+                .iter()
+                .map(|r| (r.clone(), r.clone()))
+                .collect()
         }
 
         fn resource_ids(&self) -> Vec<ResourceIdentifier> {

@@ -3,19 +3,24 @@ use std::collections::HashMap;
 /// The identifier for a resource in the manifest.
 pub type ResourceIdentifier = String;
 
-/// A Manifest describes the resources in a [`Bundle`](crate::Bundle) and how
-/// to pack and unpack them.
+/// A Manifest describes the resources in a [`Bundle`](crate::Bundle).
 ///
-/// Regardless of the format of your Manifest, it must contain a set of Locations
-/// describing where to find resources, and this trait must implement `locations`
-/// properly to match the data contained in the manifest.
+/// A manifest implementation is expected to describe a set of resources that
+/// it intends to be bundled with. The resources are expected to be identifiable
+/// by a [`ResourceIdentifier`], which is a string.
 ///
-/// You must also specify a relative path for the Manifest, and the extension
-/// for the bundle file, if you are using the "fs" feature.
+/// The bundler uses [`generate_resource_ids`](Manifest::generate_resource_ids) to
+/// request that the manifest produce a set of resource ids. The manifest must
+/// replace its resource locators with the generated ids and return the pairs of
+/// ids and resource locations to the bundler.
 pub trait Manifest:
     Clone + Sized + PartialEq + Eq + serde::Serialize + serde::de::DeserializeOwned
 {
     /// Ask the manifest to produce resources ids and a locator for the resources.
+    ///
+    /// After the operations completes, the manifest must have replaced its resource
+    /// locators with the generated ids. The returned map must contain the pairs of
+    /// resource ids and their original locators.
     ///
     /// This operation is required to be idempotent if it is called multiple times. The first
     /// call is expected to mutate the manifest so that its resources refer to ids instead of the
@@ -23,17 +28,19 @@ pub trait Manifest:
     /// must be the same as the first call.
     fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String>;
 
-    /// The list of Locations referenced in the manifest data. This must be
-    /// correctly implemented to enable resource resolution.
+    /// The list of resources referenced in the manifest data.
+    ///
+    /// This must return the same value before or after the call to [`generate_resource_ids`](Manifest::generate_resource_ids).
     fn resource_ids(&self) -> Vec<ResourceIdentifier>;
 
-    /// The file name of the manifest, to be used when unpacking a bundle and as a default when
-    /// packaging a from the file system.
+    /// The file name of the manifest file.
+    ///
+    /// This is recommended to contain a file extension, but it is not required.
     #[cfg(feature = "fs")]
     #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
     fn file_name() -> &'static str;
 
-    /// When a bundle is created from the filesystem, the bundle file gets this extension.
+    /// The file extension to use when writing the bundle to the filesystem.
     #[cfg(feature = "fs")]
     #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
     fn bundle_extension() -> &'static str;
