@@ -58,7 +58,7 @@ pub async fn unpack_raw(
     };
 
     bundle
-        .unpack_yaml(&target_dir, manifest_path, force)
+        .unpack_to_dir(&target_dir, manifest_path, force)
         .await?;
 
     Ok(target_dir)
