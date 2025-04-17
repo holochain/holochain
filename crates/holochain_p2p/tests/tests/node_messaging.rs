@@ -175,8 +175,8 @@ async fn test_call_remote() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+    let (agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
 
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
@@ -251,8 +251,8 @@ async fn test_remote_signal() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (agent1, _hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (agent1, _hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
 
     hc2.send_remote_signal(
         dna_hash,
@@ -292,8 +292,8 @@ async fn test_publish() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -349,8 +349,8 @@ async fn test_publish_reflect() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -393,8 +393,8 @@ async fn test_get() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -430,8 +430,8 @@ async fn test_get_meta() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -467,8 +467,8 @@ async fn test_get_links() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -512,8 +512,8 @@ async fn test_count_links() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -556,8 +556,8 @@ async fn test_get_agent_activity() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -598,8 +598,8 @@ async fn test_must_get_agent_activity() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -635,8 +635,8 @@ async fn test_validation_receipts() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (agent1, _hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (agent1, _hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
 
     hc2.send_validation_receipts(
         dna_hash,
@@ -667,7 +667,7 @@ async fn test_authority_for_hash() {
     let space = dna_hash.to_k2_space();
     let handler = Arc::new(Handler::default());
 
-    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
     hc1.test_set_full_arcs(space.clone()).await;
 
     assert!(hc1
@@ -684,13 +684,164 @@ async fn test_target_arcs() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
 
-    let (_agent1, hc1) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
 
     let arcs = hc1.target_arcs(dna_hash).await.unwrap();
     assert_eq!(&[DhtArc::FULL][..], &arcs);
 }
 
-async fn spawn_test(dna_hash: DnaHash, handler: DynHcP2pHandler) -> (AgentPubKey, actor::DynHcP2p) {
+/// Note that this test does not prevent messages going via the network.
+/// It just creates the conditions where we would expect a message to be bridged rather than sent
+/// over the network. So if a check on that path prevents the message, this test would catch it.
+#[tokio::test(flavor = "multi_thread")]
+async fn bridged_call_remote() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let handler = Arc::new(Handler::default());
+
+    let (_agent1, hc1, lair_client) = spawn_test(dna_hash.clone(), handler.clone()).await;
+
+    let agent2 = lair_client.new_sign_keypair_random().await.unwrap();
+    let local_agent2 = HolochainP2pLocalAgent::new(agent2.clone(), DhtArc::FULL, 1, lair_client);
+    hc1.test_kitsune()
+        .space(dna_hash.to_k2_space())
+        .await
+        .unwrap()
+        .local_agent_join(Arc::new(local_agent2))
+        .await
+        .unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+
+            // Make sure we know about both agents
+            if hc1
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap()
+                .len()
+                == 2
+            {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    // Check that both peers have the same URL
+    let all_peer_urls = hc1
+        .peer_store(dna_hash.clone())
+        .await
+        .unwrap()
+        .get_all()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|a| a.url.clone().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(2, all_peer_urls.len());
+    assert_eq!(all_peer_urls[0], all_peer_urls[1]);
+
+    // Then send a remote call to the other local agent
+    let resp = hc1
+        .call_remote(
+            dna_hash,
+            agent2,
+            ExternIO(b"world".to_vec()),
+            Signature([0; 64]),
+        )
+        .await
+        .unwrap();
+    let resp: Vec<u8> = UnsafeBytes::from(resp).into();
+    let resp = String::from_utf8_lossy(&resp);
+    assert_eq!("got_call_remote: world", resp);
+}
+
+/// Note that this test does not prevent messages going via the network.
+/// It just creates the conditions where we would expect a signal to be bridged rather than sent
+/// over the network. So if a check on that path prevents the signal, this test would catch it.
+#[tokio::test(flavor = "multi_thread")]
+async fn bridged_remote_signal() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let handler = Arc::new(Handler::default());
+
+    let (_agent1, hc1, lair_client) = spawn_test(dna_hash.clone(), handler.clone()).await;
+
+    let agent2 = lair_client.new_sign_keypair_random().await.unwrap();
+    let local_agent2 = HolochainP2pLocalAgent::new(agent2.clone(), DhtArc::FULL, 1, lair_client);
+    hc1.test_kitsune()
+        .space(dna_hash.to_k2_space())
+        .await
+        .unwrap()
+        .local_agent_join(Arc::new(local_agent2))
+        .await
+        .unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+
+            // Make sure we know about both agents
+            if hc1
+                .peer_store(dna_hash.clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap()
+                .len()
+                == 2
+            {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    // Check that both peers have the same URL
+    let all_peer_urls = hc1
+        .peer_store(dna_hash.clone())
+        .await
+        .unwrap()
+        .get_all()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|a| a.url.clone().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(2, all_peer_urls.len());
+    assert_eq!(all_peer_urls[0], all_peer_urls[1]);
+
+    // Then send a remote call to the other local agent
+    hc1.send_remote_signal(
+        dna_hash,
+        vec![(agent2, ExternIO(b"hello".to_vec()), Signature([0; 64]))],
+    )
+    .await
+    .unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            if let Some(res) = handler.0.lock().unwrap().first() {
+                assert_eq!("got_call_remote: hello", res);
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+}
+
+async fn spawn_test(
+    dna_hash: DnaHash,
+    handler: DynHcP2pHandler,
+) -> (AgentPubKey, actor::DynHcP2p, MetaLairClient) {
     let db_peer_meta =
         DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
     let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
@@ -711,7 +862,7 @@ async fn spawn_test(dna_hash: DnaHash, handler: DynHcP2pHandler) -> (AgentPubKey
             k2_test_builder: true,
             ..Default::default()
         },
-        lair_client,
+        lair_client.clone(),
     )
     .await
     .unwrap();
@@ -720,5 +871,5 @@ async fn spawn_test(dna_hash: DnaHash, handler: DynHcP2pHandler) -> (AgentPubKey
 
     hc.join(dna_hash, agent.clone(), None).await.unwrap();
 
-    (agent, hc)
+    (agent, hc, lair_client)
 }

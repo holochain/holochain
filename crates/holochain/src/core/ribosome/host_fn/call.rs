@@ -354,8 +354,8 @@ pub mod wasm_test {
         assert!(has_hash);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
     /// we can call a fn on a remote
+    #[tokio::test(flavor = "multi_thread")]
     async fn call_remote_test() {
         holochain_trace::test_run();
         let RibosomeTestFixture {

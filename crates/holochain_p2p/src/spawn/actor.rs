@@ -1,14 +1,14 @@
 #![allow(clippy::too_many_arguments)]
 
-/// Hard-code for now.
-const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
-
 use crate::metrics::create_p2p_request_duration_metric;
 use crate::*;
 use kitsune2_api::*;
 use kitsune2_core::get_remote_agents_near_location;
 use std::collections::HashMap;
 use std::sync::{Mutex, Weak};
+
+/// Hard-code for now.
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 macro_rules! timing_trace {
     ($netaudit:literal, $code:block $($rest:tt)*) => {{
@@ -52,7 +52,7 @@ impl event::HcP2pHandler for WrapEvtSender {
             true,
             {
                 self.0.handle_call_remote(
-                    dna_hash, // from,
+                    dna_hash,
                     to_agent,
                     zome_call_params_serialized,
                     signature,
@@ -245,10 +245,10 @@ pub(crate) struct HolochainP2pActor {
     this: Weak<Self>,
     target_arc_factor: u32,
     compat: NetworkCompatParams,
-    preflight: Arc<std::sync::Mutex<bytes::Bytes>>,
+    preflight: Arc<Mutex<bytes::Bytes>>,
     evt_sender: Arc<std::sync::OnceLock<WrapEvtSender>>,
     lair_client: holochain_keystore::MetaLairClient,
-    kitsune: kitsune2_api::DynKitsune,
+    kitsune: DynKitsune,
     pending: Arc<Mutex<Pending>>,
     request_duration_metric: metrics::P2pRequestDurationMetric,
 }
@@ -261,19 +261,20 @@ impl std::fmt::Debug for HolochainP2pActor {
 
 const EVT_REG_ERR: &str = "event handler not registered";
 
-impl kitsune2_api::SpaceHandler for HolochainP2pActor {
+impl SpaceHandler for HolochainP2pActor {
     fn recv_notify(&self, from_peer: Url, space: SpaceId, data: bytes::Bytes) -> K2Result<()> {
-        for msg in crate::wire::WireMessage::decode_batch(&data).map_err(|err| {
+        for msg in WireMessage::decode_batch(&data).map_err(|err| {
             K2Error::other_src("decode incoming holochain_p2p wire message batch", err)
         })? {
             // NOTE: spawning a task here could lead to memory issues
             //       in the case of DoS messaging, consider some kind
             //       of queue or semaphore.
             let from_peer = from_peer.clone();
-            let space = space.clone();
+            let space_id = space.clone();
             let evt_sender = self.evt_sender.clone();
             let kitsune = self.kitsune.clone();
             let pending = self.pending.clone();
+            let this = self.this.clone();
             tokio::task::spawn(async move {
                 use crate::event::HcP2pHandler;
                 use crate::wire::WireMessage::*;
@@ -297,7 +298,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         zome_call_params_serialized,
                         signature,
                     } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
                         let resp = match evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
@@ -315,15 +316,16 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                                 error: format!("{err:?}"),
                             },
                         };
-                        let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
-                        if let Err(err) = kitsune
-                            .space_if_exists(space)
-                            .await
-                            .ok_or_else(|| HolochainP2pError::other("no such space"))?
-                            .send_notify(from_peer, resp)
-                            .await
-                        {
-                            tracing::debug!(?err, "Error sending call remote response");
+
+                        if let Some(this) = this.upgrade() {
+                            if let Err(err) = this
+                                .send_notify_response(space_id, from_peer, msg_id, resp)
+                                .await
+                            {
+                                tracing::debug!(?err, "Error sending call remote response");
+                            }
+                        } else {
+                            tracing::debug!("HolochainP2pActor has been dropped");
                         }
                     }
                     GetReq {
@@ -332,7 +334,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         dht_hash,
                         options,
                     } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
                         let resp = match evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
@@ -347,7 +349,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space_if_exists(space)
+                            .space_if_exists(space_id)
                             .await
                             .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
@@ -362,7 +364,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         dht_hash,
                         options,
                     } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
                         let resp = match evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
@@ -377,7 +379,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space_if_exists(space)
+                            .space_if_exists(space_id)
                             .await
                             .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
@@ -392,7 +394,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         link_key,
                         options,
                     } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
                         let resp = match evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
@@ -407,7 +409,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space_if_exists(space)
+                            .space_if_exists(space_id)
                             .await
                             .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
@@ -421,7 +423,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         to_agent,
                         query,
                     } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
                         let resp = match evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
@@ -436,7 +438,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space_if_exists(space)
+                            .space_if_exists(space_id)
                             .await
                             .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
@@ -452,7 +454,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         query,
                         options,
                     } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
                         let resp = match evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
@@ -467,7 +469,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space_if_exists(space)
+                            .space_if_exists(space_id)
                             .await
                             .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
@@ -482,7 +484,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         agent,
                         filter,
                     } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
                         let resp = match evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
@@ -497,7 +499,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space_if_exists(space)
+                            .space_if_exists(space_id)
                             .await
                             .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
@@ -511,7 +513,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         to_agent,
                         receipts,
                     } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
 
                         let resp = match evt_sender
                             .get()
@@ -527,7 +529,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         };
                         let resp = crate::wire::WireMessage::encode_batch(&[&resp])?;
                         if let Err(err) = kitsune
-                            .space_if_exists(space)
+                            .space_if_exists(space_id)
                             .await
                             .ok_or_else(|| HolochainP2pError::other("no such space"))?
                             .send_notify(from_peer, resp)
@@ -544,7 +546,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                         zome_call_params_serialized,
                         signature,
                     } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
                         // remote signals are fire-and-forget
                         // so it's safe to ignore the response
                         let _response = evt_sender
@@ -559,7 +561,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                             .await;
                     }
                     PublishCountersignEvt { op } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
                         evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
@@ -567,7 +569,7 @@ impl kitsune2_api::SpaceHandler for HolochainP2pActor {
                             .await?;
                     }
                     CountersigningSessionNegotiationEvt { to_agent, message } => {
-                        let dna_hash = DnaHash::from_k2_space(&space);
+                        let dna_hash = DnaHash::from_k2_space(&space_id);
                         evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
@@ -927,14 +929,50 @@ impl HolochainP2pActor {
             .collect::<Vec<_>>())
     }
 
+    /// Check whether a message should be bridged locally to some other agent on this node.
+    ///
+    /// Checks whether this message is destined for our own URL.
+    fn should_bridge(&self, space: &DynSpace, to_url: Url) -> bool {
+        space.current_url() == Some(to_url)
+    }
+
     async fn send_notify(
         &self,
         space: &DynSpace,
         to_url: Url,
-        req: crate::wire::WireMessage,
+        req: WireMessage,
     ) -> HolochainP2pResult<()> {
-        let req = crate::wire::WireMessage::encode_batch(&[&req])?;
+        let req = WireMessage::encode_batch(&[&req])?;
         space.send_notify(to_url, req).await?;
+        Ok(())
+    }
+
+    async fn send_notify_response(
+        &self,
+        space_id: SpaceId,
+        to_url: Url,
+        msg_id: u64,
+        res: WireMessage,
+    ) -> HolochainP2pResult<()> {
+        let space = self
+            .kitsune
+            .space_if_exists(space_id)
+            .await
+            .ok_or_else(|| HolochainP2pError::other("no such space"))?;
+
+        if self.should_bridge(&space, to_url.clone()) {
+            let r = self.pending.lock().unwrap().map.remove(&msg_id);
+            if let Some(r) = r {
+                if let Err(err) = r.send(res) {
+                    tracing::warn!(?err, "Failed to send bridged response");
+                }
+            } else {
+                tracing::warn!("Attempt to bridge response for unknown msg_id: {msg_id}");
+            }
+        } else {
+            self.send_notify(&space, to_url, res).await?;
+        }
+
         Ok(())
     }
 
@@ -944,20 +982,31 @@ impl HolochainP2pActor {
         space: &DynSpace,
         to_url: Url,
         msg_id: u64,
-        req: crate::wire::WireMessage,
+        req: WireMessage,
         dna_hash: DnaHash,
         cb: C,
     ) -> HolochainP2pResult<O>
     where
-        C: FnOnce(crate::wire::WireMessage) -> HolochainP2pResult<O>,
+        C: FnOnce(WireMessage) -> HolochainP2pResult<O>,
     {
-        let req = crate::wire::WireMessage::encode_batch(&[&req])?;
+        let req = WireMessage::encode_batch(&[&req])?;
 
         let (s, r) = tokio::sync::oneshot::channel();
         self.pending.lock().unwrap().register(msg_id, s);
 
         let start = std::time::Instant::now();
-        space.send_notify(to_url.clone(), req).await?;
+
+        if self.should_bridge(space, to_url.clone()) {
+            // Note that while bridging is placed here to be supported in the general case, it is only
+            // used for the `CallRemote` case. It doesn't make sense to bridge network requests for
+            // data, or countersigning messages.
+            // For this to work, the request handler must call `send_notify_response`, which will
+            // handle relaying the response back to the original sender.
+
+            self.recv_notify(to_url.clone(), dna_hash.to_k2_space(), req)?;
+        } else {
+            space.send_notify(to_url.clone(), req).await?;
+        }
 
         let record_metric = |error: bool| {
             self.request_duration_metric.record(
@@ -1120,28 +1169,15 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let byte_count = zome_call_params_serialized.0.len();
 
-            let agent_id = to_agent.to_k2_agent();
-            if space
-                .local_agent_store()
-                .is_agent_local(agent_id.clone())
-                .await?
-            {
-                tracing::info!(?agent_id, "ignoring call_remote to local agent");
-                return Ok(SerializedBytes::default());
-            }
-
             let to_url = space
                 .peer_store()
-                .get(agent_id)
+                .get(to_agent.to_k2_agent())
                 .await?
                 .and_then(|i| i.url.clone())
                 .ok_or_else(|| HolochainP2pError::other("call_remote: no url for peer"))?;
 
-            let (msg_id, req) = crate::wire::WireMessage::call_remote_req(
-                to_agent,
-                zome_call_params_serialized,
-                signature,
-            );
+            let (msg_id, req) =
+                WireMessage::call_remote_req(to_agent, zome_call_params_serialized, signature);
 
             let start = std::time::Instant::now();
 
@@ -1183,15 +1219,6 @@ impl actor::HcP2p for HolochainP2pActor {
 
             for (to_agent, payload, signature) in target_payload_list {
                 let to_agent_id = to_agent.to_k2_agent();
-                if space
-                    .local_agent_store()
-                    .is_agent_local(to_agent_id.clone())
-                    .await?
-                {
-                    tracing::info!(?to_agent_id, "ignoring send_remote_signal to local agent");
-                    continue;
-                }
-
                 let to_url = match space
                     .peer_store()
                     .get(to_agent_id)
@@ -1204,11 +1231,19 @@ impl actor::HcP2p for HolochainP2pActor {
 
                 let req = WireMessage::remote_signal_evt(to_agent.clone(), payload, signature);
 
-                all.push(async {
-                    if let Err(err) = self.send_notify(&space, to_url, req).await {
-                        tracing::debug!(?err, "send_remote_signal failed");
+                if self.should_bridge(&space, to_url.clone()) {
+                    if let Err(err) = WireMessage::encode_batch(&[&req])
+                        .map(|msg| self.recv_notify(to_url, space_id.clone(), msg))
+                    {
+                        tracing::debug!(?err, "send_remote_signal failed to bridge call");
                     }
-                });
+                } else {
+                    all.push(async {
+                        if let Err(err) = self.send_notify(&space, to_url, req).await {
+                            tracing::debug!(?err, "send_remote_signal failed");
+                        }
+                    });
+                }
             }
 
             let start = std::time::Instant::now();
@@ -1230,7 +1265,7 @@ impl actor::HcP2p for HolochainP2pActor {
         &self,
         dna_hash: DnaHash,
         request_validation_receipt: bool,
-        basis_hash: holo_hash::OpBasis,
+        basis_hash: OpBasis,
         _source: AgentPubKey,
         op_hash_list: Vec<DhtOpHash>,
         _timeout_ms: Option<u64>,
@@ -1238,20 +1273,6 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             use crate::types::event::HcP2pHandler;
-
-            // This single function is/was a weird mix of a bunch of strange
-            // operations. We're trying to narrow it down now.
-            //
-            // - `reflect_ops` back to holochain
-            //   - TODO - remove this (fix anything it breaks)
-            // - actually publish `op_hash_list`
-            //   - This is the core functionality we want to keep here
-            // - send a notification to peers that we'd like validation receipts
-            //   - moving this to a separate call
-            // - i have no idea at all what the countersigning bool is for
-            //   - moving this to a separate call
-
-            // -- handle the bizzarre reflection thing -- //
 
             if let Some(reflect_ops) = reflect_ops {
                 self.evt_sender
@@ -1615,17 +1636,6 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let agent_id = to_agent.to_k2_agent();
 
-            // Ideally this would be filtered before here, but to protect against connecting to
-            // ourselves, we want a check here.
-            if space
-                .local_agent_store()
-                .is_agent_local(agent_id.clone())
-                .await?
-            {
-                tracing::info!("ignoring send_validation_receipts to local agent");
-                return Ok(());
-            }
-
             let to_url = match space
                 .peer_store()
                 .get(agent_id)
@@ -1640,8 +1650,15 @@ impl actor::HcP2p for HolochainP2pActor {
                 }
             };
 
+            // Ideally this would be filtered before here, but to protect against connecting to
+            // ourselves, we want a check here.
+            if space.current_url() == Some(to_url.clone()) {
+                tracing::info!("ignoring send_validation_receipts to ourselves");
+                return Ok(());
+            }
+
             let (msg_id, req) =
-                crate::wire::WireMessage::send_validation_receipts_req(to_agent.clone(), receipts);
+                WireMessage::send_validation_receipts_req(to_agent.clone(), receipts);
 
             let start = std::time::Instant::now();
 
@@ -1654,7 +1671,7 @@ impl actor::HcP2p for HolochainP2pActor {
                     req,
                     dna_hash,
                     |res| match res {
-                        crate::wire::WireMessage::SendValidationReceiptsRes { .. } => Ok(()),
+                        WireMessage::SendValidationReceiptsRes { .. } => Ok(()),
                         _ => Err(HolochainP2pError::other(format!(
                             "invalid response to send_validation_receipts: {res:?}"
                         ))),
@@ -1701,21 +1718,9 @@ impl actor::HcP2p for HolochainP2pActor {
             let mut peer_urls = Vec::with_capacity(agents.len());
             for agent in agents {
                 let agent_id = agent.to_k2_agent();
-                if space
-                    .local_agent_store()
-                    .is_agent_local(agent_id.clone())
-                    .await?
-                {
-                    tracing::info!(
-                        ?agent_id,
-                        "ignoring countersigning session negotiation to local agent"
-                    );
-                    continue;
-                }
-
                 if let Some(agent_info) = space
                     .peer_store()
-                    .get(agent_id)
+                    .get(agent_id.clone())
                     .await
                     .inspect_err(|e| {
                         tracing::error!(
@@ -1728,6 +1733,14 @@ impl actor::HcP2p for HolochainP2pActor {
                     .flatten()
                 {
                     if let Some(url) = &agent_info.url {
+                        if space.current_url() == Some(url.clone()) {
+                            tracing::info!(
+                                ?agent_id,
+                                "ignoring countersigning session negotiation to local agent"
+                            );
+                            continue;
+                        }
+
                         peer_urls.push((agent, url.clone()));
                     } else {
                         tracing::error!(?agent, "Peer has no url for countersigning negotiation");
