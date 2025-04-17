@@ -1733,14 +1733,6 @@ impl actor::HcP2p for HolochainP2pActor {
                     .flatten()
                 {
                     if let Some(url) = &agent_info.url {
-                        if space.current_url() == Some(url.clone()) {
-                            tracing::info!(
-                                ?agent_id,
-                                "ignoring countersigning session negotiation to local agent"
-                            );
-                            continue;
-                        }
-
                         peer_urls.push((agent, url.clone()));
                     } else {
                         tracing::error!(?agent, "Peer has no url for countersigning negotiation");
@@ -1754,7 +1746,17 @@ impl actor::HcP2p for HolochainP2pActor {
 
                 Box::pin({
                     let space = space.clone();
-                    async move { self.send_notify(&space, url, req).await }
+                    let space_id = space_id.clone();
+                    async move {
+                        if self.should_bridge(&space, url.clone()) {
+                            let message = WireMessage::encode_batch(&[&req])?;
+                            self.recv_notify(url, space_id, message)?;
+
+                            Ok(())
+                        } else {
+                            self.send_notify(&space, url, req).await
+                        }
+                    }
                 })
             }))
             .await;
