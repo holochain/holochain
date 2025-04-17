@@ -1,6 +1,5 @@
 //! Custom error types for the mr_bundle crate
 
-use holochain_util::ffs::IoError;
 use crate::manifest::ResourceIdentifier;
 
 /// Any error which can occur in this crate
@@ -15,18 +14,16 @@ pub enum MrBundleError {
     BundleError(#[from] BundleError),
 
     /// An unpacking error
-    #[cfg(feature = "packing")]
+    #[cfg(feature = "fs")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
     #[error(transparent)]
     UnpackingError(#[from] UnpackingError),
 
-    /// A packing error
-    #[cfg(feature = "packing")]
+    /// A fs error
+    #[cfg(feature = "fs")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
     #[error(transparent)]
     PackingError(#[from] PackingError),
-
-    /// An IO error from the `holochain_util::ffs` file system wrapper
-    #[error("IO error: {0}")]
-    IoError(#[from] IoError),
 
     /// A messagepack encoding error
     #[error(transparent)]
@@ -48,11 +45,11 @@ pub type MrBundleResult<T> = Result<T, MrBundleError>;
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum BundleError {
     /// A manifest references resources that were not provided when attempting to create a bundle.
-    #[error("Manifest references resources that were not provided when attempting to create a bundle: {0}")]
+    #[error("Manifest references resources that were not provided when attempting to create a bundle: {0:?}")]
     MissingResources(Vec<ResourceIdentifier>),
 
     /// Resources were provided when attempting to create a bundle that were not referenced in the manifest.
-    #[error("Resources were provided when attempting to create a bundle that were not referenced in the manifest: {0}")]
+    #[error("Resources were provided when attempting to create a bundle that were not referenced in the manifest: {0:?}")]
     UnusedResources(Vec<ResourceIdentifier>),
 
     /// A resource was provided that is not used in the manifest.
@@ -77,16 +74,13 @@ pub enum BundleError {
 pub type BundleResult<T> = Result<T, BundleError>;
 
 /// Errors which can occur while unpacking resources from a Bundle
-#[cfg(feature = "packing")]
+#[cfg(feature = "fs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
 #[derive(Debug, thiserror::Error)]
 pub enum UnpackingError {
     /// An IO error
     #[error(transparent)]
     StdIoError(#[from] std::io::Error),
-
-    /// An IO error from the `holochain_util::ffs` file system wrapper
-    #[error("IO error: {0}")]
-    IoError(#[from] IoError),
 
     /// A YAML error
     #[error(transparent)]
@@ -107,11 +101,13 @@ pub enum UnpackingError {
 }
 
 /// Custom result type with the error type [`UnpackingError`].
-#[cfg(feature = "packing")]
+#[cfg(feature = "fs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
 pub type UnpackingResult<T> = Result<T, UnpackingError>;
 
-/// Errors which can occur while packing resources into a Bundle
-#[cfg(feature = "packing")]
+/// Errors which can occur while fs resources into a Bundle
+#[cfg(feature = "fs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
 #[derive(Debug, thiserror::Error)]
 pub enum PackingError {
     /// An invalid manifest path
@@ -120,5 +116,6 @@ pub enum PackingError {
 }
 
 /// A custom result that uses [`PackingError`] as the error type.
-#[cfg(feature = "packing")]
+#[cfg(feature = "fs")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
 pub type PackingResult<T> = Result<T, PackingError>;

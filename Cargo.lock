@@ -4618,6 +4618,7 @@ name = "mr_bundle"
 version = "0.6.0-dev.0"
 dependencies = [
  "bytes",
+ "dunce",
  "flate2",
  "futures",
  "holochain_util",

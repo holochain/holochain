@@ -1,4 +1,4 @@
-/// Arbitrary opaque bytes representing a Resource in a [`Bundle`](crate::Bundle)
+/// Opaque bytes representing a Resource in a [`Bundle`](crate::Bundle)
 #[derive(Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ResourceBytes(bytes::Bytes);
 
