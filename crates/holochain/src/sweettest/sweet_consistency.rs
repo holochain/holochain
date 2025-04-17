@@ -143,7 +143,7 @@ async fn await_op_integration(
                 break;
             } else {
                 // Otherwise some ops haven't made it to all agents yet.
-                tracing::debug!("Not all op hashes were found in all DHT DBs, continuing...");
+                tracing::debug!("Not all op hashes were found in all DHT DBs after {:?}.", start.elapsed());
             }
         }
     })
@@ -186,17 +186,55 @@ async fn await_op_integration(
 
 #[cfg(test)]
 mod tests {
-    use crate::sweettest::{await_consistency, SweetConductorBatch, SweetDnaFile};
-    use holochain_zome_types::zome::inline_zome::InlineIntegrityZome;
+    use crate::{
+        prelude::holochain_serial,
+        sweettest::{await_consistency, SweetConductorBatch, SweetDnaFile},
+        test_utils::retry_fn_until_timeout,
+    };
+    use ::fixt::fixt;
+    use hdk::prelude::{ActionFixturator, SignatureFixturator};
+    use holo_hash::ActionHash;
+    use holochain_conductor_api::conductor::{ConductorConfig, NetworkConfig};
+    use holochain_serialized_bytes::SerializedBytes;
+    use holochain_state::prelude::insert_op_dht;
+    use holochain_types::dht_op::{ChainOp, DhtOpHashed};
+    use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::{
+        action::ChainTopOrdering,
+        entry::{AppEntryBytes, AppEntryDefLocation, CreateInput, EntryDefLocation},
+        entry_def::{EntryDef, EntryVisibility},
+        zome::inline_zome::InlineIntegrityZome,
+        Entry,
+    };
+    use serde::{Deserialize, Serialize};
+    use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "This test can be run to demo the report when consistency has not been reached"]
-    async fn consistency_not_reached() {
+    async fn consistency_reached() {
         holochain_trace::test_run();
         let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+        #[derive(Debug, Deserialize, Serialize)]
+        struct E;
+        holochain_serial!(E);
+        let entry_def = EntryDef::default_from_id("entry");
         let dna_file = SweetDnaFile::unique_from_inline_zomes((
             "integrity",
-            InlineIntegrityZome::new_unique(vec![], 0),
+            InlineIntegrityZome::new_unique(vec![entry_def], 0).function(
+                "make_some_noise",
+                |api, ()| {
+                    api.create(CreateInput::new(
+                        EntryDefLocation::App(AppEntryDefLocation {
+                            zome_index: 0.into(),
+                            entry_def_index: 0.into(),
+                        }),
+                        EntryVisibility::Public,
+                        Entry::App(AppEntryBytes(SerializedBytes::try_from(E).unwrap())),
+                        ChainTopOrdering::Relaxed,
+                    ))
+                    .unwrap();
+                    Ok(())
+                },
+            ),
         ))
         .await
         .0;
@@ -206,6 +244,134 @@ mod tests {
             .unwrap()
             .into_tuples();
 
-        await_consistency(10, &[alice, bob]).await.unwrap();
+        await_consistency(15, &[alice.clone(), bob.clone()])
+            .await
+            .unwrap();
+
+        // Both peers create an entry.
+        conductors[0]
+            .call::<_, ()>(&alice.zome("integrity"), "make_some_noise", ())
+            .await;
+        conductors[1]
+            .call::<_, ()>(&bob.zome("integrity"), "make_some_noise", ())
+            .await;
+
+        await_consistency(5, &[alice, bob]).await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn consistency_reached_with_private_entry() {
+        holochain_trace::test_run();
+        let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+        let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create])
+            .await
+            .0;
+        let ((alice,), (bob,)) = conductors
+            .setup_app("", &[dna_file])
+            .await
+            .unwrap()
+            .into_tuples();
+
+        await_consistency(15, &[alice.clone(), bob.clone()])
+            .await
+            .unwrap();
+
+        // Both peers create a private entry.
+        conductors[0]
+            .call::<_, ActionHash>(
+                &alice.zome(TestWasm::Create.coordinator_zome()),
+                "create_priv_msg",
+                (),
+            )
+            .await;
+        conductors[1]
+            .call::<_, ActionHash>(
+                &bob.zome(TestWasm::Create.coordinator_zome()),
+                "create_priv_msg",
+                (),
+            )
+            .await;
+
+        await_consistency(5, &[alice, bob]).await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn consistency_not_reached_when_ops_not_synced() {
+        holochain_trace::test_run();
+        // No bootstrap service.
+        let config = ConductorConfig {
+            network: NetworkConfig {
+                mem_bootstrap: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut conductors = SweetConductorBatch::from_config(2, config).await;
+        let dna_file = SweetDnaFile::unique_from_inline_zomes((
+            "integrity",
+            InlineIntegrityZome::new_unique(vec![], 0),
+        ))
+        .await
+        .0;
+        let ((alice,), (bob,)) = conductors
+            .setup_app("", &[dna_file.clone()])
+            .await
+            .unwrap()
+            .into_tuples();
+
+        // Await genesis actions to be integrated for both peers.
+        retry_fn_until_timeout(
+            || async {
+                conductors[0]
+                    .all_ops_integrated(dna_file.dna_hash())
+                    .unwrap()
+                    && conductors[1]
+                        .all_ops_integrated(dna_file.dna_hash())
+                        .unwrap()
+            },
+            Some(5000),
+            Some(100),
+        )
+        .await
+        .unwrap();
+
+        // Genesis actions will be integrated but not gossiped. Consistency cannot be reached.
+        await_consistency(Duration::from_micros(1), &[alice, bob])
+            .await
+            .unwrap_err();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn consistency_not_reached_when_ops_not_integrated() {
+        holochain_trace::test_run();
+        let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+        let dna_file = SweetDnaFile::unique_from_inline_zomes((
+            "integrity",
+            InlineIntegrityZome::new_unique(vec![], 0),
+        ))
+        .await
+        .0;
+        let ((alice,), (bob,)) = conductors
+            .setup_app("", &[dna_file.clone()])
+            .await
+            .unwrap()
+            .into_tuples();
+
+        await_consistency(15, &[alice.clone(), bob.clone()])
+            .await
+            .unwrap();
+
+        let op = ChainOp::RegisterAgentActivity(fixt!(Signature), fixt!(Action));
+        let unintegrated_op = DhtOpHashed::from_content_sync(op);
+        conductors[0]
+            .get_dht_db(dna_file.dna_hash())
+            .unwrap()
+            .test_write(move |txn| insert_op_dht(txn, &unintegrated_op, 0, None))
+            .unwrap();
+
+        // Unintegrated op will prevent consistency.
+        await_consistency(Duration::from_micros(1), &[alice, bob])
+            .await
+            .unwrap_err();
     }
 }
