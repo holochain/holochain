@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Refactor sweettest function `await_consistency` after seeing it was not behaving reliably. Rewritten to compare all involved peer DHT databases and check if the sum of all ops has been integrated in all of them.
+
 ## 0.6.0-dev.0
 
 - Remove unstable feature DPKI and all references to it, including the DPKI conductor service. DPKI was introduced to the codebase prematurely, largely untested, provided only a minimal set of calls to query agent keys and revoke an agent key, and kept causing problems that were disproportionately difficult to debug. If Holochain will be enhanced by agent key management in the future, it will be reimplemented from the ground up.
