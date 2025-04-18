@@ -43,12 +43,7 @@ pub async fn expand_unknown_bundle(
         bundle_path_to_dir(&bundle_path, extension)?
     };
 
-    FileSystemBundler::expand_named_to(
-        &bundle,
-        manifest_file_name,
-        &target_dir,
-        force,
-    ).await?;
+    FileSystemBundler::expand_named_to(&bundle, manifest_file_name, &target_dir, force).await?;
 
     Ok(target_dir)
 }
@@ -90,7 +85,11 @@ pub async fn pack<M: Manifest>(
         None => dir_to_bundle_path(&dir_path, name, M::bundle_extension())?,
     };
 
-    println!("Ready to bundle from {} to {}", dir_path.display(), target_path.display());
+    println!(
+        "Ready to bundle from {} to {}",
+        dir_path.display(),
+        target_path.display()
+    );
 
     FileSystemBundler::bundle_to::<M>(&manifest_path, &target_path).await?;
 
@@ -146,10 +145,9 @@ integrity:
         // in the parent directory
         std::fs::write(tmpdir.path().join("zome-3.wasm"), [7, 8, 9]).unwrap();
 
-        let bundle_path =
-            pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string())
-                .await
-                .unwrap();
+        let bundle_path = pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string())
+            .await
+            .unwrap();
         let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(&bundle_path)
             .await
             .unwrap();
@@ -170,7 +168,9 @@ integrity:
                 false
             )
             .await,
-            Err(HcBundleError::MrBundleError(MrBundleError::DirectoryExists(_)))
+            Err(HcBundleError::MrBundleError(
+                MrBundleError::DirectoryExists(_)
+            ))
         );
         // Now unpack with forcing to overwrite original directory
         expand_bundle::<ValidatedDnaManifest>(
@@ -208,7 +208,9 @@ integrity:
         let bundle_path = pack::<ValidatedDnaManifest>(&dir, None, "test_dna".to_string())
             .await
             .unwrap();
-        let bundle2 = FileSystemBundler::load_from::<ValidatedDnaManifest>(bundle_path).await.unwrap();
+        let bundle2 = FileSystemBundler::load_from::<ValidatedDnaManifest>(bundle_path)
+            .await
+            .unwrap();
         assert_eq!(bundle, bundle2);
     }
 }

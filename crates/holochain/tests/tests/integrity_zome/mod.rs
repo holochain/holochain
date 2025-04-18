@@ -89,7 +89,6 @@ async fn test_coordinator_zome_update_multi_integrity() {
         ZomeDef::Wasm(WasmZome {
             wasm_hash,
             mut dependencies,
-            preserialized_path,
         }) => {
             dependencies.clear();
             dependencies.push("2".into());
@@ -99,7 +98,6 @@ async fn test_coordinator_zome_update_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash,
                     dependencies,
-                    preserialized_path,
                 })
                 .into(),
             )
@@ -181,7 +179,6 @@ async fn test_coordinator_zome_update_multi_integrity() {
     let new_coordinator: CoordinatorZomeDef = ZomeDef::Wasm(WasmZome {
         wasm_hash,
         dependencies: vec!["2".into()],
-        preserialized_path: None,
     })
     .into();
 
@@ -229,12 +226,12 @@ async fn test_update_admin_interface() {
 
     let admin_api = AdminInterfaceApi::new(conductor.clone());
 
+    let path: PathBuf = TestCoordinatorWasm::CoordinatorZomeUpdate.into();
     let manifest = CoordinatorManifest {
         zomes: vec![ZomeManifest {
             name: TestCoordinatorWasm::CoordinatorZomeUpdate.into(),
             hash: None,
-            dylib: None,
-            location: ZomeLocation::Bundled(TestCoordinatorWasm::CoordinatorZomeUpdate.into()),
+            file: path.display().to_string(),
             dependencies: Some(vec![ZomeDependency {
                 name: TestIntegrityWasm::IntegrityZome.into(),
             }]),
@@ -246,20 +243,23 @@ async fn test_update_admin_interface() {
         .to_vec()
         .into();
 
+    println!("Using manifest: {manifest:?}");
+
     let source: CoordinatorBundle = Bundle::new(
         manifest,
         [(
-            PathBuf::from(TestCoordinatorWasm::CoordinatorZomeUpdate),
+            path.file_name().unwrap().to_str().unwrap().to_string(),
             code,
         )],
-        env!("CARGO_MANIFEST_DIR").into(),
     )
     .unwrap()
     .into();
 
+    println!("Bundle: {source:?}");
+
     let req = UpdateCoordinatorsPayload {
         dna_hash,
-        source: holochain_types::prelude::CoordinatorSource::Bundle(Box::new(source)),
+        source: CoordinatorSource::Bundle(Box::new(source)),
     };
     let req = AdminRequest::UpdateCoordinators(Box::new(req));
     let r = admin_api.handle_request(Ok(req)).await.unwrap();

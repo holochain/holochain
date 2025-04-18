@@ -2,10 +2,8 @@ use crate::prelude::*;
 use futures::StreamExt;
 use holo_hash::*;
 use mr_bundle::{Bundle, ResourceBytes, ResourceIdentifier};
+use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
-use std::{
-    collections::{BTreeMap, HashMap},
-};
 
 #[cfg(test)]
 mod test;
@@ -236,7 +234,10 @@ pub(super) async fn hash_bytes(
 
         let bytes: bytes::Bytes = resources
             .remove(&z.resource_id())
-            .expect(&format!("resource referenced in manifest must exist: {}", z.resource_id()))
+            .expect(&format!(
+                "resource referenced in manifest must exist: {}",
+                z.resource_id()
+            ))
             .clone()
             .into();
         let zome_name = z.name;

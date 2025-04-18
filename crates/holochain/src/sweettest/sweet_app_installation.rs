@@ -1,8 +1,5 @@
-use std::path::PathBuf;
-
-use holochain_types::prelude::*;
-
 use crate::conductor::conductor::app_manifest_from_dnas;
+use holochain_types::prelude::*;
 
 /// Get a "standard" AppBundle from a single DNA, with Create provisioning,
 /// with no modifiers, clone limit of 255, and arbitrary role names
@@ -53,9 +50,7 @@ pub async fn app_bundle_from_dnas(
         "app_bundle_from_dnas and app_manifest_from_dnas should produce the same manifest"
     );
 
-    AppBundle::new(manifest, resources)
-        .await
-        .unwrap()
+    AppBundle::new(manifest, resources).unwrap()
 }
 
 /// Get a "standard" InstallAppPayload from a single DNA
@@ -81,9 +76,7 @@ pub async fn get_install_app_payload_from_dnas(
             .collect(),
     );
 
-    let bytes = bundle
-        .pack()
-        .expect("failed to encode app bundle as bytes");
+    let bytes = bundle.pack().expect("failed to encode app bundle as bytes");
     InstallAppPayload {
         agent_key,
         source: AppBundleSource::Bytes(bytes),

@@ -49,10 +49,7 @@ impl mr_bundle::Manifest for ValidatedDnaManifest {
 
     fn resource_ids(&self) -> Vec<ResourceIdentifier> {
         match &self.0 {
-            DnaManifest::V1(m) => m
-                .all_zomes()
-                .map(|zome| zome.resource_id())
-                .collect(),
+            DnaManifest::V1(m) => m.all_zomes().map(|zome| zome.resource_id()).collect(),
         }
     }
 

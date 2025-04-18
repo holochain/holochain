@@ -394,9 +394,7 @@ impl RealRibosome {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
         match &zome.def {
-            ZomeDef::Wasm(wasm_zome) => {
-                self.build_module(zome.zome_name()).await
-            }
+            ZomeDef::Wasm(_) => self.build_module(zome.zome_name()).await,
             _ => RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
                 ZomeError::NonWasmZome(zome.zome_name().clone()),
             ))),
@@ -918,8 +916,9 @@ impl RibosomeT for RealRibosome {
             },
             extern_fns: {
                 match zome.zome_def() {
-                    ZomeDef::Wasm(wasm_zome) => {
-                        let module = tokio_helper::block_forever_on(self.build_module(zome.zome_name()))?;
+                    ZomeDef::Wasm(_) => {
+                        let module =
+                            tokio_helper::block_forever_on(self.build_module(zome.zome_name()))?;
                         self.get_extern_fns_for_wasm(module.clone())
                     }
                     ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),

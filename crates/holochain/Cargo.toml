@@ -211,6 +211,7 @@ test_utils = [
   "async-once-cell",
   "get_if_addrs",
   "holo_hash/fixturators",
+  "dep:bytes",
 ]
 
 fuzzing = []
