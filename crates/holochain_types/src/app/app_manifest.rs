@@ -72,7 +72,6 @@ impl Manifest for AppManifest {
                 .filter_map(|role| {
                     if let Some(file) = &mut role.dna.file {
                         let id = resource_id_for_path(&file)?;
-                        println!("Creating identifier {} for file: {}", id, file);
                         let path = file.clone();
 
                         *file = id.clone();
@@ -91,7 +90,7 @@ impl Manifest for AppManifest {
             AppManifest::V1(m) => m
                 .roles
                 .iter()
-                .filter_map(|role| role.dna.file.clone().and_then(|f| resource_id_for_path(f)))
+                .filter_map(|role| role.dna.file.clone().and_then(resource_id_for_path))
                 .collect(),
         }
     }

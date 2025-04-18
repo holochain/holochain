@@ -317,7 +317,7 @@ impl HcDnaBundleSubcommand {
                     crate::packing::expand_unknown_bundle(
                         &path,
                         DNA_BUNDLE_EXT,
-                        ValidatedDnaManifest::file_name().as_ref(),
+                        ValidatedDnaManifest::file_name(),
                         output,
                         force,
                     )
@@ -430,7 +430,7 @@ impl HcWebAppBundleSubcommand {
                     crate::packing::expand_unknown_bundle(
                         &path,
                         WEB_APP_BUNDLE_EXT,
-                        WebAppManifest::file_name().as_ref(),
+                        WebAppManifest::file_name(),
                         output,
                         force,
                     )
