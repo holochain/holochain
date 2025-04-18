@@ -5,11 +5,9 @@
 //! may contain various invalid combinations of data. In contrast, these types
 //! are structured to ensure validity, and are used internally by Holochain.
 
-use holo_hash::DnaHashB64;
-
 use super::error::{AppManifestError, AppManifestResult};
-use crate::app::app_manifest::current::DnaLocation;
 use crate::prelude::*;
+use holo_hash::DnaHashB64;
 use std::collections::HashMap;
 
 /// Normalized, validated representation of the App Manifest.
@@ -52,7 +50,7 @@ pub enum AppRoleManifestValidated {
     Create {
         clone_limit: u32,
         deferred: bool,
-        location: DnaLocation,
+        file: String,
         modifiers: DnaModifiersOpt,
         installed_hash: Option<DnaHashB64>,
     },
@@ -67,7 +65,7 @@ pub enum AppRoleManifestValidated {
     /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
     CloneOnly {
         clone_limit: u32,
-        location: DnaLocation,
+        file: String,
         modifiers: DnaModifiersOpt,
         installed_hash: Option<DnaHashB64>,
     },

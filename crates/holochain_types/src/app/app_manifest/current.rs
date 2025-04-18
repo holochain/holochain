@@ -4,5 +4,4 @@
 pub use super::app_manifest_v1::{
     AppManifestV1 as AppManifestCurrent, AppManifestV1,
     AppManifestV1Builder as AppManifestCurrentBuilder, AppManifestV1Builder, AppRoleManifest,
-    DnaLocation,
 };

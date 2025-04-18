@@ -1,17 +1,17 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::{Path, PathBuf},
-};
-
 use crate::prelude::*;
 use futures::StreamExt;
 use holo_hash::*;
-use mr_bundle::{Location, ResourceBytes};
+use mr_bundle::{Bundle, ResourceBytes, ResourceIdentifier};
+use std::io::Read;
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 
 #[cfg(test)]
 mod test;
 
-/// A bundle of Wasm zomes, respresented as a file.
+/// A bundle of Wasm zomes, represented as a file.
 #[derive(
     Clone,
     Debug,
@@ -23,16 +23,15 @@ mod test;
     shrinkwraprs::Shrinkwrap,
     derive_more::From,
 )]
-pub struct DnaBundle(mr_bundle::Bundle<ValidatedDnaManifest>);
+pub struct DnaBundle(Bundle<ValidatedDnaManifest>);
 
 impl DnaBundle {
     /// Constructor
     pub fn new(
         manifest: ValidatedDnaManifest,
-        resources: Vec<(PathBuf, ResourceBytes)>,
-        root_dir: PathBuf,
+        resources: Vec<(ResourceIdentifier, ResourceBytes)>,
     ) -> DnaResult<Self> {
-        Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
+        Ok(Bundle::new(manifest, resources)?.into())
     }
 
     /// Convert to a DnaFile, and return what the hash of the Dna *would* have
@@ -57,22 +56,12 @@ impl DnaBundle {
     }
 
     /// Construct from raw bytes
-    pub fn decode(bytes: bytes::Bytes) -> DnaResult<Self> {
-        mr_bundle::Bundle::decode(bytes)
-            .map(Into::into)
-            .map_err(Into::into)
-    }
-
-    /// Read from a bundle file
-    pub async fn read_from_file(path: &Path) -> DnaResult<Self> {
-        mr_bundle::Bundle::read_from_file(path)
-            .await
-            .map(Into::into)
-            .map_err(Into::into)
+    pub fn unpack(bytes: impl Read) -> DnaResult<Self> {
+        Bundle::unpack(bytes).map(Into::into).map_err(Into::into)
     }
 
     async fn inner_maps(&self) -> DnaResult<(IntegrityZomes, CoordinatorZomes, WasmMap)> {
-        let mut resources = self.resolve_all_cloned().await?;
+        let mut resources = self.get_all_resources().clone();
         let data = match &self.manifest().0 {
             DnaManifest::V1(manifest) => {
                 let integrity =
@@ -154,13 +143,23 @@ impl DnaBundle {
     /// Build a bundle from a DnaFile. Useful for tests.
     #[cfg(feature = "test_utils")]
     pub fn from_dna_file(dna_file: DnaFile) -> DnaResult<Self> {
-        let DnaFile { dna, code, .. } = dna_file;
-        let manifest = Self::manifest_from_dna_def(dna.into_content())?;
+        let DnaFile { ref dna, code, .. } = dna_file;
+        let manifest = Self::manifest_from_dna_def(dna.clone().into_content())?;
         let resources = code
-            .into_iter()
-            .map(|(hash, wasm)| (PathBuf::from(hash.to_string()), wasm.code.to_vec().into()))
+            .iter()
+            .map(|(hash, wasm)| {
+                let name = dna_file
+                    .dna
+                    .all_zomes()
+                    .find_map(|(name, def)| match def {
+                        ZomeDef::Wasm(w) if &w.wasm_hash == hash => Some(name),
+                        _ => None,
+                    })
+                    .unwrap();
+                (name.to_string(), wasm.code.to_vec().into())
+            })
             .collect();
-        DnaBundle::new(manifest.try_into()?, resources, PathBuf::from("."))
+        DnaBundle::new(manifest.try_into()?, resources)
     }
 
     #[cfg(feature = "test_utils")]
@@ -182,7 +181,7 @@ impl DnaBundle {
                     ZomeManifest {
                         name,
                         hash: Some(hash),
-                        location: Location::Bundled(PathBuf::from(filename)),
+                        file: filename,
                         dylib: None,
                         dependencies: Some(dependencies),
                     }
@@ -206,7 +205,7 @@ impl DnaBundle {
                     ZomeManifest {
                         name,
                         hash: Some(hash),
-                        location: Location::Bundled(PathBuf::from(filename)),
+                        file: filename,
                         dylib: None,
                         dependencies: Some(dependencies),
                     }
@@ -237,15 +236,16 @@ impl DnaBundle {
 
 pub(super) async fn hash_bytes(
     zomes: impl Iterator<Item = ZomeManifest>,
-    resources: &mut HashMap<Location, ResourceBytes>,
+    resources: &mut HashMap<ResourceIdentifier, ResourceBytes>,
 ) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>, Option<PathBuf>)>> {
     let iter = zomes.map(|z| {
-        let bytes = resources
-            .remove(&z.location)
-            .expect("resource referenced in manifest must exist");
+        let bytes: bytes::Bytes = resources
+            .remove(&z.name.to_string())
+            .expect("resource referenced in manifest must exist")
+            .into();
         let zome_name = z.name;
         let expected_hash = z.hash.map(WasmHash::from);
-        let wasm = DnaWasm::from(bytes.into_inner());
+        let wasm = DnaWasm::from(bytes);
         let dependencies = z.dependencies.map_or(Vec::with_capacity(0), |deps| {
             deps.into_iter().map(|d| d.name).collect()
         });
@@ -270,14 +270,10 @@ pub(super) async fn hash_bytes(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn dna_bundle_to_dna_file() {
-        let path1 = PathBuf::from("1");
-        let path2 = PathBuf::from("2");
         let wasm1 = vec![1, 2, 3];
         let wasm2 = vec![4, 5, 6];
         let hash1 = DnaWasm::from(wasm1.clone()).to_hash().await;
@@ -293,7 +289,7 @@ mod tests {
                     ZomeManifest {
                         name: "zome1".into(),
                         hash: None,
-                        location: mr_bundle::Location::Bundled(path1.clone()),
+                        file: "path1".to_string(),
                         dylib: None,
                         dependencies: Default::default(),
                     },
@@ -301,7 +297,7 @@ mod tests {
                         name: "zome2".into(),
                         // Intentional wrong hash
                         hash: Some(hash1.clone().into()),
-                        location: mr_bundle::Location::Bundled(path2.clone()),
+                        file: "path2".to_string(),
                         dylib: None,
                         dependencies: Default::default(),
                     },
@@ -311,15 +307,16 @@ mod tests {
             #[cfg(feature = "unstable-migration")]
             lineage,
         };
-        let resources = vec![(path1, wasm1.into()), (path2, wasm2.into())];
+        let resources = vec![
+            ("zome1".into(), wasm1.into()),
+            ("zome2".into(), wasm2.into()),
+        ];
 
         // - Show that conversion fails due to hash mismatch
-        let bad_bundle: DnaBundle = mr_bundle::Bundle::new_unchecked(
-            manifest.clone().try_into().unwrap(),
-            resources.clone(),
-        )
-        .unwrap()
-        .into();
+        let bad_bundle: DnaBundle =
+            Bundle::new(manifest.clone().try_into().unwrap(), resources.clone())
+                .unwrap()
+                .into();
         matches::assert_matches!(
             bad_bundle.into_dna_file(DnaModifiersOpt::none()).await,
             Err(DnaError::WasmHashMismatch(h1, h2))
@@ -328,12 +325,10 @@ mod tests {
 
         // - Correct the hash and try again
         manifest.integrity.zomes[1].hash = Some(hash2.into());
-        let bundle: DnaBundle = mr_bundle::Bundle::new_unchecked(
-            manifest.clone().try_into().unwrap(),
-            resources.clone(),
-        )
-        .unwrap()
-        .into();
+        let bundle: DnaBundle =
+            Bundle::new(manifest.clone().try_into().unwrap(), resources.clone())
+                .unwrap()
+                .into();
         let dna_file: DnaFile = bundle
             .into_dna_file(DnaModifiersOpt::none())
             .await
@@ -344,10 +339,9 @@ mod tests {
 
         // - Check that properties and UUID can be overridden
         let properties: YamlProperties = serde_yaml::Value::from(42).into();
-        let bundle: DnaBundle =
-            mr_bundle::Bundle::new_unchecked(manifest.try_into().unwrap(), resources)
-                .unwrap()
-                .into();
+        let bundle: DnaBundle = Bundle::new(manifest.try_into().unwrap(), resources)
+            .unwrap()
+            .into();
         let dna_file: DnaFile = bundle
             .into_dna_file(
                 DnaModifiersOpt::none()

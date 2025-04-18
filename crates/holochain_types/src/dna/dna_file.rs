@@ -24,6 +24,14 @@ mod test;
 #[serde(from = "WasmMapSerialized", into = "WasmMapSerialized")]
 pub struct WasmMap(BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>);
 
+#[cfg(feature = "test_utils")]
+impl WasmMap {
+    /// Create an iterator over the WasmMap
+    pub fn iter(&self) -> impl Iterator<Item = (&holo_hash::WasmHash, &wasm::DnaWasm)> {
+        self.0.iter()
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 struct WasmMapSerialized(Vec<(holo_hash::WasmHash, wasm::DnaWasm)>);

@@ -11,11 +11,11 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      file: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      file: nested/zome-2.wasm
     - name: zome3
-      path: ../zome-3.wasm
+      file: ../zome-3.wasm
       "#;
 
     let _manifest: DnaManifest = serde_yaml::from_str(manifest_yaml).unwrap();
@@ -32,17 +32,17 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      file: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      file: nested/zome-2.wasm
     - name: zome3
-      path: ../zome-3.wasm
+      file: ../zome-3.wasm
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      file: zome-4.wasm
     - name: zome5
-      path: ../zome-5.wasm
+      file: ../zome-5.wasm
         "#;
 
     let _manifest: DnaManifest = serde_yaml::from_str(manifest_yaml).unwrap();
@@ -61,9 +61,9 @@ integrity:
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      file: zome-4.wasm
     - name: zome5
-      path: ../zome-5.wasm
+      file: ../zome-5.wasm
         "#;
 
     serde_yaml::from_str::<DnaManifest>(manifest_yaml)
@@ -81,11 +81,11 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      file: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      file: nested/zome-2.wasm
     - name: zome3
-      path: ../zome-3.wasm
+      file: ../zome-3.wasm
 not_a_real_field: ~"#;
 
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
@@ -107,18 +107,18 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      file: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      file: nested/zome-2.wasm
     - name: zome3
-      path: ../zome-3.wasm
+      file: ../zome-3.wasm
   # Should be indented left once, this is actually nested under `integrity`
   coordinator:
     zomes:
       - name: zome4
-        bundled: zome-4.wasm
+        file: zome-4.wasm
       - name: zome5
-        path: ../zome-5.wasm"#;
+        file: ../zome-5.wasm"#;
 
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
@@ -137,20 +137,20 @@ name: test_dna
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      file: zome-4.wasm
     - name: zome5
-      path: ../zome-5.wasm
+      file: ../zome-5.wasm
   # Should be indented left once, this is actually nested under `coordinator`
   integrity:
     network_seed: blablabla
     properties: ~
     zomes:
       - name: zome1
-        bundled: zome-1.wasm
+        file: zome-1.wasm
       - name: zome2
-        bundled: nested/zome-2.wasm
+        file: nested/zome-2.wasm
       - name: zome3
-        path: ../zome-3.wasm"#;
+        file: ../zome-3.wasm"#;
 
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
     assert!(
@@ -172,11 +172,11 @@ integrity:
   not_a_real_field: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      file: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      file: nested/zome-2.wasm
     - name: zome3
-      path: ../zome-3.wasm
+      file: ../zome-3.wasm
 "#;
 
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
@@ -197,9 +197,9 @@ coordinator:
   not_a_real_field: ~
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      file: zome-4.wasm
     - name: zome5
-      path: ../zome-5.wasm
+      file: ../zome-5.wasm
         "#;
 
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
@@ -221,12 +221,12 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      file: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      file: nested/zome-2.wasm
       not_a_real_field: ~
     - name: zome3
-      path: ../zome-3.wasm
+      file: ../zome-3.wasm
 "#;
 
     let err = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap_err();
@@ -246,9 +246,9 @@ name: test_dna
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      file: zome-4.wasm
     - name: zome5
-      path: ../zome-5.wasm
+      file: ../zome-5.wasm
       not_a_real_field: ~
         "#;
 
