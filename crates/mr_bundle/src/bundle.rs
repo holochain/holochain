@@ -1,8 +1,6 @@
+use crate::error::MrBundleError;
 use crate::manifest::ResourceIdentifier;
-use crate::{
-    error::{BundleError, MrBundleResult},
-    manifest::Manifest,
-};
+use crate::{error::MrBundleResult, manifest::Manifest};
 use resource::ResourceBytes;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -101,7 +99,7 @@ where
             .cloned()
             .collect::<Vec<_>>();
         if !missing_resources.is_empty() {
-            return Err(BundleError::MissingResources(missing_resources).into());
+            return Err(MrBundleError::MissingResources(missing_resources));
         }
 
         let extra_resources = resources
@@ -113,7 +111,7 @@ where
             .collect::<Vec<_>>();
 
         if !extra_resources.is_empty() {
-            return Err(BundleError::UnusedResources(extra_resources).into());
+            return Err(MrBundleError::UnusedResources(extra_resources));
         }
 
         Ok(Self {
@@ -179,7 +177,7 @@ mod tests {
         let err =
             Bundle::new(manifest.clone(), vec![("1.thing".into(), vec![1].into())]).unwrap_err();
         assert!(
-            matches!(err, MrBundleError::BundleError(BundleError::MissingResources(ref resources)) if resources.contains(&"2.thing".into())),
+            matches!(err, MrBundleError::MissingResources(ref resources) if resources.contains(&"2.thing".into())),
             "Got other error: {err:?}"
         );
 
@@ -195,7 +193,7 @@ mod tests {
         assert!(
             matches!(
                 err,
-                MrBundleError::BundleError(BundleError::UnusedResources(ref resources)) if resources.contains(&"3.thing".into())
+                MrBundleError::UnusedResources(ref resources) if resources.contains(&"3.thing".into())
             ),
             "Got other error: {err:?}"
         );

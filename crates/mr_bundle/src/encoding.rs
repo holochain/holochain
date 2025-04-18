@@ -13,7 +13,7 @@ pub fn pack<T: serde::ser::Serialize>(data: &T) -> MrBundleResult<bytes::Bytes> 
 
 /// Decompress and deserialize some a bundle
 ///
-/// This operation is the inverse of [`encode`].
+/// This operation is the inverse of [`pack`].
 pub fn unpack<T: serde::de::DeserializeOwned>(compressed: impl Read) -> MrBundleResult<T> {
     let mut gz = flate2::read::GzDecoder::new(compressed);
     let mut bytes = Vec::new();

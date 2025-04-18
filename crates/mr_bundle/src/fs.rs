@@ -1,4 +1,5 @@
 use super::{Bundle, ResourceIdentifier};
+use crate::error::MrBundleError;
 use crate::{error::MrBundleResult, Manifest};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -33,7 +34,7 @@ pub struct FileSystemBundler;
 impl FileSystemBundler {
     /// Create a bundle from a manifest file.
     ///
-    /// The provided [`manifest_path`] is expected to be a path to a manifest file. The file is
+    /// The provided `manifest_path` is expected to be a path to a manifest file. The file is
     /// expected to be a YAML file that can be deserialized into the [`Manifest`] type.
     ///
     /// The resources referenced by the manifest will be loaded from the file system, using
@@ -43,12 +44,11 @@ impl FileSystemBundler {
     pub async fn bundle<M: Manifest>(manifest_path: impl AsRef<Path>) -> MrBundleResult<Bundle<M>> {
         let manifest_path = dunce::canonicalize(manifest_path)?;
         let manifest_yaml = tokio::fs::read_to_string(&manifest_path).await?;
-        let mut manifest: M =
-            serde_yaml::from_str(&manifest_yaml).map_err(crate::error::UnpackingError::from)?;
+        let mut manifest: M = serde_yaml::from_str(&manifest_yaml)?;
 
-        let manifest_dir = manifest_path.parent().ok_or_else(|| {
-            crate::error::UnpackingError::ParentlessPath(manifest_path.to_path_buf())
-        })?;
+        let manifest_dir = manifest_path
+            .parent()
+            .ok_or_else(|| MrBundleError::ParentlessPath(manifest_path.to_path_buf()))?;
         let resources =
             futures::future::join_all(manifest.generate_resource_ids().into_iter().map(
                 |(resource_id, relative_path)| async {
@@ -67,16 +67,19 @@ impl FileSystemBundler {
     /// A convenience function that creates a bundle and writes it to the filesystem.
     ///
     /// Uses [`bundle`](FileSystemBundler::bundle) to create the bundle and then writes it to the
-    /// provided [`bundle_path`].
+    /// provided `bundle_path`.
     pub async fn bundle_to<M: Manifest>(
         manifest_path: impl AsRef<Path>,
         bundle_path: impl AsRef<Path>,
     ) -> MrBundleResult<()> {
         let bundle = FileSystemBundler::bundle::<M>(manifest_path).await?;
 
-        tokio::fs::create_dir_all(bundle_path.as_ref().parent().ok_or_else(|| {
-            crate::error::UnpackingError::ParentlessPath(bundle_path.as_ref().to_path_buf())
-        })?)
+        tokio::fs::create_dir_all(
+            bundle_path
+                .as_ref()
+                .parent()
+                .ok_or_else(|| MrBundleError::ParentlessPath(bundle_path.as_ref().to_path_buf()))?,
+        )
         .await?;
 
         let bundle_path = bundle_path.as_ref();
@@ -98,7 +101,7 @@ impl FileSystemBundler {
 
     /// Write the contents of the bundle to the filesystem.
     ///
-    /// This will create a directory at [`target_dir`] and write the manifest and resources to it.
+    /// This will create a directory at `target_dir` and write the manifest and resources to it.
     ///
     /// By default, the function will error if the directory already exists. You can override this
     /// by passing `force` with the value `true`.
@@ -124,17 +127,14 @@ impl FileSystemBundler {
 
         // If the directory already exists, and we're not forcing, then we can't continue.
         if !force && target_dir.exists() {
-            return Err(
-                crate::error::UnpackingError::DirectoryExists(target_dir.to_owned()).into(),
-            );
+            return Err(MrBundleError::DirectoryExists(target_dir.to_owned()));
         }
 
         // Create the directory to work into.
         tokio::fs::create_dir_all(&target_dir).await?;
 
         // Write the manifest to the target directory.
-        let yaml_str = serde_yaml::to_string(bundle.manifest())
-            .map_err(|e| crate::error::UnpackingError::YamlError(e))?;
+        let yaml_str = serde_yaml::to_string(bundle.manifest())?;
         let manifest_path = target_dir.join(manifest_file_name);
         tokio::fs::write(&manifest_path, yaml_str.as_bytes()).await?;
 
@@ -144,7 +144,7 @@ impl FileSystemBundler {
             let path_clone = path.clone();
             let parent = path_clone
                 .parent()
-                .ok_or_else(|| crate::error::UnpackingError::ParentlessPath(path.clone()))?;
+                .ok_or_else(|| MrBundleError::ParentlessPath(path.clone()))?;
             tokio::fs::create_dir_all(&parent).await?;
             tokio::fs::write(&path, resource).await?;
         }
