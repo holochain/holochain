@@ -3,7 +3,6 @@
 
 use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
-use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::space::Space;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
@@ -197,29 +196,6 @@ pub fn check_valid_if_dna(action: &Action, dna_def: &DnaDefHashed) -> SysValidat
             }
         }
         _ => Ok(()),
-    }
-}
-
-/// Check if there are other actions at this
-/// sequence number
-pub async fn check_chain_rollback(
-    action: &Action,
-    workspace: &SysValidationWorkspace,
-) -> SysValidationResult<()> {
-    let empty = workspace.action_seq_is_empty(action).await?;
-
-    // Ok or log warning
-    if empty {
-        Ok(())
-    } else {
-        // TODO: implement real rollback detection once we know what that looks like
-        tracing::error!(
-            "Chain rollback detected at position {} for agent {:?} from action {:?}",
-            action.action_seq(),
-            action.author(),
-            action,
-        );
-        Ok(())
     }
 }
 
