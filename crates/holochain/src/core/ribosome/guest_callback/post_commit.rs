@@ -8,7 +8,7 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
@@ -34,7 +34,7 @@ impl PostCommitInvocation {
 pub struct PostCommitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
-    pub network: HolochainP2pDna,
+    pub network: DynHolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
 }
 
@@ -87,7 +87,7 @@ impl TryFrom<PostCommitInvocation> for ExternIO {
 pub async fn send_post_commit(
     conductor_handle: ConductorHandle,
     workspace: SourceChainWorkspace,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     actions: Vec<SignedActionHashed>,
     zomes: Vec<CoordinatorZome>,

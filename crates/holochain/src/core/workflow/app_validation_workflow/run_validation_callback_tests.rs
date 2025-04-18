@@ -13,7 +13,7 @@ use crate::{
 use fixt::fixt;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
-use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
+use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::exports::FallibleIterator;
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, prelude::insert_op_cache};
 use holochain_types::{
@@ -74,7 +74,7 @@ async fn validation_callback_must_get_action() {
         ..
     } = TestCase::new(zomes).await;
 
-    let network = Arc::new(fixt!(HolochainP2pDna));
+    let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // a create by alice
     let mut create = fixt!(Create);

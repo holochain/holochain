@@ -12,7 +12,7 @@ use ::fixt::fixt;
 use hdk::prelude::CellId;
 use holo_hash::fixt::ActionHashFixturator;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::{actor::MockHcP2p, HolochainP2pDna};
+use holochain_p2p::{actor::MockHcP2p, DynHolochainP2pDna, HolochainP2pDna};
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune2_api::DhtArc;
@@ -90,7 +90,7 @@ async fn integration_workflow_is_not_triggered_when_no_data_has_been_created() {
 
 struct TestCase {
     workspace: SourceChainWorkspace,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<RealRibosome>,
     _conductor: SweetConductor,
@@ -145,7 +145,7 @@ impl TestCase {
             is_root_zome_call: true,
         };
         let hc_p2p = Arc::new(hc_p2p);
-        let network = HolochainP2pDna::new(hc_p2p, dna_hash, None);
+        let network = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
 
         Self {
             workspace,

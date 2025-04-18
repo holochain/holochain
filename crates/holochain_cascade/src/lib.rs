@@ -32,7 +32,7 @@ use holo_hash::EntryHash;
 use holochain_p2p::actor::GetActivityOptions;
 use holochain_p2p::actor::GetLinksOptions;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::{GenericNetwork, HolochainP2pError};
+use holochain_p2p::{DynHolochainP2pDna, HolochainP2pError};
 use holochain_state::host_fn_workspace::HostFnStores;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::mutations::insert_action;
@@ -101,7 +101,7 @@ pub struct CascadeImpl {
     dht: Option<DbRead<DbKindDht>>,
     cache: Option<DbWrite<DbKindCache>>,
     scratch: Option<SyncScratch>,
-    network: Option<GenericNetwork>,
+    network: Option<DynHolochainP2pDna>,
     private_data: Option<Arc<AgentPubKey>>,
     duration_metric: &'static CascadeDurationMetric,
 }
@@ -150,7 +150,7 @@ impl CascadeImpl {
     /// Add the network and cache to the cascade.
     pub fn with_network(
         self,
-        network: GenericNetwork,
+        network: DynHolochainP2pDna,
         cache_db: DbWrite<DbKindCache>,
     ) -> CascadeImpl {
         CascadeImpl {
@@ -180,7 +180,7 @@ impl CascadeImpl {
     /// Construct a [Cascade] with network access
     pub fn from_workspace_and_network<AuthorDb, DhtDb>(
         workspace: &HostFnWorkspace<AuthorDb, DhtDb>,
-        network: GenericNetwork,
+        network: DynHolochainP2pDna,
     ) -> CascadeImpl
     where
         AuthorDb: ReadAccess<DbKindAuthored>,

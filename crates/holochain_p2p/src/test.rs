@@ -17,26 +17,6 @@ pub async fn stub_network() -> DynHcP2p {
     Arc::new(MockHcP2p::new())
 }
 
-fixturator!(
-    HolochainP2pDna;
-    curve Empty {
-        tokio_helper::block_forever_on(async {
-            let holochain_p2p = crate::test::stub_network().await;
-            HolochainP2pDna::new(
-                holochain_p2p,
-                DnaHashFixturator::new(Empty).next().unwrap(),
-                None
-            )
-        })
-    };
-    curve Unpredictable {
-        HolochainP2pDnaFixturator::new(Empty).next().unwrap()
-    };
-    curve Predictable {
-        HolochainP2pDnaFixturator::new(Empty).next().unwrap()
-    };
-);
-
 #[derive(Debug)]
 pub struct NoopPublish;
 

@@ -1,9 +1,7 @@
 //! Countersigning workflow to maintain countersigning session state.
 
 use crate::core::share::Share;
-use holochain_p2p::{
-    event::CountersigningSessionNegotiationMessage, HolochainP2pDna, HolochainP2pDnaT,
-};
+use holochain_p2p::{event::CountersigningSessionNegotiationMessage, DynHolochainP2pDna};
 use holochain_state::prelude::*;
 use std::time::Duration;
 
@@ -158,7 +156,7 @@ struct CountersigningWorkspaceInner {
 pub(crate) async fn countersigning_workflow(
     space: Space,
     workspace: Arc<CountersigningWorkspace>,
-    network: Arc<impl HolochainP2pDnaT>,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     cell_id: CellId,
     signal_tx: Sender<Signal>,
@@ -392,7 +390,7 @@ pub(crate) async fn countersigning_workflow(
 async fn try_recover_failed_session(
     space: &Space,
     workspace: Arc<CountersigningWorkspace>,
-    network: Arc<impl HolochainP2pDnaT + Sized>,
+    network: DynHolochainP2pDna,
     cell_id: &CellId,
     signal_tx: &Sender<Signal>,
 ) -> WorkflowResult<()> {
@@ -787,7 +785,7 @@ async fn force_abandon_session(
 /// Publish to entry authorities, so they can gather all the signed
 /// actions for this session and respond with a session complete.
 pub async fn countersigning_publish(
-    network: &HolochainP2pDna,
+    network: DynHolochainP2pDna,
     op: ChainOp,
 ) -> Result<(), ZomeCallResponse> {
     if let Some(enzyme) = op.enzymatic_countersigning_enzyme() {

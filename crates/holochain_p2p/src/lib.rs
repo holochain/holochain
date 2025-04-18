@@ -18,8 +18,6 @@ mod spawn;
 pub use spawn::*;
 #[cfg(feature = "test_utils")]
 pub use test::stub_network;
-#[cfg(feature = "test_utils")]
-pub use test::HolochainP2pDnaFixturator;
 
 mod peer_meta_store;
 pub use peer_meta_store::*;
@@ -155,6 +153,9 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     fn chc(&self) -> Option<ChcImpl>;
 }
 
+/// Trait object for HolochainP2pDnaT.
+pub type DynHolochainP2pDna = Arc<dyn HolochainP2pDnaT>;
+
 /// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
 /// I.e. a sender that is tied to a specific cell.
 #[derive(Clone)]
@@ -172,12 +173,6 @@ impl HolochainP2pDna {
             dna_hash: dna_hash.into(),
             chc,
         }
-    }
-}
-
-impl From<HolochainP2pDna> for GenericNetwork {
-    fn from(value: HolochainP2pDna) -> Self {
-        Arc::new(value)
     }
 }
 
