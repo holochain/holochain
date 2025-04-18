@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use super::{Bundle, ResourceIdentifier};
 use crate::error::MrBundleError;
 use crate::{error::MrBundleResult, Manifest};
@@ -42,20 +43,51 @@ impl FileSystemBundler {
     ///
     /// The resulting [`Bundle`] will contain the manifest and its resources.
     pub async fn bundle<M: Manifest>(manifest_path: impl AsRef<Path>) -> MrBundleResult<Bundle<M>> {
-        let manifest_path = dunce::canonicalize(manifest_path)?;
-        let manifest_yaml = tokio::fs::read_to_string(&manifest_path).await?;
+        let manifest_path = dunce::canonicalize(manifest_path).map_err(|e| {
+            MrBundleError::IoError(
+                "Failed to canonicalize manifest path".to_string(),
+                e,
+            )
+        })?;
+        let manifest_yaml = tokio::fs::read_to_string(&manifest_path).await.map_err(|e| {
+            MrBundleError::IoError(
+                format!("Failed to read manifest file: {:?}", manifest_path),
+                e,
+            )
+        })?;
         let mut manifest: M = serde_yaml::from_str(&manifest_yaml)?;
+
+        println!("Manifest: {:?}", manifest);
 
         let manifest_dir = manifest_path
             .parent()
             .ok_or_else(|| MrBundleError::ParentlessPath(manifest_path.to_path_buf()))?;
         let resources =
             futures::future::join_all(manifest.generate_resource_ids().into_iter().map(
-                |(resource_id, relative_path)| async {
-                    let resource_path = dunce::canonicalize(manifest_dir.join(relative_path))?;
+                |(resource_id, relative_path)| async move {
+                    println!("Got relative path: {:?}", relative_path);
+                    let resource_path = manifest_dir.join(&relative_path);
+                    let resource_path = dunce::canonicalize(&resource_path).map_err(|e| {
+                        MrBundleError::IoError(
+                            format!(
+                                "Failed to canonicalize resource path: {}",
+                                resource_path.display()
+                            ),
+                            e,
+                        )
+                    })?;
                     tokio::fs::read(&resource_path)
                         .await
                         .map(|resource| (resource_id, resource.into()))
+                        .map_err(|e| {
+                            MrBundleError::IoError(
+                                format!(
+                                    "Failed to read resource at path: {:?}",
+                                    resource_path
+                                ),
+                                e,
+                            )
+                        })
                 },
             ))
             .await
@@ -80,10 +112,20 @@ impl FileSystemBundler {
                 .parent()
                 .ok_or_else(|| MrBundleError::ParentlessPath(bundle_path.as_ref().to_path_buf()))?,
         )
-        .await?;
+        .await.map_err(|e| {
+            MrBundleError::IoError(
+                format!("Failed to create bundle directory: {}", bundle_path.as_ref().display()),
+                e,
+            )
+        })?;
 
         let bundle_path = bundle_path.as_ref();
-        tokio::fs::write(bundle_path, bundle.pack()?).await?;
+        tokio::fs::write(bundle_path, bundle.pack()?).await.map_err(|e| {
+            MrBundleError::IoError(
+                format!("Failed to write bundle to path: {}", bundle_path.display()),
+                e,
+            )
+        })?;
 
         Ok(())
     }
@@ -91,11 +133,16 @@ impl FileSystemBundler {
     /// Load a bundle from the filesystem.
     ///
     /// The bundle is automatically unpacked into a [`Bundle`] object.
-    pub async fn load_from<M: Manifest>(
+    pub async fn load_from<M: Debug + Serialize + DeserializeOwned>(
         bundle_path: impl AsRef<Path>,
     ) -> MrBundleResult<Bundle<M>> {
         let bundle_path = bundle_path.as_ref();
-        let bundle_bytes = tokio::fs::read(bundle_path).await?;
+        let bundle_bytes = tokio::fs::read(bundle_path).await.map_err(|e| {
+            MrBundleError::IoError(
+                format!("Failed to read bundle file: {:?}", bundle_path),
+                e,
+            )
+        })?;
         Bundle::unpack(&bundle_bytes[..])
     }
 
@@ -117,7 +164,7 @@ impl FileSystemBundler {
     ///
     /// This version of the [expand_to](FileSystemBundler::expand_to) has looser constraints on the
     /// contents of the manifest. As a consequence, the file name for the manifest must be provided.
-    pub async fn expand_named_to<M: Serialize + DeserializeOwned>(
+    pub async fn expand_named_to<M: Debug + Serialize + DeserializeOwned>(
         bundle: &Bundle<M>,
         manifest_file_name: &str,
         target_dir: impl AsRef<Path>,
@@ -131,12 +178,22 @@ impl FileSystemBundler {
         }
 
         // Create the directory to work into.
-        tokio::fs::create_dir_all(&target_dir).await?;
+        tokio::fs::create_dir_all(&target_dir).await.map_err(|e| {
+            MrBundleError::IoError(
+                format!("Failed to create target directory: {:?}", target_dir),
+                e,
+            )
+        })?;
 
         // Write the manifest to the target directory.
         let yaml_str = serde_yaml::to_string(bundle.manifest())?;
         let manifest_path = target_dir.join(manifest_file_name);
-        tokio::fs::write(&manifest_path, yaml_str.as_bytes()).await?;
+        tokio::fs::write(&manifest_path, yaml_str.as_bytes()).await.map_err(|e| {
+            MrBundleError::IoError(
+                format!("Failed to write manifest to path: {:?}", manifest_path),
+                e,
+            )
+        })?;
 
         // Write the resources to the target directory.
         for (resource_id, resource) in bundle.get_all_resources() {
@@ -145,8 +202,18 @@ impl FileSystemBundler {
             let parent = path_clone
                 .parent()
                 .ok_or_else(|| MrBundleError::ParentlessPath(path.clone()))?;
-            tokio::fs::create_dir_all(&parent).await?;
-            tokio::fs::write(&path, resource).await?;
+            tokio::fs::create_dir_all(&parent).await.map_err(|e| {
+                MrBundleError::IoError(
+                    format!("Failed to create resource directory: {:?}", parent),
+                    e,
+                )
+            })?;
+            tokio::fs::write(&path, resource).await.map_err(|e| {
+                MrBundleError::IoError(
+                    format!("Failed to write resource to path: {:?}", path),
+                    e,
+                )
+            })?;
         }
 
         Ok(())

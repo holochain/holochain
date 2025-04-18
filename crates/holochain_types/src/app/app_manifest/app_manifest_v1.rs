@@ -301,7 +301,7 @@ pub mod tests {
         }];
         AppManifestV1 {
             name: "Test app".to_string(),
-            description: Some("Serialization roundtrip test".to_string()),
+            description: Some("Serialization round trip test".to_string()),
             roles,
             allow_deferred_memproofs: false,
         }

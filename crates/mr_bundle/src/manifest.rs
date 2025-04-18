@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 /// The identifier for a resource in the manifest.
 pub type ResourceIdentifier = String;
@@ -14,7 +15,7 @@ pub type ResourceIdentifier = String;
 /// replace its resource locators with the generated ids and return the pairs of
 /// ids and resource locations to the bundler.
 pub trait Manifest:
-    Clone + Sized + PartialEq + Eq + serde::Serialize + serde::de::DeserializeOwned
+    Clone + Sized + PartialEq + Eq + Debug + serde::Serialize + serde::de::DeserializeOwned
 {
     /// Ask the manifest to produce resources ids and a locator for the resources.
     ///

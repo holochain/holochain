@@ -16,12 +16,12 @@ pub async fn app_bundle_from_dnas(
         .map(|dr| {
             let dna = dr.dna();
 
-            let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let modifiers = DnaModifiersOpt::none();
+            let path = format!("{}", dna.dna_hash());
             let manifest = AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {
-                    location: Some(DnaLocation::Bundled(path.clone())),
+                    file: Some(path.clone()),
                     modifiers,
                     // NOTE: for testing with inline zomes, it's essential that the
                     //       installed_hash is included, so it can be used to fetch
@@ -53,7 +53,7 @@ pub async fn app_bundle_from_dnas(
         "app_bundle_from_dnas and app_manifest_from_dnas should produce the same manifest"
     );
 
-    AppBundle::new(manifest, resources, PathBuf::from("."))
+    AppBundle::new(manifest, resources)
         .await
         .unwrap()
 }
@@ -82,7 +82,7 @@ pub async fn get_install_app_payload_from_dnas(
     );
 
     let bytes = bundle
-        .encode()
+        .pack()
         .expect("failed to encode app bundle as bytes");
     InstallAppPayload {
         agent_key,

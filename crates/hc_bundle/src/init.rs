@@ -5,6 +5,7 @@ use holochain_types::prelude::{
     AppBundle, AppManifest, AppManifestCurrentBuilder, AppRoleManifest, DnaBundle, DnaManifest,
 };
 use holochain_types::web_app::{WebAppBundle, WebAppManifest};
+use mr_bundle::FileSystemBundler;
 
 fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {
     let mut input = String::new();
@@ -39,7 +40,7 @@ fn prompt_required(prompt: &str) -> io::Result<String> {
     }
 }
 
-fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
+fn prompt_dna_init() -> anyhow::Result<DnaBundle> {
     let name = prompt_required("name:")?;
     let network_seed = Some(prompt_default(
         "network_seed:",
@@ -54,10 +55,10 @@ fn prompt_dna_init(root_dir: PathBuf) -> anyhow::Result<DnaBundle> {
         #[cfg(feature = "unstable-migration")]
         vec![],
     );
-    Ok(DnaBundle::new(manifest.try_into()?, vec![], root_dir)?)
+    Ok(DnaBundle::new(manifest.try_into()?, vec![])?)
 }
 
-fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
+fn prompt_app_init() -> anyhow::Result<AppBundle> {
     let name = prompt_required("name:")?;
     let description = prompt_optional("description:")?;
     let role = AppRoleManifest::sample("sample-role".into());
@@ -65,36 +66,35 @@ fn prompt_app_init(root_dir: PathBuf) -> anyhow::Result<AppBundle> {
         .name(name)
         .description(description)
         .roles(vec![role])
-        .build()
-        .unwrap()
+        .build()?
         .into();
 
-    Ok(mr_bundle::Bundle::new(manifest, vec![], root_dir)?.into())
+    Ok(mr_bundle::Bundle::new(manifest, vec![])?.into())
 }
 
-fn prompt_web_app_init(root_dir: PathBuf) -> anyhow::Result<WebAppBundle> {
+fn prompt_web_app_init() -> anyhow::Result<WebAppBundle> {
     let name = prompt_required("name:")?;
 
     let manifest = WebAppManifest::current(name);
 
-    Ok(mr_bundle::Bundle::new(manifest, vec![], root_dir)?.into())
+    Ok(mr_bundle::Bundle::new(manifest, vec![])?.into())
 }
 
 pub async fn init_dna(target: PathBuf) -> anyhow::Result<()> {
-    let bundle = prompt_dna_init(target.to_owned())?;
-    bundle.dump(&target, false).await?;
+    let bundle = prompt_dna_init()?;
+    FileSystemBundler::expand_to(&bundle, &target, false).await?;
     Ok(())
 }
 
 pub async fn init_app(target: PathBuf) -> anyhow::Result<()> {
-    let bundle = prompt_app_init(target.to_owned())?;
-    bundle.dump(&target, false).await?;
+    let bundle = prompt_app_init()?;
+    FileSystemBundler::expand_to(&bundle, &target, false).await?;
     Ok(())
 }
 
 pub async fn init_web_app(target: PathBuf) -> anyhow::Result<()> {
-    let bundle = prompt_web_app_init(target.to_owned())?;
-    bundle.dump(&target, false).await?;
+    let bundle = prompt_web_app_init()?;
+    FileSystemBundler::expand_to(&bundle, &target, false).await?;
     Ok(())
 }
 

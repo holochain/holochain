@@ -24,8 +24,6 @@ path = "src/bin/hc-dna.rs"
 
 # reminder - do not use workspace deps
 [dependencies]
-holochain_wasmer_host = { version = "=0.0.99", default-features = false }
-futures = "0.3"
 anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
 holochain_util = { version = "^0.6.0-dev.0", path = "../holochain_util", features = [
@@ -33,17 +31,14 @@ holochain_util = { version = "^0.6.0-dev.0", path = "../holochain_util", feature
 ] }
 holochain_serialized_bytes = "=0.0.55"
 holochain_types = { version = "^0.6.0-dev.0", path = "../holochain_types" }
-mr_bundle = { version = "^0.6.0-dev.0", path = "../mr_bundle" }
+mr_bundle = { version = "^0.6.0-dev.0", path = "../mr_bundle", features = ["fs"] }
 serde_yaml = "0.9"
 thiserror = "1.0.22"
-tracing = "0.1"
 tokio = { version = "1.27", features = ["full"] }
-wasmer = { version = "5.0.2", default-features = false }
 
 [dev-dependencies]
 assert_cmd = "2.0"
 matches = "0.1"
-predicates = "3.0"
 tempfile = "3"
 serde_json = "1.0"
 jsonschema = "0.17"
@@ -53,12 +48,7 @@ walkdir = "2"
 workspace = true
 
 [features]
-default = ["wasmer_sys"]
-
 sqlite-encrypted = ["holochain_types/sqlite-encrypted"]
 sqlite = ["holochain_types/sqlite"]
 
 unstable-migration = ["holochain_types/unstable-migration"]
-
-wasmer_sys = ["wasmer/default", "holochain_wasmer_host/wasmer_sys_dev"]
-wasmer_wamr = ["wasmer/wamr", "holochain_wasmer_host/wasmer_wamr"]

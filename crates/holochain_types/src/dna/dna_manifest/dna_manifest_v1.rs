@@ -1,9 +1,7 @@
-use std::path::PathBuf;
-
 use crate::prelude::*;
 use holo_hash::*;
-// use holochain_zome_types::prelude::*;
 use serde_with::serde_as;
+use mr_bundle::{resource_id_for_path, ResourceIdentifier};
 
 /// The structure of data that goes in the DNA bundle manifest "dna.yaml".
 ///
@@ -21,17 +19,17 @@ use serde_with::serde_as;
 ///   properties: ~
 ///   zomes:
 ///     - name: zome1
-///       bundled: ../dna1/zomes/zome1.wasm
+///       file: ../dna1/zomes/zome1.wasm
 ///     - name: zome2
-///       bundled: ../dna2/zomes/zome1.wasm
+///       file: ../dna2/zomes/zome1.wasm
 /// coordinator:
 ///   zomes:
 ///     - name: zome3
-///       bundled: ../dna1/zomes/zome2.wasm
+///       file: ../dna1/zomes/zome2.wasm
 ///       dependencies:
 ///         - name: zome1
 ///     - name: zome4
-///       bundled: ../dna2/zomes/zome2.wasm
+///       file: ../dna2/zomes/zome2.wasm
 ///       dependencies:
 ///         - name: zome2
 /// ```
@@ -50,13 +48,13 @@ use serde_with::serde_as;
 ///   properties: ~
 ///   zomes:
 ///     - name: zome1
-///       bundled: ../dna1/zomes/zome1.wasm
+///       file: ../dna1/zomes/zome1.wasm
 /// coordinator:
 ///   zomes:
 ///     - name: zome3
-///       bundled: ../dna1/zomes/zome2.wasm
+///       file: ../dna1/zomes/zome2.wasm
 ///     - name: zome4
-///       bundled: ../dna2/zomes/zome2.wasm
+///       file: ../dna2/zomes/zome2.wasm
 /// ```
 
 #[serde_as]
@@ -118,6 +116,14 @@ impl DnaManifestV1 {
             .iter()
             .chain(self.coordinator.zomes.iter())
     }
+
+    /// Get a mutable iterator over all integrity and coordinator zomes.
+    pub fn all_zomes_mut(&mut self) -> impl Iterator<Item = &mut ZomeManifest> {
+        self.integrity
+            .zomes
+            .iter_mut()
+            .chain(self.coordinator.zomes.iter_mut())
+    }
 }
 
 #[serde_as]
@@ -172,13 +178,13 @@ pub struct ZomeManifest {
     /// Coordinator zomes may depend on zero or exactly 1 integrity zome.
     /// Currently, a coordinator zome should have **at most one dependency**.
     pub dependencies: Option<Vec<ZomeDependency>>,
+}
 
-    /// DEPRECATED: Bundling precompiled and pre-serialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
-    ///
-    /// The location of the wasm dylib for this zome
-    /// Useful for iOS.
-    #[serde(default)]
-    pub dylib: Option<PathBuf>,
+impl ZomeManifest {
+    /// Get the [`ResourceIdentifier`] for this zome.
+    pub fn resource_id(&self) -> ResourceIdentifier {
+        resource_id_for_path(&self.file).unwrap_or_else(|| format!("{}.wasm", self.name))
+    }
 }
 
 /// Manifest for integrity zomes that another zome

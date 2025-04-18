@@ -5,7 +5,6 @@ use mr_bundle::{Bundle, ResourceBytes, ResourceIdentifier};
 use std::io::Read;
 use std::{
     collections::{BTreeMap, HashMap},
-    path::PathBuf,
 };
 
 #[cfg(test)]
@@ -74,22 +73,20 @@ impl DnaBundle {
 
         let integrity_zomes = data[0]
             .iter()
-            .map(|(zome_name, hash, _, dependencies, dylib_path)| {
+            .map(|(zome_name, hash, _, dependencies)| {
                 let zome_def = ZomeDef::Wasm(WasmZome {
                     wasm_hash: hash.clone(),
                     dependencies: dependencies.clone(),
-                    preserialized_path: dylib_path.clone(),
                 });
                 (zome_name.clone(), zome_def.into())
             })
             .collect();
         let coordinator_zomes = data[1]
             .iter()
-            .map(|(zome_name, hash, _, dependencies, dylib_path)| {
+            .map(|(zome_name, hash, _, dependencies)| {
                 let zome_def = ZomeDef::Wasm(WasmZome {
                     wasm_hash: hash.clone(),
                     dependencies: dependencies.clone(),
-                    preserialized_path: dylib_path.clone(),
                 });
                 (zome_name.clone(), zome_def.into())
             })
@@ -97,7 +94,7 @@ impl DnaBundle {
         let code: BTreeMap<_, _> = data
             .into_iter()
             .flatten()
-            .map(|(_, hash, wasm, _, _)| (hash, wasm))
+            .map(|(_, hash, wasm, _)| (hash, wasm))
             .collect();
 
         let wasms = WasmMap::from(code);
@@ -148,15 +145,15 @@ impl DnaBundle {
         let resources = code
             .iter()
             .map(|(hash, wasm)| {
-                let name = dna_file
+                let file_name = dna_file
                     .dna
                     .all_zomes()
                     .find_map(|(name, def)| match def {
-                        ZomeDef::Wasm(w) if &w.wasm_hash == hash => Some(name),
+                        ZomeDef::Wasm(w) if &w.wasm_hash == hash => Some(format!("{name}.wasm")),
                         _ => None,
                     })
                     .unwrap();
-                (name.to_string(), wasm.code.to_vec().into())
+                (file_name, wasm.code.to_vec().into())
             })
             .collect();
         DnaBundle::new(manifest.try_into()?, resources)
@@ -177,12 +174,10 @@ impl DnaBundle {
                     .collect();
                 zome.wasm_hash(&name).ok().map(|hash| {
                     let hash = WasmHashB64::from(hash);
-                    let filename = format!("{}", hash);
                     ZomeManifest {
-                        name,
+                        name: name.clone(),
                         hash: Some(hash),
-                        file: filename,
-                        dylib: None,
+                        file: format!("{}.wasm", name),
                         dependencies: Some(dependencies),
                     }
                 })
@@ -201,12 +196,10 @@ impl DnaBundle {
                     .collect();
                 zome.wasm_hash(&name).ok().map(|hash| {
                     let hash = WasmHashB64::from(hash);
-                    let filename = format!("{}", hash);
                     ZomeManifest {
-                        name,
+                        name: name.clone(),
                         hash: Some(hash),
-                        file: filename,
-                        dylib: None,
+                        file: format!("{}.wasm", name),
                         dependencies: Some(dependencies),
                     }
                 })
@@ -236,12 +229,15 @@ impl DnaBundle {
 
 pub(super) async fn hash_bytes(
     zomes: impl Iterator<Item = ZomeManifest>,
-    resources: &mut HashMap<ResourceIdentifier, ResourceBytes>,
-) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>, Option<PathBuf>)>> {
+    resources: &mut HashMap<&ResourceIdentifier, &ResourceBytes>,
+) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>)>> {
     let iter = zomes.map(|z| {
+        // println!("Have resources: {:?}", resources.keys());
+
         let bytes: bytes::Bytes = resources
-            .remove(&z.name.to_string())
-            .expect("resource referenced in manifest must exist")
+            .remove(&z.resource_id())
+            .expect(&format!("resource referenced in manifest must exist: {}", z.resource_id()))
+            .clone()
             .into();
         let zome_name = z.name;
         let expected_hash = z.hash.map(WasmHash::from);
@@ -249,7 +245,6 @@ pub(super) async fn hash_bytes(
         let dependencies = z.dependencies.map_or(Vec::with_capacity(0), |deps| {
             deps.into_iter().map(|d| d.name).collect()
         });
-        let dylib_path = z.dylib;
         async move {
             let hash = wasm.to_hash().await;
             if let Some(expected) = expected_hash {
@@ -257,7 +252,7 @@ pub(super) async fn hash_bytes(
                     return Err(DnaError::WasmHashMismatch(expected, hash));
                 }
             }
-            DnaResult::Ok((zome_name, hash, wasm, dependencies, dylib_path))
+            DnaResult::Ok((zome_name, hash, wasm, dependencies))
         }
     });
     futures::stream::iter(iter)
@@ -290,7 +285,6 @@ mod tests {
                         name: "zome1".into(),
                         hash: None,
                         file: "path1".to_string(),
-                        dylib: None,
                         dependencies: Default::default(),
                     },
                     ZomeManifest {
@@ -298,7 +292,6 @@ mod tests {
                         // Intentional wrong hash
                         hash: Some(hash1.clone().into()),
                         file: "path2".to_string(),
-                        dylib: None,
                         dependencies: Default::default(),
                     },
                 ],
@@ -308,8 +301,8 @@ mod tests {
             lineage,
         };
         let resources = vec![
-            ("zome1".into(), wasm1.into()),
-            ("zome2".into(), wasm2.into()),
+            ("path1".into(), wasm1.into()),
+            ("path2".into(), wasm2.into()),
         ];
 
         // - Show that conversion fails due to hash mismatch

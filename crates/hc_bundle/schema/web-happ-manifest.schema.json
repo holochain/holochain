@@ -20,46 +20,19 @@
       "description": "The name of the app"
     },
     "ui": {
-      "$ref": "#/definitions/Location"
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      }
     },
     "happ_manifest": {
-      "$ref": "#/definitions/Location"
-    }
-  },
-  "definitions": {
-    "Location": {
-      "oneOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "bundled": {
-              "type": "string",
-              "description": "Expect file to be part of this bundle"
-            }
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "path": {
-              "type": "string",
-              "description": "Get file from local filesystem (not bundled)"
-            }
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "url": {
-              "type": "string",
-              "description": "Get file from URL"
-            }
-          }
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
         }
-      ]
+      }
     }
   }
 }

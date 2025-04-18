@@ -7,8 +7,8 @@ use crate::manifest::ResourceIdentifier;
 #[non_exhaustive]
 pub enum MrBundleError {
     /// An IO error
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
+    #[error("{0}: {1}")]
+    IoError(String, std::io::Error),
 
     /// A manifest references resources that were not provided when attempting to create a bundle.
     #[error("Manifest references resources that were not provided when attempting to create a bundle: {0:?}")]

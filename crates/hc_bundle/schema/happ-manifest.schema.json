@@ -125,17 +125,9 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "bundled": {
+              "file": {
                 "type": "string",
                 "description": "Expect file to be part of this bundle"
-              },
-              "path": {
-                "type": "string",
-                "description": "Get file from local filesystem (not bundled)"
-              },
-              "url": {
-                "type": "string",
-                "description": "Get file from URL"
               },
               "modifiers": {
                 "type": "object",

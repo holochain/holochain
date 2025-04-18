@@ -35,6 +35,7 @@ impl Manifest for WebAppManifest {
                 let mut out = HashMap::new();
 
                 let ui_id = resource_id_for_ui(&m.ui.file);
+                out.insert(ui_id.clone(), m.ui.file.clone());
                 m.ui.file = ui_id;
 
                 let happ_id = resource_id_for_happ(&m.happ_manifest.file);

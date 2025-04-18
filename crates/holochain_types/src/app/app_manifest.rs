@@ -72,8 +72,11 @@ impl Manifest for AppManifest {
                 .filter_map(|role| {
                     if let Some(file) = &mut role.dna.file {
                         let id = resource_id_for_path(&file)?;
+                        let path = file.clone();
+
                         *file = id.clone();
-                        Some((id, file.clone()))
+
+                        Some((id, path))
                     } else {
                         None
                     }

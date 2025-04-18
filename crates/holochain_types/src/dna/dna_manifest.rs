@@ -34,15 +34,25 @@ impl mr_bundle::Manifest for ValidatedDnaManifest {
     fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
         match &mut self.0 {
             DnaManifest::V1(m) => m
-                .all_zomes()
-                .map(|zome| (zome.name.to_string(), zome.file.clone()))
+                .all_zomes_mut()
+                .map(|zome| {
+                    let id = zome.resource_id();
+                    let file = zome.file.clone();
+
+                    zome.file = id.clone();
+
+                    (id, file)
+                })
                 .collect(),
         }
     }
 
     fn resource_ids(&self) -> Vec<ResourceIdentifier> {
         match &self.0 {
-            DnaManifest::V1(m) => m.all_zomes().map(|zome| zome.name.to_string()).collect(),
+            DnaManifest::V1(m) => m
+                .all_zomes()
+                .map(|zome| zome.resource_id())
+                .collect(),
         }
     }
 

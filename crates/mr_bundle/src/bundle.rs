@@ -3,13 +3,14 @@ use crate::manifest::ResourceIdentifier;
 use crate::{error::MrBundleResult, manifest::Manifest};
 use resource::ResourceBytes;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Debug;
 use std::io::Read;
 
 pub mod resource;
 
 /// A map from resource identifiers to their value as byte arrays.
-pub type ResourceMap = HashMap<ResourceIdentifier, ResourceBytes>;
+pub type ResourceMap = BTreeMap<ResourceIdentifier, ResourceBytes>;
 
 /// A [Manifest], bundled with the Resources that it describes.
 ///
@@ -18,7 +19,7 @@ pub type ResourceMap = HashMap<ResourceIdentifier, ResourceBytes>;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Bundle<M>
 where
-    M: Serialize + DeserializeOwned,
+    M: Debug + Serialize + DeserializeOwned,
 {
     /// The manifest describing the resources that compose this bundle.
     #[serde(bound(deserialize = "M: DeserializeOwned"))]
@@ -32,7 +33,7 @@ where
 
 impl<M> Bundle<M>
 where
-    M: Serialize + DeserializeOwned,
+    M: Debug + Serialize + DeserializeOwned,
 {
     /// Accessor for the Manifest
     pub fn manifest(&self) -> &M {
@@ -40,8 +41,8 @@ where
     }
 
     /// Accessor for the map of resources included in this bundle
-    pub fn get_all_resources(&self) -> &ResourceMap {
-        &self.resources
+    pub fn get_all_resources(&self) -> HashMap<&ResourceIdentifier, &ResourceBytes> {
+        self.resources.iter().collect()
     }
 
     /// Retrieve the bytes for a single resource.
