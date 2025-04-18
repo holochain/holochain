@@ -269,8 +269,6 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
 
     let bundle = AppBundle::new(manifest.clone().into(), resources.clone()).unwrap();
 
-    println!("Created bundle: {:?}", bundle);
-
     let bundle_bytes = bundle.pack().unwrap();
     conductor
         .clone()

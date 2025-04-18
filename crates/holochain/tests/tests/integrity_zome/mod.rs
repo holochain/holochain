@@ -243,8 +243,6 @@ async fn test_update_admin_interface() {
         .to_vec()
         .into();
 
-    println!("Using manifest: {manifest:?}");
-
     let source: CoordinatorBundle = Bundle::new(
         manifest,
         [(

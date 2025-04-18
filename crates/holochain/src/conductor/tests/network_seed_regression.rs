@@ -47,11 +47,10 @@ async fn network_seed_regression() {
     };
 
     let resources = vec![(dna_resource_id, bundle)];
-    let b = AppBundle::new(manifest.clone().into(), resources.clone()).unwrap();
-
-    println!("Made bundle: {b:?}");
-
-    let bundle1 = b.pack().unwrap();
+    let bundle1 = AppBundle::new(manifest.clone().into(), resources.clone())
+        .unwrap()
+        .pack()
+        .unwrap();
     let bundle2 = AppBundle::new(manifest.into(), resources)
         .unwrap()
         .pack()

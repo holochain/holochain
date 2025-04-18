@@ -85,12 +85,6 @@ pub async fn pack<M: Manifest>(
         None => dir_to_bundle_path(&dir_path, name, M::bundle_extension())?,
     };
 
-    println!(
-        "Ready to bundle from {} to {}",
-        dir_path.display(),
-        target_path.display()
-    );
-
     FileSystemBundler::bundle_to::<M>(&manifest_path, &target_path).await?;
 
     Ok(target_path)
@@ -201,7 +195,7 @@ integrity:
         assert!(dir.join("zome-3.wasm").is_file());
         assert!(dir.join("dna.yaml").is_file());
 
-        // Ensure that these are 4 file
+        // Ensure that these are 4 files
         assert_eq!(dir.read_dir().unwrap().collect::<Vec<_>>().len(), 4);
 
         // Ensure that we get the same bundle after the round trip
