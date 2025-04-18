@@ -12,7 +12,7 @@ use crate::prelude::EntryFixturator;
 use crate::prelude::SignatureFixturator;
 use crate::prelude::SignedAction;
 use crate::prelude::{ActionBase, PreflightBytes, PreflightRequest, PreflightRequestAcceptance};
-use crate::prelude::{ActionHashed, CounterSigningAgentState, DhtDbQueryCache, SignedActionHashed};
+use crate::prelude::{ActionHashed, CounterSigningAgentState, SignedActionHashed};
 use fixt::prelude::*;
 use hdk::prelude::{Action, Entry, EntryTypeFixturator, Record};
 use hdk::prelude::{CounterSigningSessionTimes, Timestamp};
@@ -1808,7 +1808,6 @@ impl TestHarness {
                 .get_or_create_authored_db(author.clone())
                 .unwrap(),
             test_space.space.dht_db.clone(),
-            &DhtDbQueryCache::new(test_space.space.dht_db.clone().into()),
             keystore.clone(),
             dna_hash.clone(),
             author.clone(),

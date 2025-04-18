@@ -231,7 +231,6 @@ async fn apply_success_state_changes(
 ) -> Result<(), WorkflowError> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db.clone();
-    let dht_db_cache = space.dht_query_cache.clone();
 
     // Unlock the chain and remove the withhold publish flag from all ops in this session.
     let this_cell_actions_op_basis_hashes = authored_db
@@ -263,7 +262,6 @@ async fn apply_success_state_changes(
         this_cell_actions_op_basis_hashes,
         authored_db.into(),
         dht_db,
-        &dht_db_cache,
     )
     .await?;
 

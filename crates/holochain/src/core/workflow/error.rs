@@ -72,9 +72,6 @@ pub enum WorkflowError {
     DhtOpError(#[from] DhtOpError),
 
     #[error(transparent)]
-    DbCacheError(#[from] holochain_types::db_cache::DbCacheError),
-
-    #[error(transparent)]
     SysValidationError(#[from] SysValidationError),
 
     #[error(transparent)]

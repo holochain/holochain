@@ -25,7 +25,6 @@ use holochain_sqlite::prelude::*;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::*;
 use holochain_state::schedule::live_scheduled_fns;
-use holochain_types::db_cache::DhtDbQueryCache;
 use kitsune2_api::BoxFut;
 
 use crate::conductor::api::CellConductorApi;
@@ -174,7 +173,6 @@ impl Cell {
         conductor_handle: ConductorHandle,
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
-        dht_db_cache: DhtDbQueryCache,
         ribosome: Ribosome,
         membrane_proof: Option<MembraneProof>,
         chc: Option<ChcImpl>,
@@ -205,7 +203,6 @@ impl Cell {
             cell_id.agent_pubkey().clone(),
             membrane_proof,
             ribosome,
-            dht_db_cache,
             chc,
         );
 
@@ -778,7 +775,6 @@ impl Cell {
                 SourceChainWorkspace::new(
                     self.get_or_create_authored_db()?,
                     self.dht_db().clone(),
-                    self.space.dht_query_cache.clone(),
                     self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
@@ -831,7 +827,6 @@ impl Cell {
         let workspace = SourceChainWorkspace::init_as_root(
             self.get_or_create_authored_db()?,
             self.dht_db().clone(),
-            self.space.dht_query_cache.clone(),
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
