@@ -114,7 +114,6 @@ fuzzing = [
   "proptest-derive",
   "holo_hash/fuzzing",
   "holochain_zome_types/fuzzing",
-  "mr_bundle/fuzzing",
 ]
 
 instrument = []

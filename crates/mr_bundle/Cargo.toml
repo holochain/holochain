@@ -26,16 +26,9 @@ serde_yaml = { version = "0.9", optional = true }
 tokio = { version = "1.44", default-features = false, features = ["fs"], optional = true }
 dunce = { version = "1.0", optional = true }
 
-# Feature: fuzzing
-proptest = { version = "1", optional = true }
-proptest-derive = { version = "0", optional = true }
-test-strategy = { version = "0", optional = true }
-
 [dev-dependencies]
 mr_bundle = { version = "0.6.0-dev.0", path = ".", features = ["fs"] }
 
-matches = "0.1"
-maplit = "1"
 serde_yaml = "0.9"
 tokio = { version = "1.36.0", features = ["full"] }
 tempfile = "3"
@@ -46,9 +39,7 @@ workspace = true
 [features]
 fs = ["dep:serde_yaml", "dep:tokio", "dep:dunce"]
 
-fuzzing = ["dep:proptest", "dep:proptest-derive", "dep:test-strategy"]
-
-# RUST_FLAGS="--cfg docsrs" cargo +nightly doc --open
+# RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
 [package.metadata.docs.rs]
 # document all features
 all-features = true
