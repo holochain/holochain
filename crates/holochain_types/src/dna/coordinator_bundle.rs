@@ -1,6 +1,7 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
-use mr_bundle::Manifest;
+use mr_bundle::{Manifest, ResourceIdentifier};
+use std::collections::HashMap;
 
 use crate::prelude::DnaResult;
 use crate::prelude::DnaWasm;
@@ -8,6 +9,7 @@ use crate::prelude::DnaWasm;
 use super::hash_bytes;
 use super::CoordinatorManifest;
 
+/// A bundle of coordinator zomes.
 #[derive(
     Clone,
     Debug,
@@ -19,19 +21,25 @@ use super::CoordinatorManifest;
     shrinkwraprs::Shrinkwrap,
     derive_more::From,
 )]
-/// A bundle of coordinator zomes.
 pub struct CoordinatorBundle(mr_bundle::Bundle<CoordinatorManifest>);
 
 impl Manifest for CoordinatorManifest {
-    fn resource_ids(&self) -> Vec<mr_bundle::Location> {
+    fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
         self.zomes
             .iter()
-            .map(|zome| zome.location.clone())
+            .map(|zome| (zome.name.to_string(), zome.file.clone()))
             .collect()
     }
 
-    fn path() -> std::path::PathBuf {
-        "coordinators.yaml".into()
+    fn resource_ids(&self) -> Vec<ResourceIdentifier> {
+        self.zomes
+            .iter()
+            .map(|zome| zome.name.to_string())
+            .collect()
+    }
+
+    fn file_name() -> &'static str {
+        "coordinators.yaml"
     }
 
     fn bundle_extension() -> &'static str {
@@ -42,7 +50,7 @@ impl Manifest for CoordinatorManifest {
 impl CoordinatorBundle {
     /// Convert into zomes and their wasm files.
     pub async fn into_zomes(self) -> DnaResult<(CoordinatorZomes, Vec<DnaWasm>)> {
-        let mut resources = self.resolve_all_cloned().await?;
+        let mut resources = self.get_all_resources().clone();
         let coordinator = hash_bytes(self.manifest().zomes.iter().cloned(), &mut resources).await?;
         let coordinator_zomes = coordinator
             .iter()

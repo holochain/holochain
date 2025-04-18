@@ -1,9 +1,6 @@
-use std::path::PathBuf;
-
+use super::AppBundle;
 use crate::prelude::*;
 use app_manifest_v1::tests::{app_manifest_fixture, app_manifest_properties_fixture};
-
-use super::AppBundle;
 
 async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppBundle, DnaFile) {
     let dna_wasm = DnaWasmHashed::from_content(DnaWasm::new_invalid()).await;
@@ -16,20 +13,19 @@ async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppB
 
     let dna1 = DnaFile::new(dna_def_1, fake_wasms.clone()).await;
 
-    let path1 = PathBuf::from(format!("{}", dna1.dna_hash()));
-
     let manifest = app_manifest_fixture(
-        Some(DnaLocation::Bundled(path1.clone())),
+        Some("path1".to_string()),
         DnaHash::with_data_sync(dna1.dna_def()),
         modifiers,
     )
     .await;
 
-    let resources = vec![(path1, DnaBundle::from_dna_file(dna1.clone()).unwrap())];
+    let resources = vec![(
+        "path1".to_string(),
+        DnaBundle::from_dna_file(dna1.clone()).unwrap(),
+    )];
 
-    let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
-        .await
-        .unwrap();
+    let bundle = AppBundle::new(manifest.into(), resources).await.unwrap();
     (bundle, dna1)
 }
 
@@ -37,6 +33,7 @@ async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppB
 #[tokio::test]
 async fn provisioning_1_create() {
     holochain_trace::test_run();
+
     let modifiers = DnaModifiersOpt {
         properties: Some(app_manifest_properties_fixture()),
         network_seed: Some("network_seed".into()),

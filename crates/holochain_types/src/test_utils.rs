@@ -4,9 +4,8 @@ use crate::dna::wasm::DnaWasm;
 use crate::prelude::*;
 use crate::record::SignedActionHashedExt;
 use holochain_keystore::MetaLairClient;
-use std::path::PathBuf;
-
 pub use holochain_zome_types::test_utils::*;
+use std::path::PathBuf;
 
 #[warn(missing_docs)]
 pub mod chain;
@@ -73,18 +72,16 @@ pub fn fake_dna_zomes_named(
 /// Save a Dna to a file and return the path and tempdir that contains it
 pub async fn write_fake_dna_file(dna: DnaFile) -> anyhow::Result<(PathBuf, tempfile::TempDir)> {
     let bundle = DnaBundle::from_dna_file(dna)?;
-    let tmp_dir = tempfile::Builder::new()
-        .prefix("fake_dna")
-        .tempdir()
-        .unwrap();
-    let mut path: PathBuf = tmp_dir.path().into();
-    path.push("test-dna.dna");
-    bundle.write_to_file(&path).await?;
+    let tmp_dir = tempfile::Builder::new().prefix("fake_dna").tempdir()?;
+
+    let path = tmp_dir.path().join("test-dna.dna");
+    tokio::fs::write(&path, bundle.pack()?).await?;
+
     Ok((path, tmp_dir))
 }
 
 /// Keeping with convention if Alice is pubkey 1
-/// and bob is pubkey 2 the this helps make test
+/// and bob is pubkey 2 then this helps make test
 /// logging easier to read.
 pub fn which_agent(key: &AgentPubKey) -> String {
     let key = key.to_string();

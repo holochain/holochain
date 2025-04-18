@@ -1,5 +1,8 @@
 use crate::prelude::*;
-use std::{collections::HashSet, path::PathBuf};
+use mr_bundle::ResourceIdentifier;
+use std::collections::HashMap;
+use std::collections::HashSet;
+
 mod dna_manifest_v1;
 
 #[cfg(test)]
@@ -28,14 +31,23 @@ pub enum DnaManifest {
 pub struct ValidatedDnaManifest(pub DnaManifest);
 
 impl mr_bundle::Manifest for ValidatedDnaManifest {
-    fn resource_ids(&self) -> Vec<mr_bundle::Location> {
-        match &self.0 {
-            DnaManifest::V1(m) => m.all_zomes().map(|zome| zome.location.clone()).collect(),
+    fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
+        match &mut self.0 {
+            DnaManifest::V1(m) => m
+                .all_zomes()
+                .map(|zome| (zome.name.to_string(), zome.file.clone()))
+                .collect(),
         }
     }
 
-    fn path() -> PathBuf {
-        "dna.yaml".into()
+    fn resource_ids(&self) -> Vec<ResourceIdentifier> {
+        match &self.0 {
+            DnaManifest::V1(m) => m.all_zomes().map(|zome| zome.name.to_string()).collect(),
+        }
+    }
+
+    fn file_name() -> &'static str {
+        "dna.yaml"
     }
 
     fn bundle_extension() -> &'static str {

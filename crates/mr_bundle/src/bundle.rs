@@ -45,7 +45,7 @@ where
     }
 
     /// Retrieve the bytes for a single resource.
-    pub async fn get_resource(
+    pub fn get_resource(
         &self,
         resource_identifier: &ResourceIdentifier,
     ) -> Option<&ResourceBytes> {
