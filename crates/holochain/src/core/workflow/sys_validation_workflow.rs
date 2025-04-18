@@ -324,10 +324,6 @@ async fn sys_validation_workflow_inner(
                     }
                 }
 
-                // This is an optimization to skip app validation and integration for ops that are
-                // rejected and don't have dependencies.
-                let deps = op.sys_validation_dependencies();
-
                 match outcome {
                     Outcome::Accepted => {
                         summary.accepted += 1;
@@ -335,11 +331,10 @@ async fn sys_validation_workflow_inner(
                             DhtOpType::Chain(_) => {
                                 put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
                             }
-                            DhtOpType::Warrant(_) => {
-                                // XXX: integrate accepted warrants immediately, because we don't
-                                //      want them to go to app validation.
+                            DhtOpType::Warrant(_) =>
+                            {
                                 #[cfg(feature = "unstable-warrants")]
-                                put_integrated(txn, &op_hash, ValidationStatus::Valid)?
+                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?
                             }
                         };
                     }
@@ -352,11 +347,7 @@ async fn sys_validation_workflow_inner(
                         invalid_ops.push((op_hash.clone(), op.clone()));
 
                         summary.rejected += 1;
-                        if deps.is_empty() {
-                            put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
-                        } else {
-                            put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
-                        }
+                        put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                     }
                 }
             }
@@ -1208,6 +1199,7 @@ pub struct SysValidationWorkspace {
     // Authored DB is writeable because warrants may be written.
     authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    #[allow(dead_code)]
     dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
@@ -1278,19 +1270,6 @@ fn put_integration_limbo(
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash, status)?;
     set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
-    Ok(())
-}
-
-pub fn put_integrated(
-    txn: &mut Transaction<'_>,
-    hash: &DhtOpHash,
-    status: ValidationStatus,
-) -> WorkflowResult<()> {
-    set_validation_status(txn, hash, status)?;
-    // This set the validation stage to pending which is correct when
-    // it's integrated.
-    set_validation_stage(txn, hash, ValidationStage::Pending)?;
-    set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }
 
