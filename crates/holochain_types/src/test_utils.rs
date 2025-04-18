@@ -59,7 +59,6 @@ pub fn fake_dna_zomes_named(
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash,
                     dependencies: Default::default(),
-                    preserialized_path: None,
                 })
                 .into(),
             ));
