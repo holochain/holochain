@@ -86,11 +86,12 @@ where
     }
 
     fn from_parts(
-        manifest: M,
+        mut manifest: M,
         resources: impl IntoIterator<Item = (ResourceIdentifier, ResourceBytes)>,
     ) -> MrBundleResult<Self> {
         let resources = resources.into_iter().collect::<ResourceMap>();
-        let manifest_resource_ids: HashSet<_> = manifest.resource_ids().into_iter().collect();
+        let manifest_resource_ids: HashSet<_> =
+            manifest.generate_resource_ids().keys().cloned().collect();
 
         let missing_resources = manifest_resource_ids
             .difference(&resources.keys().cloned().collect())
@@ -214,5 +215,44 @@ mod tests {
         let unpacked = Bundle::unpack(packed.reader()).unwrap();
 
         assert_eq!(bundle, unpacked);
+    }
+
+    #[test]
+    fn consistent_id_generation_in_mem() {
+        #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct TestManifest(String);
+
+        impl Manifest for TestManifest {
+            fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
+                let id = self.0.split(".").last().unwrap().to_string();
+                let original = self.0.clone();
+
+                self.0 = id.clone();
+
+                HashMap::from([(id, original)])
+            }
+
+            fn resource_ids(&self) -> Vec<ResourceIdentifier> {
+                vec![self.0.clone()]
+            }
+
+            fn file_name() -> &'static str {
+                "test.yaml"
+            }
+
+            fn bundle_extension() -> &'static str {
+                "test"
+            }
+        }
+
+        let manifest = TestManifest("test.thing".into());
+
+        let bundle = Bundle::new(manifest.clone(), vec![("thing".into(), vec![1].into())]).unwrap();
+
+        assert_eq!(vec!["thing".to_string()], bundle.manifest.resource_ids());
+        assert_eq!(
+            &ResourceBytes::from(vec![1]),
+            bundle.get_resource(&"thing".into()).unwrap()
+        );
     }
 }

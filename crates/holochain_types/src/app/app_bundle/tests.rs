@@ -25,7 +25,7 @@ async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppB
         DnaBundle::from_dna_file(dna1.clone()).unwrap(),
     )];
 
-    let bundle = AppBundle::new(manifest.into(), resources).await.unwrap();
+    let bundle = AppBundle::new(manifest.into(), resources).unwrap();
     (bundle, dna1)
 }
 

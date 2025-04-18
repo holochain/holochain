@@ -32,11 +32,6 @@ impl AppBundle {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        println!(
-            "Packing with manifest {:?} and resources {:?}",
-            manifest, resources
-        );
-
         Ok(Bundle::new(manifest, resources)?.into())
     }
 

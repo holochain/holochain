@@ -230,14 +230,15 @@ pub(super) async fn hash_bytes(
     resources: &mut HashMap<&ResourceIdentifier, &ResourceBytes>,
 ) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>)>> {
     let iter = zomes.map(|z| {
-        // println!("Have resources: {:?}", resources.keys());
-
+        // TODO A bad bundle can cause a crash here, unaceptable!
         let bytes: bytes::Bytes = resources
             .remove(&z.resource_id())
-            .expect(&format!(
-                "resource referenced in manifest must exist: {}",
-                z.resource_id()
-            ))
+            .unwrap_or_else(|| {
+                panic!(
+                    "resource referenced in manifest must exist: {}",
+                    z.resource_id()
+                )
+            })
             .clone()
             .into();
         let zome_name = z.name;
