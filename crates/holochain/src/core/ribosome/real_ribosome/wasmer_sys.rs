@@ -23,4 +23,3 @@ pub fn get_used_metering_points(instance_with_store: Arc<InstanceWithStore>) -> 
         MeteringPoints::Exhausted => WASM_METERING_LIMIT,
     }
 }
-

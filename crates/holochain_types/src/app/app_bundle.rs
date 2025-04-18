@@ -3,7 +3,6 @@
 use super::{AppManifest, AppManifestValidated};
 use crate::prelude::*;
 use bytes::Buf;
-use futures::future::join_all;
 use mr_bundle::error::MrBundleError;
 use mr_bundle::{Bundle, ResourceIdentifier};
 use std::io::Read;
@@ -22,18 +21,22 @@ pub struct AppBundle(Bundle<AppManifest>);
 
 impl AppBundle {
     /// Create an AppBundle from a manifest and DNA files
-    pub async fn new<R: IntoIterator<Item = (String, DnaBundle)>>(
+    pub fn new<R: IntoIterator<Item = (String, DnaBundle)>>(
         manifest: AppManifest,
         resources: R,
     ) -> AppBundleResult<Self> {
-        let resources = join_all(resources.into_iter().map(
-            |(resource_id, dna_bundle)| async move {
+        let resources = resources
+            .into_iter()
+            .map(|(resource_id, dna_bundle)| {
                 dna_bundle.pack().map(|bytes| (resource_id, bytes.into()))
-            },
-        ))
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        println!(
+            "Packing with manifest {:?} and resources {:?}",
+            manifest, resources
+        );
+
         Ok(Bundle::new(manifest, resources)?.into())
     }
 

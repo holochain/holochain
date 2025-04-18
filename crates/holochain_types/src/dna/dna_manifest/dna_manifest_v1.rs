@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use holo_hash::*;
-use serde_with::serde_as;
 use mr_bundle::{resource_id_for_path, ResourceIdentifier};
+use serde_with::serde_as;
 
 /// The structure of data that goes in the DNA bundle manifest "dna.yaml".
 ///

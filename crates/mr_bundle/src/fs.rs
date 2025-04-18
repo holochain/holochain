@@ -1,9 +1,9 @@
-use std::fmt::Debug;
 use super::{Bundle, ResourceIdentifier};
 use crate::error::MrBundleError;
 use crate::{error::MrBundleResult, Manifest};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::fmt::Debug;
 use std::path::Path;
 
 /// A recommended conversion from a path to a resource identifier.
@@ -44,17 +44,16 @@ impl FileSystemBundler {
     /// The resulting [`Bundle`] will contain the manifest and its resources.
     pub async fn bundle<M: Manifest>(manifest_path: impl AsRef<Path>) -> MrBundleResult<Bundle<M>> {
         let manifest_path = dunce::canonicalize(manifest_path).map_err(|e| {
-            MrBundleError::IoError(
-                "Failed to canonicalize manifest path".to_string(),
-                e,
-            )
+            MrBundleError::IoError("Failed to canonicalize manifest path".to_string(), e)
         })?;
-        let manifest_yaml = tokio::fs::read_to_string(&manifest_path).await.map_err(|e| {
-            MrBundleError::IoError(
-                format!("Failed to read manifest file: {:?}", manifest_path),
-                e,
-            )
-        })?;
+        let manifest_yaml = tokio::fs::read_to_string(&manifest_path)
+            .await
+            .map_err(|e| {
+                MrBundleError::IoError(
+                    format!("Failed to read manifest file: {:?}", manifest_path),
+                    e,
+                )
+            })?;
         let mut manifest: M = serde_yaml::from_str(&manifest_yaml)?;
 
         println!("Manifest: {:?}", manifest);
@@ -81,10 +80,7 @@ impl FileSystemBundler {
                         .map(|resource| (resource_id, resource.into()))
                         .map_err(|e| {
                             MrBundleError::IoError(
-                                format!(
-                                    "Failed to read resource at path: {:?}",
-                                    resource_path
-                                ),
+                                format!("Failed to read resource at path: {:?}", resource_path),
                                 e,
                             )
                         })
@@ -112,20 +108,26 @@ impl FileSystemBundler {
                 .parent()
                 .ok_or_else(|| MrBundleError::ParentlessPath(bundle_path.as_ref().to_path_buf()))?,
         )
-        .await.map_err(|e| {
+        .await
+        .map_err(|e| {
             MrBundleError::IoError(
-                format!("Failed to create bundle directory: {}", bundle_path.as_ref().display()),
+                format!(
+                    "Failed to create bundle directory: {}",
+                    bundle_path.as_ref().display()
+                ),
                 e,
             )
         })?;
 
         let bundle_path = bundle_path.as_ref();
-        tokio::fs::write(bundle_path, bundle.pack()?).await.map_err(|e| {
-            MrBundleError::IoError(
-                format!("Failed to write bundle to path: {}", bundle_path.display()),
-                e,
-            )
-        })?;
+        tokio::fs::write(bundle_path, bundle.pack()?)
+            .await
+            .map_err(|e| {
+                MrBundleError::IoError(
+                    format!("Failed to write bundle to path: {}", bundle_path.display()),
+                    e,
+                )
+            })?;
 
         Ok(())
     }
@@ -138,10 +140,7 @@ impl FileSystemBundler {
     ) -> MrBundleResult<Bundle<M>> {
         let bundle_path = bundle_path.as_ref();
         let bundle_bytes = tokio::fs::read(bundle_path).await.map_err(|e| {
-            MrBundleError::IoError(
-                format!("Failed to read bundle file: {:?}", bundle_path),
-                e,
-            )
+            MrBundleError::IoError(format!("Failed to read bundle file: {:?}", bundle_path), e)
         })?;
         Bundle::unpack(&bundle_bytes[..])
     }
@@ -188,12 +187,14 @@ impl FileSystemBundler {
         // Write the manifest to the target directory.
         let yaml_str = serde_yaml::to_string(bundle.manifest())?;
         let manifest_path = target_dir.join(manifest_file_name);
-        tokio::fs::write(&manifest_path, yaml_str.as_bytes()).await.map_err(|e| {
-            MrBundleError::IoError(
-                format!("Failed to write manifest to path: {:?}", manifest_path),
-                e,
-            )
-        })?;
+        tokio::fs::write(&manifest_path, yaml_str.as_bytes())
+            .await
+            .map_err(|e| {
+                MrBundleError::IoError(
+                    format!("Failed to write manifest to path: {:?}", manifest_path),
+                    e,
+                )
+            })?;
 
         // Write the resources to the target directory.
         for (resource_id, resource) in bundle.get_all_resources() {
@@ -209,10 +210,7 @@ impl FileSystemBundler {
                 )
             })?;
             tokio::fs::write(&path, resource).await.map_err(|e| {
-                MrBundleError::IoError(
-                    format!("Failed to write resource to path: {:?}", path),
-                    e,
-                )
+                MrBundleError::IoError(format!("Failed to write resource to path: {:?}", path), e)
             })?;
         }
 

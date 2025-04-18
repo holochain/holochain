@@ -570,7 +570,7 @@ mod test {
             SweetDnaFile::unique_from_test_wasms(vec![TestWasm::PostCommitSignal]).await;
         let app_bundle = app_bundle_from_dnas(&[dna_file.clone()], false, None)
             .await
-            .encode()
+            .pack()
             .expect("failed to encode app bundle as bytes");
         let request = AdminRequest::InstallApp(Box::new(InstallAppPayload {
             source: AppBundleSource::Bytes(app_bundle),

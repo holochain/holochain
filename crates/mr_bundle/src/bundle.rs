@@ -46,10 +46,7 @@ where
     }
 
     /// Retrieve the bytes for a single resource.
-    pub fn get_resource(
-        &self,
-        resource_identifier: &ResourceIdentifier,
-    ) -> Option<&ResourceBytes> {
+    pub fn get_resource(&self, resource_identifier: &ResourceIdentifier) -> Option<&ResourceBytes> {
         self.resources.get(resource_identifier)
     }
 

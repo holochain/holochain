@@ -1,8 +1,8 @@
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasmPair;
-use std::path::Path;
 use mr_bundle::FileSystemBundler;
+use std::path::Path;
 
 /// Helpful constructors for DnaFiles used in tests
 #[derive(Clone, Debug, derive_more::From, derive_more::Into, shrinkwraprs::Shrinkwrap)]
@@ -24,7 +24,9 @@ impl SweetDnaFile {
         P: TryInto<SerializedBytes, Error = E>,
         SerializedBytesError: From<E>,
     {
-        let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(path).await.map(DnaBundle::from)?;
+        let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(path)
+            .await
+            .map(DnaBundle::from)?;
 
         Ok(bundle
             .into_dna_file(modifiers.serialized().map_err(SerializedBytesError::from)?)
