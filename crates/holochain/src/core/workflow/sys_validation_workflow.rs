@@ -88,8 +88,7 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::GenericNetwork;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
 use holochain_state::prelude::*;
@@ -121,13 +120,13 @@ mod validate_op_tests;
 /// The sys validation workflow. It is described in the module level documentation.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 #[allow(clippy::too_many_arguments)]
-pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
+pub async fn sys_validation_workflow(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: SysValDeps,
     trigger_app_validation: TriggerSender,
     trigger_publish: TriggerSender,
     trigger_self: TriggerSender,
-    network: Network,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     representative_agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
@@ -135,7 +134,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     let outcome_summary = sys_validation_workflow_inner(
         workspace.clone(),
         current_validation_dependencies.clone(),
-        &network,
+        network.clone(),
         keystore,
         representative_agent,
     )
@@ -158,7 +157,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     }
 
     // Now go to the network to try to fetch missing dependencies
-    let network_cascade = Arc::new(workspace.network_and_cache_cascade(Arc::new(network)));
+    let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
     let missing_action_hashes = current_validation_dependencies
         .same_dht
         .lock()
@@ -233,7 +232,7 @@ type ForkedPair = ((ActionHash, Signature), (ActionHash, Signature));
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: SysValDeps,
-    _network: &impl HolochainP2pDnaT,
+    _network: DynHolochainP2pDna,
     _keystore: MetaLairClient,
     _representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
@@ -1344,7 +1343,7 @@ impl SysValidationWorkspace {
         }
     }
 
-    pub fn network_and_cache_cascade(&self, network: GenericNetwork) -> CascadeImpl {
+    pub fn network_and_cache_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
         CascadeImpl::empty().with_network(network, self.cache.clone())
     }
 

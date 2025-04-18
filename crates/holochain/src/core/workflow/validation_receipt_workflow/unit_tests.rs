@@ -29,6 +29,7 @@ async fn no_running_cells() {
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipts().never(); // Verify no receipts sent
+    let dna = Arc::new(dna);
 
     let work_complete = validation_receipt_workflow(
         Arc::new(fixt!(DnaHash)),
@@ -71,8 +72,8 @@ async fn do_not_block_or_send_to_self() {
     .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
-
     dna.expect_send_validation_receipts().never(); // Verify no receipts sent
+    let dna = Arc::new(dna);
 
     let validator = CellId::new(dna_hash.clone(), author);
 
@@ -110,6 +111,7 @@ async fn block_invalid_op_author() {
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipts()
         .return_once(|_, _| Ok(()));
+    let dna = Arc::new(dna);
 
     let dna_hash = fixt!(DnaHash);
     let validator = CellId::new(
@@ -170,6 +172,7 @@ async fn continues_if_receipt_cannot_be_signed() {
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipts().never();
+    let dna = Arc::new(dna);
 
     let dna_hash = fixt!(DnaHash);
 
@@ -209,6 +212,7 @@ async fn send_validation_receipt() {
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipts()
         .return_once(|_, _| Ok(()));
+    let dna = Arc::new(dna);
 
     let dna_hash = fixt!(DnaHash);
 
@@ -263,6 +267,7 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
         .withf(move |author: &AgentPubKey, _| *author == author2)
         .in_sequence(&mut seq)
         .returning(|_, _| Ok(()));
+    let dna = Arc::new(dna);
 
     let dna_hash = fixt!(DnaHash);
 

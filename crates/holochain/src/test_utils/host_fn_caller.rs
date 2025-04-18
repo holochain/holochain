@@ -195,7 +195,7 @@ impl HostFnCaller {
         let host_access = ZomeCallHostAccess::new(
             workspace.clone().into(),
             keystore,
-            network,
+            Arc::new(network),
             signal_tx,
             call_zome_handle,
         );

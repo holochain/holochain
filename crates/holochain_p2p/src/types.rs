@@ -1,5 +1,10 @@
-/// Type to mock a Holochain P2p network using [`crate::MockHolochainP2pDnaT`].
-pub type GenericNetwork = Arc<dyn HolochainP2pDnaT>;
+pub mod actor;
+pub mod event;
+
+pub(crate) mod wire;
+
+pub use wire::WireDhtOpData;
+pub use wire::WireMessage;
 
 /// Error type for Holochain P2p.
 #[derive(Debug, thiserror::Error)]
@@ -73,15 +78,3 @@ impl From<&str> for HolochainP2pError {
         s.to_string().into()
     }
 }
-
-pub mod actor;
-pub mod event;
-
-pub(crate) mod wire;
-
-use std::sync::Arc;
-
-pub use wire::WireDhtOpData;
-pub use wire::WireMessage;
-
-use crate::HolochainP2pDnaT;

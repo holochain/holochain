@@ -16,7 +16,7 @@ pub fn spawn_sys_validation_consumer(
     conductor: ConductorHandle,
     trigger_app_validation: TriggerSender,
     trigger_publish: TriggerSender,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();

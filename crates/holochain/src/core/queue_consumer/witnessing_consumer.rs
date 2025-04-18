@@ -10,7 +10,7 @@ use tracing::*;
 pub(crate) fn spawn_witnessing_consumer(
     space: Space,
     task_manager: TaskManagerClient,
-    dna_network: HolochainP2pDna,
+    dna_network: DynHolochainP2pDna,
     trigger_sys: TriggerSender,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
