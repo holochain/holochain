@@ -25,7 +25,7 @@ pub use holo_hash::fixt::*;
 use holo_hash::WasmHash;
 use holochain_keystore::test_keystore;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pDnaFixturator;
+use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_types::db_cache::DhtDbQueryCache;
@@ -336,14 +336,14 @@ fixturator!(
     curve Empty ZomeCallHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
         keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
-        network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
         signal_tx: broadcast::channel(50).0,
         call_zome_handle: CellConductorReadHandleFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable ZomeCallHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
         keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
-        network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
         signal_tx: broadcast::channel(50).0,
         call_zome_handle: CellConductorReadHandleFixturator::new(Unpredictable).next().unwrap(),
     };
@@ -354,9 +354,7 @@ fixturator!(
         keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        network: HolochainP2pDnaFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
         signal_tx: broadcast::channel(50).0,
         call_zome_handle: CellConductorReadHandleFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
@@ -384,14 +382,14 @@ fixturator!(
     curve Empty InitHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
         keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
-        network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
         signal_tx: broadcast::channel(50).0,
         call_zome_handle: CellConductorReadHandleFixturator::new(Empty).next().unwrap(),
     };
     curve Unpredictable InitHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
         keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
-        network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
         signal_tx: broadcast::channel(50).0,
         call_zome_handle: CellConductorReadHandleFixturator::new(Unpredictable).next().unwrap(),
     };
@@ -402,9 +400,7 @@ fixturator!(
         keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        network: HolochainP2pDnaFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
         signal_tx: broadcast::channel(50).0,
         call_zome_handle: CellConductorReadHandleFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
@@ -422,13 +418,13 @@ fixturator!(
     curve Empty PostCommitHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Empty).next().unwrap(),
         keystore: MetaLairClientFixturator::new(Empty).next().unwrap(),
-        network: HolochainP2pDnaFixturator::new(Empty).next().unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
         signal_tx: broadcast::channel(50).0,
     };
     curve Unpredictable PostCommitHostAccess {
         workspace: HostFnWorkspaceFixturator::new(Unpredictable).next().unwrap(),
         keystore: MetaLairClientFixturator::new(Unpredictable).next().unwrap(),
-        network: HolochainP2pDnaFixturator::new(Unpredictable).next().unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
         signal_tx: broadcast::channel(50).0,
     };
     curve Predictable PostCommitHostAccess {
@@ -438,9 +434,7 @@ fixturator!(
         keystore: MetaLairClientFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
             .unwrap(),
-        network: HolochainP2pDnaFixturator::new_indexed(Predictable, get_fixt_index!())
-            .next()
-            .unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
         signal_tx: broadcast::channel(50).0,
     };
 );
@@ -452,7 +446,23 @@ fixturator!(
 
 fixturator!(
     ValidateHostAccess;
-    constructor fn new(HostFnWorkspace, HolochainP2pDna, bool);
+    curve Empty ValidateHostAccess {
+        workspace: HostFnWorkspaceReadFixturator::new(Empty).next().unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
+        is_inline: false,
+    };
+    curve Unpredictable ValidateHostAccess {
+        workspace: HostFnWorkspaceReadFixturator::new(Unpredictable).next().unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
+        is_inline: false,
+    };
+    curve Predictable ValidateHostAccess {
+        workspace: HostFnWorkspaceReadFixturator::new_indexed(Predictable, get_fixt_index!())
+            .next()
+            .unwrap(),
+        network: Arc::new(MockHolochainP2pDnaT::new()),
+        is_inline: false,
+    };
 );
 
 fixturator!(

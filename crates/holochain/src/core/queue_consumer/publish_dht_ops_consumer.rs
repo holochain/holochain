@@ -13,7 +13,7 @@ pub fn spawn_publish_dht_ops_consumer(
     cell_id: CellId,
     env: DbWrite<DbKindAuthored>,
     conductor: ConductorHandle,
-    network: impl HolochainP2pDnaT + Clone + 'static,
+    network: DynHolochainP2pDna,
 ) -> TriggerSender {
     #[cfg(feature = "test_utils")]
     let publish_override_interval = {
@@ -57,8 +57,7 @@ pub fn spawn_publish_dht_ops_consumer(
                     return Ok(WorkComplete::Complete);
                 }
 
-                publish_dht_ops_workflow(env, Arc::new(network), tx, agent, min_publish_interval)
-                    .await
+                publish_dht_ops_workflow(env, network, tx, agent, min_publish_interval).await
             }
         },
     );

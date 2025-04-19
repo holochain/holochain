@@ -6,7 +6,7 @@ use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -27,7 +27,7 @@ impl InitInvocation {
 pub struct InitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
-    pub network: HolochainP2pDna,
+    pub network: DynHolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
 }

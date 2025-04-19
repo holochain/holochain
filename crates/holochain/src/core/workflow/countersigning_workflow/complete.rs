@@ -5,7 +5,7 @@ use crate::core::workflow::{WorkflowError, WorkflowResult};
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_chc::AddRecordPayload;
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::db::ReadAccess;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 pub(crate) async fn inner_countersigning_session_complete(
     space: Space,
-    network: Arc<impl HolochainP2pDnaT>,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     author: AgentPubKey,
     signed_actions: Vec<SignedAction>,
@@ -185,7 +185,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 #[allow(clippy::too_many_arguments)]
 async fn reveal_countersigning_session(
     space: Space,
-    network: Arc<impl HolochainP2pDnaT>,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     session_record: Record,
     author: &AgentPubKey,
@@ -294,7 +294,7 @@ fn get_countersigning_op_hashes(
 /// the session becomes unresolved and can be forcefully completed and published anyway.
 pub(super) async fn force_publish_countersigning_session(
     space: Space,
-    network: Arc<impl HolochainP2pDnaT>,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,

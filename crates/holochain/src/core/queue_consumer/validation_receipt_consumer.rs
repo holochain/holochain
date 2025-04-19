@@ -13,7 +13,7 @@ pub fn spawn_validation_receipt_consumer(
     dna_hash: Arc<DnaHash>,
     env: DbWrite<DbKindDht>,
     conductor: ConductorHandle,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
     let keystore = conductor.keystore().clone();

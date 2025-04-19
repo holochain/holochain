@@ -38,7 +38,6 @@ use crate::conductor::{error::ConductorError, manager::ManagedTaskResult};
 use derive_more::Display;
 use futures::future::Either;
 use futures::{Future, Stream, StreamExt};
-use holochain_p2p::HolochainP2pDna;
 use holochain_p2p::*;
 use holochain_types::prelude::*;
 use publish_dht_ops_consumer::*;
@@ -80,7 +79,7 @@ mod tests;
 #[allow(clippy::too_many_arguments)]
 pub async fn spawn_queue_consumer_tasks(
     cell_id: CellId,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     space: &Space,
     conductor: ConductorHandle,
 ) -> ConductorResult<(QueueTriggers, InitialQueueTriggers)> {
