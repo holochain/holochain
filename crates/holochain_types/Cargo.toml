@@ -47,7 +47,7 @@ holochain_timestamp = { version = "^0.6.0-dev.0", path = "../timestamp" }
 kitsune2_api = "0.1.5"
 itertools = { version = "0.12" }
 mr_bundle = { path = "../mr_bundle", features = [
-  "packing",
+  "fs",
 ], version = "^0.6.0-dev.0" }
 must_future = "0.1.1"
 nanoid = "0.4"
@@ -114,7 +114,6 @@ fuzzing = [
   "proptest-derive",
   "holo_hash/fuzzing",
   "holochain_zome_types/fuzzing",
-  "mr_bundle/fuzzing",
 ]
 
 instrument = []

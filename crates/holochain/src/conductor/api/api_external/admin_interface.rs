@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
@@ -10,8 +8,8 @@ use crate::conductor::ConductorHandle;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::*;
-use mr_bundle::Bundle;
-
+use mr_bundle::FileSystemBundler;
+use std::collections::HashSet;
 use tracing::*;
 
 pub use holochain_conductor_api::*;
@@ -98,8 +96,9 @@ impl AdminInterfaceApi {
                             .update_modifiers(modifiers)
                     }
                     DnaSource::Path(ref path) => {
-                        let bundle = Bundle::read_from_file(path).await?;
-                        let bundle: DnaBundle = bundle.into();
+                        let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(path)
+                            .await
+                            .map(DnaBundle::from)?;
                         let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
@@ -127,8 +126,9 @@ impl AdminInterfaceApi {
                 let UpdateCoordinatorsPayload { dna_hash, source } = *payload;
                 let (coordinator_zomes, wasms) = match source {
                     CoordinatorSource::Path(ref path) => {
-                        let bundle = Bundle::read_from_file(path).await?;
-                        let bundle: CoordinatorBundle = bundle.into();
+                        let bundle = FileSystemBundler::load_from::<CoordinatorManifest>(path)
+                            .await
+                            .map(CoordinatorBundle::from)?;
                         bundle.into_zomes().await?
                     }
                     CoordinatorSource::Bundle(bundle) => bundle.into_zomes().await?,

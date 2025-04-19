@@ -24,6 +24,14 @@ mod test;
 #[serde(from = "WasmMapSerialized", into = "WasmMapSerialized")]
 pub struct WasmMap(BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>);
 
+#[cfg(feature = "test_utils")]
+impl WasmMap {
+    /// Create an iterator over the WasmMap
+    pub fn iter(&self) -> impl Iterator<Item = (&holo_hash::WasmHash, &wasm::DnaWasm)> {
+        self.0.iter()
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 struct WasmMapSerialized(Vec<(holo_hash::WasmHash, wasm::DnaWasm)>);
@@ -71,10 +79,10 @@ impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
 
 impl DnaFile {
     /// Construct a new DnaFile instance.
-    pub async fn new(dna: DnaDef, wasm: impl IntoIterator<Item = wasm::DnaWasm>) -> Self {
+    pub async fn new(dna: DnaDef, wasm: impl IntoIterator<Item = DnaWasm>) -> Self {
         let mut code = BTreeMap::new();
         for wasm in wasm {
-            let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
+            let wasm_hash = WasmHash::with_data(&wasm).await;
             code.insert(wasm_hash, wasm);
         }
 

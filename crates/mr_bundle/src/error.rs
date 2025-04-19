@@ -1,92 +1,49 @@
-#![allow(missing_docs)]
+//! Custom error types for the mr_bundle crate
 
-use holochain_util::ffs::IoError;
+use crate::manifest::ResourceIdentifier;
 
 /// Any error which can occur in this crate
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum MrBundleError {
-    #[error(transparent)]
-    StdIoError(#[from] std::io::Error),
+    /// An IO error
+    #[error("{0}: {1}")]
+    IoError(String, std::io::Error),
 
-    #[error(transparent)]
-    BundleError(#[from] BundleError),
+    /// A manifest references resources that were not provided when attempting to create a bundle.
+    #[error("Manifest references resources that were not provided when attempting to create a bundle: {0:?}")]
+    MissingResources(Vec<ResourceIdentifier>),
 
-    #[cfg(feature = "packing")]
-    #[error(transparent)]
-    UnpackingError(#[from] UnpackingError),
+    /// Resources were provided when attempting to create a bundle that were not referenced in the manifest.
+    #[error("Resources were provided when attempting to create a bundle that were not referenced in the manifest: {0:?}")]
+    UnusedResources(Vec<ResourceIdentifier>),
 
-    #[cfg(feature = "packing")]
-    #[error(transparent)]
-    PackingError(#[from] PackingError),
-
-    #[error("IO error: {0}")]
-    IoError(#[from] IoError),
-
-    #[error(transparent)]
-    HttpError(#[from] reqwest::Error),
-
+    /// A messagepack encoding error
     #[error(transparent)]
     MsgpackEncodeError(#[from] rmp_serde::encode::Error),
 
+    /// A messagepack decoding error
     #[error("Failed to decode bundle to [{0}] due to a deserialization error: {1}")]
     MsgpackDecodeError(String, rmp_serde::decode::Error),
 
-    #[error("This bundle failed to validate because: {0}")]
-    BundleValidationError(String),
-}
-pub type MrBundleResult<T> = Result<T, MrBundleError>;
-
-/// Errors which can occur while constructing a Bundle
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum BundleError {
-    #[error(
-        "The bundled resource path '{0}' is not mentioned in the manifest.
-        Make sure that Manifest::location returns this path as a Location::Bundled."
-    )]
-    BundledPathNotInManifest(std::path::PathBuf),
-
-    #[error("Attempted to resolve a bundled resource not present in this bundle: {0}")]
-    BundledResourceMissing(std::path::PathBuf),
-
-    #[error(
-        "Cannot use relative paths for local locations. The following local path is relative: {0}"
-    )]
-    RelativeLocalPath(std::path::PathBuf),
-}
-pub type BundleResult<T> = Result<T, BundleError>;
-
-/// Errors which can occur while unpacking resources from a Bundle
-#[cfg(feature = "packing")]
-#[derive(Debug, thiserror::Error)]
-pub enum UnpackingError {
-    #[error(transparent)]
-    StdIoError(#[from] std::io::Error),
-
-    #[error("IO error: {0}")]
-    IoError(#[from] IoError),
-
+    /// A YAML error
+    #[cfg(feature = "fs")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
     #[error(transparent)]
     YamlError(#[from] serde_yaml::Error),
 
+    /// A path with no parent directory
+    #[cfg(feature = "fs")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
     #[error("The supplied path '{0}' has no parent directory.")]
     ParentlessPath(std::path::PathBuf),
 
+    /// A target directory already exists
+    #[cfg(feature = "fs")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
     #[error("The target directory '{0}' already exists.")]
     DirectoryExists(std::path::PathBuf),
-
-    #[error("When imploding a bundle directory, the absolute manifest path specified did not match the relative path expected by the manifest.
-    Absolute path: '{0}'. Relative path: '{1}'.")]
-    ManifestPathSuffixMismatch(std::path::PathBuf, std::path::PathBuf),
 }
-#[cfg(feature = "packing")]
-pub type UnpackingResult<T> = Result<T, UnpackingError>;
 
-/// Errors which can occur while packing resources into a Bundle
-#[cfg(feature = "packing")]
-#[derive(Debug, thiserror::Error)]
-pub enum PackingError {
-    #[error("Must supply the path to the manifest file inside a bundle directory to pack. You supplied: {0}. Original error: {1}")]
-    BadManifestPath(std::path::PathBuf, std::io::Error),
-}
-#[cfg(feature = "packing")]
-pub type PackingResult<T> = Result<T, PackingError>;
+/// A custom result that uses [`MrBundleError`] as the error type.
+pub type MrBundleResult<T> = Result<T, MrBundleError>;

@@ -1,18 +1,6 @@
-/// Arbitrary opaque bytes representing a Resource in a [`Bundle`](crate::Bundle)
+/// Opaque bytes representing a Resource in a [`Bundle`](crate::Bundle)
 #[derive(Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ResourceBytes(bytes::Bytes);
-
-impl ResourceBytes {
-    /// Reference accessor
-    pub fn inner(&self) -> &bytes::Bytes {
-        &self.0
-    }
-
-    /// Accessor
-    pub fn into_inner(self) -> bytes::Bytes {
-        self.0
-    }
-}
 
 impl std::fmt::Debug for ResourceBytes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,8 +17,20 @@ impl From<bytes::Bytes> for ResourceBytes {
     }
 }
 
+impl From<ResourceBytes> for bytes::Bytes {
+    fn from(value: ResourceBytes) -> Self {
+        value.0
+    }
+}
+
 impl From<Vec<u8>> for ResourceBytes {
     fn from(value: Vec<u8>) -> Self {
         Self(value.into())
+    }
+}
+
+impl AsRef<[u8]> for ResourceBytes {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
     }
 }

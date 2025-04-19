@@ -7,7 +7,7 @@ roles:
       strategy: create
       deferred: false
     dna:
-      bundled: dna/a dna.dna
+      file: dna/a dna.dna
       modifiers:
         network_seed: 0123456
         properties: ~

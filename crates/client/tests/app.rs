@@ -194,7 +194,7 @@ async fn deferred_memproof_installation() {
             .update_manifest(manifest.into())
             .unwrap(),
     );
-    let app_bundle_bytes = app_bundle_deferred_memproofs.encode().unwrap();
+    let app_bundle_bytes = app_bundle_deferred_memproofs.pack().unwrap();
 
     admin_ws
         .install_app(InstallAppPayload {

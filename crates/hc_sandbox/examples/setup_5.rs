@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
             CmdRunner::from_sandbox_with_bin_path(&input.holochain_path, path.clone()).await?;
 
         let bundle = AppBundleSource::Path(happ.clone()).resolve().await?;
-        let bytes = bundle.encode()?;
+        let bytes = bundle.pack()?;
 
         // Create the raw InstallAppPayload request.
         let payload = InstallAppPayload {

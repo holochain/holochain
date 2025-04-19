@@ -19,26 +19,18 @@ pub struct WebAppManifestV1 {
     pub happ_manifest: AppManifestLocation,
 }
 
-/// Web UI .zip file that should be associated with the happ
+/// Web UI .zip file that should be associated with the hApp.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct WebUI {
     /// Where to find this UI.
-    ///
-    /// Note that since this is flattened,
-    /// there is no actual "location" key in the manifest.
-    #[serde(flatten)]
-    pub location: mr_bundle::Location,
+    pub file: String,
 }
 
-/// Location of the happ bundle to bind with the Web UI
+/// Location of the hApp bundle to bind with the Web UI.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct AppManifestLocation {
-    /// Where to find the happ for this web-happ.
-    ///
-    /// Note that since this is flattened,
-    /// there is no actual "location" key in the manifest.
-    #[serde(flatten)]
-    pub location: mr_bundle::Location,
+    /// Where to find the hApp for this web-happ.
+    pub file: String,
 }
