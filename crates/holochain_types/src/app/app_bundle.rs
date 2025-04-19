@@ -194,7 +194,7 @@ impl AppBundle {
                     dna_file = dna_file.update_modifiers(modifiers);
                     (dna_file, original_hash)
                 } else {
-                    self.resolve_location(resource_id, modifiers).await?
+                    self.get_modified_dna_file(resource_id, modifiers).await?
                 };
             if expected_hash != original_hash {
                 return Err(AppBundleError::CellResolutionFailure(
@@ -204,12 +204,12 @@ impl AppBundle {
             }
             dna_file
         } else {
-            self.resolve_location(resource_id, modifiers).await?.0
+            self.get_modified_dna_file(resource_id, modifiers).await?.0
         };
         Ok(dna_file)
     }
 
-    async fn resolve_location(
+    async fn get_modified_dna_file(
         &self,
         resource_id: &ResourceIdentifier,
         modifiers: DnaModifiersOpt,
