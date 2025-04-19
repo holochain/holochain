@@ -56,15 +56,12 @@ impl FileSystemBundler {
             })?;
         let mut manifest: M = serde_yaml::from_str(&manifest_yaml)?;
 
-        println!("Manifest: {:?}", manifest);
-
         let manifest_dir = manifest_path
             .parent()
             .ok_or_else(|| MrBundleError::ParentlessPath(manifest_path.to_path_buf()))?;
         let resources =
             futures::future::join_all(manifest.generate_resource_ids().into_iter().map(
                 |(resource_id, relative_path)| async move {
-                    println!("Got relative path: {:?}", relative_path);
                     let resource_path = manifest_dir.join(&relative_path);
                     let resource_path = dunce::canonicalize(&resource_path).map_err(|e| {
                         MrBundleError::IoError(
