@@ -5,6 +5,6 @@ integrity:
   properties: null
   zomes:
     - name: zome1
-      bundled: ./zomes/test_wasm_foo.wasm
+      file: ./zomes/test_wasm_foo.wasm
 coordinator:
   zomes: []
