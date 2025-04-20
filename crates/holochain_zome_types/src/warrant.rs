@@ -1,11 +1,19 @@
 //! Types for warrants
 
+use crate::signature::Signed;
+use ::fixt::prelude::strum_macros;
 use holo_hash::*;
 use holochain_integrity_types::Signature;
 pub use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
-
-use crate::signature::Signed;
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
+use {
+    rusqlite::{
+        types::{FromSql, FromSqlError, FromSqlResult, ValueRef},
+        ToSql,
+    },
+    std::str::FromStr,
+};
 
 /// A Warrant is an authored, timestamped proof of wrongdoing by another agent.
 #[derive(
@@ -68,11 +76,11 @@ impl HashableContent for Warrant {
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
 )]
 pub enum WarrantProof {
-    /// Signifies evidence of a breach of chain integrity
+    /// Signifies evidence of a breach of chain integrity.
     ChainIntegrity(ChainIntegrityWarrant),
 }
 
-/// Just the type of the warrant
+/// The type of warrant.
 #[derive(
     Clone,
     Copy,
@@ -84,6 +92,7 @@ pub enum WarrantProof {
     PartialEq,
     Hash,
     derive_more::From,
+    strum_macros::EnumString,
 )]
 pub enum WarrantType {
     // NOTE: the values here cannot overlap with ActionType,
@@ -100,11 +109,19 @@ impl From<Warrant> for WarrantType {
 }
 
 #[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
-impl rusqlite::ToSql for WarrantType {
+impl ToSql for WarrantType {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
             format!("{:?}", self).into(),
         ))
+    }
+}
+
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
+impl FromSql for WarrantType {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        String::column_result(value)
+            .and_then(|text| WarrantType::from_str(&text).map_err(|_| FromSqlError::InvalidType))
     }
 }
 
@@ -142,6 +159,8 @@ impl WarrantProof {
     /// Basis hash where this warrant should be delivered.
     /// Warrants always have the authoring agent as a basis, so that warrants
     /// can be accumulated by the agent activity authorities.
+    // TODO: It seems more logical that the basis is the warrantee's pub key.
+    // Then the warrantee's agent authority holds the warrants.
     pub fn dht_basis(&self) -> OpBasis {
         self.action_author().clone().into()
     }

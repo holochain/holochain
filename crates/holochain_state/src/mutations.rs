@@ -746,51 +746,53 @@ pub fn set_receipts_complete_redundantly_in_dht_db(
 }
 
 #[cfg(feature = "unstable-warrants")]
-/// Insert a [`Warrant`] into the Action table.
+/// Insert a [`Warrant`] into the Warrant table.
 pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMutationResult<usize> {
     let warrant_type = warrant.get_type();
     let hash = warrant.to_hash();
     let author = &warrant.author;
+    let timestamp = warrant.timestamp;
 
-    // Don't produce a warrant if one, of any kind, already exists
-    let basis = warrant.dht_basis();
+    // TODO Instead of matching the kind of warrant, it seems easiest if the warrantee's
+    // agent key is added to the warrant struct, so that the warrant table can be queried
+    // for existing warrants for an agent.
+    let exists = false;
 
-    // XXX: this is a terrible misuse of databases. When putting a Warrant in the Action table,
-    //      if it's an InvalidChainOp warrant, we store the action hash in the prev_hash field.
-    let (exists, action_hash) = match &warrant.proof {
-        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp { action, .. }) => {
-            let action_hash = Some(action.0.clone());
-            let exists = txn
-                .prepare_cached(
-                    "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash = :prev_hash",
-                )?
-                .exists(named_params! {
-                    ":type": WarrantType::ChainIntegrityWarrant,                    
-                    ":base_hash": basis,
-                    ":prev_hash": action_hash,
-                })?;
-            (exists, action_hash)
-        }
-        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. }) => {
-            let exists = txn
-                .prepare_cached(
-                    "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash IS NULL",
-                )?
-                .exists(named_params! {
-                    ":type": WarrantType::ChainIntegrityWarrant,
-                    ":base_hash": basis
-                })?;
-            (exists, None)
-        }
-    };
+    // Don't produce a warrant if one, of any kind, already exists.
+    // let basis = warrant.dht_basis();
+    // let (exists, action_hash) = match &warrant.proof {
+    //     WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp { action, .. }) => {
+    //         let action_hash = Some(action.0.clone());
+    //         let exists = txn
+    //             .prepare_cached(
+    //                 "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash = :prev_hash",
+    //             )?
+    //             .exists(named_params! {
+    //                 ":type": WarrantType::ChainIntegrityWarrant,
+    //                 ":base_hash": basis,
+    //                 ":prev_hash": action_hash,
+    //             })?;
+    //         (exists, action_hash)
+    //     }
+    //     WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. }) => {
+    //         let exists = txn
+    //             .prepare_cached(
+    //                 "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash IS NULL",
+    //             )?
+    //             .exists(named_params! {
+    //                 ":type": WarrantType::ChainIntegrityWarrant,
+    //                 ":base_hash": basis
+    //             })?;
+    //         (exists, None)
+    //     }
+    // };
 
     Ok(if !exists {
-        sql_insert!(txn, Action, {
+        sql_insert!(txn, Warrant, {
             "hash": hash,
-            "type": warrant_type,
             "author": author,
-            "base_hash": basis,
-            "prev_hash": action_hash,
+            "timestamp": timestamp,
+            "type": warrant_type,
             "blob": to_blob(&warrant)?,
         })?
     } else {
