@@ -30,7 +30,7 @@ async fn network_seed_regression() {
         let roles = vec![AppRoleManifest {
             name: "rolename".into(),
             dna: AppRoleDnaManifest {
-                file: Some(dna_resource_id.clone()),
+                path: Some(dna_resource_id.clone()),
                 modifiers: DnaModifiersOpt::default(),
                 installed_hash: None,
                 clone_limit: 0,
@@ -225,7 +225,7 @@ impl TestCase {
         let roles = vec![AppRoleManifest {
             name: "rolename".into(),
             dna: AppRoleDnaManifest {
-                file: Some(hashpath.clone()),
+                path: Some(hashpath.clone()),
                 modifiers: dna_modifiers.clone(),
                 installed_hash: None,
                 clone_limit: 10,

@@ -24,7 +24,7 @@ pub struct WebAppManifestV1 {
 #[serde(rename_all = "snake_case")]
 pub struct WebUI {
     /// Where to find this UI.
-    pub file: String,
+    pub path: String,
 }
 
 /// Location of the hApp bundle to bind with the Web UI.
@@ -32,5 +32,5 @@ pub struct WebUI {
 #[serde(rename_all = "snake_case")]
 pub struct AppManifestLocation {
     /// Where to find the hApp for this web-happ.
-    pub file: String,
+    pub path: String,
 }

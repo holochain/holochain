@@ -18,7 +18,7 @@ pub async fn app_bundle_from_dnas(
             let manifest = AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {
-                    file: Some(path.clone()),
+                    path: Some(path.clone()),
                     modifiers,
                     // NOTE: for testing with inline zomes, it's essential that the
                     //       installed_hash is included, so it can be used to fetch

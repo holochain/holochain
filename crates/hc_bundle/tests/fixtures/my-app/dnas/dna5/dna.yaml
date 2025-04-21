@@ -6,17 +6,17 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      file: ../dna1/zomes/zome11.wasm
+      path: ../dna1/zomes/zome11.wasm
     - name: zome2
-      file: ../dna2/zomes/zome21.wasm
+      path: ../dna2/zomes/zome21.wasm
 coordinator:
   zomes:
     - name: zome3
-      file: ../dna1/zomes/zome12.wasm
+      path: ../dna1/zomes/zome12.wasm
       dependencies:
         - name: zome1
     - name: zome4
-      file: ../dna2/zomes/zome22.wasm
+      path: ../dna2/zomes/zome22.wasm
       dependencies:
         - name: zome1
         - name: zome2

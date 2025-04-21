@@ -126,7 +126,7 @@ impl AppBundle {
     ) -> AppBundleResult<CellProvisioningOp> {
         match role {
             AppRoleManifestValidated::Create {
-                file,
+                path: file,
                 installed_hash,
                 clone_limit,
                 modifiers,
@@ -160,7 +160,7 @@ impl AppBundle {
 
             AppRoleManifestValidated::CloneOnly {
                 clone_limit,
-                file,
+                path: file,
                 modifiers,
                 installed_hash,
             } => {

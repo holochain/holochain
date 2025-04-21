@@ -10,13 +10,13 @@ name: test_dna
 integrity:
   zomes:
     - name: zome1
-      file: zome-1.wasm
+      path: zome-1.wasm
     - name: zome1
-      file: nested/zome-2.wasm
+      path: nested/zome-2.wasm
 coordinator:
   zomes:
     - name: zome4
-      file: zome-4.wasm
+      path: zome-4.wasm
         "#;
 
     let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap();
@@ -35,19 +35,19 @@ name: test_dna
 integrity:
   zomes:
     - name: zome1
-      file: zome-1.wasm
+      path: zome-1.wasm
       dependencies:
         - name: zome20
     - name: zome2
-      file: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
-      file: ../zome-3.wasm
+      path: ../zome-3.wasm
 coordinator:
   zomes:
     - name: zome4
-      file: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
-      file: ../zome-5.wasm
+      path: ../zome-5.wasm
         "#;
 
     let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap();
@@ -64,20 +64,20 @@ name: test_dna
 integrity:
   zomes:
     - name: zome1
-      file: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      file: nested/zome-2.wasm
+      path: nested/zome-2.wasm
       dependencies:
         - name: zome3
         - name: zome4
     - name: zome3
-      file: ../zome-3.wasm
+      path: ../zome-3.wasm
 coordinator:
   zomes:
     - name: zome4
-      file: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
-      file: ../zome-5.wasm
+      path: ../zome-5.wasm
         "#;
 
     let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap();
@@ -94,20 +94,20 @@ name: test_dna
 integrity:
   zomes:
     - name: zome1
-      file: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      file: nested/zome-2.wasm
+      path: nested/zome-2.wasm
       dependencies:
         - name: zome3
         - name: zome2
     - name: zome3
-      file: ../zome-3.wasm
+      path: ../zome-3.wasm
 coordinator:
   zomes:
     - name: zome4
-      file: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
-      file: ../zome-5.wasm
+      path: ../zome-5.wasm
         "#;
 
     let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap();

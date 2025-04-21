@@ -37,9 +37,9 @@ impl mr_bundle::Manifest for ValidatedDnaManifest {
                 .all_zomes_mut()
                 .map(|zome| {
                     let id = zome.resource_id();
-                    let file = zome.file.clone();
+                    let file = zome.path.clone();
 
-                    zome.file = id.clone();
+                    zome.path = id.clone();
 
                     (id, file)
                 })

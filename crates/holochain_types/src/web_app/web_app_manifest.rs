@@ -34,13 +34,13 @@ impl Manifest for WebAppManifest {
             WebAppManifest::V1(m) => {
                 let mut out = HashMap::new();
 
-                let ui_id = resource_id_for_ui(&m.ui.file);
-                out.insert(ui_id.clone(), m.ui.file.clone());
-                m.ui.file = ui_id;
+                let ui_id = resource_id_for_ui(&m.ui.path);
+                out.insert(ui_id.clone(), m.ui.path.clone());
+                m.ui.path = ui_id;
 
-                let happ_id = resource_id_for_happ(&m.happ_manifest.file);
-                out.insert(happ_id.clone(), m.happ_manifest.file.clone());
-                m.happ_manifest.file = happ_id;
+                let happ_id = resource_id_for_happ(&m.happ_manifest.path);
+                out.insert(happ_id.clone(), m.happ_manifest.path.clone());
+                m.happ_manifest.path = happ_id;
 
                 out
             }
@@ -50,8 +50,8 @@ impl Manifest for WebAppManifest {
     fn resource_ids(&self) -> Vec<ResourceIdentifier> {
         match self {
             WebAppManifest::V1(m) => vec![
-                resource_id_for_ui(&m.ui.file),
-                resource_id_for_happ(&m.happ_manifest.file),
+                resource_id_for_ui(&m.ui.path),
+                resource_id_for_happ(&m.happ_manifest.path),
             ],
         }
     }
@@ -71,10 +71,10 @@ impl WebAppManifest {
         WebAppManifest::V1(WebAppManifestV1 {
             name,
             ui: WebUI {
-                file: "./path/to/my/ui.zip".to_string(),
+                path: "./path/to/my/ui.zip".to_string(),
             },
             happ_manifest: AppManifestLocation {
-                file: "./path/to/my/happ-bundle.happ".to_string(),
+                path: "./path/to/my/happ-bundle.happ".to_string(),
             },
         })
     }
@@ -89,7 +89,7 @@ impl WebAppManifest {
     /// Get the bundle location of the Web UI zip included in the manifest
     pub fn web_ui_location(&self) -> ResourceIdentifier {
         match self {
-            Self::V1(WebAppManifestV1 { ui, .. }) => resource_id_for_ui(&ui.file),
+            Self::V1(WebAppManifestV1 { ui, .. }) => resource_id_for_ui(&ui.path),
         }
     }
 
@@ -97,7 +97,7 @@ impl WebAppManifest {
     pub fn happ_bundle_location(&self) -> ResourceIdentifier {
         match self {
             Self::V1(WebAppManifestV1 { happ_manifest, .. }) => {
-                resource_id_for_happ(&happ_manifest.file)
+                resource_id_for_happ(&happ_manifest.path)
             }
         }
     }
@@ -119,10 +119,10 @@ mod tests {
         let web_app_manifest = WebAppManifest::V1(WebAppManifestV1 {
             name: app_name.clone(),
             ui: WebUI {
-                file: ui_location.clone(),
+                path: ui_location.clone(),
             },
             happ_manifest: AppManifestLocation {
-                file: happ_location.clone(),
+                path: happ_location.clone(),
             },
         });
 

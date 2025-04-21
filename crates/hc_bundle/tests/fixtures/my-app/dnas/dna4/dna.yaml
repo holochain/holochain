@@ -6,8 +6,8 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      file: ../dna2/zomes/zome21.wasm
+      path: ../dna2/zomes/zome21.wasm
 coordinator:
   zomes:
     - name: zome2
-      file: ../dna2/zomes/zome22.wasm
+      path: ../dna2/zomes/zome22.wasm

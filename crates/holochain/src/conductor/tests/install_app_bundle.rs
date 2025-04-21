@@ -28,7 +28,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
         let roles = vec![AppRoleManifest {
             name: "name".into(),
             dna: AppRoleDnaManifest {
-                file: Some(path.clone()),
+                path: Some(path.clone()),
                 modifiers: modifiers.clone(),
                 installed_hash: None,
                 clone_limit,
@@ -146,7 +146,7 @@ async fn reject_duplicate_app_for_same_agent() {
     let roles = vec![AppRoleManifest {
         name: "name".into(),
         dna: AppRoleDnaManifest {
-            file: Some(path.clone()),
+            path: Some(path.clone()),
             modifiers: modifiers.clone(),
             installed_hash: None,
             clone_limit: 0,
@@ -249,7 +249,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
     let roles = vec![AppRoleManifest {
         name: "name".into(),
         dna: AppRoleDnaManifest {
-            file: Some(path.clone()),
+            path: Some(path.clone()),
             modifiers: modifiers.clone(),
             // Note that there is no installed hash provided. We'll check that this changes later.
             installed_hash: None,
@@ -432,7 +432,7 @@ async fn use_existing_integration() {
         let roles = vec![AppRoleManifest {
             name: "created".into(),
             dna: AppRoleDnaManifest {
-                file: Some(path.clone()),
+                path: Some(path.clone()),
                 modifiers: DnaModifiersOpt::none(),
                 installed_hash: None,
                 clone_limit: 0,
@@ -471,7 +471,7 @@ async fn use_existing_integration() {
                 AppRoleManifest {
                     name: "created".into(),
                     dna: AppRoleDnaManifest {
-                        file: Some(path.clone()),
+                        path: Some(path.clone()),
                         modifiers: DnaModifiersOpt::none(),
                         installed_hash: None,
                         clone_limit: 0,
@@ -481,7 +481,7 @@ async fn use_existing_integration() {
                 AppRoleManifest {
                     name: "extant".into(),
                     dna: AppRoleDnaManifest {
-                        file: None,
+                        path: None,
                         modifiers: DnaModifiersOpt::none(),
                         installed_hash,
                         clone_limit: 0,

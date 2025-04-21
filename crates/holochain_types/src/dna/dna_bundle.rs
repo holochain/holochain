@@ -175,7 +175,7 @@ impl DnaBundle {
                     ZomeManifest {
                         name: name.clone(),
                         hash: Some(hash),
-                        file: format!("{}.wasm", name),
+                        path: format!("{}.wasm", name),
                         dependencies: Some(dependencies),
                     }
                 })
@@ -197,7 +197,7 @@ impl DnaBundle {
                     ZomeManifest {
                         name: name.clone(),
                         hash: Some(hash),
-                        file: format!("{}.wasm", name),
+                        path: format!("{}.wasm", name),
                         dependencies: Some(dependencies),
                     }
                 })
@@ -286,14 +286,14 @@ mod tests {
                     ZomeManifest {
                         name: "zome1".into(),
                         hash: None,
-                        file: "path1".to_string(),
+                        path: "path1".to_string(),
                         dependencies: Default::default(),
                     },
                     ZomeManifest {
                         name: "zome2".into(),
                         // Intentional wrong hash
                         hash: Some(hash1.clone().into()),
-                        file: "path2".to_string(),
+                        path: "path2".to_string(),
                         dependencies: Default::default(),
                     },
                 ],

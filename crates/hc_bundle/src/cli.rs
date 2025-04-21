@@ -545,7 +545,7 @@ pub async fn bundled_dnas_workdir_locations(
     app_workdir_location.pop();
 
     for app_role in app_manifest.app_roles() {
-        if let Some(file) = app_role.dna.file {
+        if let Some(file) = app_role.dna.path {
             let mut dna_bundle_location = PathBuf::from(file);
 
             // Remove the "DNA_NAME.yaml" portion of the path

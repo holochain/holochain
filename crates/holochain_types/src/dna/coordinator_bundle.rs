@@ -25,7 +25,7 @@ impl Manifest for CoordinatorManifest {
     fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
         self.zomes
             .iter()
-            .map(|zome| (zome.resource_id(), zome.file.clone()))
+            .map(|zome| (zome.resource_id(), zome.path.clone()))
             .collect()
     }
 

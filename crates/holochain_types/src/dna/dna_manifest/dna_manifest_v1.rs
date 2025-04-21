@@ -19,17 +19,17 @@ use serde_with::serde_as;
 ///   properties: ~
 ///   zomes:
 ///     - name: zome1
-///       file: ../dna1/zomes/zome1.wasm
+///       path: ../dna1/zomes/zome1.wasm
 ///     - name: zome2
-///       file: ../dna2/zomes/zome1.wasm
+///       path: ../dna2/zomes/zome1.wasm
 /// coordinator:
 ///   zomes:
 ///     - name: zome3
-///       file: ../dna1/zomes/zome2.wasm
+///       path: ../dna1/zomes/zome2.wasm
 ///       dependencies:
 ///         - name: zome1
 ///     - name: zome4
-///       file: ../dna2/zomes/zome2.wasm
+///       path: ../dna2/zomes/zome2.wasm
 ///       dependencies:
 ///         - name: zome2
 /// ```
@@ -48,13 +48,13 @@ use serde_with::serde_as;
 ///   properties: ~
 ///   zomes:
 ///     - name: zome1
-///       file: ../dna1/zomes/zome1.wasm
+///       path: ../dna1/zomes/zome1.wasm
 /// coordinator:
 ///   zomes:
 ///     - name: zome3
-///       file: ../dna1/zomes/zome2.wasm
+///       path: ../dna1/zomes/zome2.wasm
 ///     - name: zome4
-///       file: ../dna2/zomes/zome2.wasm
+///       path: ../dna2/zomes/zome2.wasm
 /// ```
 
 #[serde_as]
@@ -170,8 +170,8 @@ pub struct ZomeManifest {
     /// The hash of the wasm which defines this zome
     pub hash: Option<WasmHashB64>,
 
-    /// The file location of the wasm for this zome, relative to the manifest.
-    pub file: String,
+    /// The location of the WASM for this zome, relative to the manifest.
+    pub path: String,
 
     /// The integrity zomes this zome depends on.
     /// Integrity zomes should have no dependencies; leave this field `null`.
@@ -183,7 +183,7 @@ pub struct ZomeManifest {
 impl ZomeManifest {
     /// Get the [`ResourceIdentifier`] for this zome.
     pub fn resource_id(&self) -> ResourceIdentifier {
-        resource_id_for_path(&self.file).unwrap_or_else(|| format!("{}.wasm", self.name))
+        resource_id_for_path(&self.path).unwrap_or_else(|| format!("{}.wasm", self.name))
     }
 }
 

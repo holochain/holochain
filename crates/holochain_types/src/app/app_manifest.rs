@@ -70,7 +70,7 @@ impl Manifest for AppManifest {
                 .roles
                 .iter_mut()
                 .filter_map(|role| {
-                    if let Some(file) = &mut role.dna.file {
+                    if let Some(file) = &mut role.dna.path {
                         let id = resource_id_for_path(&file)?;
                         let path = file.clone();
 
@@ -90,7 +90,7 @@ impl Manifest for AppManifest {
             AppManifest::V1(m) => m
                 .roles
                 .iter()
-                .filter_map(|role| role.dna.file.clone().and_then(resource_id_for_path))
+                .filter_map(|role| role.dna.path.clone().and_then(resource_id_for_path))
                 .collect(),
         }
     }
@@ -153,7 +153,7 @@ impl AppManifest {
                     name: role_name,
                     provisioning: None,
                     dna: AppRoleDnaManifest {
-                        file: Some(file),
+                        path: Some(file),
                         modifiers: Default::default(),
                         installed_hash: None,
                         clone_limit: 256,
@@ -202,7 +202,7 @@ mod tests {
                 .first()
                 .unwrap()
                 .dna
-                .file
+                .path
                 .clone()
                 .and_then(resource_id_for_path)
                 .unwrap()],

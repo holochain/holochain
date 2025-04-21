@@ -50,7 +50,7 @@ pub enum AppRoleManifestValidated {
     Create {
         clone_limit: u32,
         deferred: bool,
-        file: String,
+        path: String,
         modifiers: DnaModifiersOpt,
         installed_hash: Option<DnaHashB64>,
     },
@@ -65,7 +65,7 @@ pub enum AppRoleManifestValidated {
     /// This case requires `clone_limit > 0`, otherwise no Cells will ever be created.
     CloneOnly {
         clone_limit: u32,
-        file: String,
+        path: String,
         modifiers: DnaModifiersOpt,
         installed_hash: Option<DnaHashB64>,
     },

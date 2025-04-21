@@ -292,7 +292,7 @@ pub async fn register_and_install_dna_named(
     let roles = vec![AppRoleManifest {
         name: role_name,
         dna: AppRoleDnaManifest {
-            file: Some(resource_id.clone()),
+            path: Some(resource_id.clone()),
             modifiers: mods,
             installed_hash: None,
             clone_limit: 0,

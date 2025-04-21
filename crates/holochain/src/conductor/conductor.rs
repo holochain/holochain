@@ -3345,7 +3345,7 @@ pub fn app_manifest_from_dnas(
             AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {
-                    file: Some(format!("{}", dna.dna_hash())),
+                    path: Some(format!("{}", dna.dna_hash())),
                     modifiers,
                     installed_hash: Some(dr.dna().dna_hash().clone().into()),
                     clone_limit,

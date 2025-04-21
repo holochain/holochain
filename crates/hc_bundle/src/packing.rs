@@ -122,11 +122,11 @@ integrity:
       props: yay
     zomes:
       - name: zome1
-        file: zome-1.wasm
+        path: zome-1.wasm
       - name: zome2
-        file: nested/zome-2.wasm
+        path: nested/zome-2.wasm
       - name: zome3
-        file: ../zome-3.wasm
+        path: ../zome-3.wasm
         "#;
 
         // Create files in working directory

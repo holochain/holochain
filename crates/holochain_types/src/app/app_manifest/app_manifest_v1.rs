@@ -80,9 +80,11 @@ impl AppRoleManifest {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct AppRoleDnaManifest {
-    /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
-    /// use a local relative path that corresponds with the bundle structure.
-    pub file: Option<String>,
+    /// Where to find this DNA.
+    ///
+    /// The DNA bundle at this path is included in the hApp bundle. The path is resolved relative
+    /// to this app manifest file.
+    pub path: Option<String>,
 
     /// Optional default modifier values.
     ///
@@ -113,7 +115,7 @@ impl AppRoleDnaManifest {
     /// Create a sample AppRoleDnaManifest as a template to be followed
     pub fn sample() -> Self {
         Self {
-            file: Some("./path/to/my/dnabundle.dna".to_string()),
+            path: Some("./path/to/my/dnabundle.dna".to_string()),
             modifiers: DnaModifiersOpt::none(),
             installed_hash: None,
             clone_limit: 0,
@@ -218,7 +220,7 @@ impl AppManifestV1 {
                      dna,
                  }| {
                     let AppRoleDnaManifest {
-                        file,
+                        path,
                         installed_hash,
                         clone_limit,
                         modifiers,
@@ -230,7 +232,7 @@ impl AppManifestV1 {
                         CellProvisioning::Create { deferred } => AppRoleManifestValidated::Create {
                             deferred,
                             clone_limit,
-                            file: Self::require(file, "roles.dna.file")?,
+                            path: Self::require(path, "roles.dna.path")?,
                             modifiers,
                             installed_hash,
                         },
@@ -245,7 +247,7 @@ impl AppManifestV1 {
                         }
                         CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
-                            file: Self::require(file, "roles.dna.file")?,
+                            path: Self::require(path, "roles.dna.path")?,
                             installed_hash,
                             modifiers,
                         },
@@ -292,7 +294,7 @@ pub mod tests {
         let roles = vec![AppRoleManifest {
             name: "role_name".into(),
             dna: AppRoleDnaManifest {
-                file,
+                path: file,
                 modifiers,
                 installed_hash: Some(installed_hash.into()),
                 clone_limit: 50,
@@ -334,7 +336,7 @@ roles:
       strategy: "create"
       deferred: false
     dna:
-      file: /tmp/test.dna
+      path: /tmp/test.dna
       installed_hash: {}
       clone_limit: 50
       network_seed: network_seed
@@ -377,7 +379,7 @@ roles:
                 name: "test-role-1".to_string(),
                 provisioning: None,
                 dna: AppRoleDnaManifest {
-                    file: None,
+                    path: None,
                     modifiers: DnaModifiersOpt::none(),
                     installed_hash: None,
                     clone_limit: 0,
@@ -387,7 +389,7 @@ roles:
                 name: "test-role-2".to_string(),
                 provisioning: None,
                 dna: AppRoleDnaManifest {
-                    file: None,
+                    path: None,
                     modifiers: DnaModifiersOpt::none(),
                     installed_hash: None,
                     clone_limit: 0,

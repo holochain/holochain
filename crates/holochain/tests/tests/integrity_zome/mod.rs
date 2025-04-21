@@ -231,7 +231,7 @@ async fn test_update_admin_interface() {
         zomes: vec![ZomeManifest {
             name: TestCoordinatorWasm::CoordinatorZomeUpdate.into(),
             hash: None,
-            file: path.display().to_string(),
+            path: path.display().to_string(),
             dependencies: Some(vec![ZomeDependency {
                 name: TestIntegrityWasm::IntegrityZome.into(),
             }]),

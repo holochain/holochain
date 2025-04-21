@@ -28,7 +28,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         AppRoleManifest {
             name: role_name_1.clone(),
             dna: AppRoleDnaManifest {
-                file: Some(path.clone()),
+                path: Some(path.clone()),
                 modifiers: modifiers.clone(),
                 // Note that there is no installed hash provided. We'll check that this changes later.
                 installed_hash: None,
@@ -39,7 +39,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         AppRoleManifest {
             name: role_name_2.clone(),
             dna: AppRoleDnaManifest {
-                file: Some(path.clone()),
+                path: Some(path.clone()),
                 modifiers: modifiers.clone(),
                 // Note that there is no installed hash provided. We'll check that this changes later.
                 installed_hash: None,
@@ -204,7 +204,7 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
     let roles = vec![AppRoleManifest {
         name: role_name.clone(),
         dna: AppRoleDnaManifest {
-            file: Some(path.clone()),
+            path: Some(path.clone()),
             modifiers: modifiers.clone(),
             // Note that there is no installed hash provided. We'll check that this changes later.
             installed_hash: None,
