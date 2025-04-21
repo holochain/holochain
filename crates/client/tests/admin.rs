@@ -93,8 +93,6 @@ async fn signed_zome_call() {
         .unwrap();
     signer.add_credentials(cell_id.clone(), credentials);
 
-    println!("Cell ID: {:?}", cell_id);
-
     let response = app_ws
         .call_zome(
             cell_id.into(),

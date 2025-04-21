@@ -88,8 +88,5 @@ fn get_test_wasm_pair(wasm: TestWasm) -> (ResourceBytes, ResourceBytes) {
     let integrity = std::fs::read(base.join(integrity_path)).unwrap();
     let coordinator = std::fs::read(base.join(coordinator_path)).unwrap();
 
-    println!("Integrity length = {}", integrity.len());
-    println!("Coordinator length = {}", coordinator.len());
-
     (integrity.into(), coordinator.into())
 }
