@@ -39,9 +39,11 @@ tokio = { version = "1.36", features = ["rt"] }
 bytes = "1.10.1"
 fixt = { version = "^0.6.0-dev.0", path = "../fixt" }
 futures = "0.3.31"
+mr_bundle = { version = "0.6.0-dev.0", path = "../mr_bundle" }
 holochain = { version = "^0.6.0-dev.0", path = "../holochain", default-features = false, features = [
   "sweettest",
 ] }
+holochain_wasm_test_utils = { version = "^0.6.0-dev.0", path = "../test_utils/wasm" }
 
 kitsune2_core = "0.1.5"
 serde_yaml = "0.9"
@@ -53,3 +55,5 @@ lair_signing = ["dep:lair_keystore_api"]
 
 wasmer_sys = ["holochain/wasmer_sys"]
 wasmer_wamr = ["holochain/wasmer_wamr"]
+
+build_wasms = ["holochain_wasm_test_utils/build"]
