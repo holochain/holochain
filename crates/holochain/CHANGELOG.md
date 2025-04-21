@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Refactor Mr. Bundle which affects the manifest types in `holochain_types`.
-- Existing app bundles cannot be used. You can either rebundle existing happs with `hc-bundle` and the `--raw` flag or 
+- **BREAKING** Existing app bundles cannot be used. You can either rebundle existing happs with `hc-bundle` and the `--raw` flag or 
   issue a new version of your app, packaged for Holochain 0.6.
 
 ## 0.6.0-dev.0
