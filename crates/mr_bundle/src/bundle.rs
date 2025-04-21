@@ -52,7 +52,7 @@ where
 
     /// Pack this bundle into a byte array.
     ///
-    /// Uses [`pack`](crate::pack) to produce the byte array.
+    /// Uses [`pack`](fn@crate::pack) to produce the byte array.
     pub fn pack(&self) -> MrBundleResult<bytes::Bytes> {
         crate::pack(self)
     }

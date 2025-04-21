@@ -8,7 +8,7 @@
 //! the resources that should be included in the bundle. A Bundle can be
 //! serialized and written to a file.
 //!
-//! With the `fs` feature, the [`FileSystemBundler`] can be used to work with
+//! With the `fs` feature, the `FileSystemBundler` can be used to work with
 //! bundles on the file system.
 //!
 //! # Example: In-memory bundle
@@ -66,7 +66,7 @@
 //! // Then do something with the bytes...
 //! ```
 //!
-//! # Example: Bundle to the file system.
+//! # Example: Bundle to the file system
 //!
 //!
 //! ```rust,no_run
