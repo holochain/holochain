@@ -138,16 +138,16 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod bundle;
-mod encoding;
 pub mod error;
 #[cfg(feature = "fs")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
 mod fs;
 mod manifest;
+mod pack;
 
 pub use bundle::{resource::ResourceBytes, Bundle, ResourceMap};
-pub use encoding::{pack, unpack};
 pub use manifest::{Manifest, ResourceIdentifier};
+pub use pack::{pack, unpack};
 
 #[cfg(feature = "fs")]
 pub use fs::{resource_id_for_path, FileSystemBundler};
