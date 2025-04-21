@@ -15,7 +15,7 @@ pub fn pack<T: serde::ser::Serialize>(data: &T) -> MrBundleResult<bytes::Bytes> 
         .into())
 }
 
-/// Decompress and deserialize some a bundle
+/// Decompress and deserialize a bundle
 ///
 /// This operation is the inverse of [`pack`].
 pub fn unpack<T: serde::de::DeserializeOwned>(compressed: impl Read) -> MrBundleResult<T> {
