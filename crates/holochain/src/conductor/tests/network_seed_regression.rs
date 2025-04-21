@@ -1,13 +1,12 @@
 // `cargo clippy --tests` emits warnings without this
 #![allow(dead_code)]
 
-use ::fixt::prelude::strum_macros;
-use std::{fmt::Display, path::PathBuf};
-use tempfile::{tempdir, TempDir};
-
 use crate::sweettest::*;
+use ::fixt::prelude::strum_macros;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use std::fmt::Display;
+use tempfile::{tempdir, TempDir};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn network_seed_regression() {
@@ -16,22 +15,22 @@ async fn network_seed_regression() {
     let (dna, _, _) = SweetDnaFile::from_test_wasms(
         "".into(),
         vec![TestWasm::Create],
-        holochain_serialized_bytes::SerializedBytes::default(),
+        SerializedBytes::default(),
     )
     .await;
 
     let dna_path = tmp.as_ref().join("the.dna");
-    DnaBundle::from_dna_file(dna)
-        .unwrap()
-        .write_to_file(&dna_path)
+    let bundle = DnaBundle::from_dna_file(dna).unwrap();
+    tokio::fs::write(&dna_path, bundle.pack().unwrap())
         .await
         .unwrap();
 
+    let dna_resource_id = dna_path.file_name().unwrap().to_str().unwrap().to_string();
     let manifest = {
         let roles = vec![AppRoleManifest {
             name: "rolename".into(),
             dna: AppRoleDnaManifest {
-                location: Some(DnaLocation::Path(dna_path)),
+                path: Some(dna_resource_id.clone()),
                 modifiers: DnaModifiersOpt::default(),
                 installed_hash: None,
                 clone_limit: 0,
@@ -47,15 +46,14 @@ async fn network_seed_regression() {
             .unwrap()
     };
 
-    let bundle1 = AppBundle::new(manifest.clone().into(), vec![], PathBuf::from("."))
-        .await
+    let resources = vec![(dna_resource_id, bundle)];
+    let bundle1 = AppBundle::new(manifest.clone().into(), resources.clone())
         .unwrap()
-        .encode()
+        .pack()
         .unwrap();
-    let bundle2 = AppBundle::new(manifest.into(), vec![], PathBuf::from("."))
-        .await
+    let bundle2 = AppBundle::new(manifest.into(), resources)
         .unwrap()
-        .encode()
+        .pack()
         .unwrap();
 
     // if both of these apps can be installed under the same agent, the
@@ -97,7 +95,7 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     let (dna, _, _) = SweetDnaFile::from_test_wasms(
         "".to_string(),
         vec![TestWasm::Create],
-        holochain_serialized_bytes::SerializedBytes::default(),
+        SerializedBytes::default(),
     )
     .await;
 
@@ -108,9 +106,8 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
             if seed != Seed::None {
                 dna = dna.with_network_seed(seed.to_string()).await;
             }
-            DnaBundle::from_dna_file(dna.clone())
-                .unwrap()
-                .write_to_file(&path)
+            let bundle = DnaBundle::from_dna_file(dna.clone()).unwrap();
+            tokio::fs::write(&path, bundle.pack().unwrap())
                 .await
                 .unwrap();
             dna
@@ -126,12 +123,7 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
         _start: std::time::Instant::now(),
     };
 
-    use Location::*;
     use Seed::*;
-
-    let both = [Bundle, Path];
-
-    let all_locs = both.iter().flat_map(|a| both.iter().map(|b| (*a, *b)));
 
     // Build up two equality groups. All outcomes in each group should have equal hashes,
     // and each group's hash should be different from the other group's hash.
@@ -143,26 +135,22 @@ async fn network_seed_affects_dna_hash_when_app_bundle_is_installed() {
     // There is no need for a group_b since "A" and "B" are essentially interchangeable
 
     // Populate the groups with all (most) possible combinations of seed values and location specifiers
-    for (app_loc, dna_loc) in all_locs {
-        group_0.extend([TestCase(None, None, None, app_loc, dna_loc)
-            .install(&c)
-            .await]);
-        group_a.extend([
-            TestCase(A, None, None, app_loc, dna_loc).install(&c).await,
-            TestCase(None, A, None, app_loc, dna_loc).install(&c).await,
-            TestCase(None, None, A, app_loc, dna_loc).install(&c).await,
-            //
-            TestCase(A, A, None, app_loc, dna_loc).install(&c).await,
-            TestCase(A, None, A, app_loc, dna_loc).install(&c).await,
-            TestCase(None, A, A, app_loc, dna_loc).install(&c).await,
-            //
-            TestCase(A, B, None, app_loc, dna_loc).install(&c).await,
-            TestCase(A, None, B, app_loc, dna_loc).install(&c).await,
-            TestCase(None, A, B, app_loc, dna_loc).install(&c).await,
-            //
-            TestCase(A, B, B, app_loc, dna_loc).install(&c).await,
-        ]);
-    }
+    group_0.extend([TestCase(None, None, None).install(&c).await]);
+    group_a.extend([
+        TestCase(A, None, None).install(&c).await,
+        TestCase(None, A, None).install(&c).await,
+        TestCase(None, None, A).install(&c).await,
+        //
+        TestCase(A, A, None).install(&c).await,
+        TestCase(A, None, A).install(&c).await,
+        TestCase(None, A, A).install(&c).await,
+        //
+        TestCase(A, B, None).install(&c).await,
+        TestCase(A, None, B).install(&c).await,
+        TestCase(None, A, B).install(&c).await,
+        //
+        TestCase(A, B, B).install(&c).await,
+    ]);
 
     // It would be preferable to use join_all here to let all installations happen
     // in parallel, but it causes timeouts in macos tests. If it's ever determined
@@ -198,12 +186,6 @@ struct TestcaseCommon {
     _start: std::time::Instant,
 }
 
-#[derive(Clone, Copy, Debug, strum_macros::Display)]
-enum Location {
-    Path,
-    Bundle,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum_macros::Display)]
 enum Seed {
     None,
@@ -212,11 +194,11 @@ enum Seed {
 }
 
 #[derive(Debug)]
-struct TestCase(Seed, Seed, Seed, Location, Location);
+struct TestCase(Seed, Seed, Seed);
 
 impl Display for TestCase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-{}-{}-{}-{}", self.0, self.1, self.2, self.3, self.4,)
+        write!(f, "{}-{}-{}", self.0, self.1, self.2)
     }
 }
 
@@ -224,7 +206,7 @@ impl TestCase {
     async fn install(self, common: &TestcaseCommon) -> (DnaHash, Self) {
         let case = self;
         let case_str = case.to_string();
-        let TestCase(app_seed, role_seed, dna_seed, app_loc, dna_loc) = case;
+        let TestCase(app_seed, role_seed, dna_seed) = case;
         let dna = match dna_seed {
             Seed::None => common.dnas[0].clone(),
             Seed::A => common.dnas[1].clone(),
@@ -239,57 +221,26 @@ impl TestCase {
             Seed::B => DnaModifiersOpt::none().with_network_seed(Seed::B.to_string()),
         };
 
-        let dna_path = common.tmp.as_ref().join(format!("{dna_seed}.dna"));
+        let hashpath = dna_hash.to_string();
+        let roles = vec![AppRoleManifest {
+            name: "rolename".into(),
+            dna: AppRoleDnaManifest {
+                path: Some(hashpath.clone()),
+                modifiers: dna_modifiers.clone(),
+                installed_hash: None,
+                clone_limit: 10,
+            },
+            provisioning: Some(CellProvisioning::Create { deferred: false }),
+        }];
+        let manifest = AppManifestCurrentBuilder::default()
+            .name(case_str.clone())
+            .description(None)
+            .roles(roles)
+            .build()
+            .unwrap();
+        let resources = vec![(hashpath, DnaBundle::from_dna_file(dna.clone()).unwrap())];
 
-        let bundle = match dna_loc {
-            Location::Bundle => {
-                let hashpath = PathBuf::from(dna_hash.to_string());
-                let roles = vec![AppRoleManifest {
-                    name: "rolename".into(),
-                    dna: AppRoleDnaManifest {
-                        location: Some(DnaLocation::Bundled(hashpath.clone())),
-                        modifiers: dna_modifiers.clone(),
-                        installed_hash: None,
-                        clone_limit: 10,
-                    },
-                    provisioning: Some(CellProvisioning::Create { deferred: false }),
-                }];
-                let manifest = AppManifestCurrentBuilder::default()
-                    .name(case_str.clone())
-                    .description(None)
-                    .roles(roles)
-                    .build()
-                    .unwrap();
-                let resources = vec![(hashpath, DnaBundle::from_dna_file(dna.clone()).unwrap())];
-
-                AppBundle::new(manifest.into(), resources, PathBuf::from("."))
-                    .await
-                    .unwrap()
-            }
-            Location::Path => {
-                // use path
-                let roles = vec![AppRoleManifest {
-                    name: "rolename".into(),
-                    dna: AppRoleDnaManifest {
-                        location: Some(DnaLocation::Path(dna_path.clone())),
-                        modifiers: dna_modifiers.clone(),
-                        installed_hash: Some(dna_hash.clone().into()),
-                        clone_limit: 0,
-                    },
-                    provisioning: None,
-                }];
-
-                let manifest = AppManifestCurrentBuilder::default()
-                    .name(case_str.clone())
-                    .description(None)
-                    .roles(roles)
-                    .build()
-                    .unwrap();
-                AppBundle::new(manifest.into(), vec![], PathBuf::from("."))
-                    .await
-                    .unwrap()
-            }
-        };
+        let bundle = AppBundle::new(manifest.into(), resources).unwrap();
 
         let network_seed = match app_seed {
             Seed::None => None,
@@ -297,18 +248,8 @@ impl TestCase {
             Seed::B => Some(Seed::B.to_string()),
         };
 
-        let source = match app_loc {
-            Location::Path => {
-                // Unnecessary duplication, but it's ok.
-                let happ_path = common.tmp.as_ref().join(&case_str);
-                bundle.write_to_file(&happ_path).await.unwrap();
-                AppBundleSource::Path(happ_path)
-            }
-            Location::Bundle => {
-                let bundle_bytes = bundle.encode().unwrap();
-                AppBundleSource::Bytes(bundle_bytes)
-            }
-        };
+        let bundle_bytes = bundle.pack().unwrap();
+        let source = AppBundleSource::Bytes(bundle_bytes);
 
         let app = common
             .conductor

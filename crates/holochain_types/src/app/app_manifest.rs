@@ -37,8 +37,8 @@
 //!   the acceptable range of versions, and the cloning limitations.
 
 use holochain_zome_types::prelude::*;
-use mr_bundle::{Location, Manifest};
-use std::path::PathBuf;
+use mr_bundle::{resource_id_for_path, Manifest, ResourceIdentifier};
+use std::collections::HashMap;
 
 pub(crate) mod app_manifest_v1;
 pub mod app_manifest_validated;
@@ -64,18 +64,39 @@ pub enum AppManifest {
 }
 
 impl Manifest for AppManifest {
-    fn locations(&self) -> Vec<Location> {
+    fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
         match self {
             AppManifest::V1(m) => m
                 .roles
-                .iter()
-                .filter_map(|role| role.dna.location.clone())
+                .iter_mut()
+                .filter_map(|role| {
+                    if let Some(file) = &mut role.dna.path {
+                        let id = resource_id_for_path(&file)?;
+                        let path = file.clone();
+
+                        *file = id.clone();
+
+                        Some((id, path))
+                    } else {
+                        None
+                    }
+                })
                 .collect(),
         }
     }
 
-    fn path() -> PathBuf {
-        "happ.yaml".into()
+    fn resource_ids(&self) -> Vec<ResourceIdentifier> {
+        match self {
+            AppManifest::V1(m) => m
+                .roles
+                .iter()
+                .filter_map(|role| role.dna.path.clone().and_then(resource_id_for_path))
+                .collect(),
+        }
+    }
+
+    fn file_name() -> &'static str {
+        "happ.yaml"
     }
 
     fn bundle_extension() -> &'static str {
@@ -127,12 +148,12 @@ impl AppManifest {
     pub fn from_legacy(cells: impl Iterator<Item = InstalledCell>) -> Self {
         let roles = cells
             .map(|InstalledCell { role_name, .. }| {
-                let path = PathBuf::from(role_name.clone());
+                let file = role_name.clone();
                 AppRoleManifest {
                     name: role_name,
                     provisioning: None,
                     dna: AppRoleDnaManifest {
-                        location: Some(mr_bundle::Location::Bundled(path)),
+                        path: Some(file),
                         modifiers: Default::default(),
                         installed_hash: None,
                         clone_limit: 256,
@@ -153,8 +174,7 @@ impl AppManifest {
 
 #[cfg(test)]
 mod tests {
-
-    use mr_bundle::Manifest;
+    use mr_bundle::{resource_id_for_path, Manifest};
 
     use crate::app::app_manifest::{AppManifest, AppManifestV1Builder, AppRoleManifest};
 
@@ -182,10 +202,11 @@ mod tests {
                 .first()
                 .unwrap()
                 .dna
-                .location
+                .path
                 .clone()
+                .and_then(resource_id_for_path)
                 .unwrap()],
-            sample_app_manifest.locations()
+            sample_app_manifest.resource_ids()
         );
     }
 }

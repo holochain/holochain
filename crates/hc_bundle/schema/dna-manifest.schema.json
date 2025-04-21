@@ -77,17 +77,9 @@
           "type": "string",
           "description": "The hash of the wasm which defines this zome"
         },
-        "bundled": {
-          "type": "string",
-          "description": "Expect file to be part of this bundle"
-        },
         "path": {
           "type": "string",
-          "description": "Get file from local filesystem (not bundled)"
-        },
-        "url": {
-          "type": "string",
-          "description": "Get file from URL"
+          "description": "Expect file to be part of this bundle"
         },
         "dependencies": {
           "type": "array",

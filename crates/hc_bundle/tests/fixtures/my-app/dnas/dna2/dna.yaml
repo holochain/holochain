@@ -6,6 +6,6 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: ./zomes/zome1.wasm
+      path: ./zomes/zome21.wasm
     - name: zome2
-      bundled: ./zomes/zome2.wasm
+      path: ./zomes/zome22.wasm

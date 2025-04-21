@@ -15,6 +15,7 @@ use crate::{dna::DnaBundle, prelude::*};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
+use bytes::Buf;
 use derive_more::Into;
 pub use error::*;
 use holo_hash::{AgentPubKey, DnaHash};
@@ -251,17 +252,17 @@ pub enum AppBundleSource {
     Bytes(bytes::Bytes),
     /// A local file path
     Path(PathBuf),
-    // /// A URL
-    // Url(String),
 }
 
 impl AppBundleSource {
     /// Get the bundle from the source. Consumes the source.
     pub async fn resolve(self) -> Result<AppBundle, AppBundleError> {
         Ok(match self {
-            Self::Bytes(bytes) => AppBundle::decode(bytes)?,
-            Self::Path(path) => AppBundle::decode(ffs::read(&path).await?.into())?,
-            // Self::Url(url) => todo!("reqwest::get"),
+            Self::Bytes(bytes) => AppBundle::unpack(bytes.reader())?,
+            Self::Path(path) => {
+                let content = ffs::read(&path).await?;
+                AppBundle::unpack(content.as_slice())?
+            }
         })
     }
 }

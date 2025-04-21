@@ -10,13 +10,13 @@ name: test_dna
 integrity:
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome1
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
         "#;
 
     let manifest = serde_yaml::from_str::<DnaManifest>(manifest_yaml).unwrap();
@@ -35,17 +35,17 @@ name: test_dna
 integrity:
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
       dependencies:
         - name: zome20
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
         "#;
@@ -64,9 +64,9 @@ name: test_dna
 integrity:
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
       dependencies:
         - name: zome3
         - name: zome4
@@ -75,7 +75,7 @@ integrity:
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
         "#;
@@ -94,9 +94,9 @@ name: test_dna
 integrity:
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
       dependencies:
         - name: zome3
         - name: zome2
@@ -105,7 +105,7 @@ integrity:
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
         "#;

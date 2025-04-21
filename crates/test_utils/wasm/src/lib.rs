@@ -510,6 +510,5 @@ async fn path_to_def(path: PathBuf, dependencies: Vec<ZomeName>) -> ZomeDef {
     ZomeDef::Wasm(WasmZome {
         wasm_hash,
         dependencies,
-        preserialized_path: None,
     })
 }

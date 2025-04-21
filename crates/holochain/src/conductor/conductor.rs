@@ -3340,13 +3340,12 @@ pub fn app_manifest_from_dnas(
         .iter()
         .map(|dr| {
             let dna = dr.dna();
-            let path = PathBuf::from(format!("{}", dna.dna_hash()));
             let mut modifiers = DnaModifiersOpt::none();
             modifiers.network_seed.clone_from(&network_seed);
             AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {
-                    location: Some(DnaLocation::Bundled(path.clone())),
+                    path: Some(format!("{}", dna.dna_hash())),
                     modifiers,
                     installed_hash: Some(dr.dna().dna_hash().clone().into()),
                     clone_limit,

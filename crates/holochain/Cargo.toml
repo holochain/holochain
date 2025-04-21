@@ -54,7 +54,9 @@ itertools = { version = "0.12" }
 kitsune2_api = "0.1.5"
 kitsune2_core = "0.1.5"
 mockall = "0.11.3"
-mr_bundle = { version = "^0.6.0-dev.0", path = "../mr_bundle" }
+mr_bundle = { version = "^0.6.0-dev.0", path = "../mr_bundle", features = [
+  "fs",
+] }
 must_future = "0.1.1"
 nanoid = "0.4"
 holochain_trace = { version = "^0.6.0-dev.0", path = "../holochain_trace" }
@@ -211,6 +213,7 @@ test_utils = [
   "async-once-cell",
   "get_if_addrs",
   "holo_hash/fixturators",
+  "dep:bytes",
 ]
 
 fuzzing = []

@@ -34,6 +34,7 @@ use tokio::process::Child;
 use tokio::process::Command;
 
 pub use holochain::sweettest::websocket_client_by_port;
+use mr_bundle::FileSystemBundler;
 
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
@@ -276,18 +277,22 @@ pub async fn register_and_install_dna_named(
         ..Default::default()
     };
 
-    let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
-    let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();
+    let dna_bundle1 = FileSystemBundler::load_from::<ValidatedDnaManifest>(&dna_path)
+        .await
+        .map(DnaBundle::from)
+        .unwrap();
+    let dna_bundle = dna_bundle1.clone();
     let (dna, _) = dna_bundle1
         .into_dna_file(mods.clone().serialized().unwrap())
         .await
         .unwrap();
     let dna_hash = dna.dna_hash().clone();
 
+    let resource_id = dna_path.file_name().unwrap().to_str().unwrap().to_string();
     let roles = vec![AppRoleManifest {
         name: role_name,
         dna: AppRoleDnaManifest {
-            location: Some(DnaLocation::Bundled(dna_path.clone())),
+            path: Some(resource_id.clone()),
             modifiers: mods,
             installed_hash: None,
             clone_limit: 0,
@@ -302,12 +307,11 @@ pub async fn register_and_install_dna_named(
         .build()
         .unwrap();
 
-    let resources = vec![(dna_path.clone(), dna_bundle)];
+    let resources = vec![(resource_id, dna_bundle)];
 
-    let bundle = AppBundle::new(manifest.clone().into(), resources, dna_path.clone())
-        .await
+    let bundle = AppBundle::new(manifest.clone().into(), resources)
         .unwrap()
-        .encode()
+        .pack()
         .expect("failed to encode AppBundle to bytes");
 
     let payload = InstallAppPayload {

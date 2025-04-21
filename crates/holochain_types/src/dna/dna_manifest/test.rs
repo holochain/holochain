@@ -11,9 +11,9 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
       "#;
@@ -32,15 +32,15 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
         "#;
@@ -61,7 +61,7 @@ integrity:
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
         "#;
@@ -81,9 +81,9 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
 not_a_real_field: ~"#;
@@ -107,16 +107,16 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
   # Should be indented left once, this is actually nested under `integrity`
   coordinator:
     zomes:
       - name: zome4
-        bundled: zome-4.wasm
+        path: zome-4.wasm
       - name: zome5
         path: ../zome-5.wasm"#;
 
@@ -137,7 +137,7 @@ name: test_dna
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
   # Should be indented left once, this is actually nested under `coordinator`
@@ -146,9 +146,9 @@ coordinator:
     properties: ~
     zomes:
       - name: zome1
-        bundled: zome-1.wasm
+        path: zome-1.wasm
       - name: zome2
-        bundled: nested/zome-2.wasm
+        path: nested/zome-2.wasm
       - name: zome3
         path: ../zome-3.wasm"#;
 
@@ -172,9 +172,9 @@ integrity:
   not_a_real_field: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
 "#;
@@ -197,7 +197,7 @@ coordinator:
   not_a_real_field: ~
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
         "#;
@@ -221,9 +221,9 @@ integrity:
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
       not_a_real_field: ~
     - name: zome3
       path: ../zome-3.wasm
@@ -246,7 +246,7 @@ name: test_dna
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
       not_a_real_field: ~

@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Refactor Mr. Bundle which affects the manifest types in `holochain_types`.
+- **BREAKING** Existing app bundles cannot be used. You can either rebundle existing happs with `hc-bundle` and the `--raw` flag or 
+  issue a new version of your app, packaged for Holochain 0.6.
+
 ## 0.6.0-dev.0
 
 - Remove unstable feature DPKI and all references to it, including the DPKI conductor service. DPKI was introduced to the codebase prematurely, largely untested, provided only a minimal set of calls to query agent keys and revoke an agent key, and kept causing problems that were disproportionately difficult to debug. If Holochain will be enhanced by agent key management in the future, it will be reimplemented from the ground up.

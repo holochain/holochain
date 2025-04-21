@@ -7,9 +7,9 @@ roles:
       strategy: create
       deferred: false
     dna:
-      bundled: dna/a dna.dna
+      path: dna/a dna.dna
       modifiers:
-        network_seed: 0123456
+        network_seed: "0123456"
         properties: ~
       clone_limit: 0
   - name: role-2
@@ -17,9 +17,9 @@ roles:
       strategy: create
       deferred: false
     dna:
-      bundled: dna/a dna.dna
+      path: dna/a dna.dna
       modifiers:
-        network_seed: 0123456
+        network_seed: "0123456"
         properties: ~
       clone_limit: 0
   - name: role-3
@@ -27,7 +27,7 @@ roles:
       strategy: create
       deferred: false
     dna:
-      bundled: dna/a dna.dna
+      path: dna/a dna.dna
       modifiers:
         network_seed: "should remain untouched by roles settings test"
         properties: "should remain untouched by roles settings test"

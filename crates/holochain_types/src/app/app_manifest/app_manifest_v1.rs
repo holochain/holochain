@@ -80,13 +80,11 @@ impl AppRoleManifest {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct AppRoleDnaManifest {
-    /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
-    /// use a local relative path that corresponds with the bundle structure.
+    /// Where to find this DNA.
     ///
-    /// Note that since this is flattened,
-    /// there is no actual "location" key in the manifest.
-    #[serde(flatten)]
-    pub location: Option<mr_bundle::Location>,
+    /// The DNA bundle at this path is included in the hApp bundle. The path is resolved relative
+    /// to this app manifest file.
+    pub path: Option<String>,
 
     /// Optional default modifier values.
     ///
@@ -117,18 +115,13 @@ impl AppRoleDnaManifest {
     /// Create a sample AppRoleDnaManifest as a template to be followed
     pub fn sample() -> Self {
         Self {
-            location: Some(mr_bundle::Location::Bundled(
-                "./path/to/my/dnabundle.dna".into(),
-            )),
+            path: Some("./path/to/my/dnabundle.dna".to_string()),
             modifiers: DnaModifiersOpt::none(),
             installed_hash: None,
             clone_limit: 0,
         }
     }
 }
-
-/// Specifies remote, local, or bundled location of DNA
-pub type DnaLocation = mr_bundle::Location;
 
 /// Rules to determine if and how a Cell will be created for this Dna
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -227,7 +220,7 @@ impl AppManifestV1 {
                      dna,
                  }| {
                     let AppRoleDnaManifest {
-                        location,
+                        path,
                         installed_hash,
                         clone_limit,
                         modifiers,
@@ -239,7 +232,7 @@ impl AppManifestV1 {
                         CellProvisioning::Create { deferred } => AppRoleManifestValidated::Create {
                             deferred,
                             clone_limit,
-                            location: Self::require(location, "roles.dna.(path|url)")?,
+                            path: Self::require(path, "roles.dna.path")?,
                             modifiers,
                             installed_hash,
                         },
@@ -254,7 +247,7 @@ impl AppManifestV1 {
                         }
                         CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
-                            location: Self::require(location, "roles.dna.(path|url)")?,
+                            path: Self::require(path, "roles.dna.path")?,
                             installed_hash,
                             modifiers,
                         },
@@ -278,7 +271,6 @@ pub mod tests {
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
-    use std::path::PathBuf;
 
     #[derive(serde::Serialize, serde::Deserialize)]
     struct Props {
@@ -295,14 +287,14 @@ pub mod tests {
     }
 
     pub async fn app_manifest_fixture(
-        location: Option<mr_bundle::Location>,
+        file: Option<String>,
         installed_hash: DnaHash,
         modifiers: DnaModifiersOpt<YamlProperties>,
     ) -> AppManifestV1 {
         let roles = vec![AppRoleManifest {
             name: "role_name".into(),
             dna: AppRoleDnaManifest {
-                location,
+                path: file,
                 modifiers,
                 installed_hash: Some(installed_hash.into()),
                 clone_limit: 50,
@@ -311,7 +303,7 @@ pub mod tests {
         }];
         AppManifestV1 {
             name: "Test app".to_string(),
-            description: Some("Serialization roundtrip test".to_string()),
+            description: Some("Serialization round trip test".to_string()),
             roles,
             allow_deferred_memproofs: false,
         }
@@ -319,13 +311,13 @@ pub mod tests {
 
     #[tokio::test]
     async fn manifest_v1_roundtrip() {
-        let location = Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna")));
+        let file = Some("/tmp/test.dna".to_string());
         let modifiers = DnaModifiersOpt {
             properties: Some(app_manifest_properties_fixture()),
             network_seed: Some("network_seed".into()),
         };
         let installed_hash = fixt!(DnaHash);
-        let manifest = app_manifest_fixture(location, installed_hash.clone(), modifiers).await;
+        let manifest = app_manifest_fixture(file, installed_hash.clone(), modifiers).await;
         let manifest = AppManifest::from(manifest);
         let manifest_yaml = serde_yaml::to_string(&manifest).unwrap();
         let manifest_roundtrip = serde_yaml::from_str(&manifest_yaml).unwrap();
@@ -387,7 +379,7 @@ roles:
                 name: "test-role-1".to_string(),
                 provisioning: None,
                 dna: AppRoleDnaManifest {
-                    location: None,
+                    path: None,
                     modifiers: DnaModifiersOpt::none(),
                     installed_hash: None,
                     clone_limit: 0,
@@ -397,7 +389,7 @@ roles:
                 name: "test-role-2".to_string(),
                 provisioning: None,
                 dna: AppRoleDnaManifest {
-                    location: None,
+                    path: None,
                     modifiers: DnaModifiersOpt::none(),
                     installed_hash: None,
                     clone_limit: 0,
