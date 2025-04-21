@@ -20,7 +20,7 @@ pub trait Manifest:
     /// Ask the manifest to produce resource ids and a locator for the resources.
 ``
     ///
-    /// After the operations completes, the manifest must have replaced its resource
+    /// After the operations complete, the manifest must have replaced its resource
     /// locators with the generated ids. The returned map must contain the pairs of
     /// resource ids and their original locators.
     ///
