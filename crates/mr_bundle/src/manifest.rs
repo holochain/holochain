@@ -17,7 +17,8 @@ pub type ResourceIdentifier = String;
 pub trait Manifest:
     Clone + Sized + PartialEq + Eq + Debug + serde::Serialize + serde::de::DeserializeOwned
 {
-    /// Ask the manifest to produce resources ids and a locator for the resources.
+    /// Ask the manifest to produce resource ids and a locator for the resources.
+``
     ///
     /// After the operations completes, the manifest must have replaced its resource
     /// locators with the generated ids. The returned map must contain the pairs of
