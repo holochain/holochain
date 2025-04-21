@@ -81,7 +81,7 @@ pub async fn authored_ops_to_dht_db_without_check(
     Ok(())
 }
 
-fn insert_locally_validated_op(
+pub fn insert_locally_validated_op(
     txn: &mut Txn<DbKindDht>,
     op: DhtOpHashed,
 ) -> StateMutationResult<Option<DhtOpHashed>> {

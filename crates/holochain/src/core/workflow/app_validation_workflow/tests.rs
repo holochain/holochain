@@ -1196,17 +1196,13 @@ async fn app_validation_produces_warrants() {
     conductors[0].shutdown().await;
     conductors[2].startup().await;
 
-    // conductors[0].persist_dbs();
-    // conductors[1].persist_dbs();
-    // conductors[2].persist_dbs();
-
     //- Ensure that bob authored a warrant
     let alice_pubkey = alice.agent_pubkey().clone();
     conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
         let store = CascadeTxnWrapper::from(txn);
 
         let warrants = store
-            .get_warrants_for_basis(&alice_pubkey.into(), false)
+            .get_warrants_for_agent(&alice_pubkey.into(), false)
             .unwrap();
         // 3 warrants, one for each op
         assert_eq!(warrants.len(), 1);
@@ -1223,18 +1219,17 @@ async fn app_validation_produces_warrants() {
     .unwrap();
 
     //- Ensure that carol gets gossiped the warrant for alice from bob
-
-    let basis: AnyLinkableHash = alice.agent_pubkey().clone().into();
+    let alice_pubkey = alice.agent_pubkey().clone();
     crate::assert_eq_retry_10s!(
         {
-            let basis = basis.clone();
+            let alice_pubkey = alice_pubkey.clone();
             conductors[2]
                 .spaces
                 .dht_db(dna_hash)
                 .unwrap()
                 .test_read(move |txn| {
                     let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_basis(&basis, true).unwrap()
+                    store.get_warrants_for_agent(&alice_pubkey, true).unwrap()
                 })
                 .len()
         },

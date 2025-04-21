@@ -91,6 +91,8 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
+#[cfg(feature = "unstable-warrants")]
+use holochain_state::integrate::insert_locally_validated_op;
 use holochain_state::prelude::*;
 use rusqlite::Transaction;
 use std::convert::TryInto;
@@ -378,33 +380,32 @@ async fn sys_validation_workflow_inner(
             warrants.push(warrant_op);
         }
 
-        let warrant_op_hashes = warrants
-            .iter()
-            .map(|w| (w.as_hash().clone(), w.dht_basis()))
-            .collect::<Vec<_>>();
-
-        workspace
+        let authored_warrants = warrants.clone();
+        let warranted = workspace
             .authored_db
             .write_async(move |txn| {
-                for warrant_op in warrants {
+                let mut warranted = 0;
+                for warrant_op in authored_warrants {
                     insert_op_authored(txn, &warrant_op)?;
-                    summary.warranted += 1;
+                    warranted += 1;
+                }
+                StateMutationResult::Ok(warranted)
+            })
+            .await?;
+        // "self-publish" warrants, i.e. insert them into the DHT DB.
+        // This works around the problem that the commonly used function [`holochain_state::integrate::authored_ops_to_dht_db`]
+        // joins on the Action table to filter out private entries.
+        workspace
+            .dht_db
+            .write_async(move |txn| {
+                for warrant_op in warrants {
+                    insert_locally_validated_op(txn, warrant_op)?;
                 }
                 StateMutationResult::Ok(())
             })
             .await?;
 
-        if let Some(cache) = workspace.dht_query_cache.as_ref() {
-            // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
-            holochain_state::integrate::authored_ops_to_dht_db(
-                _network.target_arcs().await?,
-                warrant_op_hashes,
-                workspace.authored_db.clone().into(),
-                workspace.dht_db.clone(),
-                cache,
-            )
-            .await?;
-        }
+        summary.warranted = warranted;
     }
 
     tracing::debug!(
@@ -1275,11 +1276,11 @@ pub async fn make_invalid_chain_warrant_op_inner(
     tracing::warn!("Authoring warrant for invalid op authored by {action_author}");
 
     let proof = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-        action_author,
+        action_author: action_author.clone(),
         action: (action.to_hash().clone(), op.signature().clone()),
         validation_type,
     });
-    let warrant = Warrant::new(proof, warrant_author, Timestamp::now());
+    let warrant = Warrant::new(proof, warrant_author, Timestamp::now(), action_author);
     let warrant_op = WarrantOp::sign(keystore, warrant)
         .await
         .map_err(|e| super::WorkflowError::Other(e.into()))?;
@@ -1303,11 +1304,12 @@ pub async fn make_fork_warrant_op_inner(
 
     let warrant = Warrant::new(
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
-            chain_author,
+            chain_author: chain_author.clone(),
             action_pair,
         }),
         warrant_author,
         Timestamp::now(),
+        chain_author.clone(),
     );
     let warrant_op = WarrantOp::sign(keystore, warrant)
         .await

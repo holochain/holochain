@@ -752,46 +752,23 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
     let hash = warrant.to_hash();
     let author = &warrant.author;
     let timestamp = warrant.timestamp;
+    let warrantee = warrant.warrantee.clone();
 
-    // TODO Instead of matching the kind of warrant, it seems easiest if the warrantee's
-    // agent key is added to the warrant struct, so that the warrant table can be queried
-    // for existing warrants for an agent.
-    let exists = false;
-
-    // Don't produce a warrant if one, of any kind, already exists.
-    // let basis = warrant.dht_basis();
-    // let (exists, action_hash) = match &warrant.proof {
-    //     WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp { action, .. }) => {
-    //         let action_hash = Some(action.0.clone());
-    //         let exists = txn
-    //             .prepare_cached(
-    //                 "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash = :prev_hash",
-    //             )?
-    //             .exists(named_params! {
-    //                 ":type": WarrantType::ChainIntegrityWarrant,
-    //                 ":base_hash": basis,
-    //                 ":prev_hash": action_hash,
-    //             })?;
-    //         (exists, action_hash)
-    //     }
-    //     WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. }) => {
-    //         let exists = txn
-    //             .prepare_cached(
-    //                 "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash IS NULL",
-    //             )?
-    //             .exists(named_params! {
-    //                 ":type": WarrantType::ChainIntegrityWarrant,
-    //                 ":base_hash": basis
-    //             })?;
-    //         (exists, None)
-    //     }
-    // };
+    // Don't produce a warrant if one, of any kind, already exists for the warrantee.
+    // TODO: Why not?
+    // TODO: Move this check to the calling function.
+    let exists = txn
+        .prepare_cached("SELECT 1 FROM Warrant WHERE warrantee = :warrantee")?
+        .exists(named_params! {
+            ":warrantee": warrantee,
+        })?;
 
     Ok(if !exists {
         sql_insert!(txn, Warrant, {
             "hash": hash,
             "author": author,
             "timestamp": timestamp,
+            "warrantee": warrantee,
             "type": warrant_type,
             "blob": to_blob(&warrant)?,
         })?
@@ -1204,6 +1181,7 @@ mod tests {
             }),
             fixt!(AgentPubKey),
             fixt!(Timestamp),
+            action_author.clone(),
         );
 
         let warrant2 = Warrant::new(
@@ -1213,6 +1191,7 @@ mod tests {
             }),
             fixt!(AgentPubKey),
             fixt!(Timestamp),
+            action_author.clone(),
         );
 
         let op1 = make_op(warrant1.clone());
@@ -1230,7 +1209,7 @@ mod tests {
 
         db.test_read(move |txn| {
             let warrants: Vec<DhtOp> = CascadeTxnWrapper::from(txn)
-                .get_warrants_for_basis(&action_author.into(), false)
+                .get_warrants_for_agent(&action_author.into(), false)
                 .unwrap()
                 .into_iter()
                 .map(Into::into)
