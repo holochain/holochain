@@ -2,6 +2,14 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2025-04-21: v0.5.0-rc.4
+
+*Success*
+- Ran a test with 5 nodes. Peer discovery was quick, then it took a few minutes for the nodes to sync their profiles.
+  It appeared that nodes that ended up using SBD instead of WebRTC took a little longer to get going. Once the first
+  few nodes were connected, all other checks passed.
+- This was the fastest we've seen entries sync and new nodes see content on joining the network.
+
 ## 2025-03-10: v0.4.2-rc.1
 
 *Success*
