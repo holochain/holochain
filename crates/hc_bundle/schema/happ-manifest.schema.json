@@ -125,7 +125,7 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "file": {
+              "path": {
                 "type": "string",
                 "description": "Expect file to be part of this bundle"
               },

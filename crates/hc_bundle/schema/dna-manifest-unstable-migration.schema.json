@@ -72,7 +72,7 @@
           "type": "string",
           "description": "The hash of the wasm which defines this zome"
         },
-        "file": {
+        "path": {
           "type": "string",
           "description": "Expect file to be part of this bundle"
         },
