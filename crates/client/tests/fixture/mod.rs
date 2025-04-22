@@ -43,7 +43,7 @@ fn make_fixture_app_bundle() -> Bytes {
             }],
         },
         #[cfg(feature = "unstable-migration")]
-        lineage: vec![]
+        lineage: vec![],
     }))
     .unwrap();
 
