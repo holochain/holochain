@@ -41,7 +41,7 @@ use std::sync::Arc;
 use std::time::Duration;
 #[cfg(feature = "unstable-warrants")]
 use {
-    crate::test_utils::ConsistencyConditions,
+    crate::test_utils::conditional_consistency::*,
     holochain_state::query::{CascadeTxnWrapper, Store},
 };
 
@@ -1185,7 +1185,7 @@ async fn app_validation_produces_warrants() {
 
     let conditions = ConsistencyConditions::from(vec![(alice.agent_pubkey().clone(), 1)]);
 
-    await_consistency_advanced(
+    await_conditional_consistency(
         10,
         conditions.clone(),
         [(&alice, false), (&bob, true), (&carol, false)],
@@ -1214,7 +1214,7 @@ async fn app_validation_produces_warrants() {
 
     // TODO: ensure that bob blocked alice
 
-    await_consistency_advanced(
+    await_conditional_consistency(
         10,
         conditions,
         [(&alice, false), (&bob, true), (&carol, true)],
