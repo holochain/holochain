@@ -204,6 +204,13 @@ impl Network {
                 };
                 kit.signal_url = url2::url2!("{}", signal_url);
                 kit.webrtc_config = webrtc_config;
+                kit.advanced = Some(serde_json::json!({
+                    // Allow plaintext signal for hc sandbox to have it work with local
+                    // signaling servers spawned by kitsune2-bootstrap-srv
+                    "tx5Transport": {
+                        "signalAllowPlainText": true,
+                    }
+                }));
             }
         }
         Some(kit)
