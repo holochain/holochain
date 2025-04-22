@@ -1371,6 +1371,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_client"
+version = "0.0.1"
+dependencies = [
+ "hdk",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_clone"
 version = "0.0.1"
 dependencies = [

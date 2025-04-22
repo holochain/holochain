@@ -16,7 +16,7 @@ pub fn spawn_integrate_dht_ops_consumer(
     dht_query_cache: DhtDbQueryCache,
     tm: TaskManagerClient,
     trigger_receipt: TriggerSender,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
 

@@ -17,9 +17,10 @@ use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::{
     collections::HashMap,
-    path::PathBuf,
     sync::{Arc, Barrier},
 };
+
+mod fixture;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_signal() {
@@ -39,7 +40,7 @@ async fn handle_signal() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -134,7 +135,7 @@ async fn close_on_drop_is_clone_safe() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -180,7 +181,7 @@ async fn deferred_memproof_installation() {
     let app_id: InstalledAppId = "test-app".into();
 
     // Modify app bundle to enable deferred membrane proofs.
-    let app_bundle_source = AppBundleSource::Path(PathBuf::from("./fixture/test.happ"));
+    let app_bundle_source = AppBundleSource::Bytes(fixture::get_fixture_app_bundle());
     let original_bundle = app_bundle_source.resolve().await.unwrap();
     let manifest = AppManifestV1 {
         allow_deferred_memproofs: true,
@@ -283,7 +284,7 @@ async fn connect_multiple_addresses() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -338,7 +339,7 @@ async fn connect_with_custom_origin() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -391,7 +392,7 @@ async fn dump_network_stats() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -444,7 +445,7 @@ async fn dump_network_metrics() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
