@@ -93,7 +93,6 @@
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
-
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
@@ -108,22 +107,15 @@ use crate::core::validation::OutcomeOrError;
 use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
-
-pub use error::*;
-pub use types::Outcome;
-
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::GenericNetwork;
-use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
-
 use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
@@ -131,6 +123,9 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
+
+pub use error::*;
+pub use types::Outcome;
 
 #[cfg(test)]
 mod tests;
@@ -165,14 +160,14 @@ pub async fn app_validation_workflow(
     trigger_integration: TriggerSender,
     trigger_publish: TriggerSender,
     conductor_handle: ConductorHandle,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
     let outcome_summary = app_validation_workflow_inner(
         dna_hash,
         workspace,
         conductor_handle,
-        &network,
+        network,
         dht_query_cache,
     )
     .await?;
@@ -204,7 +199,7 @@ async fn app_validation_workflow_inner(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
     conductor: ConductorHandle,
-    network: &HolochainP2pDna,
+    network: DynHolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
@@ -241,7 +236,14 @@ async fn app_validation_workflow_inner(
         // Validate this op
         let validation_outcome = match chain_op_to_op(*chain_op.clone(), cascade.clone()).await {
             Ok(op) => {
-                validate_op_outer(dna_hash.clone(), &op, &conductor, &workspace, network).await
+                validate_op_outer(
+                    dna_hash.clone(),
+                    &op,
+                    &conductor,
+                    &workspace,
+                    network.clone(),
+                )
+                .await
             }
             Err(e) => Err(e),
         };
@@ -482,7 +484,7 @@ async fn validate_op_outer(
     op: &Op,
     conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
-    network: &HolochainP2pDna,
+    network: DynHolochainP2pDna,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
     let host_fn_workspace = workspace.validation_workspace().await?;
@@ -507,7 +509,7 @@ async fn validate_op_outer(
 pub async fn validate_op(
     op: &Op,
     workspace: HostFnWorkspaceRead,
-    network: &HolochainP2pDna,
+    network: DynHolochainP2pDna,
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
     is_inline: bool,
@@ -515,8 +517,6 @@ pub async fn validate_op(
     check_entry_def(op, &network.dna_hash(), conductor_handle)
         .await
         .map_err(AppValidationError::SysValidationError)?;
-
-    let network = Arc::new(network.clone());
 
     let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), ribosome).await;
     if let Err(OutcomeOrError::Err(err)) = &zomes_to_invoke {
@@ -594,7 +594,7 @@ async fn check_app_entry_def(
 async fn get_zomes_to_invoke(
     op: &Op,
     workspace: &HostFnWorkspaceRead,
-    network: GenericNetwork,
+    network: DynHolochainP2pDna,
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match op {
@@ -687,7 +687,7 @@ async fn get_zomes_to_invoke(
 
 async fn retrieve_deleted_action(
     workspace: &HostFnWorkspaceRead,
-    network: GenericNetwork,
+    network: DynHolochainP2pDna,
     deletes_address: &ActionHash,
 ) -> AppValidationOutcome<SignedActionHashed> {
     let cascade = CascadeImpl::from_workspace_and_network(workspace, network.clone());
@@ -713,7 +713,7 @@ async fn run_validation_callback(
     invocation: ValidateInvocation,
     ribosome: &impl RibosomeT,
     workspace: HostFnWorkspaceRead,
-    network: GenericNetwork,
+    network: DynHolochainP2pDna,
     is_inline: bool,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome
@@ -859,11 +859,11 @@ impl AppValidationWorkspace {
         .await?)
     }
 
-    pub fn full_cascade<Network: HolochainP2pDnaT>(&self, network: Network) -> CascadeImpl {
+    pub fn full_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
         CascadeImpl::empty()
             .with_authored(self.authored_db.clone().into())
             .with_dht(self.dht_db.clone().into())
-            .with_network(Arc::new(network), self.cache.clone())
+            .with_network(network, self.cache.clone())
     }
 }
 

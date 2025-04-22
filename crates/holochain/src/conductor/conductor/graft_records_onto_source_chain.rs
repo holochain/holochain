@@ -186,7 +186,7 @@ impl Conductor {
         // Run the individual record validations.
         crate::core::workflow::inline_validation(
             workspace.clone(),
-            network.clone(),
+            Arc::new(network),
             self.clone(),
             ribosome,
         )

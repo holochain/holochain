@@ -15,10 +15,9 @@ use super::error::WorkflowResult;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
 use holo_hash::*;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time;
 use std::time::Duration;
 use tracing::*;
@@ -38,7 +37,7 @@ pub const DEFAULT_RECEIPT_BUNDLE_SIZE: u8 = 5;
 )]
 pub async fn publish_dht_ops_workflow(
     db: DbWrite<DbKindAuthored>,
-    network: Arc<impl HolochainP2pDnaT>,
+    network: DynHolochainP2pDna,
     trigger_self: TriggerSender,
     agent: AgentPubKey,
     min_publish_interval: Duration,

@@ -14,7 +14,7 @@ use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::WorkflowError;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
@@ -43,7 +43,7 @@ pub struct CallZomeWorkflowArgs<RibosomeT> {
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn call_zome_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome>,
     trigger_publish_dht_ops: TriggerSender,
@@ -91,8 +91,11 @@ where
                     match countersigning_op {
                         Some(op) => {
                             if let Err(error_response) =
-                                super::countersigning_workflow::countersigning_publish(&network, op)
-                                    .await
+                                super::countersigning_workflow::countersigning_publish(
+                                    network.clone(),
+                                    op,
+                                )
+                                .await
                             {
                                 return Ok(Ok(error_response));
                             }
@@ -128,7 +131,7 @@ where
 
 async fn call_zome_workflow_inner<Ribosome>(
     workspace: SourceChainWorkspace,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome>,
     trigger_countersigning: TriggerSender,
@@ -243,7 +246,7 @@ where
 /// Run validation inline and wait for the result.
 pub async fn inline_validation<Ribosome>(
     workspace: SourceChainWorkspace,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     conductor_handle: ConductorHandle,
     ribosome: Ribosome,
 ) -> WorkflowResult<()>
@@ -252,7 +255,7 @@ where
 {
     let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
         &workspace,
-        Arc::new(network.clone()),
+        network.clone(),
     ));
 
     let scratch_records = workspace.source_chain().scratch_records()?;
@@ -288,7 +291,7 @@ where
             let outcome = app_validation_workflow::validate_op(
                 &op,
                 workspace.clone().into(),
-                &network,
+                network.clone(),
                 &ribosome,
                 &conductor_handle,
                 true, // is_inline

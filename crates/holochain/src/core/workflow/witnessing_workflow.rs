@@ -7,7 +7,7 @@ use crate::core::ribosome::weigh_placeholder;
 use crate::core::share::Share;
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
 use std::collections::HashMap;
 
@@ -43,7 +43,7 @@ struct Session {
 /// for the session.
 pub(crate) async fn witnessing_workflow(
     space: Space,
-    network: impl HolochainP2pDnaT,
+    network: DynHolochainP2pDna,
     sys_validation_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     // Get any complete sessions.

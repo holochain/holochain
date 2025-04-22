@@ -3,6 +3,7 @@ use crate::core::queue_consumer::TriggerSender;
 use ::fixt::prelude::*;
 use holo_hash::fixt::DnaHashFixturator;
 use holochain_p2p::actor::MockHcP2p;
+use holochain_p2p::HolochainP2pDna;
 use holochain_state::mutations;
 use holochain_state::query::link::{GetLinksFilter, GetLinksQuery};
 use std::sync::Arc;
@@ -357,7 +358,11 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
         .expect_new_integrated_data()
         .returning(move |_, _| Box::pin(async move { Ok(()) }));
 
-    let mock_network = HolochainP2pDna::new(Arc::new(mock_hc_p2p), fixt!(DnaHash), None);
+    let mock_network = Arc::new(HolochainP2pDna::new(
+        Arc::new(mock_hc_p2p),
+        fixt!(DnaHash),
+        None,
+    ));
     integrate_dht_ops_workflow(env.clone(), env.clone().into(), qt, mock_network)
         .await
         .unwrap();
@@ -928,7 +933,7 @@ async fn inform_kitsune_about_integrated_ops() {
                 Box::pin(async { Ok(()) })
             });
         let hc_p2p = Arc::new(hc_p2p);
-        let p2p_dna = HolochainP2pDna::new(hc_p2p, dna_hash, None);
+        let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
         integrate_dht_ops_workflow(env.clone(), env.into(), tx, p2p_dna)
             .await
             .unwrap();
@@ -947,7 +952,7 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
     let mut hc_p2p = MockHcP2p::new();
     hc_p2p.expect_new_integrated_data().never();
     let hc_p2p = Arc::new(hc_p2p);
-    let p2p_dna = HolochainP2pDna::new(hc_p2p, dna_hash, None);
+    let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
     integrate_dht_ops_workflow(env.clone(), env.into(), tx, p2p_dna)
         .await
         .unwrap();

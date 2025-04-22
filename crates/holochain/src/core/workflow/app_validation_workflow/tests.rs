@@ -140,7 +140,11 @@ async fn main_workflow() {
     hc_p2p
         .expect_target_arcs()
         .returning(|_| Box::pin(async move { Ok(vec![]) }));
-    let network = HolochainP2pDna::new(Arc::new(hc_p2p), dna_hash.clone(), None);
+    let network = Arc::new(HolochainP2pDna::new(
+        Arc::new(hc_p2p),
+        dna_hash.clone(),
+        None,
+    ));
 
     // run validation workflow
     // outcome should be incomplete - delete op is missing the dependent create op
@@ -148,7 +152,7 @@ async fn main_workflow() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &network,
+        network,
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -189,11 +193,11 @@ async fn main_workflow() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &holochain_p2p::HolochainP2pDna::new(
+        Arc::new(HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             dna_hash.clone(),
             None,
-        ),
+        )),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -344,11 +348,11 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &holochain_p2p::HolochainP2pDna::new(
+        Arc::new(HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             dna_hash.clone(),
             None,
-        ),
+        )),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -487,11 +491,11 @@ async fn validate_ops_in_sequence_must_get_action() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &holochain_p2p::HolochainP2pDna::new(
+        Arc::new(holochain_p2p::HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             dna_hash.clone(),
             None,
-        ),
+        )),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -651,11 +655,11 @@ async fn handle_error_in_op_validation() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &holochain_p2p::HolochainP2pDna::new(
+        Arc::new(HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             dna_hash.clone(),
             None,
-        ),
+        )),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()
@@ -1029,11 +1033,11 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
         Arc::new(dna_hash.clone()),
         app_validation_workspace.clone(),
         conductor.raw_handle(),
-        &holochain_p2p::HolochainP2pDna::new(
+        Arc::new(HolochainP2pDna::new(
             conductor.holochain_p2p().clone(),
             dna_hash.clone(),
             None,
-        ),
+        )),
         conductor
             .get_or_create_space(&dna_hash)
             .unwrap()

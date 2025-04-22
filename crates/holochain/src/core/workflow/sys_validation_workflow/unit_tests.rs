@@ -408,7 +408,7 @@ impl TestCase {
         );
 
         println!("Running with network: {:?}", self.actual_network);
-        let actual_network = self.actual_network.take().unwrap_or_default();
+        let actual_network = Arc::new(self.actual_network.take().unwrap_or_default());
 
         sys_validation_workflow(
             Arc::new(workspace),

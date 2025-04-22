@@ -140,7 +140,7 @@ impl Cell {
         if has_genesis {
             let (queue_triggers, initial_queue_triggers) = spawn_queue_consumer_tasks(
                 id.clone(),
-                holochain_p2p_cell.clone(),
+                Arc::new(holochain_p2p_cell.clone()),
                 &space,
                 conductor_handle.clone(),
             )
@@ -797,7 +797,7 @@ impl Cell {
         };
         Ok(call_zome_workflow(
             workspace_lock,
-            self.holochain_p2p_cell.clone(),
+            Arc::new(self.holochain_p2p_cell.clone()),
             keystore,
             args,
             self.queue_triggers.publish_dht_ops.clone(),
@@ -853,10 +853,14 @@ impl Cell {
             cell_id: self.id.clone(),
             integrate_dht_ops_trigger: self.queue_triggers.integrate_dht_ops.clone(),
         };
-        let init_result =
-            initialize_zomes_workflow(workspace, self.holochain_p2p_cell.clone(), keystore, args)
-                .await
-                .map_err(Box::new)?;
+        let init_result = initialize_zomes_workflow(
+            workspace,
+            Arc::new(self.holochain_p2p_cell.clone()),
+            keystore,
+            args,
+        )
+        .await
+        .map_err(Box::new)?;
         trace!(?init_result);
         match init_result {
             InitResult::Pass => {}
