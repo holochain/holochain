@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Remove unused `is_chain_empty` and `action_seq_is_empty` functions from `sys_validation_workflow`.
 - Change the system validation workflow to never directly put ops to integrated, instead mark them as awaiting integration.
 - Refactor: rename status parameter to stage when setting validation stage
+- Refactor sweettest function `await_consistency` after seeing it was not behaving reliably. Rewritten to compare all involved peer DHT databases and check if the sum of all ops has been integrated in all of them.
 
 ## 0.6.0-dev.0
 
