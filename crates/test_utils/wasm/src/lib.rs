@@ -27,6 +27,7 @@ pub enum TestWasm {
     AppValidation,
     Bench,
     Capability,
+    Client,
     Clone,
     CounterSigning,
     Create,
@@ -78,8 +79,9 @@ pub enum TestWasm {
     WhoAmI,
     ZomeInfo,
 }
+
 /// Utility type for combining a test wasm's coordinator
-/// zome with it's integrity zome.
+/// zome with its integrity zome.
 pub struct TestWasmPair<I, C = I> {
     pub integrity: I,
     pub coordinator: C,
@@ -92,16 +94,19 @@ impl TestWasm {
     pub fn integrity_zome_name(self) -> ZomeName {
         TestWasmPair::<ZomeName>::from(self).integrity
     }
+
     /// Get the [`ZomeName`] for the coordinator zome.
     pub fn coordinator_zome_name(self) -> ZomeName {
         TestWasmPair::<ZomeName>::from(self).coordinator
     }
+
     /// Get the [`Zome`] for the integrity zome.
     pub fn integrity_zome(self) -> Zome {
         TestWasmPair::<IntegrityZome, CoordinatorZome>::from(self)
             .integrity
             .erase_type()
     }
+
     /// Get the [`Zome`] for the coordinator zome.
     pub fn coordinator_zome(self) -> Zome {
         TestWasmPair::<IntegrityZome, CoordinatorZome>::from(self)
@@ -138,6 +143,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::AppValidation => "app_validation",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
+            TestWasm::Client => "client",
             TestWasm::Clone => "clone",
             TestWasm::CounterSigning => "countersigning",
             TestWasm::Create => "create_entry",
@@ -214,6 +220,7 @@ impl From<TestWasm> for PathBuf {
             TestWasm::AppValidation => "wasm32-unknown-unknown/release/test_wasm_app_validation.wasm",
             TestWasm::Bench => "wasm32-unknown-unknown/release/test_wasm_bench.wasm",
             TestWasm::Capability => "wasm32-unknown-unknown/release/test_wasm_capability.wasm",
+            TestWasm::Client => "wasm32-unknown-unknown/release/test_wasm_client.wasm",
             TestWasm::Clone => "wasm32-unknown-unknown/release/test_wasm_clone.wasm",
             TestWasm::CounterSigning => {
                 "wasm32-unknown-unknown/release/test_wasm_countersigning.wasm"
