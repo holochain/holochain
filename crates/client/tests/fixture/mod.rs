@@ -10,15 +10,13 @@ use holochain_types::dna::{
 use holochain_types::prelude::AppBundle;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair};
 use mr_bundle::ResourceBytes;
-use std::cell::OnceCell;
 use std::path::PathBuf;
-
-const TEST_APP_BUNDLE: OnceCell<Bytes> = OnceCell::new();
+use std::sync::OnceLock;
 
 pub fn get_fixture_app_bundle() -> Bytes {
-    TEST_APP_BUNDLE
-        .get_or_init(|| make_fixture_app_bundle())
-        .clone()
+    static TEST_APP_BUNDLE: OnceLock<Bytes> = OnceLock::new();
+
+    TEST_APP_BUNDLE.get_or_init(make_fixture_app_bundle).clone()
 }
 
 fn make_fixture_app_bundle() -> Bytes {
