@@ -333,11 +333,7 @@ pub async fn call(
     } else {
         let mut clients = Vec::with_capacity(running.len());
         for port in running {
-            clients.push(
-                AdminWebsocket::connect(format!("localhost:{port}"))
-                    .await
-                    .expect(format!("Failed to connect to conductor at port {port}.").as_str()),
-            );
+            clients.push(AdminWebsocket::connect(format!("localhost:{port}")).await?);
         }
         clients
     };
@@ -506,10 +502,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
 }
 
 /// Calls [`AdminRequest::RegisterDna`] and registers DNA.
-pub async fn register_dna(
-    client: &mut AdminWebsocket,
-    args: RegisterDna,
-) -> anyhow::Result<DnaHash> {
+async fn register_dna(client: &mut AdminWebsocket, args: RegisterDna) -> anyhow::Result<DnaHash> {
     let RegisterDna {
         network_seed,
         properties,
@@ -603,7 +596,7 @@ pub async fn add_agent_info(
 }
 
 /// Calls [`AdminRequest::AgentInfo`] and pretty prints the agent info on this conductor.
-pub async fn request_agent_info(
+async fn request_agent_info(
     client: &mut AdminWebsocket,
     args: ListAgents,
 ) -> anyhow::Result<Vec<Arc<AgentInfoSigned>>> {
