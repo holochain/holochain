@@ -36,4 +36,9 @@ tokio = { version = "1.36.0", features = ["full"] }
 workspace = true
 
 [features]
+default = ["wasmer_sys"]
+
+wasmer_sys = ["holochain_cli_sandbox/wasmer_sys"]
+wasmer_wamr = ["holochain_cli_sandbox/wasmer_wamr"]
+
 chc = ["holochain_cli_sandbox/chc"]

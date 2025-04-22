@@ -34,7 +34,7 @@ holo_hash = { version = "^0.6.0-dev.0", path = "../holo_hash", features = [
   "kitsune2",
 ] }
 holochain_chc = { version = "^0.3.0-dev.0", path = "../holochain_chc", optional = true }
-holochain_client = { version = "^0.7.0-rc.0", path = "../client" }
+holochain_client = { version = "^0.7.0-rc.0", path = "../client", default-features = false }
 holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.6.0-dev.0", features = [
   "sqlite",
 ] }
@@ -68,7 +68,10 @@ nix = { version = "0.29", features = ["process", "signal"] }
 workspace = true
 
 [features]
-default = []
+default = ["wasmer_sys"]
+
+wasmer_sys = ["holochain_client/wasmer_sys"]
+wasmer_wamr = ["holochain_client/wasmer_wamr"]
 
 chc = [
   "dep:holochain_chc",
