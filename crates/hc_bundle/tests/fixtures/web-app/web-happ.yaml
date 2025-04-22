@@ -3,5 +3,5 @@ manifest_version: "1"
 name: fixture-web-app
 ui:
   path: "./ui.zip"
-happ_manifest:
+happ:
   path: "../my-app/fixture-app.happ"

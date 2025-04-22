@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use holo_hash::*;
 use mr_bundle::{resource_id_for_path, ResourceIdentifier};
+use schemars::JsonSchema;
 use serde_with::serde_as;
 
 /// The structure of data that goes in the DNA bundle manifest "dna.yaml".
@@ -56,7 +57,6 @@ use serde_with::serde_as;
 ///     - name: zome4
 ///       path: ../dna2/zomes/zome2.wasm
 /// ```
-
 #[serde_as]
 #[derive(
     Serialize,
@@ -65,6 +65,7 @@ use serde_with::serde_as;
     Debug,
     PartialEq,
     Eq,
+    JsonSchema,
     derive_more::Constructor,
     derive_builder::Builder,
 )]
@@ -134,6 +135,7 @@ impl DnaManifestV1 {
     Debug,
     PartialEq,
     Eq,
+    JsonSchema,
     derive_more::Constructor,
     derive_builder::Builder,
 )]
@@ -152,7 +154,7 @@ pub struct IntegrityManifest {
     pub zomes: Vec<ZomeManifest>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 /// Coordinator zomes.
 pub struct CoordinatorManifest {
@@ -161,7 +163,7 @@ pub struct CoordinatorManifest {
 }
 
 /// Manifest for an individual Zome
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ZomeManifest {
     /// Just a friendly name, no semantic meaning.
@@ -189,7 +191,7 @@ impl ZomeManifest {
 
 /// Manifest for integrity zomes that another zome
 /// depends on.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ZomeDependency {
     /// The name of the integrity zome this zome depends on.

@@ -52,6 +52,20 @@ impl<T: HashType> serde::Serialize for HoloHashB64<T> {
     }
 }
 
+#[cfg(feature = "schema")]
+impl<T: HashType> schemars::JsonSchema for HoloHashB64<T> {
+    fn schema_name() -> String {
+        "HoloHashB64".to_string()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::schema::Schema {
+        schemars::schema::Schema::Object(schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::String.into()),
+            ..Default::default()
+        })
+    }
+}
+
 // NB: These could be macroized, but if we spell it out, we get better IDE
 // support
 

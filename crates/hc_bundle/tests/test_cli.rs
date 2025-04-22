@@ -4,6 +4,7 @@ use holochain_types::{prelude::*, web_app::WebAppBundle};
 use holochain_util::ffs;
 use jsonschema::JSONSchema;
 use mr_bundle::FileSystemBundler;
+use schemars::JsonSchema;
 use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
@@ -413,11 +414,7 @@ async fn test_hash_dna_function() {
 
 #[test]
 fn test_all_dna_manifests_match_schema() {
-    let schema = if cfg!(feature = "unstable-migration") {
-        load_schema("dna-manifest-unstable-migration")
-    } else {
-        load_schema("dna-manifest")
-    };
+    let schema = get_schema::<DnaManifest>();
 
     for entry in WalkDir::new("./tests/fixtures")
         .into_iter()
@@ -460,7 +457,7 @@ fn test_default_dna_manifest_matches_schema() {
     let default_manifest: Value =
         serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
 
-    let schema = load_schema("dna-manifest");
+    let schema = get_schema::<DnaManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
 }
 
@@ -479,13 +476,13 @@ fn test_default_dna_manifest_matches_schema() {
     let default_manifest: Value =
         serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
 
-    let schema = load_schema("dna-manifest-unstable-migration");
+    let schema = get_schema::<DnaManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
 }
 
 #[test]
 fn test_all_app_manifests_match_schema() {
-    let schema = load_schema("happ-manifest");
+    let schema = get_schema::<AppManifest>();
 
     for entry in WalkDir::new("./tests/fixtures")
         .into_iter()
@@ -515,13 +512,13 @@ fn test_default_app_manifest_matches_schema() {
     let default_manifest: Value =
         serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
 
-    let schema = load_schema("happ-manifest");
+    let schema = get_schema::<AppManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
 }
 
 #[test]
 fn test_all_web_app_manifests_match_schema() {
-    let schema = load_schema("web-happ-manifest");
+    let schema = get_schema::<WebAppManifest>();
 
     for entry in WalkDir::new("./tests/fixtures")
         .into_iter()
@@ -544,16 +541,14 @@ fn test_default_web_app_manifest_matches_schema() {
     let default_manifest: Value =
         serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
 
-    let schema = load_schema("web-happ-manifest");
+    let schema = get_schema::<WebAppManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
 }
 
-fn load_schema(schema_name: &str) -> JSONSchema {
-    let schema_content =
-        ffs::sync::read_to_string(format!("./schema/{}.schema.json", schema_name)).unwrap();
-    let schema: Value = serde_json::from_str(schema_content.as_str()).unwrap();
-    let schema = JSONSchema::compile(&schema).expect("Schema should be valid");
-    schema
+fn get_schema<T: JsonSchema>() -> JSONSchema {
+    let schema = schemars::schema_for!(T);
+    let schema_value = serde_json::to_value(&schema).unwrap();
+    JSONSchema::compile(&schema_value).expect("Schema should be valid")
 }
 
 fn validate_schema(schema: &JSONSchema, manifest: &Value, context: &str) {

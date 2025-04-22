@@ -17,11 +17,19 @@ use super::{
 use crate::prelude::{RoleName, YamlProperties};
 use holo_hash::DnaHashB64;
 use holochain_zome_types::prelude::*;
+use schemars::JsonSchema;
 use std::collections::HashMap;
 
 /// Version 1 of the App manifest schema
 #[derive(
-    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    JsonSchema,
+    derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
 pub struct AppManifestV1 {
@@ -48,7 +56,7 @@ pub struct AppManifestV1 {
 /// Description of an app "role" defined by this app.
 /// Roles get filled according to the provisioning rules, as well as by
 /// potential runtime clones.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct AppRoleManifest {
     /// The ID which will be used to refer to:
@@ -77,7 +85,7 @@ impl AppRoleManifest {
 }
 
 /// The DNA portion of an app role
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct AppRoleDnaManifest {
     /// Where to find this DNA.
@@ -124,7 +132,7 @@ impl AppRoleDnaManifest {
 }
 
 /// Rules to determine if and how a Cell will be created for this Dna
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "strategy")]
 #[allow(missing_docs)]

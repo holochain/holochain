@@ -3,6 +3,7 @@
 //! Defines the hApp Manifest YAML format, including validation.
 
 use mr_bundle::{resource_id_for_path, Manifest, ResourceIdentifier};
+use schemars::JsonSchema;
 use std::collections::HashMap;
 
 mod current;
@@ -20,7 +21,9 @@ fn resource_id_for_happ(file: &str) -> ResourceIdentifier {
 
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema, derive_more::From,
+)]
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 pub enum WebAppManifest {
@@ -38,9 +41,9 @@ impl Manifest for WebAppManifest {
                 out.insert(ui_id.clone(), m.ui.path.clone());
                 m.ui.path = ui_id;
 
-                let happ_id = resource_id_for_happ(&m.happ_manifest.path);
-                out.insert(happ_id.clone(), m.happ_manifest.path.clone());
-                m.happ_manifest.path = happ_id;
+                let happ_id = resource_id_for_happ(&m.happ.path);
+                out.insert(happ_id.clone(), m.happ.path.clone());
+                m.happ.path = happ_id;
 
                 out
             }
@@ -51,7 +54,7 @@ impl Manifest for WebAppManifest {
         match self {
             WebAppManifest::V1(m) => vec![
                 resource_id_for_ui(&m.ui.path),
-                resource_id_for_happ(&m.happ_manifest.path),
+                resource_id_for_happ(&m.happ.path),
             ],
         }
     }
@@ -73,7 +76,7 @@ impl WebAppManifest {
             ui: WebUI {
                 path: "./path/to/my/ui.zip".to_string(),
             },
-            happ_manifest: AppManifestLocation {
+            happ: AppManifestLocation {
                 path: "./path/to/my/happ-bundle.happ".to_string(),
             },
         })
@@ -96,9 +99,10 @@ impl WebAppManifest {
     /// Get the location of the app bundle included in the manifest
     pub fn happ_bundle_location(&self) -> ResourceIdentifier {
         match self {
-            Self::V1(WebAppManifestV1 { happ_manifest, .. }) => {
-                resource_id_for_happ(&happ_manifest.path)
-            }
+            Self::V1(WebAppManifestV1 {
+                happ: happ_manifest,
+                ..
+            }) => resource_id_for_happ(&happ_manifest.path),
         }
     }
 }
@@ -121,7 +125,7 @@ mod tests {
             ui: WebUI {
                 path: ui_location.clone(),
             },
-            happ_manifest: AppManifestLocation {
+            happ: AppManifestLocation {
                 path: happ_location.clone(),
             },
         });
