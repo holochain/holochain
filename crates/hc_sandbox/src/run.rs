@@ -108,7 +108,16 @@ pub async fn run_async(
                 &config_root_path.is_also_data_root_path().try_into()?,
                 passphrase,
             )?;
-            create_config(config_root_path.clone(), Some(con_url))?
+            let mut generated_config = create_config(config_root_path.clone(), Some(con_url))?;
+            generated_config.network.advanced = Some(serde_json::json!({
+                // Allow plaintext signal for hc sandbox to have it work with local
+                // signaling servers spawned by kitsune2-bootstrap-srv
+                "tx5Transport": {
+                    "signalAllowPlainText": true,
+                    "timeoutS": 5,
+                }
+            }));
+            generated_config
         }
     };
     match force_admin_port {
