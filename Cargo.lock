@@ -2808,6 +2808,7 @@ dependencies = [
  "futures",
  "holo_hash",
  "holochain_chc",
+ "holochain_client",
  "holochain_conductor_api",
  "holochain_conductor_config",
  "holochain_nonce",

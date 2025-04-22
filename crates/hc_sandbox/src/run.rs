@@ -1,10 +1,8 @@
 //! Helpers for running the conductor.
 
-use crate::calls::attach_app_interface;
-use crate::calls::AddAppWs;
 use crate::cli::LaunchInfo;
-use crate::CmdRunner;
 use anyhow::anyhow;
+use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigFilePath;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::conductor::paths::KeystorePath;
@@ -55,16 +53,10 @@ pub async fn run(
     .await?;
     let mut launch_info = LaunchInfo::from_admin_port(admin_port);
     for app_port in app_ports {
-        let mut cmd = CmdRunner::try_new(admin_port).await?;
-        let port = attach_app_interface(
-            &mut cmd,
-            AddAppWs {
-                port: Some(app_port),
-                allowed_origins: AllowedOrigins::Any,
-                installed_app_id: None,
-            },
-        )
-        .await?;
+        let admin_ws = AdminWebsocket::connect(format!("localhost:{admin_port}")).await?;
+        let port = admin_ws
+            .attach_app_interface(app_port, AllowedOrigins::Any, None)
+            .await?;
         launch_info.app_ports.push(port);
     }
 

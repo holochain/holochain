@@ -34,6 +34,7 @@ holo_hash = { version = "^0.6.0-dev.0", path = "../holo_hash", features = [
   "kitsune2",
 ] }
 holochain_chc = { version = "^0.3.0-dev.0", path = "../holochain_chc", optional = true }
+holochain_client = { path = "../client" }
 holochain_conductor_api = { path = "../holochain_conductor_api", version = "^0.6.0-dev.0", features = [
   "sqlite",
 ] }
