@@ -313,16 +313,7 @@ pub async fn call(
                         structured.clone(),
                     )
                     .await?;
-                    clients.push(
-                        AdminWebsocket::connect(format!("localhost:{port}"))
-                            .await
-                            .expect(
-                                format!(
-                                "Failed to connect to freshly started conductor at port {port}."
-                            )
-                                .as_str(),
-                            ),
-                    );
+                    clients.push(AdminWebsocket::connect(format!("localhost:{port}")).await?);
                 }
             }
         }
