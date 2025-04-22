@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Refactor Mr. Bundle which affects the manifest types in `holochain_types`.
 - **BREAKING** Existing app bundles cannot be used. You can either rebundle existing happs with `hc-bundle` and the `--raw` flag or 
   issue a new version of your app, packaged for Holochain 0.6.
+- Remove unused `check_chain_rollback` function from `sys_validation`.
+- Remove unused `is_chain_empty` and `action_seq_is_empty` functions from `sys_validation_workflow`.
+- Change the system validation workflow to never directly put ops to integrated, instead mark them as awaiting integration.
+- Refactor: rename status parameter to stage when setting validation stage
 
 ## 0.6.0-dev.0
 
