@@ -1,9 +1,9 @@
 //! Helpers for making [`AdminRequest`]s to the admin API.
 //!
 //! This module is designed for use in a CLI so it is more simplified
-//! than calling the [`CmdRunner`] directly.
+//! than calling the [`AdminWebsocket`] directly.
 //! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
-//! but if you want more control use [`CmdRunner::command`].
+//! but if you want more control use [`AdminWebsocket::send`].
 
 use std::collections::HashMap;
 use std::path::Path;
