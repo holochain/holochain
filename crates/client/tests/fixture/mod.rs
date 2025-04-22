@@ -42,6 +42,8 @@ fn make_fixture_app_bundle() -> Bytes {
                 path: "integrity_test_wasm_client.wasm".to_string(),
             }],
         },
+        #[cfg(feature = "unstable-migration")]
+        lineage: vec![]
     }))
     .unwrap();
 
