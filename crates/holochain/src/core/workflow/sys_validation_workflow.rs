@@ -768,21 +768,6 @@ async fn validate_chain_op(
     }
 }
 
-/// Verify agent key validity.
-///
-/// If the previous action is a `Delete` of the current agent pub key,
-/// that agent key is invalid.
-fn check_agent_validity(agent: &AgentPubKey, prev_action: &Action) -> SysValidationResult<()> {
-    if let Action::Delete(delete) = prev_action {
-        if delete.deletes_entry_address == agent.clone().into() {
-            return Err(SysValidationError::ValidationOutcome(
-                ValidationOutcome::InvalidAgentKey(agent.clone()),
-            ));
-        }
-    }
-    Ok(())
-}
-
 async fn validate_warrant_op(
     op: &WarrantOp,
     _dna_def: &DnaDefHashed,
@@ -926,19 +911,6 @@ async fn sys_validate_record_inner(
         )
         .await;
 
-        // Check agent validity
-        if let Some(previous_action_hash) = action.prev_action() {
-            let deps = validation_dependencies.same_dht.lock();
-            // Previous action was fetched in the preceding call `fetch_previous_actions`.
-            let previous_action = deps
-                .get(previous_action_hash)
-                .and_then(|s| s.as_action())
-                .ok_or_else(|| {
-                    ValidationOutcome::DepMissingFromDht(previous_action_hash.clone().into())
-                })?;
-            check_agent_validity(action.author(), previous_action)?;
-        }
-
         store_record(action, validation_dependencies.clone())?;
         if let Some(maybe_entry) = maybe_entry {
             store_entry(
@@ -1016,9 +988,6 @@ fn register_agent_activity(
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
             .ok_or_else(|| ValidationOutcome::DepMissingFromDht(prev_action_hash.clone().into()))?;
-
-        // Agent key updates are only validated by agent authorities.
-        check_agent_validity(action.author(), prev_action)?;
 
         match prev_action {
             Action::CloseChain(_) => Err(ValidationOutcome::PrevActionError(
