@@ -88,8 +88,7 @@ use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::GenericNetwork;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::prelude::*;
 use holochain_sqlite::sql::sql_cell::ACTION_HASH_BY_PREV;
 use holochain_state::prelude::*;
@@ -121,13 +120,13 @@ mod validate_op_tests;
 /// The sys validation workflow. It is described in the module level documentation.
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 #[allow(clippy::too_many_arguments)]
-pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
+pub async fn sys_validation_workflow(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: SysValDeps,
     trigger_app_validation: TriggerSender,
     trigger_publish: TriggerSender,
     trigger_self: TriggerSender,
-    network: Network,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     representative_agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
@@ -135,7 +134,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     let outcome_summary = sys_validation_workflow_inner(
         workspace.clone(),
         current_validation_dependencies.clone(),
-        &network,
+        network.clone(),
         keystore,
         representative_agent,
     )
@@ -158,7 +157,7 @@ pub async fn sys_validation_workflow<Network: HolochainP2pDnaT + 'static>(
     }
 
     // Now go to the network to try to fetch missing dependencies
-    let network_cascade = Arc::new(workspace.network_and_cache_cascade(Arc::new(network)));
+    let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
     let missing_action_hashes = current_validation_dependencies
         .same_dht
         .lock()
@@ -233,7 +232,7 @@ type ForkedPair = ((ActionHash, Signature), (ActionHash, Signature));
 async fn sys_validation_workflow_inner(
     workspace: Arc<SysValidationWorkspace>,
     current_validation_dependencies: SysValDeps,
-    _network: &impl HolochainP2pDnaT,
+    _network: DynHolochainP2pDna,
     _keystore: MetaLairClient,
     _representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
@@ -325,10 +324,6 @@ async fn sys_validation_workflow_inner(
                     }
                 }
 
-                // This is an optimization to skip app validation and integration for ops that are
-                // rejected and don't have dependencies.
-                let deps = op.sys_validation_dependencies();
-
                 match outcome {
                     Outcome::Accepted => {
                         summary.accepted += 1;
@@ -336,11 +331,10 @@ async fn sys_validation_workflow_inner(
                             DhtOpType::Chain(_) => {
                                 put_validation_limbo(txn, &op_hash, ValidationStage::SysValidated)?
                             }
-                            DhtOpType::Warrant(_) => {
-                                // XXX: integrate accepted warrants immediately, because we don't
-                                //      want them to go to app validation.
+                            DhtOpType::Warrant(_) =>
+                            {
                                 #[cfg(feature = "unstable-warrants")]
-                                put_integrated(txn, &op_hash, ValidationStatus::Valid)?
+                                put_integration_limbo(txn, &op_hash, ValidationStatus::Valid)?
                             }
                         };
                     }
@@ -353,11 +347,7 @@ async fn sys_validation_workflow_inner(
                         invalid_ops.push((op_hash.clone(), op.clone()));
 
                         summary.rejected += 1;
-                        if deps.is_empty() {
-                            put_integrated(txn, &op_hash, ValidationStatus::Rejected)?;
-                        } else {
-                            put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
-                        }
+                        put_integration_limbo(txn, &op_hash, ValidationStatus::Rejected)?;
                     }
                 }
             }
@@ -1209,6 +1199,7 @@ pub struct SysValidationWorkspace {
     // Authored DB is writeable because warrants may be written.
     authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
+    #[allow(dead_code)]
     dht_query_cache: Option<DhtDbQueryCache>,
     cache: DbWrite<DbKindCache>,
     pub(crate) dna_def: Arc<DnaDef>,
@@ -1235,102 +1226,6 @@ impl SysValidationWorkspace {
         }
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    pub async fn is_chain_empty(&self, author: &AgentPubKey) -> SourceChainResult<bool> {
-        // If we have a query cache then this is an authority node and
-        // we can quickly check if the chain is empty from the cache.
-        if let Some(c) = &self.dht_query_cache {
-            return Ok(c.is_chain_empty(author).await?);
-        }
-
-        // Otherwise we need to check this is an author node and
-        // we need to check the author db.
-        let author = author.clone();
-        let chain_not_empty = self
-            .authored_db
-            .read_async(move |txn| {
-                let mut stmt = txn.prepare(
-                    "
-                SELECT
-                EXISTS (
-                    SELECT
-                    1
-                    FROM Action
-                    JOIN
-                    DhtOp ON Action.hash = DhtOp.action_hash
-                    WHERE
-                    Action.author = :author
-                    AND
-                    DhtOp.when_integrated IS NOT NULL
-                    AND
-                    DhtOp.type = :activity
-                    LIMIT 1
-                )
-                ",
-                )?;
-                DatabaseResult::Ok(stmt.query_row(
-                    named_params! {
-                        ":author": author,
-                        ":activity": ChainOpType::RegisterAgentActivity,
-                    },
-                    |row| row.get(0),
-                )?)
-            })
-            .await?;
-        let chain_not_empty = match &self.scratch {
-            Some(scratch) => scratch.apply(|scratch| !scratch.is_empty())? || chain_not_empty,
-            None => chain_not_empty,
-        };
-        Ok(!chain_not_empty)
-    }
-
-    pub async fn action_seq_is_empty(&self, action: &Action) -> SourceChainResult<bool> {
-        let author = action.author().clone();
-        let seq = action.action_seq();
-        let hash = ActionHash::with_data_sync(action);
-        let action_seq_is_not_empty = self
-            .dht_db
-            .read_async({
-                let hash = hash.clone();
-                move |txn| {
-                    DatabaseResult::Ok(txn.query_row(
-                        "
-                SELECT EXISTS(
-                    SELECT
-                    1
-                    FROM Action
-                    WHERE
-                    Action.author = :author
-                    AND
-                    Action.seq = :seq
-                    AND
-                    Action.hash != :hash
-                    LIMIT 1
-                )
-                ",
-                        named_params! {
-                            ":author": author,
-                            ":seq": seq,
-                            ":hash": hash,
-                        },
-                        |row| row.get(0),
-                    )?)
-                }
-            })
-            .await?;
-        let action_seq_is_not_empty = match &self.scratch {
-            Some(scratch) => {
-                scratch.apply(|scratch| {
-                    scratch.actions().any(|shh| {
-                        shh.action().action_seq() == seq && *shh.action_address() != hash
-                    })
-                })? || action_seq_is_not_empty
-            }
-            None => action_seq_is_not_empty,
-        };
-        Ok(!action_seq_is_not_empty)
-    }
-
     /// Create a cascade with local data only
     pub fn local_cascade(&self) -> CascadeImpl {
         let cascade = CascadeImpl::empty()
@@ -1344,7 +1239,7 @@ impl SysValidationWorkspace {
         }
     }
 
-    pub fn network_and_cache_cascade(&self, network: GenericNetwork) -> CascadeImpl {
+    pub fn network_and_cache_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
         CascadeImpl::empty().with_network(network, self.cache.clone())
     }
 
@@ -1362,9 +1257,9 @@ impl SysValidationWorkspace {
 fn put_validation_limbo(
     txn: &mut Transaction<'_>,
     hash: &DhtOpHash,
-    status: ValidationStage,
+    stage: ValidationStage,
 ) -> WorkflowResult<()> {
-    set_validation_stage(txn, hash, status)?;
+    set_validation_stage(txn, hash, stage)?;
     Ok(())
 }
 
@@ -1375,19 +1270,6 @@ fn put_integration_limbo(
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash, status)?;
     set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
-    Ok(())
-}
-
-pub fn put_integrated(
-    txn: &mut Transaction<'_>,
-    hash: &DhtOpHash,
-    status: ValidationStatus,
-) -> WorkflowResult<()> {
-    set_validation_status(txn, hash, status)?;
-    // This set the validation stage to pending which is correct when
-    // it's integrated.
-    set_validation_stage(txn, hash, ValidationStage::Pending)?;
-    set_when_integrated(txn, hash, Timestamp::now())?;
     Ok(())
 }
 

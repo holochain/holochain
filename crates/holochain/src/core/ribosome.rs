@@ -85,8 +85,7 @@ use guest_callback::validate::ValidateHostAccess;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::*;
-use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
@@ -209,11 +208,11 @@ impl HostContext {
     }
 
     /// Get the network, panics if none was provided
-    pub fn network(&self) -> Arc<dyn HolochainP2pDnaT> {
+    pub fn network(&self) -> DynHolochainP2pDna {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
-            | Self::PostCommit(PostCommitHostAccess { network, .. }) => Arc::new(network.clone()),
+            | Self::PostCommit(PostCommitHostAccess { network, .. }) => network.clone(),
             Self::Validate(ValidateHostAccess { network, .. }) => network.clone(),
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
@@ -561,7 +560,7 @@ impl From<ZomeCallInvocation> for ZomeCallParams {
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
-    pub network: HolochainP2pDna,
+    pub network: DynHolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
 }

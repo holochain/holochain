@@ -5,6 +5,7 @@ members = [
   "app_validation",
   "bench",
   "capability",
+  "client",
   "clone",
   "coordinator_zome",
   "coordinator_zome_update",

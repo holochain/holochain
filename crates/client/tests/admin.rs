@@ -8,8 +8,10 @@ use holochain_client::{
 use holochain_conductor_api::{CellInfo, StorageBlob};
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::prelude::ExternIO;
+use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr};
-use std::{collections::HashMap, path::PathBuf};
+
+mod fixture;
 
 const ROLE_NAME: &str = "foo";
 
@@ -46,7 +48,7 @@ async fn signed_zome_call() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -121,7 +123,7 @@ async fn storage_info() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -155,7 +157,7 @@ async fn dump_network_stats() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -200,7 +202,7 @@ async fn agent_info() {
             installed_app_id: Some(app_id.clone()),
             roles_settings: None,
             network_seed: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -245,7 +247,7 @@ async fn list_cell_ids() {
             installed_app_id: Some(app_id.clone()),
             roles_settings: None,
             network_seed: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -297,7 +299,7 @@ async fn install_app_with_roles_settings() {
             installed_app_id: Some(app_id.clone()),
             roles_settings: Some(HashMap::from([role_settings])),
             network_seed: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await

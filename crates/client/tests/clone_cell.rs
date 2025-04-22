@@ -1,6 +1,3 @@
-use std::net::Ipv4Addr;
-use std::path::PathBuf;
-
 use holochain::{
     prelude::{DeleteCloneCellPayload, DisableCloneCellPayload, EnableCloneCellPayload},
     sweettest::SweetConductor,
@@ -14,6 +11,9 @@ use holochain_types::prelude::{
 };
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::{dependencies::holochain_integrity_types::ExternIO, prelude::RoleName};
+use std::net::Ipv4Addr;
+
+mod fixture;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_cell_management() {
@@ -34,7 +34,7 @@ async fn clone_cell_management() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await
@@ -185,7 +185,7 @@ pub async fn app_info_refresh() {
             installed_app_id: Some(app_id.clone()),
             network_seed: None,
             roles_settings: None,
-            source: AppBundleSource::Path(PathBuf::from("./fixture/test.happ")),
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
             ignore_genesis_failure: false,
         })
         .await

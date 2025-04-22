@@ -10,7 +10,7 @@ use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
 use crate::core::ribosome::RibosomeT;
 use derive_more::Constructor;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::{HolochainP2pDna, HolochainP2pDnaT};
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use holochain_zome_types::action::builder;
@@ -40,7 +40,7 @@ where
 // #[cfg_attr(feature = "instrument", tracing::instrument(skip(network, keystore, workspace, args)))]
 pub async fn initialize_zomes_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult>
@@ -83,7 +83,7 @@ where
 
 async fn initialize_zomes_workflow_inner<Ribosome>(
     workspace: SourceChainWorkspace,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: InitializeZomesWorkflowArgs<Ribosome>,
 ) -> WorkflowResult<InitResult>
@@ -132,8 +132,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::*;
     use crate::conductor::Conductor;
     use crate::core::ribosome::guest_callback::validate::ValidateResult;
@@ -144,13 +142,14 @@ mod tests {
     use crate::test_utils::fake_genesis;
     use ::fixt::prelude::*;
     use holochain_keystore::test_keystore;
-    use holochain_p2p::HolochainP2pDnaFixturator;
+    use holochain_p2p::MockHolochainP2pDnaT;
     use holochain_state::prelude::*;
     use holochain_state::test_utils::test_db_dir;
     use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
+    use std::sync::Arc;
 
     async fn get_chain(cell: &SweetCell, keystore: MetaLairClient) -> SourceChain {
         SourceChain::new(
@@ -180,6 +179,7 @@ mod tests {
 
         let dna_def = DnaDefFixturator::new(Unpredictable).next().unwrap();
         let dna_def_hashed = DnaDefHashed::from_content_sync(dna_def.clone());
+        let dna_hash = dna_def_hashed.hash.clone();
 
         let workspace = SourceChainWorkspace::new(
             db.clone(),
@@ -218,11 +218,15 @@ mod tests {
             ribosome,
             conductor_handle,
             signal_tx: broadcast::channel(1).0,
-            cell_id: CellId::new(dna_def_hashed.to_hash(), author.clone()),
+            cell_id: CellId::new(dna_hash.clone(), author.clone()),
             integrate_dht_ops_trigger: integrate_dht_ops_trigger.0.clone(),
         };
         let keystore = fixt!(MetaLairClient);
-        let network = fixt!(HolochainP2pDna);
+        let mut network = MockHolochainP2pDnaT::new();
+        network
+            .expect_dna_hash()
+            .returning(move || dna_hash.clone());
+        let network = Arc::new(network);
 
         initialize_zomes_workflow_inner(workspace.clone(), network, keystore, args)
             .await

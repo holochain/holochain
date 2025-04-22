@@ -23,7 +23,7 @@ pub fn spawn_app_validation_consumer(
     conductor: ConductorHandle,
     trigger_integration: TriggerSender,
     trigger_publish: TriggerSender,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     dht_query_cache: DhtDbQueryCache,
 ) -> TriggerSender {
     let (tx, rx) = TriggerSender::new();
