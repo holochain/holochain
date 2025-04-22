@@ -1,8 +1,8 @@
-//! Helpers for making [`AdminRequest`]s to the admin API.
+//! Helpers for making [`holochain_conductor_api::AdminRequest`]s to the admin API.
 //!
 //! This module is designed for use in a CLI so it is more simplified
 //! than calling the [`AdminWebsocket`] directly.
-//! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
+//! For simple calls like [`AdminWebsocket::list_dnas`] this is probably easier
 //! but if you want more control use [`AdminWebsocket::send`].
 
 use std::collections::HashMap;
@@ -501,7 +501,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
     Ok(())
 }
 
-/// Calls [`AdminRequest::RegisterDna`] and registers DNA.
+/// Calls [`AdminWebsocket::register_dna`] and registers the DNA.
 async fn register_dna(client: &mut AdminWebsocket, args: RegisterDna) -> anyhow::Result<DnaHash> {
     let RegisterDna {
         network_seed,
@@ -531,7 +531,8 @@ async fn register_dna(client: &mut AdminWebsocket, args: RegisterDna) -> anyhow:
     Ok(client.register_dna(dna).await?)
 }
 
-/// Calls [`AdminRequest::InstallApp`] and installs a new app.
+/// Constructs install payload with roles settings and calls
+/// [`AdminWebsocket::install_app`] to install the provided app.
 pub async fn install_app_bundle(
     client: &mut AdminWebsocket,
     args: InstallApp,
@@ -583,7 +584,7 @@ pub async fn install_app_bundle(
     Ok(installed_app)
 }
 
-/// Calls [`AdminRequest::AddAgentInfo`] and adds the list of agent info.
+/// Calls [`AdminWebsocket::add_agent_info`] and adds the list of agent info.
 pub async fn add_agent_info(
     client: &mut AdminWebsocket,
     args: Vec<Arc<AgentInfoSigned>>,
@@ -595,7 +596,7 @@ pub async fn add_agent_info(
     Ok(client.add_agent_info(agent_infos).await?)
 }
 
-/// Calls [`AdminRequest::AgentInfo`] and pretty prints the agent info on this conductor.
+/// Calls [`AdminWebsocket::agent_info`] and pretty prints the agent info on this conductor.
 async fn request_agent_info(
     client: &mut AdminWebsocket,
     args: ListAgents,
