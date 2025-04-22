@@ -114,7 +114,6 @@ pub async fn run_async(
                 // signaling servers spawned by kitsune2-bootstrap-srv
                 "tx5Transport": {
                     "signalAllowPlainText": true,
-                    "timeoutS": 5,
                 }
             }));
             generated_config

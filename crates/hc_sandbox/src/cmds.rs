@@ -209,7 +209,6 @@ impl Network {
                     // signaling servers spawned by kitsune2-bootstrap-srv
                     "tx5Transport": {
                         "signalAllowPlainText": true,
-                        "timeoutS": 5,
                     }
                 }));
             }
