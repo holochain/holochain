@@ -870,9 +870,9 @@ impl AppValidationWorkspace {
 pub fn put_validation_limbo(
     txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
-    status: ValidationStage,
+    stage: ValidationStage,
 ) -> WorkflowResult<()> {
-    set_validation_stage(txn, hash, status)?;
+    set_validation_stage(txn, hash, stage)?;
     Ok(())
 }
 
