@@ -1,6 +1,6 @@
 pub mod sql_cell {
-    pub const SET_APP_VALIDATED_OPS_TO_INTEGRATED: &str =
-        include_str!("sql/cell/set_app_validated_ops_to_integrated.sql");
+    pub const SET_VALIDATED_OPS_TO_INTEGRATED: &str =
+        include_str!("sql/cell/set_validated_ops_to_integrated.sql");
 
     pub const ACTIVITY_INTEGRATED_UPPER_BOUND: &str =
         include_str!("sql/cell/activity_integrated_upper_bound.sql");
