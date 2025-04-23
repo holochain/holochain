@@ -2832,7 +2832,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_client"
-version = "0.7.0-rc.0"
+version = "0.8.0-dev.0"
 dependencies = [
  "anyhow",
  "async-trait",
