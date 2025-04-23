@@ -7,8 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- **BREAKING CHANGE** The `Location` field which permitted `bundled` and `path` options has been removed for DNA bundles,
-  app bundles, and webapp bundles. Where you previously used `bundled`, you should now use `path` instead.
+## 0.6.0-dev.1
+
+- **BREAKING CHANGE** The `Location` field which permitted `bundled` and `path` options has been removed for DNA bundles, app bundles, and webapp bundles. Where you previously used `bundled`, you should now use `path` instead.
 
 ## 0.6.0-dev.0
 

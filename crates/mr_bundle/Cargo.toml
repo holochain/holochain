@@ -1,12 +1,19 @@
 [package]
 name = "mr_bundle"
-version = "0.6.0-dev.0"
+version = "0.6.0-dev.1"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "Implements the un-/packing of bundles that either embed or reference a set of resources"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/mr_bundle"
+
+# RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
+[package.metadata.docs.rs]
+# document all features
+all-features = true
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]
 
 # reminder - do not use workspace deps
 [dependencies]
@@ -37,10 +44,3 @@ workspace = true
 
 [features]
 fs = ["dep:serde_yaml", "dep:tokio", "dep:dunce"]
-
-# RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
-[package.metadata.docs.rs]
-# document all features
-all-features = true
-# defines the configuration attribute `docsrs`
-rustdoc-args = ["--cfg", "docsrs"]

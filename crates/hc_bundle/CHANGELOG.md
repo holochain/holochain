@@ -7,12 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.1
+
 - Updated to use the new Mr. Bundle API.
 - The ability to include build and bundle WASM modules for iOS that was deprecated in 0.5 has now been removed.
-- Schemas may need updating to facilitate this change, including the removed of the `Location` type that supported 
-  `bundled` and `path` options.
-- It will still be possible to open old bundles with the `--raw` option so that you can unpack them and re-pack them 
-  with the new manifest format but please be aware that the hashes of the bundles will change!
+- Schemas may need updating to facilitate this change, including the removed of the `Location` type that supported `bundled` and `path` options.
+- It will still be possible to open old bundles with the `--raw` option so that you can unpack them and re-pack them with the new manifest format but please be aware that the hashes of the bundles will change\!
 
 ## 0.6.0-dev.0
 
