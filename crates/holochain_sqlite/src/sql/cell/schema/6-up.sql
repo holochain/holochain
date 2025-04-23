@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS DhtOpNew (
   type TEXT NOT NULL,
   basis_hash BLOB NOT NULL,
   require_receipt INTEGER NOT NULL,  -- BOOLEAN
-  -- This is not strictly an action hash, but a foreign key to a row in the Action or Warrant table.
+  -- This is not strictly an action hash, but a reference to a row in the Action or Warrant table. Note this is not a foreign key, because a foreign key must reference a single table, and this may reference either table, depending on if the Op is a Warrant or other Op.
   action_hash BLOB NOT NULL,
   storage_center_loc INTEGER NOT NULL,
   -- The timestamp on the DhtOp itself. NOT the timestamp of the row being created.
