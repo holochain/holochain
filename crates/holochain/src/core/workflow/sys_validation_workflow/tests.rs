@@ -49,12 +49,8 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
 
     // - Create an invalid op
     let bob_pubkey = fixt!(AgentPubKey);
-    let mut action = fixt!(Create);
-    action.author = bob_pubkey.clone();
     let mut mismatched_action = fixt!(Create);
     mismatched_action.author = bob_pubkey.clone();
-    let action = Action::Create(action);
-    let signed_action = SignedActionHashed::new_unchecked(action.clone(), fixt!(Signature));
     let op = ChainOp::StoreEntry(
         fixt!(Signature),
         NewEntryAction::Create(mismatched_action),

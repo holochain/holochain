@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix warrant persistence. Warrants were formerly stored in the Action table, but did not quite fit there. A new Warrant table was created, to which warrants are now written.
+
 ## 0.6.0-dev.1
 
 - Refactor Mr. Bundle which affects the manifest types in `holochain_types`.

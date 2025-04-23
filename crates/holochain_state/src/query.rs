@@ -353,15 +353,14 @@ impl Store for CascadeTxnWrapper<'_, '_> {
         check_valid: bool,
     ) -> StateQueryResult<Vec<WarrantOp>> {
         let sql = if check_valid {
-            // TODO: This SQL will need to be updated once work on warrants is resumed.
             "
             SELECT
-            Action.blob as action_blob
-            FROM Action
-            JOIN DhtOp ON DhtOp.action_hash = Action.hash
-            WHERE Action.base_hash = :hash
-            AND Action.type = :type
+            Warrant.blob as warrant_blob
+            FROM Warrant
+            JOIN DhtOp ON DhtOp.action_hash = Warrant.hash
+            WHERE Warrant.warrantee = :agent_key
             AND DhtOp.validation_status = :status
+            AND Warrant.type = :type
             "
         } else {
             "
@@ -384,7 +383,7 @@ impl Store for CascadeTxnWrapper<'_, '_> {
                 .prepare_cached(sql)?
                 .query_map(
                     named_params! {
-                        ":hash": agent_key,
+                        ":agent_key": agent_key,
                         ":type": WarrantType::ChainIntegrityWarrant,
                         ":status": ValidationStatus::Valid
                     },

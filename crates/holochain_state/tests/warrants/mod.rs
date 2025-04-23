@@ -36,21 +36,21 @@ async fn write_invalid_op_warrant_to_database() {
 
     test_db.test_read(move |txn| {
         txn.query_row(
-            "SELECT hash, author, timestamp, type, blob FROM Warrant",
+            "SELECT hash, author, timestamp, warrantee, type, blob FROM Warrant",
             [],
             |row| {
                 let hash = row.get_unwrap::<_, WarrantHash>(0);
                 let author = row.get_unwrap::<_, AgentPubKey>(1);
                 let timestamp = row.get_unwrap::<_, Timestamp>(2);
                 let warrantee = row.get_unwrap::<_, AgentPubKey>(3);
-                let warrant_type = row.get_unwrap::<_, WarrantType>(3);
+                let warrant_type = row.get_unwrap::<_, WarrantType>(4);
                 assert_eq!(hash, warrant.to_hash());
                 assert_eq!(author, warrant.author);
                 assert_eq!(timestamp, warrant.timestamp);
                 assert_eq!(warrantee, warrant.warrantee);
                 assert_eq!(warrant_type, warrant.get_type());
                 let actual_warrant =
-                    from_blob::<SignedWarrant>(row.get_unwrap::<_, Vec<u8>>(4)).unwrap();
+                    from_blob::<SignedWarrant>(row.get_unwrap::<_, Vec<u8>>(5)).unwrap();
                 assert_eq!(actual_warrant, signed_warrant);
                 Ok(())
             },
@@ -96,7 +96,7 @@ async fn write_chain_fork_warrant_to_database() {
                 assert_eq!(warrantee, warrant.warrantee);
                 assert_eq!(warrant_type, warrant.get_type());
                 let actual_warrant =
-                    from_blob::<SignedWarrant>(row.get_unwrap::<_, Vec<u8>>(4)).unwrap();
+                    from_blob::<SignedWarrant>(row.get_unwrap::<_, Vec<u8>>(5)).unwrap();
                 assert_eq!(actual_warrant, signed_warrant);
                 Ok(())
             },

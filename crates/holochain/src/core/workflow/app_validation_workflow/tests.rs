@@ -1201,9 +1201,7 @@ async fn app_validation_produces_warrants() {
     conductors[1].spaces.get_all_authored_dbs(dna_hash).unwrap()[0].test_read(move |txn| {
         let store = CascadeTxnWrapper::from(txn);
 
-        let warrants = store
-            .get_warrants_for_agent(&alice_pubkey.into(), false)
-            .unwrap();
+        let warrants = store.get_warrants_for_agent(&alice_pubkey, false).unwrap();
         // 3 warrants, one for each op
         assert_eq!(warrants.len(), 1);
     });

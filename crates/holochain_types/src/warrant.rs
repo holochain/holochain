@@ -1,9 +1,8 @@
 //! Defines the Warrant variant of DhtOp
 
-use std::str::FromStr;
-
 use holochain_keystore::{AgentPubKeyExt, LairResult, MetaLairClient};
 use holochain_zome_types::prelude::*;
+use std::str::FromStr;
 
 /// A Warrant DhtOp
 #[derive(

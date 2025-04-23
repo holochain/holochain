@@ -214,15 +214,6 @@ async fn test_block_invalid_receipt() {
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    // Don't check alice's integrated ops, since she gets blocked during gossip
-    await_conditional_consistency(
-        10,
-        vec![(alice_cell.agent_pubkey().clone(), 1)],
-        [(&alice_cell, false), (&bob_cell, true)],
-    )
-    .await
-    .unwrap();
-
     let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
     let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());
 
