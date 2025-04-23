@@ -1,3 +1,5 @@
+#![deny(missing_docs)]
+
 //! Interfaces to manage Holochain applications (hApps) and call their functions.
 //!
 //! The Conductor is the central component of Holochain. It exposes WebSockets for clients to
@@ -33,7 +35,6 @@ pub mod docs;
 mod admin_interface;
 mod app_interface;
 pub mod config;
-pub mod signal_subscription;
 pub mod state_dump;
 pub mod storage_info;
 

@@ -52,8 +52,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
 
-mod admin_interface_config;
-#[allow(missing_docs)]
 mod error;
 mod keystore_config;
 /// Defines subdirectories of the config directory.

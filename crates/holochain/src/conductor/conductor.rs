@@ -2126,7 +2126,7 @@ mod scheduler_impls {
 /// Miscellaneous methods
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
-    use holochain_conductor_api::JsonDump;
+    use holochain_conductor_api::CellStateDump;
     use holochain_zome_types::{action::builder, Entry};
     use kitsune2_api::{SpaceId, TransportStats};
     use std::sync::atomic::Ordering;
@@ -2282,7 +2282,7 @@ mod misc_impls {
             let source_chain_dump =
                 source_chain::dump_state(authored_db.clone().into(), agent_pub_key).await?;
 
-            let out = JsonDump {
+            let out = CellStateDump {
                 peer_dump,
                 source_chain_dump,
                 integration_dump: integration_dump(dht_db).await?,

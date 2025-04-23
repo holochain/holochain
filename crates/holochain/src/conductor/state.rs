@@ -372,9 +372,6 @@ impl ConductorState {
 #[derive(Clone, Deserialize, Serialize, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct AppInterfaceConfig {
-    /// The signal subscription settings for each App
-    pub signal_subscriptions: HashMap<InstalledAppId, SignalSubscription>,
-
     /// The application that this interface is for. If `Some`, then this interface will only allow
     /// connections which use a token that has been issued for the same app id. Otherwise, any app
     /// is allowed to connect.
@@ -392,7 +389,6 @@ impl AppInterfaceConfig {
         installed_app_id: Option<InstalledAppId>,
     ) -> Self {
         Self {
-            signal_subscriptions: HashMap::new(),
             installed_app_id,
             driver: InterfaceDriver::Websocket {
                 port,

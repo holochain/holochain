@@ -13,7 +13,8 @@ pub const WASM_DIRECTORY: &str = "wasm";
 /// Name of the file that conductor config is written to.
 pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";
 
-/// Newtype to make sure we never accidentaly use or not use the config path.
+/// Newtype to make sure we never accidentally use or not use the config path.
+///
 /// Intentionally has no default value.
 #[derive(
     shrinkwraprs::Shrinkwrap,
@@ -28,14 +29,16 @@ pub struct ConfigRootPath(PathBuf);
 
 impl ConfigRootPath {
     /// Create a new config root path from a data path.
+    ///
     /// This is useful for when you want to use the same path for both.
     pub fn is_also_data_root_path(&self) -> DataRootPath {
-        self.0.clone().into()
+        DataRootPath(self.0.clone())
     }
 }
 
-/// Newtype to make sure we never accidentaly use or not use the config file
+/// Newtype to make sure we never accidentally use or not use the config file
 /// path.
+///
 /// Intentionally has no default value.
 #[derive(
     shrinkwraprs::Shrinkwrap,
@@ -54,7 +57,8 @@ impl From<ConfigRootPath> for ConfigFilePath {
     }
 }
 
-/// Newtype to make sure we never accidentaly use or not use the data path.
+/// Newtype to make sure we never accidentally use or not use the data path.
+///
 /// Intentionally has no default value.
 #[derive(
     shrinkwraprs::Shrinkwrap,
@@ -103,7 +107,8 @@ impl TryFrom<DataRootPath> for DatabasesRootPath {
     }
 }
 
-/// Newtype to make sure we never accidentaly use or not use the wasm path.
+/// Newtype to make sure we never accidentally use or not use the wasm path.
+///
 /// Intentionally has no default value.
 #[derive(
     shrinkwraprs::Shrinkwrap,

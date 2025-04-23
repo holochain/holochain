@@ -9,11 +9,13 @@ use serde::Serialize;
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum KeystoreConfig {
     /// Enabling this will use a test keystore instead of lair.
+    ///
     /// This generates publicly accessible private keys.
     /// DO NOT USE THIS IN PRODUCTION!
     DangerTestKeystore,
 
     /// Connect to an external lair-keystore process.
+    ///
     /// This keystore type requires a secure passphrase specified
     /// to the cli binary entrypoint for this Holochain conductor process.
     LairServer {
@@ -23,13 +25,15 @@ pub enum KeystoreConfig {
         connection_url: url2::Url2,
     },
 
-    /// Run a lair-keystore server in-process. It will require exclusive
-    /// access to the root directory (no other conductors can share this lair).
-    /// This keystore type requires a secure passphrase specified
-    /// to the cli binary entrypoint for this Holochain conductor process.
+    /// Run a lair-keystore server in-process.
+    ///
+    /// It will require exclusive access to the root directory (no other conductors can share this
+    /// lair). This keystore type requires a secure passphrase specified to the cli binary
+    /// entrypoint for this Holochain conductor process.
     LairServerInProc {
         /// The "lair_root" path, i.e. the directory containing the
         /// "lair-keystore-config.yaml" file.
+        ///
         /// If not specified, will default to the ConductorConfig
         /// `[environment_path]/ks`.
         #[serde(default, skip_serializing_if = "Option::is_none")]

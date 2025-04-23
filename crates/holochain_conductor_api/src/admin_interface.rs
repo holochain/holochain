@@ -376,7 +376,9 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::CapabilityGrantsInfo`]
     ListCapabilityGrants {
+        /// The app ID to get capability grants for.
         installed_app_id: String,
+        /// Whether to include revoked capability grants.
         include_revoked: bool,
     },
 
@@ -496,7 +498,9 @@ pub enum AdminResponse {
     ///
     /// Contains the app info and list of errors for cells that could not be enabled.
     AppEnabled {
+        /// The app info of the app that was enabled
         app: AppInfo,
+        /// A list of errors that occurred while enabling the app.
         errors: Vec<(CellId, String)>,
     },
 

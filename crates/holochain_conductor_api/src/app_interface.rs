@@ -302,6 +302,7 @@ pub struct ZomeCallParamsSigned {
 }
 
 impl ZomeCallParamsSigned {
+    /// Create a new [`ZomeCallParamsSigned`] from the given bytes and signature.
     pub fn new(bytes: Vec<u8>, signature: Signature) -> Self {
         Self {
             bytes: ExternIO::from(bytes),
@@ -309,6 +310,9 @@ impl ZomeCallParamsSigned {
         }
     }
 
+    /// Create a new [`ZomeCallParamsSigned`] from the given [`ZomeCallParams`].
+    ///
+    /// The resulting call is signed by the agent key specified in the provenance.
     pub async fn try_from_params(
         keystore: &MetaLairClient,
         params: ZomeCallParams,
@@ -322,13 +326,14 @@ impl ZomeCallParamsSigned {
     }
 }
 
+/// Information about a cell.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CellInfo {
     /// Cells provisioned at app installation as defined in the bundle.
     Provisioned(ProvisionedCell),
 
-    // Cells created at runtime by cloning provisioned cells.
+    /// Cells created at runtime by cloning provisioned cells.
     Cloned(ClonedCell),
 
     /// Potential cells with deferred installation as defined in the bundle.
@@ -337,6 +342,7 @@ pub enum CellInfo {
 }
 
 impl CellInfo {
+    /// Construct a new [`CellInfo::Provisioned`] cell.
     pub fn new_provisioned(cell_id: CellId, dna_modifiers: DnaModifiers, name: String) -> Self {
         Self::Provisioned(ProvisionedCell {
             cell_id,
@@ -345,6 +351,7 @@ impl CellInfo {
         })
     }
 
+    /// Construct a new [`CellInfo::Cloned`] cell.
     pub fn new_cloned(
         cell_id: CellId,
         clone_id: CloneId,
@@ -408,6 +415,7 @@ pub struct AppInfo {
 }
 
 impl AppInfo {
+    /// Create an [`AppInfo`] for the given [`InstalledApp`] and DNA definitions.
     pub fn from_installed_app(
         app: &InstalledApp,
         dna_definitions: &IndexMap<CellId, DnaDefHashed>,
@@ -514,9 +522,19 @@ impl AppInfo {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppInfoStatus {
-    Paused { reason: PausedAppReason },
-    Disabled { reason: DisabledAppReason },
+    /// The app is paused, for a reason given by the system or user.
+    Paused {
+        /// The reason that the app is paused.
+        reason: PausedAppReason
+    },
+    /// The app is disabled.
+    Disabled {
+        /// The reason that is app was disabled.
+        reason: DisabledAppReason
+    },
+    /// The app is running.
     Running,
+    /// The app is waiting for memproofs to be provided.
     AwaitingMemproofs,
 }
 
