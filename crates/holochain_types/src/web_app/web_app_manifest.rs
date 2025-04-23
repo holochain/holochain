@@ -99,10 +99,7 @@ impl WebAppManifest {
     /// Get the location of the app bundle included in the manifest
     pub fn happ_bundle_location(&self) -> ResourceIdentifier {
         match self {
-            Self::V1(WebAppManifestV1 {
-                happ: happ_manifest,
-                ..
-            }) => resource_id_for_happ(&happ_manifest.path),
+            Self::V1(WebAppManifestV1 { happ, .. }) => resource_id_for_happ(&happ.path),
         }
     }
 }
