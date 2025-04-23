@@ -922,6 +922,7 @@ impl Cell {
             .trigger(&"notify_authored_ops_moved_to_limbo");
     }
 
+    #[cfg(feature = "unstable-countersigning")]
     pub(crate) fn countersigning_trigger(&self) -> TriggerSender {
         self.queue_triggers.countersigning.clone()
     }
