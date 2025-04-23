@@ -123,6 +123,7 @@ enum Db {
     Integrated(DhtOp),
     IntQueue(DhtOp),
     IntQueueEmpty,
+    ValidateQueue(DhtOp),
     MetaActivity(Action),
     MetaUpdate(AnyDhtHash, Action),
     MetaDelete(ActionHash, Action),
@@ -175,6 +176,27 @@ impl Db {
                                 named_params! {
                                     ":hash": op_hash,
                                     ":status": ValidationStatus::Valid,
+                                },
+                                |row| row.get(0),
+                            )
+                            .unwrap();
+                        assert!(found, "{}\n{:?}", here, op);
+                    }
+                    Db::ValidateQueue(op) => {
+                        let op_hash = DhtOpHash::with_data_sync(&op);
+
+                        let found: bool = txn
+                            .query_row(
+                                "
+                                SELECT EXISTS(
+                                    SELECT 1 FROM DhtOp
+                                    WHERE when_integrated IS NULL
+                                    AND validation_stage IS NULL
+                                    AND hash = :hash
+                                )
+                                ",
+                                named_params! {
+                                    ":hash": op_hash,
                                 },
                                 |row| row.get(0),
                             )
@@ -314,6 +336,13 @@ impl Db {
                         )
                         .unwrap();
                         mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
+                            .unwrap();
+                    }
+                    Db::ValidateQueue(op) => {
+                        let op = DhtOpHashed::from_content_sync(op.clone());
+                        let hash = op.as_hash().clone();
+                        mutations::insert_op_dht(txn, &op, 0, None).unwrap();
+                        mutations::set_validation_stage(txn, &hash, ValidationStage::Pending)
                             .unwrap();
                     }
                     _ => {
@@ -903,6 +932,11 @@ async fn inform_kitsune_about_integrated_ops() {
 #[tokio::test(flavor = "multi_thread")]
 async fn kitsune_not_informed_when_no_ops_integrated() {
     let env = test_dht_db().to_db();
+    let test_data = TestData::new();
+    let op: DhtOp =
+        ChainOp::RegisterAgentActivity(test_data.signature.clone(), fixt!(Action)).into();
+    let pre_state = vec![Db::ValidateQueue(op)];
+    Db::set(pre_state, env.clone()).await;
 
     let (tx, _rx) = TriggerSender::new();
     let dna_hash = fixt!(DnaHash);
