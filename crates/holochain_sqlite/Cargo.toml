@@ -1,6 +1,6 @@
 [package]
 name = "holochain_sqlite"
-version = "0.6.0-dev.0"
+version = "0.6.0-dev.1"
 description = "Abstractions for persistence of Holochain state via SQLite"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -16,13 +16,13 @@ base64 = "0.22"
 derive_more = "0.99"
 fallible-iterator = "0.3.0"
 futures = "0.3"
-holo_hash = { path = "../holo_hash", version = "^0.6.0-dev.0" }
+holo_hash = { path = "../holo_hash", version = "^0.6.0-dev.1"}
 holochain_serialized_bytes = "=0.0.55"
 holochain_util = { version = "^0.6.0-dev.0", path = "../holochain_util", features = [
   "backtrace",
   "time",
 ], optional = true }
-holochain_zome_types = { version = "^0.6.0-dev.0", path = "../holochain_zome_types" }
+holochain_zome_types = { version = "^0.6.0-dev.1", path = "../holochain_zome_types" }
 holochain_nonce = { version = "^0.6.0-dev.0", path = "../holochain_nonce" }
 holochain_timestamp = { version = "^0.6.0-dev.0", path = "../timestamp" }
 nanoid = "0.4"

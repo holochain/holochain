@@ -7,11 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.1
+
 - Major rework of Mr. Bundle:
   - Collapsed multiple error types into a single `MrBundleError` type.
-  - Added context for I/O errors because they're unusable when you don't know which file operation might have caused them.
+  - Added context for I/O errors because they’re unusable when you don’t know which file operation might have caused them.
   - Removed `RawBundle`, the purpose it used to fill for working with bundles with an unknown manifest can now be done without a specialized type.
-  - Renamed manifest `path` method to `file_name` and changed the return type from `PathBuf` to `&'static str` because that's how it's always used.
+  - Renamed manifest `path` method to `file_name` and changed the return type from `PathBuf` to `&'static str` because that’s how it’s always used.
   - Added a new `generate_resource_ids` method to the `Manifest` type. See documentation for usage.
   - Removed all file system operations from the `Manifest` and `Bundle` types. The same functionality with a simpler interface is now provided by a new `FileSystemBundler` type.
   - The `Bundle` no longer requires complex logic to work with relative paths, so the `new_unchecked` method which bypassed these checks has been removed.
