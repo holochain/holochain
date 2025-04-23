@@ -7,7 +7,6 @@ use holochain_state::prelude::*;
 #[cfg(feature = "unstable-warrants")]
 use {
     crate::core::ribosome::guest_callback::validate::ValidateResult, crate::prelude::InlineZomeSet,
-    crate::test_utils::conditional_consistency::await_conditional_consistency,
 };
 
 #[tokio::test(flavor = "multi_thread")]
