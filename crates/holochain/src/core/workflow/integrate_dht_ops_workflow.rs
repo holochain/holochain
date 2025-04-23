@@ -25,7 +25,7 @@ pub async fn integrate_dht_ops_workflow(
     let stored_ops = vault
         .write_async(move |txn| {
             let mut stored_ops = Vec::new();
-            let mut stmt = txn.prepare_cached(SET_APP_VALIDATED_OPS_TO_INTEGRATED)?;
+            let mut stmt = txn.prepare_cached(SET_VALIDATED_OPS_TO_INTEGRATED)?;
             let integrated_ops = stmt.query_map(
                 named_params! {
                     ":when_integrated": time,
