@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS DhtOpNew (
   -- The sys validation dependency if there is one.
   dependency BLOB NULL,
   -- To be deleted right after migration.
-  dependency2 BLOG NULL,
+  dependency2 BLOB NULL,
   serialized_size INTEGER NOT NULL DEFAULT 0,
   transfer_source BLOB NULL,
   transfer_method INTEGER NULL,
