@@ -3120,12 +3120,7 @@ mod countersigning_impls {
             cell_id: CellId,
             request: PreflightRequest,
         ) -> ConductorResult<PreflightRequestAcceptance> {
-            let countersigning_trigger = self
-                .cell_by_id(&cell_id)
-                .await?
-                .triggers()
-                .countersigning
-                .clone();
+            let countersigning_trigger = self.cell_by_id(&cell_id).await?.countersigning_trigger();
 
             Ok(
                 workflow::countersigning_workflow::accept_countersigning_request(
@@ -3166,8 +3161,7 @@ mod countersigning_impls {
                 .await?;
             let cell = self.cell_by_id(cell_id).await?;
             countersigning_workspace.mark_countersigning_session_for_force_abandon(cell_id)?;
-            cell.triggers()
-                .countersigning
+            cell.countersigning_trigger()
                 .trigger(&"force_abandon_session");
             Ok(())
         }
@@ -3183,8 +3177,7 @@ mod countersigning_impls {
                 .await?;
             let cell = self.cell_by_id(cell_id).await?;
             countersigning_workspace.mark_countersigning_session_for_force_publish(cell_id)?;
-            cell.triggers()
-                .countersigning
+            cell.countersigning_trigger()
                 .trigger(&"force_publish_session");
             Ok(())
         }
