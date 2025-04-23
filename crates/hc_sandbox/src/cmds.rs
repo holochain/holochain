@@ -186,7 +186,18 @@ impl Network {
             transport,
             bootstrap,
         } = match this {
-            None => return None,
+            None => {
+                return Some(NetworkConfig {
+                    advanced: Some(serde_json::json!({
+                        // Allow plaintext signal for hc sandbox to have it work with local
+                        // signaling servers spawned by kitsune2-bootstrap-srv
+                        "tx5Transport": {
+                            "signalAllowPlainText": true,
+                        }
+                    })),
+                    ..NetworkConfig::default()
+                });
+            }
             Some(n) => (*n).clone(),
         };
 
