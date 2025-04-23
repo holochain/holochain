@@ -755,7 +755,9 @@ pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMut
     let warrantee = warrant.warrantee.clone();
 
     // Don't produce a warrant if one, of any kind, already exists for the warrantee.
-    // TODO: Why not?
+    // TODO: If warrants were permanent, this would relieve peers from having to store a possibly endless
+    // number of warrants for an agent. However, warrants may be redeemable at some stage, which is when
+    // there needs to be a different check performed here.
     // TODO: Move this check to the calling function.
     let exists = txn
         .prepare_cached("SELECT 1 FROM Warrant WHERE warrantee = :warrantee")?
