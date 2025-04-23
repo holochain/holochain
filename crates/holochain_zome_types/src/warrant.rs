@@ -164,8 +164,6 @@ impl WarrantProof {
     /// Basis hash where this warrant should be delivered.
     /// Warrants always have the authoring agent as a basis, so that warrants
     /// can be accumulated by the agent activity authorities.
-    // TODO: It seems more logical that the basis is the warrantee's pub key.
-    // Then the warrantee's agent authority holds the warrants.
     pub fn dht_basis(&self) -> OpBasis {
         self.action_author().clone().into()
     }
