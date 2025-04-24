@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_config"
-version = "0.5.0"
+version = "0.5.1-rc.0"
 description = "Provides utilities for generating holochain conductor configuration."
 homepage = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_conductor_config"
@@ -14,13 +14,13 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0"
 ansi_term = "0.12"
-holochain_conductor_api = { version = "^0.5.0", path = "../holochain_conductor_api", features = [
+holochain_conductor_api = { version = "^0.5.1-rc.0", path = "../holochain_conductor_api", features = [
   "sqlite",
 ] }
-holochain_types = { version = "^0.5.0", path = "../holochain_types", features = [
+holochain_types = { version = "^0.5.1-rc.0", path = "../holochain_types", features = [
   "sqlite",
 ] }
-holochain_util = { version = "^0.5.0", path = "../holochain_util", default-features = false, features = [
+holochain_util = { version = "^0.5.1-rc.0", path = "../holochain_util", default-features = false, features = [
   "pw",
 ] }
 nanoid = "0.4"
