@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Integrate all app validated ops, regardless of type and order
+- Remove DHT DB query cache, a premature optimization that made integration complicated and error-prone without any appreciable benefit.
+
 ## 0.6.0-dev.1
 
 - Refactor Mr. Bundle which affects the manifest types in `holochain_types`.

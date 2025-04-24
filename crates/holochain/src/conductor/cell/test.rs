@@ -29,7 +29,6 @@ async fn test_cell_handle_publish() {
         .get_or_create_authored_db(cell_id.agent_pubkey().clone())
         .unwrap();
     let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
-    let dht_db_cache = spaces.test_spaces[&dna].space.dht_query_cache.clone();
 
     let holochain_p2p_cell = HolochainP2pDna::new(Arc::new(MockHcP2p::new()), dna.clone(), None);
 
@@ -56,7 +55,6 @@ async fn test_cell_handle_publish() {
         handle.clone(),
         db.clone(),
         dht_db.clone(),
-        dht_db_cache.clone(),
         ribosome,
         None,
         None,

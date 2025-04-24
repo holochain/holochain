@@ -1,20 +1,6 @@
 pub mod sql_cell {
-    // UPDATE queries to set ops to integrated.
-    pub const UPDATE_INTEGRATE_DEP_ACTIVITY: &str =
-        include_str!("sql/cell/update_dep_activity.sql");
-    pub const UPDATE_INTEGRATE_STORE_RECORD: &str =
-        include_str!("sql/cell/update_store_record.sql");
-    pub const UPDATE_INTEGRATE_STORE_ENTRY: &str = include_str!("sql/cell/update_store_entry.sql");
-    pub const UPDATE_INTEGRATE_DEP_STORE_ENTRY: &str =
-        include_str!("sql/cell/update_dep_store_entry.sql");
-    pub const SET_ADD_LINK_OPS_TO_INTEGRATED: &str =
-        include_str!("sql/cell/set_add_link_ops_to_integrated.sql");
-    pub const UPDATE_INTEGRATE_DEP_STORE_RECORD: &str =
-        include_str!("sql/cell/update_dep_store_record.sql");
-    pub const SET_DELETE_LINK_OPS_TO_INTEGRATED: &str =
-        include_str!("sql/cell/set_delete_link_ops_to_integrated.sql");
-    pub const SET_CHAIN_INTEGRITY_WARRANT_OPS_TO_INTEGRATED: &str =
-        include_str!("sql/cell/set_chain_integrity_warrant_ops_to_integrated.sql");
+    pub const SET_VALIDATED_OPS_TO_INTEGRATED: &str =
+        include_str!("sql/cell/set_validated_ops_to_integrated.sql");
 
     pub const ACTIVITY_INTEGRATED_UPPER_BOUND: &str =
         include_str!("sql/cell/activity_integrated_upper_bound.sql");
