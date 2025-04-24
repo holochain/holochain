@@ -36,6 +36,7 @@ serde_bytes = { version = "0.11", optional = true }
 sha2 = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true }
 holochain_wasmer_common = { version = "=0.0.99", optional = true }
+schemars = { version = "0.8.22", optional = true }
 
 [dev-dependencies]
 serde_json = { version = "1.0.51", features = ["preserve_order"] }
@@ -47,15 +48,16 @@ workspace = true
 default = ["serialization", "holochain-wasmer"]
 full = ["fixturators", "hashing", "encoding", "sqlite"]
 
+test_utils = ["fixturators"]
+fixturators = ["fixt", "rand", "hashing", "encoding"]
 fuzzing = ["proptest", "proptest-derive", "holochain_serialized_bytes?/fuzzing"]
 
-fixturators = ["fixt", "rand", "hashing", "encoding"]
 hashing = ["futures", "must_future", "dep:blake2b_simd", "serialization"]
 kitsune2 = ["dep:bytes", "dep:kitsune2_api"]
 serialization = ["holochain_serialized_bytes", "serde", "serde_bytes"]
 encoding = ["dep:base64", "dep:blake2b_simd", "dep:derive_more", "dep:sha2"]
-test_utils = ["fixturators"]
 holochain-wasmer = ["holochain_wasmer_common"]
+schema = ["dep:schemars"]
 
 sqlite-encrypted = ["rusqlite", "rusqlite/bundled-sqlcipher-vendored-openssl"]
 sqlite = ["rusqlite", "rusqlite/bundled"]

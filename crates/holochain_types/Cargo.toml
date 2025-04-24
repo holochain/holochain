@@ -13,24 +13,13 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
-automap = { version = "0.1", features = ["serde"] }
 backtrace = "0.3.27"
-base64 = "0.13"
-cfg-if = "0.1"
-chrono = { version = "0.4", default-features = false, features = [
-  "clock",
-  "std",
-  "oldtime",
-  "serde",
-] }
 derive_builder = "0.20"
 derive_more = "0.99"
-flate2 = "1.0.14"
 futures = "0.3"
-getrandom = { version = "0.2.7" }
-one_err = "0.0.8"
 holo_hash = { version = "^0.6.0-dev.1", path = "../holo_hash", features = [
   "encoding",
+  "schema",
 ] }
 holochain_keystore = { version = "^0.6.0-dev.1", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.6.0-dev.0", path = "../holochain_nonce" }
@@ -83,7 +72,6 @@ contrafact = { version = "0.2.0-rc.1", optional = true }
 holochain_types = { path = ".", features = ["test_utils", "fuzzing"] }
 
 isotest = { version = "0" }
-maplit = "1"
 matches = "0.1"
 pretty_assertions = "1.4"
 serde_json = "1.0"

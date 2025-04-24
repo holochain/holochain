@@ -3,9 +3,18 @@
 //! NB: After stabilization, *do not modify this file*! Create a new version of
 //! the spec and leave this one alone to maintain backwards compatibility.
 
+use schemars::JsonSchema;
+
 /// Version 1 of the App manifest schema
 #[derive(
-    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    JsonSchema,
+    derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
 pub struct WebAppManifestV1 {
@@ -16,11 +25,11 @@ pub struct WebAppManifestV1 {
     pub ui: WebUI,
 
     /// The Cell manifests that make up this app.
-    pub happ_manifest: AppManifestLocation,
+    pub happ: AppManifestLocation,
 }
 
 /// Web UI .zip file that should be associated with the hApp.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct WebUI {
     /// Where to find this UI.
@@ -28,7 +37,7 @@ pub struct WebUI {
 }
 
 /// Location of the hApp bundle to bind with the Web UI.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct AppManifestLocation {
     /// Where to find the hApp for this web-happ.
