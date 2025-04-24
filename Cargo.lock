@@ -3358,6 +3358,7 @@ dependencies = [
  "serde_yaml",
  "shrinkwraprs",
  "strum 0.18.0",
+ "strum_macros 0.18.0",
  "subtle",
  "thiserror 1.0.69",
  "tracing",

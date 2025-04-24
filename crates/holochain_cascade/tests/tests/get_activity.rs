@@ -12,6 +12,11 @@ use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::*;
 use std::sync::Arc;
 use test_case::test_case;
+#[cfg(feature = "unstable-warrants")]
+use {
+    holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator},
+    holochain_state::integrate::insert_locally_validated_op,
+};
 
 macro_rules! assert_agent_activity_responses_eq {
     ($expected:expr, $actual:expr) => {
@@ -372,7 +377,12 @@ async fn get_activity_with_warrants() {
             chain_author: td.agent.clone(),
             action_pair,
         });
-        let warrant = Warrant::new(p, AgentPubKey::from_raw_36(vec![255; 36]), Timestamp::now());
+        let warrant = Warrant::new(
+            p,
+            AgentPubKey::from_raw_36(vec![255; 36]),
+            Timestamp::now(),
+            td.agent.clone(),
+        );
         WarrantOp::from(SignedWarrant::new(warrant, ::fixt::fixt!(Signature)))
     };
 
@@ -457,16 +467,18 @@ struct Data {
 }
 
 #[cfg(feature = "unstable-warrants")]
-fn warrant(author: u8, action: u8) -> WarrantOp {
+fn warrant(warrantee: u8) -> WarrantOp {
     let p = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-        action_author: AgentPubKey::from_raw_36(vec![author; 36]),
-        action: (
-            ActionHash::from_raw_36(vec![action; 36]),
-            ::fixt::fixt!(Signature),
-        ),
+        action_author: ::fixt::fixt!(AgentPubKey),
+        action: (::fixt::fixt!(ActionHash), ::fixt::fixt!(Signature)),
         validation_type: ValidationType::Sys,
     });
-    let warrant = Warrant::new(p, AgentPubKey::from_raw_36(vec![255; 36]), Timestamp::now());
+    let warrant = Warrant::new(
+        p,
+        ::fixt::fixt!(AgentPubKey),
+        Timestamp::now(),
+        AgentPubKey::from_raw_36(vec![warrantee; 36]),
+    );
     WarrantOp::from(SignedWarrant::new(warrant, ::fixt::fixt!(Signature)))
 }
 
@@ -598,11 +610,11 @@ async fn test_must_get_agent_activity(
 
 #[cfg(feature = "unstable-warrants")]
 #[test_case(
-    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(1, 1)], ..Default::default() },
+    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0)], ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
     => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with dht 0 till 2 with 1 unrelated chain warrant")]
 #[test_case(
-    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0, 0)], ..Default::default() },
+    Data { dht: agent_chain(&[(0, 0..3)]), warrants: vec![warrant(0)], ..Default::default() },
     agent_hash(&[0]), ChainFilter::new(action_hash(&[1]))
     => matches MustGetAgentActivityResponse::Activity { warrants, .. } if warrants.len() == 1; "1 to genesis with dht 0 till 2 with 1 chain warrant")]
 #[tokio::test(flavor = "multi_thread")]
@@ -640,16 +652,25 @@ async fn test_must_get_agent_activity_inner(
         authored,
     );
     let hashes = warrants.iter().map(|w| w.to_hash()).collect();
+    let authored_warrants = warrants.clone();
     authored.test_write(|txn| {
-        for w in warrants {
+        for w in authored_warrants {
             let w = DhtOp::from(w).into_hashed();
             insert_op_authored(txn, &w).unwrap();
         }
     });
 
-    authored_ops_to_dht_db_without_check(hashes, authored.clone().into(), dht)
+    authored_ops_to_dht_db_without_check(hashes, authored.clone().into(), dht.clone())
         .await
         .unwrap();
+    #[cfg(feature = "unstable-warrants")]
+    {
+        dht.test_write(|txn| {
+            for warrant in warrants {
+                insert_locally_validated_op(txn, DhtOpHashed::from_content_sync(warrant)).unwrap();
+            }
+        });
+    }
 
     let sync_scratch = match scratch {
         Some(scratch) => {

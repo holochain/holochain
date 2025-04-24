@@ -66,8 +66,7 @@ pub async fn handle_get_agent_activity(
         .read_async(move |txn| -> CascadeResult<AgentActivityResponse> {
             let txn = CascadeTxnWrapper::from(txn);
 
-            let warrants =
-                txn.get_warrants_for_basis(&AnyLinkableHash::from(agent.clone()), true)?;
+            let warrants = txn.get_warrants_for_agent(&agent, true)?;
 
             let mut activity_response = if options.include_full_records {
                 // If the caller wanted records, prioritise giving those back.

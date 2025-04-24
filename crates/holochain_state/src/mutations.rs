@@ -746,51 +746,32 @@ pub fn set_receipts_complete_redundantly_in_dht_db(
 }
 
 #[cfg(feature = "unstable-warrants")]
-/// Insert a [`Warrant`] into the Action table.
+/// Insert a [`Warrant`] into the Warrant table.
 pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMutationResult<usize> {
     let warrant_type = warrant.get_type();
     let hash = warrant.to_hash();
     let author = &warrant.author;
+    let timestamp = warrant.timestamp;
+    let warrantee = warrant.warrantee.clone();
 
-    // Don't produce a warrant if one, of any kind, already exists
-    let basis = warrant.dht_basis();
-
-    // XXX: this is a terrible misuse of databases. When putting a Warrant in the Action table,
-    //      if it's an InvalidChainOp warrant, we store the action hash in the prev_hash field.
-    let (exists, action_hash) = match &warrant.proof {
-        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp { action, .. }) => {
-            let action_hash = Some(action.0.clone());
-            let exists = txn
-                .prepare_cached(
-                    "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash = :prev_hash",
-                )?
-                .exists(named_params! {
-                    ":type": WarrantType::ChainIntegrityWarrant,                    
-                    ":base_hash": basis,
-                    ":prev_hash": action_hash,
-                })?;
-            (exists, action_hash)
-        }
-        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. }) => {
-            let exists = txn
-                .prepare_cached(
-                    "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash IS NULL",
-                )?
-                .exists(named_params! {
-                    ":type": WarrantType::ChainIntegrityWarrant,
-                    ":base_hash": basis
-                })?;
-            (exists, None)
-        }
-    };
+    // Don't produce a warrant if one, of any kind, already exists for the warrantee.
+    // TODO: If warrants were permanent, this would relieve peers from having to store a possibly endless
+    // number of warrants for an agent. However, warrants may be redeemable at some stage, which is when
+    // there needs to be a different check performed here.
+    // TODO: Move this check to the calling function.
+    let exists = txn
+        .prepare_cached("SELECT 1 FROM Warrant WHERE warrantee = :warrantee")?
+        .exists(named_params! {
+            ":warrantee": warrantee,
+        })?;
 
     Ok(if !exists {
-        sql_insert!(txn, Action, {
+        sql_insert!(txn, Warrant, {
             "hash": hash,
-            "type": warrant_type,
             "author": author,
-            "base_hash": basis,
-            "prev_hash": action_hash,
+            "timestamp": timestamp,
+            "warrantee": warrantee,
+            "type": warrant_type,
             "blob": to_blob(&warrant)?,
         })?
     } else {
@@ -1166,74 +1147,4 @@ pub fn remove_countersigning_session(
     tracing::debug!("Removed {} actions", count);
 
     Ok(())
-}
-
-#[cfg(feature = "unstable-warrants")]
-#[cfg(test)]
-mod tests {
-    use super::insert_op_authored;
-    use crate::prelude::{CascadeTxnWrapper, Store};
-    use ::fixt::fixt;
-    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
-    use holochain_types::prelude::*;
-    use std::sync::Arc;
-
-    #[test]
-    fn can_write_and_read_warrants() {
-        let dir = tempfile::tempdir().unwrap();
-
-        let cell_id = Arc::new(fixt!(CellId));
-
-        let pair = (fixt!(ActionHash), fixt!(Signature));
-
-        let make_op = |warrant| {
-            let op = SignedWarrant::new(warrant, fixt!(Signature));
-            let op: DhtOp = op.into();
-            op.into_hashed()
-        };
-
-        let action_author = fixt!(AgentPubKey);
-
-        let warrant1 = Warrant::new(
-            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-                action_author: action_author.clone(),
-                action: pair.clone(),
-                validation_type: ValidationType::App,
-            }),
-            fixt!(AgentPubKey),
-            fixt!(Timestamp),
-        );
-
-        let warrant2 = Warrant::new(
-            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
-                chain_author: action_author.clone(),
-                action_pair: (pair.clone(), pair.clone()),
-            }),
-            fixt!(AgentPubKey),
-            fixt!(Timestamp),
-        );
-
-        let op1 = make_op(warrant1.clone());
-        let op2 = make_op(warrant2.clone());
-
-        let db = DbWrite::<DbKindAuthored>::test(dir.as_ref(), DbKindAuthored(cell_id)).unwrap();
-        db.test_write({
-            let op1 = op1.clone();
-            let op2 = op2.clone();
-            move |txn| {
-                insert_op_authored(txn, &op1).unwrap();
-                insert_op_authored(txn, &op2).unwrap();
-            }
-        });
-
-        db.test_read(move |txn| {
-            let warrants: Vec<DhtOp> = CascadeTxnWrapper::from(txn)
-                .get_warrants_for_basis(&action_author.into(), false)
-                .unwrap()
-                .into_iter()
-                .map(Into::into)
-                .collect();
-            assert_eq!(warrants, vec![op1.into_content(), op2.into_content()]);
-        });
-    }
 }
