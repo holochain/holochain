@@ -121,10 +121,9 @@ impl TestData {
 #[derive(Clone)]
 enum Db {
     Integrated(DhtOp),
-    IntegratedEmpty,
     IntQueue(DhtOp),
     IntQueueEmpty,
-    MetaEmpty,
+    ValidateQueue(DhtOp),
     MetaActivity(Action),
     MetaUpdate(AnyDhtHash, Action),
     MetaDelete(ActionHash, Action),
@@ -177,6 +176,27 @@ impl Db {
                                 named_params! {
                                     ":hash": op_hash,
                                     ":status": ValidationStatus::Valid,
+                                },
+                                |row| row.get(0),
+                            )
+                            .unwrap();
+                        assert!(found, "{}\n{:?}", here, op);
+                    }
+                    Db::ValidateQueue(op) => {
+                        let op_hash = DhtOpHash::with_data_sync(&op);
+
+                        let found: bool = txn
+                            .query_row(
+                                "
+                                SELECT EXISTS(
+                                    SELECT 1 FROM DhtOp
+                                    WHERE when_integrated IS NULL
+                                    AND validation_stage IS NULL
+                                    AND hash = :hash
+                                )
+                                ",
+                                named_params! {
+                                    ":hash": op_hash,
                                 },
                                 |row| row.get(0),
                             )
@@ -264,30 +284,10 @@ impl Db {
                             .unwrap();
                         assert!(found, "{}\n{:?}", here, action);
                     }
-                    Db::IntegratedEmpty => {
-                        let not_empty: bool = txn
-                            .query_row(
-                                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NOT NULL)",
-                                [],
-                                |row| row.get(0),
-                            )
-                            .unwrap();
-                        assert!(!not_empty, "{}", here);
-                    }
                     Db::IntQueueEmpty => {
                         let not_empty: bool = txn
                             .query_row(
                                 "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
-                                [],
-                                |row| row.get(0),
-                            )
-                            .unwrap();
-                        assert!(!not_empty, "{}", here);
-                    }
-                    Db::MetaEmpty => {
-                        let not_empty: bool = txn
-                            .query_row(
-                                "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NOT NULL)",
                                 [],
                                 |row| row.get(0),
                             )
@@ -338,6 +338,13 @@ impl Db {
                         mutations::set_validation_status(txn, &hash, ValidationStatus::Valid)
                             .unwrap();
                     }
+                    Db::ValidateQueue(op) => {
+                        let op = DhtOpHashed::from_content_sync(op.clone());
+                        let hash = op.as_hash().clone();
+                        mutations::insert_op_dht(txn, &op, 0, None).unwrap();
+                        mutations::set_validation_stage(txn, &hash, ValidationStage::Pending)
+                            .unwrap();
+                    }
                     _ => {
                         unimplemented!("Use Db::Integrated");
                     }
@@ -363,7 +370,7 @@ async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
         fixt!(DnaHash),
         None,
     ));
-    integrate_dht_ops_workflow(env.clone(), env.clone().into(), qt, mock_network)
+    integrate_dht_ops_workflow(env, qt, mock_network)
         .await
         .unwrap();
 }
@@ -826,19 +833,6 @@ fn register_delete_link(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) 
     (pre_state, expect, "register link remove", op)
 }
 
-// Link remove when not an author
-fn register_delete_link_missing_base(a: TestData) -> (Vec<Db>, Vec<Db>, &'static str, DhtOp) {
-    let op: DhtOp = ChainOp::RegisterRemoveLink(a.signature.clone(), a.link_remove.clone()).into();
-    let pre_state = vec![Db::IntQueue(op.clone())];
-    let expect = vec![Db::IntegratedEmpty, Db::IntQueue(op.clone()), Db::MetaEmpty];
-    (
-        pre_state,
-        expect,
-        "register remove link remove missing base",
-        op,
-    )
-}
-
 // This runs the above tests
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ops_state() {
@@ -864,7 +858,6 @@ async fn test_ops_state() {
         register_deleted_action_by,
         register_create_link,
         register_delete_link,
-        register_delete_link_missing_base,
     ];
 
     for t in tests.iter() {
@@ -906,8 +899,6 @@ async fn inform_kitsune_about_integrated_ops() {
         register_deleted_action_by,
         register_create_link,
         register_delete_link,
-        // Not including register_delete_link_missing_base because it does not integrate ops,
-        // only tests the query cache state.
     ];
     for test in tests.iter() {
         let env = test_dht_db().to_db();
@@ -934,9 +925,7 @@ async fn inform_kitsune_about_integrated_ops() {
             });
         let hc_p2p = Arc::new(hc_p2p);
         let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
-        integrate_dht_ops_workflow(env.clone(), env.into(), tx, p2p_dna)
-            .await
-            .unwrap();
+        integrate_dht_ops_workflow(env, tx, p2p_dna).await.unwrap();
     }
 }
 
@@ -944,7 +933,9 @@ async fn inform_kitsune_about_integrated_ops() {
 async fn kitsune_not_informed_when_no_ops_integrated() {
     let env = test_dht_db().to_db();
     let test_data = TestData::new();
-    let (pre_state, _, _, _) = register_delete_link_missing_base(test_data);
+    let op: DhtOp =
+        ChainOp::RegisterAgentActivity(test_data.signature.clone(), fixt!(Action)).into();
+    let pre_state = vec![Db::ValidateQueue(op)];
     Db::set(pre_state, env.clone()).await;
 
     let (tx, _rx) = TriggerSender::new();
@@ -953,7 +944,5 @@ async fn kitsune_not_informed_when_no_ops_integrated() {
     hc_p2p.expect_new_integrated_data().never();
     let hc_p2p = Arc::new(hc_p2p);
     let p2p_dna = Arc::new(HolochainP2pDna::new(hc_p2p, dna_hash, None));
-    integrate_dht_ops_workflow(env.clone(), env.into(), tx, p2p_dna)
-        .await
-        .unwrap();
+    integrate_dht_ops_workflow(env, tx, p2p_dna).await.unwrap();
 }

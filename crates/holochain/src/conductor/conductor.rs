@@ -1629,8 +1629,6 @@ mod clone_cell_impls {
                 let source_chain = SourceChain::new(
                     self.get_or_create_authored_db(app_role.dna_hash(), app.agent_key().clone())?,
                     self.get_or_create_dht_db(app_role.dna_hash())?,
-                    self.get_or_create_space(app_role.dna_hash())?
-                        .dht_query_cache,
                     self.keystore.clone(),
                     app.agent_key().clone(),
                 )
@@ -2149,8 +2147,6 @@ mod misc_impls {
                     cell.id().agent_pubkey().clone(),
                 )?,
                 self.get_or_create_dht_db(cell_id.dna_hash())?,
-                self.get_or_create_space(cell_id.dna_hash())?
-                    .dht_query_cache,
                 self.keystore.clone(),
                 cell_id.agent_pubkey().clone(),
             )
@@ -2208,8 +2204,6 @@ mod misc_impls {
                     )?
                     .into(),
                     self.get_or_create_dht_db(cell_id.dna_hash())?.into(),
-                    self.get_or_create_space(cell_id.dna_hash())?
-                        .dht_query_cache,
                     self.keystore().clone(),
                     cell_id.agent_pubkey().clone(),
                 )
@@ -3220,12 +3214,6 @@ mod test_utils_impls {
         pub fn get_dht_db(&self, dna_hash: &DnaHash) -> ConductorApiResult<DbWrite<DbKindDht>> {
             Ok(self.get_or_create_dht_db(dna_hash)?)
         }
-        pub fn get_dht_db_cache(
-            &self,
-            dna_hash: &DnaHash,
-        ) -> ConductorApiResult<holochain_types::db_cache::DhtDbQueryCache> {
-            Ok(self.get_or_create_space(dna_hash)?.dht_query_cache)
-        }
 
         pub async fn get_cache_db(
             &self,
@@ -3280,7 +3268,6 @@ pub(crate) async fn genesis_cells(
             let authored_db =
                 space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
             let dht_db = space.dht_db;
-            let dht_db_cache = space.dht_query_cache;
             let chc = conductor.get_chc(&cell_id_inner);
             let ribosome = conductor
                 .get_ribosome(cell_id_inner.dna_hash())
@@ -3291,7 +3278,6 @@ pub(crate) async fn genesis_cells(
                 conductor,
                 authored_db,
                 dht_db,
-                dht_db_cache,
                 ribosome,
                 proof,
                 chc,

@@ -150,7 +150,6 @@ mod types;
         trigger_publish,
         conductor_handle,
         network,
-        dht_query_cache,
     ))
 )]
 #[allow(clippy::too_many_arguments)]
@@ -161,16 +160,9 @@ pub async fn app_validation_workflow(
     trigger_publish: TriggerSender,
     conductor_handle: ConductorHandle,
     network: DynHolochainP2pDna,
-    dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<WorkComplete> {
-    let outcome_summary = app_validation_workflow_inner(
-        dna_hash,
-        workspace,
-        conductor_handle,
-        network,
-        dht_query_cache,
-    )
-    .await?;
+    let outcome_summary =
+        app_validation_workflow_inner(dna_hash, workspace, conductor_handle, network).await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // If ops have been accepted or rejected, trigger integration.
@@ -200,7 +192,6 @@ async fn app_validation_workflow_inner(
     workspace: Arc<AppValidationWorkspace>,
     conductor: ConductorHandle,
     network: DynHolochainP2pDna,
-    dht_query_cache: DhtDbQueryCache,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
     let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
@@ -342,17 +333,8 @@ async fn app_validation_workflow_inner(
         warrant_op_hashes,
         workspace.authored_db.clone().into(),
         workspace.dht_db.clone(),
-        &workspace.dht_db_cache,
     )
     .await?;
-
-    // Once the database transaction is committed, add agent activity to the cache
-    // that is ready for integration.
-    for (author, seq) in agent_activity_ops {
-        dht_query_cache
-            .set_activity_ready_to_integrate(&author, Some(seq))
-            .await?;
-    }
 
     let accepted_ops = accepted_ops.load(Ordering::SeqCst);
     let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
@@ -823,7 +805,6 @@ pub struct AppValidationWorkspace {
     // Writeable because of warrants
     authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
-    dht_db_cache: DhtDbQueryCache,
     cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
     dna_def: Arc<DnaDef>,
@@ -834,7 +815,6 @@ impl AppValidationWorkspace {
         // Writeable because of warrants
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
-        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         dna_def: Arc<DnaDef>,
@@ -842,7 +822,6 @@ impl AppValidationWorkspace {
         Self {
             authored_db,
             dht_db,
-            dht_db_cache,
             cache,
             keystore,
             dna_def,
@@ -853,7 +832,6 @@ impl AppValidationWorkspace {
         Ok(HostFnWorkspace::new(
             self.authored_db.clone().into(),
             self.dht_db.clone().into(),
-            self.dht_db_cache.clone(),
             self.cache.clone(),
             self.keystore.clone(),
             None,

@@ -19,7 +19,6 @@ use derive_more::Constructor;
 use holochain_chc::ChcImpl;
 use holochain_sqlite::prelude::*;
 use holochain_state::source_chain;
-use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
 
@@ -33,7 +32,6 @@ where
     agent_pubkey: AgentPubKey,
     membrane_proof: Option<MembraneProof>,
     ribosome: Ribosome,
-    dht_db_cache: DhtDbQueryCache,
     chc: Option<ChcImpl>,
 }
 
@@ -63,7 +61,6 @@ where
         agent_pubkey,
         membrane_proof,
         ribosome,
-        dht_db_cache,
         chc,
     } = args;
 
@@ -116,7 +113,6 @@ where
     source_chain::genesis(
         workspace.vault.clone(),
         workspace.dht_db.clone(),
-        &dht_db_cache,
         api.keystore().clone(),
         dna_file.dna_hash().clone(),
         agent_pubkey,
@@ -185,7 +181,6 @@ mod tests {
         holochain_trace::test_run();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
         let dna = fake_dna_file("a");
@@ -207,22 +202,16 @@ mod tests {
                 agent_pubkey: author.clone(),
                 membrane_proof: None,
                 ribosome,
-                dht_db_cache: dht_db_cache.clone(),
                 chc: None,
             };
             let _: () = genesis_workflow(workspace, api, args).await.unwrap();
         }
 
         {
-            let source_chain = SourceChain::new(
-                vault.clone(),
-                dht_db.to_db(),
-                dht_db_cache,
-                keystore,
-                author.clone(),
-            )
-            .await
-            .unwrap();
+            let source_chain =
+                SourceChain::new(vault.clone(), dht_db.to_db(), keystore, author.clone())
+                    .await
+                    .unwrap();
             let actions = source_chain
                 .query(Default::default())
                 .await

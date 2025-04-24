@@ -659,8 +659,8 @@ async fn test_must_get_agent_activity_inner(
             insert_op_authored(txn, &w).unwrap();
         }
     });
-    let dht_cache = DhtDbQueryCache::new(dht.clone().into());
-    authored_ops_to_dht_db_without_check(hashes, authored.clone().into(), dht.clone(), &dht_cache)
+
+    authored_ops_to_dht_db_without_check(hashes, authored.clone().into(), dht.clone())
         .await
         .unwrap();
     #[cfg(feature = "unstable-warrants")]

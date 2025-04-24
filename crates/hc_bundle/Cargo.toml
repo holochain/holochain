@@ -37,6 +37,8 @@ mr_bundle = { version = "^0.6.0-dev.1", path = "../mr_bundle", features = [
 serde_yaml = "0.9"
 thiserror = "1.0.22"
 tokio = { version = "1.27", features = ["full"] }
+schemars = "0.8.22"
+serde_json = "1.0.140"
 
 [dev-dependencies]
 assert_cmd = "2.0"

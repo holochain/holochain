@@ -52,6 +52,9 @@ proptest-derive = { version = "0", optional = true }
 contrafact = { version = "0.2.0-rc.1", optional = true }
 once_cell = { version = "1.4", optional = true }
 
+# Enabled with the `schema` feature
+schemars = { version = "0.8.22", optional = true }
+
 [dev-dependencies]
 holochain_zome_types = { path = ".", features = ["test_utils"] }
 once_cell = { version = "1.4", optional = false }
@@ -79,6 +82,7 @@ full = [
   "holochain_timestamp/now",
   "properties",
   "holochain_integrity_types/full",
+  "schema",
 ]
 
 fixturators = [
@@ -132,3 +136,5 @@ unstable-functions = []
 unstable-countersigning = []
 
 unstable-migration = []
+
+schema = ["dep:schemars"]

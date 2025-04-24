@@ -38,6 +38,7 @@
 
 use holochain_zome_types::prelude::*;
 use mr_bundle::{resource_id_for_path, Manifest, ResourceIdentifier};
+use schemars::JsonSchema;
 use std::collections::HashMap;
 
 pub(crate) mod app_manifest_v1;
@@ -55,7 +56,9 @@ use super::{InstalledCell, ModifiersMap};
 
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema, derive_more::From,
+)]
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 pub enum AppManifest {

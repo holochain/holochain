@@ -1,5 +1,4 @@
 use crate::query::StateQueryError;
-use holochain_types::db_cache::DbCacheError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -12,9 +11,6 @@ pub enum StateMutationError {
 
     #[error(transparent)]
     DatabaseError(#[from] holochain_sqlite::error::DatabaseError),
-
-    #[error(transparent)]
-    DbCacheError(#[from] DbCacheError),
 
     #[error(transparent)]
     DhtOpError(#[from] holochain_types::dht_op::DhtOpError),
