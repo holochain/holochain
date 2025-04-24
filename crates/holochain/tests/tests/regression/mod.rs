@@ -235,4 +235,60 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ link_hash: {link_hash:?}");
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn zero_arc_can_delete_link() {
+    holochain_trace::test_run();
+
+    let empty_arc_conductor_config =
+        SweetConductorConfig::standard().tune_network_config(|nc| nc.target_arc_factor = 0);
+
+    let other_config = SweetConductorConfig::standard();
+    let mut conductors =
+        SweetConductorBatch::from_configs(vec![other_config, empty_arc_conductor_config]).await;
+
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
+        .await
+        .0;
+
+    let apps = conductors
+        .setup_app("app", &[dna_file.clone()])
+        .await
+        .unwrap();
+
+    let ((alice,), (bob_empty_arc,)) = apps.into_tuples();
+
+    conductors[0]
+        .declare_full_storage_arcs(dna_file.dna_hash())
+        .await;
+    // Now we want to update agent infos where Alice has declared full arc.
+    conductors.exchange_peer_info().await;
+
+    // Alice creates a link.
+    let link_hash: ActionHash = conductors[0]
+        .call(
+            &alice.zome(TestWasm::Link.coordinator_zome_name()),
+            "create_link",
+            (),
+        )
+        .await;
+
+    // Wait for Alice to integrate all ops.
+    retry_fn_until_timeout(
+        || async { conductors[0].all_ops_integrated(alice.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Bob attempts to delete the link.
+    let _: ActionHash = conductors[1]
+        .call(
+            &bob_empty_arc.zome(TestWasm::Link.coordinator_zome()),
+            "delete_link",
+            link_hash,
+        )
+        .await;
+}
+
 pub mod must_get_agent_activity_saturation;
