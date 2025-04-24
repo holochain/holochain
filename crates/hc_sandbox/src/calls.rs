@@ -2,8 +2,6 @@
 //!
 //! This module is designed for use in a CLI so it is more simplified
 //! than calling the [`AdminWebsocket`] directly.
-//! For simple calls like [`AdminWebsocket::list_dnas`] this is probably easier
-//! but if you want more control use [`AdminWebsocket::send`].
 
 use std::collections::HashMap;
 use std::path::Path;
