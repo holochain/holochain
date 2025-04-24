@@ -86,7 +86,6 @@ pub async fn spawn_queue_consumer_tasks(
     let Space {
         dht_db,
         cache_db: cache,
-        dht_query_cache,
         ..
     } = space;
 
@@ -121,7 +120,6 @@ pub async fn spawn_queue_consumer_tasks(
         spawn_integrate_dht_ops_consumer(
             dna_hash.clone(),
             dht_db.clone(),
-            dht_query_cache.clone(),
             conductor.task_manager(),
             tx_receipt.clone(),
             network.clone(),
@@ -140,7 +138,6 @@ pub async fn spawn_queue_consumer_tasks(
             AppValidationWorkspace::new(
                 authored_db.clone(),
                 dht_db.clone(),
-                space.dht_query_cache.clone(),
                 cache.clone(),
                 keystore.clone(),
                 Arc::new(dna_def),
@@ -149,7 +146,6 @@ pub async fn spawn_queue_consumer_tasks(
             tx_integration.clone(),
             tx_publish.clone(),
             network.clone(),
-            dht_query_cache.clone(),
         )
     });
 
@@ -164,7 +160,6 @@ pub async fn spawn_queue_consumer_tasks(
             SysValidationWorkspace::new(
                 authored_db.clone(),
                 dht_db.clone(),
-                dht_query_cache.clone(),
                 cache.clone(),
                 Arc::new(dna_def),
                 conductor

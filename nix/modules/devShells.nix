@@ -25,21 +25,24 @@
       devShells = {
         default = self'.devShells.holonix;
         holonix = pkgs.lib.makeOverridable
-          ({ holochainOverrides }: (if inputs.versions.stub or false then pkgs.mkShell {
-            shellHook = ''
-                echo "This Holochain version is not supported on the current Holonix version. Please migrate to the new Holonix"
-                echo "See the instructions here: https://developer.holochain.org/resources/upgrade/upgrade-new-holonix/"
-                echo "Alternatively, you can use the quickstart guide provided with the updated Holonix: https://github.com/holochain/holonix"
-                exit 1;
-            '';
-          } else lib.warn "\n\nThis version of Holonix is being deprecated, please consider migrating: https://developer.holochain.org/resources/upgrade/upgrade-new-holonix/" pkgs.mkShell {
-            inputsFrom = [ self'.devShells.rustDev ];
-            packages = (holonixPackages { inherit holochainOverrides; }) ++ [ hn-introspect ];
-            shellHook = ''
-              echo Holochain development shell spawned. Type 'exit' to leave.
-              export PS1='\n\[\033[1;34m\][holonix:\w]\$\[\033[0m\] '
-            '';
-          }))
+          ({ holochainOverrides }: (if inputs.versions.stub or false then
+            pkgs.mkShell
+              {
+                shellHook = ''
+                  echo "This Holochain version is not supported on the current Holonix version. Please migrate to the new Holonix"
+                  echo "See the instructions here: https://developer.holochain.org/resources/upgrade/upgrade-new-holonix/"
+                  echo "Alternatively, you can use the quickstart guide provided with the updated Holonix: https://github.com/holochain/holonix"
+                  exit 1;
+                '';
+              } else
+            lib.warn "\n\nThis version of Holonix is being deprecated, please consider migrating: https://developer.holochain.org/resources/upgrade/upgrade-new-holonix/" pkgs.mkShell {
+              inputsFrom = [ self'.devShells.rustDev ];
+              packages = (holonixPackages { inherit holochainOverrides; }) ++ [ hn-introspect ];
+              shellHook = ''
+                echo Holochain development shell spawned. Type 'exit' to leave.
+                export PS1='\n\[\033[1;34m\][holonix:\w]\$\[\033[0m\] '
+              '';
+            }))
           {
             holochainOverrides = { };
           };
@@ -134,6 +137,8 @@
                 (builtins.attrValues holochainTestDrvs)
             )
             ;
+
+            LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
 
             packages = with pkgs; [
               cargo-nextest
