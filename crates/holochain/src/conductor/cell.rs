@@ -48,6 +48,7 @@ use crate::{conductor::api::error::ConductorApiError, core::ribosome::RibosomeT}
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 #[cfg(feature = "unstable-countersigning")]
 use {
+    crate::core::queue_consumer::TriggerSender,
     crate::core::workflow::countersigning_workflow::countersigning_success,
     crate::core::workflow::witnessing_workflow::receive_incoming_countersigning_ops,
 };
@@ -917,6 +918,11 @@ impl Cell {
         self.queue_triggers
             .integrate_dht_ops
             .trigger(&"notify_authored_ops_moved_to_limbo");
+    }
+
+    #[cfg(feature = "unstable-countersigning")]
+    pub(crate) fn countersigning_trigger(&self) -> TriggerSender {
+        self.queue_triggers.countersigning.clone()
     }
 
     pub(crate) fn publish_authored_ops(&self) {
