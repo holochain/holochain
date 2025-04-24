@@ -12,9 +12,7 @@ edition = "2021"
 [dependencies]
 cfg-if = "1.0"
 derive_more = "0.99"
-holo_hash = { version = "^0.5.1", path = "../holo_hash", features = [
-  "full",
-] }
+holo_hash = { version = "^0.5.1", path = "../holo_hash", features = ["full"] }
 holochain_state_types = { version = "^0.5.1", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.55"
 holochain_types = { version = "^0.5.1", path = "../holochain_types" }
