@@ -34,10 +34,12 @@ impl DnaModifiers {
 
 /// [`DnaModifiers`] options of which all are optional.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DnaModifiersOpt<P = SerializedBytes> {
     /// see [`DnaModifiers`]
     pub network_seed: Option<NetworkSeed>,
     /// see [`DnaModifiers`]
+    #[cfg_attr(feature = "schema", schemars(schema_with = "properties_schema"))]
     pub properties: Option<P>,
 }
 
@@ -102,4 +104,18 @@ pub trait TryFromDnaProperties {
     fn try_from_dna_properties() -> Result<Self, Self::Error>
     where
         Self: Sized;
+}
+
+#[cfg(feature = "schema")]
+fn properties_schema(_: &mut schemars::SchemaGenerator) -> schemars::schema::Schema {
+    schemars::schema::Schema::Object(schemars::schema::SchemaObject {
+        instance_type: Some(
+            vec![
+                schemars::schema::InstanceType::Object,
+                schemars::schema::InstanceType::Null,
+            ]
+            .into(),
+        ),
+        ..Default::default()
+    })
 }

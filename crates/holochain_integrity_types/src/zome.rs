@@ -6,12 +6,12 @@
 //! using Rust closures, and is useful for quickly defining zomes on-the-fly
 //! for tests.
 
-use std::borrow::Cow;
-
 use holochain_serialized_bytes::prelude::*;
+use std::borrow::Cow;
 
 /// ZomeName as a String.
 #[derive(Clone, Debug, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[repr(transparent)]
 pub struct ZomeName(pub Cow<'static, str>);
 

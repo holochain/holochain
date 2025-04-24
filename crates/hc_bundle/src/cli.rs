@@ -1,5 +1,7 @@
 //! CLI definitions.
 
+use crate::error::HcBundleResult;
+use anyhow::Context;
 use clap::{Parser, Subcommand};
 use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::{AppManifest, DnaManifest, ValidatedDnaManifest};
@@ -8,8 +10,6 @@ use holochain_util::ffs;
 use mr_bundle::{FileSystemBundler, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
-
-use crate::error::HcBundleResult;
 
 /// The file extension to use for DNA bundles.
 pub const DNA_BUNDLE_EXT: &str = "dna";
@@ -329,13 +329,11 @@ impl HcDnaBundleSubcommand {
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
             Self::Schema => {
-                #[cfg(not(feature = "unstable-migration"))]
-                println!("{}", include_str!("../schema/dna-manifest.schema.json"));
-                #[cfg(feature = "unstable-migration")]
-                println!(
-                    "{}",
-                    include_str!("../schema/dna-manifest-unstable-migration.schema.json")
-                );
+                let schema = schemars::schema_for!(DnaManifest);
+                let schema_string = serde_json::to_string_pretty(&schema)
+                    .context("Failed to pretty print schema")?;
+
+                println!("{}", schema_string);
             }
             Self::Hash { path } => {
                 let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(path)
@@ -391,7 +389,11 @@ impl HcAppBundleSubcommand {
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
             Self::Schema => {
-                println!("{}", include_str!("../schema/happ-manifest.schema.json"));
+                let schema = schemars::schema_for!(AppManifest);
+                let schema_string = serde_json::to_string_pretty(&schema)
+                    .context("Failed to pretty print schema")?;
+
+                println!("{}", schema_string);
             }
         }
         Ok(())
@@ -441,10 +443,11 @@ impl HcWebAppBundleSubcommand {
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
             Self::Schema => {
-                println!(
-                    "{}",
-                    include_str!("../schema/web-happ-manifest.schema.json")
-                );
+                let schema = schemars::schema_for!(WebAppManifest);
+                let schema_string = serde_json::to_string_pretty(&schema)
+                    .context("Failed to pretty print schema")?;
+
+                println!("{}", schema_string);
             }
         }
         Ok(())

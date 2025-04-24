@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use mr_bundle::ResourceIdentifier;
+use schemars::JsonSchema;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -15,7 +16,9 @@ pub use dna_manifest_v1::{
 };
 
 /// The enum which encompasses all versions of the DNA manifest, past and present.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema, derive_more::From,
+)]
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 pub enum DnaManifest {
