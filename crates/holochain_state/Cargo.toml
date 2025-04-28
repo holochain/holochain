@@ -18,7 +18,9 @@ chrono = { version = "0.4.22", default-features = false, features = [
 ] }
 derive_more = "0.99"
 holochain_sqlite = { version = "^0.5.2-rc.0", path = "../holochain_sqlite" }
-holo_hash = { version = "^0.5.2-rc.0", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.5.2-rc.0", path = "../holo_hash", features = [
+  "full",
+] }
 fallible-iterator = "0.3.0"
 holochain_chc = { version = "^0.2.2-rc.0", path = "../holochain_chc" }
 holochain_keystore = { version = "^0.5.2-rc.0", path = "../holochain_keystore" }
