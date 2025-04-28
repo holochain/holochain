@@ -217,6 +217,7 @@ async fn get_agent_activity() {
             validation_type: ValidationType::Sys,
         }),
         fixt!(AgentPubKey),
+        td.agent.clone(),
     );
     let warrant_invalid = Warrant::new_now(
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
@@ -225,6 +226,7 @@ async fn get_agent_activity() {
             validation_type: ValidationType::Sys,
         }),
         fixt!(AgentPubKey),
+        td.agent.clone(),
     );
     {
         let warrant_op_valid =

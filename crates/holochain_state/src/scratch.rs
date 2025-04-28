@@ -221,9 +221,9 @@ impl Store for Scratch {
             .cloned())
     }
 
-    fn get_warrants_for_basis(
+    fn get_warrants_for_agent(
         &self,
-        _hash: &AnyLinkableHash,
+        _agent_key: &AgentPubKey,
         _check_validity: bool,
     ) -> StateQueryResult<Vec<WarrantOp>> {
         unimplemented!(

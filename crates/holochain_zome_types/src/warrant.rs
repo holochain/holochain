@@ -1,11 +1,18 @@
 //! Types for warrants
 
+use crate::signature::Signed;
 use holo_hash::*;
 use holochain_integrity_types::Signature;
 pub use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
-
-use crate::signature::Signed;
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
+use {
+    rusqlite::{
+        types::{FromSql, FromSqlError, FromSqlResult, ValueRef},
+        ToSql,
+    },
+    std::str::FromStr,
+};
 
 /// A Warrant is an authored, timestamped proof of wrongdoing by another agent.
 #[derive(
@@ -21,32 +28,41 @@ use crate::signature::Signed;
     derive_more::Deref,
 )]
 pub struct Warrant {
-    /// The self-proving part of the warrant containing evidence of bad behavior
+    /// The self-proving part of the warrant containing evidence of bad behavior.
     #[deref]
     pub proof: WarrantProof,
-    /// The author of the warrant
+    /// The author of the warrant.
     pub author: AgentPubKey,
-    /// Time when the warrant was issued
+    /// Time when the warrant was issued.
     pub timestamp: Timestamp,
+    /// The warranted agent.
+    pub warrantee: AgentPubKey,
 }
 
 impl Warrant {
     /// Constructor
-    pub fn new(proof: WarrantProof, author: AgentPubKey, timestamp: Timestamp) -> Self {
+    pub fn new(
+        proof: WarrantProof,
+        author: AgentPubKey,
+        timestamp: Timestamp,
+        warrantee: AgentPubKey,
+    ) -> Self {
         Self {
             proof,
             author,
             timestamp,
+            warrantee,
         }
     }
 
     /// Constructor with timestamp set to now()
     #[cfg(feature = "full")]
-    pub fn new_now(proof: WarrantProof, author: AgentPubKey) -> Self {
+    pub fn new_now(proof: WarrantProof, author: AgentPubKey, warrantee: AgentPubKey) -> Self {
         Self {
             proof,
             author,
             timestamp: Timestamp::now(),
+            warrantee,
         }
     }
 }
@@ -68,11 +84,11 @@ impl HashableContent for Warrant {
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
 )]
 pub enum WarrantProof {
-    /// Signifies evidence of a breach of chain integrity
+    /// Signifies evidence of a breach of chain integrity.
     ChainIntegrity(ChainIntegrityWarrant),
 }
 
-/// Just the type of the warrant
+/// The type of warrant.
 #[derive(
     Clone,
     Copy,
@@ -84,11 +100,9 @@ pub enum WarrantProof {
     PartialEq,
     Hash,
     derive_more::From,
+    strum_macros::EnumString,
 )]
 pub enum WarrantType {
-    // NOTE: the values here cannot overlap with ActionType,
-    // because they occupy the same field in the Action table.
-    //
     /// Signifies evidence of a breach of chain integrity
     ChainIntegrityWarrant,
 }
@@ -100,11 +114,19 @@ impl From<Warrant> for WarrantType {
 }
 
 #[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
-impl rusqlite::ToSql for WarrantType {
+impl ToSql for WarrantType {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
         Ok(rusqlite::types::ToSqlOutput::Owned(
             format!("{:?}", self).into(),
         ))
+    }
+}
+
+#[cfg(any(feature = "sqlite", feature = "sqlite-encrypted"))]
+impl FromSql for WarrantType {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        String::column_result(value)
+            .and_then(|text| WarrantType::from_str(&text).map_err(|_| FromSqlError::InvalidType))
     }
 }
 

@@ -275,13 +275,16 @@ async fn app_validation_workflow_inner(
 
                     warrant_op_hashes.push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
 
-                    workspace
+                    if let Err(err) = workspace
                         .authored_db
                         .write_async(move |txn| {
                             warn!("Inserting warrant op");
                             insert_op_authored(txn, &warrant_op)
                         })
-                        .await?;
+                        .await
+                    {
+                        tracing::warn!("Error writing warrant op: {err}");
+                    }
 
                     warranted_ops.fetch_add(1, Ordering::SeqCst);
                 }
