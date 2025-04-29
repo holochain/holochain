@@ -313,6 +313,7 @@ async fn create_sandbox_and_call_list_apps() {
         ))
         .arg("--piped")
         .arg("create")
+        .arg("--in-process-lair")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
