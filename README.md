@@ -17,7 +17,7 @@ This code is in initial Beta release. It's ready for limited production use. It 
 
 This repository contains the Holochain core libraries, not the runtime intended for end-users of Holochain applications.
 
-If you just want to install and run Holochain and apps from its AppStore, download the latest release of [Holochain Launcher](https://github.com/holochain/launcher/releases) appropriate for Linux, Mac, or Windows. 
+If you just want to install and run Holochain and apps from its AppStore, download the latest release of [Holochain Launcher](https://github.com/holochain/launcher/releases) appropriate for Linux, Mac, or Windows.
 
 ## Installing Holochain for App Development
 
