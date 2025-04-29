@@ -298,6 +298,43 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
     shutdown_sandbox(hc_admin).await;
 }
 
+/// Creates a new sandbox and tries to list apps via `hc-sandbox call`
+#[tokio::test(flavor = "multi_thread")]
+async fn create_sandbox_and_call_list_apps() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("create")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit());
+
+    let mut hc_create = input_piped_password(&mut cmd).await;
+    hc_create.wait().await.unwrap();
+
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("call")
+        .arg("list-apps")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit());
+
+    let mut hc_call = input_piped_password(&mut cmd).await;
+
+    let exit_code = hc_call.wait().await.unwrap();
+    assert!(exit_code.success());
+}
+
 /// Generates a new sandbox with roles settings overridden by a yaml file passed via
 /// the --roles-settings argument and verifies that the modifiers have been set
 /// correctly
