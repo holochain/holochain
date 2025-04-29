@@ -650,9 +650,9 @@ checksum = "5ce89b21cab1437276d2650d57e971f9d548a2d9037cc231abdc0562b97498ce"
 
 [[package]]
 name = "bytemuck"
-version = "1.22.0"
+version = "1.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6b1fc10dbac614ebc03540c9dbd60e83887fda27794998c6528f1782047d540"
+checksum = "9134a6ef01ce4b366b50689c94f82c14bc72bc5d0386829828a2e2752ef7958c"
 
 [[package]]
 name = "byteorder"
@@ -749,9 +749,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chrono"
-version = "0.4.40"
+version = "0.4.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a7964611d71df112cb1730f2ee67324fcf4d0fc6606acbbe9bfe06df124637c"
+checksum = "c469d952047f47f91b68d1cba3f10d63c11d73e4636f24f08daf0278abf01c4d"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
@@ -2397,7 +2397,7 @@ version = "0.3.0-dev.1"
 dependencies = [
  "clap 4.5.37",
  "tokio",
- "tx5-signal",
+ "tx5-signal 0.3.4",
  "ureq 3.0.11",
  "url2",
 ]
@@ -2862,6 +2862,8 @@ dependencies = [
  "indexmap 2.9.0",
  "kitsune2_api",
  "kitsune2_core",
+ "kitsune2_gossip",
+ "kitsune2_transport_tx5",
  "matches",
  "pretty_assertions",
  "rmp-serde",
@@ -4064,22 +4066,23 @@ dependencies = [
 
 [[package]]
 name = "kitsune2"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ffbd25536369ff5a6f566d3dc1501337d5897d3d4995b80f691c1e5362f9071"
+checksum = "6e02f0a8c6e494ea8ac180daab1daa4b0a3e8b30e21ec6545085dc891b306aad"
 dependencies = [
  "bytes",
  "kitsune2_api",
  "kitsune2_core",
  "kitsune2_gossip",
  "kitsune2_transport_tx5",
+ "serde",
 ]
 
 [[package]]
 name = "kitsune2_api"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac29cd5724b3060cdf6a13906c587d290e8b4c3baf9357f03e6a05c4cfd13ca1"
+checksum = "c23a9357eda3bff9232ceebb20018b9cf3b1a4e0ffbe7eeba9e2495df1c70d7e"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4094,9 +4097,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_client"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34d41801172987673a7667a924d1deff6724674a7585243fbc508d15cdf624a8"
+checksum = "2498d7864dd5bab86a2914fca2b7554652b2a0cffdedd52e14578e1de6c38db1"
 dependencies = [
  "base64 0.22.1",
  "kitsune2_api",
@@ -4107,9 +4110,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_srv"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52e951694ac49ef8ccbe54b875ab4dc8aa30f76b172e868b4e9e13a3bc4ea6c6"
+checksum = "093d253286f39e2fc131ebc79ba4a17ab5b678b8320190191bf84f7b2820bdca"
 dependencies = [
  "async-channel",
  "axum",
@@ -4134,9 +4137,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_core"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3f9e7386cdced094827117da6a00125da72486177f2a2aee2a7ed6e95367074"
+checksum = "29fbf84fcd26c7abad2d4065f2823ba9f77c4bca86c7046ebacc3b35a3fa4bdd"
 dependencies = [
  "backon",
  "bytes",
@@ -4146,19 +4149,19 @@ dependencies = [
  "kitsune2_bootstrap_client",
  "prost",
  "rand 0.8.5",
+ "schemars",
  "serde",
  "serde_json",
  "tokio",
  "tracing",
- "ureq 2.12.1",
  "url",
 ]
 
 [[package]]
 name = "kitsune2_dht"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7078fb03bb12b32dfba83828eb3907c647594ea08b71c80ae22491fa1d11257b"
+checksum = "ff4d238d7a040f84a2f763b85a06c5ce6fe8d97c3c2a493901da9acf6aeb523e"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4167,9 +4170,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_gossip"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c86250f29ae2f69ae205ea81d510be6d7f6310b73407931f09cf4e096fa14a42"
+checksum = "8741f78915c9f62d6ea8bd224a602e61a0fd67229d074b4624623eca93ff7395"
 dependencies = [
  "backon",
  "bytes",
@@ -4178,6 +4181,7 @@ dependencies = [
  "kitsune2_dht",
  "prost",
  "rand 0.8.5",
+ "schemars",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -4187,15 +4191,15 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_transport_tx5"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dda807796017c00bf931cfc0c552108fb115682547e3b90b40a918f3f2a9cb29"
+checksum = "3d855950caa4b3c1156c6ab7650129ae4ee6a1e3dfa9ef770361947e999655b0"
 dependencies = [
  "base64 0.22.1",
  "bytes",
  "kitsune2_api",
+ "schemars",
  "serde",
- "serde_json",
  "tokio",
  "tracing",
  "tx5",
@@ -6354,6 +6358,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
 dependencies = [
  "dyn-clone",
+ "indexmap 1.9.3",
  "schemars_derive",
  "serde",
  "serde_json",
@@ -7341,9 +7346,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.8.21"
+version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "900f6c86a685850b1bc9f6223b20125115ee3f31e01207d81655bbcc0aea9231"
+checksum = "05ae329d1f08c4d17a59bed7ff5b5a769d062e64a62d34a3261b219e62cd5aae"
 dependencies = [
  "serde",
  "serde_spanned",
@@ -7362,9 +7367,9 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.22.25"
+version = "0.22.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10558ed0bd2a1562e630926a2d1f0b98c827da99fabd3fe20920a59642504485"
+checksum = "310068873db2c5b3e7659d2cc35d21855dbafa50d1ce336397c666e3cb08137e"
 dependencies = [
  "indexmap 2.9.0",
  "serde",
@@ -7376,9 +7381,9 @@ dependencies = [
 
 [[package]]
 name = "toml_write"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28391a4201ba7eb1984cfeb6862c0b3ea2cfe23332298967c749dddc0d6cd976"
+checksum = "bfb942dfe1d8e29a7ee7fcbde5bd2b9a25fb89aa70caea2eba3bee836ff41076"
 
 [[package]]
 name = "tower"
@@ -7592,9 +7597,9 @@ dependencies = [
 
 [[package]]
 name = "tx5"
-version = "0.3.4"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "243f2f2815e826b2c79e1cf10093f77afda339ef0e0dd4a2d619d57cbc4ef40a"
+checksum = "91f84fd225371150c55da756ee40260bd6c3481e951e5e9afc89732a209c29c8"
 dependencies = [
  "base64 0.22.1",
  "futures",
@@ -7604,25 +7609,26 @@ dependencies = [
  "tokio",
  "tracing",
  "tx5-connection",
- "tx5-core",
+ "tx5-core 0.4.0",
  "url",
 ]
 
 [[package]]
 name = "tx5-connection"
-version = "0.3.4"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa4792c1810c269c5775fc4646f5f958fdb10b81fde97763244ef8d106f7bf49"
+checksum = "67f69d4fd6868cf8d751762b69f1ba3ac05bdc8331b1729061c846f2c5037fdd"
 dependencies = [
  "bit_field",
  "datachannel",
  "futures",
+ "schemars",
  "serde",
  "serde_json",
  "tokio",
  "tracing",
- "tx5-core",
- "tx5-signal",
+ "tx5-core 0.4.0",
+ "tx5-signal 0.4.0",
 ]
 
 [[package]]
@@ -7630,6 +7636,21 @@ name = "tx5-core"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad25f7c4aa26e6eec448eebb76aa7e845587c10a636e026919ff44a76cdcefbb"
+dependencies = [
+ "base64 0.22.1",
+ "once_cell",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "tx5-core"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d89c76968f7b5c6d26f36f9067044e3b3be0c45b49cd3ce58e4ca55a9fe61576"
 dependencies = [
  "base64 0.22.1",
  "once_cell",
@@ -7650,7 +7671,20 @@ dependencies = [
  "sbd-e2e-crypto-client",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.3.4",
+]
+
+[[package]]
+name = "tx5-signal"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f126665f54e5a69b2738edb8fa05f619f2c06ca68315dc943d018fcc6bc5b003"
+dependencies = [
+ "rand 0.8.5",
+ "sbd-e2e-crypto-client",
+ "tokio",
+ "tracing",
+ "tx5-core 0.4.0",
 ]
 
 [[package]]
