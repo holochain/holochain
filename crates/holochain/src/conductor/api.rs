@@ -11,7 +11,6 @@
 
 mod api_cell;
 mod api_external;
-#[allow(missing_docs)]
 pub mod error;
 
 pub use api_cell::*;

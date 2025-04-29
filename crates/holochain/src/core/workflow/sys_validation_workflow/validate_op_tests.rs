@@ -1061,7 +1061,8 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(to_update_signed_action.action().clone()).to_string()
+            ValidationOutcome::NotNewEntry(Box::new(to_update_signed_action.action().clone()))
+                .to_string()
         ),
         outcome
     );
@@ -1439,7 +1440,8 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(to_update_signed_action.action().clone()).to_string()
+            ValidationOutcome::NotNewEntry(Box::new(to_update_signed_action.action().clone()))
+                .to_string()
         ),
         outcome,
     );
@@ -1857,7 +1859,8 @@ async fn validate_register_deleted_by_wrong_delete_target() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(to_delete_signed_action.action().clone()).to_string()
+            ValidationOutcome::NotNewEntry(Box::new(to_delete_signed_action.action().clone()))
+                .to_string()
         ),
         outcome
     );
@@ -1971,7 +1974,8 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(to_delete_signed_action.action().clone()).to_string()
+            ValidationOutcome::NotNewEntry(Box::new(to_delete_signed_action.action().clone()))
+                .to_string()
         ),
         outcome
     );
@@ -2005,7 +2009,7 @@ async fn validate_delete_a_delete_is_rejected() {
         .unwrap();
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(delete_action_signed_hashed.action().clone())
+            ValidationOutcome::NotNewEntry(Box::new(delete_action_signed_hashed.action().clone()))
                 .to_string()
         ),
         outcome
@@ -2021,7 +2025,7 @@ async fn validate_delete_a_delete_is_rejected() {
         .unwrap();
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(delete_action_signed_hashed.action().clone())
+            ValidationOutcome::NotNewEntry(Box::new(delete_action_signed_hashed.action().clone()))
                 .to_string()
         ),
         outcome

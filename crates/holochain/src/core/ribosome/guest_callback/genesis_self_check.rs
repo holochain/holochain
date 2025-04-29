@@ -74,8 +74,8 @@ mod slow_tests {
         guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckResult},
         RibosomeT,
     };
-    use crate::fixt::curve::Zomes;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::fixt::Zomes;
     use holochain_wasm_test_utils::TestWasm;
 
     fn invocation_fixture() -> GenesisSelfCheckInvocation {

@@ -275,7 +275,7 @@ pub async fn setup_app_inner(
 pub fn warm_wasm_tests() {
     if let Some(_path) = std::env::var_os("HC_WASM_CACHE_PATH") {
         let wasms: Vec<_> = TestWasm::iter().collect();
-        crate::fixt::RealRibosomeFixturator::new(crate::fixt::curve::Zomes(wasms))
+        crate::fixt::RealRibosomeFixturator::new(crate::fixt::Zomes(wasms))
             .next()
             .unwrap();
     }

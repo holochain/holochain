@@ -946,7 +946,7 @@ mod network_impls {
         async fn storage_info_for_dna(
             &self,
             dna_hash: &DnaHash,
-            used_by: &Vec<InstalledAppId>,
+            used_by: &[InstalledAppId],
         ) -> ConductorResult<StorageBlob> {
             let authored_dbs = self.spaces.get_all_authored_dbs(dna_hash)?;
             let dht_db = self.spaces.dht_db(dna_hash)?;
@@ -990,7 +990,7 @@ mod network_impls {
                     .map_err(ConductorError::DatabaseError)
                     .await?,
                 dna_hash: dna_hash.clone(),
-                used_by: used_by.clone(),
+                used_by: used_by.to_vec(),
             }))
         }
 
@@ -3114,7 +3114,7 @@ impl Conductor {
                     if app_role.is_clone_limit_reached() {
                         return Err(ConductorError::AppError(AppError::CloneLimitExceeded(
                             app_role.clone_limit(),
-                            app_role.clone(),
+                            Box::new(app_role.clone()),
                         )));
                     }
                     let original_dna_hash = app_role.dna_hash().clone();

@@ -691,7 +691,7 @@ impl InstalledAppCommon {
         if app_role_assignment.is_clone_limit_reached() {
             return Err(AppError::CloneLimitExceeded(
                 app_role_assignment.clone_limit,
-                app_role_assignment.clone(),
+                Box::new(app_role_assignment.clone()),
             ));
         }
         let clone_id = CloneId::new(role_name, app_role_assignment.next_clone_index);

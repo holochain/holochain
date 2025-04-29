@@ -13,7 +13,6 @@ pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
 
-#[allow(missing_docs)]
 mod error;
 #[cfg(test)]
 mod tests;
@@ -36,7 +35,7 @@ pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysVal
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitAction((*sig).clone(), (*action).clone()),
+            ValidationOutcome::CounterfeitAction((*sig).clone(), Box::new((*action).clone())),
         ))
     }
 }
@@ -51,7 +50,7 @@ pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationRe
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitWarrant(warrant_op.warrant().clone()),
+            ValidationOutcome::CounterfeitWarrant(Box::new(warrant_op.warrant().clone())),
         ))
     }
 }
@@ -82,8 +81,8 @@ pub fn check_countersigning_session_data_contains_action(
     if !action_is_in_session {
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::ActionNotInCounterSigningSession(
-                session_data.to_owned(),
-                action.to_new_entry_action(),
+                Box::new(session_data.to_owned()),
+                Box::new(action.to_new_entry_action()),
             ),
         ))
     } else {
@@ -101,7 +100,7 @@ pub async fn check_countersigning_preflight_response_signature(
         .get(*preflight_response.agent_state().agent_index() as usize)
         .ok_or_else(|| {
             SysValidationError::ValidationOutcome(ValidationOutcome::PreflightResponseSignature(
-                (*preflight_response).clone(),
+                Box::new((*preflight_response).clone()),
             ))
         })?
         .0
@@ -111,9 +110,9 @@ pub async fn check_countersigning_preflight_response_signature(
                 .encode_for_signature()
                 .map_err(|_| {
                     SysValidationError::ValidationOutcome(
-                        ValidationOutcome::PreflightResponseSignature(
+                        ValidationOutcome::PreflightResponseSignature(Box::new(
                             (*preflight_response).clone(),
-                        ),
+                        )),
                     )
                 })?
                 .into(),
@@ -123,7 +122,7 @@ pub async fn check_countersigning_preflight_response_signature(
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
+            ValidationOutcome::PreflightResponseSignature(Box::new((*preflight_response).clone())),
         ))
     }
 }
@@ -348,7 +347,7 @@ pub fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<
 pub fn check_new_entry_action(action: &Action) -> SysValidationResult<()> {
     match action {
         Action::Create(_) | Action::Update(_) => Ok(()),
-        _ => Err(ValidationOutcome::NotNewEntry(action.clone()).into()),
+        _ => Err(ValidationOutcome::NotNewEntry(Box::new(action.clone())).into()),
     }
 }
 

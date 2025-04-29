@@ -15,6 +15,7 @@ use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 /// Errors occurring during a [`CellConductorApi`](super::CellConductorApi) or [`InterfaceApi`](super::InterfaceApi) call
+#[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
     /// The Dna for this Cell is not installed in the conductor.
@@ -170,6 +171,10 @@ impl From<RibosomeError> for ExternalApiWireError {
     }
 }
 
+/// Convert a zome call response into a conductor api result.
+///
+/// This is a convenience function to handle errors when making zome
+/// calls from the conductor.
 pub fn zome_call_response_to_conductor_api_result<T: DeserializeOwned + std::fmt::Debug>(
     zcr: ZomeCallResponse,
 ) -> ConductorApiResult<T> {

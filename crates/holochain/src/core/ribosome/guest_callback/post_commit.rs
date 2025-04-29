@@ -183,10 +183,10 @@ mod test {
 mod slow_tests {
     use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::fixt::Zomes;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 
