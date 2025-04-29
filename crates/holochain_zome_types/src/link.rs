@@ -74,12 +74,20 @@ pub struct DeleteLinkInput {
     pub address: holo_hash::ActionHash,
     /// Chain top ordering rules for writes.
     pub chain_top_ordering: ChainTopOrdering,
+    /// Whether to fetch the corresponding create link record from the network if it does not
+    /// exist locally, or to only look it up locally. Defaults to fetching from the network.
+    pub get_options: GetOptions,
 }
 
 impl DeleteLinkInput {
-    pub fn new(address: holo_hash::ActionHash, chain_top_ordering: ChainTopOrdering) -> Self {
+    pub fn new(
+        address: holo_hash::ActionHash,
+        get_options: GetOptions,
+        chain_top_ordering: ChainTopOrdering,
+    ) -> Self {
         Self {
             address,
+            get_options,
             chain_top_ordering,
         }
     }

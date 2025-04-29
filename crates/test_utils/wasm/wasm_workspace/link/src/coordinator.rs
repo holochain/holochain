@@ -74,8 +74,8 @@ fn create_tagged_link(tag: String) -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
-fn delete_link(input: ActionHash) -> ExternResult<ActionHash> {
-    hdk::prelude::delete_link(input)
+fn delete_link(create_link_hash: ActionHash) -> ExternResult<ActionHash> {
+    hdk::prelude::delete_link(create_link_hash, GetOptions::default())
 }
 
 #[hdk_extern]
@@ -212,7 +212,7 @@ fn delete_all_links(_: ()) -> ExternResult<()> {
     for link in hdk::prelude::get_links(
         GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?.build(),
     )? {
-        hdk::prelude::delete_link(link.create_link_hash)?;
+        hdk::prelude::delete_link(link.create_link_hash, GetOptions::default())?;
     }
     Ok(())
 }
@@ -301,7 +301,9 @@ fn test_entry_create() -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
-fn link_validation_calls_must_get_valid_record(input: (ActionHash, AgentPubKey)) -> ExternResult<ActionHash> {
+fn link_validation_calls_must_get_valid_record(
+    input: (ActionHash, AgentPubKey),
+) -> ExternResult<ActionHash> {
     hdk::prelude::create_link(
         input.0,
         input.1,
@@ -311,7 +313,9 @@ fn link_validation_calls_must_get_valid_record(input: (ActionHash, AgentPubKey))
 }
 
 #[hdk_extern]
-fn link_validation_calls_must_get_action_then_entry(input: (ActionHash, AgentPubKey)) -> ExternResult<ActionHash> {
+fn link_validation_calls_must_get_action_then_entry(
+    input: (ActionHash, AgentPubKey),
+) -> ExternResult<ActionHash> {
     hdk::prelude::create_link(
         input.0,
         input.1,
@@ -321,7 +325,9 @@ fn link_validation_calls_must_get_action_then_entry(input: (ActionHash, AgentPub
 }
 
 #[hdk_extern]
-fn link_validation_calls_must_get_agent_activity(input: (ActionHash, AgentPubKey)) -> ExternResult<ActionHash> {
+fn link_validation_calls_must_get_agent_activity(
+    input: (ActionHash, AgentPubKey),
+) -> ExternResult<ActionHash> {
     hdk::prelude::create_link(
         input.0,
         input.1,

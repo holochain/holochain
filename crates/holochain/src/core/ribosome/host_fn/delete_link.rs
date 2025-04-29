@@ -23,6 +23,7 @@ pub fn delete_link<'a>(
             let DeleteLinkInput {
                 address,
                 chain_top_ordering,
+                get_options,
             } = input;
             // get the base address from the add link action
             // don't allow the wasm developer to get this wrong
@@ -39,7 +40,7 @@ pub fn delete_link<'a>(
                     let workspace = call_context_2.host_context.workspace();
                     CascadeResult::Ok(
                         CascadeImpl::from_workspace_and_network(&workspace, network)
-                            .dht_get(address_2.into(), GetOptions::local())
+                            .dht_get(address_2.into(), get_options)
                             .await?
                             .map(|el| el.into_inner().0),
                     )
