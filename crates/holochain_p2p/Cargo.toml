@@ -40,10 +40,10 @@ tokio-stream = "0.1"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = "0.2.1"
-kitsune2_api = "0.2.1"
-kitsune2_core = "0.2.1"
-kitsune2_gossip = "0.2.1"
+kitsune2 = "0.2.2"
+kitsune2_api = "0.2.2"
+kitsune2_core = "0.2.2"
+kitsune2_gossip = "0.2.2"
 bytes = "1.10"
 holochain_sqlite = { version = "^0.6.0-dev.1", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.1"
