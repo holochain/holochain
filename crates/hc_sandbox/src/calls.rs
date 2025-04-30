@@ -25,6 +25,7 @@ use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
+use kitsune2_core::Ed25519Verifier;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -81,8 +82,7 @@ pub enum AdminRequestCli {
     DumpNetworkStats,
     ListCapabilityGrants(ListCapGrants),
     /// Calls AdminRequest::AddAgentInfo.
-    /// _Unimplemented_.
-    AddAgents,
+    AddAgents(AgentInfos),
     ListAgents(ListAgents),
 }
 
@@ -246,6 +246,14 @@ pub struct ListCapGrants {
     pub installed_app_id: String,
     /// include revoked grants
     pub include_revoked: bool,
+}
+
+/// Calls AdminRequest::AddAgentInfo
+/// and disables the installed app.
+#[derive(Debug, Args, Clone)]
+pub struct AgentInfos {
+    /// A JSON array of agent infos.
+    pub agent_infos: String,
 }
 
 /// Calls AdminRequest::RequestAgentInfo
@@ -451,7 +459,15 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             // Print without other text so it can be piped
             println!("{:?}", info);
         }
-        AdminRequestCli::AddAgents => todo!("Adding agent info via CLI is not implemented"),
+        AdminRequestCli::AddAgents(args) => {
+            let agent_infos_results =
+                AgentInfoSigned::decode_list(&Ed25519Verifier, args.agent_infos.as_bytes())?;
+            let agent_infos = agent_infos_results
+                .into_iter()
+                .map(|r| r.expect("Failed to decode agent info."))
+                .collect();
+            add_agent_info(client, agent_infos).await?;
+        }
         AdminRequestCli::ListAgents(args) => {
             use std::fmt::Write;
             let agent_infos = request_agent_info(client, args).await?;

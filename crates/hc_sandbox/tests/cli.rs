@@ -1,4 +1,5 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
+use holochain_client::AdminWebsocket;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
 use holochain_conductor_api::{AppResponse, CellInfo};
 use holochain_types::app::InstalledAppId;
@@ -236,7 +237,7 @@ async fn generate_sandbox_and_call_list_dna() {
 
     let mut hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info = get_launch_info(&mut hc_admin).await;
+    let launch_info: LaunchInfo = get_launch_info(&mut hc_admin).await;
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -479,6 +480,76 @@ async fn generate_sandbox_with_roles_settings_override() {
         }
         _ => panic!("AppResponse is of the wrong type"),
     }
+
+    shutdown_sandbox(hc_admin).await;
+}
+
+/// Generates a new sandbox with a single app deployed and tries to list DNA
+/// This tests that the conductor gets started up and connected to propely
+/// upon calling `hc-sandbox call`
+#[tokio::test(flavor = "multi_thread")]
+async fn generate_sandbox_and_add_and_list_agent() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg("--run=0")
+        .arg("tests/fixtures/my-app/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+
+    let launch_info: LaunchInfo = get_launch_info(&mut hc_admin).await;
+
+    let admin_ws =
+        AdminWebsocket::connect(format!("localhost:{}", launch_info.admin_port).as_str())
+            .await
+            .unwrap();
+
+    let agent_infos = admin_ws.agent_info(None).await.unwrap();
+    assert_eq!(agent_infos.len(), 2);
+
+    let space = kitsune2_api::AgentInfoSigned::decode(
+        &kitsune2_core::Ed25519Verifier,
+        agent_infos[0].as_bytes(),
+    )
+    .unwrap()
+    .space
+    .clone();
+
+    let other_agent = make_agent(space);
+    let agent_infos_to_add = format!("[{}]", other_agent); // add-agents expects a JSON array
+
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        // .env("RUST_LOG", "warn")
+        .arg("--piped")
+        .arg("call")
+        .arg("add-agents")
+        .arg(agent_infos_to_add)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit());
+
+    let mut hc_call = input_piped_password(&mut cmd).await;
+
+    let exit_code = hc_call.wait().await.unwrap();
+    assert!(exit_code.success());
+
+    let agent_infos = admin_ws.agent_info(None).await.unwrap();
+    assert_eq!(agent_infos.len(), 3);
 
     shutdown_sandbox(hc_admin).await;
 }
@@ -739,6 +810,24 @@ async fn shutdown_sandbox(mut child: Child) {
         // simple way.
         child.kill().await.unwrap();
     }
+}
+
+fn make_agent(space: kitsune2_api::SpaceId) -> String {
+    let local = kitsune2_core::Ed25519LocalAgent::default();
+    let created_at = kitsune2_api::Timestamp::now();
+    let expires_at = created_at + std::time::Duration::from_secs(60 * 20);
+    let info = kitsune2_api::AgentInfo {
+        agent: kitsune2_api::LocalAgent::agent(&local).clone(),
+        space,
+        created_at,
+        expires_at,
+        is_tombstone: false,
+        url: None,
+        storage_arc: kitsune2_api::DhtArc::FULL,
+    };
+    let info =
+        futures::executor::block_on(kitsune2_api::AgentInfoSigned::sign(&local, info)).unwrap();
+    info.encode().unwrap()
 }
 
 struct WsPoll(tokio::task::JoinHandle<()>);
