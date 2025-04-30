@@ -1,8 +1,11 @@
+//! Custom error type for the Holochain interface.
+
 use crate::conductor::error::ConductorError;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_types::signal::Signal;
 
 /// Interface Error Type
+#[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
 pub enum InterfaceError {
     #[error(transparent)]

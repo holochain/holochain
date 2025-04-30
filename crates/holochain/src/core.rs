@@ -1,7 +1,5 @@
 //! Defines the core Holochain workflows
 
-#![deny(missing_docs)]
-
 pub mod queue_consumer;
 #[allow(missing_docs)]
 pub mod ribosome;

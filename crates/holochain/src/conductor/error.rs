@@ -1,3 +1,5 @@
+//! Error types for the conductor.
+
 use super::interface::error::InterfaceError;
 use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
@@ -9,8 +11,10 @@ use holochain_wasmer_host::prelude::WasmErrorInner;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
+/// Custom result type for conductor errors with [`ConductorError`] as the error type.
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
+#[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum ConductorError {
     #[error("Internal Cell error: {0}")]

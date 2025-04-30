@@ -15,6 +15,7 @@ use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
 use thiserror::Error;
 
+#[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum WorkflowError {
     #[error("The genesis self-check failed. App cannot be installed. Reason: {0}")]

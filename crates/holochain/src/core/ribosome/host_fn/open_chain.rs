@@ -71,7 +71,7 @@ use super::open_chain;
     async fn call_open_chain() {
         // Note that any zome will do here, we're not calling its functions!
         let ribosome =
-            RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::MigrateNew]))
+            RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::MigrateNew]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();

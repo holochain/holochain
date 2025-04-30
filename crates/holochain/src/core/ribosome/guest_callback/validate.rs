@@ -249,7 +249,7 @@ mod slow_tests {
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
     use crate::core::workflow::WorkflowError;
-    use crate::fixt::curve::Zomes;
+    use crate::fixt::Zomes;
     use crate::fixt::*;
     use crate::sweettest::{SweetConductor, SweetDnaFile};
     use ::fixt::prelude::*;

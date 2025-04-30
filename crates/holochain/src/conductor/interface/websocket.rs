@@ -795,7 +795,7 @@ mod test {
         );
 
         // warm the zome
-        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+        let _ = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
 
@@ -837,7 +837,7 @@ mod test {
         );
 
         // warm the zome
-        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+        let _ = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
 
@@ -1159,7 +1159,7 @@ mod test {
         );
         let agent_pubkey = fake_agent_pubkey_1();
 
-        let _ = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Foo]))
+        let _ = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Foo]))
             .next()
             .unwrap();
         let (_tmpdir, _, conductor_handle, _agent_key) = setup_app_in_new_conductor(

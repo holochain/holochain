@@ -642,7 +642,7 @@ pub(crate) async fn validate_op(
 fn action_to_entry_rate_weight(action: &Action) -> SysValidationResult<EntryRateWeight> {
     action
         .entry_rate_data()
-        .ok_or_else(|| SysValidationError::NonEntryAction(action.clone()))
+        .ok_or_else(|| SysValidationError::NonEntryAction(Box::new(action.clone())))
 }
 
 fn new_entry_action_to_entry_rate_weight(action: &NewEntryAction) -> EntryRateWeight {
@@ -696,7 +696,7 @@ async fn validate_chain_op(
                 store_entry(
                     (action)
                         .try_into()
-                        .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
+                        .map_err(|_| ValidationOutcome::NotNewEntry(Box::new(action.clone())))?,
                     entry,
                     validation_dependencies,
                 )
@@ -792,7 +792,7 @@ async fn validate_warrant_op(
 
                     if action.author() != action_author {
                         return Err(ValidationOutcome::InvalidWarrant(
-                            op.warrant().clone(),
+                            Box::new(op.warrant().clone()),
                             "action author mismatch".into(),
                         )
                         .into());
@@ -822,7 +822,7 @@ async fn validate_warrant_op(
                     // chain_author basis must match the author of the action
                     if action1.author() != chain_author {
                         return Err(ValidationOutcome::InvalidWarrant(
-                            op.warrant().clone(),
+                            Box::new(op.warrant().clone()),
                             "chain author mismatch".into(),
                         )
                         .into());
@@ -831,7 +831,7 @@ async fn validate_warrant_op(
                     // Both actions must be by same author
                     if action1.author() != action2.author() {
                         return Err(ValidationOutcome::InvalidWarrant(
-                            op.warrant().clone(),
+                            Box::new(op.warrant().clone()),
                             "action pair author mismatch".into(),
                         )
                         .into());
@@ -845,7 +845,7 @@ async fn validate_warrant_op(
                     // prevents the attack.
                     if action1.prev_action() != action2.prev_action() {
                         return Err(ValidationOutcome::InvalidWarrant(
-                            op.warrant().clone(),
+                            Box::new(op.warrant().clone()),
                             "action pair seq mismatch".into(),
                         )
                         .into());
@@ -917,7 +917,7 @@ async fn sys_validate_record_inner(
             store_entry(
                 action
                     .try_into()
-                    .map_err(|_| ValidationOutcome::NotNewEntry(action.clone()))?,
+                    .map_err(|_| ValidationOutcome::NotNewEntry(Box::new(action.clone())))?,
                 maybe_entry,
                 validation_dependencies.clone(),
             )
@@ -1159,7 +1159,7 @@ fn update_check(entry_update: &Update, original_action: &Action) -> SysValidatio
     // This shouldn't fail due to the above `check_new_entry_action` check
     let original_action: NewEntryActionRef = original_action
         .try_into()
-        .map_err(|_| ValidationOutcome::NotNewEntry(original_action.clone()))?;
+        .map_err(|_| ValidationOutcome::NotNewEntry(Box::new(original_action.clone())))?;
     check_update_reference(entry_update, &original_action)?;
     Ok(())
 }

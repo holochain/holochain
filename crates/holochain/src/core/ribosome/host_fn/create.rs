@@ -124,7 +124,7 @@ pub mod wasm_test {
     /// we can get an entry hash out of the fn directly
     async fn create_entry_test() {
         let ribosome =
-            RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Create]))
+            RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Create]))
                 .next()
                 .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();
