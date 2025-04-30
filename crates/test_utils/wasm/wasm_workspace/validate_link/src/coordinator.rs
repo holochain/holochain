@@ -48,7 +48,7 @@ fn add_valid_link_inner() -> ExternResult<ActionHash> {
 #[hdk_extern]
 fn remove_valid_link(_: ()) -> ExternResult<ActionHash> {
     let valid_link = add_valid_link_inner()?;
-    delete_link(valid_link)
+    delete_link(valid_link, GetOptions::default())
 }
 
 #[hdk_extern]
@@ -74,5 +74,5 @@ fn add_invalid_link_inner() -> ExternResult<ActionHash> {
 #[hdk_extern]
 fn remove_invalid_link(_: ()) -> ExternResult<ActionHash> {
     let valid_link = add_invalid_link_inner()?;
-    delete_link(valid_link)
+    delete_link(valid_link, GetOptions::default())
 }

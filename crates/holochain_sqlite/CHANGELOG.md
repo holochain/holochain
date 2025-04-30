@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.2
+
 - Remove queries for filtering out particular ops for integration. Instead use a single query that gets all ops ready to be integrated.
 
 ## 0.6.0-dev.1

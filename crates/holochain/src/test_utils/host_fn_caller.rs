@@ -390,7 +390,11 @@ impl HostFnCaller {
             host_fn::delete_link::delete_link(
                 ribosome,
                 call_context,
-                DeleteLinkInput::new(link_add_hash, ChainTopOrdering::default()),
+                DeleteLinkInput::new(
+                    link_add_hash,
+                    GetOptions::default(),
+                    ChainTopOrdering::default(),
+                ),
             )
             .unwrap()
         };
