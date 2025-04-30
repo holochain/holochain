@@ -304,6 +304,9 @@ pub async fn call(
             match AdminWebsocket::connect(format!("localhost:{port}")).await {
                 Ok(client) => clients.push((client, None, None)),
                 Err(_) => {
+                    // Note that the holochain and lair processes need to be returned here
+                    // in order to not get dropped but keep running until the admin call
+                    // is being made
                     let (port, holochain, lair) = run_async(
                         holochain_path,
                         ConfigRootPath::from(path),
