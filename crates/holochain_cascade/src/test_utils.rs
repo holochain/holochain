@@ -321,9 +321,9 @@ pub fn handle_get_entry_txn(
 pub fn handle_get_record_txn(
     txn: &Transaction<'_>,
     hash: ActionHash,
-    options: holochain_p2p::event::GetOptions,
+    _options: holochain_p2p::event::GetOptions,
 ) -> WireRecordOps {
-    let query = GetRecordOpsQuery::new(hash, options);
+    let query = GetRecordOpsQuery::new(hash);
     query.run(CascadeTxnWrapper::from(txn)).unwrap()
 }
 

@@ -263,7 +263,7 @@ impl Cascade for CascadeImpl {
     async fn retrieve_entry(
         &self,
         hash: EntryHash,
-        mut options: NetworkGetOptions,
+        options: NetworkGetOptions,
     ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>> {
         let private_data = self.private_data.clone();
         let result = self
@@ -280,7 +280,6 @@ impl Cascade for CascadeImpl {
         if result.is_some() {
             return Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Local)));
         }
-        options.request_type = holochain_p2p::event::GetRequest::Pending;
         self.fetch_record(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
@@ -302,7 +301,7 @@ impl Cascade for CascadeImpl {
     async fn retrieve_action(
         &self,
         hash: ActionHash,
-        mut options: NetworkGetOptions,
+        options: NetworkGetOptions,
     ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>> {
         let result = self
             .find_map({
@@ -313,7 +312,6 @@ impl Cascade for CascadeImpl {
         if result.is_some() {
             return Ok(result.map(|a| (a, CascadeSource::Local)));
         }
-        options.request_type = holochain_p2p::event::GetRequest::Pending;
         self.fetch_record(hash.clone().into(), options).await?;
 
         // Check if we have the data now after the network call.
@@ -330,7 +328,7 @@ impl Cascade for CascadeImpl {
     async fn retrieve(
         &self,
         hash: AnyDhtHash,
-        mut options: NetworkGetOptions,
+        options: NetworkGetOptions,
     ) -> CascadeResult<Option<(Record, CascadeSource)>> {
         let private_data = self.private_data.clone();
         let result = self
@@ -347,7 +345,6 @@ impl Cascade for CascadeImpl {
         if result.is_some() {
             return Ok(result.map(|r| (r, CascadeSource::Local)));
         }
-        options.request_type = holochain_p2p::event::GetRequest::Pending;
         self.fetch_record(hash.clone(), options).await?;
 
         let private_data = self.private_data.clone();

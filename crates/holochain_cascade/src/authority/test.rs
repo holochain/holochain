@@ -5,7 +5,6 @@ use holo_hash::fixt::ActionHashFixturator;
 #[cfg(feature = "unstable-warrants")]
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain_p2p::actor;
-use holochain_p2p::event::GetRequest;
 use holochain_state::prelude::test_dht_db;
 #[cfg(feature = "unstable-warrants")]
 use {crate::authority::handle_get_agent_activity, holochain_types::activity::ChainItems};
@@ -14,7 +13,6 @@ fn options() -> holochain_p2p::event::GetOptions {
     holochain_p2p::event::GetOptions {
         follow_redirects: false,
         all_live_actions_with_metadata: true,
-        request_type: Default::default(),
     }
 }
 
@@ -128,30 +126,6 @@ async fn get_record() {
         deletes: vec![],
         updates: vec![],
         entry: td.any_entry.clone(),
-    };
-    assert_eq!(result, expected);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn retrieve_record() {
-    holochain_trace::test_run();
-    let db = test_dht_db();
-
-    let td = RecordTestData::create();
-
-    fill_db_pending(&db.to_db(), td.store_record_op.clone()).await;
-
-    let mut options = options();
-    options.request_type = GetRequest::Pending;
-
-    let result = handle_get_record(db.to_db().into(), td.create_hash.clone(), options.clone())
-        .await
-        .unwrap();
-    let expected = WireRecordOps {
-        action: Some(td.wire_create.clone()),
-        deletes: vec![],
-        updates: vec![],
-        entry: Some(td.entry.clone()),
     };
     assert_eq!(result, expected);
 }
