@@ -302,16 +302,20 @@ pub async fn call(
         let mut clients = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match AdminWebsocket::connect(format!("localhost:{port}")).await {
-                Ok(client) => clients.push(client),
+                Ok(client) => clients.push((client, None, None)),
                 Err(_) => {
-                    let (port, _holochain, _lair) = run_async(
+                    let (port, holochain, lair) = run_async(
                         holochain_path,
                         ConfigRootPath::from(path),
                         None,
                         structured.clone(),
                     )
                     .await?;
-                    clients.push(AdminWebsocket::connect(format!("localhost:{port}")).await?);
+                    clients.push((
+                        AdminWebsocket::connect(format!("localhost:{port}")).await?,
+                        Some(holochain),
+                        Some(lair),
+                    ));
                 }
             }
         }
@@ -331,12 +335,16 @@ pub async fn call(
     } else {
         let mut clients = Vec::with_capacity(running.len());
         for port in running {
-            clients.push(AdminWebsocket::connect(format!("localhost:{port}")).await?);
+            clients.push((
+                AdminWebsocket::connect(format!("localhost:{port}")).await?,
+                None,
+                None,
+            ));
         }
         clients
     };
     for mut client in admin_clients {
-        call_inner(&mut client, call.clone()).await?;
+        call_inner(&mut client.0, call.clone()).await?;
     }
     Ok(())
 }

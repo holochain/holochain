@@ -298,6 +298,48 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
     shutdown_sandbox(hc_admin).await;
 }
 
+/// Generates a new sandbox with a single app deployed and tries to list DNA
+/// This tests that the conductor gets started up and connected to propely
+/// upon calling `hc-sandbox call`
+#[tokio::test(flavor = "multi_thread")]
+async fn generate_non_running_sandbox_and_call_list_dna() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg("tests/fixtures/my-app/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    hc_admin.wait().await.unwrap();
+
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("call")
+        .arg("list-dnas")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit());
+
+    let mut hc_call = input_piped_password(&mut cmd).await;
+
+    let exit_code = hc_call.wait().await.unwrap();
+    assert!(exit_code.success());
+}
+
 /// Creates a new sandbox and tries to list apps via `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_and_call_list_apps() {
