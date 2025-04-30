@@ -7,8 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- **BREAKING CHANGE** Renamed `happ_manifest` field of a web app bundle to `happ`. The field is expected to point to a
-  `.happ` file, not a `happ.yaml`. The name change reflects that.
+## 0.6.0-dev.2
+
+- **BREAKING CHANGE** Renamed `happ_manifest` field of a web app bundle to `happ`. The field is expected to point to a `.happ` file, not a `happ.yaml`. The name change reflects that.
 
 ## 0.6.0-dev.1
 

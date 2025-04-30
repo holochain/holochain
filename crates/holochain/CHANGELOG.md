@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-dev.2
+
 - Integrate all app validated ops, regardless of type and order
 - Remove DHT DB query cache, a premature optimization that made integration complicated and error-prone without any appreciable benefit.
 - Fix warrant persistence. Warrants were formerly stored in the Action table, but did not quite fit there. A new Warrant table was created, to which warrants are now written.
