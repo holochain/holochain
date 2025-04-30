@@ -23,7 +23,7 @@ fn ensure(path_string: String) -> ExternResult<()> {
 
 #[hdk_extern]
 fn delete_link(delete_link: ActionHash) -> ExternResult<ActionHash> {
-    hdk::prelude::delete_link(delete_link)
+    hdk::prelude::delete_link(delete_link, GetOptions::default())
 }
 
 #[hdk_extern]
