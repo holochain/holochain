@@ -50,7 +50,6 @@ impl HcP2pHandler for Handler {
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         _dht_hash: holo_hash::AnyDhtHash,
-        _options: holochain_p2p::event::GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         Box::pin(async move {
             self.0.lock().unwrap().push("get".into());
@@ -411,7 +410,6 @@ async fn test_get() {
                         vec![1; 36],
                         holo_hash::hash_type::AnyDht::Entry,
                     ),
-                    holochain_p2p::actor::GetOptions::default(),
                 )
                 .await
                 .is_ok()

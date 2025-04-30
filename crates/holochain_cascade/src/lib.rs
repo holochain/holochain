@@ -536,11 +536,11 @@ impl CascadeImpl {
     pub async fn fetch_record(
         &self,
         hash: AnyDhtHash,
-        options: NetworkGetOptions,
+        _options: NetworkGetOptions,
     ) -> CascadeResult<()> {
         let network = some_or_return!(self.network.as_ref());
         let results = match network
-            .get(hash, options.clone())
+            .get(hash)
             .instrument(debug_span!("fetch_record::network_get"))
             .await
         {

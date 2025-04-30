@@ -174,7 +174,7 @@ async fn validation_callback_awaiting_deps_hashes() {
     // mock network that returns the requested create action
     let mut network = MockHolochainP2pDnaT::new();
     let action_to_return = create_action_signed_hashed.clone();
-    network.expect_get().returning(move |hash, _| {
+    network.expect_get().returning(move |hash| {
         assert_eq!(hash, action_to_return.as_hash().clone().into());
         Ok(vec![WireOps::Record(WireRecordOps {
             action: Some(Judged::new(

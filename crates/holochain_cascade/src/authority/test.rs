@@ -9,13 +9,6 @@ use holochain_state::prelude::test_dht_db;
 #[cfg(feature = "unstable-warrants")]
 use {crate::authority::handle_get_agent_activity, holochain_types::activity::ChainItems};
 
-fn options() -> holochain_p2p::event::GetOptions {
-    holochain_p2p::event::GetOptions {
-        follow_redirects: false,
-        all_live_actions_with_metadata: true,
-    }
-}
-
 #[tokio::test(flavor = "multi_thread")]
 async fn get_entry() {
     holochain_trace::test_run();
@@ -24,9 +17,8 @@ async fn get_entry() {
     let td = EntryTestData::create();
 
     fill_db(&db.to_db(), td.store_entry_op.clone()).await;
-    let options = options();
 
-    let result = handle_get_entry(db.to_db().into(), td.hash.clone(), options.clone())
+    let result = handle_get_entry(db.to_db().into(), td.hash.clone())
         .await
         .unwrap();
     let expected = WireEntryOps {
@@ -39,7 +31,7 @@ async fn get_entry() {
 
     fill_db(&db.to_db(), td.delete_entry_action_op.clone()).await;
 
-    let result = handle_get_entry(db.to_db().into(), td.hash.clone(), options.clone())
+    let result = handle_get_entry(db.to_db().into(), td.hash.clone())
         .await
         .unwrap();
     let expected = WireEntryOps {
@@ -52,9 +44,19 @@ async fn get_entry() {
 
     fill_db(&db.to_db(), td.update_content_op.clone()).await;
 
-    let result = handle_get_entry(db.to_db().into(), td.hash.clone(), options.clone())
+    let result = handle_get_entry(db.to_db().into(), td.hash.clone())
         .await
         .unwrap();
+    let result_2 = handle_get_entry(db.to_db().into(), td.hash.clone())
+        .await
+        .unwrap();
+    let result_3 = handle_get_entry(db.to_db().into(), td.hash.clone())
+        .await
+        .unwrap();
+    println!("wire entry ops 1 {result:?}");
+    println!("wire entry ops 2 {result_2:?}");
+    println!("result == result_2 {}", result == result_2);
+    println!("result2 == result_3 {}", result_2 == result_3);
     let expected = WireEntryOps {
         creates: vec![td.wire_create.clone()],
         deletes: vec![td.wire_delete.clone()],
@@ -73,9 +75,7 @@ async fn get_record() {
 
     fill_db(&db.to_db(), td.store_record_op.clone()).await;
 
-    let options = options();
-
-    let result = handle_get_record(db.to_db().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_record(db.to_db().into(), td.create_hash.clone())
         .await
         .unwrap();
     let expected = WireRecordOps {
@@ -88,7 +88,7 @@ async fn get_record() {
 
     fill_db(&db.to_db(), td.deleted_by_op.clone()).await;
 
-    let result = handle_get_record(db.to_db().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_record(db.to_db().into(), td.create_hash.clone())
         .await
         .unwrap();
     let expected = WireRecordOps {
@@ -101,7 +101,7 @@ async fn get_record() {
 
     fill_db(&db.to_db(), td.update_record_op.clone()).await;
 
-    let result = handle_get_record(db.to_db().into(), td.create_hash.clone(), options.clone())
+    let result = handle_get_record(db.to_db().into(), td.create_hash.clone())
         .await
         .unwrap();
     let expected = WireRecordOps {
@@ -114,13 +114,9 @@ async fn get_record() {
 
     fill_db(&db.to_db(), td.any_store_record_op.clone()).await;
 
-    let result = handle_get_record(
-        db.to_db().into(),
-        td.any_action_hash.clone(),
-        options.clone(),
-    )
-    .await
-    .unwrap();
+    let result = handle_get_record(db.to_db().into(), td.any_action_hash.clone())
+        .await
+        .unwrap();
     let expected = WireRecordOps {
         action: Some(td.any_action.clone()),
         deletes: vec![],

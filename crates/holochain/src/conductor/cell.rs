@@ -411,7 +411,6 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
-        options: holochain_p2p::event::GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         Box::pin(async {
             // TODO: Later we will need more get types but for now
@@ -419,14 +418,12 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
             // the hash is an entry or action.
             // In the future we should use GetOptions to choose which get to run.
             let mut r = match dht_hash.into_primitive() {
-                AnyDhtHashPrimitive::Entry(hash) => self
-                    .handle_get_entry(hash, options)
-                    .await
-                    .map(WireOps::Entry),
-                AnyDhtHashPrimitive::Action(hash) => self
-                    .handle_get_record(hash, options)
-                    .await
-                    .map(WireOps::Record),
+                AnyDhtHashPrimitive::Entry(hash) => {
+                    self.handle_get_entry(hash).await.map(WireOps::Entry)
+                }
+                AnyDhtHashPrimitive::Action(hash) => {
+                    self.handle_get_record(hash).await.map(WireOps::Record)
+                }
             };
             if let Err(e) = &mut r {
                 error!(msg = "Error handling a get", ?e, agent = ?self.id.agent_pubkey());
@@ -705,25 +702,17 @@ impl holochain_p2p::event::HcP2pHandler for Cell {
 
 impl Cell {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
-    async fn handle_get_entry(
-        &self,
-        hash: EntryHash,
-        options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<WireEntryOps> {
+    async fn handle_get_entry(&self, hash: EntryHash) -> CellResult<WireEntryOps> {
         let db = self.space.dht_db.clone();
-        authority::handle_get_entry(db.into(), hash, options)
+        authority::handle_get_entry(db.into(), hash)
             .await
             .map_err(Into::into)
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    async fn handle_get_record(
-        &self,
-        hash: ActionHash,
-        options: holochain_p2p::event::GetOptions,
-    ) -> CellResult<WireRecordOps> {
+    async fn handle_get_record(&self, hash: ActionHash) -> CellResult<WireRecordOps> {
         let db = self.space.dht_db.clone();
-        authority::handle_get_record(db.into(), hash, options)
+        authority::handle_get_record(db.into(), hash)
             .await
             .map_err(Into::into)
     }

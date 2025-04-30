@@ -66,7 +66,6 @@ pub enum WireMessage {
         msg_id: u64,
         to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
-        options: event::GetOptions,
     },
     GetRes {
         msg_id: u64,
@@ -208,11 +207,7 @@ impl WireMessage {
     }
 
     /// Outgoing "Get" request.
-    pub fn get_req(
-        to_agent: AgentPubKey,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: event::GetOptions,
-    ) -> (u64, WireMessage) {
+    pub fn get_req(to_agent: AgentPubKey, dht_hash: holo_hash::AnyDhtHash) -> (u64, WireMessage) {
         let msg_id = next_msg_id();
         (
             msg_id,
@@ -220,7 +215,6 @@ impl WireMessage {
                 msg_id,
                 to_agent,
                 dht_hash,
-                options,
             },
         )
     }

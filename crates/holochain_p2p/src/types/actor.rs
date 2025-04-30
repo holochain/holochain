@@ -36,16 +36,6 @@ pub struct GetOptions {
     /// See `as_race` for details.
     /// Set to `None` for a default "best-effort" race.
     pub race_timeout_ms: Option<u64>,
-
-    /// `[Remote]`
-    /// Whether the remote-end should follow redirects or just return the
-    /// requested entry.
-    pub follow_redirects: bool,
-
-    /// `[Remote]`
-    /// Return all live actions even if there is deletes.
-    /// Useful for metadata calls.
-    pub all_live_actions_with_metadata: bool,
 }
 
 impl Default for GetOptions {
@@ -55,8 +45,6 @@ impl Default for GetOptions {
             timeout_ms: None,
             as_race: true,
             race_timeout_ms: None,
-            follow_redirects: true,
-            all_live_actions_with_metadata: false,
         }
     }
 }
@@ -70,9 +58,6 @@ impl GetOptions {
             timeout_ms: None,
             as_race: true,
             race_timeout_ms: None,
-            // Never redirect as the returned value must always match the hash.
-            follow_redirects: false,
-            all_live_actions_with_metadata: false,
         }
     }
 }
@@ -303,7 +288,6 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         &self,
         dna_hash: DnaHash,
         dht_hash: holo_hash::AnyDhtHash,
-        options: GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireOps>>>;
 
     /// Get metadata from the DHT.
