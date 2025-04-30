@@ -144,8 +144,6 @@ pub enum ValidationOutcome {
     UpdateTypeMismatch(EntryType, EntryType),
     #[error("Update original {0:?} doesn't match the {1:?} in the update")]
     UpdateHashMismatch(EntryHash, EntryHash),
-    // #[error("Signature {0:?} failed to verify for Action {1:?}")]
-    // VerifySignature(Signature, Box<Action>),
     #[error("The zome index for {0:?} was out of range")]
     ZomeIndex(AppEntryDef),
 }
