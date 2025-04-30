@@ -76,7 +76,7 @@ pub mod wasm_test {
     /// we can get an entry hash out of the fn directly
     async fn hash_test() {
         let ribosome = Arc::new(
-            RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+            RealRibosomeFixturator::new(crate::fixt::Zomes(vec![]))
                 .next()
                 .unwrap(),
         );

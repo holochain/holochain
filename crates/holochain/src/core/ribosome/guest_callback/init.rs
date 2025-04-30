@@ -230,10 +230,10 @@ mod slow_tests {
     use crate::core::ribosome::RibosomeError;
     use crate::core::ribosome::RibosomeT;
     use crate::core::workflow::WorkflowError;
-    use crate::fixt::curve::Zomes;
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::fixt::Zomes;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetZome;

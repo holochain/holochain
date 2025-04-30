@@ -316,7 +316,7 @@ mod tests {
         assert_eq!(ops, &ops_sorted);
     }
 
-    async fn assert_sorted_by_validation_attempts(db: &DbWrite<DbKindDht>, ops: &Vec<DhtOpHashed>) {
+    async fn assert_sorted_by_validation_attempts(db: &DbWrite<DbKindDht>, ops: &[DhtOpHashed]) {
         assert!(
             get_num_validation_attempts(db, ops.iter().map(|op| op.hash.clone()).collect())
                 .await

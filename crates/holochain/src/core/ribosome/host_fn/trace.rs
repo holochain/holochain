@@ -64,7 +64,7 @@ pub mod wasm_test {
     /// we can get an entry hash out of the fn directly
     #[tokio::test(flavor = "multi_thread")]
     async fn trace_test() {
-        let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![]))
             .next()
             .unwrap();
         let call_context = CallContextFixturator::new(::fixt::Unpredictable)

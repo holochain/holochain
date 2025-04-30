@@ -9,10 +9,6 @@
 //! to call zome functions on other Cells, as well as to send Signals to the
 //! outside world
 
-#![deny(missing_docs)]
-
-// TODO: clean up allow(missing_docs) once parent is fully documented
-
 pub mod api;
 mod cell;
 #[cfg(feature = "chc")]
@@ -20,16 +16,13 @@ pub mod chc;
 #[allow(clippy::module_inception)]
 #[allow(missing_docs)]
 pub mod conductor;
-#[allow(missing_docs)]
 pub mod config;
 pub mod entry_def_store;
-#[allow(missing_docs)]
 pub mod error;
 pub mod interface;
 pub mod manager;
 mod metrics;
 pub mod paths;
-#[allow(missing_docs)]
 pub mod ribosome_store;
 pub mod space;
 pub mod state;

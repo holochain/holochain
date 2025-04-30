@@ -25,7 +25,7 @@ static TOKIO_RUNTIME: Lazy<Mutex<tokio::runtime::Runtime>> = Lazy::new(|| {
 static REAL_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::real_ribosome::RealRibosome>> =
     Lazy::new(|| {
         Mutex::new(
-            holochain::fixt::RealRibosomeFixturator::new(holochain::fixt::curve::Zomes(vec![
+            holochain::fixt::RealRibosomeFixturator::new(holochain::fixt::Zomes(vec![
                 TestWasm::Bench,
             ]))
             .next()

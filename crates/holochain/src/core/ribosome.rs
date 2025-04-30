@@ -7,7 +7,6 @@
 
 // This allow is here because #[automock] automaticaly creates a struct without
 // documentation, and there seems to be no way to add docs to it after the fact
-#[allow(missing_docs)]
 pub mod error;
 
 /// How to version guest callbacks.

@@ -60,7 +60,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn call_get_validation_receipts() {
-        let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![TestWasm::Crd]))
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Crd]))
             .next()
             .unwrap();
         let mut call_context = CallContextFixturator::new(Unpredictable).next().unwrap();

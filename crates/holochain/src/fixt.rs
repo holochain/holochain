@@ -1,4 +1,4 @@
-pub mod curve;
+//! Fixturators for holochain types
 
 use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::api::MockCellConductorReadHandleT;
@@ -42,6 +42,9 @@ use tokio::sync::broadcast;
 
 pub use holochain_types::fixt::*;
 
+/// A collection of test WASMs.
+pub struct Zomes(pub Vec<TestWasm>);
+
 newtype_fixturator!(FnComponents<Vec<String>>);
 
 fixturator!(
@@ -49,7 +52,7 @@ fixturator!(
     constructor fn empty(DnaFile);
 );
 
-impl Iterator for RealRibosomeFixturator<curve::Zomes> {
+impl Iterator for RealRibosomeFixturator<Zomes> {
     type Item = RealRibosome;
 
     fn next(&mut self) -> Option<Self::Item> {

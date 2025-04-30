@@ -55,7 +55,7 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn directly
     async fn random_bytes_test() {
-        let ribosome = RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+        let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![]))
             .next()
             .unwrap();
         let mut call_context = CallContextFixturator::new(::fixt::Unpredictable)

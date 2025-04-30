@@ -10,6 +10,7 @@ use crate::from_sub_error;
 
 use super::types::Outcome;
 
+#[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum AppValidationError {
     #[error(transparent)]

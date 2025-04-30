@@ -204,6 +204,9 @@ impl<T> ValidationDependencyState<T> {
         }
     }
 
+    /// Set the source of the dependency.
+    ///
+    /// This is used to track where the dependency was found.
     pub fn set_source(&mut self, new_source: CascadeSource) {
         if let Some(ValidationDependency { fetched_from, .. }) = &mut self.dependency {
             *fetched_from = new_source;
@@ -212,6 +215,7 @@ impl<T> ValidationDependencyState<T> {
 }
 
 impl ValidationDependencyState<SignedActionHashed> {
+    /// Get the action from the dependency state if it is present.
     pub fn as_action(&self) -> Option<&Action> {
         self.dependency.as_ref().map(|d| d.dep.action())
     }

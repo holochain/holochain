@@ -59,7 +59,6 @@ use super::ConductorHandle;
 
 pub const INIT_MUTEX_TIMEOUT_SECS: u64 = 30;
 
-#[allow(missing_docs)]
 pub mod error;
 
 #[cfg(test)]
@@ -860,7 +859,7 @@ impl Cell {
         trace!(?init_result);
         match init_result {
             InitResult::Pass => {}
-            r => return Err(CellError::InitFailed(r)),
+            r => return Err(CellError::InitFailed(Box::new(r))),
         }
         Ok(())
     }
