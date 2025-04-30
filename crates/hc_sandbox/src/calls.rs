@@ -303,7 +303,8 @@ pub async fn call(
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match AdminWebsocket::connect(format!("localhost:{port}")).await {
                 Ok(client) => clients.push((client, None, None)),
-                Err(_) => {
+                Err(e) => {
+                    tracing::debug!("Connecting to the sandbox conductor failed: {e}.\nThis is expected in case the conductor is not running. Trying to start it up now...");
                     // Note that the holochain and lair processes need to be returned here
                     // in order to not get dropped but keep running until the admin call
                     // is being made
