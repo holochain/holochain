@@ -14,6 +14,7 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use tokio::sync::broadcast;
+use crate::conductor::api::CellConductorReadHandle;
 
 pub const POST_COMMIT_CHANNEL_BOUND: usize = 100;
 pub const POST_COMMIT_CONCURRENT_LIMIT: usize = 5;
@@ -36,6 +37,7 @@ pub struct PostCommitHostAccess {
     pub keystore: MetaLairClient,
     pub network: DynHolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
+    pub call_zome_handle: Option<CellConductorReadHandle>,
 }
 
 impl std::fmt::Debug for PostCommitHostAccess {
@@ -55,9 +57,9 @@ impl From<&PostCommitHostAccess> for HostFnAccess {
         let mut access = Self::all();
         // Post commit happens after all workspace writes are complete.
         // Writing more to the workspace becomes circular.
-        // If you need to trigger some more writes, try a `call_remote` back
-        // into the current cell.
-        access.write_workspace = Permission::Allow;
+        // If you need to trigger some more writes, try calling another
+        // zome function.
+        access.write_workspace = Permission::Allow; // TODO temporary
         access
     }
 }
@@ -92,6 +94,7 @@ pub async fn send_post_commit(
     actions: Vec<SignedActionHashed>,
     zomes: Vec<CoordinatorZome>,
     signal_tx: broadcast::Sender<Signal>,
+    call_zome_handle: Option<CellConductorReadHandle>,
 ) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
     let cell_id = workspace.source_chain().cell_id();
 
@@ -105,6 +108,7 @@ pub async fn send_post_commit(
                     keystore: keystore.clone(),
                     network: network.clone(),
                     signal_tx: signal_tx.clone(),
+                    call_zome_handle: call_zome_handle.clone(),
                 },
                 invocation: PostCommitInvocation::new(zome, actions.clone()),
                 cell_id: cell_id.clone(),

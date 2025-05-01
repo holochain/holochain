@@ -108,6 +108,9 @@ where
 
                     // Only send post commit if this is a coordinator zome.
                     if let Some(coordinator_zome) = coordinator_zome {
+                        let call_zome_handle =
+                            CellConductorApi::new(conductor_handle.clone(), args.cell_id).into_call_zome_handle();
+
                         send_post_commit(
                             conductor_handle,
                             workspace,
@@ -116,6 +119,7 @@ where
                             flushed_actions,
                             vec![coordinator_zome],
                             signal_tx,
+                            Some(call_zome_handle),
                         )
                         .await?;
                     }

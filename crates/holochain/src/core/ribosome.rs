@@ -136,6 +136,15 @@ impl CallContext {
     pub fn auth(&self) -> InvocationAuth {
         self.auth.clone()
     }
+
+    pub fn switch_host_context(&self, transform: fn(&HostContext) -> RibosomeResult<HostContext>) -> RibosomeResult<CallContext> {
+        Ok(Self {
+            zome: self.zome.clone(),
+            function_name: self.function_name.clone(),
+            host_context: transform(&self.host_context)?,
+            auth: self.auth.clone(),
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -144,7 +153,7 @@ pub enum HostContext {
     GenesisSelfCheckV1(GenesisSelfCheckHostAccessV1),
     GenesisSelfCheckV2(GenesisSelfCheckHostAccessV2),
     Init(InitHostAccess),
-    PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
+    PostCommit(PostCommitHostAccess),
     Validate(ValidateHostAccess),
     ZomeCall(ZomeCallHostAccess),
 }
@@ -239,6 +248,7 @@ impl HostContext {
                 call_zome_handle, ..
             })
             | Self::Init(InitHostAccess { call_zome_handle, .. })
+            | Self::PostCommit(PostCommitHostAccess { call_zome_handle, .. })
             => call_zome_handle,
             _ => panic!(
                 "Gave access to a host function that uses the call zome handle without providing a call zome handle"
@@ -561,7 +571,7 @@ pub struct ZomeCallHostAccess {
     pub keystore: MetaLairClient,
     pub network: DynHolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
-    pub call_zome_handle: CellConductorReadHandle,
+    pub call_zome_handle: Option<CellConductorReadHandle>,
 }
 
 impl std::fmt::Debug for ZomeCallHostAccess {
