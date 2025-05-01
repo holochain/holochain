@@ -5,6 +5,7 @@ use crate::conductor::error::ConductorError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
+use holochain_conductor_api::*;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::*;
@@ -12,11 +13,7 @@ use mr_bundle::FileSystemBundler;
 use std::collections::HashSet;
 use tracing::*;
 
-pub use holochain_conductor_api::*;
-
-/// The admin interface that external connections
-/// can use to make requests to the conductor
-/// The concrete (non-mock) implementation of the AdminInterfaceApi
+/// The admin interface that external connections can use to make requests to the conductor.
 #[derive(Clone)]
 pub struct AdminInterfaceApi {
     /// Mutable access to the Conductor

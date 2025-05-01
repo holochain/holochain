@@ -1,11 +1,12 @@
 use crate::conductor::interface::error::InterfaceResult;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::prelude::InstalledAppId;
 
 mod admin_interface;
 mod app_interface;
+
 pub use admin_interface::*;
 pub use app_interface::*;
-use holochain_types::prelude::InstalledAppId;
 
 /// A trait that unifies both the admin and app interfaces
 #[async_trait::async_trait]

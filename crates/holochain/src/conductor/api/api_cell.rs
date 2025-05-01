@@ -34,7 +34,7 @@ pub type CellConductorHandle = Arc<dyn CellConductorApiT + Send + 'static>;
 
 /// A minimal set of functionality needed from the conductor by
 /// host functions.
-pub type CellConductorReadHandle = Arc<dyn CellConductorReadHandleT + Send + 'static>;
+pub type CellConductorReadHandle = Arc<dyn CellConductorHandleT + Send + 'static>;
 
 impl CellConductorApi {
     /// Instantiate from a Conductor reference and a CellId to identify which Cell
@@ -126,11 +126,16 @@ pub trait CellConductorApiT: Send + Sync {
     async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>>;
 }
 
-#[async_trait]
-#[cfg_attr(feature = "test_utils", mockall::automock)]
 /// A minimal set of functionality needed from the conductor by
 /// host functions.
-pub trait CellConductorReadHandleT: Send + Sync {
+///
+/// Note that these functions should be cautious about exposing functions that can
+/// modify the conductor state in destructive ways. FOr example, uninstalling the
+/// app that is making the call. This trait originally only exposed read-only
+/// operations for this reason.
+#[async_trait]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
+pub trait CellConductorHandleT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
 
@@ -213,7 +218,7 @@ pub trait CellConductorReadHandleT: Send + Sync {
 }
 
 #[async_trait]
-impl CellConductorReadHandleT for CellConductorApi {
+impl CellConductorHandleT for CellConductorApi {
     fn cell_id(&self) -> &CellId {
         &self.cell_id
     }
