@@ -1114,14 +1114,14 @@ pub fn produce_op_lites_from_iter<'a>(
                             store_record_basis,
                         )
                     }
-                    (ChainOpType::RegisterAgentActivity, _) => {
-                        let register_activity_basis =
-                            ChainOpUniqueForm::RegisterAgentActivity(action).basis();
-                        ChainOpLite::RegisterAgentActivity(
-                            action_hash.clone(),
-                            register_activity_basis,
-                        )
-                    }
+                    // (ChainOpType::RegisterAgentActivity, _) => {
+                    //     let register_activity_basis =
+                    //         ChainOpUniqueForm::RegisterAgentActivity(action).basis();
+                    //     ChainOpLite::RegisterAgentActivity(
+                    //         action_hash.clone(),
+                    //         register_activity_basis,
+                    //     )
+                    // }
                     (ChainOpType::StoreEntry, Action::Create(create)) => ChainOpLite::StoreEntry(
                         action_hash.clone(),
                         maybe_entry_hash.clone()?,
