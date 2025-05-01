@@ -329,6 +329,10 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg("--piped")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
         .arg("call")
         .arg("list-dnas")
         .stdin(Stdio::piped())
@@ -367,6 +371,10 @@ async fn create_sandbox_and_call_list_apps() {
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg("--piped")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
         .arg("call")
         .arg("list-apps")
         .stdin(Stdio::piped())
