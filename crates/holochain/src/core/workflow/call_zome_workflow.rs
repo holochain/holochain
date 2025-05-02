@@ -67,6 +67,7 @@ where
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
     let signal_tx = args.signal_tx.clone();
+    let cell_id = args.cell_id.clone();
     let result = call_zome_workflow_inner(
         workspace.clone(),
         network.clone(),
@@ -108,6 +109,10 @@ where
 
                     // Only send post commit if this is a coordinator zome.
                     if let Some(coordinator_zome) = coordinator_zome {
+                        let call_zome_handle =
+                            CellConductorApi::new(conductor_handle.clone(), cell_id)
+                                .into_call_zome_handle();
+
                         send_post_commit(
                             conductor_handle,
                             workspace,
@@ -116,6 +121,7 @@ where
                             flushed_actions,
                             vec![coordinator_zome],
                             signal_tx,
+                            Some(call_zome_handle),
                         )
                         .await?;
                     }
