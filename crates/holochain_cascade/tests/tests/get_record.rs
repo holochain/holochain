@@ -54,16 +54,18 @@ async fn get_action_from_authored() {
         .unwrap();
     assert!(maybe_record.is_none());
 
-    // Set op to integrated.
+    // Set op to integrated, even though this is the authored database. Queries are applied
+    // equally to all 3 databases, so this field must exist and be set for them to return rows.
     authored.test_write(move |txn| {
         set_when_integrated(txn, &op_hash, Timestamp::now()).unwrap();
     });
-    // Get should return the op.
-    let maybe_record = cascade
+    // Get should return the record from the op.
+    let record = cascade
         .dht_get(create_action.to_hash().into(), GetOptions::local())
         .await
+        .unwrap()
         .unwrap();
-    assert!(maybe_record.is_some());
+    assert_eq!(*record.action(), create_action);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -189,7 +191,8 @@ async fn get_updated_then_deleted_action() {
         set_when_integrated(txn, &create_op2.hash, Timestamp::now()).unwrap();
     });
 
-    // Write an update to the dht db.
+    // Write an update to the dht db. This won't affect the result of the function.
+    // This step is included here because updates are included in the query.
     let mut update = fixt!(Update);
     update.original_action_address = create_action.to_hash();
     let update_op = DhtOp::ChainOp(Box::new(ChainOp::RegisterUpdatedRecord(
