@@ -1,11 +1,10 @@
-use std::sync::Arc;
-
 use holo_hash::HasHash;
 use holochain_cascade::test_utils::*;
 use holochain_cascade::{Cascade, CascadeImpl};
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::mutations::insert_op_scratch;
 use holochain_state::prelude::*;
+use std::sync::Arc;
 
 async fn assert_can_get(
     td_entry: &EntryTestData,
@@ -493,4 +492,42 @@ async fn test_pending_data_isnt_returned() {
     assert_is_none(&td_entry, &td_record, &cascade, GetOptions::network()).await;
 
     assert_can_retrieve(&td_entry, &cascade, GetOptions::network()).await;
+}
+
+mod zero_arc {
+    use super::*;
+    use ::fixt::fixt;
+
+    // When deleting an entry as a zero-arc node, firstly the details of the record are fetched
+    // by action hash. This test makes sure that the details can be gotten.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn update_or_delete_other_agents_entry() {
+        let cache = test_cache_db();
+        let cascade = CascadeImpl::empty().with_cache(cache.clone());
+
+        let mut create = fixt!(Create);
+        create.entry_type = EntryType::App(AppEntryDef {
+            entry_index: 0.into(),
+            zome_index: 0.into(),
+            visibility: EntryVisibility::Public,
+        });
+        let create_op = DhtOp::ChainOp(Box::new(ChainOp::StoreRecord(
+            fixt!(Signature),
+            Action::Create(create),
+            RecordEntry::NotStored,
+        )))
+        .into_hashed();
+        let create_action_hash = create_op.as_chain_op().unwrap().action().to_hash();
+        cache.test_write(move |txn| {
+            insert_op_cache(txn, &create_op).unwrap();
+            set_validation_status(txn, &create_op.hash, ValidationStatus::Valid).unwrap();
+            set_when_integrated(txn, &create_op.hash, Timestamp::now()).unwrap();
+        });
+
+        let maybe_details = cascade
+            .get_details(create_action_hash.into(), GetOptions::local())
+            .await
+            .unwrap();
+        assert!(maybe_details.is_some());
+    }
 }
