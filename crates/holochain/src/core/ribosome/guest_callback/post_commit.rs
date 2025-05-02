@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::conductor::api::CellConductorReadHandle;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
@@ -14,7 +15,6 @@ use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_types::prelude::*;
 use tokio::sync::broadcast;
-use crate::conductor::api::CellConductorReadHandle;
 
 pub const POST_COMMIT_CHANNEL_BOUND: usize = 100;
 pub const POST_COMMIT_CONCURRENT_LIMIT: usize = 5;
@@ -59,7 +59,7 @@ impl From<&PostCommitHostAccess> for HostFnAccess {
         // Writing more to the workspace becomes circular.
         // If you need to trigger some more writes, try calling another
         // zome function.
-        access.write_workspace = Permission::Allow; // TODO temporary
+        access.write_workspace = Permission::Deny;
         access
     }
 }
@@ -86,6 +86,7 @@ impl TryFrom<PostCommitInvocation> for ExternIO {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn send_post_commit(
     conductor_handle: ConductorHandle,
     workspace: SourceChainWorkspace,
@@ -288,8 +289,6 @@ mod slow_tests {
                 Ok(hash)
             })
             .function("create_other_string", move |api, s: AppString| {
-                tracing::warn!("create_other_string");
-
                 let entry = Entry::app(s.try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
                     InlineZomeSet::get_entry_location(&api, EntryDefIndex(1)),
@@ -298,6 +297,10 @@ mod slow_tests {
                     ChainTopOrdering::default(),
                 ))?;
                 Ok(hash)
+            })
+            .function("get_string", move |api, h: ActionHash| {
+                let out = api.get(vec![GetInput::new(h.into(), GetOptions::local())])?;
+                Ok(out.first().cloned().flatten())
             })
             .function("post_commit", move |api, input: Vec<SignedActionHashed>| {
                 if !input.is_empty() {
@@ -335,7 +338,11 @@ mod slow_tests {
         let mut rx = conductor.subscribe_to_app_signals("app".into());
 
         let _: ActionHash = conductor
-            .call(&cell_1.zome(SweetInlineZomes::COORDINATOR), "create_string", AppString("first string".into()))
+            .call(
+                &cell_1.zome(SweetInlineZomes::COORDINATOR),
+                "create_string",
+                AppString("first string".into()),
+            )
             .await;
 
         let signal = rx.recv().await.unwrap();
@@ -343,6 +350,16 @@ mod slow_tests {
             Signal::App { signal, .. } => {
                 let action: ActionHash = signal.into_inner().decode().unwrap();
 
+                // Verify that the content was written to the chain
+                let r: Option<Record> = conductor
+                    .call(
+                        &cell_1.zome(SweetInlineZomes::COORDINATOR),
+                        "get_string",
+                        action,
+                    )
+                    .await;
+
+                assert!(r.is_some());
             }
             s => {
                 unreachable!("unexpected app signal: {:?}", s);

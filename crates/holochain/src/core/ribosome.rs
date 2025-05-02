@@ -97,6 +97,7 @@ use must_future::MustBoxFuture;
 use std::iter::Iterator;
 use std::sync::Arc;
 use tokio::sync::broadcast;
+use wasmer::RuntimeError;
 
 #[derive(Clone)]
 pub struct CallContext {
@@ -137,7 +138,10 @@ impl CallContext {
         self.auth.clone()
     }
 
-    pub fn switch_host_context(&self, transform: fn(&HostContext) -> RibosomeResult<HostContext>) -> RibosomeResult<CallContext> {
+    pub fn switch_host_context(
+        &self,
+        transform: impl Fn(&HostContext) -> Result<HostContext, RuntimeError>,
+    ) -> Result<CallContext, RuntimeError> {
         Ok(Self {
             zome: self.zome.clone(),
             function_name: self.function_name.clone(),
@@ -248,7 +252,7 @@ impl HostContext {
                 call_zome_handle, ..
             })
             | Self::Init(InitHostAccess { call_zome_handle, .. })
-            | Self::PostCommit(PostCommitHostAccess { call_zome_handle, .. })
+            | Self::PostCommit(PostCommitHostAccess { call_zome_handle: Some(call_zome_handle), .. })
             => call_zome_handle,
             _ => panic!(
                 "Gave access to a host function that uses the call zome handle without providing a call zome handle"
@@ -571,7 +575,7 @@ pub struct ZomeCallHostAccess {
     pub keystore: MetaLairClient,
     pub network: DynHolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
-    pub call_zome_handle: Option<CellConductorReadHandle>,
+    pub call_zome_handle: CellConductorReadHandle,
 }
 
 impl std::fmt::Debug for ZomeCallHostAccess {

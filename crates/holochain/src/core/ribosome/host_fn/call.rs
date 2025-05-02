@@ -19,7 +19,10 @@ pub fn call(
     let results: Vec<Result<ZomeCallResponse, RuntimeError>> =
         tokio_helper::block_forever_on(async move {
             join_all(inputs.into_iter().map(|input| async {
-                match (&input.target, HostFnAccess::from(&call_context.host_context())) {
+                match (
+                    &input.target,
+                    HostFnAccess::from(&call_context.host_context()),
+                ) {
                     (
                         CallTarget::ConductorCell(_),
                         HostFnAccess {
@@ -35,9 +38,7 @@ pub fn call(
                             agent_info: Permission::Allow,
                             ..
                         },
-                    ) => {
-                        execute_call(ribosome, call_context, input).await
-                    }
+                    ) => execute_call(ribosome.clone(), call_context.clone(), input, false).await,
                     (
                         CallTarget::ConductorCell(_),
                         HostFnAccess {
@@ -46,31 +47,33 @@ pub fn call(
                             ..
                         },
                     ) => {
-                        let zome_call_context = call_context.switch_host_context(|context| match context {
-                            HostContext::PostCommit(
-                                post_commit @ PostCommitHostAccess {
-                                    call_zome_handle: Some(handle),
-                                    ..
-                                },
-                            ) => Ok(HostContext::ZomeCall(ZomeCallHostAccess::new(
-                                post_commit.workspace.clone(),
-                                post_commit.keystore.clone(),
-                                post_commit.network.clone(),
-                                post_commit.signal_tx.clone(),
-                                Some(handle.clone()),
-                            ))),
-                            _ => return Err(wasm_error!(WasmErrorInner::Host(
-                                RibosomeError::HostFnPermissions(
-                                    call_context.zome.zome_name().clone(),
-                                    call_context.function_name().clone(),
-                                    "call".into(),
-                                )
-                                .to_string(),
-                            ))
-                            .into()),
-                        })?;
+                        let zome_call_context =
+                            call_context.switch_host_context(|context| match context {
+                                HostContext::PostCommit(
+                                    post_commit @ PostCommitHostAccess {
+                                        call_zome_handle: Some(handle),
+                                        ..
+                                    },
+                                ) => Ok(HostContext::ZomeCall(ZomeCallHostAccess::new(
+                                    post_commit.workspace.clone(),
+                                    post_commit.keystore.clone(),
+                                    post_commit.network.clone(),
+                                    post_commit.signal_tx.clone(),
+                                    handle.clone(),
+                                ))),
+                                _ => Err(wasm_error!(WasmErrorInner::Host(
+                                    RibosomeError::HostFnPermissions(
+                                        call_context.zome.zome_name().clone(),
+                                        call_context.function_name().clone(),
+                                        "call".into(),
+                                    )
+                                    .to_string(),
+                                ))
+                                .into()),
+                            })?;
 
-                        execute_call(ribosome, Arc::new(zome_call_context), input).await
+                        execute_call(ribosome.clone(), Arc::new(zome_call_context), input, true)
+                            .await
                     }
                     _ => Err(wasm_error!(WasmErrorInner::Host(
                         RibosomeError::HostFnPermissions(
@@ -93,6 +96,7 @@ async fn execute_call(
     ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     input: Call,
+    fork: bool,
 ) -> Result<ZomeCallResponse, RuntimeError> {
     let Call {
         target,
@@ -110,19 +114,14 @@ async fn execute_call(
         .expect("Must have source chain to know provenance")
         .agent_pubkey()
         .clone();
-    let (nonce, expires_at) =
-        fresh_nonce(Timestamp::now()).map_err(|e| -> RuntimeError {
-            wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-        })?;
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now())
+        .map_err(|e| -> RuntimeError { wasm_error!(WasmErrorInner::Host(e.to_string())).into() })?;
 
     let result: Result<ZomeCallResponse, RuntimeError> = match target {
         CallTarget::NetworkAgent(target_agent) => {
             let zome_call_params = ZomeCallParams {
                 provenance: provenance.clone(),
-                cell_id: CellId::new(
-                    ribosome.dna_def().as_hash().clone(),
-                    target_agent.clone(),
-                ),
+                cell_id: CellId::new(ribosome.dna_def().as_hash().clone(), target_agent.clone()),
                 zome_name,
                 fn_name,
                 cap_secret,
@@ -134,10 +133,10 @@ async fn execute_call(
                 call_context.host_context.keystore(),
                 zome_call_params.clone(),
             )
-                .await
-                .map_err(|e| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                })?;
+            .await
+            .map_err(|e| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+            })?;
             match call_context
                 .host_context()
                 .network()
@@ -148,16 +147,13 @@ async fn execute_call(
                 )
                 .await
             {
-                Ok(serialized_bytes) => {
-                    ZomeCallResponse::try_from(serialized_bytes)
-                        .map_err(|e| -> RuntimeError { wasm_error!(e).into() })
-                }
+                Ok(serialized_bytes) => ZomeCallResponse::try_from(serialized_bytes)
+                    .map_err(|e| -> RuntimeError { wasm_error!(e).into() }),
                 Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
             }
         }
         CallTarget::ConductorCell(target_cell) => {
-            let cell_id_result: Result<CellId, RuntimeError> = match target_cell
-            {
+            let cell_id_result: Result<CellId, RuntimeError> = match target_cell {
                 CallTargetCell::OtherRole(role_name) => {
                     let this_cell_id = call_context
                         .host_context()
@@ -167,19 +163,14 @@ async fn execute_call(
                     call_context
                         .host_context()
                         .call_zome_handle()
-                        .find_cell_with_role_alongside_cell(
-                            &this_cell_id,
-                            &role_name,
-                        )
+                        .find_cell_with_role_alongside_cell(&this_cell_id, &role_name)
                         .await
                         .map_err(|e| -> RuntimeError { wasm_error!(e).into() })
                         .and_then(|c| {
                             c.ok_or_else(|| {
-                                wasmer::RuntimeError::from(wasm_error!(
-                                                        WasmErrorInner::Host(format!(
-                                                            "Role not found: {role_name}"
-                                                        ))
-                                                    ))
+                                wasmer::RuntimeError::from(wasm_error!(WasmErrorInner::Host(
+                                    format!("Role not found: {role_name}")
+                                )))
                             })
                         })
                 }
@@ -202,34 +193,39 @@ async fn execute_call(
                         nonce,
                         expires_at,
                     };
-                    tracing::info!("Calling zome: {:?}", zome_call_params);
-                    match call_context
-                        .host_context()
-                        .call_zome_handle()
-                        .call_zome(
-                            zome_call_params,
-                            call_context
-                                .host_context()
-                                .workspace_write()
-                                .clone()
-                                .try_into()
-                                .expect(
-                                    "Must have source chain to make zome call",
-                                ),
-                        )
-                        .await
-                    {
+
+                    let outcome = if fork {
+                        call_context
+                            .host_context()
+                            .call_zome_handle()
+                            .call_zome(zome_call_params)
+                            .await
+                    } else {
+                        call_context
+                            .host_context()
+                            .call_zome_handle()
+                            .call_zome_with_workspace(
+                                zome_call_params,
+                                call_context
+                                    .host_context()
+                                    .workspace_write()
+                                    .clone()
+                                    .try_into()
+                                    .expect("Must have source chain to make zome call"),
+                            )
+                            .await
+                    };
+
+                    match outcome {
                         Ok(Ok(zome_call_response)) => Ok(zome_call_response),
-                        Ok(Err(ribosome_error)) => Err(wasm_error!(
-                                                WasmErrorInner::Host(ribosome_error.to_string())
-                                            )
-                            .into()),
-                        Err(conductor_api_error) => {
-                            Err(wasm_error!(WasmErrorInner::Host(
-                                                    conductor_api_error.to_string()
-                                                ))
-                                .into())
-                        }
+                        Ok(Err(ribosome_error)) => Err(wasm_error!(WasmErrorInner::Host(
+                            ribosome_error.to_string()
+                        ))
+                        .into()),
+                        Err(conductor_api_error) => Err(wasm_error!(WasmErrorInner::Host(
+                            conductor_api_error.to_string()
+                        ))
+                        .into()),
                     }
                 }
                 Err(e) => Err(e),
