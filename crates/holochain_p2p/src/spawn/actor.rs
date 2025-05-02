@@ -828,6 +828,8 @@ impl HolochainP2pActor {
         #[cfg(not(feature = "test_utils"))]
         let mut builder = kitsune2::default_builder();
 
+        builder.auth_material = config.auth_material;
+
         let evt_sender = Arc::new(std::sync::OnceLock::new());
 
         builder.peer_meta_store = Arc::new(HolochainPeerMetaStoreFactory {
