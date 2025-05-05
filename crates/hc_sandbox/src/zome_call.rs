@@ -73,25 +73,21 @@
 
 use crate::cmds::Existing;
 use crate::ports::get_admin_ports;
-use crate::CmdRunner;
 use anyhow::Context;
 use clap::Parser;
-use ed25519_dalek::Signer;
-use holochain_conductor_api::{
-    AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse, CellInfo,
-    IssueAppAuthenticationTokenPayload, ZomeCallParamsSigned,
+use holochain_client::{
+    AdminWebsocket, AppWebsocket, CellId, ClientAgentSigner, DynAgentSigner, SigningCredentials,
+    ZomeCallTarget,
 };
+use holochain_conductor_api::{CellInfo, IssueAppAuthenticationTokenPayload};
 use holochain_types::prelude::{
     AgentPubKey, CapAccess, CapSecret, DnaHashB64, ExternIO, FunctionName,
-    GrantZomeCallCapabilityPayload, GrantedFunctions, InstalledAppId, SerializedBytes,
-    SerializedBytesError, Signature, Timestamp, ZomeCallCapGrant, ZomeCallParams, ZomeName,
+    GrantZomeCallCapabilityPayload, GrantedFunctions, InstalledAppId, ZomeCallCapGrant, ZomeName,
     CAP_SECRET_BYTES,
 };
 use holochain_types::websocket::AllowedOrigins;
-use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketReceiver};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::net::ToSocketAddrs;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Parser)]
@@ -155,11 +151,12 @@ pub async fn zome_call_auth(
 ) -> anyhow::Result<()> {
     let admin_port = admin_port_from_connect_args(zome_call_auth.connect_args, admin_port).await?;
 
-    let app_client = AppClient::try_new(admin_port, zome_call_auth.app_id.clone()).await?;
-    let app_info = app_client.request(AppRequest::AppInfo).await?;
+    let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}")).await?;
+    let app_client = get_app_client(&admin_client, zome_call_auth.app_id.clone(), None).await?;
+    let app_info = app_client.app_info().await?;
     let info = match app_info {
-        AppResponse::AppInfo(Some(info)) => info,
-        other => anyhow::bail!("Unexpected response while getting app info: {:?}", other),
+        Some(info) => info,
+        _ => anyhow::bail!("No app info found for app id {}", zome_call_auth.app_id),
     };
 
     let cell_ids = info
@@ -172,7 +169,7 @@ pub async fn zome_call_auth(
         })
         .collect::<HashSet<_>>();
 
-    let mut client = CmdRunner::try_new(admin_port).await?;
+    let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}")).await?;
 
     holochain_util::pw::pw_set_piped(zome_call_auth.piped);
     if !zome_call_auth.piped {
@@ -185,22 +182,19 @@ pub async fn zome_call_auth(
     let signing_agent_key = AgentPubKey::from_raw_32(key.verifying_key().as_bytes().to_vec());
 
     for cell_id in cell_ids {
-        client
-            .command(AdminRequest::GrantZomeCallCapability(Box::new(
-                GrantZomeCallCapabilityPayload {
-                    cell_id: cell_id.clone(),
-                    cap_grant: ZomeCallCapGrant::new(
-                        "sandbox".to_string(),
-                        CapAccess::Assigned {
-                            secret: auth.cap_secret,
-                            assignees: vec![signing_agent_key.clone()].into_iter().collect(),
-                        },
-                        GrantedFunctions::All,
-                    ),
-                },
-            )))
+        admin_client
+            .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
+                cell_id: cell_id.clone(),
+                cap_grant: ZomeCallCapGrant::new(
+                    "sandbox".to_string(),
+                    CapAccess::Assigned {
+                        secret: auth.cap_secret,
+                        assignees: vec![signing_agent_key.clone()].into_iter().collect(),
+                    },
+                    GrantedFunctions::All,
+                ),
+            })
             .await?;
-
         msg!("Authorized zome calls for cell: {:?}", cell_id);
     }
 
@@ -210,14 +204,14 @@ pub async fn zome_call_auth(
 pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::Result<()> {
     let admin_port = admin_port_from_connect_args(zome_call.connect_args, admin_port).await?;
 
-    let client = AppClient::try_new(admin_port, zome_call.app_id.clone())
-        .await
-        .context("Could not create app client")?;
+    let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}")).await?;
 
-    let app_info = client.request(AppRequest::AppInfo).await?;
+    let app_client = get_app_client(&admin_client, zome_call.app_id.clone(), None).await?;
+
+    let app_info = app_client.app_info().await?;
     let info = match app_info {
-        AppResponse::AppInfo(Some(info)) => info,
-        other => anyhow::bail!("Unexpected response while getting app info: {:?}", other),
+        Some(info) => info,
+        _ => anyhow::bail!("No app info found for app id {}", zome_call.app_id.clone()),
     };
 
     let cell_ids = info
@@ -250,40 +244,38 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
 
     let (auth, key) = generate_signing_credentials(passphrase).await?;
 
-    let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now())
-        .map_err(|e| anyhow::anyhow!("Failed to generate nonce: {:?}", e))?;
+    let credentials: Vec<(CellId, SigningCredentials)> = cell_ids
+        .clone()
+        .into_iter()
+        .map(|cell_id| {
+            (
+                cell_id,
+                SigningCredentials {
+                    signing_agent_key: AgentPubKey::from_raw_32(
+                        key.verifying_key().as_bytes().to_vec(),
+                    ),
+                    keypair: key.clone(),
+                    cap_secret: auth.cap_secret,
+                },
+            )
+        })
+        .collect();
 
-    let params = ZomeCallParams {
-        provenance: AgentPubKey::from_raw_32(key.verifying_key().as_bytes().to_vec()),
-        cell_id: cell_ids.first().unwrap().clone(),
-        zome_name: ZomeName::from(zome_call.zome_name.clone()),
-        fn_name: FunctionName(zome_call.function.clone()),
-        cap_secret: Some(auth.cap_secret),
-        payload: ExternIO::encode(serde_json::from_slice::<serde_json::Value>(
-            zome_call.payload.as_bytes(),
-        )?)?,
-        nonce,
-        expires_at,
-    };
-    let (payload, hash) = params.serialize_and_hash()?;
+    let app_client =
+        get_app_client(&admin_client, zome_call.app_id.clone(), Some(credentials)).await?;
 
-    let sig = key.try_sign(&hash)?;
-
-    let response = client
-        .request(AppRequest::CallZome(Box::new(ZomeCallParamsSigned {
-            bytes: ExternIO::from(payload),
-            signature: Signature::try_from(sig.to_vec())?,
-        })))
+    let response = app_client
+        .call_zome(
+            ZomeCallTarget::CellId(cell_ids.first().unwrap().clone()),
+            ZomeName::from(zome_call.zome_name),
+            FunctionName(zome_call.function),
+            ExternIO::encode(serde_json::from_slice::<serde_json::Value>(
+                zome_call.payload.as_bytes(),
+            )?)?,
+        )
         .await?;
 
-    match response {
-        AppResponse::ZomeCalled(response) => {
-            let response: serde_json::Value = response.decode()?;
-            serde_json::to_writer(std::io::stdout(), &response)?;
-            println!(); // Add newline
-        }
-        other => anyhow::bail!("Unexpected response while calling zome: {:?}", other),
-    }
+    println!("{}", response.decode::<serde_json::Value>()?.to_string());
 
     Ok(())
 }
@@ -350,129 +342,66 @@ async fn admin_port_from_connect_args(
     }
 }
 
-struct AppClient {
-    ws_send: holochain_websocket::WebsocketSender,
-    _recv: WsPollRecv,
-}
+async fn get_app_client(
+    admin_client: &AdminWebsocket,
+    installed_app_id: InstalledAppId,
+    credentials: Option<Vec<(CellId, SigningCredentials)>>,
+) -> anyhow::Result<AppWebsocket> {
+    let app_interfaces = admin_client.list_app_interfaces().await?;
 
-impl AppClient {
-    async fn try_new(admin_port: u16, installed_app_id: InstalledAppId) -> anyhow::Result<Self> {
-        let mut cmd_runner = CmdRunner::try_new(admin_port).await?;
-
-        let admin_response = cmd_runner.command(AdminRequest::ListAppInterfaces).await?;
-
-        let app_interfaces = match admin_response {
-            AdminResponse::AppInterfacesListed(app_interfaces) => app_interfaces,
-            other => anyhow::bail!(
-                "Unexpected response while listing app interfaces: {:?}",
-                other
-            ),
-        };
-
-        let existing_port = app_interfaces
-            .iter()
-            .filter_map(|app_interface| {
-                if app_interface.installed_app_id.is_some()
-                    && app_interface.installed_app_id.as_ref().unwrap() != &installed_app_id
-                {
-                    return None;
-                }
-
-                if app_interface.allowed_origins.is_allowed("sandbox") {
-                    Some(app_interface.port)
-                } else {
-                    None
-                }
-            })
-            .next();
-
-        let port = match existing_port {
-            Some(port) => port,
-            None => {
-                let response = cmd_runner
-                    .command(AdminRequest::AttachAppInterface {
-                        port: None,
-                        allowed_origins: AllowedOrigins::Origins(
-                            vec!["sandbox".to_string()].into_iter().collect(),
-                        ),
-                        installed_app_id: None,
-                    })
-                    .await?;
-
-                match response {
-                    AdminResponse::AppInterfaceAttached { port } => port,
-                    other => anyhow::bail!(
-                        "Unexpected response while attaching app interface: {:?}",
-                        other
-                    ),
-                }
+    let existing_port = app_interfaces
+        .iter()
+        .filter_map(|app_interface| {
+            if app_interface.installed_app_id.is_some()
+                && app_interface.installed_app_id.as_ref().unwrap() != &installed_app_id
+            {
+                return None;
             }
-        };
 
-        let (ws_send, ws_recv) = connect(
-            Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-            ConnectRequest::new(
-                format!("localhost:{port}")
-                    .to_socket_addrs()
-                    .unwrap()
-                    .next()
-                    .unwrap(),
-            )
-            .try_set_header("origin", "sandbox")
-            .unwrap(),
-        )
+            if app_interface.allowed_origins.is_allowed("sandbox") {
+                Some(app_interface.port)
+            } else {
+                None
+            }
+        })
+        .next();
+
+    let port = match existing_port {
+        Some(port) => port,
+        None => {
+            admin_client
+                .attach_app_interface(
+                    0,
+                    AllowedOrigins::Origins(vec!["sandbox".to_string()].into_iter().collect()),
+                    None,
+                )
+                .await?
+        }
+    };
+
+    let token = admin_client
+        .issue_app_auth_token(IssueAppAuthenticationTokenPayload::for_installed_app_id(
+            installed_app_id.clone(),
+        ))
         .await?;
 
-        let _recv = WsPollRecv::new::<AppResponse>(ws_recv);
+    let signer = ClientAgentSigner::new();
 
-        let response = cmd_runner
-            .command(AdminRequest::IssueAppAuthenticationToken(
-                IssueAppAuthenticationTokenPayload::for_installed_app_id(installed_app_id.clone()),
-            ))
-            .await
-            .context("Could not issue app authentication token")?;
-
-        let token = match response {
-            AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
-            other => anyhow::bail!(
-                "Unexpected response while issuing app authentication token: {:?}",
-                other
-            ),
-        };
-
-        ws_send
-            .authenticate(AppAuthenticationRequest { token })
-            .await
-            .context("Failed to authenticate app interface connection")?;
-
-        Ok(Self { ws_send, _recv })
+    match credentials {
+        None => (),
+        Some(c) => {
+            for (cell_id, creds) in c {
+                signer.add_credentials(cell_id, creds);
+            }
+        }
     }
 
-    async fn request(&self, request: AppRequest) -> anyhow::Result<AppResponse> {
-        Ok(self.ws_send.request(request).await?)
-    }
-}
-
-/// You do not need to do anything with this type. While it is held it will keep polling a websocket
-/// receiver.
-struct WsPollRecv(tokio::task::JoinHandle<()>);
-
-impl Drop for WsPollRecv {
-    fn drop(&mut self) {
-        self.0.abort();
-    }
-}
-
-impl WsPollRecv {
-    fn new<D>(mut rx: WebsocketReceiver) -> Self
-    where
-        D: std::fmt::Debug,
-        SerializedBytes: TryInto<D, Error = SerializedBytesError>,
-    {
-        Self(tokio::task::spawn(async move {
-            while rx.recv::<D>().await.is_ok() {}
-        }))
-    }
+    Ok(AppWebsocket::connect(
+        format!("localhost:{}", port),
+        token.token,
+        DynAgentSigner::from(signer),
+    )
+    .await?)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

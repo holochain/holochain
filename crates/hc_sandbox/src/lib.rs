@@ -18,13 +18,6 @@
 //!
 //! and the examples.
 
-use std::path::Path;
-
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::{AdminRequest, AdminResponse};
-use holochain_websocket::{WebsocketResult, WebsocketSender};
-use ports::get_admin_api;
-
 pub use ports::force_admin_port;
 
 /// Print a message with `hc-sandbox: ` prepended
@@ -46,64 +39,9 @@ pub mod run;
 pub mod sandbox;
 pub mod save;
 pub use cli::HcSandbox;
-use holochain_trace::Output;
 
 mod ports;
 mod zome_call;
-
-/// An active connection to a running conductor.
-pub struct CmdRunner {
-    client: WebsocketSender,
-    task: tokio::task::JoinHandle<()>,
-}
-
-impl Drop for CmdRunner {
-    fn drop(&mut self) {
-        self.task.abort();
-    }
-}
-
-impl CmdRunner {
-    const HOLOCHAIN_PATH: &'static str = "holochain";
-    /// Create a new connection for calling admin interface commands.
-    /// Panics if admin port fails to connect.
-    pub async fn new(port: u16) -> Self {
-        Self::try_new(port)
-            .await
-            .expect("Failed to create CmdRunner because admin port failed to connect")
-    }
-
-    /// Create a new connection for calling admin interface commands.
-    pub async fn try_new(port: u16) -> WebsocketResult<Self> {
-        let (client, task) = get_admin_api(port).await?;
-        Ok(Self { client, task })
-    }
-
-    /// Create a command runner from a sandbox path.
-    /// This expects holochain to be on the path.
-    pub async fn from_sandbox(
-        sandbox_path: ConfigRootPath,
-    ) -> anyhow::Result<(Self, tokio::process::Child)> {
-        Self::from_sandbox_with_bin_path(Path::new(Self::HOLOCHAIN_PATH), sandbox_path).await
-    }
-
-    /// Create a command runner from a sandbox path and
-    /// set the path to the holochain binary.
-    pub async fn from_sandbox_with_bin_path(
-        holochain_bin_path: &Path,
-        sandbox_path: ConfigRootPath,
-    ) -> anyhow::Result<(Self, tokio::process::Child)> {
-        let conductor = run::run_async(holochain_bin_path, sandbox_path, None, Output::Log).await?;
-        let cmd = CmdRunner::try_new(conductor.0).await?;
-        Ok((cmd, conductor.1))
-    }
-
-    /// Make an Admin request to this conductor.
-    pub async fn command(&mut self, cmd: AdminRequest) -> anyhow::Result<AdminResponse> {
-        let response: Result<AdminResponse, _> = self.client.request(cmd).await;
-        Ok(response?)
-    }
-}
 
 #[macro_export]
 /// Expect that an enum matches a variant and panic if it doesn't.
