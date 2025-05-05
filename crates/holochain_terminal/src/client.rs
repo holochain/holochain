@@ -1,25 +1,16 @@
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_conductor_api::{
-    AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken, AppInfo,
-    AppInterfaceInfo, AppRequest, AppResponse, CellInfo,
-};
+use holochain_client::{AdminWebsocket, AppWebsocket, ClientAgentSigner, DynAgentSigner};
+use holochain_conductor_api::{AppAuthenticationToken, AppInterfaceInfo, CellInfo};
 use holochain_types::network::Kitsune2NetworkMetrics;
 use holochain_types::prelude::InstalledAppId;
 use holochain_types::websocket::AllowedOrigins;
-use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
 use std::collections::HashMap;
-use std::sync::Arc;
+
+const HC_TERM_ORIGIN: &str = "hcterm";
 
 pub struct AppClient {
-    tx: WebsocketSender,
-    rx: tokio::task::JoinHandle<()>,
-}
-
-impl Drop for AppClient {
-    fn drop(&mut self) {
-        self.rx.abort();
-    }
+    client: AppWebsocket,
 }
 
 impl AppClient {
@@ -28,19 +19,10 @@ impl AppClient {
         addr: std::net::SocketAddr,
         token: AppAuthenticationToken,
     ) -> anyhow::Result<Self> {
-        let (tx, mut rx) = connect(
-            Arc::new(WebsocketConfig::CLIENT_DEFAULT),
-            ConnectRequest::new(addr).try_set_header("origin", HC_TERM_ORIGIN)?,
-        )
-        .await?;
-
-        let rx = tokio::task::spawn(async move { while rx.recv::<AppResponse>().await.is_ok() {} });
-
-        tx.authenticate(AppAuthenticationRequest { token })
-            .await
-            .context("Failed to authenticate app client")?;
-
-        Ok(AppClient { tx, rx })
+        let client =
+            AppWebsocket::connect(addr, token, DynAgentSigner::from(ClientAgentSigner::new()))
+                .await?;
+        Ok(AppClient { client })
     }
 
     pub async fn discover_network_metrics_params(
@@ -48,6 +30,7 @@ impl AppClient {
         app_id: InstalledAppId,
     ) -> anyhow::Result<(AgentPubKey, Vec<(String, DnaHash)>)> {
         let app_info = self
+            .client
             .app_info()
             .await?
             .ok_or(anyhow!("App not found {}", app_id))?;
@@ -72,111 +55,46 @@ impl AppClient {
     pub async fn network_metrics(
         &mut self,
     ) -> anyhow::Result<HashMap<DnaHash, Kitsune2NetworkMetrics>> {
-        let msg = AppRequest::DumpNetworkMetrics {
-            dna_hash: None,
-            include_dht_summary: false,
-        };
-        let response = self.send(msg).await?;
-        match response {
-            AppResponse::NetworkMetricsDumped(metrics) => Ok(metrics),
-            _ => unreachable!("Unexpected response {:?}", response),
-        }
-    }
-
-    async fn app_info(&mut self) -> anyhow::Result<Option<AppInfo>> {
-        let msg = AppRequest::AppInfo;
-        let response = self.send(msg).await?;
-        match response {
-            AppResponse::AppInfo(app_info) => Ok(app_info),
-            _ => unreachable!("Unexpected response {:?}", response),
-        }
-    }
-
-    async fn send(&mut self, msg: AppRequest) -> anyhow::Result<AppResponse> {
-        let response = self.tx.request(msg).await?;
-
-        match response {
-            AppResponse::Error(error) => Err(anyhow!("External error: {:?}", error)),
-            _ => Ok(response),
-        }
+        Ok(self.client.dump_network_metrics(None, false).await?)
     }
 }
 
 pub struct AdminClient {
-    tx: WebsocketSender,
-    rx: tokio::task::JoinHandle<()>,
+    client: AdminWebsocket,
     addr: std::net::SocketAddr,
 }
-
-impl Drop for AdminClient {
-    fn drop(&mut self) {
-        self.rx.abort();
-    }
-}
-
-const HC_TERM_ORIGIN: &str = "hcterm";
 
 impl AdminClient {
     /// Creates an Admin websocket client which can send messages but ignores any incoming messages
     pub async fn connect(addr: std::net::SocketAddr) -> anyhow::Result<Self> {
-        let (tx, mut rx) = connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), addr).await?;
-
-        let rx =
-            tokio::task::spawn(async move { while rx.recv::<AdminResponse>().await.is_ok() {} });
-
-        Ok(AdminClient { tx, rx, addr })
+        let client = AdminWebsocket::connect(addr).await?;
+        Ok(AdminClient { client, addr })
     }
 
     pub async fn connect_app_client(
         &mut self,
         installed_app_id: InstalledAppId,
     ) -> anyhow::Result<AppClient> {
-        let app_interfaces = self.list_app_interfaces().await?;
+        let app_interfaces = self.client.list_app_interfaces().await?;
 
         let app_port = if let Some(interface) =
             Self::select_usable_app_interface(app_interfaces, installed_app_id.clone())
         {
             interface.port
         } else {
-            self.attach_app_interface(0).await?
+            self.client
+                .attach_app_interface(0, HC_TERM_ORIGIN.to_string().into(), None)
+                .await?
         };
 
         let app_addr = (self.addr.ip(), app_port).into();
 
-        let issue_token_response = self
-            .tx
-            .request(AdminRequest::IssueAppAuthenticationToken(
-                installed_app_id.into(),
-            ))
+        let token = self
+            .client
+            .issue_app_auth_token(installed_app_id.into())
             .await?;
-        let token = match issue_token_response {
-            AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
-            _ => anyhow::bail!("Unexpected response {:?}", issue_token_response),
-        };
 
-        AppClient::connect(app_addr, token).await
-    }
-
-    async fn list_app_interfaces(&mut self) -> anyhow::Result<Vec<AppInterfaceInfo>> {
-        let msg = AdminRequest::ListAppInterfaces;
-        let response = self.send(msg).await?;
-        match response {
-            AdminResponse::AppInterfacesListed(interfaces) => Ok(interfaces),
-            _ => unreachable!("Unexpected response {:?}", response),
-        }
-    }
-
-    async fn attach_app_interface(&mut self, port: u16) -> anyhow::Result<u16> {
-        let msg = AdminRequest::AttachAppInterface {
-            port: Some(port),
-            allowed_origins: HC_TERM_ORIGIN.to_string().into(),
-            installed_app_id: None,
-        };
-        let response = self.send(msg).await?;
-        match response {
-            AdminResponse::AppInterfaceAttached { port } => Ok(port),
-            _ => unreachable!("Unexpected response {:?}", response),
-        }
+        AppClient::connect(app_addr, token.token).await
     }
 
     fn select_usable_app_interface(
@@ -194,14 +112,5 @@ impl AdminClient {
 
             can_use_app_id && can_use_origin
         })
-    }
-
-    async fn send(&mut self, msg: AdminRequest) -> anyhow::Result<AdminResponse> {
-        let response = self.tx.request(msg).await?;
-
-        match response {
-            AdminResponse::Error(error) => Err(anyhow!("External error: {:?}", error)),
-            _ => Ok(response),
-        }
     }
 }
