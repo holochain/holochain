@@ -1,14 +1,11 @@
 //! Helpers for working with websockets and ports.
 
-use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_conductor_config::config::{read_config, write_config};
 use holochain_conductor_config::ports::set_admin_port;
-use holochain_websocket::{self as ws, WebsocketConfig, WebsocketResult, WebsocketSender};
 
 /// Update the first admin interface to use this port.
 pub fn force_admin_port(config_root_path: ConfigRootPath, port: u16) -> anyhow::Result<()> {
@@ -40,36 +37,4 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
         }
     }
     Ok(ports)
-}
-
-/// Creates a [`WebsocketSender`] along with a task which simply consumes and discards
-/// all messages on the receiving side
-pub(crate) async fn get_admin_api(
-    port: u16,
-) -> WebsocketResult<(WebsocketSender, tokio::task::JoinHandle<()>)> {
-    tracing::debug!(port);
-    websocket_client_by_port(port).await
-}
-
-async fn websocket_client_by_port(
-    port: u16,
-) -> WebsocketResult<(WebsocketSender, tokio::task::JoinHandle<()>)> {
-    let req = holochain_websocket::ConnectRequest::new(
-        format!("localhost:{port}")
-            .to_socket_addrs()?
-            .next()
-            .ok_or_else(|| std::io::Error::other("Could not resolve localhost"))?,
-    )
-    .try_set_header("Origin", "hc_sandbox")
-    .expect("Failed to set `Origin` header for websocket connection request");
-
-    let (send, mut recv) = ws::connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), req).await?;
-    let task = tokio::task::spawn(async move {
-        while recv
-            .recv::<holochain_conductor_api::AdminResponse>()
-            .await
-            .is_ok()
-        {}
-    });
-    Ok((send, task))
 }
