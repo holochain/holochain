@@ -2820,6 +2820,7 @@ dependencies = [
  "futures",
  "holo_hash",
  "holochain_chc",
+ "holochain_client",
  "holochain_conductor_api",
  "holochain_conductor_config",
  "holochain_nonce",
@@ -2843,7 +2844,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_client"
-version = "0.7.0-rc.0"
+version = "0.8.0-dev.0"
 dependencies = [
  "anyhow",
  "async-trait",

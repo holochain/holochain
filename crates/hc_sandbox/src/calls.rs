@@ -1,9 +1,7 @@
-//! Helpers for making [`AdminRequest`]s to the admin API.
+//! Helpers for making [`holochain_conductor_api::AdminRequest`]s to the admin API.
 //!
 //! This module is designed for use in a CLI so it is more simplified
-//! than calling the [`CmdRunner`] directly.
-//! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
-//! but if you want more control use [`CmdRunner::command`].
+//! than calling the [`AdminWebsocket`] directly.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -12,17 +10,14 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use anyhow::bail;
-use anyhow::ensure;
+use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::AdminResponse;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
-use holochain_conductor_api::{AdminRequest, AppInterfaceInfo};
 use holochain_types::app::AppManifest;
 use holochain_types::app::RoleSettingsMap;
 use holochain_types::app::RoleSettingsMapYaml;
-use holochain_types::prelude::AppCapGrantInfo;
 use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::YamlProperties;
@@ -30,18 +25,15 @@ use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
+use kitsune2_core::Ed25519Verifier;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
-use crate::expect_match;
 use crate::ports::get_admin_ports;
 use crate::run::run_async;
-use crate::CmdRunner;
 use clap::{Args, Parser, Subcommand};
 use holochain_trace::Output;
-use holochain_types::network::Kitsune2NetworkMetrics;
 use holochain_types::websocket::AllowedOrigins;
-use holochain_websocket::WebsocketError;
 use kitsune2_api::AgentInfoSigned;
 
 #[doc(hidden)]
@@ -90,8 +82,7 @@ pub enum AdminRequestCli {
     DumpNetworkStats,
     ListCapabilityGrants(ListCapGrants),
     /// Calls AdminRequest::AddAgentInfo.
-    /// _Unimplemented_.
-    AddAgents,
+    AddAgents(AgentInfos),
     ListAgents(ListAgents),
 }
 
@@ -257,6 +248,14 @@ pub struct ListCapGrants {
     pub include_revoked: bool,
 }
 
+/// Calls AdminRequest::AddAgentInfo
+/// and disables the installed app.
+#[derive(Debug, Args, Clone)]
+pub struct AgentInfos {
+    /// A JSON array of agent infos.
+    pub agent_infos: String,
+}
+
 /// Calls AdminRequest::RequestAgentInfo
 /// and pretty prints the agent info on
 /// this conductor.
@@ -301,46 +300,39 @@ pub async fn call(
         force_admin_ports
     };
 
-    let cmds = if running.is_empty() {
+    let admin_clients = if running.is_empty() {
         let paths = if existing.is_empty() {
             crate::save::load(std::env::current_dir()?)?
         } else {
             existing.load()?
         };
         let ports = get_admin_ports(paths.clone()).await?;
-        let mut cmds = Vec::with_capacity(ports.len());
+        let mut clients = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
-            match CmdRunner::try_new(port).await {
-                Ok(cmd) => cmds.push((cmd, None, None)),
-                Err(WebsocketError::Io(e)) => {
-                    if let std::io::ErrorKind::ConnectionRefused
-                    | std::io::ErrorKind::AddrNotAvailable = e.kind()
-                    {
-                        let (port, holochain, lair) = run_async(
-                            holochain_path,
-                            ConfigRootPath::from(path),
-                            None,
-                            structured.clone(),
-                        )
-                        .await?;
-                        cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
-                        continue;
-                    }
-                    bail!(
-                        "Failed to connect to running conductor or start one {:?}",
-                        e
-                    )
-                }
+            match AdminWebsocket::connect(format!("localhost:{port}")).await {
+                Ok(client) => clients.push((client, None, None)),
                 Err(e) => {
-                    bail!(
-                        "Failed to connect to running conductor or start one {:?}",
-                        e
+                    tracing::debug!("Connecting to the sandbox conductor failed: {e}.\nThis is expected in case the conductor is not running. Trying to start it up now...");
+                    // Note that the holochain and lair processes need to be returned here
+                    // in order to not get dropped but keep running until the admin call
+                    // is being made
+                    let (port, holochain, lair) = run_async(
+                        holochain_path,
+                        ConfigRootPath::from(path),
+                        None,
+                        structured.clone(),
                     )
+                    .await?;
+                    clients.push((
+                        AdminWebsocket::connect(format!("localhost:{port}")).await?,
+                        Some(holochain),
+                        Some(lair),
+                    ));
                 }
             }
         }
 
-        if cmds.is_empty() {
+        if clients.is_empty() {
             bail!(
                 "No running conductors found by searching the current directory. \
                 \nYou need to do one of: \
@@ -351,83 +343,99 @@ pub async fn call(
             );
         }
 
-        cmds
+        clients
     } else {
-        let mut cmds = Vec::with_capacity(running.len());
+        let mut clients = Vec::with_capacity(running.len());
         for port in running {
-            cmds.push((CmdRunner::new(port).await, None, None));
+            clients.push((
+                AdminWebsocket::connect(format!("localhost:{port}")).await?,
+                None,
+                None,
+            ));
         }
-        cmds
+        clients
     };
-    for mut cmd in cmds {
-        call_inner(&mut cmd.0, call.clone()).await?;
+    for mut client in admin_clients {
+        call_inner(&mut client.0, call.clone()).await?;
     }
     Ok(())
 }
 
-async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Result<()> {
+async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyhow::Result<()> {
     match call {
         AdminRequestCli::AddAdminWs(args) => {
-            let port = add_admin_interface(cmd, args).await?;
+            let port = args.port.unwrap_or(0);
+            client
+                .add_admin_interfaces(vec![AdminInterfaceConfig {
+                    driver: InterfaceDriver::Websocket {
+                        port,
+                        allowed_origins: args.allowed_origins,
+                    },
+                }])
+                .await?;
             msg!("Added admin port {}", port);
         }
         AdminRequestCli::AddAppWs(args) => {
-            let port = attach_app_interface(cmd, args).await?;
+            let port = args.port.unwrap_or(0);
+            let port = client
+                .attach_app_interface(port, args.allowed_origins, args.installed_app_id)
+                .await?;
             msg!("Added app port {}", port);
         }
         AdminRequestCli::ListAppWs => {
-            let ports = list_app_ws(cmd).await?;
-            msg!("Attached app interfaces {:?}", ports);
+            let interface_infos = client.list_app_interfaces().await?;
+            msg!("Attached app interfaces {:?}", interface_infos);
         }
         AdminRequestCli::RegisterDna(args) => {
-            let dnas = register_dna(cmd, args).await?;
+            let dnas = register_dna(client, args).await?;
             msg!("Registered DNA: {:?}", dnas);
         }
         AdminRequestCli::InstallApp(args) => {
-            let app = install_app_bundle(cmd, args).await?;
+            let app = install_app_bundle(client, args).await?;
             msg!("Installed app: {}", app.installed_app_id,);
         }
         AdminRequestCli::UninstallApp(args) => {
-            let app_id = args.app_id.clone();
-            uninstall_app(cmd, args).await?;
-            msg!("Uninstalled app: {}", app_id,);
+            client
+                .uninstall_app(args.app_id.clone(), args.force)
+                .await?;
+            msg!("Uninstalled app: {}", args.app_id,);
         }
         AdminRequestCli::ListDnas => {
-            let dnas = list_dnas(cmd).await?;
+            let dnas = client.list_dnas().await?;
             msg!("DNAs: {:?}", dnas);
         }
         AdminRequestCli::NewAgent => {
-            let agent = generate_agent_pub_key(cmd).await?;
+            let agent = client.generate_agent_pub_key().await?;
             msg!("Added agent {}", agent);
         }
         AdminRequestCli::ListCells => {
-            let cells = list_cell_ids(cmd).await?;
+            let cells = client.list_cell_ids().await?;
             msg!("Cell IDs: {:?}", cells);
         }
         AdminRequestCli::ListApps(args) => {
-            let apps = list_apps(cmd, args).await?;
+            let apps = client.list_apps(args.status).await?;
             msg!("List apps: {:?}", apps);
         }
         AdminRequestCli::EnableApp(args) => {
-            let app_id = args.app_id.clone();
-            enable_app(cmd, args).await?;
-            msg!("Activated app: {:?}", app_id);
+            client.enable_app(args.app_id.clone()).await?;
+            msg!("Activated app: {:?}", args.app_id);
         }
         AdminRequestCli::DisableApp(args) => {
-            let app_id = args.app_id.clone();
-            disable_app(cmd, args).await?;
-            msg!("Deactivated app: {:?}", app_id);
+            client.disable_app(args.app_id.clone()).await?;
+            msg!("Deactivated app: {:?}", args.app_id);
         }
         AdminRequestCli::DumpState(args) => {
-            let state = dump_state(cmd, args).await?;
+            let state = client.dump_state(args.into()).await?;
             msg!("DUMP STATE \n{}", state);
         }
         AdminRequestCli::DumpConductorState => {
-            let state = dump_conductor_state(cmd).await?;
+            let state = client.dump_conductor_state().await?;
             msg!("DUMP CONDUCTOR STATE \n{}", state);
         }
         AdminRequestCli::DumpNetworkMetrics(args) => {
-            let metrics = dump_network_metrics(cmd, args).await?;
+            let metrics = client
+                .dump_network_metrics(args.dna, args.include_dht_summary)
+                .await?;
             // Print without other text so it can be piped
             println!(
                 "{}",
@@ -440,22 +448,32 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
             );
         }
         AdminRequestCli::DumpNetworkStats => {
-            let stats = dump_network_stats(cmd).await?;
+            let stats = client.dump_network_stats().await?;
             // Print without other text so it can be piped
             println!("{}", serde_json::to_string(&stats)?);
         }
         AdminRequestCli::ListCapabilityGrants(args) => {
-            let info = list_capability_grants(cmd, args).await?;
+            let info = client
+                .list_capability_grants(args.installed_app_id, args.include_revoked)
+                .await?;
             // Print without other text so it can be piped
             println!("{:?}", info);
         }
-        AdminRequestCli::AddAgents => todo!("Adding agent info via CLI is coming soon"),
+        AdminRequestCli::AddAgents(args) => {
+            let agent_infos_results =
+                AgentInfoSigned::decode_list(&Ed25519Verifier, args.agent_infos.as_bytes())?;
+            let agent_infos = agent_infos_results
+                .into_iter()
+                .map(|r| r.expect("Failed to decode agent info."))
+                .collect();
+            add_agent_info(client, agent_infos).await?;
+        }
         AdminRequestCli::ListAgents(args) => {
             use std::fmt::Write;
-            let agent_infos = request_agent_info(cmd, args).await?;
+            let agent_infos = request_agent_info(client, args).await?;
             for info in agent_infos {
                 let mut out = String::new();
-                let cell_info = list_cell_ids(cmd).await?;
+                let cell_info = client.list_cell_ids().await?;
                 let agents = cell_info
                     .iter()
                     .map(|c| c.agent_pubkey().clone())
@@ -509,30 +527,8 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
     Ok(())
 }
 
-/// Calls [`AdminRequest::AddAdminInterfaces`] and adds another admin interface.
-pub async fn add_admin_interface(cmd: &mut CmdRunner, args: AddAdminWs) -> anyhow::Result<u16> {
-    let port = args.port.unwrap_or(0);
-    let resp = cmd
-        .command(AdminRequest::AddAdminInterfaces(vec![
-            AdminInterfaceConfig {
-                driver: InterfaceDriver::Websocket {
-                    port,
-                    allowed_origins: AllowedOrigins::Any,
-                },
-            },
-        ]))
-        .await?;
-    ensure!(
-        matches!(resp, AdminResponse::AdminInterfacesAdded),
-        "Failed to add admin interface, got: {:?}",
-        resp
-    );
-    // TODO: return chosen port when 0 is used
-    Ok(port)
-}
-
-/// Calls [`AdminRequest::RegisterDna`] and registers DNA.
-pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Result<DnaHash> {
+/// Calls [`AdminWebsocket::register_dna`] and registers the DNA.
+async fn register_dna(client: &mut AdminWebsocket, args: RegisterDna) -> anyhow::Result<DnaHash> {
     let RegisterDna {
         network_seed,
         properties,
@@ -558,15 +554,15 @@ pub async fn register_dna(cmd: &mut CmdRunner, args: RegisterDna) -> anyhow::Res
         source,
     };
 
-    let r = AdminRequest::RegisterDna(Box::new(dna));
-    let registered_dna = cmd.command(r).await?;
-    let hash =
-        expect_match!(registered_dna => AdminResponse::DnaRegistered, "Failed to register DNA");
-    Ok(hash)
+    Ok(client.register_dna(dna).await?)
 }
 
-/// Calls [`AdminRequest::InstallApp`] and installs a new app.
-pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow::Result<AppInfo> {
+/// Constructs install payload with roles settings and calls
+/// [`AdminWebsocket::install_app`] to install the provided app.
+pub async fn install_app_bundle(
+    client: &mut AdminWebsocket,
+    args: InstallApp,
+) -> anyhow::Result<AppInfo> {
     let InstallApp {
         app_id,
         agent_key,
@@ -597,21 +593,14 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
         ignore_genesis_failure: false,
     };
 
-    let r = AdminRequest::InstallApp(Box::new(payload));
-    let installed_app = cmd.command(r).await?;
-    let installed_app =
-        expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
+    let installed_app = client.install_app(payload).await?;
 
     match &installed_app.manifest {
         AppManifest::V1(manifest) => {
             if !manifest.allow_deferred_memproofs {
-                enable_app(
-                    cmd,
-                    EnableApp {
-                        app_id: installed_app.installed_app_id.clone(),
-                    },
-                )
-                .await?
+                client
+                    .enable_app(installed_app.installed_app_id.clone())
+                    .await?;
             }
         }
     }
@@ -621,193 +610,24 @@ pub async fn install_app_bundle(cmd: &mut CmdRunner, args: InstallApp) -> anyhow
     Ok(installed_app)
 }
 
-/// Calls [`AdminRequest::UninstallApp`] and uninstalls the installed app.
-pub async fn uninstall_app(cmd: &mut CmdRunner, args: UninstallApp) -> anyhow::Result<()> {
-    let resp = cmd
-        .command(AdminRequest::UninstallApp {
-            installed_app_id: args.app_id,
-            force: args.force,
-        })
-        .await?;
-
-    assert!(
-        matches!(resp, AdminResponse::AppUninstalled),
-        "Failed to uninstall app"
-    );
-    Ok(())
-}
-
-/// Calls [`AdminRequest::ListAppInterfaces`].
-pub async fn list_app_ws(cmd: &mut CmdRunner) -> anyhow::Result<Vec<AppInterfaceInfo>> {
-    let resp = cmd.command(AdminRequest::ListAppInterfaces).await?;
-    Ok(expect_match!(resp => AdminResponse::AppInterfacesListed, "Failed to list app interfaces"))
-}
-
-/// Calls [`AdminRequest::ListCellIds`].
-pub async fn list_dnas(cmd: &mut CmdRunner) -> anyhow::Result<Vec<DnaHash>> {
-    let resp = cmd.command(AdminRequest::ListDnas).await?;
-    Ok(expect_match!(resp => AdminResponse::DnasListed, "Failed to list DNAs"))
-}
-
-/// Calls [`AdminRequest::GenerateAgentPubKey`].
-pub async fn generate_agent_pub_key(cmd: &mut CmdRunner) -> anyhow::Result<AgentPubKey> {
-    let resp = cmd.command(AdminRequest::GenerateAgentPubKey).await?;
-    Ok(
-        expect_match!(resp => AdminResponse::AgentPubKeyGenerated, "Failed to generate agent pubkey"),
-    )
-}
-
-/// Calls [`AdminRequest::ListCellIds`].
-pub async fn list_cell_ids(cmd: &mut CmdRunner) -> anyhow::Result<Vec<CellId>> {
-    let resp = cmd.command(AdminRequest::ListCellIds).await?;
-    Ok(expect_match!(resp => AdminResponse::CellIdsListed, "Failed to list cell IDs"))
-}
-
-/// Calls [`AdminRequest::ListApps`].
-pub async fn list_apps(cmd: &mut CmdRunner, args: ListApps) -> anyhow::Result<Vec<AppInfo>> {
-    let resp = cmd
-        .command(AdminRequest::ListApps {
-            status_filter: args.status,
-        })
-        .await?;
-    Ok(expect_match!(resp => AdminResponse::AppsListed, "Failed to list apps"))
-}
-
-/// Calls [`AdminRequest::EnableApp`] and activates the installed app.
-pub async fn enable_app(cmd: &mut CmdRunner, args: EnableApp) -> anyhow::Result<()> {
-    let resp = cmd
-        .command(AdminRequest::EnableApp {
-            installed_app_id: args.app_id,
-        })
-        .await?;
-    assert!(matches!(resp, AdminResponse::AppEnabled { .. }));
-    Ok(())
-}
-
-/// Calls [`AdminRequest::DisableApp`] and disables the installed app.
-pub async fn disable_app(cmd: &mut CmdRunner, args: DisableApp) -> anyhow::Result<()> {
-    let resp = cmd
-        .command(AdminRequest::DisableApp {
-            installed_app_id: args.app_id,
-        })
-        .await?;
-    ensure!(
-        matches!(resp, AdminResponse::AppDisabled),
-        "Failed to disable app, got: {:?}",
-        resp
-    );
-    Ok(())
-}
-
-/// Calls [`AdminRequest::AttachAppInterface`] and adds another app interface.
-pub async fn attach_app_interface(cmd: &mut CmdRunner, args: AddAppWs) -> anyhow::Result<u16> {
-    let resp = cmd
-        .command(AdminRequest::AttachAppInterface {
-            port: args.port,
-            allowed_origins: args.allowed_origins,
-            installed_app_id: args.installed_app_id,
-        })
-        .await?;
-    tracing::debug!(?resp);
-    match resp {
-        AdminResponse::AppInterfaceAttached { port } => Ok(port),
-        _ => Err(anyhow!(
-            "Failed to attach app interface {:?}, got: {:?}",
-            args.port,
-            resp
-        )),
-    }
-}
-
-/// Calls [`AdminRequest::DumpState`] and dumps the current cell's state.
-// TODO: Add pretty print.
-// TODO: Default to dumping all cell state.
-pub async fn dump_state(cmd: &mut CmdRunner, args: DumpState) -> anyhow::Result<String> {
-    let resp = cmd
-        .command(AdminRequest::DumpState {
-            cell_id: Box::new(args.into()),
-        })
-        .await?;
-    Ok(expect_match!(resp => AdminResponse::StateDumped, "Failed to dump state"))
-}
-
-/// Calls [`AdminRequest::DumpConductorState`] and dumps the current conductor state.
-pub async fn dump_conductor_state(cmd: &mut CmdRunner) -> anyhow::Result<String> {
-    let resp = cmd.command(AdminRequest::DumpConductorState).await?;
-    Ok(expect_match!(resp => AdminResponse::ConductorStateDumped, "Failed to dump state"))
-}
-
-/// Calls [`AdminRequest::DumpNetworkMetrics`] and dumps network metrics.
-async fn dump_network_metrics(
-    cmd: &mut CmdRunner,
-    args: DumpNetworkMetrics,
-) -> anyhow::Result<HashMap<DnaHash, Kitsune2NetworkMetrics>> {
-    let resp = cmd
-        .command(AdminRequest::DumpNetworkMetrics {
-            dna_hash: args.dna,
-            include_dht_summary: args.include_dht_summary,
-        })
-        .await?;
-    Ok(expect_match!(resp => AdminResponse::NetworkMetricsDumped, "Failed to dump network metrics"))
-}
-
-/// Calls [`AdminRequest::DumpNetworkStats`] and dumps network stats.
-async fn dump_network_stats(cmd: &mut CmdRunner) -> anyhow::Result<kitsune2_api::TransportStats> {
-    let resp = cmd.command(AdminRequest::DumpNetworkStats).await?;
-    Ok(expect_match!(resp => AdminResponse::NetworkStatsDumped, "Failed to dump network stats"))
-}
-
-/// Calls [`AdminRequest::ListCapabilityGrants`] and lists the cap grant info.
-async fn list_capability_grants(
-    cmd: &mut CmdRunner,
-    args: ListCapGrants,
-) -> anyhow::Result<AppCapGrantInfo> {
-    let (installed_app_id, include_revoked) = (args.installed_app_id, args.include_revoked);
-    let resp = cmd
-        .command(AdminRequest::ListCapabilityGrants {
-            installed_app_id,
-            include_revoked,
-        })
-        .await?;
-    Ok(
-        expect_match!(resp => AdminResponse::CapabilityGrantsInfo, "Failed to list capability grants"),
-    )
-}
-
-/// Calls [`AdminRequest::AddAgentInfo`] and adds the list of agent info.
+/// Calls [`AdminWebsocket::add_agent_info`] and adds the list of agent info.
 pub async fn add_agent_info(
-    cmd: &mut CmdRunner,
+    client: &mut AdminWebsocket,
     args: Vec<Arc<AgentInfoSigned>>,
 ) -> anyhow::Result<()> {
     let mut agent_infos = Vec::new();
     for info in args {
         agent_infos.push(info.encode()?);
     }
-    let resp = cmd
-        .command(AdminRequest::AddAgentInfo { agent_infos })
-        .await?;
-    ensure!(
-        matches!(resp, AdminResponse::AgentInfoAdded),
-        "Failed to add agent info, got: {:?}",
-        resp
-    );
-    Ok(())
+    Ok(client.add_agent_info(agent_infos).await?)
 }
 
-/// Calls [`AdminRequest::AgentInfo`] and pretty prints the agent info on this conductor.
-pub async fn request_agent_info(
-    cmd: &mut CmdRunner,
+/// Calls [`AdminWebsocket::agent_info`] and pretty prints the agent info on this conductor.
+async fn request_agent_info(
+    client: &mut AdminWebsocket,
     args: ListAgents,
 ) -> anyhow::Result<Vec<Arc<AgentInfoSigned>>> {
-    let resp = cmd
-        .command(AdminRequest::AgentInfo {
-            cell_id: args.into(),
-        })
-        .await?;
-
-    let resp: Vec<String> =
-        expect_match!(resp => AdminResponse::AgentInfo, "Failed to request agent info");
-
+    let resp = client.agent_info(args.into()).await?;
     let mut out = Vec::new();
     for info in resp {
         out.push(AgentInfoSigned::decode(

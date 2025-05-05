@@ -1,11 +1,9 @@
 use std::path::PathBuf;
 
-use hc_sandbox::calls::EnableApp;
-use hc_sandbox::expect_match;
-use hc_sandbox::CmdRunner;
 use holochain_cli_sandbox as hc_sandbox;
-use holochain_conductor_api::AdminRequest;
-use holochain_conductor_api::AdminResponse;
+use holochain_cli_sandbox::run;
+use holochain_client::AdminWebsocket;
+use holochain_trace::Output;
 use holochain_types::prelude::AppBundleSource;
 use holochain_types::prelude::InstallAppPayload;
 
@@ -41,11 +39,10 @@ async fn main() -> anyhow::Result<()> {
             None,
         )?;
 
-        // Create a command runner to run admin commands.
-        // This runs the conductor in the background and cleans
-        // up the process when the guard is dropped.
-        let (mut cmd, _conductor_guard) =
-            CmdRunner::from_sandbox_with_bin_path(&input.holochain_path, path.clone()).await?;
+        // Run a conductor and connect to the admin websocket
+        let (admin_port, _, _) =
+            run::run_async(&input.holochain_path, path.clone(), None, Output::Log).await?;
+        let admin_ws = AdminWebsocket::connect(format!("localhost:{admin_port}")).await?;
 
         let bundle = AppBundleSource::Path(happ.clone()).resolve().await?;
         let bytes = bundle.pack()?;
@@ -60,23 +57,9 @@ async fn main() -> anyhow::Result<()> {
             ignore_genesis_failure: false,
         };
 
-        let r = AdminRequest::InstallApp(Box::new(payload));
+        let installed_app = admin_ws.install_app(payload).await?;
 
-        // Run the command and wait for the response.
-        let installed_app = cmd.command(r).await?;
-
-        // Check you got the correct response and get the inner value.
-        let installed_app =
-            expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
-
-        // Activate the app using the simple calls api.
-        hc_sandbox::calls::enable_app(
-            &mut cmd,
-            EnableApp {
-                app_id: installed_app.installed_app_id,
-            },
-        )
-        .await?;
+        admin_ws.enable_app(installed_app.installed_app_id).await?;
     }
     Ok(())
 }
