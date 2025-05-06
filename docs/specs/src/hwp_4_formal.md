@@ -1,8 +1,6 @@
 # Holochain Formal Design Elements
 
-Now we turn to a more formal and detailed presentation of the Holochain
-system, including assumptions, architecture, integrity guarantees, and
-formal state model.
+Now we turn to a more formal and detailed presentation of the Holochain system, including assumptions, architecture, integrity guarantees, and formal state model.
 
 **Purpose of this Section:** To provide an understanding of the functional requirements of Holochain and specify a technical implementation of the cryptographic state transitions and application processes that enforce Holochain's integrity guarantees.
 
@@ -51,7 +49,7 @@ Students of biology may recognize ways that our language doesn't fully mesh with
 
 #### The Conductor
 
-Much of the discussion below is from the perspective of a single DNA, which is the core unit in Holochain that provides a set of integrity guarantees for binding agents together into a single social context. However, Holochain can also be seen as micro-service provider, with each DNA providing one micro-service. From this perspective, a Holochain node is a running process that manages many connections to many DNAs simultaneously, from user interfaces initiating actions, from other nodes sharing a subset of identical DNAs, and from cells within the same node sharing the same agent ID but bound to different DNAs. Thus, we call a Holochain node the **Conductor** as it manages the information flows from "outside" (UI calls and calls from other local cells) and from "inside" (network interactions) as they flow into and out of the may DNA instances running code. This term was chosen as it suggests the feel of musical coordination of a group, as well as the conduit of an electrical flow. Please see the [Implementation Spec (Appendix A)](hwp_A_implementation_spec.md) for a more detailed on how a complete Holochain Conductor must be built.
+Much of the discussion below is from the perspective of a single DNA, which is the core unit in Holochain that provides a set of integrity guarantees for binding agents together into a single social context. However, Holochain can also be seen as micro-service provider, with each DNA providing one micro-service. From this perspective, a Holochain node is a running process that manages many connections to many DNAs simultaneously, from user interfaces initiating actions, from other nodes sharing a subset of identical DNAs, and from cells within the same node sharing the same agent ID but bound to different DNAs. Thus, we call a Holochain node the **Conductor** as it manages the information flows from "outside" (UI calls and calls from other local cells) and from "inside" (network interactions) as they flow into and out of the may DNA instances running code. This term was chosen as it suggests the feel of musical coordination of a group, as well as the conduit of an electrical flow. Please see the [references at the end of this white paper](hwp_A_implementation_spec.md) for details on how a complete Holochain Conductor must be built, by way of a 'living example' of the current reference implementation.
 
 ## Integrity Guarantees
 
@@ -65,7 +63,7 @@ Within the context of the Basic Assumptions and the System Architecture both des
 6. **Strong Eventual Consistency:** Despite network partitions, all nodes who are authorities for a given DHT address (or become one at any point) will eventually converge to the same state for data at that address. This is ensured by the DHT functioning as a conflict-free replicated data type (CRDT).
 8. **"0 of N" Trust Model:** Holochain is immune to "majority attacks" because any node can always validate data for themselves independent of what any other nodes say.[^zero-of-n]
 9. **Data Model Scalability:** Because of the overlapping sharding scheme of DHT storage and validation, the total computing power and overall throughput for an application scales linearly as more users join the app.
-10. **Atomic Zome Calls:** Multiple writes in a single zome call will all be committed in a single SQL transaction or all fail together. If they fail the zome call, they will report an error to the caller and the writes will be rolled back.
+10. **Atomic Zome Calls:** Multiple writes in a single zome call will all be committed in a single database transaction or all fail together. If they fail the zome call, they will report an error to the caller and the writes will be rolled back.
 
 [^zero-of-n]:  See this Levels of Trust Diagram <https://miro.medium.com/max/1248/0*k3o00pQovnOWRwtA>.
 
@@ -77,7 +75,7 @@ The structure of a Source Chain is that of a hash chain which uses headers (call
 
 Since the action contains the prior action hash and current entry hash (if applicable), each record is a tamper-proof atomic data element. Additionally, in practice a record is always transmitted along with a signature on the action's hash, signed by the private complement of the public key in the action. This means that anyone can hash the entry content to make sure it hasn't been tampered with, and they can hash the action data and compare the accompanying signature on that hash to ensure it matches the author's public key. The action's chain sequence and monotonic timestamp properties provide further immutable reinforcement of logical chain ordering.
 
-Data in Holochain is kept in Content Addressable Stores which are key-value stores where the key is the hash of the content. This makes all content self-validating, whether served locally or remotely over the DHT. Data can be retrieved by the action hash (synonymous with record hash) or the entry hash.
+Data in Holochain is kept in Content Addressable Stores which are key-value stores, where the key is the hash of the content. This makes all content self-validating in terms of the integrity of the stored bytes, whether served locally or remotely over the DHT. Data can be retrieved by the action hash (synonymous with record hash) or the entry hash.
 
 The code that comprises a Holochain application is categorized into two different types of zomes:
 
@@ -565,15 +563,3 @@ Note: Beyond Warrants, blocking can also theoretically be used by apps or agents
 ## Cross-DNA Composability
 
 Holochain is designed to be used to build micro-services that can be assembled into applications. We expect DNAs to be written that assume the existence of other long-running DNAs and make calls to them via the agency of a user having installed both DNAs on their node. The Capabilities security model described above makes sure this kind of calling is safe and can only happen when permissions to do so have been explicitly granted in a given context. The HDK `call` function provides an affordance to allow specification of the DNA by hash when making the call, so the Holochain node can make a zome call to that DNA and return the result to the calling node.
-
-## Holochain Implementation
-
-Given the above formal description of our local state model (Source Chain) and shared data model (Graph DHT) we can now present a high-level implementation specification of different components of the Holochain architecture. The components include:
-
-* App Virtual Machine (Ribosome)
-* State Management (Workflows)
-* P2P Networking (Kitsune and Holochain P2P)
-* Application Interface (Conductor API)
-* Secure Private Key Management (lair-keystore)
-
-Please see the [Implementation Spec (Appendix A)](hwp_A_implementation_spec.md) for details.
