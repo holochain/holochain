@@ -27,7 +27,6 @@ pub(crate) mod get_record_query;
 pub async fn handle_get_entry(
     db: DbRead<DbKindDht>,
     hash: EntryHash,
-    _options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireEntryOps> {
     let query = GetEntryOpsQuery::new(hash);
     let results = db
@@ -41,9 +40,8 @@ pub async fn handle_get_entry(
 pub async fn handle_get_record(
     env: DbRead<DbKindDht>,
     hash: ActionHash,
-    options: holochain_p2p::event::GetOptions,
 ) -> CascadeResult<WireRecordOps> {
-    let query = GetRecordOpsQuery::new(hash, options);
+    let query = GetRecordOpsQuery::new(hash);
     let results = env
         .read_async(move |txn| query.run(CascadeTxnWrapper::from(txn)))
         .await?;
