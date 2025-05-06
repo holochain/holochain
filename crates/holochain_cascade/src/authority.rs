@@ -3,10 +3,7 @@
 use self::get_agent_activity_query::must_get_agent_activity::must_get_agent_activity;
 use self::get_entry_ops_query::GetEntryOpsQuery;
 use self::get_links_ops_query::GetLinksOpsQuery;
-use self::{
-    get_agent_activity_query::deterministic::DeterministicGetAgentActivityQuery,
-    get_record_query::GetRecordOpsQuery,
-};
+use self::get_record_query::GetRecordOpsQuery;
 use super::error::CascadeResult;
 use crate::authority::get_agent_activity_query::hashes::GetAgentActivityHashesQuery;
 use crate::authority::get_agent_activity_query::records::GetAgentActivityRecordsQuery;
@@ -16,7 +13,6 @@ use holochain_state::query::link::GetLinksQuery;
 use holochain_state::query::CascadeTxnWrapper;
 use holochain_state::query::{Query, Store};
 use holochain_types::prelude::*;
-use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
 
 #[cfg(test)]
 mod test;
@@ -97,21 +93,6 @@ pub async fn handle_must_get_agent_activity(
     filter: ChainFilter,
 ) -> CascadeResult<MustGetAgentActivityResponse> {
     Ok(must_get_agent_activity(env, author, filter).await?)
-}
-
-/// Handler for get_agent_activity_deterministic query to an Activity authority
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(env)))]
-pub async fn handle_get_agent_activity_deterministic(
-    env: DbRead<DbKindDht>,
-    agent: AgentPubKey,
-    filter: DeterministicGetAgentActivityFilter,
-    options: holochain_p2p::event::GetActivityOptions,
-) -> CascadeResult<DeterministicGetAgentActivityResponse> {
-    let query = DeterministicGetAgentActivityQuery::new(agent, filter, options);
-    let results = env
-        .read_async(move |txn| query.run(CascadeTxnWrapper::from(txn)))
-        .await?;
-    Ok(results)
 }
 
 /// Handler for get_links query to a Record/Entry authority
