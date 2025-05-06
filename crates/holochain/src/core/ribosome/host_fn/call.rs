@@ -57,6 +57,7 @@ pub fn call(
                                 ) => Ok(HostContext::ZomeCall(ZomeCallHostAccess::new(
                                     post_commit.workspace.clone(),
                                     post_commit.keystore.clone(),
+                                    None,
                                     post_commit.network.clone(),
                                     post_commit.signal_tx.clone(),
                                     handle.clone(),

@@ -192,7 +192,6 @@ mod slow_tests {
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::fixt::Zomes;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::{SweetDnaFile, SweetInlineZomes};
     use crate::test_utils::inline_zomes::AppString;
