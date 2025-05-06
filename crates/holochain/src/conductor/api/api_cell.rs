@@ -146,7 +146,10 @@ pub trait CellConductorReadHandleT: Send + Sync {
     fn cell_id(&self) -> &CellId;
 
     /// Invoke a zome function on a Cell
-    async fn call_zome(
+    async fn call_zome(&self, params: ZomeCallParams) -> ConductorApiResult<ZomeCallResult>;
+
+    /// Invoke a zome function on a Cell
+    async fn call_zome_with_workspace(
         &self,
         params: ZomeCallParams,
         workspace_lock: SourceChainWorkspace,
@@ -232,7 +235,11 @@ impl CellConductorReadHandleT for CellConductorApi {
         &self.cell_id
     }
 
-    async fn call_zome(
+    async fn call_zome(&self, params: ZomeCallParams) -> ConductorApiResult<ZomeCallResult> {
+        self.conductor_handle.call_zome(params).await
+    }
+
+    async fn call_zome_with_workspace(
         &self,
         params: ZomeCallParams,
         workspace_lock: SourceChainWorkspace,

@@ -1,8 +1,9 @@
-use crate::core::ribosome::CallContext;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallParamsSigned;
+use crate::core::ribosome::{CallContext, HostContext, ZomeCallHostAccess};
 use futures::future::join_all;
 use holochain_nonce::fresh_nonce;
 use holochain_types::prelude::*;
@@ -18,18 +19,10 @@ pub fn call(
     let results: Vec<Result<ZomeCallResponse, RuntimeError>> =
         tokio_helper::block_forever_on(async move {
             join_all(inputs.into_iter().map(|input| async {
-                // The line below was added when migrating to rust edition 2021, per
-                // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
-                let _ = &input;
-                let Call {
-                    target,
-                    zome_name,
-                    fn_name,
-                    cap_secret,
-                    payload,
-                } = input;
-
-                match (&target, HostFnAccess::from(&call_context.host_context())) {
+                match (
+                    &input.target,
+                    HostFnAccess::from(&call_context.host_context()),
+                ) {
                     (
                         CallTarget::ConductorCell(_),
                         HostFnAccess {
@@ -45,141 +38,43 @@ pub fn call(
                             agent_info: Permission::Allow,
                             ..
                         },
+                    ) => execute_call(ribosome.clone(), call_context.clone(), input, false).await,
+                    (
+                        CallTarget::ConductorCell(_),
+                        HostFnAccess {
+                            write_workspace: Permission::Deny,
+                            agent_info: Permission::Allow,
+                            ..
+                        },
                     ) => {
-                        let provenance = call_context
-                            .host_context
-                            .workspace()
-                            .source_chain()
-                            .as_ref()
-                            .expect("Must have source chain to know provenance")
-                            .agent_pubkey()
-                            .clone();
-                        let (nonce, expires_at) =
-                            fresh_nonce(Timestamp::now()).map_err(|e| -> RuntimeError {
-                                wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+                        let zome_call_context =
+                            call_context.switch_host_context(|context| match context {
+                                HostContext::PostCommit(
+                                    post_commit @ PostCommitHostAccess {
+                                        call_zome_handle: Some(handle),
+                                        ..
+                                    },
+                                ) => Ok(HostContext::ZomeCall(ZomeCallHostAccess::new(
+                                    post_commit.workspace.clone(),
+                                    post_commit.keystore.clone(),
+                                    None,
+                                    post_commit.network.clone(),
+                                    post_commit.signal_tx.clone(),
+                                    handle.clone(),
+                                ))),
+                                _ => Err(wasm_error!(WasmErrorInner::Host(
+                                    RibosomeError::HostFnPermissions(
+                                        call_context.zome.zome_name().clone(),
+                                        call_context.function_name().clone(),
+                                        "call".into(),
+                                    )
+                                    .to_string(),
+                                ))
+                                .into()),
                             })?;
 
-                        let result: Result<ZomeCallResponse, RuntimeError> = match target {
-                            CallTarget::NetworkAgent(target_agent) => {
-                                let zome_call_params = ZomeCallParams {
-                                    provenance: provenance.clone(),
-                                    cell_id: CellId::new(
-                                        ribosome.dna_def().as_hash().clone(),
-                                        target_agent.clone(),
-                                    ),
-                                    zome_name,
-                                    fn_name,
-                                    cap_secret,
-                                    payload,
-                                    nonce,
-                                    expires_at,
-                                };
-                                let zome_call_payload = ZomeCallParamsSigned::try_from_params(
-                                    call_context.host_context.keystore(),
-                                    zome_call_params.clone(),
-                                )
-                                .await
-                                .map_err(|e| -> RuntimeError {
-                                    wasm_error!(WasmErrorInner::Host(e.to_string())).into()
-                                })?;
-                                match call_context
-                                    .host_context()
-                                    .network()
-                                    .call_remote(
-                                        target_agent,
-                                        zome_call_payload.bytes,
-                                        zome_call_payload.signature,
-                                    )
-                                    .await
-                                {
-                                    Ok(serialized_bytes) => {
-                                        ZomeCallResponse::try_from(serialized_bytes)
-                                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })
-                                    }
-                                    Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
-                                }
-                            }
-                            CallTarget::ConductorCell(target_cell) => {
-                                let cell_id_result: Result<CellId, RuntimeError> = match target_cell
-                                {
-                                    CallTargetCell::OtherRole(role_name) => {
-                                        let this_cell_id = call_context
-                                            .host_context()
-                                            .call_zome_handle()
-                                            .cell_id()
-                                            .clone();
-                                        call_context
-                                            .host_context()
-                                            .call_zome_handle()
-                                            .find_cell_with_role_alongside_cell(
-                                                &this_cell_id,
-                                                &role_name,
-                                            )
-                                            .await
-                                            .map_err(|e| -> RuntimeError { wasm_error!(e).into() })
-                                            .and_then(|c| {
-                                                c.ok_or_else(|| {
-                                                    wasmer::RuntimeError::from(wasm_error!(
-                                                        WasmErrorInner::Host(format!(
-                                                            "Role not found: {role_name}"
-                                                        ))
-                                                    ))
-                                                })
-                                            })
-                                    }
-                                    CallTargetCell::OtherCell(cell_id) => Ok(cell_id),
-                                    CallTargetCell::Local => Ok(call_context
-                                        .host_context()
-                                        .call_zome_handle()
-                                        .cell_id()
-                                        .clone()),
-                                };
-                                match cell_id_result {
-                                    Ok(cell_id) => {
-                                        let zome_call_params = ZomeCallParams {
-                                            cell_id,
-                                            zome_name,
-                                            fn_name,
-                                            payload,
-                                            cap_secret,
-                                            provenance,
-                                            nonce,
-                                            expires_at,
-                                        };
-                                        match call_context
-                                            .host_context()
-                                            .call_zome_handle()
-                                            .call_zome(
-                                                zome_call_params,
-                                                call_context
-                                                    .host_context()
-                                                    .workspace_write()
-                                                    .clone()
-                                                    .try_into()
-                                                    .expect(
-                                                        "Must have source chain to make zome call",
-                                                    ),
-                                            )
-                                            .await
-                                        {
-                                            Ok(Ok(zome_call_response)) => Ok(zome_call_response),
-                                            Ok(Err(ribosome_error)) => Err(wasm_error!(
-                                                WasmErrorInner::Host(ribosome_error.to_string())
-                                            )
-                                            .into()),
-                                            Err(conductor_api_error) => {
-                                                Err(wasm_error!(WasmErrorInner::Host(
-                                                    conductor_api_error.to_string()
-                                                ))
-                                                .into())
-                                            }
-                                        }
-                                    }
-                                    Err(e) => Err(e),
-                                }
-                            }
-                        };
-                        result
+                        execute_call(ribosome.clone(), Arc::new(zome_call_context), input, true)
+                            .await
                     }
                     _ => Err(wasm_error!(WasmErrorInner::Host(
                         RibosomeError::HostFnPermissions(
@@ -196,6 +91,149 @@ pub fn call(
         });
     let results: Result<Vec<_>, _> = results.into_iter().collect();
     results
+}
+
+async fn execute_call(
+    ribosome: Arc<impl RibosomeT>,
+    call_context: Arc<CallContext>,
+    input: Call,
+    fork: bool,
+) -> Result<ZomeCallResponse, RuntimeError> {
+    let Call {
+        target,
+        zome_name,
+        fn_name,
+        cap_secret,
+        payload,
+    } = input;
+
+    let provenance = call_context
+        .host_context
+        .workspace()
+        .source_chain()
+        .as_ref()
+        .expect("Must have source chain to know provenance")
+        .agent_pubkey()
+        .clone();
+    let (nonce, expires_at) = fresh_nonce(Timestamp::now())
+        .map_err(|e| -> RuntimeError { wasm_error!(WasmErrorInner::Host(e.to_string())).into() })?;
+
+    let result: Result<ZomeCallResponse, RuntimeError> = match target {
+        CallTarget::NetworkAgent(target_agent) => {
+            let zome_call_params = ZomeCallParams {
+                provenance: provenance.clone(),
+                cell_id: CellId::new(ribosome.dna_def().as_hash().clone(), target_agent.clone()),
+                zome_name,
+                fn_name,
+                cap_secret,
+                payload,
+                nonce,
+                expires_at,
+            };
+            let zome_call_payload = ZomeCallParamsSigned::try_from_params(
+                call_context.host_context.keystore(),
+                zome_call_params.clone(),
+            )
+            .await
+            .map_err(|e| -> RuntimeError {
+                wasm_error!(WasmErrorInner::Host(e.to_string())).into()
+            })?;
+            match call_context
+                .host_context()
+                .network()
+                .call_remote(
+                    target_agent,
+                    zome_call_payload.bytes,
+                    zome_call_payload.signature,
+                )
+                .await
+            {
+                Ok(serialized_bytes) => ZomeCallResponse::try_from(serialized_bytes)
+                    .map_err(|e| -> RuntimeError { wasm_error!(e).into() }),
+                Err(e) => Ok(ZomeCallResponse::NetworkError(e.to_string())),
+            }
+        }
+        CallTarget::ConductorCell(target_cell) => {
+            let cell_id_result: Result<CellId, RuntimeError> = match target_cell {
+                CallTargetCell::OtherRole(role_name) => {
+                    let this_cell_id = call_context
+                        .host_context()
+                        .call_zome_handle()
+                        .cell_id()
+                        .clone();
+                    call_context
+                        .host_context()
+                        .call_zome_handle()
+                        .find_cell_with_role_alongside_cell(&this_cell_id, &role_name)
+                        .await
+                        .map_err(|e| -> RuntimeError { wasm_error!(e).into() })
+                        .and_then(|c| {
+                            c.ok_or_else(|| {
+                                wasmer::RuntimeError::from(wasm_error!(WasmErrorInner::Host(
+                                    format!("Role not found: {role_name}")
+                                )))
+                            })
+                        })
+                }
+                CallTargetCell::OtherCell(cell_id) => Ok(cell_id),
+                CallTargetCell::Local => Ok(call_context
+                    .host_context()
+                    .call_zome_handle()
+                    .cell_id()
+                    .clone()),
+            };
+            match cell_id_result {
+                Ok(cell_id) => {
+                    let zome_call_params = ZomeCallParams {
+                        cell_id,
+                        zome_name,
+                        fn_name,
+                        payload,
+                        cap_secret,
+                        provenance,
+                        nonce,
+                        expires_at,
+                    };
+
+                    let outcome = if fork {
+                        call_context
+                            .host_context()
+                            .call_zome_handle()
+                            .call_zome(zome_call_params)
+                            .await
+                    } else {
+                        call_context
+                            .host_context()
+                            .call_zome_handle()
+                            .call_zome_with_workspace(
+                                zome_call_params,
+                                call_context
+                                    .host_context()
+                                    .workspace_write()
+                                    .clone()
+                                    .try_into()
+                                    .expect("Must have source chain to make zome call"),
+                            )
+                            .await
+                    };
+
+                    match outcome {
+                        Ok(Ok(zome_call_response)) => Ok(zome_call_response),
+                        Ok(Err(ribosome_error)) => Err(wasm_error!(WasmErrorInner::Host(
+                            ribosome_error.to_string()
+                        ))
+                        .into()),
+                        Err(conductor_api_error) => Err(wasm_error!(WasmErrorInner::Host(
+                            conductor_api_error.to_string()
+                        ))
+                        .into()),
+                    }
+                }
+                Err(e) => Err(e),
+            }
+        }
+    };
+    result
 }
 
 #[cfg(test)]

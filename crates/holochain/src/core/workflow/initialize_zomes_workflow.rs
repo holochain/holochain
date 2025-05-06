@@ -72,6 +72,7 @@ where
             flushed_actions,
             coordinators,
             signal_tx,
+            None,
         )
         .await?;
 
