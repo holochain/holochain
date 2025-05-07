@@ -106,11 +106,6 @@ async fn admin_agent_info() {
         _ => panic!("Expected AgentInfo response"),
     };
 
-    println!("angent_infos {:?}", agent_infos);
-
-    // Should have 12 agent infos becuase `exchange_peer_info` simply shares all agent_infos with
-    // all conductors in the batch.  we have 4 cells and 3 conductors = 12
-    assert_eq!(agent_infos.len(), 7, "Should have agent_info for each dna on each conductor");
     let mut sorted_infos: Vec<std::sync::Arc<AgentInfoSigned>> = Vec::new();
     let mut seen_spaces = std::collections::HashSet::new();
     for info in &agent_infos {
@@ -125,6 +120,9 @@ async fn admin_agent_info() {
         println!("  {:?}", info);
     }
 
+    // TODO: is this really what we want to test?
+    assert_eq!(agent_infos.len(), 7, "Should have agent_info for each dna on each conductor");
+
     // Should have seen all DNA spaces
     // println!("dn1k2: {}", &dna1_hash.to_k2_space());
     // assert!(seen_spaces.contains(&dna1_hash.to_k2_space()));
@@ -134,7 +132,7 @@ async fn admin_agent_info() {
     // assert!(seen_spaces.contains(&dna3_hash.to_k2_space()));
 
     // Test getting agent info for the clone cell
-    let response = admin_sender
+    let response = admin_sender_0
         .request(AdminRequest::AgentInfo { 
             cell_id: Some(clone_cell.cell_id.clone()) 
         })
