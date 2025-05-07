@@ -42,31 +42,3 @@ pub use cli::HcSandbox;
 
 mod ports;
 mod zome_call;
-
-#[macro_export]
-/// Expect that an enum matches a variant and panic if it doesn't.
-macro_rules! expect_variant {
-    ($var:expr => $variant:path, $error_msg:expr) => {
-        match $var {
-            $variant(v) => v,
-            _ => panic!(format!("{}: Expected {} but got {:?}", $error_msg, stringify!($variant), $var)),
-        }
-    };
-    ($var:expr => $variant:path) => {
-        expect_variant!($var => $variant, "")
-    };
-}
-
-#[macro_export]
-/// Expect that an enum matches a variant and return an error if it doesn't.
-macro_rules! expect_match {
-    ($var:expr => $variant:path, $error_msg:expr) => {
-        match $var {
-            $variant(v) => v,
-            _ => anyhow::bail!("{}: Expected {} but got {:?}", $error_msg, stringify!($variant), $var),
-        }
-    };
-    ($var:expr => $variant:path) => {
-        expect_variant!($var => $variant, "")
-    };
-}
