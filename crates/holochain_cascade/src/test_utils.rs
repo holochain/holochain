@@ -65,28 +65,22 @@ impl PassThroughNetwork {
 
 #[async_trait::async_trait]
 impl HolochainP2pDnaT for PassThroughNetwork {
-    async fn get(
-        &self,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: actor::GetOptions,
-    ) -> HolochainP2pResult<Vec<WireOps>> {
+    async fn get(&self, dht_hash: holo_hash::AnyDhtHash) -> HolochainP2pResult<Vec<WireOps>> {
         let mut out = Vec::new();
         match dht_hash.into_primitive() {
             AnyDhtHashPrimitive::Entry(hash) => {
                 for db in &self.envs {
-                    let r =
-                        authority::handle_get_entry(db.clone(), hash.clone(), (&options).into())
-                            .await
-                            .map_err(|e| HolochainP2pError::Other(e.into()))?;
+                    let r = authority::handle_get_entry(db.clone(), hash.clone())
+                        .await
+                        .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Entry(r));
                 }
             }
             AnyDhtHashPrimitive::Action(hash) => {
                 for db in &self.envs {
-                    let r =
-                        authority::handle_get_record(db.clone(), hash.clone(), (&options).into())
-                            .await
-                            .map_err(|e| HolochainP2pError::Other(e.into()))?;
+                    let r = authority::handle_get_record(db.clone(), hash.clone())
+                        .await
+                        .map_err(|e| HolochainP2pError::Other(e.into()))?;
                     out.push(WireOps::Record(r));
                 }
             }
@@ -308,38 +302,22 @@ pub async fn fill_db_as_author(db: &DbWrite<DbKindAuthored>, op: ChainOpHashed) 
 }
 
 /// Utility for network simulation response to get entry.
-pub fn handle_get_entry_txn(
-    txn: &Transaction<'_>,
-    hash: EntryHash,
-    _options: holochain_p2p::event::GetOptions,
-) -> WireEntryOps {
+pub fn handle_get_entry_txn(txn: &Transaction<'_>, hash: EntryHash) -> WireEntryOps {
     let query = GetEntryOpsQuery::new(hash);
     query.run(CascadeTxnWrapper::from(txn)).unwrap()
 }
 
 /// Utility for network simulation response to get record.
-pub fn handle_get_record_txn(
-    txn: &Transaction<'_>,
-    hash: ActionHash,
-    options: holochain_p2p::event::GetOptions,
-) -> WireRecordOps {
-    let query = GetRecordOpsQuery::new(hash, options);
+pub fn handle_get_record_txn(txn: &Transaction<'_>, hash: ActionHash) -> WireRecordOps {
+    let query = GetRecordOpsQuery::new(hash);
     query.run(CascadeTxnWrapper::from(txn)).unwrap()
 }
 
 /// Utility for network simulation response to get.
-pub fn handle_get_txn(
-    txn: &Transaction<'_>,
-    hash: AnyDhtHash,
-    options: holochain_p2p::event::GetOptions,
-) -> WireOps {
+pub fn handle_get_txn(txn: &Transaction<'_>, hash: AnyDhtHash) -> WireOps {
     match hash.into_primitive() {
-        AnyDhtHashPrimitive::Entry(hash) => {
-            WireOps::Entry(handle_get_entry_txn(txn, hash, options))
-        }
-        AnyDhtHashPrimitive::Action(hash) => {
-            WireOps::Record(handle_get_record_txn(txn, hash, options))
-        }
+        AnyDhtHashPrimitive::Entry(hash) => WireOps::Entry(handle_get_entry_txn(txn, hash)),
+        AnyDhtHashPrimitive::Action(hash) => WireOps::Record(handle_get_record_txn(txn, hash)),
     }
 }
 

@@ -3,7 +3,7 @@ use fixt::fixt;
 use holo_hash::{AgentPubKey, AnyDhtHash, DnaHash, HasHash};
 use holochain_p2p::event::{
     CountersigningSessionNegotiationMessage, DynHcP2pHandler, GetActivityOptions, GetLinksOptions,
-    GetMetaOptions, GetOptions, HcP2pHandler,
+    GetMetaOptions, HcP2pHandler,
 };
 use holochain_p2p::{HolochainOpStore, HolochainP2pResult};
 use holochain_serialized_bytes::SerializedBytes;
@@ -74,7 +74,6 @@ impl HcP2pHandler for StubHost {
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         _dht_hash: AnyDhtHash,
-        _options: GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         unimplemented!()
     }

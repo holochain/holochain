@@ -15,8 +15,6 @@ pub struct MetadataRequest {
     pub all_deletes: bool,
     /// Get all the updates on an entry or action
     pub all_updates: bool,
-    /// Placeholder
-    pub follow_redirects: bool,
     /// Request the status of an entry.
     /// This is faster then getting all the actions
     /// and checking for live actions.
@@ -30,7 +28,6 @@ impl Default for MetadataRequest {
             all_invalid_actions: false,
             all_deletes: true,
             all_updates: true,
-            follow_redirects: false,
             entry_dht_status: false,
         }
     }

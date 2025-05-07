@@ -2,14 +2,17 @@ use crate::error::{ConductorApiError, ConductorApiResult};
 use crate::util::AbortOnDropHandle;
 use holo_hash::DnaHash;
 use holochain_conductor_api::{
-    AdminRequest, AdminResponse, AppAuthenticationToken, AppAuthenticationTokenIssued, AppInfo,
-    AppInterfaceInfo, AppStatusFilter, FullStateDump, IssueAppAuthenticationTokenPayload,
-    StorageInfo,
+    AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationToken,
+    AppAuthenticationTokenIssued, AppInfo, AppInterfaceInfo, AppStatusFilter, FullStateDump,
+    IssueAppAuthenticationTokenPayload, StorageInfo,
 };
 use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
     dna::AgentPubKey,
-    prelude::{CellId, DeleteCloneCellPayload, InstallAppPayload, UpdateCoordinatorsPayload},
+    prelude::{
+        AppCapGrantInfo, CellId, DeleteCloneCellPayload, InstallAppPayload, RegisterDnaPayload,
+        UpdateCoordinatorsPayload,
+    },
 };
 use holochain_websocket::{connect, ConnectRequest, WebsocketConfig, WebsocketSender};
 use holochain_zome_types::{
@@ -212,6 +215,19 @@ impl AdminWebsocket {
         }
     }
 
+    /// Add additional admin interfaces to the conductor.
+    pub async fn add_admin_interfaces(
+        &self,
+        configs: Vec<AdminInterfaceConfig>,
+    ) -> ConductorApiResult<()> {
+        let msg = AdminRequest::AddAdminInterfaces(configs);
+        let response = self.send(msg).await?;
+        match response {
+            AdminResponse::AdminInterfacesAdded => Ok(()),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
     /// List all app interfaces attached to the conductor.
     ///
     /// See the documentation for [AdminWebsocket::attach_app_interface] to understand the content
@@ -296,6 +312,16 @@ impl AdminWebsocket {
         }
     }
 
+    pub async fn register_dna(&self, payload: RegisterDnaPayload) -> ConductorApiResult<DnaHash> {
+        let response = self
+            .send(AdminRequest::RegisterDna(Box::new(payload)))
+            .await?;
+        match response {
+            AdminResponse::DnaRegistered(dna_hash) => Ok(dna_hash),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
     pub async fn list_dnas(&self) -> ConductorApiResult<Vec<DnaHash>> {
         let response = self.send(AdminRequest::ListDnas).await?;
         match response {
@@ -353,6 +379,23 @@ impl AdminWebsocket {
 
         match response {
             AdminResponse::ZomeCallCapabilityGranted => Ok(()),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
+    pub async fn list_capability_grants(
+        &self,
+        installed_app_id: String,
+        include_revoked: bool,
+    ) -> ConductorApiResult<AppCapGrantInfo> {
+        let msg = AdminRequest::ListCapabilityGrants {
+            installed_app_id,
+            include_revoked,
+        };
+        let response = self.send(msg).await?;
+
+        match response {
+            AdminResponse::CapabilityGrantsInfo(info) => Ok(info),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

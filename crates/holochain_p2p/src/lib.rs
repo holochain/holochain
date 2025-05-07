@@ -91,11 +91,7 @@ pub trait HolochainP2pDnaT: Send + Sync + 'static {
     ) -> HolochainP2pResult<()>;
 
     /// Get an entry from the DHT.
-    async fn get(
-        &self,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: actor::GetOptions,
-    ) -> HolochainP2pResult<Vec<WireOps>>;
+    async fn get(&self, dht_hash: holo_hash::AnyDhtHash) -> HolochainP2pResult<Vec<WireOps>>;
 
     /// Get metadata from the DHT.
     async fn get_meta(
@@ -272,13 +268,9 @@ impl HolochainP2pDnaT for HolochainP2pDna {
     }
 
     /// Get [`ChainOp::StoreRecord`] or [`ChainOp::StoreEntry`] from the DHT.
-    async fn get(
-        &self,
-        dht_hash: holo_hash::AnyDhtHash,
-        options: actor::GetOptions,
-    ) -> HolochainP2pResult<Vec<WireOps>> {
+    async fn get(&self, dht_hash: holo_hash::AnyDhtHash) -> HolochainP2pResult<Vec<WireOps>> {
         self.sender
-            .get((*self.dna_hash).clone(), dht_hash, options)
+            .get((*self.dna_hash).clone(), dht_hash)
             .instrument(tracing::debug_span!("HolochainP2p::get"))
             .await
     }
