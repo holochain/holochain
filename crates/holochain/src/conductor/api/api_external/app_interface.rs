@@ -98,6 +98,8 @@ impl AppInterfaceApi {
 
                 // Get all agent infos
                 let all_infos = self.conductor_handle.get_agent_infos(None).await?;
+
+                // TODO: Debugging code, delete.
                 println!("all_infos ({}):", all_infos.len());
                 let mut sorted_infos = all_infos.iter().collect::<Vec<_>>();
                 sorted_infos.sort_by(|a, b| a.agent.cmp(&b.agent));
@@ -111,7 +113,10 @@ impl AppInterfaceApi {
                     let dna = DnaHash::from_k2_space(&info.space);
                     dna_to_infos.entry(dna).or_default().push(info);
                 }
+
+                // TODO: Debugging code, delete.
                 println!("dna_to_infos: {:?}", dna_to_infos);
+
                 // 2. Collect all DNAs for this app
                 let mut app_dnas = Vec::new();
                 for cell_info in app_info.cell_info.values().flatten() {
@@ -121,7 +126,10 @@ impl AppInterfaceApi {
                         _ => continue,
                     }
                 }
+
+                // TODO: Debugging code, delete.
                 println!("app_dnas: {:?}", app_dnas);
+
                 // If dna_hash is specified, filter to only that DNA
                 if let Some(dna_hash) = &dna_hash {
                     if !app_dnas.contains(dna_hash) {
@@ -130,7 +138,10 @@ impl AppInterfaceApi {
                     app_dnas.clear();
                     app_dnas.push(dna_hash.clone());
                 }
+
+                // TODO: Debugging code, delete.
                 println!("app_dnas after fliter: {:?}", app_dnas);
+
                 // 3. Collect agent infos for app's DNAs
                 let mut agent_infos = Vec::new();
                 let mut seen_agents = HashSet::new();
