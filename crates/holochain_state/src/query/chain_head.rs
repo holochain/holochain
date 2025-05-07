@@ -26,8 +26,7 @@ impl Query for ChainHeadQuery {
         "
         SELECT Action.blob, Action.hash
         FROM Action
-        JOIN DhtOp ON DhtOp.action_hash = Action.hash
-        WHERE Action.author = :author AND Action.hash IS NOT NULL
+        WHERE Action.author = :author
         ORDER BY Action.seq DESC LIMIT 1
         "
         .into()
