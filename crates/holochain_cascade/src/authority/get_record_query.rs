@@ -1,18 +1,16 @@
-use std::sync::Arc;
-
 use holo_hash::ActionHash;
-use holochain_p2p::event::GetOptions;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
-pub struct GetRecordOpsQuery(ActionHash, GetOptions);
+pub struct GetRecordOpsQuery(ActionHash);
 
 impl GetRecordOpsQuery {
-    pub fn new(hash: ActionHash, request: GetOptions) -> Self {
-        Self(hash, request)
+    pub fn new(hash: ActionHash) -> Self {
+        Self(hash)
     }
 }
 
@@ -27,8 +25,7 @@ impl Query for GetRecordOpsQuery {
     type Output = Self::State;
 
     fn query(&self) -> String {
-        let request_type = self.1.request_type.clone();
-        let query = "
+        "
             SELECT Action.blob AS action_blob, DhtOp.type AS dht_type,
             DhtOp.validation_status AS status
             FROM DhtOp
@@ -36,19 +33,10 @@ impl Query for GetRecordOpsQuery {
             WHERE DhtOp.type IN (:store_record, :delete, :update)
             AND
             DhtOp.basis_hash = :action_hash
-        ";
-        let is_integrated = "
             AND
             DhtOp.when_integrated IS NOT NULL
-        ";
-        match request_type {
-            holochain_p2p::event::GetRequest::All
-            | holochain_p2p::event::GetRequest::Content
-            | holochain_p2p::event::GetRequest::Metadata => {
-                format!("{}{}", query, is_integrated)
-            }
-            holochain_p2p::event::GetRequest::Pending => query.into(),
-        }
+        "
+        .into()
     }
 
     fn params(&self) -> Vec<Params> {

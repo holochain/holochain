@@ -50,12 +50,11 @@ impl holochain_p2p::event::HcP2pHandler for Conductor {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
-        options: holochain_p2p::event::GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         Box::pin(async {
             self.cell_by_parts(&dna_hash, &to_agent)
                 .await?
-                .handle_get(dna_hash, to_agent, dht_hash, options)
+                .handle_get(dna_hash, to_agent, dht_hash)
                 .await
         })
     }

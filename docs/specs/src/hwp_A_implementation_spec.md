@@ -1764,22 +1764,6 @@ publish
         ```rust
         {
             dht_hash: AnyDhtHash,
-            options: GetOptions,
-        }
-
-        struct GetOptions {
-            request_type: GetRequest,
-        }
-
-        enum GetRequest {
-            // Get integrated content and metadata.
-            All,
-            // Get only addressable content.
-            Content,
-            // Get only metadata.
-            Metadata,
-            // Get content even if it hasn't been integrated.
-            Pending,
         }
         ```
 
