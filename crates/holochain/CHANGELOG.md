@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Change `hcterm` to use the admin and app websocket clients from `holochain_client` internally
+
 ## 0.6.0-dev.3
 
 - New feature to permit using a `call` from the `post_commit` hook. This was previously only possible with a `remote_call` to yourself. That no longer works because the networking doesn’t let you “connect” to yourself. This is a shorter and clearer route to the same result. \#4957
