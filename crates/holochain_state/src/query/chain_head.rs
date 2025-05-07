@@ -1,12 +1,6 @@
-use holo_hash::*;
-use holochain_sqlite::rusqlite::*;
-use holochain_zome_types::prelude::*;
-use std::fmt::Debug;
-
-use crate::prelude::HeadInfo;
-
-use super::Params;
 use super::*;
+use crate::prelude::HeadInfo;
+use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct ChainHeadQuery(Arc<AgentPubKey>);
@@ -26,30 +20,13 @@ impl Query for ChainHeadQuery {
         "
         SELECT Action.blob, Action.hash
         FROM Action
-        WHERE Action.author = :author
         ORDER BY Action.seq DESC LIMIT 1
         "
         .into()
     }
 
-    fn params(&self) -> Vec<Params> {
-        let params = named_params! {
-            ":author": self.0,
-        };
-        params.to_vec()
-    }
-
     fn init_fold(&self) -> StateQueryResult<Self::State> {
         Ok(None)
-    }
-
-    fn as_filter(&self) -> Box<dyn Fn(&QueryData<Self>) -> bool> {
-        let author = self.0.clone();
-        // NB: it's a little redundant to filter on author, since we should never
-        // be putting any actions by other authors in our scratch, but it
-        // certainly doesn't hurt to be consistent.
-        let f = move |action: &SignedActionHashed| *action.action().author() == *author;
-        Box::new(f)
     }
 
     fn fold(&self, state: Self::State, sh: Self::Item) -> StateQueryResult<Self::State> {
@@ -98,6 +75,8 @@ mod tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::fixt::DhtOpHashFixturator;
+    use holochain_sqlite::rusqlite::Connection;
+    use holochain_sqlite::rusqlite::TransactionBehavior;
     use holochain_sqlite::schema::SCHEMA_CELL;
     use holochain_types::dht_op::DhtOpLite;
     use holochain_types::dht_op::OpOrder;
@@ -114,8 +93,8 @@ mod tests {
 
         let author = fixt!(AgentPubKey);
 
-        // Create 5 consecutive actions for the authoring agent,
-        // as well as 5 other random actions, interspersed.
+        // Create 5 consecutive actions for the authoring agent.
+        // There can not be any actions by different authors in the chain.
         let mut actions: Vec<_> = vec![
             fixt!(ActionBuilderCommon),
             fixt!(ActionBuilderCommon),
@@ -125,29 +104,26 @@ mod tests {
         ]
         .into_iter()
         .enumerate()
-        .flat_map(|(seq, random_action)| {
-            let mut chain_action = random_action.clone();
+        .map(|(seq, action)| {
+            let mut chain_action = action.clone();
             chain_action.action_seq = seq as u32;
             chain_action.author = author.clone();
-            vec![chain_action, random_action]
-        })
-        .map(|b| {
             SignedActionHashed::with_presigned(
                 // A chain made entirely of InitZomesComplete actions is totally invalid,
                 // but we don't need a valid chain for this test,
                 // we just need an ordered sequence of actions
-                ActionHashed::from_content_sync(InitZomesComplete::from_builder(b)),
+                ActionHashed::from_content_sync(InitZomesComplete::from_builder(chain_action)),
                 fixt!(Signature),
             )
         })
         .collect();
 
-        // Other actions have a different author, so the 9th action should be the head for our author's chain
-        let expected_head = actions[8].clone();
+        // The 5th action should be the head for our author's chain.
+        let expected_head = actions[4].clone();
         // Shuffle so the head will sometimes be in scratch and sometimes be in the database and not always the last action by our author.
         actions.shuffle(&mut thread_rng());
 
-        for action in &actions[..6] {
+        for action in &actions[..2] {
             let hash = action.action_address();
             let op = DhtOpLite::from(ChainOpLite::StoreRecord(
                 hash.clone(),
@@ -169,10 +145,7 @@ mod tests {
         }
 
         let mut scratch = Scratch::new();
-
-        // It's also totally invalid for a call_zome scratch to contain actions
-        // from other authors, but it doesn't matter here
-        for action in &actions[6..] {
+        for action in &actions[2..] {
             scratch.add_action(action.clone(), ChainTopOrdering::default());
         }
 
