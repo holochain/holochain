@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
@@ -90,10 +90,7 @@ impl AppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?
                     .ok_or_else(|| {
-                        ConductorApiError::other(format!(
-                            "App not installed: {}",
-                            installed_app_id
-                        ))
+                        ConductorApiError::other(format!("App not installed: {}", installed_app_id))
                     })?;
 
                 // Get all agent infos
@@ -106,7 +103,7 @@ impl AppInterfaceApi {
                 for info in sorted_infos {
                     println!("  {:?}", info);
                 }
-                
+
                 // 1. Create HashMap mapping DNAs to agent infos
                 let mut dna_to_infos: HashMap<DnaHash, Vec<&AgentInfoSigned>> = HashMap::new();
                 for info in &all_infos {
@@ -121,7 +118,9 @@ impl AppInterfaceApi {
                 let mut app_dnas = Vec::new();
                 for cell_info in app_info.cell_info.values().flatten() {
                     match cell_info {
-                        CellInfo::Provisioned(cell) => app_dnas.push(cell.cell_id.dna_hash().clone()),
+                        CellInfo::Provisioned(cell) => {
+                            app_dnas.push(cell.cell_id.dna_hash().clone())
+                        }
                         CellInfo::Cloned(cell) => app_dnas.push(cell.cell_id.dna_hash().clone()),
                         _ => continue,
                     }
