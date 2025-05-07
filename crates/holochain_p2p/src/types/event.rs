@@ -4,44 +4,6 @@
 use crate::*;
 use holochain_zome_types::signature::Signature;
 
-/// The data required for a get request.
-#[derive(Default, Debug, serde::Serialize, serde::Deserialize, Clone)]
-pub enum GetRequest {
-    /// Get all the integrated data.
-    #[default]
-    All,
-    /// Get only the integrated content.
-    Content,
-    /// Get only the metadata.
-    /// If you already have the content this is all you need.
-    Metadata,
-    /// Get the content even if it's still pending.
-    Pending,
-}
-
-/// Get options help control how the get is processed at various levels.
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
-pub struct GetOptions {
-    /// Whether the remote-end should follow redirects or just return the
-    /// requested entry.
-    pub follow_redirects: bool,
-    /// Return all live actions even if there is deletes.
-    /// Useful for metadata calls.
-    pub all_live_actions_with_metadata: bool,
-    /// The type of data this get request requires.
-    pub request_type: GetRequest,
-}
-
-impl From<&actor::GetOptions> for GetOptions {
-    fn from(a: &actor::GetOptions) -> Self {
-        Self {
-            follow_redirects: a.follow_redirects,
-            all_live_actions_with_metadata: a.all_live_actions_with_metadata,
-            request_type: a.request_type.clone(),
-        }
-    }
-}
-
 /// GetMeta options help control how the get is processed at various levels.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetMetaOptions {}
@@ -133,7 +95,6 @@ pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
-        options: GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>>;
 
     /// A remote node is requesting metadata from us.

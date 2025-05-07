@@ -227,144 +227,7 @@ impl CascadeImpl {
     pub fn cache(&self) -> Option<&DbWrite<DbKindCache>> {
         self.cache.as_ref()
     }
-}
 
-/// TODO
-#[async_trait::async_trait]
-#[cfg_attr(feature = "test_utils", mockall::automock)]
-pub trait Cascade {
-    /// Retrieve [`Entry`] either locally or from an authority.
-    /// Data might not have been validated yet by the authority.
-    async fn retrieve_entry(
-        &self,
-        hash: EntryHash,
-        mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>>;
-
-    /// Retrieve [`SignedActionHashed`] from either locally or from an authority.
-    /// Data might not have been validated yet by the authority.
-    async fn retrieve_action(
-        &self,
-        hash: ActionHash,
-        mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>>;
-
-    /// Retrieve data from either locally or from an authority.
-    /// Data might not have been validated yet by the authority.
-    async fn retrieve(
-        &self,
-        hash: AnyDhtHash,
-        mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<(Record, CascadeSource)>>;
-}
-
-#[async_trait::async_trait]
-impl Cascade for CascadeImpl {
-    async fn retrieve_entry(
-        &self,
-        hash: EntryHash,
-        mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>> {
-        let private_data = self.private_data.clone();
-        let result = self
-            .find_map({
-                let hash = hash.clone();
-                move |store| {
-                    Ok(store.get_public_or_authored_entry(
-                        &hash,
-                        private_data.as_ref().map(|a| a.as_ref()),
-                    )?)
-                }
-            })
-            .await?;
-        if result.is_some() {
-            return Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Local)));
-        }
-        options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_record(hash.clone().into(), options).await?;
-
-        // Check if we have the data now after the network call.
-        let private_data = self.private_data.clone();
-        let result = self
-            .find_map({
-                let hash = hash.clone();
-                move |store| {
-                    Ok(store.get_public_or_authored_entry(
-                        &hash,
-                        private_data.as_ref().map(|a| a.as_ref()),
-                    )?)
-                }
-            })
-            .await?;
-        Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Network)))
-    }
-
-    async fn retrieve_action(
-        &self,
-        hash: ActionHash,
-        mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>> {
-        let result = self
-            .find_map({
-                let hash = hash.clone();
-                move |store| Ok(store.get_action(&hash)?)
-            })
-            .await?;
-        if result.is_some() {
-            return Ok(result.map(|a| (a, CascadeSource::Local)));
-        }
-        options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_record(hash.clone().into(), options).await?;
-
-        // Check if we have the data now after the network call.
-        let result = self
-            .find_map(move |store| {
-                Ok(store
-                    .get_action(&hash)?
-                    .map(|a| (a, CascadeSource::Network)))
-            })
-            .await?;
-        Ok(result)
-    }
-
-    async fn retrieve(
-        &self,
-        hash: AnyDhtHash,
-        mut options: NetworkGetOptions,
-    ) -> CascadeResult<Option<(Record, CascadeSource)>> {
-        let private_data = self.private_data.clone();
-        let result = self
-            .find_map({
-                let hash = hash.clone();
-                move |store| {
-                    Ok(store.get_public_or_authored_record(
-                        &hash,
-                        private_data.as_ref().map(|a| a.as_ref()),
-                    )?)
-                }
-            })
-            .await?;
-        if result.is_some() {
-            return Ok(result.map(|r| (r, CascadeSource::Local)));
-        }
-        options.request_type = holochain_p2p::event::GetRequest::Pending;
-        self.fetch_record(hash.clone(), options).await?;
-
-        let private_data = self.private_data.clone();
-        // Check if we have the data now after the network call.
-        let result = self
-            .find_map(move |store| {
-                Ok(store.get_public_or_authored_record(
-                    &hash,
-                    private_data.as_ref().map(|a| a.as_ref()),
-                )?)
-            })
-            .await?;
-        Ok(result.map(|r| (r, CascadeSource::Network)))
-    }
-}
-
-impl CascadeImpl {
     #[allow(clippy::result_large_err)] // TODO - investigate this lint
     fn insert_rendered_op(txn: &mut Txn<DbKindCache>, op: &RenderedOp) -> CascadeResult<()> {
         let RenderedOp {
@@ -539,11 +402,11 @@ impl CascadeImpl {
     pub async fn fetch_record(
         &self,
         hash: AnyDhtHash,
-        options: NetworkGetOptions,
+        _options: NetworkGetOptions,
     ) -> CascadeResult<()> {
         let network = some_or_return!(self.network.as_ref());
         let results = match network
-            .get(hash, options.clone())
+            .get(hash)
             .instrument(debug_span!("fetch_record::network_get"))
             .await
         {
@@ -1267,6 +1130,138 @@ impl CascadeImpl {
             Some(author) => Q::with_private_data_access(hash, author),
             None => Q::without_private_data_access(hash),
         }
+    }
+}
+
+/// TODO
+#[async_trait::async_trait]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
+pub trait Cascade {
+    /// Retrieve [`Entry`] either locally or from an authority.
+    /// Data might not have been validated yet by the authority.
+    async fn retrieve_entry(
+        &self,
+        hash: EntryHash,
+        mut options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>>;
+
+    /// Retrieve [`SignedActionHashed`] from either locally or from an authority.
+    /// Data might not have been validated yet by the authority.
+    async fn retrieve_action(
+        &self,
+        hash: ActionHash,
+        mut options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>>;
+
+    /// Retrieve data from either locally or from an authority.
+    /// Data might not have been validated yet by the authority.
+    async fn retrieve(
+        &self,
+        hash: AnyDhtHash,
+        mut options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(Record, CascadeSource)>>;
+}
+
+#[async_trait::async_trait]
+impl Cascade for CascadeImpl {
+    async fn retrieve_entry(
+        &self,
+        hash: EntryHash,
+        options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(EntryHashed, CascadeSource)>> {
+        let private_data = self.private_data.clone();
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| {
+                    Ok(store.get_public_or_authored_entry(
+                        &hash,
+                        private_data.as_ref().map(|a| a.as_ref()),
+                    )?)
+                }
+            })
+            .await?;
+        if result.is_some() {
+            return Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Local)));
+        }
+        self.fetch_record(hash.clone().into(), options).await?;
+
+        // Check if we have the data now after the network call.
+        let private_data = self.private_data.clone();
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| {
+                    Ok(store.get_public_or_authored_entry(
+                        &hash,
+                        private_data.as_ref().map(|a| a.as_ref()),
+                    )?)
+                }
+            })
+            .await?;
+        Ok(result.map(|e| (EntryHashed::from_content_sync(e), CascadeSource::Network)))
+    }
+
+    async fn retrieve_action(
+        &self,
+        hash: ActionHash,
+        options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(SignedActionHashed, CascadeSource)>> {
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| Ok(store.get_action(&hash)?)
+            })
+            .await?;
+        if result.is_some() {
+            return Ok(result.map(|a| (a, CascadeSource::Local)));
+        }
+        self.fetch_record(hash.clone().into(), options).await?;
+
+        // Check if we have the data now after the network call.
+        let result = self
+            .find_map(move |store| {
+                Ok(store
+                    .get_action(&hash)?
+                    .map(|a| (a, CascadeSource::Network)))
+            })
+            .await?;
+        Ok(result)
+    }
+
+    async fn retrieve(
+        &self,
+        hash: AnyDhtHash,
+        options: NetworkGetOptions,
+    ) -> CascadeResult<Option<(Record, CascadeSource)>> {
+        let private_data = self.private_data.clone();
+        let result = self
+            .find_map({
+                let hash = hash.clone();
+                move |store| {
+                    Ok(store.get_public_or_authored_record(
+                        &hash,
+                        private_data.as_ref().map(|a| a.as_ref()),
+                    )?)
+                }
+            })
+            .await?;
+        if result.is_some() {
+            return Ok(result.map(|r| (r, CascadeSource::Local)));
+        }
+        self.fetch_record(hash.clone(), options).await?;
+
+        let private_data = self.private_data.clone();
+        // Check if we have the data now after the network call.
+        let result = self
+            .find_map(move |store| {
+                Ok(store.get_public_or_authored_record(
+                    &hash,
+                    private_data.as_ref().map(|a| a.as_ref()),
+                )?)
+            })
+            .await?;
+        Ok(result.map(|r| (r, CascadeSource::Network)))
     }
 }
 

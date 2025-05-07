@@ -179,7 +179,7 @@ async fn validate_op_with_dependency_not_held() {
     let response = WireOps::Record(ops);
     network
         .expect_get()
-        .return_once(move |_, _| Ok(vec![response]));
+        .return_once(move |_| Ok(vec![response]));
 
     network
         .expect_target_arcs()
@@ -242,7 +242,7 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     let response = WireOps::Record(WireRecordOps::new());
     network
         .expect_get()
-        .return_once(move |_, _| Ok(vec![response]));
+        .return_once(move |_| Ok(vec![response]));
 
     #[cfg(feature = "unstable-warrants")]
     network
