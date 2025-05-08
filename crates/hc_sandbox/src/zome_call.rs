@@ -275,8 +275,7 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
         )
         .await?;
 
-    let response: serde_json::Value = response.decode()?;
-    serde_json::to_writer(std::io::stdout(), &response)?;
+    serde_json::to_writer(std::io::stdout(), &response.decode::<serde_json::Value>()?)?;
     println!(); // Add newline
 
     Ok(())
