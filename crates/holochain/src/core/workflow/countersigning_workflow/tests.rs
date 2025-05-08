@@ -2005,13 +2005,7 @@ impl TestHarness {
             .space
             .get_or_create_authored_db(self.author.clone())
             .unwrap();
-        let chain_head = authored
-            .read_async({
-                let author = self.author.clone();
-                move |txn| chain_head_db(txn, Arc::new(author))
-            })
-            .await
-            .unwrap();
+        let chain_head = authored.read_async(chain_head_db).await.unwrap();
 
         chain_head.unwrap()
     }
@@ -2155,10 +2149,7 @@ impl TestHarness {
             .unwrap();
 
         let session = authored
-            .read_async({
-                let author = self.author.clone();
-                move |txn| current_countersigning_session(txn, Arc::new(author))
-            })
+            .read_async(current_countersigning_session)
             .await
             .unwrap();
 

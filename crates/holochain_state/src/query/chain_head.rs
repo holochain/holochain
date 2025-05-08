@@ -3,15 +3,21 @@ use crate::prelude::HeadInfo;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
-pub struct ChainHeadQuery(Arc<AgentPubKey>);
+pub struct AuthoredChainHeadQuery;
 
-impl ChainHeadQuery {
-    pub fn new(agent: Arc<AgentPubKey>) -> Self {
-        Self(agent)
+impl AuthoredChainHeadQuery {
+    pub fn new() -> Self {
+        Self
     }
 }
 
-impl Query for ChainHeadQuery {
+impl Default for AuthoredChainHeadQuery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Query for AuthoredChainHeadQuery {
     type Item = Judged<SignedActionHashed>;
     type State = Option<SignedActionHashed>;
     type Output = Option<HeadInfo>;
@@ -149,7 +155,7 @@ mod tests {
             scratch.add_action(action.clone(), ChainTopOrdering::default());
         }
 
-        let query = ChainHeadQuery::new(Arc::new(author));
+        let query = AuthoredChainHeadQuery::new();
 
         let head = query.run(DbScratch::new(&[&mut txn], &scratch)).unwrap();
         assert_eq!(
