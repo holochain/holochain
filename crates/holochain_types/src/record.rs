@@ -244,8 +244,6 @@ pub struct RawGetEntryResponse {
     // not the delete action hash as we do now.
     pub deletes: Vec<WireActionStatus<WireDelete>>,
     /// Any updates on this entry.
-    /// Note you will need to ask for "all_live_actions_with_metadata"
-    /// to get this back
     pub updates: Vec<WireActionStatus<WireUpdateRelationship>>,
     /// The entry shared across all actions
     pub entry: Entry,

@@ -7,16 +7,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- New feature to permit using a `call` from the `post_commit` hook. This was previously only possible with a `remote_call`
-  to yourself. That no longer works because the networking doesn't let you "connect" to yourself. This is a shorter
-  and clearer route to the same result. #4957
+- Change `hc-sandbox` to use admin and app clients from the `holochain_client` crate
+- Change `hcterm` to use the admin and app websocket clients from `holochain_client` internally
+- Reinstate indexes on `DhtOp` tables. With the latest migration script, the indexes were not carried over. #4970
+- Optimize `ChainHeadQuery` for performance. A flame graph analysis revealed that a significant proportion of the CPU time was spent on this query in a test with a high number of entry creates and reads. The query now runs about 30 % faster. #4971
+
+## 0.6.0-dev.3
+
+- New feature to permit using a `call` from the `post_commit` hook. This was previously only possible with a `remote_call` to yourself. That no longer works because the networking doesn’t let you “connect” to yourself. This is a shorter and clearer route to the same result. \#4957
 
 ## 0.6.0-dev.2
 
 - Integrate all app validated ops, regardless of type and order
 - Remove DHT DB query cache, a premature optimization that made integration complicated and error-prone without any appreciable benefit.
 - Fix warrant persistence. Warrants were formerly stored in the Action table, but did not quite fit there. A new Warrant table was created, to which warrants are now written.
-- Fix bug where a zero-arc node could not delete a link it hasn't created. Fetching the action that created the link allows network access now.
+- Fix bug where a zero-arc node could not delete a link it hasn’t created. Fetching the action that created the link allows network access now.
 - Expose `GetOptions` for `delete_link` call. Developers can specify whether `delete_link` should be restricted to local data to look up the create link record, or if it can request it from the network.
 
 ## 0.6.0-dev.1

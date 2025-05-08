@@ -82,11 +82,10 @@ impl event::HcP2pHandler for WrapEvtSender {
         dna_hash: DnaHash,
         to_agent: AgentPubKey,
         dht_hash: holo_hash::AnyDhtHash,
-        options: event::GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         timing_trace!(
             true,
-            { self.0.handle_get(dna_hash, to_agent, dht_hash, options) },
+            { self.0.handle_get(dna_hash, to_agent, dht_hash) },
             a = "recv_get",
         )
     }
@@ -332,13 +331,12 @@ impl SpaceHandler for HolochainP2pActor {
                         msg_id,
                         to_agent,
                         dht_hash,
-                        options,
                     } => {
                         let dna_hash = DnaHash::from_k2_space(&space_id);
                         let resp = match evt_sender
                             .get()
                             .ok_or_else(|| HolochainP2pError::other(EVT_REG_ERR))?
-                            .handle_get(dna_hash, to_agent, dht_hash, options)
+                            .handle_get(dna_hash, to_agent, dht_hash)
                             .await
                         {
                             Ok(response) => GetRes { msg_id, response },
@@ -1374,7 +1372,6 @@ impl actor::HcP2p for HolochainP2pActor {
         &self,
         dna_hash: DnaHash,
         dht_hash: holo_hash::AnyDhtHash,
-        options: actor::GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<WireOps>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
@@ -1383,9 +1380,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let (to_agent, to_url) = self.get_peer_for_loc("get", &space, loc).await?;
 
-            let r_options: event::GetOptions = (&options).into();
-
-            let (msg_id, req) = crate::wire::WireMessage::get_req(to_agent, dht_hash, r_options);
+            let (msg_id, req) = crate::wire::WireMessage::get_req(to_agent, dht_hash);
 
             let start = std::time::Instant::now();
 

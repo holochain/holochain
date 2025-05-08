@@ -57,24 +57,6 @@ CREATE TABLE IF NOT EXISTS DhtOpNew (
   transfer_time INTEGER NULL
 );
 
-CREATE INDEX IF NOT EXISTS DhtOp_type_dep_idx ON DhtOpNew (type, dependency);
-
-CREATE INDEX IF NOT EXISTS DhtOp_type_when_int_idx ON DhtOpNew (type, when_integrated);
-
-CREATE INDEX IF NOT EXISTS DhtOp_validation_stage_idx ON DhtOpNew (validation_stage, type, dependency);
-
-CREATE INDEX IF NOT EXISTS DhtOp_stage_type_status_idx ON DhtOpNew (validation_stage, type, validation_status);
-
-CREATE INDEX IF NOT EXISTS DhtOp_validation_status_idx ON DhtOpNew (validation_status);
-
-CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_idx ON DhtOpNew (authored_timestamp);
-
-CREATE INDEX IF NOT EXISTS DhtOp_storage_center_loc_idx ON DhtOpNew (storage_center_loc);
-
-CREATE INDEX IF NOT EXISTS DhtOp_action_hash_idx ON DhtOpNew (action_hash);
-
-CREATE INDEX IF NOT EXISTS DhtOp_basis_hash_idx ON DhtOpNew (basis_hash);
-
 -- Copy data from old to new DhtOp table.
 INSERT INTO
   DhtOpNew
@@ -93,3 +75,21 @@ ALTER TABLE
 -- Drop deprecated columns.
 ALTER TABLE
   DhtOp DROP COLUMN dependency2;
+
+CREATE INDEX IF NOT EXISTS DhtOp_type_dep_idx ON DhtOp (type, dependency);
+
+CREATE INDEX IF NOT EXISTS DhtOp_type_when_int_idx ON DhtOp (type, when_integrated);
+
+CREATE INDEX IF NOT EXISTS DhtOp_validation_stage_idx ON DhtOp (validation_stage, type, dependency);
+
+CREATE INDEX IF NOT EXISTS DhtOp_stage_type_status_idx ON DhtOp (validation_stage, type, validation_status);
+
+CREATE INDEX IF NOT EXISTS DhtOp_validation_status_idx ON DhtOp (validation_status);
+
+CREATE INDEX IF NOT EXISTS DhtOp_authored_timestamp_idx ON DhtOp (authored_timestamp);
+
+CREATE INDEX IF NOT EXISTS DhtOp_storage_center_loc_idx ON DhtOp (storage_center_loc);
+
+CREATE INDEX IF NOT EXISTS DhtOp_action_hash_idx ON DhtOp (action_hash);
+
+CREATE INDEX IF NOT EXISTS DhtOp_basis_hash_idx ON DhtOp (basis_hash);
