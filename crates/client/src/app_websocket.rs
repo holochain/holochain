@@ -425,6 +425,18 @@ impl AppWebsocket {
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }
+
+    pub async fn agent_info(
+        &self,
+        dna_hash: Option<holo_hash::DnaHash>,
+    ) -> ConductorApiResult<Vec<String>> {
+        let msg = AppRequest::AgentInfo { dna_hash };
+        let response = self.inner.send(msg).await?;
+        match response {
+            AppResponse::AgentInfo(infos) => Ok(infos),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
 }
 
 pub enum ZomeCallTarget {
