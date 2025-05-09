@@ -19,7 +19,6 @@ use holochain_zome_types::prelude::{
     ChainQueryFilter, ChainQueryFilterRange, ChainStatus, SignedAction,
 };
 use itertools::Itertools;
-use std::sync::Arc;
 
 /// Resolve an incomplete countersigning session.
 ///
@@ -38,11 +37,8 @@ pub async fn inner_countersigning_session_incomplete(
 
     let maybe_current_session = authored_db
         .read_async({
-            let author = author.clone();
             move |txn| -> SourceChainResult<CurrentCountersigningSessionOpt> {
-                let maybe_current_session =
-                    current_countersigning_session(txn, Arc::new(author.clone()))?;
-
+                let maybe_current_session = current_countersigning_session(txn)?;
                 Ok(maybe_current_session)
             }
         })
