@@ -150,7 +150,6 @@ mod tests {
     use holochain_p2p::HolochainP2pDnaFixturator;
     use holochain_state::prelude::*;
     use holochain_state::test_utils::test_db_dir;
-    use holochain_types::db_cache::DhtDbQueryCache;
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_wasm_test_utils::TestWasm;
     use matches::assert_matches;
@@ -159,7 +158,6 @@ mod tests {
         SourceChain::new(
             cell.authored_db().clone(),
             cell.dht_db().clone(),
-            DhtDbQueryCache::new(cell.dht_db().clone().into()),
             keystore,
             cell.agent_pubkey().clone(),
         )
@@ -187,7 +185,6 @@ mod tests {
         let workspace = SourceChainWorkspace::new(
             db.clone(),
             test_dht.to_db(),
-            DhtDbQueryCache::new(test_dht.to_db().into()),
             test_cache.to_db(),
             keystore,
             author.clone(),

@@ -29,7 +29,6 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::HolochainP2pDnaFixturator;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
-use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 #[cfg(feature = "wasmer_sys")]
@@ -217,7 +216,6 @@ fixturator!(
             HostFnWorkspace::new(
                 authored_db.to_db(),
                 dht_db.to_db(),
-                DhtDbQueryCache::new(dht_db.to_db().into()),
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
@@ -235,7 +233,6 @@ fixturator!(
             HostFnWorkspace::new(
                 authored_db.to_db(),
                 dht_db.to_db(),
-                DhtDbQueryCache::new(dht_db.to_db().into()),
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
@@ -254,7 +251,6 @@ fixturator!(
             HostFnWorkspace::new(
                 authored_db.to_db(),
                 dht_db.to_db(),
-                DhtDbQueryCache::new(dht_db.to_db().into()),
                 cache.to_db(),
                 keystore,
                 Some(agent),
@@ -276,7 +272,6 @@ fixturator!(
             HostFnWorkspaceRead::new(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
-                DhtDbQueryCache::new(dht_db.to_db().into()),
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
@@ -294,7 +289,6 @@ fixturator!(
             HostFnWorkspaceRead::new(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
-                DhtDbQueryCache::new(dht_db.to_db().into()),
                 cache.to_db(),
                 keystore,
                 Some(fixt!(AgentPubKey, Predictable, get_fixt_index!())),
@@ -313,7 +307,6 @@ fixturator!(
             HostFnWorkspaceRead::new(
                 authored_db.to_db().into(),
                 dht_db.to_db().into(),
-                DhtDbQueryCache::new(dht_db.to_db().into()),
                 cache.to_db(),
                 keystore,
                 Some(agent),

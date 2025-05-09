@@ -401,7 +401,6 @@ impl TestCase {
                 .get_or_create_authored_db(self.agent.clone())
                 .unwrap(),
             self.test_space.space.dht_db.clone(),
-            self.test_space.space.dht_query_cache.clone(),
             self.test_space.space.cache_db.clone(),
             Arc::new(self.dna_def.clone()),
             None,

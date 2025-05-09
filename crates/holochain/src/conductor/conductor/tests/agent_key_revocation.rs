@@ -297,7 +297,6 @@ mod single_conductor {
                 .get_or_create_authored_db(cell_id_1.dna_hash(), agent_key.clone())
                 .unwrap(),
             conductor.get_dht_db(cell_id_1.dna_hash()).unwrap(),
-            conductor.get_dht_db_cache(cell_id_1.dna_hash()).unwrap(),
             conductor.keystore().clone(),
             agent_key.clone(),
         )
@@ -395,7 +394,6 @@ mod single_conductor {
                 .get_or_create_authored_db(cell_id_1.dna_hash(), agent_key.clone())
                 .unwrap(),
             conductor.get_dht_db(cell_id_1.dna_hash()).unwrap(),
-            conductor.get_dht_db_cache(cell_id_1.dna_hash()).unwrap(),
             conductor.keystore().clone(),
             agent_key.clone(),
         )

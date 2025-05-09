@@ -129,9 +129,6 @@ impl Conductor {
                 let source_chain = SourceChain::new(
                     conductor.get_or_create_authored_db(cell_id.dna_hash(), agent_key.clone())?,
                     conductor.get_or_create_dht_db(cell_id.dna_hash())?,
-                    conductor
-                        .get_or_create_space(cell_id.dna_hash())?
-                        .dht_query_cache,
                     conductor.keystore().clone(),
                     agent_key.clone(),
                 )
