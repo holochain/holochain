@@ -42,6 +42,9 @@ pub struct HolochainP2pConfig {
     /// The arc factor to apply to target arc hints.
     pub target_arc_factor: u32,
 
+    /// Authentication material if required by sbd/signal/bootstrap services.
+    pub auth_material: Option<Vec<u8>>,
+
     /// Configuration to pass to Kitsune2.
     ///
     /// This should contain module configurations such as [CoreBootstrapModConfig](kitsune2_core::factories::CoreBootstrapModConfig).
@@ -101,6 +104,7 @@ impl Default for HolochainP2pConfig {
             get_db_peer_meta: Arc::new(|_| unimplemented!()),
             get_db_op_store: Arc::new(|_| unimplemented!()),
             target_arc_factor: 1,
+            auth_material: None,
             network_config: None,
             compat: Default::default(),
             #[cfg(feature = "test_utils")]

@@ -184,6 +184,11 @@ fn default_mem_bootstrap() -> bool {
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct NetworkConfig {
+    /// Authentication material if required by sbd/signal/bootstrap services.
+    /// This material should be specified as a base64 string
+    #[serde(default)]
+    pub base64_auth_material: Option<String>,
+
     /// The Kitsune2 bootstrap server to use for WAN discovery.
     #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
     pub bootstrap_url: url2::Url2,
@@ -234,6 +239,7 @@ pub struct NetworkConfig {
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
+            base64_auth_material: None,
             bootstrap_url: url2::Url2::parse("https://dev-test-bootstrap2.holochain.org"),
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
             webrtc_config: None,
