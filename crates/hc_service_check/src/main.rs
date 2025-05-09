@@ -77,8 +77,11 @@ async fn bootstrap(url: impl AsRef<str>) -> Result<()> {
 async fn signal(url: String) -> Result<()> {
     println!("Signal check of {url}");
     let config = tx5_signal::SignalConfig {
+        client_config: tx5_signal::SbdClientConfig {
+            allow_plain_text: true,
+            ..Default::default()
+        },
         listener: false,
-        allow_plain_text: true,
         ..Default::default()
     };
     let (conn, _rcv) = tx5_signal::SignalConnection::connect(&url, Arc::new(config)).await?;
