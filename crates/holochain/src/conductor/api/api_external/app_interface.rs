@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
@@ -10,6 +12,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
 
 pub use holochain_conductor_api::*;
+use kitsune2_api::AgentInfoSigned;
 
 /// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
 /// other Api references
@@ -79,6 +82,59 @@ impl AppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
+            AppRequest::AgentInfo { dna_hash } => {
+                // Get app info to know which DNAs belong to this app
+                let app_info = self
+                    .conductor_handle
+                    .get_app_info(&installed_app_id)
+                    .await?
+                    .ok_or_else(|| {
+                        ConductorApiError::other(format!("App not installed: {}", installed_app_id))
+                    })?;
+
+                // Get all agent infos
+                let all_infos = self.conductor_handle.get_agent_infos(None).await?;
+
+                // 1. Create HashMap mapping DNAs to agent infos
+                let mut dna_to_infos: HashMap<DnaHash, Vec<&AgentInfoSigned>> = HashMap::new();
+                for info in &all_infos {
+                    let dna = DnaHash::from_k2_space(&info.space);
+                    dna_to_infos.entry(dna).or_default().push(info);
+                }
+
+                // 2. Collect all DNAs for this app
+                let mut app_dnas = Vec::new();
+                for cell_info in app_info.cell_info.values().flatten() {
+                    match cell_info {
+                        CellInfo::Provisioned(cell) => {
+                            app_dnas.push(cell.cell_id.dna_hash().clone())
+                        }
+                        CellInfo::Cloned(cell) => app_dnas.push(cell.cell_id.dna_hash().clone()),
+                        _ => continue,
+                    }
+                }
+
+                // If dna_hash is specified, filter to only that DNA
+                if let Some(dna_hash) = &dna_hash {
+                    if !app_dnas.contains(dna_hash) {
+                        return Ok(AppResponse::AgentInfo(Vec::new()));
+                    }
+                    app_dnas.clear();
+                    app_dnas.push(dna_hash.clone());
+                }
+
+                // 3. Collect agent infos for app's DNAs
+                let mut agent_infos = Vec::new();
+                for dna in app_dnas {
+                    if let Some(infos) = dna_to_infos.get(&dna) {
+                        for info in infos {
+                            agent_infos.push(info.encode()?);
+                        }
+                    }
+                }
+
+                Ok(AppResponse::AgentInfo(agent_infos))
+            }
             AppRequest::CallZome(zome_call_params_signed) => {
                 match self.conductor_handle.handle_external_zome_call(*zome_call_params_signed).await? {
                     Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),

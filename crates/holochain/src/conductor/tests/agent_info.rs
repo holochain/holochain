@@ -69,6 +69,24 @@ async fn setup_tests() -> (
     )
 }
 
+fn make_agent(space: kitsune2_api::SpaceId) -> String {
+    let local = kitsune2_core::Ed25519LocalAgent::default();
+    let created_at = kitsune2_api::Timestamp::now();
+    let expires_at = created_at + std::time::Duration::from_secs(60 * 20);
+    let info = kitsune2_api::AgentInfo {
+        agent: kitsune2_api::LocalAgent::agent(&local).clone(),
+        space,
+        created_at,
+        expires_at,
+        is_tombstone: false,
+        url: None,
+        storage_arc: kitsune2_api::DhtArc::FULL,
+    };
+    let info =
+        futures::executor::block_on(kitsune2_api::AgentInfoSigned::sign(&local, info)).unwrap();
+    info.encode().unwrap()
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn admin_agent_info() {
     holochain_trace::test_run();
@@ -83,7 +101,7 @@ async fn admin_agent_info() {
         conductor,
     ) = setup_tests().await;
 
-    // Get admin interface for conductor[0]
+    // Get admin interface for conductor
     let (admin_sender, _admin_receiver) = conductor.admin_ws_client::<AdminResponse>().await;
 
     // Get all agent infos via admin interface
@@ -155,4 +173,156 @@ async fn admin_agent_info() {
             "Agent info should be for the clone cell's DNA"
         );
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn app_agent_info() {
+    holochain_trace::test_run();
+
+    let (
+        dna1_hash,
+        dna2_hash,
+        dna3_hash,
+        installed_app1_id,
+        installed_app2_id,
+        clone_cell,
+        conductor,
+    ) = setup_tests().await;
+
+    // Test app1's agent info
+    let (app1_sender, _app1_receiver) = conductor
+        .app_ws_client::<AppResponse>(installed_app1_id.to_string())
+        .await;
+
+    // Test getting agent info for all cells in app1
+    let response = app1_sender
+        .request(AppRequest::AgentInfo { dna_hash: None })
+        .await
+        .unwrap();
+    let agent_infos = match response {
+        AppResponse::AgentInfo(infos) => infos,
+        _ => panic!("Expected AgentInfo response"),
+    };
+
+    // Should have agent info for each DNA in app1
+    assert_eq!(agent_infos.len(), 3);
+
+    // Verify agent info content
+    for info in &agent_infos {
+        let decoded = AgentInfoSigned::decode(&Ed25519Verifier, info.as_bytes()).unwrap();
+        assert!(
+            decoded.space == dna1_hash.to_k2_space()
+                || decoded.space == dna2_hash.to_k2_space()
+                || decoded.space == clone_cell.cell_id.dna_hash().to_k2_space(),
+            "Agent info space should be one of app1's DNAs or the clone cell's DNA"
+        );
+    }
+
+    // Test getting agent info for dna1 in app1
+    let response = app1_sender
+        .request(AppRequest::AgentInfo {
+            dna_hash: Some(dna1_hash.clone()),
+        })
+        .await
+        .unwrap();
+    let agent_infos_dna1 = match response {
+        AppResponse::AgentInfo(infos) => infos,
+        _ => panic!("Expected AgentInfo response"),
+    };
+    // Should have just 1 agent info for the dna
+    assert_eq!(agent_infos_dna1.len(), 1);
+
+    for info in &agent_infos_dna1 {
+        let decoded = AgentInfoSigned::decode(&Ed25519Verifier, info.as_bytes()).unwrap();
+        assert_eq!(
+            decoded.space,
+            dna1_hash.to_k2_space(),
+            "Agent info should be for dna1"
+        );
+    }
+
+    // Test app2's agent info
+    let (app2_sender, _app2_receiver) = conductor
+        .app_ws_client::<AppResponse>(installed_app2_id.to_string())
+        .await;
+
+    // Test getting agent info for all cells in app2
+    let response = app2_sender
+        .request(AppRequest::AgentInfo { dna_hash: None })
+        .await
+        .unwrap();
+    let agent_infos_app2 = match response {
+        AppResponse::AgentInfo(infos) => infos,
+        _ => panic!("Expected AgentInfo response"),
+    };
+
+    // Should have agent info the dna in app2
+    assert_eq!(agent_infos_app2.len(), 1);
+
+    // Verify all agent infos are for dna3
+    for info in &agent_infos_app2 {
+        let decoded = AgentInfoSigned::decode(&Ed25519Verifier, info.as_bytes()).unwrap();
+        assert_eq!(
+            decoded.space,
+            dna3_hash.to_k2_space(),
+            "Agent info should be for dna3"
+        );
+    }
+
+    // Test getting agent info for non-existent DNA in app1
+    let non_existent_dna = DnaHash::from_raw_32(vec![0; 32]);
+    let response = app1_sender
+        .request(AppRequest::AgentInfo {
+            dna_hash: Some(non_existent_dna),
+        })
+        .await
+        .unwrap();
+    let agent_infos_none = match response {
+        AppResponse::AgentInfo(infos) => infos,
+        _ => panic!("Expected AgentInfo response"),
+    };
+
+    // Should have no agent infos for non-existent DNA
+    assert_eq!(agent_infos_none.len(), 0);
+
+    // Test getting agent info for dna3 (from app2) when querying from app1
+    // This should return no results even though dna3 exists on the conductor in a different app
+    let response = app1_sender
+        .request(AppRequest::AgentInfo {
+            dna_hash: Some(dna3_hash.clone()),
+        })
+        .await
+        .unwrap();
+    let agent_infos_dna3_from_app1 = match response {
+        AppResponse::AgentInfo(infos) => infos,
+        _ => panic!("Expected AgentInfo response"),
+    };
+
+    // Should have no agent infos for dna3 when querying from app1
+    assert_eq!(agent_infos_dna3_from_app1.len(), 0,
+        "Querying for dna3 from app1 should return no results, even though dna3 exists on conductor");
+
+    // test when adding an new "external" agent_info
+    let other_agent = make_agent(dna1_hash.to_k2_space());
+    let (admin_sender, _admin_receiver) = conductor.admin_ws_client::<AdminResponse>().await;
+    let _: AdminResponse = admin_sender
+        .request(AdminRequest::AddAgentInfo {
+            agent_infos: vec![other_agent],
+        })
+        .await
+        .unwrap();
+
+    // get the agent infos for app1 again.
+    let response = app1_sender
+        .request(AppRequest::AgentInfo {
+            dna_hash: Some(dna1_hash.clone()),
+        })
+        .await
+        .unwrap();
+    let agent_infos_dna1_from_app1 = match response {
+        AppResponse::AgentInfo(infos) => infos,
+        _ => panic!("Expected AgentInfo response"),
+    };
+
+    assert_eq!(agent_infos_dna1_from_app1.len(), 2);
 }
