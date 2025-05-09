@@ -90,3 +90,21 @@ fn get_test_wasm_pair(wasm: TestWasm) -> (ResourceBytes, ResourceBytes) {
 
     (integrity.into(), coordinator.into())
 }
+
+pub fn make_agent(space: kitsune2_api::SpaceId) -> String {
+    let local = kitsune2_core::Ed25519LocalAgent::default();
+    let created_at = kitsune2_api::Timestamp::now();
+    let expires_at = created_at + std::time::Duration::from_secs(60 * 20);
+    let info = kitsune2_api::AgentInfo {
+        agent: kitsune2_api::LocalAgent::agent(&local).clone(),
+        space,
+        created_at,
+        expires_at,
+        is_tombstone: false,
+        url: None,
+        storage_arc: kitsune2_api::DhtArc::FULL,
+    };
+    let info =
+        futures::executor::block_on(kitsune2_api::AgentInfoSigned::sign(&local, info)).unwrap();
+    info.encode().unwrap()
+}
