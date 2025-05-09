@@ -23,6 +23,24 @@ use std::{
 
 mod fixture;
 
+fn make_agent(space: kitsune2_api::SpaceId) -> String {
+    let local = kitsune2_core::Ed25519LocalAgent::default();
+    let created_at = kitsune2_api::Timestamp::now();
+    let expires_at = created_at + std::time::Duration::from_secs(60 * 20);
+    let info = kitsune2_api::AgentInfo {
+        agent: kitsune2_api::LocalAgent::agent(&local).clone(),
+        space,
+        created_at,
+        expires_at,
+        is_tombstone: false,
+        url: None,
+        storage_arc: kitsune2_api::DhtArc::FULL,
+    };
+    let info =
+        futures::executor::block_on(kitsune2_api::AgentInfoSigned::sign(&local, info)).unwrap();
+    info.encode().unwrap()
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_signal() {
     let conductor = SweetConductor::from_standard_config().await;
@@ -547,7 +565,7 @@ async fn agent_info() {
     .space
     .clone();
 
-    let other_agent = fixture::make_agent(space.clone());
+    let other_agent = make_agent(space.clone());
 
     admin_ws
         .add_agent_info(vec![other_agent.clone()])
