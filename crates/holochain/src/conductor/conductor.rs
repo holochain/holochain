@@ -859,7 +859,7 @@ mod network_impls {
                     let dna_hashes = self
                         .spaces
                         .get_from_spaces(|space| (*space.dna_hash).clone());
-                    let mut out = Vec::new();
+                    let mut out = HashSet::new();
                     for dna_hash in dna_hashes {
                         let peer_store = self
                             .holochain_p2p
@@ -869,7 +869,7 @@ mod network_impls {
                         let all_peers = peer_store.get_all().await?;
                         out.extend(all_peers);
                     }
-                    Ok(out)
+                    Ok(out.into_iter().collect())
                 }
             }
         }
