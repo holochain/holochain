@@ -2,6 +2,17 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2025-05-08: v0.5.2-rc.2
+
+*Success*
+- Ran a test with 4 nodes. Passed all tests.
+- We did see one WebRTC connection timeout that fell back to SBD relay, but after a conductor restart, those peers
+  were able to connect over WebRTC.
+- We also did some testing with multiple agent infos on the bootstrap server that we then took offline. This didn't 
+  behave as well. We were still able to sync data but saw a lot more attempts to connect to, and get data from, the 
+  offline nodes than expected. This is not a new problem with this release and has existed since previous releases of 
+  Holochain. It is something that we need to follow up on though.
+
 ## 2025-04-21: v0.5.0-rc.4
 
 *Success*
