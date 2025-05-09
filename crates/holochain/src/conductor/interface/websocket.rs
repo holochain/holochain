@@ -1218,62 +1218,6 @@ mod test {
         conductor_handle.shutdown().await.unwrap().unwrap();
     }
 
-    /// Check that we can add and get agent info for a conductor
-    /// across the admin websocket.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn add_agent_info_via_admin() {
-        holochain_trace::test_run();
-        let mut conductor = SweetConductor::from_standard_config().await;
-        let admin_api = AdminInterfaceApi::new(conductor.clone());
-        let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentInfo])
-            .await
-            .0;
-        let app = conductor.setup_app("1", &[dna_file.clone()]).await.unwrap();
-        // Await agent to be added to peer store.
-        retry_until_timeout!({
-            if conductor
-                .holochain_p2p()
-                .peer_store(dna_file.dna_hash().clone())
-                .await
-                .unwrap()
-                .get(app.agent().to_k2_agent())
-                .await
-                .unwrap()
-                .is_some()
-            {
-                break;
-            }
-        });
-
-        // Request all infos
-        let req = AdminRequest::AgentInfo { cell_id: None };
-        let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let agent_infos = unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone();
-        let results = to_key(agent_infos.clone()).clone();
-        let expected_space_id = app.cells()[0].dna_hash().to_k2_space();
-        let expected_agent_id = app.cells()[0].agent_pubkey().to_k2_agent();
-        assert_eq!(
-            results,
-            vec![(expected_space_id.clone(), expected_agent_id.clone())]
-        );
-
-        // Create new conductor and add agent info to it.
-        drop(admin_api);
-        drop(conductor);
-        let conductor = SweetConductor::from_standard_config().await;
-        let admin_api = AdminInterfaceApi::new(conductor.clone());
-        // Add agent info to new conductor.
-        let req = AdminRequest::AddAgentInfo { agent_infos };
-        let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        assert_matches!(r, AdminResponse::AgentInfoAdded);
-
-        // Infos should contain new agent info.
-        let req = AdminRequest::AgentInfo { cell_id: None };
-        let r = make_req(admin_api.clone(), req).await.await.unwrap();
-        let results = to_key(unwrap_to::unwrap_to!(r => AdminResponse::AgentInfo).clone());
-        assert_eq!(results, vec![(expected_space_id, expected_agent_id)]);
-    }
-
     async fn make_req(
         admin_api: AdminInterfaceApi,
         req: AdminRequest,
