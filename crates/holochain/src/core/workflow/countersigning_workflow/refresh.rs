@@ -67,8 +67,7 @@ pub async fn refresh_workspace_state(
                     .write_async({
                         let agent = agent.clone();
                         move |txn| -> SourceChainResult<(CurrentCountersigningSessionOpt, bool)> {
-                            let maybe_current_session =
-                                current_countersigning_session(txn, Arc::new(agent.clone()))?;
+                            let maybe_current_session = current_countersigning_session(txn)?;
                             tracing::trace!("Current session: {:?}", maybe_current_session);
 
                             // If we've not made a commit and the entry hasn't been committed then

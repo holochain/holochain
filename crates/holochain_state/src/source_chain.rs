@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::chain_lock::{get_chain_lock, ChainLock};
 use crate::integrate::authored_ops_to_dht_db;
 use crate::integrate::authored_ops_to_dht_db_without_check;
-use crate::query::chain_head::ChainHeadQuery;
+use crate::query::chain_head::AuthoredChainHeadQuery;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
@@ -107,7 +107,7 @@ impl SourceChain {
                     action: persisted_head,
                     seq: persisted_seq,
                     ..
-                } = chain_head_db_nonempty(txn, author.clone())?;
+                } = chain_head_db_nonempty(txn)?;
                 let countersigning_agent_state =
                     CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
                 lock_chain(
@@ -368,7 +368,7 @@ impl SourceChain {
                 }
 
                 // As at check.
-                let head_info = chain_head_db(txn, author.clone())?;
+                let head_info = chain_head_db(txn)?;
                 let latest_head = head_info.as_ref().map(|h| h.action.clone());
 
                 if persisted_head != latest_head {
@@ -526,14 +526,7 @@ where
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let head_info = Some(
-            vault
-                .read_async({
-                    let author = author.clone();
-                    move |txn| chain_head_db_nonempty(txn, author)
-                })
-                .await?,
-        );
+        let head_info = Some(vault.read_async(chain_head_db_nonempty).await?);
         Ok(Self {
             scratch,
             vault,
@@ -558,12 +551,7 @@ where
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let head_info = vault
-            .read_async({
-                let author = author.clone();
-                move |txn| chain_head_db(txn, author)
-            })
-            .await?;
+        let head_info = vault.read_async(chain_head_db).await?;
         Ok(Self {
             scratch,
             vault,
@@ -1224,21 +1212,15 @@ pub fn put_raw(
 }
 
 /// Get the current chain head of the database, if the chain is nonempty.
-pub fn chain_head_db(
-    txn: &Transaction,
-    author: Arc<AgentPubKey>,
-) -> SourceChainResult<Option<HeadInfo>> {
-    let chain_head = ChainHeadQuery::new(author);
+pub fn chain_head_db(txn: &Txn<DbKindAuthored>) -> SourceChainResult<Option<HeadInfo>> {
+    let chain_head = AuthoredChainHeadQuery::new();
     Ok(chain_head.run(CascadeTxnWrapper::from(txn))?)
 }
 
 /// Get the current chain head of the database.
 /// Error if the chain is empty.
-pub fn chain_head_db_nonempty(
-    txn: &Transaction,
-    author: Arc<AgentPubKey>,
-) -> SourceChainResult<HeadInfo> {
-    chain_head_db(txn, author)?.ok_or(SourceChainError::ChainEmpty)
+pub fn chain_head_db_nonempty(txn: &Txn<DbKindAuthored>) -> SourceChainResult<HeadInfo> {
+    chain_head_db(txn)?.ok_or(SourceChainError::ChainEmpty)
 }
 
 pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSigningSessionData)>;
@@ -1246,10 +1228,9 @@ pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSig
 /// Check if there is a current countersigning session and if so, return the
 /// session data and the entry hash.
 pub fn current_countersigning_session(
-    txn: &Transaction<'_>,
-    author: Arc<AgentPubKey>,
+    txn: &Txn<DbKindAuthored>,
 ) -> SourceChainResult<CurrentCountersigningSessionOpt> {
-    match chain_head_db(txn, author) {
+    match chain_head_db(txn) {
         // We haven't done genesis so no session can be active.
         Err(e) => Err(e),
         Ok(None) => Ok(None),
@@ -1269,67 +1250,6 @@ pub fn current_countersigning_session(
             })
         }
     }
-}
-
-#[cfg(test)]
-async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
-    vault: holochain_types::prelude::DbWrite<DbKindAuthored>,
-    keystore: &MetaLairClient,
-    author: Arc<AgentPubKey>,
-    action_builder: B,
-    maybe_entry: Option<Entry>,
-) -> SourceChainResult<ActionHash> {
-    let HeadInfo {
-        action: prev_action,
-        seq: last_action_seq,
-        ..
-    } = vault
-        .read_async({
-            let query_author = author.clone();
-
-            move |txn| chain_head_db_nonempty(txn, query_author.clone())
-        })
-        .await?;
-    let action_seq = last_action_seq + 1;
-
-    let common = ActionBuilderCommon {
-        author: (*author).clone(),
-        timestamp: Timestamp::now(),
-        action_seq,
-        prev_action: prev_action.clone(),
-    };
-    let action = action_builder.build(common).weightless();
-    let action = ActionHashed::from_content_sync(action);
-    let action = SignedActionHashed::sign(keystore, action).await?;
-    let record = Record::new(action, maybe_entry);
-    let ops = produce_op_lites_from_records(vec![&record])?;
-    let (action, entry) = record.into_inner();
-    let entry = entry.into_option();
-    let hash = action.as_hash().clone();
-    vault
-        .write_async(move |txn| -> SourceChainResult<Vec<DhtOpHash>> {
-            let head_info = chain_head_db_nonempty(txn, author.clone())?;
-            if head_info.action != prev_action {
-                let entries = match (entry, action.action().entry_hash()) {
-                    (Some(e), Some(entry_hash)) => {
-                        vec![holochain_types::EntryHashed::with_pre_hashed(
-                            e,
-                            entry_hash.clone(),
-                        )]
-                    }
-                    _ => vec![],
-                };
-                return Err(SourceChainError::HeadMoved(
-                    Box::new(vec![action]),
-                    Box::new(entries),
-                    Some(prev_action),
-                    Some(head_info),
-                ));
-            }
-            Ok(put_raw(txn, action, ops, entry)?)
-        })
-        .await?;
-    Ok(hash)
 }
 
 /// dump the entire source chain as a pretty-printed json string
@@ -1464,12 +1384,10 @@ mod tests {
             .put(action_builder, None, ChainTopOrdering::Relaxed)
             .await?;
 
-        let author = Arc::new(alice);
         let storage_arcs = vec![DhtArc::Empty];
         chain_1.flush(storage_arcs.clone(), None).await?;
-        let author_1 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn, author_1))
+            .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1478,17 +1396,15 @@ mod tests {
             chain_2.flush(storage_arcs.clone(), None).await,
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
-        let author_2 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn, author_2))
+            .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
             .seq;
         assert_eq!(seq, 3);
 
         chain_3.flush(storage_arcs, None).await?;
-        let author_3 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn, author_3))
+            .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
             .seq;
         assert_eq!(seq, 4);
@@ -1560,12 +1476,10 @@ mod tests {
             .await
             .unwrap();
 
-        let author = Arc::new(alice);
         let storage_arcs = vec![DhtArc::Empty];
         chain_1.flush(storage_arcs.clone(), None).await?;
-        let author_1 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn, author_1))
+            .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
             .seq;
         assert_eq!(seq, 3);
@@ -1576,9 +1490,8 @@ mod tests {
         ));
 
         chain_3.flush(storage_arcs, None).await?;
-        let author_2 = Arc::clone(&author);
         let head = db
-            .write_async(move |txn| chain_head_db_nonempty(txn, author_2.clone()))
+            .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?;
 
         // not equal since action hash change due to rebasing
@@ -2110,10 +2023,8 @@ mod tests {
 
         vault
             .read_async({
-                let query_author = author.clone();
-
                 move |txn| -> DatabaseResult<()> {
-                    assert_matches!(chain_head_db(txn, query_author.clone()), Ok(None));
+                    assert_matches!(chain_head_db(txn), Ok(None));
 
                     Ok(())
                 }
@@ -2164,15 +2075,9 @@ mod tests {
             .read_async({
                 let check_h1 = h1.clone();
                 let check_h2 = h2.clone();
-                let check_author = author.clone();
 
                 move |txn| -> DatabaseResult<()> {
-                    assert_eq!(
-                        chain_head_db_nonempty(txn, check_author.clone())
-                            .unwrap()
-                            .action,
-                        check_h2
-                    );
+                    assert_eq!(chain_head_db_nonempty(txn).unwrap().action, check_h2);
                     // get the full record
                     let store = CascadeTxnWrapper::from(txn);
                     let h1_record_fetched = store

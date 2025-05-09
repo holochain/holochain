@@ -15,7 +15,6 @@ use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::ChainOp;
 use holochain_zome_types::prelude::SignedAction;
 use rusqlite::{named_params, Transaction};
-use std::sync::Arc;
 
 pub(crate) async fn inner_countersigning_session_complete(
     space: Space,
@@ -49,7 +48,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         move |txn: &Txn<DbKindAuthored>| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
             if let Some((session_record, cs_entry_hash, session_data)) =
-                current_countersigning_session(txn, Arc::new(author.clone()))?
+                current_countersigning_session(txn)?
             {
                 let lock_subject = session_data.preflight_request.fingerprint()?;
 
@@ -305,9 +304,7 @@ pub(super) async fn force_publish_countersigning_session(
         let preflight_request = preflight_request.clone();
         move |txn: &Txn<DbKindAuthored>| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
-            if let Some((session_record, _, session_data)) =
-                current_countersigning_session(txn, Arc::new(author.clone()))?
-            {
+            if let Some((session_record, _, session_data)) = current_countersigning_session(txn)? {
                 let lock_subject = session_data.preflight_request.fingerprint()?;
                 if lock_subject != preflight_request.fingerprint()? {
                     return SourceChainResult::Ok(None);

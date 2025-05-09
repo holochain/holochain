@@ -602,12 +602,7 @@ async fn apply_timeout(
 
     let authored = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
 
-    let current_session = authored
-        .read_async({
-            let author = cell_id.agent_pubkey().clone();
-            move |txn| current_countersigning_session(txn, Arc::new(author))
-        })
-        .await?;
+    let current_session = authored.read_async(current_countersigning_session).await?;
 
     let mut has_committed_session = false;
     if let Some((_, _, session_data)) = current_session {
@@ -717,10 +712,7 @@ async fn force_abandon_session(
     let abandon_fingerprint = preflight_request.fingerprint()?;
 
     let maybe_session_data = authored_db
-        .read_async({
-            let author = author.clone();
-            move |txn| current_countersigning_session(txn, Arc::new(author.clone()))
-        })
+        .read_async(current_countersigning_session)
         .await?;
 
     match maybe_session_data {

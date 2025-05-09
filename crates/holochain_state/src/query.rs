@@ -936,12 +936,8 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
     ) -> StateQueryResult<StmtIter<'iter, T>> {
         match stmt {
             Some(stmt) => {
-                if params.is_empty() {
-                    Ok(Box::new(fallible_iterator::convert(std::iter::empty())) as StmtIter<T>)
-                } else {
-                    let iter = stmt.query_and_then(params, move |r| map_fn(r))?;
-                    Ok(Box::new(fallible_iterator::convert(iter)) as StmtIter<T>)
-                }
+                let iter = stmt.query_and_then(params, move |r| map_fn(r))?;
+                Ok(Box::new(fallible_iterator::convert(iter)) as StmtIter<T>)
             }
             None => Ok(Box::new(fallible_iterator::convert(std::iter::empty())) as StmtIter<T>),
         }
