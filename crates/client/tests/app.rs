@@ -1,3 +1,4 @@
+use holo_hash::DnaHash;
 use holochain::{
     prelude::{AppBundleSource, Signal},
     sweettest::SweetConductor,
@@ -21,6 +22,24 @@ use std::{
 };
 
 mod fixture;
+
+fn make_agent(space: kitsune2_api::SpaceId) -> String {
+    let local = kitsune2_core::Ed25519LocalAgent::default();
+    let created_at = kitsune2_api::Timestamp::now();
+    let expires_at = created_at + std::time::Duration::from_secs(60 * 20);
+    let info = kitsune2_api::AgentInfo {
+        agent: kitsune2_api::LocalAgent::agent(&local).clone(),
+        space,
+        created_at,
+        expires_at,
+        is_tombstone: false,
+        url: None,
+        storage_arc: kitsune2_api::DhtArc::FULL,
+    };
+    let info =
+        futures::executor::block_on(kitsune2_api::AgentInfoSigned::sign(&local, info)).unwrap();
+    info.encode().unwrap()
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_signal() {
@@ -476,4 +495,72 @@ async fn dump_network_metrics() {
     let metrics = app_ws.dump_network_metrics(None, true).await.unwrap();
 
     assert_eq!(1, metrics.len());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn agent_info() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port))
+        .await
+        .unwrap();
+    let _app_port = admin_ws
+        .attach_app_interface(0, AllowedOrigins::from("my_cli_app".to_string()), None)
+        .await
+        .unwrap();
+
+    let app_id: InstalledAppId = "test-app".into();
+    let agent_key = admin_ws.generate_agent_pub_key().await.unwrap();
+    admin_ws
+        .install_app(InstallAppPayload {
+            agent_key: Some(agent_key.clone()),
+            installed_app_id: Some(app_id.clone()),
+            roles_settings: None,
+            network_seed: None,
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
+            ignore_genesis_failure: false,
+        })
+        .await
+        .unwrap();
+    admin_ws.enable_app(app_id.clone()).await.unwrap();
+
+    // Connect app client
+    let app_ws_port = admin_ws
+        .attach_app_interface(0, AllowedOrigins::Any, None)
+        .await
+        .unwrap();
+    let token_issued = admin_ws
+        .issue_app_auth_token(app_id.clone().into())
+        .await
+        .unwrap();
+    let signer = ClientAgentSigner::default().into();
+    let app_ws = AppWebsocket::connect(
+        (Ipv4Addr::LOCALHOST, app_ws_port),
+        token_issued.token,
+        signer,
+    )
+    .await
+    .unwrap();
+
+    let agent_infos = app_ws.agent_info(None).await.unwrap();
+    assert_eq!(agent_infos.len(), 1);
+
+    let space = kitsune2_api::AgentInfoSigned::decode(
+        &kitsune2_core::Ed25519Verifier,
+        agent_infos[0].as_bytes(),
+    )
+    .unwrap()
+    .space
+    .clone();
+
+    let other_agent = make_agent(space.clone());
+
+    admin_ws
+        .add_agent_info(vec![other_agent.clone()])
+        .await
+        .unwrap();
+    let dna = DnaHash::from_k2_space(&space);
+    let agent_infos = app_ws.agent_info(Some(dna)).await.unwrap();
+    assert_eq!(agent_infos.len(), 2);
+    assert!(agent_infos.contains(&other_agent));
 }

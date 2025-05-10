@@ -24,6 +24,17 @@ pub enum AppRequest {
     /// [`AppResponse::AppInfo`]
     AppInfo,
 
+    /// Request information about the agents in this Conductor's peer store.
+    /// This is limited to cells of the app you are connected to.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::AgentInfo`]
+    AgentInfo {
+        /// Optionally limit the results to a specific DNA hash
+        dna_hash: Option<DnaHash>,
+    },
+
     /// Call a zome function.
     ///
     /// The payload to this call is composed of the serialized [`ZomeCallParams`] as bytes
@@ -238,6 +249,9 @@ pub enum AppResponse {
     ///
     /// Option will be `None` if there is no installed app with the given `installed_app_id`.
     AppInfo(Option<AppInfo>),
+
+    /// The successful response to an [`AppRequest::AgentInfo`].
+    AgentInfo(Vec<String>),
 
     /// The successful response to an [`AppRequest::CallZome`].
     ///
