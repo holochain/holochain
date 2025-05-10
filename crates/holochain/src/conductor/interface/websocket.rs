@@ -494,9 +494,7 @@ mod test {
     use crate::conductor::Conductor;
     use crate::conductor::ConductorHandle;
     use crate::fixt::RealRibosomeFixturator;
-    use crate::retry_until_timeout;
     use crate::sweettest::websocket_client_by_port;
-    use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::WsPollRecv;
     use crate::sweettest::{app_bundle_from_dnas, authenticate_app_ws_client};
@@ -513,8 +511,6 @@ mod test {
     use holochain_types::test_utils::fake_dna_zomes;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::test_utils::fake_agent_pubkey_2;
-    use kitsune2_api::AgentInfoSigned;
-    use kitsune2_api::{AgentId, SpaceId};
     use matches::assert_matches;
     use pretty_assertions::assert_eq;
     use std::collections::HashSet;
@@ -1216,35 +1212,6 @@ mod test {
             .await
             .unwrap();
         conductor_handle.shutdown().await.unwrap().unwrap();
-    }
-
-    async fn make_req(
-        admin_api: AdminInterfaceApi,
-        req: AdminRequest,
-    ) -> tokio::sync::oneshot::Receiver<AdminResponse> {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-
-        let respond = move |response: AdminResponse| {
-            tx.send(response).unwrap();
-        };
-
-        test_handle_incoming_admin_message(req, respond, admin_api)
-            .await
-            .unwrap();
-        rx
-    }
-
-    fn to_key(r: Vec<String>) -> Vec<(SpaceId, AgentId)> {
-        let mut results = r
-            .into_iter()
-            .map(|a| {
-                let parsed_info =
-                    AgentInfoSigned::decode(&kitsune2_core::Ed25519Verifier, a.as_bytes()).unwrap();
-                (parsed_info.space.clone(), parsed_info.agent.clone())
-            })
-            .collect::<Vec<_>>();
-        results.sort();
-        results
     }
 
     fn get_app_data_storage_info(
