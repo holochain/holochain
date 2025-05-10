@@ -828,7 +828,7 @@ mod network_impls {
         zome_call_response_to_conductor_api_result, ConductorApiError,
     };
     use futures::future::join_all;
-    use holochain_conductor_api::ZomeCallParamsSigned;
+    use holochain_conductor_api::{CellInfo, ZomeCallParamsSigned};
     use holochain_conductor_api::{DnaStorageInfo, StorageBlob, StorageInfo};
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
@@ -872,6 +872,52 @@ mod network_impls {
                     Ok(out.into_iter().collect())
                 }
             }
+        }
+
+        /// Get signed agent info from the conductor for a given app
+        pub async fn get_app_agent_infos(
+            &self,
+            installed_app_id: &InstalledAppId,
+            dna_hash: Option<DnaHash>,
+        ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
+            // Get app info to know which DNAs belong to this app
+            let app_info = self.get_app_info(&installed_app_id).await?.ok_or_else(|| {
+                ConductorApiError::other(format!("App not installed: {}", installed_app_id))
+            })?;
+
+            // Get all agent infos
+            let mut all_infos = self.get_agent_infos(None).await?;
+
+            // 1. Create HashMap mapping DNAs to agent infos
+            let mut dna_to_infos: HashMap<DnaHash, Vec<&AgentInfoSigned>> = HashMap::new();
+            for info in &all_infos {
+                let dna = DnaHash::from_k2_space(&info.space);
+                dna_to_infos.entry(dna).or_default().push(info);
+            }
+
+            // 2. Collect all DNAs for this app
+            let mut app_dnas = Vec::new();
+            for cell_info in app_info.cell_info.values().flatten() {
+                match cell_info {
+                    CellInfo::Provisioned(cell) => app_dnas.push(cell.cell_id.dna_hash().clone()),
+                    CellInfo::Cloned(cell) => app_dnas.push(cell.cell_id.dna_hash().clone()),
+                    _ => continue,
+                }
+            }
+
+            // If dna_hash is specified, filter to only that DNA
+            if let Some(dna_hash) = &dna_hash {
+                if !app_dnas.contains(dna_hash) {
+                    return Ok(Vec::new());
+                }
+                app_dnas.clear();
+                app_dnas.push(dna_hash.clone());
+            }
+
+            // 3. Remove all agent infos not in the dnas list.
+            all_infos.retain(|info| app_dnas.contains(&DnaHash::from_k2_space(&info.space)));
+
+            Ok(all_infos)
         }
 
         pub(crate) async fn witness_nonce_from_calling_agent(
