@@ -881,7 +881,7 @@ mod network_impls {
             dna_hash: Option<DnaHash>,
         ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
             // Get app info to know which DNAs belong to this app
-            let app_info = self.get_app_info(&installed_app_id).await?.ok_or_else(|| {
+            let app_info = self.get_app_info(installed_app_id).await?.ok_or_else(|| {
                 ConductorApiError::other(format!("App not installed: {}", installed_app_id))
             })?;
 
