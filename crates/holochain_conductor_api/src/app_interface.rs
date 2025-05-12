@@ -284,9 +284,6 @@ pub enum AppResponse {
     /// All the wasm host functions supported by this conductor.
     ListWasmHostFunctions(Vec<String>),
 
-    /// The app agent key as been rotated, and the new key is returned.
-    AppAgentKeyRotated(AgentPubKey),
-
     /// Operation successful, no payload.
     Ok,
 }
