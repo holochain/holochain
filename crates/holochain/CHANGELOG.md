@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Optimize `ChainHeadQuery` for performance. A flame graph analysis revealed that a significant proportion of the CPU time was spent on this query in a test with a high number of entry creates and reads. The query now runs about 30 % faster. #4971
 - Allow queries in `holochain_state` to run without parameters. Previously such queries would not be run against any stores. That is now possible.
 - Further optimize `ChainHeadQuery` for performance by removing redundant WHERE clause. Formerly multiple agents on a conductor would share the same authored database, so the chain head had to be determined by agent. Since a refactor every agent has their own authored database, thus the clause is no longer required. #4974
+- Remove unused column `dependency` and related indexes from table `DhtOp`.
 
 ## 0.6.0-dev.3
 
