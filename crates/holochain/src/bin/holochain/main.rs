@@ -62,6 +62,12 @@ struct Opt {
 }
 
 fn main() {
+    if rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .is_err()
+    {
+        tracing::error!("could not set cyrpto provider for tls");
+    }
     // the async_main function should only end if our program is done
     tokio_helper::block_forever_on(async_main());
 }
