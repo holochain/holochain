@@ -221,7 +221,6 @@ pub fn insert_op_when(
     let timestamp = op.timestamp();
     let signature = op.signature().clone();
     let op_order = OpOrder::new(op_type, op.timestamp());
-    let deps = op.sys_validation_dependencies();
 
     #[cfg(not(feature = "unstable-warrants"))]
     let create_op = true;
@@ -263,7 +262,6 @@ pub fn insert_op_when(
             transfer_data,
             when_stored,
         )?;
-        set_dependency(txn, hash, deps)?;
     }
     Ok(())
 }
@@ -587,22 +585,6 @@ pub fn set_validation_status(
     dht_op_update!(txn, hash, {
         "validation_status": status,
     })?;
-    Ok(())
-}
-/// Set the integration dependency of a [DhtOp] in the database.
-pub fn set_dependency(
-    txn: &mut Transaction,
-    hash: &DhtOpHash,
-    deps: SysValDeps,
-) -> StateMutationResult<()> {
-    // NOTE: this is only the FIRST dependency. This was written at a time when sys validation
-    // only had a notion of one dependency. This db field is not used, so we're not putting too
-    // much effort into getting all deps into the database.
-    if let Some(dep) = deps.first() {
-        dht_op_update!(txn, hash, {
-            "dependency": dep,
-        })?;
-    }
     Ok(())
 }
 
