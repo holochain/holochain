@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Contains a fix to address a panic that could occur on macOS in case of invalid certificates in the keychain [#4323](https://github.com/holochain/holochain/issues/4323)
+
 ## 0.4.2
 
 ## 0.4.2-rc.1
