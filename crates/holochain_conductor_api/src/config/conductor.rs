@@ -33,7 +33,7 @@
 //!   ## to what you can see here:
 //!   webrtc_config: {
 //!     "iceServers": [
-//!       { "urls": ["stun:devtest-stun-1.holochain.org:443"] }
+//!       { "urls": ["stun://stun.l.google.com:19302"] }
 //!     ]
 //!   }
 //! "#;
