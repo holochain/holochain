@@ -31,7 +31,7 @@ static-fmt:
 
 # lint our toml files
 static-toml:
-	cargo install taplo-cli@0.9.0
+	cargo install taplo-cli@0.9.0 --locked
 	$(F) taplo format --check ./*.toml
 	$(F) taplo format --check ./crates/**/*.toml
 
@@ -77,7 +77,7 @@ build-workspace-wasmer_wamr:
 
 # execute tests on all crates with wasmer compiler
 test-workspace-wasmer_sys:
-	cargo install cargo-nextest
+	cargo install cargo-nextest --locked
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
@@ -86,7 +86,7 @@ test-workspace-wasmer_sys:
 
 # executes tests on all crates with wasmer compiler and unstable dpki feature
 test-workspace-wasmer_sys-unstable:
-	cargo install cargo-nextest
+	cargo install cargo-nextest --locked
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
@@ -95,7 +95,7 @@ test-workspace-wasmer_sys-unstable:
 
 # execute tests on all crates with wasmer interpreter
 test-workspace-wasmer_wamr:
-	cargo install cargo-nextest
+	cargo install cargo-nextest --locked
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
