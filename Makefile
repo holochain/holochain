@@ -31,7 +31,7 @@ static-fmt:
 
 # lint our toml files
 static-toml:
-	cargo install taplo-cli@0.9.0
+	cargo install taplo-cli@0.9.0 --locked
 	$(F) taplo format --check ./*.toml
 	$(F) taplo format --check ./crates/**/*.toml
 
