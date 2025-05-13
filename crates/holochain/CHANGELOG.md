@@ -6,9 +6,12 @@ default_semver_increment_mode: !pre_patch rc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## 0.4.3-rc.0
+
 - Set crypto provider for TLS connections in Holochain binary. This used to produce error when running the binary.
 
-- Contains a fix to address a panic that could occur on macOS in case of invalid certificates in the keychain [#4323](https://github.com/holochain/holochain/issues/4323)
+- Contains a fix to address a panic that could occur on macOS in case of invalid certificates in the keychain [\#4323](https://github.com/holochain/holochain/issues/4323)
 
 ## 0.4.2
 
