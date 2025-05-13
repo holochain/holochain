@@ -76,7 +76,7 @@ jobs:
       - name: install build dependencies (macos-latest, wasmer_wamr)
         if: matrix.os == 'macos-latest' && matrix.target == 'wasmer_wamr'
         shell: bash
-        run: brew update && brew install cmake@3.31.0 ninja && cmake --version
+        run: brew extract --version 3.31.6 cmake homebrew/tap && brew install homebrew/tab/cmake@3.31.6 && brew install ninja && cmake --version
 
       - name: build (windows-latest)
         if: matrix.os == 'windows-latest'
