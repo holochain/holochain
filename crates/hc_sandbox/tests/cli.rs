@@ -873,7 +873,7 @@ async fn get_config_root_path(child: &mut Child) -> PathBuf {
 
     while let Ok(Some(line)) = lines.next_line().await {
         println!("@@@-{line}-@@@");
-        if line.find("Created [ConfigRootPath(\"").is_some() {
+        if line.contains("Created [ConfigRootPath(\"") {
             let start = line
                 .find("(\"")
                 .expect("Unexpected config root path line format.");
