@@ -9,7 +9,7 @@ use crate::msg;
 
 pub fn set_admin_port(config: &mut ConductorConfig, port: u16) {
     let p = port;
-    let port = AdminInterfaceConfig {
+    let default_interface = AdminInterfaceConfig {
         driver: InterfaceDriver::Websocket {
             port,
             allowed_origins: AllowedOrigins::Any,
@@ -21,9 +21,14 @@ pub fn set_admin_port(config: &mut ConductorConfig, port: u16) {
         .and_then(|ai| ai.get_mut(0))
     {
         Some(admin_interface) => {
-            *admin_interface = port;
+            *admin_interface = AdminInterfaceConfig {
+                driver: InterfaceDriver::Websocket {
+                    port,
+                    allowed_origins: admin_interface.driver.allowed_origins().to_owned(),
+                },
+            };
         }
-        None => config.admin_interfaces = Some(vec![port]),
+        None => config.admin_interfaces = Some(vec![default_interface]),
     }
     msg!("Admin port set to: {}", p);
 }

@@ -1,7 +1,11 @@
 use holochain_cli_sandbox::cli::LaunchInfo;
-use holochain_client::AdminWebsocket;
-use holochain_conductor_api::{AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest};
+use holochain_client::{AdminWebsocket, AllowedOrigins};
+use holochain_conductor_api::{
+    AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest,
+    InterfaceDriver,
+};
 use holochain_conductor_api::{AppResponse, CellInfo};
+use holochain_conductor_config::config::{read_config, write_config};
 use holochain_types::app::InstalledAppId;
 use holochain_types::prelude::{SerializedBytes, SerializedBytesError, YamlProperties};
 use holochain_websocket::{
@@ -237,7 +241,7 @@ async fn generate_sandbox_and_call_list_dna() {
 
     let mut hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info: LaunchInfo = get_launch_info(&mut hc_admin).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -341,6 +345,99 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
 
     let mut hc_call = input_piped_password(&mut cmd).await;
 
+    let exit_code = hc_call.wait().await.unwrap();
+    assert!(exit_code.success());
+}
+
+/// Generates a sandbox and overwrites the conductor config with
+/// a specific allowed origin on the admin interface, then calls
+/// ListDna with the correct origin
+#[tokio::test(flavor = "multi_thread")]
+async fn generate_sandbox_and_call_list_dna_with_origin() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg("tests/fixtures/my-app/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let config_root_path = get_config_root_path(&mut hc_admin).await;
+    hc_admin.wait().await.unwrap();
+
+    // Overwrite the allowed_origins field
+    let mut config = read_config(config_root_path.clone().into())
+        .expect("msg")
+        .unwrap();
+
+    match config
+        .admin_interfaces
+        .as_mut()
+        .and_then(|ai| ai.get_mut(0))
+    {
+        Some(admin_interface) => {
+            *admin_interface = AdminInterfaceConfig {
+                driver: InterfaceDriver::Websocket {
+                    port: admin_interface.driver.port(),
+                    allowed_origins: AllowedOrigins::Origins(
+                        vec!["test-origin".to_string()].into_iter().collect(),
+                    ),
+                },
+            };
+        }
+        None => panic!("No admin interface config found in conductor config"),
+    }
+
+    write_config(config_root_path.clone().into(), &config).unwrap();
+
+    // Verify that admin call fails without specifying an origin to make sure
+    // the conductor config has properly been modified
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("call")
+        .arg("list-dnas")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit());
+
+    let mut hc_call = input_piped_password(&mut cmd).await;
+    let exit_code = hc_call.wait().await.unwrap();
+    assert!(exit_code.code() == Some(1)); // Should fail
+
+    // Verify that admin call succeeds the correct origin
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("call")
+        .arg("--origin")
+        .arg("test-origin")
+        .arg("list-dnas")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit());
+
+    let mut hc_call = input_piped_password(&mut cmd).await;
     let exit_code = hc_call.wait().await.unwrap();
     assert!(exit_code.success());
 }
@@ -519,7 +616,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
 
     let mut hc_admin = input_piped_password(&mut cmd).await;
 
-    let launch_info: LaunchInfo = get_launch_info(&mut hc_admin).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
 
     let admin_ws = AdminWebsocket::connect(
         format!("localhost:{}", launch_info.admin_port).as_str(),
@@ -768,6 +865,25 @@ fn get_holochain_bin_path() -> PathBuf {
 
 fn get_sandbox_command() -> Command {
     Command::new(get_target("hc-sandbox"))
+}
+
+async fn get_config_root_path(child: &mut Child) -> PathBuf {
+    let stdout = child.stdout.take().unwrap();
+    let mut lines = BufReader::new(stdout).lines();
+
+    while let Ok(Some(line)) = lines.next_line().await {
+        println!("@@@-{line}-@@@");
+        if let Some(_) = line.find("Created [ConfigRootPath(\"") {
+            let start = line
+                .find("(\"")
+                .expect("Unexpected config root path line format.");
+            let end = line
+                .find("\")]")
+                .expect("Unexpected config root path line format.");
+            return PathBuf::from(&line[(start + 2)..end]);
+        }
+    }
+    panic!("Unable to find conductor root path in sandbox output. See stderr above.")
 }
 
 async fn get_launch_info(child: &mut Child) -> LaunchInfo {
