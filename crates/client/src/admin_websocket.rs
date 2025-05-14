@@ -61,15 +61,23 @@ impl AdminWebsocket {
     /// use std::net::Ipv4Addr;
     /// use holochain_client::AdminWebsocket;
     ///
-    /// let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, 30_000)).await.unwrap();
+    /// let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, 30_000), String::from("my_cli_app")).await.unwrap();
     /// # }
     /// ```
     ///
     /// As string: `"localhost:30000"`
     ///
     /// As tuple: `([127.0.0.1], 30000)`
-    pub async fn connect(socket_addr: impl ToSocketAddrs) -> ConductorApiResult<Self> {
-        Self::connect_with_config(socket_addr, Arc::new(WebsocketConfig::CLIENT_DEFAULT)).await
+    pub async fn connect(
+        socket_addr: impl ToSocketAddrs,
+        origin: Option<String>,
+    ) -> ConductorApiResult<Self> {
+        Self::connect_with_config(
+            socket_addr,
+            Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+            origin,
+        )
+        .await
     }
 
     /// Connect to a Conductor API admin websocket with a custom [WebsocketConfig].
@@ -92,16 +100,21 @@ impl AdminWebsocket {
     ///
     /// let client_config = Arc::new(client_config);
     ///
-    /// let admin_ws = AdminWebsocket::connect_with_config((Ipv4Addr::LOCALHOST, 30_000), client_config).await.unwrap();
+    /// let admin_ws = AdminWebsocket::connect_with_config((Ipv4Addr::LOCALHOST, 30_000), client_config, None).await.unwrap();
     /// # }
     /// ```
     pub async fn connect_with_config(
         socket_addr: impl ToSocketAddrs,
         websocket_config: Arc<WebsocketConfig>,
+        origin: Option<String>,
     ) -> ConductorApiResult<Self> {
         let mut last_err = None;
         for addr in socket_addr.to_socket_addrs()? {
-            let request: ConnectRequest = addr.into();
+            let request: ConnectRequest = if let Some(o) = origin.clone() {
+                Into::<ConnectRequest>::into(addr).try_set_header("Origin", o.as_str())?
+            } else {
+                addr.into()
+            };
 
             match Self::connect_with_request_and_config(request, websocket_config.clone()).await {
                 Ok(admin_ws) => return Ok(admin_ws),
@@ -144,9 +157,6 @@ impl AdminWebsocket {
     /// for addr in connect_to {
     ///     // Send a request with a custom origin header to identify the client
     ///     let mut request: ConnectRequest = addr.into();
-    ///     let request = request
-    ///         .try_set_header("Origin", "my_cli_app")
-    ///         .unwrap();
     ///
     ///     match AdminWebsocket::connect_with_request_and_config(request, client_config.clone()).await {
     ///         Ok(admin_ws) => {

@@ -67,7 +67,7 @@ pub struct AdminClient {
 impl AdminClient {
     /// Creates an Admin websocket client which can send messages but ignores any incoming messages
     pub async fn connect(addr: std::net::SocketAddr) -> anyhow::Result<Self> {
-        let client = AdminWebsocket::connect(addr).await?;
+        let client = AdminWebsocket::connect(addr, None).await?;
         Ok(AdminClient { client, addr })
     }
 

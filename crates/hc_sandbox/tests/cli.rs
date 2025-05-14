@@ -521,10 +521,12 @@ async fn generate_sandbox_and_add_and_list_agent() {
 
     let launch_info: LaunchInfo = get_launch_info(&mut hc_admin).await;
 
-    let admin_ws =
-        AdminWebsocket::connect(format!("localhost:{}", launch_info.admin_port).as_str())
-            .await
-            .unwrap();
+    let admin_ws = AdminWebsocket::connect(
+        format!("localhost:{}", launch_info.admin_port).as_str(),
+        None,
+    )
+    .await
+    .unwrap();
 
     let agent_infos = admin_ws.agent_info(None).await.unwrap();
     assert_eq!(agent_infos.len(), 2);

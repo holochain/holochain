@@ -45,7 +45,7 @@ pub async fn default_with_network(
         chc_url,
     )?;
     let conductor = run_async(holochain_path, config_path.clone(), None, structured).await?;
-    let mut client = AdminWebsocket::connect(format!("localhost:{}", conductor.0)).await?;
+    let mut client = AdminWebsocket::connect(format!("localhost:{}", conductor.0), None).await?;
     let install_bundle = InstallApp {
         app_id: Some(app_id),
         agent_key: None,

@@ -21,7 +21,7 @@ async fn clone_cell_management() {
 
     // Connect admin client
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port))
+    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
         .await
         .unwrap();
 
@@ -171,7 +171,7 @@ pub async fn app_info_refresh() {
 
     // Connect admin client
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port))
+    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
         .await
         .unwrap();
 
