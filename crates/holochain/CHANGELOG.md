@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Slightly simplify `GetLinksQuery` by removing a sub query. The sub query filtered `RegisterRemoveLink` ops by those that reference a `RegisterAddLink` op. That filter is not needed, because the logic then only filters out removed links from the result set if they reference a created link in the result set. Also it is very unlikely if not impossible that there are remove link actions in the database without the corresponding create link actions.
+
 ## 0.6.0-dev.4
 
 - Change `hc-sandbox` to use admin and app clients from the `holochain_client` crate
