@@ -54,7 +54,7 @@ pub enum RunCmd {
         #[arg(long, default_value = "-")]
         dna: std::path::PathBuf,
 
-        /// the outbox path.
+        /// The outbox path.
         #[arg(long, default_value = "hc-demo-cli-outbox")]
         outbox: std::path::PathBuf,
 
@@ -69,6 +69,10 @@ pub enum RunCmd {
         /// The bootstrap server URL.
         #[arg(long, default_value = DEF_BOOTSTRAP_URL)]
         bootstrap_url: String,
+
+        /// Any auth material required for the signal/bootstrap endpoints.
+        #[arg(long)]
+        base64_auth_material: Option<String>,
     },
 
     /// Generate a dna file that can be used with hc demo-cli.
@@ -89,6 +93,7 @@ pub async fn run_demo(opts: RunOpts) {
             inbox,
             signal_url,
             bootstrap_url,
+            base64_auth_material,
         } => {
             run(
                 dna,
@@ -96,6 +101,7 @@ pub async fn run_demo(opts: RunOpts) {
                 inbox,
                 signal_url,
                 bootstrap_url,
+                base64_auth_material,
                 None,
                 None,
                 true,
@@ -209,6 +215,7 @@ async fn run(
     inbox: std::path::PathBuf,
     signal_url: String,
     bootstrap_url: String,
+    base64_auth_material: Option<String>,
     ready: Option<tokio::sync::oneshot::Sender<()>>,
     rendezvous: Option<holochain::sweettest::DynSweetRendezvous>,
     prod: bool,
@@ -258,7 +265,9 @@ async fn run(
         }
     };
 
-    let config = holochain::sweettest::SweetConductorConfig::rendezvous(true);
+    let mut config = holochain::sweettest::SweetConductorConfig::rendezvous(true);
+
+    config.network.base64_auth_material = base64_auth_material;
 
     tracing::info!("Using config: {:?}", *config);
 
