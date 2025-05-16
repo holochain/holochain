@@ -110,7 +110,7 @@ impl AdminWebsocket {
     ) -> ConductorApiResult<Self> {
         let mut last_err = None;
         for addr in socket_addr.to_socket_addrs()? {
-            let request: ConnectRequest = if let Some(o) = origin.clone() {
+            let request: ConnectRequest = if let Some(o) = &origin {
                 Into::<ConnectRequest>::into(addr).try_set_header("Origin", o.as_str())?
             } else {
                 addr.into()
