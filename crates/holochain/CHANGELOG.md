@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Add `--origin` option to `hc sandbox call` command
+- Adds the `--origin` option to the `hc sandbox call` command in order to allow making admin calls to deployed conductors with restricted `allowed_origins`.
 
 ## 0.6.0-dev.4
 
