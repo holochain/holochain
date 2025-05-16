@@ -47,7 +47,7 @@ async fn add_agent_infos_to_peer_store() {
         .unwrap()
         .unwrap();
     let agent_infos = conductor
-        .get_agent_infos(Some(cell_id.clone()))
+        .get_agent_infos_by_cell(Some(cell_id.clone()))
         .await
         .unwrap();
     assert_eq!(agent_infos, vec![expected_agent_info.clone()]);
