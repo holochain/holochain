@@ -8,13 +8,6 @@ use holochain_types::websocket::AllowedOrigins;
 use crate::msg;
 
 pub fn set_admin_port(config: &mut ConductorConfig, port: u16) {
-    let p = port;
-    let default_interface = AdminInterfaceConfig {
-        driver: InterfaceDriver::Websocket {
-            port,
-            allowed_origins: AllowedOrigins::Any,
-        },
-    };
     match config
         .admin_interfaces
         .as_mut()
@@ -28,7 +21,14 @@ pub fn set_admin_port(config: &mut ConductorConfig, port: u16) {
                 },
             };
         }
-        None => config.admin_interfaces = Some(vec![default_interface]),
+        None => {
+            config.admin_interfaces = Some(vec![AdminInterfaceConfig {
+                driver: InterfaceDriver::Websocket {
+                    port,
+                    allowed_origins: AllowedOrigins::Any,
+                },
+            }])
+        }
     }
-    msg!("Admin port set to: {}", p);
+    msg!("Admin port set to: {}", port);
 }
