@@ -615,7 +615,7 @@ impl Agent {
     async fn setup(bootstrap_url: String, signal_url: String, network_seed: String) -> Agent {
         let admin_port = 0;
         let tmp_dir = TempDir::new().unwrap();
-        let path = tmp_dir.into_path();
+        let path = tmp_dir.keep();
         let environment_path = path.clone();
         let mut config = create_config(admin_port, environment_path.into());
         config.network.advanced = Some(serde_json::json!({

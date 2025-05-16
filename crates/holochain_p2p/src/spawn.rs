@@ -85,6 +85,7 @@ impl std::fmt::Debug for HolochainP2pConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut dbg = f.debug_struct("HolochainP2pConfig");
         dbg.field("compat", &self.compat);
+        dbg.field("auth_material", &self.auth_material);
 
         #[cfg(feature = "test_utils")]
         {

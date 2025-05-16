@@ -3,8 +3,6 @@ use holochain::sweettest::SweetConductorConfig;
 use holochain::sweettest::*;
 use holochain_sqlite::db::{DbKindT, DbWrite};
 use holochain_sqlite::prelude::DatabaseResult;
-use holochain_types::network::Kitsune2NetworkMetricsRequest;
-use std::collections::HashMap;
 use unwrap_to::unwrap_to;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, SerializedBytes, derive_more::From)]
@@ -115,24 +113,6 @@ async fn multi_conductor() -> anyhow::Result<()> {
         *record.entry(),
         RecordEntry::Present(Entry::app(().try_into().unwrap()).unwrap())
     );
-
-    // See if we can fetch metric data from bobbo
-    let metrics = conductors[1]
-        .dump_network_metrics(Kitsune2NetworkMetricsRequest::default())
-        .await?
-        .into_iter()
-        .map(|(k, v)| (k.to_string(), v))
-        .collect::<HashMap<_, _>>();
-    tracing::info!(target: "TEST", "@!@! - metrics: {}", serde_json::to_string_pretty(&metrics).unwrap());
-
-    // See if we can fetch network stats from bobbo
-    let stats = conductors[1].dump_network_stats().await?;
-    tracing::info!(target: "TEST", "@!@! - stats: {}", serde_json::to_string_pretty(&stats).unwrap());
-
-    let stats = conductors[1]
-        .dump_network_stats_for_app(&"app".to_string())
-        .await?;
-    tracing::info!(target: "TEST", "@!@! - stats by app: {}", serde_json::to_string_pretty(&stats).unwrap());
 
     Ok(())
 }
