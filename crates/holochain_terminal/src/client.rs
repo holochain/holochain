@@ -19,9 +19,13 @@ impl AppClient {
         addr: std::net::SocketAddr,
         token: AppAuthenticationToken,
     ) -> anyhow::Result<Self> {
-        let client =
-            AppWebsocket::connect(addr, token, DynAgentSigner::from(ClientAgentSigner::new()))
-                .await?;
+        let client = AppWebsocket::connect(
+            addr,
+            token,
+            DynAgentSigner::from(ClientAgentSigner::new()),
+            None,
+        )
+        .await?;
         Ok(AppClient { client })
     }
 

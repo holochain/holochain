@@ -69,6 +69,7 @@ async fn signed_zome_call() {
         (Ipv4Addr::LOCALHOST, app_ws_port),
         issued_token.token,
         signer.clone().into(),
+        None,
     )
     .await
     .unwrap();

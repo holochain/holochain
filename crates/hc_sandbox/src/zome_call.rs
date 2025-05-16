@@ -401,6 +401,7 @@ async fn get_app_client(
         format!("localhost:{}", port),
         token.token,
         DynAgentSigner::from(signer),
+        Some(String::from("sandbox")),
     )
     .await?)
 }

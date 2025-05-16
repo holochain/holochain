@@ -55,6 +55,7 @@ async fn clone_cell_management() {
         format!("127.0.0.1:{}", app_api_port),
         issued_token.token,
         signer.clone().into(),
+        None,
     )
     .await
     .unwrap();
@@ -208,6 +209,7 @@ pub async fn app_info_refresh() {
         (Ipv4Addr::LOCALHOST, app_api_port),
         token_issued.token,
         signer.clone().into(),
+        None,
     )
     .await
     .unwrap();
