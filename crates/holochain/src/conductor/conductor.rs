@@ -836,88 +836,80 @@ mod network_impls {
     use zome_call_signature_verification::is_valid_signature;
 
     impl Conductor {
+        /// Get signed agent infos from the conductor for a given cell
+        pub async fn get_agent_infos_by_cell(
+            &self,
+            maybe_cell_id: Option<CellId>,
+        ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
+            let maybe_dna_hashes = maybe_cell_id.map(|cell_id| vec![cell_id.dna_hash().clone()]);
+            self.get_agent_infos(maybe_dna_hashes).await
+        }
+
         /// Get signed agent info from the conductor
         pub async fn get_agent_infos(
             &self,
-            cell_id: Option<CellId>,
+            maybe_dna_hashes: Option<Vec<DnaHash>>,
         ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
-            match cell_id {
-                Some(c) => {
-                    let (dna_hash, agent_key) = c.into_dna_and_agent();
-                    let peer_store = self
-                        .holochain_p2p
-                        .peer_store(dna_hash)
-                        .await
-                        .map_err(|err| ConductorApiError::CellError(err.into()))?;
-                    Ok(peer_store
-                        .get(agent_key.to_k2_agent())
-                        .await?
-                        .map(|agent_info| vec![agent_info])
-                        .unwrap_or_default())
-                }
-                None => {
-                    let dna_hashes = self
-                        .spaces
-                        .get_from_spaces(|space| (*space.dna_hash).clone());
-                    let mut out = HashSet::new();
-                    for dna_hash in dna_hashes {
-                        let peer_store = self
-                            .holochain_p2p
-                            .peer_store(dna_hash)
-                            .await
-                            .map_err(|err| ConductorApiError::CellError(err.into()))?;
-                        let all_peers = peer_store.get_all().await?;
-                        out.extend(all_peers);
-                    }
-                    Ok(out.into_iter().collect())
-                }
+            let dna_hashes = match maybe_dna_hashes {
+                Some(hashes) => hashes,
+                None => self
+                    .spaces
+                    .get_from_spaces(|space| (*space.dna_hash).clone()),
+            };
+
+            let mut out = HashSet::new();
+            for dna_hash in dna_hashes {
+                let peer_store = self
+                    .holochain_p2p
+                    .peer_store(dna_hash.clone())
+                    .await
+                    .map_err(|err| ConductorApiError::CellError(err.into()))?;
+                let all_peers = peer_store.get_all().await?;
+                println!("PEERS for {:?} -> {:?}",dna_hash, all_peers);
+                out.extend(all_peers);
             }
+            Ok(out.into_iter().collect())
         }
 
         /// Get signed agent info from the conductor for a given app
         pub async fn get_app_agent_infos(
             &self,
             installed_app_id: &InstalledAppId,
-            dna_hash: Option<DnaHash>,
+            maybe_dna_hash: Option<DnaHash>,
         ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
             // Get app info to know which DNAs belong to this app
             let app_info = self.get_app_info(installed_app_id).await?.ok_or_else(|| {
                 ConductorApiError::other(format!("App not installed: {}", installed_app_id))
             })?;
 
-            // Get all agent infos
-            let mut all_infos = self.get_agent_infos(None).await?;
-
-            // 1. Create HashMap mapping DNAs to agent infos
-            let mut dna_to_infos: HashMap<DnaHash, Vec<&AgentInfoSigned>> = HashMap::new();
-            for info in &all_infos {
-                let dna = DnaHash::from_k2_space(&info.space);
-                dna_to_infos.entry(dna).or_default().push(info);
-            }
-
-            // 2. Collect all DNAs for this app
-            let mut app_dnas = Vec::new();
-            for cell_info in app_info.cell_info.values().flatten() {
-                match cell_info {
-                    CellInfo::Provisioned(cell) => app_dnas.push(cell.cell_id.dna_hash().clone()),
-                    CellInfo::Cloned(cell) => app_dnas.push(cell.cell_id.dna_hash().clone()),
-                    _ => continue,
+            let mut app_dnas: HashSet<DnaHash> = HashSet::new();
+            for cell_infos in app_info.cell_info.values() {
+                for cell_info in cell_infos {
+                    let dna = match cell_info {
+                        CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
+                        CellInfo::Cloned(cell) => cell.cell_id.dna_hash().clone(),
+                        CellInfo::Stem(cell) => cell.original_dna_hash.clone(),
+                    };
+                    app_dnas.insert(dna);
                 }
             }
 
-            // If dna_hash is specified, filter to only that DNA
-            if let Some(dna_hash) = &dna_hash {
-                if !app_dnas.contains(dna_hash) {
-                    return Ok(Vec::new());
+            match maybe_dna_hash {
+                Some(dna_hash) => {
+                    if !app_dnas.contains(&dna_hash) {
+                        Err(ConductorApiError::other(format!(
+                            "Dna not part of app: {}",
+                            installed_app_id
+                        )))
+                    } else {
+                        self.get_agent_infos(Some(vec![dna_hash])).await
+                    }
                 }
-                app_dnas.clear();
-                app_dnas.push(dna_hash.clone());
+                None => {
+                    self.get_agent_infos(Some(app_dnas.into_iter().collect()))
+                        .await
+                }
             }
-
-            // 3. Remove all agent infos not in the dnas list.
-            all_infos.retain(|info| app_dnas.contains(&DnaHash::from_k2_space(&info.space)));
-
-            Ok(all_infos)
         }
 
         pub(crate) async fn witness_nonce_from_calling_agent(

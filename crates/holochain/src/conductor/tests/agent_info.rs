@@ -106,7 +106,7 @@ async fn admin_agent_info() {
 
     // Get all agent infos via admin interface
     let response = admin_sender
-        .request(AdminRequest::AgentInfo { cell_id: None })
+        .request(AdminRequest::AgentInfo { dna_hashes: None })
         .await
         .unwrap();
     let agent_infos = match response {
@@ -145,10 +145,14 @@ async fn admin_agent_info() {
         "The agent_infos should cover the two agents (one for each app)"
     );
 
+    let clone_cell_dna = clone_cell.cell_id.dna_hash();
+println!(
+    "TESTING CLONE CELL"
+);
     // Test getting agent info for the clone cell
     let response = admin_sender
         .request(AdminRequest::AgentInfo {
-            cell_id: Some(clone_cell.cell_id.clone()),
+            dna_hashes: Some(vec![clone_cell_dna.clone()]),
         })
         .await
         .unwrap();
@@ -157,11 +161,13 @@ async fn admin_agent_info() {
         _ => panic!("Expected AgentInfo response"),
     };
 
+    println!("AGENT INFOS: {:?}", clone_agent_infos);
+
     // Should have agent info for each conductor that has the clone cell (1 peers)
     assert_eq!(
         clone_agent_infos.len(),
         1,
-        "Should have agent info for the clone cell on both conductors that have it"
+        "Should have agent info for the clone cell"
     );
 
     // Verify all agent infos are for the clone cell's DNA
@@ -169,7 +175,7 @@ async fn admin_agent_info() {
         let decoded = AgentInfoSigned::decode(&Ed25519Verifier, info.as_bytes()).unwrap();
         assert_eq!(
             decoded.space,
-            clone_cell.cell_id.dna_hash().to_k2_space(),
+            clone_cell_dna.to_k2_space(),
             "Agent info should be for the clone cell's DNA"
         );
     }

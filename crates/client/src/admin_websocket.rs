@@ -524,8 +524,11 @@ impl AdminWebsocket {
         }
     }
 
-    pub async fn agent_info(&self, cell_id: Option<CellId>) -> ConductorApiResult<Vec<String>> {
-        let msg = AdminRequest::AgentInfo { cell_id };
+    pub async fn agent_info(
+        &self,
+        dna_hashes: Option<Vec<DnaHash>>,
+    ) -> ConductorApiResult<Vec<String>> {
+        let msg = AdminRequest::AgentInfo { dna_hashes };
         let response = self.send(msg).await?;
         match response {
             AdminResponse::AgentInfo(agent_info) => Ok(agent_info),
