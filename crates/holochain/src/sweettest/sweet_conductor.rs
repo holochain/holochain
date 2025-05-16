@@ -827,7 +827,7 @@ impl SweetConductor {
         tokio::time::timeout(max_wait, async move {
             loop {
                 let infos = handle
-                    .get_agent_infos(cell_id.clone())
+                    .get_agent_infos_by_cell(cell_id.clone())
                     .await?
                     .into_iter()
                     .map(|p| AgentPubKey::from_k2_agent(&p.agent))
