@@ -61,7 +61,7 @@ impl AppWebsocket {
     /// let app_id = "test-app".to_string();
     /// let issued = admin_ws.issue_app_auth_token(app_id.clone().into()).await.unwrap();
     /// let signer = ClientAgentSigner::default();
-    /// let app_ws = AppWebsocket::connect((Ipv4Addr::LOCALHOST, 30_001), issued.token, signer.into()).await.unwrap();
+    /// let app_ws = AppWebsocket::connect((Ipv4Addr::LOCALHOST, 30_001), issued.token, signer.into(), None).await.unwrap();
     /// # }
     /// ```
     ///
@@ -72,8 +72,9 @@ impl AppWebsocket {
         socket_addr: impl ToSocketAddrs,
         token: AppAuthenticationToken,
         signer: DynAgentSigner,
+        origin: Option<String>,
     ) -> ConductorApiResult<Self> {
-        let app_ws = AppWebsocketInner::connect(socket_addr).await?;
+        let app_ws = AppWebsocketInner::connect(socket_addr, origin).await?;
         Self::post_connect(app_ws, token, signer).await
     }
 
@@ -103,7 +104,7 @@ impl AppWebsocket {
     /// let client_config = Arc::new(client_config);
     ///
     /// let signer = ClientAgentSigner::default();
-    /// let app_ws = AppWebsocket::connect_with_config((Ipv4Addr::LOCALHOST, 30_001), client_config, issued.token, signer.into()).await.unwrap();
+    /// let app_ws = AppWebsocket::connect_with_config((Ipv4Addr::LOCALHOST, 30_001), client_config, issued.token, signer.into(), None).await.unwrap();
     /// # }
     /// ```
     pub async fn connect_with_config(
@@ -111,8 +112,10 @@ impl AppWebsocket {
         websocket_config: Arc<WebsocketConfig>,
         token: AppAuthenticationToken,
         signer: DynAgentSigner,
+        origin: Option<String>,
     ) -> ConductorApiResult<Self> {
-        let app_ws = AppWebsocketInner::connect_with_config(socket_addr, websocket_config).await?;
+        let app_ws =
+            AppWebsocketInner::connect_with_config(socket_addr, websocket_config, origin).await?;
         Self::post_connect(app_ws, token, signer).await
     }
 
@@ -150,13 +153,7 @@ impl AppWebsocket {
     ///     SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 30_001),
     /// ];
     /// for addr in connect_to {
-    ///     // Send a request with a custom origin header to identify the client
-    ///     let mut request: ConnectRequest = addr.into();
-    ///     let request = request
-    ///         .try_set_header("Origin", "my_cli_app")
-    ///         .unwrap();
-    ///
-    ///     match AppWebsocket::connect_with_request_and_config(request, client_config.clone(), issued.token.clone(), signer.clone()).await {
+    ///     match AppWebsocket::connect_with_request_and_config(request, client_config.clone(), issued.token.clone(), signer.clone(), None).await {
     ///         Ok(admin_ws) => {
     ///             println!("Connected to {:?}", addr);
     ///             break;

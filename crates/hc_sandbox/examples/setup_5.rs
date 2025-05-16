@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
         // Run a conductor and connect to the admin websocket
         let (admin_port, _, _) =
             run::run_async(&input.holochain_path, path.clone(), None, Output::Log).await?;
-        let admin_ws = AdminWebsocket::connect(format!("localhost:{admin_port}")).await?;
+        let admin_ws = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
 
         let bundle = AppBundleSource::Path(happ.clone()).resolve().await?;
         let bytes = bundle.pack()?;
