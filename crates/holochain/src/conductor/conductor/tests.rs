@@ -1162,16 +1162,6 @@ async fn test_deferred_memproof_provisioning() {
         ConductorError::SourceChainError(SourceChainError::ChainEmpty)
     );
 
-    //- Rotate app agent key a few times just for the heck of it
-    // TODO: not yet implemented
-
-    // let agent1 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
-    // let agent2 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
-    // let agent3 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
-    // assert_ne!(agent_key, agent1);
-    // assert_ne!(agent1, agent2);
-    // assert_ne!(agent2, agent3);
-
     //- Now provide the memproofs
     conductor
         .clone()

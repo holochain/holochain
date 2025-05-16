@@ -6,14 +6,18 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Add `AgentInfo` call to the conductor's app interface so that application developers can correlate connected kitsune nodes with app agents.
+
+## 0.6.0-dev.4
 
 - Change `hc-sandbox` to use admin and app clients from the `holochain_client` crate
 - Change `hcterm` to use the admin and app websocket clients from `holochain_client` internally
-- Reinstate indexes on `DhtOp` tables. With the latest migration script, the indexes were not carried over. #4970
-- Optimize `ChainHeadQuery` for performance. A flame graph analysis revealed that a significant proportion of the CPU time was spent on this query in a test with a high number of entry creates and reads. The query now runs about 30 % faster. #4971
+- Reinstate indexes on `DhtOp` tables. With the latest migration script, the indexes were not carried over. \#4970
+- Optimize `ChainHeadQuery` for performance. A flame graph analysis revealed that a significant proportion of the CPU time was spent on this query in a test with a high number of entry creates and reads. The query now runs about 30 % faster. \#4971
 - Allow queries in `holochain_state` to run without parameters. Previously such queries would not be run against any stores. That is now possible.
-- Further optimize `ChainHeadQuery` for performance by removing redundant WHERE clause. Formerly multiple agents on a conductor would share the same authored database, so the chain head had to be determined by agent. Since a refactor every agent has their own authored database, thus the clause is no longer required. #4974
-- Add `AgentInfo` call to the conductor's app interface so that application developers can correlate connected kitsune nodes with app agents.
+- Further optimize `ChainHeadQuery` for performance by removing redundant WHERE clause. Formerly multiple agents on a conductor would share the same authored database, so the chain head had to be determined by agent. Since a refactor every agent has their own authored database, thus the clause is no longer required. \#4974
+- Remove unused column `dependency` and related indexes from table `DhtOp`.
+- Remove placeholder variant `AppResponse::AppAgentKeyRotated`.
 
 ## 0.6.0-dev.3
 
