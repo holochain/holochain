@@ -1155,7 +1155,7 @@ impl TestCase {
         let admin_port = 0;
 
         let tmp_dir = TempDir::new().unwrap();
-        let path = tmp_dir.into_path();
+        let path = tmp_dir.keep();
         let environment_path = path.clone();
         let config = create_config(admin_port, environment_path.into());
         let config_path = write_config(path, &config);

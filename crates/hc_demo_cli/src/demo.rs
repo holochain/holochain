@@ -128,6 +128,7 @@ pub async fn run_test_demo(
             inbox,
             signal_url,
             bootstrap_url,
+            base64_auth_material,
         } => {
             run(
                 dna,
@@ -135,6 +136,7 @@ pub async fn run_test_demo(
                 inbox,
                 signal_url,
                 bootstrap_url,
+                base64_auth_material,
                 Some(ready),
                 Some(rendezvous),
                 false,

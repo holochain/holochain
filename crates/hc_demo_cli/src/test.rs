@@ -173,6 +173,7 @@ async fn run(
             inbox: std::path::PathBuf::from(format!("{name}-in")),
             signal_url: "not-used".into(),
             bootstrap_url: "not-used".into(),
+            base64_auth_material: None,
         },
     };
 
