@@ -24,7 +24,8 @@ async fn setup_tests() -> (
 
     // Install two different apps on a conductor: app1 (dna1, dna2) and app2 (dna3)
     let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config.clone()).await;
+    let mut conductor =
+        SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await;
 
     let app1_id: InstalledAppId = "app1".into();
     let app2_id: InstalledAppId = "app2".into();
@@ -45,7 +46,7 @@ async fn setup_tests() -> (
         .clone();
 
     // Create a disabled clone cell for app1 on conductor[0]
-    let clone_cell_r = conductor
+    let clone_cell = conductor
         .create_clone_cell(
             &installed_app1_id,
             CreateCloneCellPayload {
@@ -55,8 +56,8 @@ async fn setup_tests() -> (
                 name: Some("disabled_clone".into()),
             },
         )
-        .await;
-    let clone_cell = clone_cell_r.unwrap();
+        .await
+        .unwrap();
 
     (
         dna1.0.dna_hash().clone(),
