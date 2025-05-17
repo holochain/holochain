@@ -308,8 +308,8 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::AgentInfo`]
     AgentInfo {
-        /// Optionally choose the agent info of a specific cell.
-        cell_id: Option<CellId>,
+        /// Optionally choose the agent infos of a set of Dnas.
+        dna_hashes: Option<Vec<DnaHash>>,
     },
 
     /// "Graft" [`Record`]s onto the source chain of the specified [`CellId`].
