@@ -56,6 +56,10 @@ pub struct Call {
     #[command(flatten)]
     pub existing: Existing,
 
+    /// The origin to use in the admin websocket request
+    #[arg(long)]
+    pub origin: Option<String>,
+
     /// The admin request you want to make.
     #[command(subcommand)]
     pub call: AdminRequestCli,
@@ -291,6 +295,7 @@ pub async fn call(
     let Call {
         existing,
         running,
+        origin,
         call,
     } = req;
     // Force admin ports takes precedence over running. They both specify the same thing but force admin ports
@@ -310,7 +315,7 @@ pub async fn call(
         let ports = get_admin_ports(paths.clone()).await?;
         let mut cmds = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
-            match CmdRunner::try_new(port).await {
+            match CmdRunner::try_new(port, origin.clone()).await {
                 Ok(cmd) => cmds.push((cmd, None, None)),
                 Err(WebsocketError::Io(e)) => {
                     if let std::io::ErrorKind::ConnectionRefused
@@ -323,7 +328,11 @@ pub async fn call(
                             structured.clone(),
                         )
                         .await?;
-                        cmds.push((CmdRunner::new(port).await, Some(holochain), Some(lair)));
+                        cmds.push((
+                            CmdRunner::new(port, origin.clone()).await,
+                            Some(holochain),
+                            Some(lair),
+                        ));
                         continue;
                     }
                     bail!(
@@ -355,7 +364,7 @@ pub async fn call(
     } else {
         let mut cmds = Vec::with_capacity(running.len());
         for port in running {
-            cmds.push((CmdRunner::new(port).await, None, None));
+            cmds.push((CmdRunner::new(port, origin.clone()).await, None, None));
         }
         cmds
     };

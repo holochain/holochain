@@ -46,13 +46,15 @@ pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
 /// all messages on the receiving side
 pub(crate) async fn get_admin_api(
     port: u16,
+    origin: Option<String>,
 ) -> WebsocketResult<(WebsocketSender, tokio::task::JoinHandle<()>)> {
     tracing::debug!(port);
-    websocket_client_by_port(port).await
+    websocket_client_by_port(port, origin).await
 }
 
 async fn websocket_client_by_port(
     port: u16,
+    origin: Option<String>,
 ) -> WebsocketResult<(WebsocketSender, tokio::task::JoinHandle<()>)> {
     let req = holochain_websocket::ConnectRequest::new(
         format!("localhost:{port}")
@@ -60,7 +62,7 @@ async fn websocket_client_by_port(
             .next()
             .ok_or_else(|| std::io::Error::other("Could not resolve localhost"))?,
     )
-    .try_set_header("Origin", "hc_sandbox")
+    .try_set_header("Origin", origin.unwrap_or("hc_sandbox".into()).as_str())
     .expect("Failed to set `Origin` header for websocket connection request");
 
     let (send, mut recv) = ws::connect(Arc::new(WebsocketConfig::CLIENT_DEFAULT), req).await?;

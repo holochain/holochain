@@ -55,7 +55,7 @@ pub async fn run(
     .await?;
     let mut launch_info = LaunchInfo::from_admin_port(admin_port);
     for app_port in app_ports {
-        let mut cmd = CmdRunner::try_new(admin_port).await?;
+        let mut cmd = CmdRunner::try_new(admin_port, None).await?;
         let port = attach_app_interface(
             &mut cmd,
             AddAppWs {
