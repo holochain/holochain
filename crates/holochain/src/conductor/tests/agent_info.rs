@@ -147,9 +147,7 @@ async fn admin_agent_info() {
     );
 
     let clone_cell_dna = clone_cell.cell_id.dna_hash();
-println!(
-    "TESTING CLONE CELL"
-);
+
     // Test getting agent info for the clone cell
     let response = admin_sender
         .request(AdminRequest::AgentInfo {
@@ -162,9 +160,7 @@ println!(
         _ => panic!("Expected AgentInfo response"),
     };
 
-    println!("AGENT INFOS: {:?}", clone_agent_infos);
-
-    // Should have agent info for each conductor that has the clone cell (1 peers)
+    // Should have a single agent info
     assert_eq!(
         clone_agent_infos.len(),
         1,
@@ -203,7 +199,7 @@ async fn app_agent_info() {
 
     // Test getting agent info for all cells in app1
     let response = app1_sender
-        .request(AppRequest::AgentInfo { dna_hash: None })
+        .request(AppRequest::AgentInfo { dna_hashes: None })
         .await
         .unwrap();
     let agent_infos = match response {
@@ -228,7 +224,7 @@ async fn app_agent_info() {
     // Test getting agent info for dna1 in app1
     let response = app1_sender
         .request(AppRequest::AgentInfo {
-            dna_hash: Some(dna1_hash.clone()),
+            dna_hashes: Some(vec![dna1_hash.clone()]),
         })
         .await
         .unwrap();
@@ -255,7 +251,7 @@ async fn app_agent_info() {
 
     // Test getting agent info for all cells in app2
     let response = app2_sender
-        .request(AppRequest::AgentInfo { dna_hash: None })
+        .request(AppRequest::AgentInfo { dna_hashes: None })
         .await
         .unwrap();
     let agent_infos_app2 = match response {
@@ -280,7 +276,7 @@ async fn app_agent_info() {
     let non_existent_dna = DnaHash::from_raw_32(vec![0; 32]);
     let response = app1_sender
         .request(AppRequest::AgentInfo {
-            dna_hash: Some(non_existent_dna),
+            dna_hashes: Some(vec![non_existent_dna]),
         })
         .await
         .unwrap();
@@ -296,7 +292,7 @@ async fn app_agent_info() {
     // This should return no results even though dna3 exists on the conductor in a different app
     let response = app1_sender
         .request(AppRequest::AgentInfo {
-            dna_hash: Some(dna3_hash.clone()),
+            dna_hashes: Some(vec![dna3_hash.clone()]),
         })
         .await
         .unwrap();
@@ -322,7 +318,7 @@ async fn app_agent_info() {
     // get the agent infos for app1 again.
     let response = app1_sender
         .request(AppRequest::AgentInfo {
-            dna_hash: Some(dna1_hash.clone()),
+            dna_hashes: Some(vec![dna1_hash.clone()]),
         })
         .await
         .unwrap();
