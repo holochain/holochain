@@ -896,7 +896,7 @@ mod network_impls {
             let hashes = match maybe_dna_hashes {
                 Some(dna_hashes) => {
                     for dna_hash in &dna_hashes {
-                        if !app_dnas.contains(&dna_hash) {
+                        if !app_dnas.contains(dna_hash) {
                             return Err(ConductorApiError::other(format!(
                                 "Dna {} not part of app: {}",
                                 dna_hash, installed_app_id
