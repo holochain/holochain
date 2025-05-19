@@ -633,7 +633,7 @@ async fn request_agent_info(
     client: &mut AdminWebsocket,
     args: ListAgents,
 ) -> anyhow::Result<Vec<Arc<AgentInfoSigned>>> {
-    let resp = client.agent_info(args.into()).await?;
+    let resp = client.agent_info(args.dna.map(|dna| vec![dna])).await?;
     let mut out = Vec::new();
     for info in resp {
         out.push(AgentInfoSigned::decode(
