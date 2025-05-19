@@ -31,8 +31,8 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::AgentInfo`]
     AgentInfo {
-        /// Optionally limit the results to a specific DNA hash
-        dna_hash: Option<DnaHash>,
+        /// Optionally limit the results to specific DNA hashes
+        dna_hashes: Option<Vec<DnaHash>>,
     },
 
     /// Call a zome function.

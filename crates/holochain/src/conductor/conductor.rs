@@ -865,7 +865,6 @@ mod network_impls {
                     .await
                     .map_err(|err| ConductorApiError::CellError(err.into()))?;
                 let all_peers = peer_store.get_all().await?;
-                println!("PEERS for {:?} -> {:?}",dna_hash, all_peers);
                 out.extend(all_peers);
             }
             Ok(out.into_iter().collect())
@@ -875,7 +874,7 @@ mod network_impls {
         pub async fn get_app_agent_infos(
             &self,
             installed_app_id: &InstalledAppId,
-            maybe_dna_hash: Option<DnaHash>,
+            maybe_dna_hashes: Option<Vec<DnaHash>>,
         ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
             // Get app info to know which DNAs belong to this app
             let app_info = self.get_app_info(installed_app_id).await?.ok_or_else(|| {
@@ -894,22 +893,21 @@ mod network_impls {
                 }
             }
 
-            match maybe_dna_hash {
-                Some(dna_hash) => {
-                    if !app_dnas.contains(&dna_hash) {
-                        Err(ConductorApiError::other(format!(
-                            "Dna not part of app: {}",
-                            installed_app_id
-                        )))
-                    } else {
-                        self.get_agent_infos(Some(vec![dna_hash])).await
+            let hashes = match maybe_dna_hashes {
+                Some(dna_hashes) => {
+                    for dna_hash in &dna_hashes {
+                        if !app_dnas.contains(&dna_hash) {
+                            return Err(ConductorApiError::other(format!(
+                                "Dna {} not part of app: {}",
+                                dna_hash, installed_app_id
+                            )));
+                        }
                     }
+                    dna_hashes
                 }
-                None => {
-                    self.get_agent_infos(Some(app_dnas.into_iter().collect()))
-                        .await
-                }
-            }
+                None => app_dnas.into_iter().collect(),
+            };
+            self.get_agent_infos(Some(hashes)).await
         }
 
         pub(crate) async fn witness_nonce_from_calling_agent(

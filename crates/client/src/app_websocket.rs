@@ -2,7 +2,7 @@ use crate::app_websocket_inner::AppWebsocketInner;
 use crate::signing::DynAgentSigner;
 use crate::{signing::sign_zome_call, ConductorApiError, ConductorApiResult};
 use anyhow::{anyhow, Result};
-use holo_hash::AgentPubKey;
+use holo_hash::{AgentPubKey, DnaHash};
 use holochain_conductor_api::{
     AppAuthenticationToken, AppInfo, AppRequest, AppResponse, CellInfo, ProvisionedCell,
     ZomeCallParamsSigned,
@@ -426,11 +426,17 @@ impl AppWebsocket {
         }
     }
 
+    /// Returns a list of connected peer `AgentInfo`s for the app's DNAs
+    ///
+    /// `dna_hashes` is an optional list of Dna Hashes to filter by, if `None` returns peers for all
+    /// of the app's DNAs.
+    ///
+    /// The return value is a JSON encoded list
     pub async fn agent_info(
         &self,
-        dna_hash: Option<holo_hash::DnaHash>,
+        dna_hashes: Option<Vec<DnaHash>>,
     ) -> ConductorApiResult<Vec<String>> {
-        let msg = AppRequest::AgentInfo { dna_hash };
+        let msg = AppRequest::AgentInfo { dna_hashes };
         let response = self.inner.send(msg).await?;
         match response {
             AppResponse::AgentInfo(infos) => Ok(infos),
