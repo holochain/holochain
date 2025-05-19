@@ -419,7 +419,7 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
 
     let mut hc_call = input_piped_password(&mut cmd).await;
     let exit_code = hc_call.wait().await.unwrap();
-    assert!(exit_code.code() == Some(1)); // Should fail
+    assert!(exit_code.success() == false); // Should fail
 
     // Verify that admin call succeeds the correct origin
     let mut cmd = get_sandbox_command();
