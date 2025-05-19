@@ -14,6 +14,9 @@ use holochain_types::{
 };
 use holochain_websocket::ConnectRequest;
 use holochain_zome_types::dependencies::holochain_integrity_types::ExternIO;
+use kitsune2_api::AgentInfoSigned;
+use kitsune2_core::{Ed25519LocalAgent, Ed25519Verifier};
+use kitsune2_test_utils::agent::AgentBuilder;
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::{
@@ -22,24 +25,6 @@ use std::{
 };
 
 mod fixture;
-
-fn make_agent(space: kitsune2_api::SpaceId) -> String {
-    let local = kitsune2_core::Ed25519LocalAgent::default();
-    let created_at = kitsune2_api::Timestamp::now();
-    let expires_at = created_at + std::time::Duration::from_secs(60 * 20);
-    let info = kitsune2_api::AgentInfo {
-        agent: kitsune2_api::LocalAgent::agent(&local).clone(),
-        space,
-        created_at,
-        expires_at,
-        is_tombstone: false,
-        url: None,
-        storage_arc: kitsune2_api::DhtArc::FULL,
-    };
-    let info =
-        futures::executor::block_on(kitsune2_api::AgentInfoSigned::sign(&local, info)).unwrap();
-    info.encode().unwrap()
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_signal() {
@@ -516,16 +501,11 @@ async fn agent_info() {
     let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port))
         .await
         .unwrap();
-    let _app_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::from("my_cli_app".to_string()), None)
-        .await
-        .unwrap();
 
     let app_id: InstalledAppId = "test-app".into();
-    let agent_key = admin_ws.generate_agent_pub_key().await.unwrap();
     admin_ws
         .install_app(InstallAppPayload {
-            agent_key: Some(agent_key.clone()),
+            agent_key: None,
             installed_app_id: Some(app_id.clone()),
             roles_settings: None,
             network_seed: None,
@@ -557,15 +537,17 @@ async fn agent_info() {
     let agent_infos = app_ws.agent_info(None).await.unwrap();
     assert_eq!(agent_infos.len(), 1);
 
-    let space = kitsune2_api::AgentInfoSigned::decode(
-        &kitsune2_core::Ed25519Verifier,
-        agent_infos[0].as_bytes(),
-    )
-    .unwrap()
-    .space
-    .clone();
+    let space = AgentInfoSigned::decode(&Ed25519Verifier, agent_infos[0].as_bytes())
+        .unwrap()
+        .space
+        .clone();
 
-    let other_agent = make_agent(space.clone());
+    let mut builder = AgentBuilder::default();
+    let local_agent: kitsune2_api::DynLocalAgent = Arc::new(Ed25519LocalAgent::default());
+    builder.space = Some(space.clone());
+    let info = builder.build(local_agent);
+
+    let other_agent = info.encode().unwrap();
 
     admin_ws
         .add_agent_info(vec![other_agent.clone()])
