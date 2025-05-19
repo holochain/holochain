@@ -572,7 +572,7 @@ async fn agent_info() {
         .await
         .unwrap();
     let dna = DnaHash::from_k2_space(&space);
-    let agent_infos = app_ws.agent_info(Some(dna)).await.unwrap();
+    let agent_infos = app_ws.agent_info(Some(vec![dna])).await.unwrap();
     assert_eq!(agent_infos.len(), 2);
     assert!(agent_infos.contains(&other_agent));
 }
