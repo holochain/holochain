@@ -26,20 +26,28 @@ impl std::fmt::Debug for AppWebsocketInner {
 
 impl AppWebsocketInner {
     /// Connect to a Conductor API app websocket.
-    pub(crate) async fn connect(socket_addr: impl ToSocketAddrs) -> ConductorApiResult<Self> {
+    pub(crate) async fn connect(
+        socket_addr: impl ToSocketAddrs,
+        origin: Option<String>,
+    ) -> ConductorApiResult<Self> {
         let websocket_config = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
 
-        Self::connect_with_config(socket_addr, websocket_config).await
+        Self::connect_with_config(socket_addr, websocket_config, origin).await
     }
 
     /// Connect to a Conductor API app websocket with a custom [WebsocketConfig].
     pub async fn connect_with_config(
         socket_addr: impl ToSocketAddrs,
         websocket_config: Arc<WebsocketConfig>,
+        origin: Option<String>,
     ) -> ConductorApiResult<Self> {
         let mut last_err = None;
         for addr in socket_addr.to_socket_addrs()? {
-            let request: ConnectRequest = addr.into();
+            let request: ConnectRequest = if let Some(o) = &origin {
+                Into::<ConnectRequest>::into(addr).try_set_header("Origin", o.as_str())?
+            } else {
+                addr.into()
+            };
 
             match Self::connect_with_config_and_request(websocket_config.clone(), request).await {
                 Ok(app_ws) => return Ok(app_ws),

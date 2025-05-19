@@ -48,6 +48,10 @@ pub struct Call {
     #[command(flatten)]
     pub existing: Existing,
 
+    /// The origin to use in the admin websocket request
+    #[arg(long)]
+    pub origin: Option<String>,
+
     /// The admin request you want to make.
     #[command(subcommand)]
     pub call: AdminRequestCli,
@@ -290,6 +294,7 @@ pub async fn call(
     let Call {
         existing,
         running,
+        origin,
         call,
     } = req;
     // Force admin ports takes precedence over running. They both specify the same thing but force admin ports
@@ -309,7 +314,7 @@ pub async fn call(
         let ports = get_admin_ports(paths.clone()).await?;
         let mut clients = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
-            match AdminWebsocket::connect(format!("localhost:{port}")).await {
+            match AdminWebsocket::connect(format!("localhost:{port}"), origin.clone()).await {
                 Ok(client) => clients.push((client, None, None)),
                 Err(e) => {
                     tracing::debug!("Connecting to the sandbox conductor failed: {e}.\nThis is expected in case the conductor is not running. Trying to start it up now...");
@@ -324,7 +329,8 @@ pub async fn call(
                     )
                     .await?;
                     clients.push((
-                        AdminWebsocket::connect(format!("localhost:{port}")).await?,
+                        AdminWebsocket::connect(format!("localhost:{port}"), origin.clone())
+                            .await?,
                         Some(holochain),
                         Some(lair),
                     ));
@@ -348,7 +354,7 @@ pub async fn call(
         let mut clients = Vec::with_capacity(running.len());
         for port in running {
             clients.push((
-                AdminWebsocket::connect(format!("localhost:{port}")).await?,
+                AdminWebsocket::connect(format!("localhost:{port}"), origin.clone()).await?,
                 None,
                 None,
             ));
