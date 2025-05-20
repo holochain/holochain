@@ -836,15 +836,6 @@ mod network_impls {
     use zome_call_signature_verification::is_valid_signature;
 
     impl Conductor {
-        /// Get signed agent infos from the conductor for a given cell
-        pub async fn get_agent_infos_by_cell(
-            &self,
-            maybe_cell_id: Option<CellId>,
-        ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
-            let maybe_dna_hashes = maybe_cell_id.map(|cell_id| vec![cell_id.dna_hash().clone()]);
-            self.get_agent_infos(maybe_dna_hashes).await
-        }
-
         /// Get signed agent info from the conductor
         pub async fn get_agent_infos(
             &self,
