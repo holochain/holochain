@@ -172,7 +172,7 @@ pub async fn zome_call_auth(
         })
         .collect::<HashSet<_>>();
 
-    let mut client = CmdRunner::try_new(admin_port).await?;
+    let mut client = CmdRunner::try_new(admin_port, None).await?;
 
     holochain_util::pw::pw_set_piped(zome_call_auth.piped);
     if !zome_call_auth.piped {
@@ -357,7 +357,7 @@ struct AppClient {
 
 impl AppClient {
     async fn try_new(admin_port: u16, installed_app_id: InstalledAppId) -> anyhow::Result<Self> {
-        let mut cmd_runner = CmdRunner::try_new(admin_port).await?;
+        let mut cmd_runner = CmdRunner::try_new(admin_port, None).await?;
 
         let admin_response = cmd_runner.command(AdminRequest::ListAppInterfaces).await?;
 

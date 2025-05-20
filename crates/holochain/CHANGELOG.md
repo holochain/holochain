@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Integrate all app validated ops, regardless of type and order
 - Remove DHT DB query cache, a premature optimization that made integration complicated and error-prone without any appreciable benefit.
+- Adds the `--origin` option to the `hc sandbox call` command in order to allow making admin calls to deployed conductors with restricted `allowed_origins`.
 
 ## 0.5.2
 

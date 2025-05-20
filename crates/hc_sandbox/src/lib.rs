@@ -67,15 +67,15 @@ impl CmdRunner {
     const HOLOCHAIN_PATH: &'static str = "holochain";
     /// Create a new connection for calling admin interface commands.
     /// Panics if admin port fails to connect.
-    pub async fn new(port: u16) -> Self {
-        Self::try_new(port)
+    pub async fn new(port: u16, origin: Option<String>) -> Self {
+        Self::try_new(port, origin)
             .await
             .expect("Failed to create CmdRunner because admin port failed to connect")
     }
 
     /// Create a new connection for calling admin interface commands.
-    pub async fn try_new(port: u16) -> WebsocketResult<Self> {
-        let (client, task) = get_admin_api(port).await?;
+    pub async fn try_new(port: u16, origin: Option<String>) -> WebsocketResult<Self> {
+        let (client, task) = get_admin_api(port, origin).await?;
         Ok(Self { client, task })
     }
 
@@ -94,7 +94,7 @@ impl CmdRunner {
         sandbox_path: ConfigRootPath,
     ) -> anyhow::Result<(Self, tokio::process::Child)> {
         let conductor = run::run_async(holochain_bin_path, sandbox_path, None, Output::Log).await?;
-        let cmd = CmdRunner::try_new(conductor.0).await?;
+        let cmd = CmdRunner::try_new(conductor.0, None).await?;
         Ok((cmd, conductor.1))
     }
 
