@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.8.0-dev.2
+
 - Add `origin` argument to `AdminWebsocket::connect()` and `AppWebsocket::connect()`.
 
 ## 0.8.0-dev.1
