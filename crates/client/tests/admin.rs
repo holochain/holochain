@@ -21,7 +21,7 @@ async fn app_interfaces() {
 
     // Connect admin client
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port))
+    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
         .await
         .unwrap();
 
@@ -36,7 +36,7 @@ async fn signed_zome_call() {
 
     // Connect admin client
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port))
+    let admin_ws = AdminWebsocket::connect((Ipv4Addr::LOCALHOST, admin_port), None)
         .await
         .unwrap();
 
@@ -69,6 +69,7 @@ async fn signed_zome_call() {
         (Ipv4Addr::LOCALHOST, app_ws_port),
         issued_token.token,
         signer.clone().into(),
+        None,
     )
     .await
     .unwrap();
@@ -112,7 +113,7 @@ async fn signed_zome_call() {
 async fn storage_info() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port))
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
         .await
         .unwrap();
     let app_id: InstalledAppId = "test-app".into();
@@ -147,7 +148,7 @@ async fn storage_info() {
 async fn dump_network_stats() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port))
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
         .await
         .unwrap();
     let app_id: InstalledAppId = "test-app".into();
@@ -192,7 +193,7 @@ fn make_agent(space: kitsune2_api::SpaceId) -> String {
 async fn agent_info() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port))
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
         .await
         .unwrap();
     let app_id: InstalledAppId = "test-app".into();
@@ -237,7 +238,7 @@ async fn agent_info() {
 async fn list_cell_ids() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port))
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
         .await
         .unwrap();
     let app_id: InstalledAppId = "test-app".into();
@@ -271,7 +272,7 @@ async fn list_cell_ids() {
 async fn install_app_with_roles_settings() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port))
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
         .await
         .unwrap();
     let app_id: InstalledAppId = "test-app".into();
@@ -342,6 +343,7 @@ async fn connect_multiple_addresses() {
             // Should then move on and try this one
             SocketAddr::new(Ipv4Addr::LOCALHOST.into(), admin_port),
         ][..],
+        None,
     )
     .await
     .unwrap();

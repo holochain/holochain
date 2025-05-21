@@ -151,7 +151,7 @@ pub async fn zome_call_auth(
 ) -> anyhow::Result<()> {
     let admin_port = admin_port_from_connect_args(zome_call_auth.connect_args, admin_port).await?;
 
-    let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}")).await?;
+    let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
     let app_client = get_app_client(&admin_client, zome_call_auth.app_id.clone(), None).await?;
     let app_info = app_client.app_info().await?;
     let info = match app_info {
@@ -169,7 +169,7 @@ pub async fn zome_call_auth(
         })
         .collect::<HashSet<_>>();
 
-    let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}")).await?;
+    let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
 
     holochain_util::pw::pw_set_piped(zome_call_auth.piped);
     if !zome_call_auth.piped {
@@ -204,7 +204,7 @@ pub async fn zome_call_auth(
 pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::Result<()> {
     let admin_port = admin_port_from_connect_args(zome_call.connect_args, admin_port).await?;
 
-    let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}")).await?;
+    let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
 
     let app_client = get_app_client(&admin_client, zome_call.app_id.clone(), None).await?;
 
@@ -401,6 +401,7 @@ async fn get_app_client(
         format!("localhost:{}", port),
         token.token,
         DynAgentSigner::from(signer),
+        Some(String::from("sandbox")),
     )
     .await?)
 }
