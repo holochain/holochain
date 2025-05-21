@@ -227,7 +227,7 @@ impl TestDir {
             Self::Temp(d) => {
                 println!("Made temp dir permanent at {:?}", d);
                 tracing::info!("Made temp dir permanent at {:?}", d);
-                *self = Self::Perm(d.into_path());
+                *self = Self::Perm(d.keep());
             }
             old => *self = old,
         }
