@@ -327,8 +327,8 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
-    let mut hc_admin = input_piped_password(&mut cmd).await;
-    hc_admin.wait().await.unwrap();
+    let hc_admin = input_piped_password(&mut cmd).await;
+    hc_admin.wait_with_output().await.unwrap();
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
