@@ -13,6 +13,7 @@ use holochain_websocket::{
     WebsocketSender,
 };
 use kitsune2_api::{DynLocalAgent, SpaceId};
+use kitsune2_core::Ed25519LocalAgent;
 use kitsune2_test_utils::agent::AgentBuilder;
 use std::future::Future;
 use std::net::ToSocketAddrs;
