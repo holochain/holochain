@@ -25,7 +25,7 @@ pub enum AppRequest {
     AppInfo,
 
     /// Request information about the agents in this Conductor's peer store.
-    /// 
+    ///
     /// This is limited to cells of the app you are connected to.
     ///
     /// # Returns
