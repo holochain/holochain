@@ -1,3 +1,4 @@
+use common::make_agent;
 use holo_hash::DnaHash;
 use holochain::{
     prelude::{AppBundleSource, Signal},
@@ -15,8 +16,7 @@ use holochain_types::{
 use holochain_websocket::ConnectRequest;
 use holochain_zome_types::dependencies::holochain_integrity_types::ExternIO;
 use kitsune2_api::AgentInfoSigned;
-use kitsune2_core::{Ed25519LocalAgent, Ed25519Verifier};
-use kitsune2_test_utils::agent::AgentBuilder;
+use kitsune2_core::Ed25519Verifier;
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr};
 use std::{
@@ -24,6 +24,7 @@ use std::{
     sync::{Arc, Barrier},
 };
 
+mod common;
 mod fixture;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -498,7 +499,7 @@ async fn dump_network_metrics() {
 async fn agent_info() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
-    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port))
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
         .await
         .unwrap();
 
@@ -530,6 +531,7 @@ async fn agent_info() {
         (Ipv4Addr::LOCALHOST, app_ws_port),
         token_issued.token,
         signer,
+        None,
     )
     .await
     .unwrap();
@@ -542,12 +544,7 @@ async fn agent_info() {
         .space
         .clone();
 
-    let mut builder = AgentBuilder::default();
-    let local_agent: kitsune2_api::DynLocalAgent = Arc::new(Ed25519LocalAgent::default());
-    builder.space = Some(space.clone());
-    let info = builder.build(local_agent);
-
-    let other_agent = info.encode().unwrap();
+    let other_agent = make_agent(&space);
 
     admin_ws
         .add_agent_info(vec![other_agent.clone()])

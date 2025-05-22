@@ -70,21 +70,11 @@ async fn setup_tests() -> (
     )
 }
 
-fn make_agent(space: kitsune2_api::SpaceId) -> String {
-    let local = kitsune2_core::Ed25519LocalAgent::default();
-    let created_at = kitsune2_api::Timestamp::now();
-    let expires_at = created_at + std::time::Duration::from_secs(60 * 20);
-    let info = kitsune2_api::AgentInfo {
-        agent: kitsune2_api::LocalAgent::agent(&local).clone(),
-        space,
-        created_at,
-        expires_at,
-        is_tombstone: false,
-        url: None,
-        storage_arc: kitsune2_api::DhtArc::FULL,
-    };
-    let info =
-        futures::executor::block_on(kitsune2_api::AgentInfoSigned::sign(&local, info)).unwrap();
+fn make_agent(space: SpaceId) -> String {
+    let mut builder = AgentBuilder::default();
+    let local_agent: DynLocalAgent = Arc::new(Ed25519LocalAgent::default());
+    builder.space = Some(space.clone());
+    let info = builder.build(local_agent);
     info.encode().unwrap()
 }
 

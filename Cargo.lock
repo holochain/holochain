@@ -2914,6 +2914,7 @@ dependencies = [
  "holochain_websocket",
  "kitsune2_api",
  "kitsune2_core",
+ "kitsune2_test_utils",
  "nanoid",
  "nix 0.29.0",
  "serde",
