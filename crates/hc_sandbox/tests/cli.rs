@@ -639,7 +639,14 @@ async fn generate_sandbox_and_add_and_list_agent() {
     .space
     .clone();
 
-    let other_agent = make_agent(space);
+    let other_agent = AgentBuilder {
+        space: Some(space.clone()),
+        ..Default::default()
+    }
+    .build(Arc::new(Ed25519LocalAgent::default()) as DynLocalAgent)
+    .encode()
+    .unwrap();
+
     let agent_infos_to_add = format!("[{}]", other_agent); // add-agents expects a JSON array
 
     let mut cmd = get_sandbox_command();
@@ -939,14 +946,6 @@ async fn shutdown_sandbox(mut child: Child) {
         // simple way.
         child.kill().await.unwrap();
     }
-}
-
-fn make_agent(space: SpaceId) -> String {
-    let mut builder = AgentBuilder::default();
-    let local_agent: DynLocalAgent = Arc::new(Ed25519LocalAgent::default());
-    builder.space = Some(space.clone());
-    let info = builder.build(local_agent);
-    info.encode().unwrap()
 }
 
 struct WsPoll(tokio::task::JoinHandle<()>);
