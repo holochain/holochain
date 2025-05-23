@@ -73,14 +73,6 @@ async fn setup_tests() -> (
     )
 }
 
-fn make_agent(space: SpaceId) -> String {
-    let mut builder = AgentBuilder::default();
-    let local_agent: DynLocalAgent = Arc::new(Ed25519LocalAgent::default());
-    builder.space = Some(space.clone());
-    let info = builder.build(local_agent);
-    info.encode().unwrap()
-}
-
 #[tokio::test(flavor = "multi_thread")]
 async fn admin_agent_info() {
     holochain_trace::test_run();
@@ -299,7 +291,14 @@ async fn app_agent_info() {
         "Querying for dna3 from app1 should return no results, even though dna3 exists on conductor");
 
     // test when adding an new "external" agent_info
-    let other_agent = make_agent(dna1_hash.to_k2_space());
+    let other_agent = AgentBuilder {
+        space: Some(dna1_hash.to_k2_space()),
+        ..Default::default()
+    }
+    .build(Arc::new(Ed25519LocalAgent::default()) as DynLocalAgent)
+    .encode()
+    .unwrap();
+
     let (admin_sender, _admin_receiver) = conductor.admin_ws_client::<AdminResponse>().await;
     let _: AdminResponse = admin_sender
         .request(AdminRequest::AddAgentInfo {
