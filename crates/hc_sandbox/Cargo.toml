@@ -61,6 +61,10 @@ url2 = "0.0.6"
 walkdir = "2"
 ed25519-dalek = "2.1"
 
+[dev-dependencies]
+kitsune2_test_utils = "0.2.6"
+kitsune2_core = "0.2.6"
+
 [target.'cfg(unix)'.dev-dependencies]
 nix = { version = "0.29", features = ["process", "signal"] }
 
