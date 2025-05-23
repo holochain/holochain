@@ -566,18 +566,18 @@ async fn countersigning_session_interaction_calls() {
     assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
 
     let resp =
-        request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &alice.admin_tx)
+        request::<_, AdminResponse>(AdminRequest::AgentInfo { dna_hashes: None }, &alice.admin_tx)
             .await;
     tracing::info!("Alice agent info: {:?}", resp);
 
     let resp =
-        request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &bob.admin_tx).await;
+        request::<_, AdminResponse>(AdminRequest::AgentInfo { dna_hashes: None }, &bob.admin_tx).await;
     tracing::info!("Bob agent info: {:?}", resp);
 
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     let resp =
-        request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &bob.admin_tx).await;
+        request::<_, AdminResponse>(AdminRequest::AgentInfo { dna_hashes: None }, &bob.admin_tx).await;
     tracing::info!("Bob agent info: {:?}", resp);
 
     tracing::info!("Alice published session.\n");
@@ -803,7 +803,7 @@ impl Agent {
 async fn expect_bootstrapping_completed(agents: &[&Agent]) {
     loop {
         let agent_requests = agents.iter().map(|agent| async {
-            match request(AdminRequest::AgentInfo { cell_id: None }, &agent.admin_tx).await {
+            match request(AdminRequest::AgentInfo { dna_hashes: None }, &agent.admin_tx).await {
                 AdminResponse::AgentInfo(agent_infos) => agent_infos.len() == agents.len(),
                 _ => unreachable!(),
             }
@@ -910,7 +910,7 @@ async fn wait_for_full_arc_for_agent(
     tokio::time::timeout(Duration::from_secs(30), async move {
         loop {
             let resp =
-                request::<_, AdminResponse>(AdminRequest::AgentInfo { cell_id: None }, &admin_tx)
+                request::<_, AdminResponse>(AdminRequest::AgentInfo { dna_hashes: None }, &admin_tx)
                     .await;
             match resp {
                 AdminResponse::AgentInfo(infos) => {
