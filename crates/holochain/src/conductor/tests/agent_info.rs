@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
 use crate::sweettest::*;
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
-use kitsune2_api::AgentInfoSigned;
-use kitsune2_core::Ed25519Verifier;
+use kitsune2_api::{AgentInfoSigned, DynLocalAgent, SpaceId};
+use kitsune2_core::{Ed25519LocalAgent, Ed25519Verifier};
+use kitsune2_test_utils::agent::AgentBuilder;
 
 // in these tests we set up a mix of apps and including clone cells so we can test
 // different varieties of combinations in the app_agent_info case, and we use the same setup in the admin_agent_info

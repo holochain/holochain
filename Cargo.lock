@@ -2742,6 +2742,7 @@ dependencies = [
  "kitsune2_api",
  "kitsune2_bootstrap_srv",
  "kitsune2_core",
+ "kitsune2_test_utils",
  "lair_keystore",
  "lair_keystore_api",
  "maplit",
