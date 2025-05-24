@@ -144,7 +144,6 @@ async fn storage_info() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "TODO FIXME k2 memory transport no longer supports network stats"]
 async fn dump_network_stats() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
