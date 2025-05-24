@@ -38,7 +38,7 @@ holochain_serialized_bytes = "=0.0.55"
 holochain_state = { version = "^0.6.0-dev.5", path = "../holochain_state" }
 holochain_types = { version = "^0.6.0-dev.5", path = "../holochain_types" }
 holochain_util = { version = "^0.6.0-dev.0", path = "../holochain_util" }
-holochain_wasmer_host = { version = "=0.0.99", default-features = false, features = [
+holochain_wasmer_host = { version = "=0.0.100", default-features = false, features = [
   "error_as_host",
 ] }
 holochain_websocket = { version = "^0.6.0-dev.5", path = "../holochain_websocket" }
@@ -95,8 +95,8 @@ uuid = { version = "1.8", features = ["serde", "v4"] }
 sha3 = "0.10"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 indexmap = { version = "2.6.0", features = ["serde"] }
-wasmer = { version = "5.0.2", default-features = false }
-wasmer-middlewares = { version = "5.0.2", optional = true, default-features = false }
+wasmer = { version = "6.0.1", default-features = false }
+wasmer-middlewares = { version = "6.0.1", optional = true, default-features = false }
 
 # Dependencies for test_utils / other optional deps
 fixt = { version = "^0.6.0-dev.0", path = "../fixt", optional = true }
