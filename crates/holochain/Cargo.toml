@@ -153,7 +153,7 @@ tokio = { version = "1.36.0", features = ["full", "test-util"] }
 tokio-tungstenite = "0.21"
 predicates = "3.1"
 assert2 = "0.3.15"
-kitsune2_test_utils = "0.2.6"
+kitsune2_test_utils = "0.2.7"
 
 [build-dependencies]
 hdk = { version = "^0.6.0-dev.5", path = "../hdk" }
