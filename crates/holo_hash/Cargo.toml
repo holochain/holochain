@@ -35,7 +35,7 @@ serde = { version = "1", optional = true }
 serde_bytes = { version = "0.11", optional = true }
 sha2 = { version = "0.10", optional = true }
 tracing = { version = "0.1", optional = true }
-holochain_wasmer_common = { version = "=0.0.99", optional = true }
+holochain_wasmer_common = { version = "=0.0.100", optional = true }
 schemars = { version = "0.8.22", optional = true }
 
 [dev-dependencies]

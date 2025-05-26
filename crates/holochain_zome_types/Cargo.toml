@@ -28,7 +28,7 @@ strum = "0.18.0"
 strum_macros = "0.18.0"
 thiserror = "1.0.22"
 tracing = "0.1"
-holochain_wasmer_common = "=0.0.99"
+holochain_wasmer_common = "=0.0.100"
 derive_more = "0.99"
 
 # fixturator dependencies

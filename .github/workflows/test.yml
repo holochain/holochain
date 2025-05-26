@@ -31,7 +31,7 @@ jobs:
       - name: cmake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: '3.31.x'
+          cmake-version: "3.31.x"
 
       - name: static-fmt
         run: make static-fmt
@@ -84,12 +84,13 @@ jobs:
       - name: cmake
         uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: '3.31.x'
+          cmake-version: "3.31.x"
 
       - name: install build dependencies (macos-latest, wasmer_wamr)
         if: matrix.os == 'macos-latest' && matrix.target == 'wasmer_wamr'
-        shell: bash
-        run: brew install cmake ninja
+        run: |
+          brew install llvm
+          echo "PATH=/opt/homebrew/opt/llvm/bin:$PATH" >> "$GITHUB_ENV"
 
       - name: build (windows-latest)
         if: matrix.os == 'windows-latest'
@@ -99,7 +100,8 @@ jobs:
 
       - name: build
         if: matrix.os != 'windows-latest'
-        run: make build-workspace-${{ matrix.target }}
+        run: |
+          make build-workspace-${{ matrix.target }}
 
       - name: install nextest
         run: cargo install cargo-nextest
