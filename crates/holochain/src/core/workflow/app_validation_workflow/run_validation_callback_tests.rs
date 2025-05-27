@@ -229,7 +229,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
                 filter_hashes.insert(delete.hashed.deletes_address.clone().clone());
                 let chain_filter = ChainFilter {
                     chain_top: delete.as_hash().clone(),
-                    filters: ChainFilters::Until(filter_hashes),
+                    filters: ChainFilters::UntilHash(filter_hashes),
                     include_cached_entries: false,
                 };
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {

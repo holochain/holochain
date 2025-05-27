@@ -47,7 +47,7 @@ fn can_take_n(len: u32, chain_top: u32, take: u32) -> Vec<TestChainItem> {
 #[test_case(10, 9, hash(0) => using pretty(chain(0..10)))]
 /// Check taking until some hash works.
 fn can_until_hash(len: u32, chain_top: u32, until: TestHash) -> Vec<TestChainItem> {
-    let filter = TestFilter::new(hash(chain_top)).until(until);
+    let filter = TestFilter::new(hash(chain_top)).until_hash(until);
     build_chain(chain(0..len), filter)
 }
 

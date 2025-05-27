@@ -22,6 +22,9 @@ pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug + Send + Sync {
     fn seq(&self) -> u32;
 
     /// The hash of this item
+    fn get_timestamp(&self) -> Timestamp;
+
+    /// The hash of this item
     fn get_hash(&self) -> &Self::Hash;
 
     /// The hash of the previous item
@@ -39,6 +42,10 @@ impl ChainItem for ActionHashed {
 
     fn seq(&self) -> u32 {
         self.action_seq()
+    }
+
+    fn get_timestamp(&self) -> Timestamp {
+        self.timestamp()
     }
 
     fn get_hash(&self) -> &Self::Hash {
@@ -61,6 +68,10 @@ impl ChainItem for SignedActionHashed {
         self.hashed.seq()
     }
 
+    fn get_timestamp(&self) -> Timestamp {
+       self.hashed.timestamp()
+    }
+
     fn get_hash(&self) -> &Self::Hash {
         self.hashed.get_hash()
     }
@@ -76,6 +87,7 @@ impl ChainItem for SignedActionHashed {
 
 /// Validate that a sequence of actions forms a valid hash chain via `prev_action`,
 /// with an optional starting point.
+/// TODO: check timestamp are in order?
 pub fn validate_chain<'iter, A: 'iter + ChainItem>(
     mut actions: impl Iterator<Item = &'iter A>,
     persisted_chain_head: &Option<(A::Hash, u32)>,
@@ -109,6 +121,7 @@ pub fn validate_chain<'iter, A: 'iter + ChainItem>(
 }
 
 // Check the action is valid for the previous action.
+/// TODO: check timestamp are in order?
 fn check_prev_action_chain<A: ChainItem>(
     prev_action_hash: &A::Hash,
     prev_action_seq: u32,

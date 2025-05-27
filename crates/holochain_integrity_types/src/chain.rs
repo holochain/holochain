@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
-
+use holochain_timestamp::Timestamp;
 use crate::MigrationTarget;
 
 #[cfg(test)]
@@ -37,11 +37,13 @@ pub enum ChainFilters<H: Eq + Ord + std::hash::Hash = ActionHash> {
     ToGenesis,
     /// Take this many (inclusive of the starting position).
     Take(u32),
+    /// Continue until timestamp is reached
+    UntilTimestamp(Timestamp),
     /// Continue until one of these hashes is found.
-    Until(HashSet<H>),
-    /// Combination of both take and until.
+    UntilHash(HashSet<H>),
+    /// Combination of take and both until.
     /// Whichever is the smaller set.
-    Both(u32, HashSet<H>),
+    Multiple(u32, HashSet<H>, Timestamp),
 }
 
 /// Create a deterministic hash to compare filters.
@@ -51,15 +53,17 @@ impl<H: Eq + Ord + std::hash::Hash> core::hash::Hash for ChainFilters<H> {
         match self {
             ChainFilters::ToGenesis => (),
             ChainFilters::Take(t) => t.hash(state),
-            ChainFilters::Until(u) => {
+            ChainFilters::UntilTimestamp(t) => t.hash(state),
+            ChainFilters::UntilHash(u) => {
                 let mut u: Vec<_> = u.iter().collect();
                 u.sort_unstable();
                 u.hash(state);
             }
-            ChainFilters::Both(t, u) => {
+            ChainFilters::Multiple(n, u, t) => {
                 let mut u: Vec<_> = u.iter().collect();
                 u.sort_unstable();
                 u.hash(state);
+                n.hash(state);
                 t.hash(state);
             }
         }
@@ -71,19 +75,20 @@ impl<H: Eq + Ord + std::hash::Hash> core::cmp::PartialEq for ChainFilters<H> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Take(l0), Self::Take(r0)) => l0 == r0,
-            (Self::Until(a), Self::Until(b)) => {
+            (Self::UntilTimestamp(l0), Self::UntilTimestamp(r0)) => l0 == r0,
+            (Self::UntilHash(a), Self::UntilHash(b)) => {
                 let mut a: Vec<_> = a.iter().collect();
                 let mut b: Vec<_> = b.iter().collect();
                 a.sort_unstable();
                 b.sort_unstable();
                 a == b
             }
-            (Self::Both(l0, a), Self::Both(r0, b)) => {
+            (Self::Multiple(l0, a, t0), Self::Multiple(r0, b, t1)) => {
                 let mut a: Vec<_> = a.iter().collect();
                 let mut b: Vec<_> = b.iter().collect();
                 a.sort_unstable();
                 b.sort_unstable();
-                l0 == r0 && a == b
+                l0 == r0 && a == b && t0 == t1
             }
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
@@ -118,8 +123,9 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
         self.filters = match self.filters {
             ChainFilters::ToGenesis => ChainFilters::Take(n),
             ChainFilters::Take(old_n) => ChainFilters::Take(old_n.min(n)),
-            ChainFilters::Until(u) => ChainFilters::Both(n, u),
-            ChainFilters::Both(old_n, u) => ChainFilters::Both(old_n.min(n), u),
+            ChainFilters::UntilTimestamp(t) => ChainFilters::Multiple(n, HashSet::new(), t),
+            ChainFilters::UntilHash(u) => ChainFilters::Multiple(n, u, Timestamp(0)),
+            ChainFilters::Multiple(old_n, u, t) => ChainFilters::Multiple(old_n.min(n), u, t),
         };
         self
     }
@@ -131,32 +137,45 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
         self
     }
 
+    /// Take all actions until this timestamp is reached
+    pub fn until_timestamp(mut self, timestamp: Timestamp) -> Self {
+        self.filters = match self.filters {
+            ChainFilters::ToGenesis => ChainFilters::UntilTimestamp(timestamp),
+            ChainFilters::Take(n) => ChainFilters::Multiple(n, HashSet::new(), timestamp),
+            ChainFilters::UntilTimestamp(_) => ChainFilters::UntilTimestamp(timestamp),
+            ChainFilters::UntilHash(u) => ChainFilters::Multiple(0, u, timestamp),
+            ChainFilters::Multiple(n, u, _) => ChainFilters::Multiple(n, u, timestamp),
+        };
+        self
+    }
+
     /// Take all actions until this action hash is found.
-    /// Note that all actions specified as `until` hashes must be
+    /// Note that all actions specified as `until_hash` hashes must be
     /// found so this filter can produce deterministic results.
     /// It is invalid to specify an until hash that is on a different
     /// fork then the starting position.
-    pub fn until(mut self, action_hash: H) -> Self {
+    pub fn until_hash(mut self, action_hash: H) -> Self {
         self.filters = match self.filters {
-            ChainFilters::ToGenesis => ChainFilters::Until(Some(action_hash).into_iter().collect()),
-            ChainFilters::Take(n) => ChainFilters::Both(n, Some(action_hash).into_iter().collect()),
-            ChainFilters::Until(mut u) => {
+            ChainFilters::ToGenesis => ChainFilters::UntilHash(Some(action_hash).into_iter().collect()),
+            ChainFilters::Take(n) => ChainFilters::Multiple(n, Some(action_hash).into_iter().collect(), Timestamp(0)),
+            ChainFilters::UntilTimestamp(t) => ChainFilters::Multiple(0, Some(action_hash).into_iter().collect(), t),
+            ChainFilters::UntilHash(mut u) => {
                 u.insert(action_hash);
-                ChainFilters::Until(u)
+                ChainFilters::UntilHash(u)
             }
-            ChainFilters::Both(n, mut u) => {
+            ChainFilters::Multiple(n, mut u, t) => {
                 u.insert(action_hash);
-                ChainFilters::Both(n, u)
+                ChainFilters::Multiple(n, u, t)
             }
         };
         self
     }
 
     /// Get the until hashes if there are any.
-    pub fn get_until(&self) -> Option<&HashSet<H>> {
+    pub fn get_until_hash(&self) -> Option<&HashSet<H>> {
         match &self.filters {
-            ChainFilters::Until(u) => Some(u),
-            ChainFilters::Both(_, u) => Some(u),
+            ChainFilters::UntilHash(u) => Some(u),
+            ChainFilters::Multiple(_, u,_) => Some(u),
             _ => None,
         }
     }
@@ -164,8 +183,17 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     /// Get the take number if there is one.
     pub fn get_take(&self) -> Option<u32> {
         match &self.filters {
-            ChainFilters::Take(s) => Some(*s),
-            ChainFilters::Both(s, _) => Some(*s),
+            ChainFilters::Take(n) => Some(*n),
+            ChainFilters::Multiple(n, _, _) => if *n > 0 { Some(*n)} else { None },
+            _ => None,
+        }
+    }
+
+    /// Get the take number if there is one.
+    pub fn get_until_timestamp(&self) -> Option<Timestamp> {
+        match &self.filters {
+            ChainFilters::UntilTimestamp(ts) => Some(*ts),
+            ChainFilters::Multiple(_, _, ts) => if ts.0 > 0 { Some(*ts)} else { None },
             _ => None,
         }
     }

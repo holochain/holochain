@@ -63,6 +63,8 @@ pub struct TestChainItem {
     pub seq: u32,
     /// The hash
     pub hash: TestChainHash,
+    /// The timestamp
+    pub timestamp: Timestamp,
     /// The previous hash, unless this is the first item
     pub prev: Option<TestChainHash>,
 }
@@ -73,6 +75,7 @@ impl TestChainItem {
         Self {
             seq,
             hash: TestChainHash(seq),
+            timestamp: Timestamp(seq.into()),
             prev: seq.checked_sub(1).map(TestChainHash),
         }
     }
@@ -82,6 +85,7 @@ impl TestChainItem {
         Self {
             seq: seq.into(),
             hash: TestChainHash::forked(seq, new_fork),
+            timestamp: Timestamp(seq.into()),
             prev: seq
                 .checked_sub(1)
                 .map(|s| TestChainHash::forked(s, prev_fork)),
@@ -98,6 +102,10 @@ impl ChainItem for TestChainItem {
 
     fn get_hash(&self) -> &Self::Hash {
         &self.hash
+    }
+
+    fn get_timestamp(&self) -> Timestamp  {
+        self.timestamp
     }
 
     fn prev_hash(&self) -> Option<&Self::Hash> {
@@ -178,6 +186,7 @@ pub fn forked_chain(ranges: &[Range<u8>]) -> Vec<TestChainItem> {
                     TestChainItem {
                         seq: n as u32,
                         hash: TestChainHash::forked(n, i as u8),
+                        timestamp: Timestamp(n.into()),
                         prev,
                     }
                 } else {
@@ -187,6 +196,7 @@ pub fn forked_chain(ranges: &[Range<u8>]) -> Vec<TestChainItem> {
                     TestChainItem {
                         seq: n as u32,
                         hash: TestChainHash::forked(n, i as u8),
+                        timestamp: Timestamp(n.into()),
                         prev,
                     }
                 }

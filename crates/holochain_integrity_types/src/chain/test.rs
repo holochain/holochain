@@ -28,11 +28,11 @@ fn take_n_is_min() {
 #[test]
 fn until_hash_is_a_set() {
     assert_eq!(
-        ChainFilter::new(hash(0)).until(hash(0)).until(hash(1)),
+        ChainFilter::new(hash(0)).until_hash(hash(0)).until_hash(hash(1)),
         ChainFilter::new(hash(0))
-            .until(hash(0))
-            .until(hash(0))
-            .until(hash(1))
-            .until(hash(1)),
+            .until_hash(hash(0))
+            .until_hash(hash(0))
+            .until_hash(hash(1))
+            .until_hash(hash(1)),
     );
 }

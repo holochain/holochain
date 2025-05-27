@@ -83,7 +83,7 @@ pub fn filter_then_check(
     }
 }
 
-/// Find the filters sequence bounds.
+/// Find the filter's sequence bounds.
 fn find_bounds(
     txn: &Transaction,
     scratch: Option<&Scratch>,
@@ -93,7 +93,7 @@ fn find_bounds(
     let mut statement = txn.prepare(ACTION_HASH_TO_SEQ)?;
 
     // Map an action hash to its sequence.
-    let get_seq = move |hash: &ActionHash| {
+    let get_seq_from_hash = |hash: &ActionHash| {
         if let Some(scratch) = scratch {
             if let Some(action) = scratch.actions().find(|a| a.action_address() == hash) {
                 return Ok(Some(action.action().action_seq()));
@@ -107,8 +107,24 @@ fn find_bounds(
         Ok(result)
     };
 
+    // Map a timestamp to its sequence.
+    let mut statement2 = txn.prepare(ACTION_HASH_TO_SEQ)?;
+    let get_seq_from_ts = |ts: Timestamp| {
+        if let Some(scratch) = scratch {
+            if let Some(action) = scratch.actions().find(|a| a.get_timestamp() == ts) {
+                return Ok(Some(action.action().action_seq()));
+            }
+        }
+        let result = statement2
+          .query_row(named_params! {":timestamp": ts, ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
+              row.get(0)
+          })
+          .optional()?;
+        Ok(result)
+    };
+
     // For all the hashes in the filter, get their sequences.
-    Sequences::find_sequences(filter, get_seq)
+    Sequences::find_sequences(filter, get_seq_from_hash, get_seq_from_ts)
 }
 
 /// Get the agent activity for a given range of actions

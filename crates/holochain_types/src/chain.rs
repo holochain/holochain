@@ -42,10 +42,12 @@ impl AgentActivityExt for AgentActivityResponse {}
 /// - Ignore any ops that are not a direct ancestor to the starting position.
 /// - Stop at the first gap in the chain.
 /// - Take no **more** then the [`take`]. It may return less.
-/// - Stop at (including) the [`ActionHash`] in [`until`]. But not if this hash is not in the chain.
+/// - Stop at (including) the [`ActionHash`] in [`until_hash`]. But not if this hash is not in the chain.
+/// - Stop when [`until_timestamp`] is reached.
 ///
 /// [`take`]: ChainFilter::take
-/// [`until`]: ChainFilter::until
+/// [`until_timestamp`]: ChainFilter::until_timestamp
+/// [`until_hash`]: ChainFilter::until_hash
 pub struct ChainFilterIter<I: AsRef<A>, A: ChainItem = SignedActionHashed> {
     filter: ChainFilter<A::Hash>,
     iter: Peekable<std::vec::IntoIter<I>>,
@@ -56,7 +58,7 @@ pub struct ChainFilterIter<I: AsRef<A>, A: ChainItem = SignedActionHashed> {
 /// A [`ChainFilter`] with the action sequences for the
 /// starting position and any `until` hashes.
 pub struct ChainFilterRange {
-    /// The filter for for this chain.
+    /// The filter for this chain.
     filter: ChainFilter,
     /// The start of this range is the end of
     /// the filter iterator.
@@ -75,9 +77,12 @@ enum ChainBottomType {
     /// The bottom of the chain is the action where `take`
     /// has reached zero.
     Take,
+    /// The bottom of the chain is the oldest action before 
+    /// `until_timestamp` is reached.
+    UntilTimestamp,
     /// The bottom of the chain is the action where an
-    /// `until` hash was found.
-    Until,
+    /// `until_hash` hash was found.
+    UntilHash,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -319,8 +324,16 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
         match &mut self.filter.filters {
             // Check if there is any left to take.
             ChainFilters::Take(n) => *n = n.checked_sub(1)?,
-            // Check if the `until` hash has been found.
-            ChainFilters::Until(until_hashes) => {
+            // Check if the timestamp has been reached
+            ChainFilters::UntilTimestamp(ts) => {
+                if op.as_ref().get_timestamp() < *ts  {
+                    // If it has, don't return it.
+                    self.end = true;
+                    return None;
+                }
+            }
+            // Check if the `until_hash` hash has been found.
+            ChainFilters::UntilHash(until_hashes) => {
                 if until_hashes.contains(op.as_ref().get_hash()) {
                     // If it has, include it and return on the next call to `next`.
                     self.end = true;
@@ -329,11 +342,17 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
             // Just keep going till genesis.
             ChainFilters::ToGenesis => (),
             // Both filters are active. Return on the first to be hit.
-            ChainFilters::Both(n, until_hashes) => {
+            ChainFilters::Multiple(n, until_hashes, ts) => {
                 *n = n.checked_sub(1)?;
 
                 if until_hashes.contains(op.as_ref().get_hash()) {
                     self.end = true;
+                }
+
+                if op.as_ref().get_timestamp() < *ts  {
+                    // Timestamp reached, don't return it.
+                    self.end = true;
+                    return None;
                 }
             }
         }
@@ -343,14 +362,15 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
 
 impl Sequences {
     /// Find the action sequences for all hashes in the filter.
-    pub fn find_sequences<F, E>(filter: ChainFilter, mut get_seq: F) -> Result<Self, E>
+    pub fn find_sequences<F,F2, E>(filter: ChainFilter, mut get_seq_for_hash: F, mut get_seq_for_ts: F2) -> Result<Self, E>
     where
         F: FnMut(&ActionHash) -> Result<Option<u32>, E>,
+        F2: FnMut(Timestamp) -> Result<Option<u32>, E>,
     {
         // Get the top of the chain action sequence.
         // This is the highest sequence number and also the
         // start of the iterator.
-        let chain_top = match get_seq(&filter.chain_top)? {
+        let chain_top = match get_seq_for_hash(&filter.chain_top)? {
             Some(seq) => seq,
             None => return Ok(Self::ChainTopNotFound(filter.chain_top)),
         };
@@ -361,17 +381,17 @@ impl Sequences {
         // If there are any until hashes in the filter,
         // then find the highest sequence of the set
         // and find the distance from the position.
-        let distance = match filter.get_until() {
+        let mut distance = match filter.get_until_hash() {
             Some(until_hashes) => {
                 // Find the highest sequence of the until hashes.
                 let max = until_hashes
                     .iter()
                     .filter_map(|hash| {
-                        match get_seq(hash) {
+                        match get_seq_for_hash(hash) {
                             Ok(seq) => {
                                 // Ignore any until hashes that could not be found.
                                 let seq = seq?;
-                                // Ignore any until hashes that are higher then a chain top.
+                                // Ignore any until hashes that are higher than the chain top.
                                 (seq <= chain_top).then(|| Ok(seq))
                             }
                             Err(e) => Some(Err(e)),
@@ -385,7 +405,7 @@ impl Sequences {
                 if max != 0 {
                     // If the max is not genesis then there is an
                     // until hash that was found.
-                    chain_bottom_type = ChainBottomType::Until;
+                    chain_bottom_type = ChainBottomType::UntilHash;
                 }
 
                 // The distance from the chain top till highest until hash.
@@ -397,8 +417,31 @@ impl Sequences {
             None => chain_top,
         };
 
+        // Check if there is an until timestamp filter and get the distance from the position
+        if let Some(ts) = filter.get_until_timestamp() {
+            let mut ts_distance = std::u32::MAX;
+            // A timestamp of zero will produce an empty range.
+            if ts.0 == 0 {
+                return Ok(Self::EmptyRange);
+            } else {
+                let seq = get_seq_for_ts(ts)?;
+                // Ignore any until timestamp that could not be found.
+                if let Some(s) = seq {
+                    // Ignore any until timestamp that are higher than the chain top.
+                    if s <= chain_top {
+                        ts_distance = chain_top - s;
+                    }
+                }
+            }
+            // Keep the shortest distance
+            if ts_distance <= distance {
+                chain_bottom_type = ChainBottomType::UntilTimestamp;
+                distance = ts_distance;
+            }
+        }
+
         // Check if there is a take filter and if that
-        // will be reached before any until hashes or genesis.
+        // will be reached before any until or genesis.
         let start = match filter.get_take() {
             Some(take) => {
                 // A take of zero will produce an empty range.
@@ -439,7 +482,7 @@ impl ChainFilterRange {
         chain: Vec<RegisterAgentActivity>,
         warrants: Vec<WarrantOp>,
     ) -> MustGetAgentActivityResponse {
-        let until_hashes = self.filter.get_until().cloned();
+        let until_hashes = self.filter.get_until_hash().cloned();
 
         // Create the filter iterator and collect the filtered actions.
         let actions: Vec<_> = ChainFilterIter::new(self.filter, chain).collect();
@@ -454,7 +497,7 @@ impl ChainFilterRange {
                 // If the range start was an until hash then the first action must
                 // actually be an action from the until set.
                 if let Some(hashes) = until_hashes {
-                    if matches!(self.chain_bottom_type, ChainBottomType::Until)
+                    if matches!(self.chain_bottom_type, ChainBottomType::UntilHash)
                         && !hashes.contains(lowest.action.action_address())
                     {
                         return MustGetAgentActivityResponse::IncompleteChain;
