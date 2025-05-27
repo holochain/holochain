@@ -156,9 +156,15 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     /// fork then the starting position.
     pub fn until_hash(mut self, action_hash: H) -> Self {
         self.filters = match self.filters {
-            ChainFilters::ToGenesis => ChainFilters::UntilHash(Some(action_hash).into_iter().collect()),
-            ChainFilters::Take(n) => ChainFilters::Multiple(n, Some(action_hash).into_iter().collect(), Timestamp(0)),
-            ChainFilters::UntilTimestamp(t) => ChainFilters::Multiple(0, Some(action_hash).into_iter().collect(), t),
+            ChainFilters::ToGenesis => {
+                ChainFilters::UntilHash(Some(action_hash).into_iter().collect())
+            },
+            ChainFilters::Take(n) => {
+                ChainFilters::Multiple(n, Some(action_hash).into_iter().collect(), Timestamp(0))
+            },
+            ChainFilters::UntilTimestamp(t) => {
+                ChainFilters::Multiple(0, Some(action_hash).into_iter().collect(), t)
+            },
             ChainFilters::UntilHash(mut u) => {
                 u.insert(action_hash);
                 ChainFilters::UntilHash(u)
@@ -175,7 +181,7 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     pub fn get_until_hash(&self) -> Option<&HashSet<H>> {
         match &self.filters {
             ChainFilters::UntilHash(u) => Some(u),
-            ChainFilters::Multiple(_, u,_) => Some(u),
+            ChainFilters::Multiple(_, u, _) => Some(u),
             _ => None,
         }
     }

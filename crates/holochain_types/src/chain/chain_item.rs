@@ -69,7 +69,7 @@ impl ChainItem for SignedActionHashed {
     }
 
     fn get_timestamp(&self) -> Timestamp {
-       self.hashed.timestamp()
+        self.hashed.timestamp()
     }
 
     fn get_hash(&self) -> &Self::Hash {
