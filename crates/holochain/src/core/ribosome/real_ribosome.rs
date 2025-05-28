@@ -77,13 +77,14 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use futures::FutureExt;
-use ghost_actor::dependencies::must_future::MustBoxFuture;
 use holochain_types::prelude::*;
 use holochain_util::timed;
+use holochain_wasmer_host::module::build_module as build_wasmer_module;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
+use must_future::MustBoxFuture;
 use tokio_stream::StreamExt;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
@@ -97,14 +98,10 @@ use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
 
-#[cfg(feature = "unstable-functions")]
-use super::host_fn::get_agent_key_lineage::get_agent_key_lineage;
 #[cfg(feature = "unstable-countersigning")]
 use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 #[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::block_agent::block_agent;
-#[cfg(feature = "unstable-functions")]
-use crate::core::ribosome::host_fn::is_same_agent::is_same_agent;
 #[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::schedule::schedule;
 #[cfg(feature = "unstable-functions")]
@@ -123,7 +120,6 @@ use once_cell::sync::Lazy;
 use opentelemetry_api::global::meter_with_version;
 use opentelemetry_api::metrics::Counter;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
@@ -158,11 +154,7 @@ pub struct RealRibosome {
     pub usage_meter: Arc<Counter<u64>>,
 
     /// File system and in-memory cache for wasm modules.
-    pub wasmer_module_cache: Arc<ModuleCacheLock>,
-
-    #[cfg(test)]
-    /// Wasm cache for Deepkey wasm in a temporary directory to be shared across all tests.
-    pub shared_test_module_cache: Arc<ModuleCacheLock>,
+    pub wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
 }
 
 type ContextMap = Lazy<Arc<Mutex<HashMap<u64, Arc<CallContext>>>>>;
@@ -263,26 +255,14 @@ impl RealRibosome {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn new(
         dna_file: DnaFile,
-        wasmer_module_cache: Arc<ModuleCacheLock>,
+        wasmer_module_cache: Option<Arc<ModuleCacheLock>>,
     ) -> RibosomeResult<Self> {
-        let mut _shared_test_module_cache: Option<PathBuf> = None;
-        #[cfg(test)]
-        {
-            // Create this temporary directory only in tests.
-            let shared_test_module_cache_dir = std::env::temp_dir().join("deepkey_wasm_cache");
-            let _ = std::fs::create_dir_all(shared_test_module_cache_dir.clone());
-            _shared_test_module_cache = Some(shared_test_module_cache_dir);
-        }
         let mut ribosome = Self {
             dna_file,
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
             wasmer_module_cache,
-            #[cfg(test)]
-            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(
-                _shared_test_module_cache,
-            ))),
         };
 
         // Collect the number of entry and link types
@@ -377,27 +357,26 @@ impl RealRibosome {
             zome_types: Default::default(),
             zome_dependencies: Default::default(),
             usage_meter: Self::standard_usage_meter(),
-            wasmer_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
-            #[cfg(test)]
-            shared_test_module_cache: Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
+            wasmer_module_cache: Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
         }
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn build_module(&self, zome_name: &ZomeName) -> RibosomeResult<Arc<Module>> {
-        let cache_key = self.get_module_cache_key(zome_name)?;
-        // When running tests, use cache folder accessible to all tests.
-        #[cfg(test)]
-        let cache_lock = self.shared_test_module_cache.clone();
-        #[cfg(not(test))]
-        let cache_lock = self.wasmer_module_cache.clone();
+        let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.clone().code();
 
-        let wasm = self.dna_file.get_wasm_for_zome(zome_name)?.code();
-        tokio::task::spawn_blocking(move || {
-            let cache = timed!([1, 10, 1000], cache_lock.write());
-            Ok(timed!([1, 1000, 10_000], cache.get(cache_key, &wasm))?)
-        })
-        .await?
+        if self.wasmer_module_cache.is_some() {
+            let cache_key = self.get_module_cache_key(zome_name)?;
+            let cache_lock = self.wasmer_module_cache.clone().unwrap();
+
+            tokio::task::spawn_blocking(move || {
+                let cache = timed!([1, 10, 1000], cache_lock.write());
+                Ok(timed!([1, 1000, 10_000], cache.get(cache_key, &wasm))?)
+            })
+            .await?
+        } else {
+            Ok(build_wasmer_module(&wasm)?)
+        }
     }
 
     // Create a key for module cache.
@@ -415,13 +394,7 @@ impl RealRibosome {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn get_module_for_zome(&self, zome: &Zome<ZomeDef>) -> RibosomeResult<Arc<Module>> {
         match &zome.def {
-            ZomeDef::Wasm(wasm_zome) => {
-                if let Some(module) = get_prebuilt_module(wasm_zome)? {
-                    Ok(module)
-                } else {
-                    self.build_module(zome.zome_name()).await
-                }
-            }
+            ZomeDef::Wasm(_) => self.build_module(zome.zome_name()).await,
             _ => RibosomeResult::Err(RibosomeError::DnaError(DnaError::ZomeError(
                 ZomeError::NonWasmZome(zome.zome_name().clone()),
             ))),
@@ -444,7 +417,7 @@ impl RealRibosome {
             let mut store_mut = store.as_store_mut();
             instance = Arc::new(Instance::new(&mut store_mut, &module, &imports).map_err(
                 |e| -> RuntimeError {
-                    wasm_error!(WasmErrorInner::Compile(format!("{}: {}", name, e))).into()
+                    wasm_error!(WasmErrorInner::ModuleBuild(format!("{}: {}", name, e))).into()
                 },
             )?);
         }
@@ -459,7 +432,7 @@ impl RealRibosome {
                     .exports
                     .get_memory("memory")
                     .map_err(|e| -> RuntimeError {
-                        wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
+                        wasm_error!(WasmErrorInner::ModuleBuild(e.to_string())).into()
                     })?
                     .clone(),
             );
@@ -468,7 +441,7 @@ impl RealRibosome {
                     .exports
                     .get_typed_function(&store_mut, "__hc__deallocate_1")
                     .map_err(|e| -> RuntimeError {
-                        wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
+                        wasm_error!(WasmErrorInner::ModuleBuild(e.to_string())).into()
                     })?,
             );
             data_mut.allocate = Some(
@@ -476,7 +449,7 @@ impl RealRibosome {
                     .exports
                     .get_typed_function(&store_mut, "__hc__allocate_1")
                     .map_err(|e| -> RuntimeError {
-                        wasm_error!(WasmErrorInner::Compile(e.to_string())).into()
+                        wasm_error!(WasmErrorInner::ModuleBuild(e.to_string())).into()
                     })?,
             );
         }
@@ -498,17 +471,16 @@ impl RealRibosome {
             modifiers: DnaModifiers {
                 network_seed: Default::default(),
                 properties: Default::default(),
-                origin_time: Timestamp(0),
-                quantum_time: Default::default(),
             },
             integrity_zomes: Default::default(),
             coordinator_zomes: Default::default(),
+            #[cfg(feature = "unstable-migration")]
             lineage: Default::default(),
         };
         let empty_dna_file = DnaFile::new(empty_dna_def, vec![]).await;
         let empty_ribosome = RealRibosome::new(
             empty_dna_file,
-            Arc::new(ModuleCacheLock::new(ModuleCache::new(None))),
+            Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(None)))),
         )
         .await?;
         let context_key = RealRibosome::next_context_key();
@@ -656,12 +628,6 @@ impl RealRibosome {
         );
         #[cfg(feature = "unstable-functions")]
         host_fn_builder
-            .with_host_function(
-                &mut ns,
-                "__hc__get_agent_key_lineage_1",
-                get_agent_key_lineage,
-            )
-            .with_host_function(&mut ns, "__hc__is_same_agent_1", is_same_agent)
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
             .with_host_function(&mut ns, "__hc__schedule_1", schedule)
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
@@ -950,12 +916,9 @@ impl RibosomeT for RealRibosome {
             },
             extern_fns: {
                 match zome.zome_def() {
-                    ZomeDef::Wasm(wasm_zome) => {
-                        let module = if let Some(module) = get_prebuilt_module(wasm_zome)? {
-                            module
-                        } else {
-                            tokio_helper::block_forever_on(self.build_module(zome.zome_name()))?
-                        };
+                    ZomeDef::Wasm(_) => {
+                        let module =
+                            tokio_helper::block_forever_on(self.build_module(zome.zome_name()))?;
                         self.get_extern_fns_for_wasm(module.clone())
                     }
                     ZomeDef::Inline { inline_zome, .. } => inline_zome.0.functions(),
@@ -1259,21 +1222,29 @@ pub mod wasm_test {
                 .collect::<Result<Vec<_>, _>>()
                 .unwrap();
 
+            // With the `wasmer_wamr` feature, we expect zome calls to take longer,
+            // because the wasm is interpreted instead of compiled.
+            #[cfg(feature = "wasmer_wamr")]
+            let maximum_response_time_ms = Duration::from_millis(150);
+
+            #[cfg(not(feature = "wasmer_wamr"))]
+            let maximum_response_time_ms = Duration::from_millis(50);
+
             assert!(
-                results[0] <= Duration::from_millis(15),
-                "{:?} > 15ms",
-                results[0]
+                results[0] <= maximum_response_time_ms,
+                "{:?} > {:?}",
+                results[0],
+                maximum_response_time_ms
             );
             assert!(
-                results[1] <= Duration::from_millis(15),
-                "{:?} > 15ms",
-                results[1]
+                results[1] <= maximum_response_time_ms,
+                "{:?} > {:?}",
+                results[1],
+                maximum_response_time_ms
             );
         }
 
         // Make sure the context map does not retain items.
-        // Zome `deepkey_csr`` does a post_commit call which takes some time to complete,
-        // before it is removed from the context map.
         wait_for_10s!(
             CONTEXT_MAP.clone(),
             |context_map: &Arc<Mutex<HashMap<u64, Arc<_>>>>| context_map.lock().is_empty(),
@@ -1366,15 +1337,11 @@ pub mod wasm_test {
                 "__hc__enable_clone_cell_1",
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
-                #[cfg(feature = "unstable-functions")]
-                "__hc__get_agent_key_lineage_1",
                 "__hc__get_details_1",
                 "__hc__get_link_details_1",
                 "__hc__get_links_1",
                 "__hc__get_validation_receipts_1",
                 "__hc__hash_1",
-                #[cfg(feature = "unstable-functions")]
-                "__hc__is_same_agent_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
                 "__hc__must_get_entry_1",

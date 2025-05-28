@@ -1,9 +1,9 @@
 use crate::db::key::DbKey;
-use crate::functions::add_custom_functions;
 use holochain_serialized_bytes::prelude::*;
 use once_cell::sync::Lazy;
 use rusqlite::*;
 use scheduled_thread_pool::ScheduledThreadPool;
+use schemars::JsonSchema;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{path::Path, sync::Arc, time::Duration};
 
@@ -36,7 +36,7 @@ pub enum DbSyncLevel {
 /// The strategy for database file system synchronization.
 /// Some databases like the cache can be safely rebuilt if
 /// corruption occurs due to using the faster [`DbSyncLevel::Off`].
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Default, JsonSchema)]
 pub enum DbSyncStrategy {
     /// Allows databases that can be wiped and rebuilt to
     /// use the faster [`DbSyncLevel::Off`].
@@ -109,7 +109,9 @@ pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) 
     conn.busy_timeout(SQLITE_BUSY_TIMEOUT)?;
 
     #[cfg(feature = "sqlite-encrypted")]
-    conn.execute_batch(&String::from_utf8_lossy(&config.key.unlocked.read_lock()))?;
+    conn.execute_batch(&String::from_utf8_lossy(
+        &*config.key.unlocked.lock().unwrap().lock(),
+    ))?;
 
     // this is recommended to always be off:
     // https://sqlite.org/pragma.html#pragma_trusted_schema
@@ -124,7 +126,7 @@ pub(super) fn initialize_connection(conn: &mut Connection, config: &PoolConfig) 
         DbSyncLevel::Off => conn.pragma_update(None, "synchronous", "0".to_string())?,
     }
 
-    add_custom_functions(conn)?;
+    vtab::array::load_module(conn)?;
 
     Ok(())
 }

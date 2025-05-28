@@ -9,12 +9,13 @@ pub struct DnaStorageInfo {
     pub dht_data_size_on_disk: usize,
     pub cache_data_size: usize,
     pub cache_data_size_on_disk: usize,
+    pub dna_hash: DnaHash,
     pub used_by: Vec<InstalledAppId>,
 }
 
 /// The type of storage blob
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum StorageBlob {
     /// Storage blob used by hApps to store data
     Dna(DnaStorageInfo),

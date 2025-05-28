@@ -36,6 +36,13 @@ impl<T: HashType> HoloHashB64<T> {
     }
 }
 
+impl<T: HashType> std::str::FromStr for HoloHashB64<T> {
+    type Err = HoloHashError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        HoloHashB64::from_b64_str(s)
+    }
+}
+
 impl<T: HashType> serde::Serialize for HoloHashB64<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -45,25 +52,17 @@ impl<T: HashType> serde::Serialize for HoloHashB64<T> {
     }
 }
 
-#[cfg(feature = "fuzzing")]
-impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHashB64<P> {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(HoloHash::arbitrary(u)?.into())
+#[cfg(feature = "schema")]
+impl<T: HashType> schemars::JsonSchema for HoloHashB64<T> {
+    fn schema_name() -> String {
+        "HoloHashB64".to_string()
     }
-}
 
-#[cfg(feature = "fuzzing")]
-impl<T: HashType + proptest::arbitrary::Arbitrary + 'static> proptest::arbitrary::Arbitrary
-    for HoloHashB64<T>
-where
-    T::Strategy: 'static,
-{
-    type Parameters = ();
-    type Strategy = proptest::strategy::BoxedStrategy<HoloHashB64<T>>;
-
-    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-        use proptest::strategy::Strategy;
-        HoloHash::arbitrary().prop_map(Into::into).boxed()
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::schema::Schema {
+        schemars::schema::Schema::Object(schemars::schema::SchemaObject {
+            instance_type: Some(schemars::schema::InstanceType::String.into()),
+            ..Default::default()
+        })
     }
 }
 

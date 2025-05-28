@@ -1,17 +1,20 @@
+//! Error types for the conductor.
+
 use super::interface::error::InterfaceError;
 use super::{entry_def_store::error::EntryDefStoreError, state::AppInterfaceId};
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
-use holochain_conductor_services::DpkiServiceError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmErrorInner;
 use holochain_zome_types::cell::CellId;
 use thiserror::Error;
 
+/// Custom result type for conductor errors with [`ConductorError`] as the error type.
 pub type ConductorResult<T> = Result<T, ConductorError>;
 
+#[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum ConductorError {
     #[error("Internal Cell error: {0}")]
@@ -55,9 +58,6 @@ pub enum ConductorError {
 
     #[error(transparent)]
     CountersigningError(#[from] CountersigningError),
-
-    #[error("DPKI service error: {0}")]
-    DpkiError(#[from] DpkiServiceError),
 
     #[error("Config deserialization error: {0}")]
     SerializationError(#[from] serde_yaml::Error),
@@ -116,9 +116,6 @@ pub enum ConductorError {
 
     #[error(transparent)]
     KeystoreError(#[from] holochain_keystore::KeystoreError),
-
-    #[error(transparent)]
-    KitsuneP2pError(#[from] kitsune_p2p::KitsuneP2pError),
 
     #[error(transparent)]
     MrBundleError(#[from] mr_bundle::error::MrBundleError),

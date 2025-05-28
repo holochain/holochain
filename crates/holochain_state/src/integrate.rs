@@ -1,36 +1,32 @@
+use crate::{prelude::*, query::get_public_op_from_db};
 use holo_hash::{AnyLinkableHash, DhtOpHash, HasHash};
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_types::{
-    db_cache::DhtDbQueryCache,
     dht_op::{ChainOpType, DhtOp, DhtOpHashed},
     prelude::*,
 };
-
-use crate::{prelude::*, query::get_public_op_from_db};
+use kitsune2_api::DhtArc;
 
 /// Insert any authored ops that have been locally validated
 /// into the dht database awaiting integration.
 /// This checks if ops are within the storage arc
 /// of any local agents.
 pub async fn authored_ops_to_dht_db(
-    network: &(dyn HolochainP2pDnaT + Send + Sync),
+    storage_arcs: Vec<DhtArc>,
     hashes: Vec<(DhtOpHash, AnyLinkableHash)>,
     authored_db: DbRead<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
-    dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
     // Check if any agents in this space are an authority for these hashes.
     let mut should_hold_hashes = Vec::new();
 
     for (op_hash, basis) in hashes {
-        if network.authority_for_hash(basis).await? {
+        if storage_arcs.iter().any(|arc| arc.contains(basis.get_loc())) {
             should_hold_hashes.push(op_hash);
         }
     }
 
     // Clone the ops into the dht db for the hashes that should be held.
-    authored_ops_to_dht_db_without_check(should_hold_hashes, authored_db, dht_db, dht_db_cache)
-        .await
+    authored_ops_to_dht_db_without_check(should_hold_hashes, authored_db, dht_db).await
 }
 
 /// Insert any authored ops that have been locally validated
@@ -44,7 +40,6 @@ pub async fn authored_ops_to_dht_db_without_check(
     hashes: Vec<DhtOpHash>,
     authored_db: DbRead<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
-    dht_db_cache: &DhtDbQueryCache,
 ) -> StateMutationResult<()> {
     // Get the ops from the authored database.
     let mut ops = Vec::with_capacity(hashes.len());
@@ -60,40 +55,18 @@ pub async fn authored_ops_to_dht_db_without_check(
             StateMutationResult::Ok(ops)
         })
         .await?;
-    let mut activity = Vec::new();
-    let activity = dht_db
+    dht_db
         .write_async(|txn| {
             for op in ops {
-                if let Some(op) = insert_locally_validated_op(txn, op)? {
-                    activity.push(op);
-                }
+                insert_locally_validated_op(txn, op)?;
             }
-            StateMutationResult::Ok(activity)
+            StateMutationResult::Ok(())
         })
         .await?;
-    for op in activity {
-        let deps = op.sys_validation_dependencies();
-
-        if deps.is_empty() {
-            let _ = dht_db_cache
-                .set_activity_to_integrated(
-                    &op.author(),
-                    op.as_chain_op().map(|op| op.action().action_seq()),
-                )
-                .await;
-        } else {
-            dht_db_cache
-                .set_activity_ready_to_integrate(
-                    &op.author(),
-                    op.as_chain_op().map(|op| op.action().action_seq()),
-                )
-                .await?;
-        }
-    }
     Ok(())
 }
 
-fn insert_locally_validated_op(
+pub fn insert_locally_validated_op(
     txn: &mut Txn<DbKindDht>,
     op: DhtOpHashed,
 ) -> StateMutationResult<Option<DhtOpHashed>> {
@@ -105,23 +78,26 @@ fn insert_locally_validated_op(
     let op = filter_private_entry(op)?;
     let hash = op.as_hash();
 
-    let deps = op.sys_validation_dependencies();
     let op_type = op.get_type();
 
+    let serialized_size = op
+        .as_content()
+        .as_chain_op()
+        .and_then(|op| {
+            holochain_serialized_bytes::encode(&op)
+                .map(|e| e.len())
+                .ok()
+        })
+        // Note that is it safe to cast because the entry size will have been checked by sys
+        // validation.
+        .unwrap_or_default() as u32;
+
     // Insert the op.
-    insert_op_dht(txn, &op, None)?;
+    insert_op_dht(txn, &op, serialized_size, None)?;
     // Set the status to valid because we authored it.
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
 
-    // If this op has no dependencies or is a warrant, we can mark it integrated immediately.
-    if deps.is_empty() || matches!(op_type, DhtOpType::Warrant(_)) {
-        // This set the validation stage to pending which is correct when
-        // it's integrated.
-        set_validation_stage(txn, hash, ValidationStage::Pending)?;
-        set_when_integrated(txn, hash, holochain_zome_types::prelude::Timestamp::now())?;
-    } else {
-        set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
-    }
+    set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
 
     // If this is a `RegisterAgentActivity` then we need to return it to the dht db cache.
     if matches!(

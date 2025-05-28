@@ -8,9 +8,7 @@ use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
 use holochain_zome_types::test_utils::fake_cell_id;
-use kitsune_p2p::KitsuneSpace;
 use shrinkwraprs::Shrinkwrap;
-use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -18,69 +16,12 @@ use tempfile::TempDir;
 
 pub mod mutations_helpers;
 
-#[cfg(test)]
-mod tests {
-    use holochain_sqlite::error::DatabaseResult;
-    use holochain_sqlite::rusqlite::Transaction;
-
-    fn _dbg_db_schema(db_name: &str, conn: &Transaction) {
-        #[allow(dead_code)]
-        #[derive(Debug)]
-        pub struct Schema {
-            pub ty: String,
-            pub name: String,
-            pub tbl_name: String,
-            pub rootpage: u64,
-            pub sql: Option<String>,
-        }
-
-        let mut statement = conn.prepare("select * from sqlite_schema").unwrap();
-        let iter = statement
-            .query_map([], |row| {
-                Ok(Schema {
-                    ty: row.get(0)?,
-                    name: row.get(1)?,
-                    tbl_name: row.get(2)?,
-                    rootpage: row.get(3)?,
-                    sql: row.get(4)?,
-                })
-            })
-            .unwrap();
-
-        println!("~~~ {} START ~~~", &db_name);
-        for i in iter {
-            dbg!(&i);
-        }
-        println!("~~~ {} END ~~~", &db_name);
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    pub async fn dbg_db_schema() {
-        super::test_conductor_db()
-            .db
-            .read_async(move |txn| -> DatabaseResult<()> {
-                _dbg_db_schema("conductor", txn);
-                Ok(())
-            })
-            .await
-            .unwrap();
-
-        super::test_p2p_agents_db()
-            .db
-            .read_async(move |txn| -> DatabaseResult<()> {
-                _dbg_db_schema("p2p_agents", txn);
-                Ok(())
-            })
-            .await
-            .unwrap();
-    }
-}
-
 /// Create a [`TestDb`] of [`DbKindAuthored`], backed by a temp directory.
 pub fn test_authored_db() -> TestDb<DbKindAuthored> {
     test_authored_db_with_id(1)
 }
 
+/// Create a test authored database with a DNA hash and agent key based on the input `id`.
 pub fn test_authored_db_with_id(id: u8) -> TestDb<DbKindAuthored> {
     test_db(DbKindAuthored(Arc::new(CellId::new(
         fake_dna_hash(id),
@@ -122,16 +63,6 @@ pub fn test_conductor_db() -> TestDb<DbKindConductor> {
 /// Create a [`TestDb`] of [DbKindWasm], backed by a temp directory.
 pub fn test_wasm_db() -> TestDb<DbKindWasm> {
     test_db(DbKindWasm)
-}
-
-/// Create a [`TestDb`] of [`DbKindP2pAgents`], backed by a temp directory.
-pub fn test_p2p_agents_db() -> TestDb<DbKindP2pAgents> {
-    test_db(DbKindP2pAgents(Arc::new(KitsuneSpace(vec![0; 36]))))
-}
-
-/// Create a [`TestDb`] of [DbKindP2pMetrics], backed by a temp directory.
-pub fn test_p2p_metrics_db() -> TestDb<DbKindP2pMetrics> {
-    test_db(DbKindP2pMetrics(Arc::new(KitsuneSpace(vec![0; 36]))))
 }
 
 fn test_db<Kind: DbKindT>(kind: Kind) -> TestDb<Kind> {
@@ -244,10 +175,6 @@ pub struct TestDbs {
     conductor: DbWrite<DbKindConductor>,
     /// A test wasm environment
     wasm: DbWrite<DbKindWasm>,
-    /// A test p2p environment
-    p2p: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pAgents>>>>,
-    /// A test p2p environment
-    p2p_metrics: Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>>,
     /// The shared root temp dir for these environments
     dir: TestDir,
     /// The keystore sender for these environments
@@ -300,7 +227,7 @@ impl TestDir {
             Self::Temp(d) => {
                 println!("Made temp dir permanent at {:?}", d);
                 tracing::info!("Made temp dir permanent at {:?}", d);
-                *self = Self::Perm(d.into_path());
+                *self = Self::Perm(d.keep());
             }
             old => *self = old,
         }
@@ -313,13 +240,9 @@ impl TestDbs {
     pub fn with_keystore(tempdir: TempDir, keystore: MetaLairClient) -> Self {
         let conductor = DbWrite::test(tempdir.path(), DbKindConductor).unwrap();
         let wasm = DbWrite::test(tempdir.path(), DbKindWasm).unwrap();
-        let p2p = Arc::new(parking_lot::Mutex::new(HashMap::new()));
-        let p2p_metrics = Arc::new(parking_lot::Mutex::new(HashMap::new()));
         Self {
             conductor,
             wasm,
-            p2p,
-            p2p_metrics,
             dir: TestDir::new(tempdir),
             keystore,
         }
@@ -336,18 +259,6 @@ impl TestDbs {
 
     pub fn wasm(&self) -> DbWrite<DbKindWasm> {
         self.wasm.clone()
-    }
-
-    pub fn p2p(
-        &self,
-    ) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pAgents>>>> {
-        self.p2p.clone()
-    }
-
-    pub fn p2p_metrics(
-        &self,
-    ) -> Arc<parking_lot::Mutex<HashMap<Arc<KitsuneSpace>, DbWrite<DbKindP2pMetrics>>>> {
-        self.p2p_metrics.clone()
     }
 
     /// Get the root path for these environments
@@ -403,4 +314,53 @@ pub fn dump_db(txn: &Transaction) {
     tracing::debug!("DhtOps:");
     let stmt = txn.prepare("SELECT * FROM DhtOp").unwrap();
     dump(stmt);
+}
+
+#[cfg(test)]
+mod tests {
+    use holochain_sqlite::error::DatabaseResult;
+    use holochain_sqlite::rusqlite::Transaction;
+
+    fn _dbg_db_schema(db_name: &str, conn: &Transaction) {
+        #[allow(dead_code)]
+        #[derive(Debug)]
+        pub struct Schema {
+            pub ty: String,
+            pub name: String,
+            pub tbl_name: String,
+            pub rootpage: u64,
+            pub sql: Option<String>,
+        }
+
+        let mut statement = conn.prepare("select * from sqlite_schema").unwrap();
+        let iter = statement
+            .query_map([], |row| {
+                Ok(Schema {
+                    ty: row.get(0)?,
+                    name: row.get(1)?,
+                    tbl_name: row.get(2)?,
+                    rootpage: row.get(3)?,
+                    sql: row.get(4)?,
+                })
+            })
+            .unwrap();
+
+        println!("~~~ {} START ~~~", &db_name);
+        for i in iter {
+            dbg!(&i);
+        }
+        println!("~~~ {} END ~~~", &db_name);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    pub async fn dbg_db_schema() {
+        super::test_conductor_db()
+            .db
+            .read_async(move |txn| -> DatabaseResult<()> {
+                _dbg_db_schema("conductor", txn);
+                Ok(())
+            })
+            .await
+            .unwrap();
+    }
 }

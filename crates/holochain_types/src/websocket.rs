@@ -1,6 +1,8 @@
 //! Common types for WebSocket connections.
 
 use itertools::Itertools;
+use schemars::schema::{Metadata, Schema, SchemaObject, SingleOrVec};
+use schemars::{JsonSchema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -58,6 +60,33 @@ impl std::fmt::Display for AllowedOrigins {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str: String = self.clone().into();
         write!(f, "{}", str)
+    }
+}
+
+impl JsonSchema for AllowedOrigins {
+    fn schema_name() -> String {
+        "AllowedOrigins".to_string()
+    }
+
+    fn json_schema(_: &mut SchemaGenerator) -> Schema {
+        schemars::schema::Schema::Object(SchemaObject {
+            metadata: Some(Box::new(Metadata {
+                description: Some("Allowed origins for WebSocket connections.".to_string()),
+                examples: vec![
+                    serde_json::json!("*"),
+                    serde_json::json!("http://example.com"),
+                ],
+                ..Default::default()
+            })),
+            instance_type: Some(SingleOrVec::Single(Box::new(
+                schemars::schema::InstanceType::String,
+            ))),
+            string: Some(Box::new(schemars::schema::StringValidation {
+                min_length: Some(1),
+                ..Default::default()
+            })),
+            ..Default::default()
+        })
     }
 }
 

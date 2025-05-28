@@ -1,2 +1,0 @@
-mod coordinator;
-mod integrity;

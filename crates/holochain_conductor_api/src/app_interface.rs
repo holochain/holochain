@@ -4,7 +4,7 @@ use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use indexmap::IndexMap;
-use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
+use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
 /// and will result in a corresponding [`AppResponse`] message being sent back over the
@@ -14,7 +14,7 @@ use kitsune_p2p_types::fetch_pool::FetchPoolInfo;
 ///
 /// Returns an [`AppResponse::Error`] with a reason why the request failed.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppRequest {
     /// Get info about the app that you are connected to, including info about each cell installed
     /// by this app.
@@ -165,12 +165,39 @@ pub enum AppRequest {
     /// [`AppResponse::CloneCellEnabled`]
     EnableCloneCell(Box<EnableCloneCellPayload>),
 
-    /// Info about networking processes
+    /// Retrieve network metrics for the current app.
+    ///
+    /// Identical to what [`AdminRequest::DumpNetworkMetrics`](crate::admin_interface::AdminRequest::DumpNetworkMetrics)
+    /// does, but scoped to the current app.
+    ///
+    /// If `dna_hash` is not set, metrics for all DNAs in the current app are returned.
     ///
     /// # Returns
     ///
-    /// [`AppResponse::NetworkInfo`]
-    NetworkInfo(Box<NetworkInfoRequestPayload>),
+    /// [`AppResponse::NetworkMetricsDumped`]
+    DumpNetworkMetrics {
+        /// If set, limits the metrics dumped to a single DNA hash space.
+        #[serde(default)]
+        dna_hash: Option<DnaHash>,
+
+        /// Whether to include a DHT summary.
+        ///
+        /// You need a dump from multiple nodes in order to make a comparison, so this is not
+        /// requested by default.
+        #[serde(default)]
+        include_dht_summary: bool,
+    },
+
+    /// Dump network statistics from the Kitsune2 networking transport module.
+    ///
+    /// Identical to what [`AdminRequest::DumpNetworkStats`](crate::admin_interface::AdminRequest::DumpNetworkStats)
+    /// does, but scoped to the current app. Connections that are not relevant to a DNA in the
+    /// current app are filtered out.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::NetworkStatsDumped`]
+    DumpNetworkStats,
 
     /// List all host functions available to wasm on this conductor.
     ///
@@ -196,25 +223,11 @@ pub enum AppRequest {
     ///
     /// [`AppResponse::Ok`]
     EnableApp,
-    //
-    // TODO: implement after DPKI lands
-    // /// Replace the agent key associated with this app with a new one.
-    // /// The new key will be created using the same method which is used
-    // /// when installing an app with no agent key provided.
-    // ///
-    // /// This method is only available if this app was installed using `allow_deferred_memproofs`,
-    // /// and can only be called before [`AppRequest::ProvideMemproofs`] has been called.
-    // /// Until then, it can be called as many times as needed.
-    // ///
-    // /// # Returns
-    // ///
-    // /// [`AppResponse::AppAgentKeyRotated`]
-    // RotateAppAgentKey,
 }
 
 /// Represents the possible responses to an [`AppRequest`].
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case", tag = "type", content = "data")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppResponse {
     /// Can occur in response to any [`AppRequest`].
     ///
@@ -262,14 +275,14 @@ pub enum AppResponse {
     /// is returned.
     CloneCellEnabled(ClonedCell),
 
-    /// NetworkInfo is returned
-    NetworkInfo(Vec<NetworkInfo>),
+    /// The successful result of a call to [`AppRequest::DumpNetworkMetrics`].
+    NetworkMetricsDumped(HashMap<DnaHash, Kitsune2NetworkMetrics>),
+
+    /// The successful result of a call to [`AppRequest::DumpNetworkStats`].
+    NetworkStatsDumped(kitsune2_api::TransportStats),
 
     /// All the wasm host functions supported by this conductor.
     ListWasmHostFunctions(Vec<String>),
-
-    /// The app agent key as been rotated, and the new key is returned.
-    AppAgentKeyRotated(AgentPubKey),
 
     /// Operation successful, no payload.
     Ok,
@@ -307,7 +320,7 @@ impl ZomeCallParamsSigned {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CellInfo {
     /// Cells provisioned at app installation as defined in the bundle.
     Provisioned(ProvisionedCell),
@@ -494,16 +507,9 @@ impl AppInfo {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-/// The parameters to revoke an agent for an app.
-pub struct RevokeAgentKeyPayload {
-    pub agent_key: AgentPubKey,
-    pub app_id: InstalledAppId,
-}
-
 /// A flat, slightly more API-friendly representation of [`AppInfo`]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppInfoStatus {
     Paused { reason: PausedAppReason },
     Disabled { reason: DisabledAppReason },
@@ -531,21 +537,6 @@ impl From<AppInfoStatus> for AppStatus {
             AppInfoStatus::AwaitingMemproofs => AppStatus::AwaitingMemproofs,
         }
     }
-}
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub struct NetworkInfo {
-    pub fetch_pool_info: FetchPoolInfo,
-    pub current_number_of_peers: u32,
-    pub arc_size: f64,
-    pub total_network_peers: u32,
-    pub bytes_since_last_time_queried: u64,
-    pub completed_rounds_since_last_time_queried: u32,
-}
-
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-pub enum ScottyPanel {
-    GossipInfo { last_round: Option<Timestamp> },
 }
 
 /// The request payload sent on a Holochain app websocket to authenticate the connection.
@@ -590,14 +581,14 @@ mod tests {
             serialized_response,
             vec![
                 130, 164, 116, 121, 112, 101, 184, 108, 105, 115, 116, 95, 119, 97, 115, 109, 95,
-                104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 164, 100, 97,
-                116, 97, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111, 115,
-                116, 95, 102, 110, 95, 50
+                104, 111, 115, 116, 95, 102, 117, 110, 99, 116, 105, 111, 110, 115, 165, 118, 97,
+                108, 117, 101, 146, 169, 104, 111, 115, 116, 95, 102, 110, 95, 49, 169, 104, 111,
+                115, 116, 95, 102, 110, 95, 50
             ]
         );
 
         let json_expected =
-            r#"{"type":"list_wasm_host_functions","data":["host_fn_1","host_fn_2"]}"#;
+            r#"{"type":"list_wasm_host_functions","value":["host_fn_1","host_fn_2"]}"#;
         let mut deserializer = Deserializer::new(&*serialized_response);
         let json_value: serde_json::Value = Deserialize::deserialize(&mut deserializer).unwrap();
         let json_actual = serde_json::to_string(&json_value).unwrap();
@@ -614,7 +605,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"disabled\":{\"reason\":{\"error\":\"because\"}}}"
+            "{\"type\":\"disabled\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}"
         );
 
         let status: AppInfoStatus =
@@ -622,14 +613,14 @@ mod tests {
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"paused\":{\"reason\":{\"error\":\"because\"}}}"
+            "{\"type\":\"paused\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}",
         );
 
         let status: AppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"disabled\":{\"reason\":\"user\"}}"
+            "{\"type\":\"disabled\",\"value\":{\"reason\":{\"type\":\"user\"}}}",
         );
     }
 }

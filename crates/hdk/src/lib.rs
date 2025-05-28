@@ -298,8 +298,6 @@ fn wasm_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 getrandom::register_custom_getrandom!(wasm_getrandom);
 
-pub mod agent;
-
 /// Capability claims and grants.
 ///
 /// Every exposed function in Holochain uses capability grants/claims to secure
@@ -450,7 +448,8 @@ pub mod prelude;
 /// This is also repudiable so both participants know the data must have been encrypted by the other (because they didn't encrypt it themselves) but cannot prove this to anybody else (because they _could have_ encrypted it themselves).
 /// If repudiability is not something you want, you need to use a different approach.
 ///
-/// Note that the secrets are located within the secure lair keystore (@todo actually secretbox puts the secret in WASM, but this will be fixed soon) and never touch WASM memory.
+/// Note that the secrets are located within the secure lair keystore and never touch WASM memory.
+// @todo actually secretbox puts the secret in WASM, but this will be fixed soon
 /// The WASM must provide either the public key for box or an opaque _reference_ to the secret key so that lair can encrypt or decrypt as required.
 //
 // @todo implement a way to export/send an encrypted shared secret for a peer from lair

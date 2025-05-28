@@ -1,5 +1,5 @@
 use holochain_secure_primitive::secure_primitive;
-use kitsune_p2p_timestamp::Timestamp;
+use holochain_timestamp::Timestamp;
 use std::{error::Error, time::Duration};
 
 /// 256 Bit generic nonce.
@@ -35,7 +35,7 @@ pub fn fresh_nonce(
 
 #[cfg(test)]
 pub mod test {
-    use kitsune_p2p_timestamp::Timestamp;
+    use holochain_timestamp::Timestamp;
 
     use crate::{fresh_nonce, FRESH_NONCE_EXPIRES_AFTER};
 

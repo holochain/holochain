@@ -23,8 +23,6 @@
 //!
 //! The complete 39 bytes together are known as the "full" hash
 
-use kitsune_p2p_dht_arc::DhtLocation;
-
 use crate::error::{HoloHashError, HoloHashResult};
 use crate::has_hash::HasHash;
 use crate::HashType;
@@ -71,48 +69,6 @@ macro_rules! assert_length {
 pub struct HoloHash<T: HashType> {
     hash: Vec<u8>,
     hash_type: T,
-}
-
-#[cfg(feature = "fuzzing")]
-impl<'a, P: PrimitiveHashType> arbitrary::Arbitrary<'a> for HoloHash<P> {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let mut buf = [0; HOLO_HASH_FULL_LEN];
-        buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(P::static_prefix());
-        buf[HOLO_HASH_PREFIX_LEN..]
-            .copy_from_slice(u.bytes(HOLO_HASH_FULL_LEN - HOLO_HASH_PREFIX_LEN)?);
-        Ok(HoloHash {
-            hash: buf.to_vec(),
-            hash_type: P::new(),
-        })
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl<T: HashType + proptest::arbitrary::Arbitrary> proptest::arbitrary::Arbitrary for HoloHash<T>
-where
-    T::Strategy: 'static,
-{
-    type Parameters = ();
-    type Strategy = proptest::strategy::BoxedStrategy<HoloHash<T>>;
-
-    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
-        use proptest::strategy::Strategy;
-
-        let strat = T::arbitrary().prop_flat_map(move |hash_type| {
-            // Generate 39 arbitrary bytes. `?-u:` specifies that the bytes need not be valid UTF-8
-            // (any value from 0-255 is allowed).
-            let gen_strat = proptest::string::bytes_regex(r"(?-u:.{39})").unwrap();
-            gen_strat.prop_map(move |mut buf| {
-                assert_eq!(buf.len(), 39);
-                buf[0..HOLO_HASH_PREFIX_LEN].copy_from_slice(hash_type.get_prefix());
-                HoloHash {
-                    hash: buf.to_vec(),
-                    hash_type,
-                }
-            })
-        });
-        strat.boxed()
-    }
 }
 
 impl<T: HashType> HoloHash<T> {
@@ -186,10 +142,8 @@ impl<T: HashType> HoloHash<T> {
     }
 
     /// Fetch the holo dht location for this hash
-    pub fn get_loc(&self) -> DhtLocation {
-        DhtLocation::new(bytes_to_loc(
-            &self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..],
-        ))
+    pub fn get_loc(&self) -> u32 {
+        bytes_to_loc(&self.hash[HOLO_HASH_FULL_LEN - HOLO_HASH_LOC_LEN..])
     }
 
     /// consume into the inner byte vector
@@ -201,6 +155,48 @@ impl<T: HashType> HoloHash<T> {
     /// Get the hex representation of the hash bytes
     pub fn to_hex(&self) -> String {
         holochain_util::hex::bytes_to_hex(&self.hash, false)
+    }
+}
+
+#[cfg(feature = "kitsune2")]
+impl crate::DnaHash {
+    /// Convert this holo hash into a kitsune2 SpaceId.
+    pub fn to_k2_space(&self) -> kitsune2_api::SpaceId {
+        kitsune2_api::SpaceId::from(bytes::Bytes::copy_from_slice(self.get_raw_32()))
+    }
+
+    /// Convert a kitsune2 SpaceId into a DnaHash.
+    #[cfg(feature = "hashing")]
+    pub fn from_k2_space(space: &kitsune2_api::SpaceId) -> Self {
+        Self::from_raw_32(space.to_vec())
+    }
+}
+
+#[cfg(feature = "kitsune2")]
+impl crate::AgentPubKey {
+    /// Convert this holo hash into a kitsune2 AgentId.
+    pub fn to_k2_agent(&self) -> kitsune2_api::AgentId {
+        kitsune2_api::AgentId::from(bytes::Bytes::copy_from_slice(self.get_raw_32()))
+    }
+
+    /// Convert a kitsune2 AgentId into a AgentPubKey.
+    #[cfg(feature = "hashing")]
+    pub fn from_k2_agent(agent: &kitsune2_api::AgentId) -> Self {
+        Self::from_raw_32(agent.to_vec())
+    }
+}
+
+#[cfg(feature = "kitsune2")]
+impl crate::DhtOpHash {
+    /// Convert this holo hash into a kitsune2 OpId.
+    pub fn to_k2_op(&self) -> kitsune2_api::OpId {
+        kitsune2_api::OpId::from(bytes::Bytes::copy_from_slice(self.get_raw_32()))
+    }
+
+    /// Convert a kitsune2 OpId into a DhtOpHash.
+    #[cfg(feature = "hashing")]
+    pub fn from_k2_op(op: &kitsune2_api::OpId) -> Self {
+        Self::from_raw_32(op.to_vec())
     }
 }
 
@@ -297,7 +293,7 @@ mod tests {
     use crate::*;
 
     fn assert_type<T: HashType>(t: &str, h: HoloHash<T>) {
-        assert_eq!(3_688_618_971, h.get_loc().as_u32());
+        assert_eq!(3_688_618_971, h.get_loc());
         assert_eq!(h.hash_type().hash_name(), t);
         assert_eq!(
             "[219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219, 219]",
@@ -407,14 +403,5 @@ mod tests {
         raw.extend(vec![0xdb; 36]);
 
         DnaHash::from_raw_39(raw);
-    }
-
-    #[test]
-    #[cfg(feature = "fuzzing")]
-    fn proptest_arbitrary_smoke_test() {
-        use proptest::prelude::*;
-        proptest!(|(h: DnaHash)| {
-            assert_eq!(*h.hash_type(), hash_type::Dna);
-        });
     }
 }

@@ -23,7 +23,11 @@ impl Conductor {
         let space = self.get_or_create_space(cell_id.dna_hash())?;
 
         let chc = None;
-        let network = self.holochain_p2p().to_dna(cell_id.dna_hash().clone(), chc);
+        let network = holochain_p2p::HolochainP2pDna::new(
+            self.holochain_p2p().clone(),
+            cell_id.dna_hash().clone(),
+            chc,
+        );
 
         let source_chain: SourceChain = space
             .source_chain(self.keystore().clone(), cell_id.agent_pubkey().clone())
@@ -111,13 +115,15 @@ impl Conductor {
         // Only integrated if a cell is installed.
         if self.running_cell_ids().contains(&cell_id) {
             holochain_state::integrate::authored_ops_to_dht_db(
-                &network,
+                network
+                    .target_arcs()
+                    .await
+                    .map_err(ConductorApiError::other)?,
                 ops_to_integrate,
                 space
                     .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
                     .into(),
                 space.dht_db.clone(),
-                &space.dht_query_cache,
             )
             .await?;
 
@@ -138,14 +144,17 @@ impl Conductor {
         let space = self.get_or_create_space(cell_id.dna_hash())?;
         let ribosome = self.get_ribosome(cell_id.dna_hash())?;
         let chc = None;
-        let network = self.holochain_p2p().to_dna(cell_id.dna_hash().clone(), chc);
+        let network = holochain_p2p::HolochainP2pDna::new(
+            self.holochain_p2p().clone(),
+            cell_id.dna_hash().clone(),
+            chc,
+        );
 
         // Create a raw source chain to validate against because
         // genesis may not have been run yet.
         let workspace = SourceChainWorkspace::raw_empty(
             space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?,
             space.dht_db.clone(),
-            space.dht_query_cache.clone(),
             space.cache_db.clone(),
             self.keystore().clone(),
             cell_id.agent_pubkey().clone(),
@@ -175,7 +184,7 @@ impl Conductor {
         // Run the individual record validations.
         crate::core::workflow::inline_validation(
             workspace.clone(),
-            network.clone(),
+            Arc::new(network),
             self.clone(),
             ribosome,
         )
@@ -306,103 +315,5 @@ impl<A: ChainItem, B: Clone + AsRef<A>> ChainGraft<A, B> {
 
     pub fn incoming(&self) -> &[B] {
         self.incoming.as_ref()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use holochain_types::test_utils::chain::{self as tu, TestChainItem};
-    use test_case::test_case;
-
-    use super::*;
-
-    impl<A: ChainItem, B: Clone + AsRef<A>> ChainGraft<A, B> {
-        pub fn map<T>(&self, f: impl Fn(A) -> T + Clone) -> ChainGraft<T, T> {
-            ChainGraft {
-                existing: self.existing.clone().into_iter().map(f.clone()).collect(),
-                incoming: self
-                    .incoming
-                    .iter()
-                    .map(AsRef::as_ref)
-                    .cloned()
-                    .map(f)
-                    .collect(),
-            }
-        }
-    }
-
-    #[derive(PartialEq, Eq)]
-    struct Answer {
-        pivot: (Option<usize>, usize),
-        rebalanced: ChainGraft<TestChainItem, TestChainItem>,
-    }
-
-    /// Rebalancing an already-balanced set of incoming records is a no-op
-    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(3..6)), Answer {
-        pivot: (Some(0), 0),
-        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(3..6)),
-    } ; "1")]
-    #[test_case(ChainGraft::new(tu::chain(0..4), tu::chain(3..6)), Answer {
-        pivot: (Some(1), 1),
-        rebalanced: ChainGraft::new(tu::chain(0..4), tu::chain(4..6)),
-    } ; "2")]
-    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(1..4)), Answer {
-        pivot: (Some(2), 2),
-        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(3..4)),
-    } ; "3")]
-    #[test_case(ChainGraft::new(tu::chain(0..3), tu::chain(0..4)), Answer {
-        pivot: (Some(3), 3),
-        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(3..4)),
-    } ; "4")]
-    #[test_case(ChainGraft::new(tu::chain(0..5), tu::chain(0..3)), Answer {
-        pivot: (Some(5), 3),
-        rebalanced: ChainGraft::new(tu::chain(0..3), vec![]),
-    } ; "5")]
-    #[test_case(ChainGraft::new(tu::chain(0..2), tu::chain(3..6)), Answer {
-        pivot: (None, 0),
-        rebalanced: ChainGraft::new(vec![], tu::chain(3..6)),
-    } ; "6")]
-    #[test_case(ChainGraft::new(tu::chain(0..2), vec![]), Answer {
-        pivot: (None, 0),
-        rebalanced: ChainGraft::new(vec![], vec![]),
-    } ; "7")]
-    #[test_case(ChainGraft::new(vec![], tu::chain(0..5)), Answer {
-        pivot: (Some(0), 0),
-        rebalanced: ChainGraft::new(vec![], tu::chain(0..5)),
-    } ; "8")]
-    #[test_case(ChainGraft::new(tu::chain(0..3), tu::forked_chain(&[0..0, 3..6])), Answer {
-        pivot: (Some(0), 0),
-        rebalanced: ChainGraft::new(tu::chain(0..3), tu::forked_chain(&[0..0, 3..6])),
-    } ; "9")]
-    #[test_case(ChainGraft::new(tu::chain(0..3), tu::forked_chain(&[0..0, 4..6])), Answer {
-        pivot: (None, 0),
-        rebalanced: ChainGraft::new(vec![], tu::forked_chain(&[0..0, 4..6])),
-    } ; "10")]
-    #[test_case(ChainGraft::new(tu::forked_chain(&[0..3, 3..6]), tu::chain(2..6)), Answer {
-        pivot: (Some(4), 1),
-        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(3..6)),
-    } ; "11")]
-    #[test_case(ChainGraft::new(tu::gap_chain(&[0..3, 6..9]), tu::chain(3..6)), Answer {
-        pivot: (Some(3), 0),
-        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(3..6)),
-    } ; "12")]
-    #[test_case(ChainGraft::new(tu::chain(0..6), tu::gap_chain(&[0..3, 6..9])), Answer {
-        pivot: (Some(6), 3),
-        rebalanced: ChainGraft::new(tu::chain(0..3), tu::chain(6..9)),
-    } ; "13")]
-    fn test_incoming_rebalance_idempotence(
-        case: ChainGraft<TestChainItem, TestChainItem>,
-        answer: Answer,
-    ) {
-        isotest::isotest!(TestChainItem => |iso_a| {
-            let case = case.map(|a| iso_a.create(a));
-            pretty_assertions::assert_eq!(case.pivot_and_overlap(), answer.pivot);
-            pretty_assertions::assert_eq!(case.rebalance(), answer.rebalanced.map(|a| iso_a.create(a)));
-        });
-
-        pretty_assertions::assert_eq!(
-            case.clone().rebalance().incoming,
-            case.clone().rebalance().rebalance().incoming
-        );
     }
 }

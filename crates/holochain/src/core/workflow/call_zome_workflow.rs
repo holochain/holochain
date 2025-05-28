@@ -5,9 +5,7 @@ use super::error::WorkflowResult;
 use super::sys_validation_workflow::sys_validate_record;
 use crate::conductor::api::CellConductorApi;
 use crate::conductor::api::CellConductorApiT;
-use crate::conductor::api::DpkiApi;
 use crate::conductor::ConductorHandle;
-use crate::core::check_dpki_agent_validity_for_record;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::ribosome::error::RibosomeResult;
 use crate::core::ribosome::guest_callback::post_commit::send_post_commit;
@@ -16,7 +14,7 @@ use crate::core::ribosome::ZomeCallHostAccess;
 use crate::core::ribosome::ZomeCallInvocation;
 use crate::core::workflow::WorkflowError;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::SourceChainWorkspace;
 use holochain_state::prelude::IncompleteCommitReason;
 use holochain_state::source_chain::SourceChainError;
@@ -25,6 +23,8 @@ use holochain_zome_types::record::Record;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
+#[cfg(test)]
+mod unit_tests;
 #[cfg(test)]
 mod validation_test;
 
@@ -43,7 +43,7 @@ pub struct CallZomeWorkflowArgs<RibosomeT> {
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn call_zome_workflow<Ribosome>(
     workspace: SourceChainWorkspace,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome>,
     trigger_publish_dht_ops: TriggerSender,
@@ -66,11 +66,10 @@ where
         .ok();
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
-    let maybe_dpki = args.conductor_handle.running_services().dpki;
     let signal_tx = args.signal_tx.clone();
+    let cell_id = args.cell_id.clone();
     let result = call_zome_workflow_inner(
         workspace.clone(),
-        maybe_dpki,
         network.clone(),
         keystore.clone(),
         args,
@@ -82,7 +81,11 @@ where
     // commit the workspace
     if should_write {
         let countersigning_op = workspace.source_chain().countersigning_op()?;
-        match workspace.source_chain().flush(&network).await {
+        match workspace
+            .source_chain()
+            .flush(network.target_arcs().await?, network.chc())
+            .await
+        {
             Ok(flushed_actions) => {
                 // Skip if nothing was written
                 if !flushed_actions.is_empty() {
@@ -90,12 +93,8 @@ where
                         Some(op) => {
                             if let Err(error_response) =
                                 super::countersigning_workflow::countersigning_publish(
-                                    &network,
+                                    network.clone(),
                                     op,
-                                    (*workspace.author().ok_or_else(|| {
-                                        WorkflowError::Other("author required".into())
-                                    })?)
-                                    .clone(),
                                 )
                                 .await
                             {
@@ -110,6 +109,10 @@ where
 
                     // Only send post commit if this is a coordinator zome.
                     if let Some(coordinator_zome) = coordinator_zome {
+                        let call_zome_handle =
+                            CellConductorApi::new(conductor_handle.clone(), cell_id)
+                                .into_call_zome_handle();
+
                         send_post_commit(
                             conductor_handle,
                             workspace,
@@ -118,6 +121,7 @@ where
                             flushed_actions,
                             vec![coordinator_zome],
                             signal_tx,
+                            Some(call_zome_handle),
                         )
                         .await?;
                     }
@@ -133,8 +137,7 @@ where
 
 async fn call_zome_workflow_inner<Ribosome>(
     workspace: SourceChainWorkspace,
-    dpki: DpkiApi,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     args: CallZomeWorkflowArgs<Ribosome>,
     trigger_countersigning: TriggerSender,
@@ -158,7 +161,6 @@ where
     let host_access = ZomeCallHostAccess::new(
         workspace.clone().into(),
         keystore,
-        dpki,
         network.clone(),
         signal_tx,
         call_zome_handle,
@@ -226,7 +228,11 @@ pub async fn call_zome_function_authorized<R>(
 where
     R: RibosomeT + 'static,
 {
-    match invocation.is_authorized(&host_access).await? {
+    match invocation
+        .is_authorized(&host_access)
+        .await
+        .map_err(WorkflowError::other)?
+    {
         ZomeCallAuthorization::Authorized => {
             let r = ribosome.call_zome_function(host_access, invocation).await;
             Ok((ribosome, r))
@@ -246,7 +252,7 @@ where
 /// Run validation inline and wait for the result.
 pub async fn inline_validation<Ribosome>(
     workspace: SourceChainWorkspace,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
     conductor_handle: ConductorHandle,
     ribosome: Ribosome,
 ) -> WorkflowResult<()>
@@ -255,28 +261,10 @@ where
 {
     let cascade = Arc::new(holochain_cascade::CascadeImpl::from_workspace_and_network(
         &workspace,
-        Arc::new(network.clone()),
+        network.clone(),
     ));
 
     let scratch_records = workspace.source_chain().scratch_records()?;
-
-    if let Some(dpki) = conductor_handle.running_services().dpki.clone() {
-        // Don't check DPKI validity on DPKI itself!
-        if !dpki.is_deepkey_dna(workspace.source_chain().cell_id().dna_hash()) {
-            // Check the validity of the author as-at the first and the last record to be committed.
-            // If these are valid, then the author is valid for the entire commit.
-            let first = scratch_records.first();
-            let last = scratch_records.last();
-            if let Some(r) = first {
-                check_dpki_agent_validity_for_record(&dpki, r).await?;
-            }
-            if let Some(r) = last {
-                if first != last {
-                    check_dpki_agent_validity_for_record(&dpki, r).await?;
-                }
-            }
-        }
-    }
 
     let records = {
         // collect all the records we need to validate in wasm
@@ -296,8 +284,6 @@ where
         to_app_validate
     };
 
-    let dpki = conductor_handle.running_services().dpki;
-
     for mut chain_record in records {
         for op_type in action_to_op_types(chain_record.action()) {
             let outcome =
@@ -311,10 +297,9 @@ where
             let outcome = app_validation_workflow::validate_op(
                 &op,
                 workspace.clone().into(),
-                &network,
+                network.clone(),
                 &ribosome,
                 &conductor_handle,
-                dpki.clone(),
                 true, // is_inline
             )
             .await;

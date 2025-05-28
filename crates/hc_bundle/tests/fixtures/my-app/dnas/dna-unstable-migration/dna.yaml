@@ -1,0 +1,25 @@
+---
+manifest_version: "1"
+name: multi integrity dna unstable-migration
+integrity:
+  network_seed: 00000000-0000-0000-0000-000000000000
+  properties: ~
+  zomes:
+    - name: zome1
+      path: ../dna1/zomes/zome11.wasm
+    - name: zome2
+      path: ../dna2/zomes/zome21.wasm
+coordinator:
+  zomes:
+    - name: zome3
+      path: ../dna1/zomes/zome12.wasm
+      dependencies:
+        - name: zome1
+    - name: zome4
+      path: ../dna2/zomes/zome22.wasm
+      dependencies:
+        - name: zome1
+        - name: zome2
+lineage:
+  - uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm
+  - uhC0k39SDf7rynCg5bYgzroGaOJKGKrloI1o57Xao6S-U5KNZ0dUH

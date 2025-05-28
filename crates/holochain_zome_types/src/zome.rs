@@ -6,11 +6,9 @@
 //! using Rust closures, and is useful for quickly defining zomes on-the-fly
 //! for tests.
 
-use std::path::PathBuf;
+use holochain_serialized_bytes::prelude::*;
 
 pub use holochain_integrity_types::zome::*;
-
-use holochain_serialized_bytes::prelude::*;
 
 mod error;
 pub use error::*;
@@ -26,7 +24,6 @@ use std::sync::Arc;
 /// A Holochain Zome. Includes the ZomeDef as well as the name of the Zome.
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "full-dna-def", derive(shrinkwraprs::Shrinkwrap))]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Zome<T: Send + Sync = ZomeDef> {
     pub name: ZomeName,
     #[cfg_attr(feature = "full-dna-def", shrinkwrap(main_field))]
@@ -147,20 +144,12 @@ impl From<CoordinatorZome> for CoordinatorZomeDef {
 // TODO: move to `holochain_types`
 
 #[derive(Serialize, Deserialize, Hash, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct WasmZome {
     /// The WasmHash representing the WASM byte code for this zome.
     pub wasm_hash: holo_hash::WasmHash,
 
     /// The zome dependencies
     pub dependencies: Vec<ZomeName>,
-
-    /// DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
-    ///
-    /// The path to a preserialized wasmer module used as a "dynamic library" (dylib).
-    /// Useful for iOS and other targets.
-    #[serde(default)]
-    pub preserialized_path: Option<PathBuf>,
 }
 
 /// Just the definition of a Zome, without the name included. This exists
@@ -332,34 +321,12 @@ impl From<ZomeDef> for CoordinatorZomeDef {
     }
 }
 
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for ZomeDef {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self::Wasm(WasmZome::arbitrary(u)?))
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for IntegrityZomeDef {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
-    }
-}
-
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for CoordinatorZomeDef {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Ok(Self(ZomeDef::Wasm(WasmZome::arbitrary(u)?)))
-    }
-}
-
 impl WasmZome {
     /// Constructor
     pub fn new(wasm_hash: holo_hash::WasmHash) -> Self {
         Self {
             wasm_hash,
             dependencies: Default::default(),
-            preserialized_path: None,
         }
     }
 }
@@ -370,7 +337,6 @@ impl ZomeDef {
         Self::Wasm(WasmZome {
             wasm_hash,
             dependencies: Default::default(),
-            preserialized_path: None,
         })
     }
 }

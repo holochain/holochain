@@ -56,6 +56,14 @@ async fn remote_signals_work_after_sbd_restart() {
     let (app2,) = c2.setup_app("app", &[dna_file]).await.unwrap().into_tuple();
     let a2 = app2.agent_pubkey().clone();
 
+    c1.require_initial_gossip_activity_for_cell(&app1, 1, Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    c2.require_initial_gossip_activity_for_cell(&app2, 1, Duration::from_secs(30))
+        .await
+        .unwrap();
+
     let mut c2_rx = c2.subscribe_to_app_signals("app".to_string());
 
     let _: () = c1
@@ -131,8 +139,7 @@ async fn remote_signals_work_after_sbd_restart() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]
-#[ignore = "flaky"]
-async fn remote_signals_batch() -> anyhow::Result<()> {
+async fn remote_signals_batch() {
     holochain_trace::test_run();
 
     let mut conductors =
@@ -149,8 +156,8 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
         app_batch.into_tuples();
 
     // Make sure the conductors are talking to each other before sending signals.
-    conductors[1]
-        .require_initial_gossip_activity_for_cell(&bob, 3, Duration::from_secs(90))
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(&alice, 2, Duration::from_secs(90))
         .await
         .unwrap();
 
@@ -179,26 +186,34 @@ async fn remote_signals_batch() -> anyhow::Result<()> {
 
     // Check that Bob and Carol receive all the signals.
     tokio::time::timeout(Duration::from_secs(60), async move {
-        for i in 0..6 {
+        let mut signals_1 = Vec::with_capacity(6);
+        let mut signals_2 = Vec::with_capacity(6);
+
+        for _ in 0..6 {
             let msg_1 = conductor_1_signal_rx
                 .recv()
                 .await
                 .map(to_signal_message)
                 .unwrap()
                 .value;
+            signals_1.push(msg_1);
             let msg_2 = conductor_2_signal_rx
                 .recv()
                 .await
                 .map(to_signal_message)
                 .unwrap()
                 .value;
-
-            assert_eq!(msg_1, format!("message {}", i));
-            assert_eq!(msg_1, msg_2);
+            signals_2.push(msg_2);
         }
+
+        assert_eq!(6, signals_1.len());
+        assert_eq!(6, signals_2.len());
+
+        // Received all the signals, but might have received them in a different order.
+        signals_1.sort();
+        signals_2.sort();
+        assert_eq!(signals_1, signals_2);
     })
     .await
     .unwrap();
-
-    Ok(())
 }

@@ -14,6 +14,7 @@ use holochain_zome_types::cell::CellId;
 use std::path::PathBuf;
 use thiserror::Error;
 
+#[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum CellError {
     #[error("error dealing with workspace state: {0}")]
@@ -43,13 +44,11 @@ pub enum CellError {
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
-    WorkspaceError(#[from] holochain_state::workspace::WorkspaceError),
-    #[error(transparent)]
     RibosomeError(#[from] RibosomeError),
     #[error(transparent)]
     SourceChainError(#[from] SourceChainError),
     #[error("The cell tried to run the initialize zomes callback but failed because {0:?}")]
-    InitFailed(InitResult),
+    InitFailed(Box<InitResult>),
     #[error(
         "Another zome function has triggered the `init()` callback, which has been blocking this zome call for longer than {} seconds. Giving up.",
         INIT_MUTEX_TIMEOUT_SECS

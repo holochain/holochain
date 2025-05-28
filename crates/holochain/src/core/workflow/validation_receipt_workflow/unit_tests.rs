@@ -1,6 +1,5 @@
 use crate::core::queue_consumer::WorkComplete;
 use crate::core::workflow::validation_receipt_workflow::validation_receipt_workflow;
-use crate::prelude::AgentPubKeyFixturator;
 use crate::prelude::CreateFixturator;
 use crate::prelude::DhtOpHashed;
 use crate::prelude::SignatureFixturator;
@@ -8,6 +7,7 @@ use ::fixt::fixt;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use hdk::prelude::Action;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::HasHash;
 use holo_hash::{AgentPubKey, DhtOpHash};
@@ -29,6 +29,7 @@ async fn no_running_cells() {
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipts().never(); // Verify no receipts sent
+    let dna = Arc::new(dna);
 
     let work_complete = validation_receipt_workflow(
         Arc::new(fixt!(DnaHash)),
@@ -71,8 +72,8 @@ async fn do_not_block_or_send_to_self() {
     .unwrap();
 
     let mut dna = MockHolochainP2pDnaT::new();
-
     dna.expect_send_validation_receipts().never(); // Verify no receipts sent
+    let dna = Arc::new(dna);
 
     let validator = CellId::new(dna_hash.clone(), author);
 
@@ -110,6 +111,7 @@ async fn block_invalid_op_author() {
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipts()
         .return_once(|_, _| Ok(()));
+    let dna = Arc::new(dna);
 
     let dna_hash = fixt!(DnaHash);
     let validator = CellId::new(
@@ -170,6 +172,7 @@ async fn continues_if_receipt_cannot_be_signed() {
 
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipts().never();
+    let dna = Arc::new(dna);
 
     let dna_hash = fixt!(DnaHash);
 
@@ -209,6 +212,7 @@ async fn send_validation_receipt() {
     let mut dna = MockHolochainP2pDnaT::new();
     dna.expect_send_validation_receipts()
         .return_once(|_, _| Ok(()));
+    let dna = Arc::new(dna);
 
     let dna_hash = fixt!(DnaHash);
 
@@ -263,6 +267,7 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
         .withf(move |author: &AgentPubKey, _| *author == author2)
         .in_sequence(&mut seq)
         .returning(|_, _| Ok(()));
+    let dna = Arc::new(dna);
 
     let dna_hash = fixt!(DnaHash);
 
@@ -284,8 +289,13 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 
     assert_eq!(WorkComplete::Complete, work_complete);
 
-    // Should no longer require a receipt for either
-    assert!(!get_requires_receipt(vault.clone(), op_hash1).await);
+    // Sending the receipt to this author returned an error,
+    // so we did NOT clear the wants receipt flag.
+    assert!(get_requires_receipt(vault.clone(), op_hash1).await);
+
+    // But even after we got the above error, we proceeded to
+    // send the receipt for the second author which DID work,
+    // so its flag is cleared.
     assert!(!get_requires_receipt(vault.clone(), op_hash2).await);
 }
 
@@ -308,7 +318,7 @@ async fn create_op_with_status(
         .write_async({
             let test_op_hash = test_op_hash.clone();
             move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_dht(txn, &op, None)?;
+                holochain_state::mutations::insert_op_dht(txn, &op, 0, None)?;
                 set_require_receipt(txn, &test_op_hash, true)?;
                 set_when_integrated(txn, &test_op_hash, Timestamp::now())?;
                 set_validation_status(txn, &test_op_hash, validation_status)?;

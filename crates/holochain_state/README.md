@@ -39,13 +39,3 @@ The Query trait allows combining arbitrary database SQL queries with
 the scratch space so reads can union across the database and in-memory data.
 
 <!-- cargo-rdme end -->
-
-## License
- [![License: CAL 1.0](https://img.shields.io/badge/License-CAL-1.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
-
-Copyright (C) 2019 - 2024, Holochain Foundation
-
-This program is free software: you can redistribute it and/or modify it under the terms of the license
-provided in the LICENSE file (CAL-1.0).  This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-PURPOSE.

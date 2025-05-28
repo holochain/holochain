@@ -7,6 +7,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.6
+
+## 0.6.0-dev.5
+
+## 0.6.0-dev.4
+
+## 0.6.0-dev.3
+
+## 0.6.0-dev.2
+
+- **BREAKING CHANGE** Renamed `happ_manifest` field of a web app bundle to `happ`. The field is expected to point to a `.happ` file, not a `happ.yaml`. The name change reflects that.
+
+## 0.6.0-dev.1
+
+- **BREAKING CHANGE** The `Location` field which permitted `bundled` and `path` options has been removed for DNA bundles, app bundles, and webapp bundles. Where you previously used `bundled`, you should now use `path` instead.
+
+## 0.6.0-dev.0
+
+- **BREAKING CHANGE** `AppBundleSource` variant `Bytes(Vec<u8>)` is now `Bytes(bytes::Bytes)`.
+- **BREAKING CHANGE** `WebAppBundle::decode`, `DnaBundle::decode`, and `AppBundle::decode` all take a `bytes::Bytes` as input.
+
+## 0.5.0
+
+## 0.5.0-rc.1
+
+## 0.5.0-rc.0
+
+## 0.5.0-dev.22
+
+## 0.5.0-dev.21
+
+- **BREAKING CHANGE**: Replace the `Bundle(AppBundle)` variant in `AppBundleSource` with a `Bytes(Vec<u8>)` variant.
+
+## 0.5.0-dev.20
+
+## 0.5.0-dev.19
+
+## 0.5.0-dev.18
+
+- Prevent “TODO” comments from being rendered in cargo docs.
+
+## 0.5.0-dev.17
+
+## 0.5.0-dev.16
+
+## 0.5.0-dev.15
+
+## 0.5.0-dev.14
+
+## 0.5.0-dev.13
+
 ## 0.5.0-dev.12
 
 ## 0.5.0-dev.11

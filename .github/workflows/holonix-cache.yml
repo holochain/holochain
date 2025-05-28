@@ -18,14 +18,11 @@ jobs:
           - "github:holochain/holochain#devShells.{0}.holonix"
         extra_args:
           - ""
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_2"
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_2_rc"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3_rc"
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_4_rc"
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
+          # - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_4_rc"
+          # - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
         platform:
-          - x86_64-darwin
           - aarch64-darwin
           - x86_64-linux
 
@@ -76,13 +73,10 @@ jobs:
           - "github:holochain/holochain#packages.{0}.hc-scaffold"
         extra_args:
           - ""
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_2"
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_2_rc"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3"
           - "--refresh --override-input versions github:holochain/holochain?dir=versions/0_3_rc"
-          - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
+          # - "--refresh --override-input versions github:holochain/holochain?dir=versions/weekly"
         platform:
-          - x86_64-darwin
           - aarch64-darwin
           - x86_64-linux
     runs-on: ubuntu-latest

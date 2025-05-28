@@ -98,6 +98,12 @@ pub enum HcSandboxSubcommand {
     /// Make a call to a conductor's admin interface.
     Call(crate::calls::Call),
 
+    /// Create and authorize credentials for making zome calls.
+    ZomeCallAuth(crate::zome_call::ZomeCallAuth),
+
+    /// Make a call to a zome function on a running app.
+    ZomeCall(crate::zome_call::ZomeCall),
+
     /// List sandboxes found in `$(pwd)/.hc`.
     List {
         /// Show more verbose information.
@@ -165,7 +171,10 @@ impl HcSandbox {
                     let structured = self.structured.clone();
 
                     let result = tokio::select! {
-                        result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
+                        result = tokio::signal::ctrl_c() => {
+                            msg!("Received Ctrl-C, shutting down");
+                            result.map_err(anyhow::Error::from)
+                        }
                         result = run_n(&holochain_path, paths, ports, force_admin_ports, structured) => result,
                     };
                     crate::save::release_ports(std::env::current_dir()?).await?;
@@ -182,7 +191,10 @@ impl HcSandbox {
                 let force_admin_ports = self.force_admin_ports.clone();
 
                 let result = tokio::select! {
-                    result = tokio::signal::ctrl_c() => result.map_err(anyhow::Error::from),
+                    result = tokio::signal::ctrl_c() => {
+                        msg!("Received Ctrl-C, shutting down");
+                        result.map_err(anyhow::Error::from)
+                    }
                     result = run_n(&holochain_path, paths.into_iter().map(ConfigRootPath::from).collect(), ports, force_admin_ports, self.structured) => result,
                 };
                 crate::save::release_ports(std::env::current_dir()?).await?;
@@ -197,7 +209,13 @@ impl HcSandbox {
                 )
                 .await?
             }
-            // HcSandboxSubcommand::Task => todo!("Running custom tasks is coming soon"),
+            HcSandboxSubcommand::ZomeCallAuth(auth) => {
+                crate::zome_call::zome_call_auth(auth, self.force_admin_ports.first().cloned())
+                    .await?
+            }
+            HcSandboxSubcommand::ZomeCall(call) => {
+                crate::zome_call::zome_call(call, self.force_admin_ports.first().cloned()).await?
+            }
             HcSandboxSubcommand::List { verbose } => {
                 crate::save::list(std::env::current_dir()?, verbose)?
             }
@@ -208,10 +226,6 @@ impl HcSandbox {
                 root,
                 directories,
                 in_process_lair,
-                #[cfg(feature = "unstable-dpki")]
-                no_dpki,
-                #[cfg(feature = "unstable-dpki")]
-                dpki_network_seed,
                 #[cfg(feature = "chc")]
                 chc_url,
             }) => {
@@ -222,15 +236,12 @@ impl HcSandbox {
                 );
                 for i in 0..num_sandboxes {
                     let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
-                    let path = crate::generate::generate(
+                    let path = holochain_conductor_config::generate::generate(
                         network,
                         root.clone(),
                         directories.get(i).cloned(),
                         in_process_lair,
-                        #[cfg(feature = "unstable-dpki")]
-                        no_dpki,
-                        #[cfg(feature = "unstable-dpki")]
-                        dpki_network_seed.clone(),
+                        0,
                         #[cfg(feature = "chc")]
                         chc_url.clone(),
                     )?;

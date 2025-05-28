@@ -40,10 +40,10 @@ impl RunOpts {
 }
 
 /// The default configured signal server url.
-pub const DEF_SIGNAL_URL: &str = "wss://sbd-0.main.infra.holo.host";
+pub const DEF_SIGNAL_URL: &str = "wss://dev-test-bootstrap2.holochain.org ";
 
 /// The default configured bootstrap server url.
-pub const DEF_BOOTSTRAP_URL: &str = "https://bootstrap.holo.host";
+pub const DEF_BOOTSTRAP_URL: &str = "https://dev-test-bootstrap2.holochain.org";
 
 /// hc_demo_cli run command.
 #[derive(Debug, clap::Subcommand, serde::Serialize, serde::Deserialize)]
@@ -54,7 +54,7 @@ pub enum RunCmd {
         #[arg(long, default_value = "-")]
         dna: std::path::PathBuf,
 
-        /// the outbox path.
+        /// The outbox path.
         #[arg(long, default_value = "hc-demo-cli-outbox")]
         outbox: std::path::PathBuf,
 
@@ -69,6 +69,10 @@ pub enum RunCmd {
         /// The bootstrap server URL.
         #[arg(long, default_value = DEF_BOOTSTRAP_URL)]
         bootstrap_url: String,
+
+        /// Any auth material required for the signal/bootstrap endpoints.
+        #[arg(long)]
+        base64_auth_material: Option<String>,
     },
 
     /// Generate a dna file that can be used with hc demo-cli.
@@ -89,8 +93,20 @@ pub async fn run_demo(opts: RunOpts) {
             inbox,
             signal_url,
             bootstrap_url,
+            base64_auth_material,
         } => {
-            run(dna, outbox, inbox, signal_url, bootstrap_url, None, None).await;
+            run(
+                dna,
+                outbox,
+                inbox,
+                signal_url,
+                bootstrap_url,
+                base64_auth_material,
+                None,
+                None,
+                true,
+            )
+            .await;
         }
         RunCmd::GenDnaFile { output } => {
             gen_dna_file(output).await;
@@ -112,6 +128,7 @@ pub async fn run_test_demo(
             inbox,
             signal_url,
             bootstrap_url,
+            base64_auth_material,
         } => {
             run(
                 dna,
@@ -119,8 +136,10 @@ pub async fn run_test_demo(
                 inbox,
                 signal_url,
                 bootstrap_url,
+                base64_auth_material,
                 Some(ready),
                 Some(rendezvous),
+                false,
             )
             .await;
         }
@@ -139,7 +158,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     .unwrap();
 
     let i_wasm = DnaWasmHashed::from_content(DnaWasm {
-        code: Arc::new(i_wasm.into_boxed_slice()),
+        code: i_wasm.into(),
     })
     .await;
     let i_zome = IntegrityZomeDef::from(ZomeDef::Wasm(WasmZome::new(i_wasm.hash.clone())));
@@ -152,7 +171,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     .unwrap();
 
     let c_wasm = DnaWasmHashed::from_content(DnaWasm {
-        code: Arc::new(c_wasm.into_boxed_slice()),
+        code: c_wasm.into(),
     })
     .await;
     let c_zome = CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome::new(c_wasm.hash.clone())));
@@ -164,7 +183,6 @@ async fn gen_dna_file(output: std::path::PathBuf) {
         .modifiers(
             DnaModifiersBuilder::default()
                 .network_seed(network_seed.into())
-                .origin_time(Timestamp::now())
                 .build()
                 .unwrap(),
         )
@@ -192,14 +210,17 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run(
     dna: std::path::PathBuf,
     outbox: std::path::PathBuf,
     inbox: std::path::PathBuf,
     signal_url: String,
     bootstrap_url: String,
+    base64_auth_material: Option<String>,
     ready: Option<tokio::sync::oneshot::Sender<()>>,
     rendezvous: Option<holochain::sweettest::DynSweetRendezvous>,
+    prod: bool,
 ) {
     let _ = tokio::fs::create_dir_all(&outbox).await;
     let _ = tokio::fs::create_dir_all(&inbox).await;
@@ -246,7 +267,11 @@ async fn run(
         }
     };
 
-    let config = holochain::sweettest::SweetConductorConfig::rendezvous(true);
+    let mut config = holochain::sweettest::SweetConductorConfig::rendezvous(true);
+
+    config.network.base64_auth_material = base64_auth_material;
+
+    tracing::info!("Using config: {:?}", *config);
 
     let keystore = holochain_keystore::spawn_mem_keystore().await.unwrap();
 
@@ -255,6 +280,7 @@ async fn run(
         Some(keystore),
         Some(rendezvous),
         true,
+        prod,
     )
     .await;
 
@@ -281,7 +307,24 @@ async fn run(
         let _ = ready.send(());
     }
 
+    let mut last_peer_dump = std::time::Instant::now();
+
     loop {
+        if last_peer_dump.elapsed() > std::time::Duration::from_secs(60) {
+            let known_peers = handle
+                .holochain_p2p()
+                .peer_store(cell.dna_hash().clone())
+                .await
+                .unwrap()
+                .get_all()
+                .await
+                .unwrap();
+
+            println!("#KNOWN_PEERS#{known_peers:?}#");
+
+            last_peer_dump = std::time::Instant::now();
+        }
+
         let mut dir = tokio::fs::read_dir(&outbox).await.unwrap();
 
         while let Ok(Some(i)) = dir.next_entry().await {

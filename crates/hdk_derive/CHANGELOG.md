@@ -7,6 +7,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.4
+
+## 0.6.0-dev.3
+
+## 0.6.0-dev.2
+
+## 0.6.0-dev.1
+
+## 0.6.0-dev.0
+
+## 0.5.0
+
+## 0.5.0-rc.0
+
+## 0.5.0-dev.15
+
+## 0.5.0-dev.14
+
+- `#[hdk_extern]` validates the annotated function’s return type
+
+## 0.5.0-dev.13
+
+## 0.5.0-dev.12
+
+## 0.5.0-dev.11
+
+## 0.5.0-dev.10
+
+## 0.5.0-dev.9
+
+## 0.5.0-dev.8
+
 ## 0.5.0-dev.7
 
 ## 0.5.0-dev.6

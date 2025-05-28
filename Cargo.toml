@@ -27,28 +27,16 @@ members = [
   "crates/holochain_metrics",
   "crates/holochain_nonce",
   "crates/holochain_secure_primitive",
-  "crates/holochain_conductor_services",
+  "crates/holochain_conductor_config",
+  "crates/timestamp",
 
-  "crates/hc_deepkey_sdk",
-  "crates/hc_deepkey_types",
-
+  "crates/client",
   "crates/hc",
   "crates/hc_bundle",
   "crates/hc_sandbox",
-  "crates/hc_run_local_services",
   "crates/hc_demo_cli",
   "crates/hc_service_check",
   "crates/holochain_terminal",
-
-  "crates/kitsune_p2p/bootstrap",
-  "crates/kitsune_p2p/bootstrap_client",
-  "crates/kitsune_p2p/dht",
-  "crates/kitsune_p2p/dht_arc",
-  "crates/kitsune_p2p/fetch",
-  "crates/kitsune_p2p/kitsune_p2p",
-  "crates/kitsune_p2p/mdns",
-  "crates/kitsune_p2p/timestamp",
-  "crates/kitsune_p2p/types",
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
@@ -99,39 +87,27 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
-# holochain_deepkey_dna = { path = "../deepkey/crates/holochain_deepkey_dna" }
-
+# kitsune2_api = { path = "../kitsune2/crates/api" }
+# kitsune2_core = { path = "../kitsune2/crates/core" }
+# kitsune2 = { path = "../kitsune2/crates/kitsune2" }
+# kitsune2_dht = { path = "../kitsune2/crates/dht" }
+# kitsune2_gossip = { path = "../kitsune2/crates/gossip" }
+# kitsune2_bootstrap_srv = { path = "../kitsune2/crates/bootstrap_srv" }
+# kitsune2_bootstrap_client = { path = "../kitsune2/crates/bootstrap_client" }
+# sbd-server = { path = "../sbd/rust/sbd-server" }
+# sbd-client = { path = "../sbd/rust/sbd-client" }
+# sbd-e2e-crypto-client = { path = "../sbd/rust/sbd-e2e-crypto-client" }
+# tx5-core = { path = "../tx5/crates/tx5-core" }
+# tx5 = { path = "../tx5/crates/tx5" }
 # task-motel = { path = "../task-motel" }
-# proptest = { path = "/home/michael/gitfork/proptest/proptest" }
-# proptest = { git = "https://github.com/maackle/proptest", branch = "arbitrary-pathbuf" }
-
 # influxive-child-svc = { path = "../influxive/crates/influxive-child-svc" }
 # influxive-otel = { path = "../influxive/crates/influxive-otel" }
-# contrafact = { git = "https://github.com/maackle/contrafact-rs.git", branch = "lambda" }
-# tx5 = { path = "../tx5/crates/tx5" }
-# tx5-core = { path = "../tx5/crates/tx5-core" }
-# tx5-go-pion = { path = "../tx5/crates/tx5-go-pion" }
-# tx5-go-pion-sys = { path = "../tx5/crates/tx5-go-pion-sys" }
-# tx5-go-pion-turn = { path = "../tx5/crates/tx5-go-pion-turn" }
-# tx5-signal = { path = "../tx5/crates/tx5-signal" }
-# sbd-e2e-crypto-client = { path = "../sbd/rust/sbd-e2e-crypto-client" }
-# sbd-server = { path = "../sbd/rust/sbd-server" }
-# tx5 = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# tx5-signal = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# tx5-go-pion-turn = { git = "https://github.com/holochain/tx5.git", rev = "f0f009f77a84c96c2acded6b27df27ece3f7dbbb" }
-# isotest = { git = "https://github.com/maackle/isotest-rs.git" }
 # holochain_wasmer_host = { path = "../holochain-wasmer/crates/host" }
 # holochain_wasmer_guest = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_host = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_wasmer_common = { git = "https://github.com/holochain/holochain-wasmer.git", rev = "2fc225add8c72cbe49e458a2431c8069c9e405ec" }
 # holochain_serialized_bytes = { git = "https://github.com/holochain/holochain-serialization.git", branch = "proptest" }
 # holochain_serialized_bytes_derive = { git = "https://github.com/holochain/holochain-serialization.git", branch = "develop" }
-#ghost_actor = { path = "../ghost_actor/crates/ghost_actor" }
 # lair_keystore_api = { path = "../lair/crates/lair_keystore_api" }
-#lair_keystore = { path = "../lair/crates/lair_keystore" }
-#lair_keystore_api_0_0 = { path = "../lair_0_0/crates/lair_keystore_api", package = "lair_keystore_api" }
-#lair_keystore_client_0_0 = { path = "../lair_0_0/crates/lair_keystore_client", package = "lair_keystore_client" }
-#lair_keystore_api = { git = "https://github.com/holochain/lair.git", branch = "secretbox" }
-#lair_keystore_api_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_api" }
-#lair_keystore_client_0_0 = { git = "https://github.com/holochain/lair.git", branch = "release-0.0.x-bump-sodoken", package = "lair_keystore_client" }
+# lair_keystore = { path = "../lair/crates/lair_keystore" }
 # r2d2_sqlite = { path = "../r2d2-sqlite" }

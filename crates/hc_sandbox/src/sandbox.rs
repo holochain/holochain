@@ -1,5 +1,6 @@
 //! Common use sandboxes with lots of default choices.
 
+use holochain_client::AdminWebsocket;
 use holochain_trace::Output;
 use std::path::Path;
 use std::path::PathBuf;
@@ -10,7 +11,6 @@ use holochain_types::prelude::InstalledAppId;
 use crate::calls::InstallApp;
 use crate::cmds::*;
 use crate::run::run_async;
-use crate::CmdRunner;
 
 /// Generates a new sandbox with a default [`ConductorConfig`](holochain_conductor_api::config::conductor::ConductorConfig)
 /// and optional network.
@@ -30,29 +30,22 @@ pub async fn default_with_network(
         network,
         root,
         in_process_lair,
-        #[cfg(feature = "unstable-dpki")]
-        no_dpki,
-        #[cfg(feature = "unstable-dpki")]
-        dpki_network_seed,
         #[cfg(feature = "chc")]
         chc_url,
         ..
     } = create;
     let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
-    let path = crate::generate::generate(
+    let config_path = holochain_conductor_config::generate::generate(
         network,
         root,
         directory,
         in_process_lair,
-        #[cfg(feature = "unstable-dpki")]
-        no_dpki,
-        #[cfg(feature = "unstable-dpki")]
-        dpki_network_seed,
+        0,
         #[cfg(feature = "chc")]
         chc_url,
     )?;
-    let conductor = run_async(holochain_path, path.clone(), None, structured).await?;
-    let mut cmd = CmdRunner::new(conductor.0).await;
+    let conductor = run_async(holochain_path, config_path.clone(), None, structured).await?;
+    let mut client = AdminWebsocket::connect(format!("localhost:{}", conductor.0), None).await?;
     let install_bundle = InstallApp {
         app_id: Some(app_id),
         agent_key: None,
@@ -60,8 +53,8 @@ pub async fn default_with_network(
         network_seed,
         roles_settings,
     };
-    crate::calls::install_app_bundle(&mut cmd, install_bundle).await?;
-    Ok(path)
+    crate::calls::install_app_bundle(&mut client, install_bundle).await?;
+    Ok(config_path)
 }
 
 /// Same as [`default_with_network`] but creates _n_ copies

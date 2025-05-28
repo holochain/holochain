@@ -1,9 +1,8 @@
 //! Defines the Warrant variant of DhtOp
 
-use std::str::FromStr;
-
 use holochain_keystore::{AgentPubKeyExt, LairResult, MetaLairClient};
 use holochain_zome_types::prelude::*;
+use std::str::FromStr;
 
 /// A Warrant DhtOp
 #[derive(
@@ -17,10 +16,6 @@ use holochain_zome_types::prelude::*;
     Hash,
     derive_more::From,
     derive_more::Deref,
-)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub struct WarrantOp(SignedWarrant);
 

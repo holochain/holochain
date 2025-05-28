@@ -3,12 +3,20 @@
 //! NB: After stabilization, *do not modify this file*! Create a new version of
 //! the spec and leave this one alone to maintain backwards compatibility.
 
+use schemars::JsonSchema;
+
 /// Version 1 of the App manifest schema
 #[derive(
-    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    JsonSchema,
+    derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct WebAppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
@@ -17,31 +25,21 @@ pub struct WebAppManifestV1 {
     pub ui: WebUI,
 
     /// The Cell manifests that make up this app.
-    pub happ_manifest: AppManifestLocation,
+    pub happ: AppManifestLocation,
 }
 
-/// Web UI .zip file that should be associated with the happ
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// Web UI .zip file that should be associated with the hApp.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct WebUI {
     /// Where to find this UI.
-    ///
-    /// Note that since this is flattened,
-    /// there is no actual "location" key in the manifest.
-    #[serde(flatten)]
-    pub location: mr_bundle::Location,
+    pub path: String,
 }
 
-/// Location of the happ bundle to bind with the Web UI
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// Location of the hApp bundle to bind with the Web UI.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct AppManifestLocation {
-    /// Where to find the happ for this web-happ.
-    ///
-    /// Note that since this is flattened,
-    /// there is no actual "location" key in the manifest.
-    #[serde(flatten)]
-    pub location: mr_bundle::Location,
+    /// Where to find the hApp for this web-happ.
+    pub path: String,
 }

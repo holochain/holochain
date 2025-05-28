@@ -14,15 +14,11 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_chc::ChcImpl;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::actor::HolochainP2pRefToDna;
-use holochain_p2p::HolochainP2pDna;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_state::prelude::test_db_dir;
-use holochain_types::db_cache::DhtDbQueryCache;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_wasm_test_utils::TestZomes;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -33,7 +29,6 @@ pub struct CellHostFnCaller {
     pub cell_id: CellId,
     pub authored_db: DbWrite<DbKindAuthored>,
     pub dht_db: DbWrite<DbKindDht>,
-    pub dht_db_cache: DhtDbQueryCache,
     pub cache: DbWrite<DbKindCache>,
     pub ribosome: RealRibosome,
     pub network: HolochainP2pDna,
@@ -52,7 +47,6 @@ impl CellHostFnCaller {
     ) -> Self {
         let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
         let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
-        let dht_db_cache = handle.get_dht_db_cache(cell_id.dna_hash()).unwrap();
         let cache = handle.get_cache_db(cell_id).await.unwrap();
         let keystore = handle.keystore().clone();
         let network = handle
@@ -67,7 +61,6 @@ impl CellHostFnCaller {
             cell_id: cell_id.clone(),
             authored_db,
             dht_db,
-            dht_db_cache,
             cache,
             ribosome,
             network,
@@ -86,7 +79,6 @@ impl CellHostFnCaller {
         HostFnCaller {
             authored_db: self.authored_db.clone(),
             dht_db: self.dht_db.clone(),
-            dht_db_cache: self.dht_db_cache.clone(),
             cache: self.cache.clone(),
             ribosome: self.ribosome.clone(),
             zome_path,
@@ -187,8 +179,6 @@ impl ConductorTestData {
                 modifiers: DnaModifiers {
                     network_seed: "ba1d046d-ce29-4778-914b-47e6010d2faf".to_string(),
                     properties: SerializedBytes::try_from(()).unwrap(),
-                    origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                    quantum_time: holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME,
                 },
                 integrity_zomes: zomes
                     .clone()

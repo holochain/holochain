@@ -104,7 +104,7 @@ pub fn get_links(
 pub mod slow_tests {
     use crate::{
         core::ribosome::wasm_test::RibosomeTestFixture,
-        sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile},
+        sweettest::{await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile},
     };
     use hdk::prelude::*;
     use holochain_test_wasm_common::*;
@@ -343,6 +343,8 @@ pub mod slow_tests {
             conductor,
             alice,
             bob,
+            alice_cell,
+            bob_cell,
             ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
@@ -365,6 +367,10 @@ pub mod slow_tests {
         let hash_b_a: ActionHash = conductor
             .call(&bob, "create_tagged_link", "b.a".to_string())
             .await;
+
+        await_consistency(30, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         // Get the base all the links are attached from
         let base: AnyLinkableHash = conductor.call(&alice, "get_base_hash", ()).await;
@@ -455,6 +461,8 @@ pub mod slow_tests {
             conductor,
             alice,
             bob,
+            alice_cell,
+            bob_cell,
             ..
         } = RibosomeTestFixture::new(TestWasm::Link).await;
 
@@ -475,6 +483,10 @@ pub mod slow_tests {
         let hash_d: ActionHash = conductor
             .call(&bob, "create_tagged_link", "d".to_string())
             .await;
+
+        await_consistency(30, [&alice_cell, &bob_cell])
+            .await
+            .unwrap();
 
         // Get the base all the links are attached from
         let base: AnyLinkableHash = conductor.call(&alice, "get_base_hash", ()).await;
@@ -565,13 +577,11 @@ pub mod slow_tests {
     async fn get_links_local_only() {
         holochain_trace::test_run();
         // agents should not pass around data
-        let config = SweetConductorConfig::rendezvous(false)
-            .no_dpki()
-            .tune(|config| {
-                config.disable_historical_gossip = true;
-                config.disable_recent_gossip = true;
-                config.disable_publish = true;
-            });
+        let config = SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
+            nc.disable_gossip = true;
+            nc.disable_publish = true;
+        });
+
         let mut conductors = SweetConductorBatch::from_config_rendezvous(2, config).await;
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
         let apps = conductors.setup_app("test", &[dna_file]).await.unwrap();

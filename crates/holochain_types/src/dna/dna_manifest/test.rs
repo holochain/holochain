@@ -8,13 +8,12 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
       "#;
@@ -30,19 +29,18 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
         "#;
@@ -58,13 +56,12 @@ manifest_version: "1"
 name: test_dna
 integrity: 
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes: ~
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
         "#;
@@ -81,13 +78,12 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
 not_a_real_field: ~"#;
@@ -108,20 +104,19 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
   # Should be indented left once, this is actually nested under `integrity`
   coordinator:
     zomes:
       - name: zome4
-        bundled: zome-4.wasm
+        path: zome-4.wasm
       - name: zome5
         path: ../zome-5.wasm"#;
 
@@ -142,19 +137,18 @@ name: test_dna
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
   # Should be indented left once, this is actually nested under `coordinator`
   integrity:
     network_seed: blablabla
-    origin_time: 2022-02-11T23:29:00.789576Z
     properties: ~
     zomes:
       - name: zome1
-        bundled: zome-1.wasm
+        path: zome-1.wasm
       - name: zome2
-        bundled: nested/zome-2.wasm
+        path: nested/zome-2.wasm
       - name: zome3
         path: ../zome-3.wasm"#;
 
@@ -174,14 +168,13 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   not_a_real_field: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
     - name: zome3
       path: ../zome-3.wasm
 "#;
@@ -204,7 +197,7 @@ coordinator:
   not_a_real_field: ~
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
         "#;
@@ -225,13 +218,12 @@ manifest_version: "1"
 name: test_dna
 integrity:
   network_seed: blablabla
-  origin_time: 2022-02-11T23:29:00.789576Z
   properties: ~
   zomes:
     - name: zome1
-      bundled: zome-1.wasm
+      path: zome-1.wasm
     - name: zome2
-      bundled: nested/zome-2.wasm
+      path: nested/zome-2.wasm
       not_a_real_field: ~
     - name: zome3
       path: ../zome-3.wasm
@@ -254,7 +246,7 @@ name: test_dna
 coordinator:
   zomes:
     - name: zome4
-      bundled: zome-4.wasm
+      path: zome-4.wasm
     - name: zome5
       path: ../zome-5.wasm
       not_a_real_field: ~

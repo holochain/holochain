@@ -6,12 +6,12 @@ use crate::conductor::space::TestSpace;
 use crate::core::queue_consumer::TriggerReceiver;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use crate::prelude::AgentPubKeyFixturator;
 use crate::prelude::AgentValidationPkgFixturator;
 use crate::prelude::CreateFixturator;
 use crate::prelude::SignatureFixturator;
 use fixt::*;
 use hdk::prelude::Dna as HdkDna;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
@@ -46,6 +46,15 @@ async fn validate_op_with_no_dependency() {
     holochain_trace::test_run();
 
     let mut test_case = TestCase::new().await;
+
+    #[cfg(feature = "unstable-warrants")]
+    {
+        let mut network = MockHolochainP2pDnaT::default();
+        network
+            .expect_target_arcs()
+            .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+        test_case.actual_network = Some(network);
+    }
 
     let dna_action = HdkDna {
         author: fixt!(AgentPubKey),
@@ -110,6 +119,15 @@ async fn validate_op_with_dependency_held_in_cache() {
         .await
         .unwrap();
 
+    #[cfg(feature = "unstable-warrants")]
+    {
+        let mut network = MockHolochainP2pDnaT::default();
+        network
+            .expect_target_arcs()
+            .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+        test_case.with_network_behaviour(network);
+    }
+
     test_case.run().await;
 
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
@@ -155,20 +173,32 @@ async fn validate_op_with_dependency_not_held() {
         .await
         .unwrap();
 
-    let mut network = MockHolochainP2pDnaT::new();
+    let mut network = MockHolochainP2pDnaT::default();
     let mut ops: WireRecordOps = WireRecordOps::new();
     ops.action = Some(Judged::valid(previous_action.clone().into()));
     let response = WireOps::Record(ops);
     network
         .expect_get()
-        .return_once(move |_, _| Ok(vec![response]));
+        .return_once(move |_| Ok(vec![response]));
+
+    network
+        .expect_target_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
 
     test_case.with_network_behaviour(network).run().await;
 
+    let mut network = MockHolochainP2pDnaT::default();
+    network
+        .expect_target_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
+
+    test_case.with_network_behaviour(network).run().await;
     test_case.check_trigger_and_rerun().await;
 
     let ops_to_app_validate = test_case.get_ops_pending_app_validation().await;
     assert!(ops_to_app_validate.contains(&op_hash));
+
+    println!("Starting expectation");
 
     test_case.expect_app_validation_triggered().await;
 }
@@ -212,7 +242,12 @@ async fn validate_op_with_dependency_not_found_on_the_dht() {
     let response = WireOps::Record(WireRecordOps::new());
     network
         .expect_get()
-        .return_once(move |_, _| Ok(vec![response]));
+        .return_once(move |_| Ok(vec![response]));
+
+    #[cfg(feature = "unstable-warrants")]
+    network
+        .expect_target_arcs()
+        .return_once(|| Ok(vec![kitsune2_api::DhtArc::Empty]));
 
     test_case.with_network_behaviour(network).run().await;
 
@@ -228,8 +263,8 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
 
     let mut network = MockHolochainP2pDnaT::new();
     network
-        .expect_authority_for_hash()
-        .return_once(move |_| Ok(true));
+        .expect_target_arcs()
+        .return_once(move || Ok(vec![kitsune2_api::DhtArc::FULL]));
 
     let mut test_case = TestCase::new().await;
     test_case.with_network_behaviour(network);
@@ -349,7 +384,7 @@ impl TestCase {
         let test_op_hash = op.as_hash().clone();
         db.write_async({
             move |txn| -> StateMutationResult<()> {
-                holochain_state::mutations::insert_op_untyped(txn, &op)?;
+                holochain_state::mutations::insert_op_untyped(txn, &op, 0)?;
                 Ok(())
             }
         })
@@ -366,14 +401,13 @@ impl TestCase {
                 .get_or_create_authored_db(self.agent.clone())
                 .unwrap(),
             self.test_space.space.dht_db.clone(),
-            self.test_space.space.dht_query_cache.clone(),
             self.test_space.space.cache_db.clone(),
             Arc::new(self.dna_def.clone()),
-            None,
             std::time::Duration::from_secs(10),
         );
 
-        let actual_network = self.actual_network.take().unwrap_or_default();
+        println!("Running with network: {:?}", self.actual_network);
+        let actual_network = Arc::new(self.actual_network.take().unwrap_or_default());
 
         sys_validation_workflow(
             Arc::new(workspace),
@@ -397,6 +431,8 @@ impl TestCase {
         .await
         .unwrap()
         .unwrap();
+
+        println!("Got a trigger, running once");
 
         self.run().await
     }

@@ -1,8 +1,8 @@
-use kitsune_p2p_types::dependencies::lair_keystore_api;
+use ::lair_keystore::dependencies::lair_keystore_api;
 use lair_keystore_api::dependencies::hc_seed_bundle;
 use lair_keystore_api::ipc_keystore::*;
 use lair_keystore_api::prelude::*;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 fn load_conf(conf_path: &std::path::Path) -> LairResult<LairServerConfig> {
     let bytes = std::fs::read(conf_path)?;
@@ -20,7 +20,9 @@ async fn main() {
     conf_path.push("lair-config.yaml");
 
     // set up a passphrase
-    let passphrase = sodoken::BufRead::from(&b"passphrase"[..]);
+    let passphrase = Arc::new(Mutex::new(sodoken::LockedArray::from(
+        b"passphrase".to_vec(),
+    )));
 
     // create the config for the test server
     let config = match load_conf(&conf_path) {

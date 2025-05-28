@@ -162,9 +162,9 @@ pub trait Store {
     /// The second parameter determines whether the warrant op should be checked for validity.
     /// It should be set to false if reading from an Authored DB, where everything is valid,
     /// and true if reading from a DHT DB, where validation status matters
-    fn get_warrants_for_basis(
+    fn get_warrants_for_agent(
         &self,
-        hash: &AnyLinkableHash,
+        agent_key: &AgentPubKey,
         check_valid: bool,
     ) -> StateQueryResult<Vec<WarrantOp>>;
 
@@ -347,34 +347,34 @@ impl Store for CascadeTxnWrapper<'_, '_> {
         }
     }
 
-    fn get_warrants_for_basis(
+    fn get_warrants_for_agent(
         &self,
-        hash: &AnyLinkableHash,
+        agent_key: &AgentPubKey,
         check_valid: bool,
     ) -> StateQueryResult<Vec<WarrantOp>> {
         let sql = if check_valid {
             "
             SELECT
-            Action.blob as action_blob
-            FROM Action
-            JOIN DhtOp ON DhtOp.action_hash = Action.hash
-            WHERE Action.base_hash = :hash
-            AND Action.type = :type
+            Warrant.blob as warrant_blob
+            FROM Warrant
+            JOIN DhtOp ON DhtOp.action_hash = Warrant.hash
+            WHERE Warrant.warrantee = :agent_key
             AND DhtOp.validation_status = :status
+            AND Warrant.type = :type
             "
         } else {
             "
             SELECT
-            Action.blob as action_blob
-            FROM Action
-            WHERE Action.base_hash = :hash
-            AND Action.type = :type
+            Warrant.blob as warrant_blob
+            FROM Warrant
+            WHERE Warrant.warrantee = :agent_key
+            AND Warrant.type = :type
             "
         };
 
         let row_fn = |row: &Row<'_>| {
             Ok(
-                from_blob::<SignedWarrant>(row.get(row.as_ref().column_index("action_blob")?)?)
+                from_blob::<SignedWarrant>(row.get(row.as_ref().column_index("warrant_blob")?)?)
                     .map(Into::into),
             )
         };
@@ -383,7 +383,7 @@ impl Store for CascadeTxnWrapper<'_, '_> {
                 .prepare_cached(sql)?
                 .query_map(
                     named_params! {
-                        ":hash": hash,
+                        ":agent_key": agent_key,
                         ":type": WarrantType::ChainIntegrityWarrant,
                         ":status": ValidationStatus::Valid
                     },
@@ -395,7 +395,7 @@ impl Store for CascadeTxnWrapper<'_, '_> {
                 .prepare_cached(sql)?
                 .query_map(
                     named_params! {
-                        ":hash": hash,
+                        ":agent_key": agent_key,
                         ":type": WarrantType::ChainIntegrityWarrant
                     },
                     row_fn,
@@ -673,14 +673,14 @@ impl Store for Txns<'_, '_> {
         Ok(None)
     }
 
-    fn get_warrants_for_basis(
+    fn get_warrants_for_agent(
         &self,
-        hash: &AnyLinkableHash,
+        agent_key: &AgentPubKey,
         check_validity: bool,
     ) -> StateQueryResult<Vec<WarrantOp>> {
         let mut warrants = vec![];
         for txn in &self.txns {
-            let r = txn.get_warrants_for_basis(hash, check_validity)?;
+            let r = txn.get_warrants_for_agent(agent_key, check_validity)?;
             warrants.extend(r.into_iter());
         }
         Ok(warrants)
@@ -784,13 +784,13 @@ impl Store for DbScratch<'_, '_> {
         }
     }
 
-    fn get_warrants_for_basis(
+    fn get_warrants_for_agent(
         &self,
-        hash: &AnyLinkableHash,
+        agent_key: &AgentPubKey,
         check_validity: bool,
     ) -> StateQueryResult<Vec<WarrantOp>> {
         // The scratch will never contain warrants, since they are not committed to chain
-        self.txns.get_warrants_for_basis(hash, check_validity)
+        self.txns.get_warrants_for_agent(agent_key, check_validity)
     }
 
     fn get_record(&self, hash: &AnyDhtHash) -> StateQueryResult<Option<Record>> {
@@ -936,12 +936,8 @@ impl<'stmt, 'iter, Q: Query> QueryStmt<'stmt, Q> {
     ) -> StateQueryResult<StmtIter<'iter, T>> {
         match stmt {
             Some(stmt) => {
-                if params.is_empty() {
-                    Ok(Box::new(fallible_iterator::convert(std::iter::empty())) as StmtIter<T>)
-                } else {
-                    let iter = stmt.query_and_then(params, move |r| map_fn(r))?;
-                    Ok(Box::new(fallible_iterator::convert(iter)) as StmtIter<T>)
-                }
+                let iter = stmt.query_and_then(params, move |r| map_fn(r))?;
+                Ok(Box::new(fallible_iterator::convert(iter)) as StmtIter<T>)
             }
             None => Ok(Box::new(fallible_iterator::convert(std::iter::empty())) as StmtIter<T>),
         }

@@ -220,6 +220,7 @@ fn bump_release_versions<'a>(
 
         let incremented_version = {
             let mut v = current_version.clone();
+            info!("Increment semver for {}", crt.name());
             increment_semver(&mut v, semver_increment_mode)?;
             v
         };

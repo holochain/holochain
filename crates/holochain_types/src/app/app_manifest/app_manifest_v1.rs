@@ -17,17 +17,21 @@ use super::{
 use crate::prelude::{RoleName, YamlProperties};
 use holo_hash::DnaHashB64;
 use holochain_zome_types::prelude::*;
+use schemars::JsonSchema;
 use std::collections::HashMap;
 
 /// Version 1 of the App manifest schema
 #[derive(
-    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_builder::Builder,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    JsonSchema,
+    derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct AppManifestV1 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
@@ -52,12 +56,8 @@ pub struct AppManifestV1 {
 /// Description of an app "role" defined by this app.
 /// Roles get filled according to the provisioning rules, as well as by
 /// potential runtime clones.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct AppRoleManifest {
     /// The ID which will be used to refer to:
     /// - this role,
@@ -85,20 +85,14 @@ impl AppRoleManifest {
 }
 
 /// The DNA portion of an app role
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct AppRoleDnaManifest {
-    /// Where to find this Dna. To specify a DNA included in a hApp Bundle,
-    /// use a local relative path that corresponds with the bundle structure.
+    /// Where to find this DNA.
     ///
-    /// Note that since this is flattened,
-    /// there is no actual "location" key in the manifest.
-    #[serde(flatten)]
-    pub location: Option<mr_bundle::Location>,
+    /// The DNA bundle at this path is included in the hApp bundle. The path is resolved relative
+    /// to this app manifest file.
+    pub path: Option<String>,
 
     /// Optional default modifier values.
     ///
@@ -129,9 +123,7 @@ impl AppRoleDnaManifest {
     /// Create a sample AppRoleDnaManifest as a template to be followed
     pub fn sample() -> Self {
         Self {
-            location: Some(mr_bundle::Location::Bundled(
-                "./path/to/my/dnabundle.dna".into(),
-            )),
+            path: Some("./path/to/my/dnabundle.dna".to_string()),
             modifiers: DnaModifiersOpt::none(),
             installed_hash: None,
             clone_limit: 0,
@@ -139,17 +131,10 @@ impl AppRoleDnaManifest {
     }
 }
 
-/// Specifies remote, local, or bundled location of DNA
-pub type DnaLocation = mr_bundle::Location;
-
 /// Rules to determine if and how a Cell will be created for this Dna
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "strategy")]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 #[allow(missing_docs)]
 pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
@@ -218,14 +203,8 @@ impl AppManifestV1 {
                 if let Some(network_seed) = modifier_opts.network_seed.clone() {
                     role.dna.modifiers.network_seed = Some(network_seed);
                 }
-                if let Some(origin_time) = modifier_opts.origin_time {
-                    role.dna.modifiers.origin_time = Some(origin_time);
-                }
                 if let Some(props) = modifier_opts.properties.clone() {
                     role.dna.modifiers.properties = Some(props);
-                }
-                if let Some(quantum_time) = modifier_opts.quantum_time {
-                    role.dna.modifiers.quantum_time = Some(quantum_time);
                 }
             }
         }
@@ -249,7 +228,7 @@ impl AppManifestV1 {
                      dna,
                  }| {
                     let AppRoleDnaManifest {
-                        location,
+                        path,
                         installed_hash,
                         clone_limit,
                         modifiers,
@@ -261,7 +240,7 @@ impl AppManifestV1 {
                         CellProvisioning::Create { deferred } => AppRoleManifestValidated::Create {
                             deferred,
                             clone_limit,
-                            location: Self::require(location, "roles.dna.(path|url)")?,
+                            path: Self::require(path, "roles.dna.path")?,
                             modifiers,
                             installed_hash,
                         },
@@ -276,7 +255,7 @@ impl AppManifestV1 {
                         }
                         CellProvisioning::CloneOnly => AppRoleManifestValidated::CloneOnly {
                             clone_limit,
-                            location: Self::require(location, "roles.dna.(path|url)")?,
+                            path: Self::require(path, "roles.dna.path")?,
                             installed_hash,
                             modifiers,
                         },
@@ -299,10 +278,7 @@ pub mod tests {
     use crate::app::app_manifest::AppManifest;
     use crate::prelude::*;
     use ::fixt::prelude::*;
-    use std::path::PathBuf;
-
-    #[cfg(feature = "fuzzing")]
-    use arbitrary::Arbitrary;
+    use holo_hash::fixt::*;
 
     #[derive(serde::Serialize, serde::Deserialize)]
     struct Props {
@@ -319,14 +295,14 @@ pub mod tests {
     }
 
     pub async fn app_manifest_fixture(
-        location: Option<mr_bundle::Location>,
+        file: Option<String>,
         installed_hash: DnaHash,
         modifiers: DnaModifiersOpt<YamlProperties>,
     ) -> AppManifestV1 {
         let roles = vec![AppRoleManifest {
             name: "role_name".into(),
             dna: AppRoleDnaManifest {
-                location,
+                path: file,
                 modifiers,
                 installed_hash: Some(installed_hash.into()),
                 clone_limit: 50,
@@ -335,7 +311,7 @@ pub mod tests {
         }];
         AppManifestV1 {
             name: "Test app".to_string(),
-            description: Some("Serialization roundtrip test".to_string()),
+            description: Some("Serialization round trip test".to_string()),
             roles,
             allow_deferred_memproofs: false,
         }
@@ -343,15 +319,13 @@ pub mod tests {
 
     #[tokio::test]
     async fn manifest_v1_roundtrip() {
-        let location = Some(mr_bundle::Location::Path(PathBuf::from("/tmp/test.dna")));
+        let file = Some("/tmp/test.dna".to_string());
         let modifiers = DnaModifiersOpt {
             properties: Some(app_manifest_properties_fixture()),
             network_seed: Some("network_seed".into()),
-            origin_time: None,
-            quantum_time: None,
         };
         let installed_hash = fixt!(DnaHash);
-        let manifest = app_manifest_fixture(location, installed_hash.clone(), modifiers).await;
+        let manifest = app_manifest_fixture(file, installed_hash.clone(), modifiers).await;
         let manifest = AppManifest::from(manifest);
         let manifest_yaml = serde_yaml::to_string(&manifest).unwrap();
         let manifest_roundtrip = serde_yaml::from_str(&manifest_yaml).unwrap();
@@ -402,19 +376,36 @@ roles:
 
     #[tokio::test]
     async fn manifest_v1_set_network_seed() {
-        let mut u = arbitrary::Unstructured::new(&[0]);
-        let mut manifest = AppManifestV1::arbitrary(&mut u).unwrap();
+        let mut manifest = AppManifestV1 {
+            name: "test".to_string(),
+            description: None,
+            roles: vec![],
+            allow_deferred_memproofs: false,
+        };
         manifest.roles = vec![
-            AppRoleManifest::arbitrary(&mut u).unwrap(),
-            AppRoleManifest::arbitrary(&mut u).unwrap(),
-            // AppRoleManifest::arbitrary(&mut u).unwrap(),
-            // AppRoleManifest::arbitrary(&mut u).unwrap(),
+            AppRoleManifest {
+                name: "test-role-1".to_string(),
+                provisioning: None,
+                dna: AppRoleDnaManifest {
+                    path: None,
+                    modifiers: DnaModifiersOpt::none(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                },
+            },
+            AppRoleManifest {
+                name: "test-role-2".to_string(),
+                provisioning: None,
+                dna: AppRoleDnaManifest {
+                    path: None,
+                    modifiers: DnaModifiersOpt::none(),
+                    installed_hash: None,
+                    clone_limit: 0,
+                },
+            },
         ];
         manifest.roles[0].provisioning = Some(CellProvisioning::Create { deferred: false });
         manifest.roles[1].provisioning = Some(CellProvisioning::Create { deferred: false });
-        // manifest.roles[2].provisioning = Some(CellProvisioning::UseExisting { deferred: false });
-        // manifest.roles[3].provisioning =
-        //     Some(CellProvisioning::CreateIfNotExists { deferred: false });
 
         let network_seed = NetworkSeed::from("blabla");
         manifest.set_network_seed(network_seed.clone());
@@ -428,15 +419,5 @@ roles:
             manifest.roles[1].dna.modifiers.network_seed.as_ref(),
             Some(&network_seed)
         );
-        // assert_eq!(
-        //     manifest.roles[3].dna.modifiers.network_seed.as_ref(),
-        //     Some(&network_seed)
-        // );
-
-        // // - The others do not.
-        // assert_ne!(
-        //     manifest.roles[2].dna.modifiers.network_seed.as_ref(),
-        //     Some(&network_seed)
-        // );
     }
 }

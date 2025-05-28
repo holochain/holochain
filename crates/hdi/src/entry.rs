@@ -20,8 +20,8 @@ pub mod examples;
 /// [`must_get_entry`] is available in contexts such as validation where both determinism and network access is desirable.
 ///
 /// An EntryHashed will NOT be returned if:
-/// - @TODO It is PURGED (community redacted entry)
-/// - @TODO ALL actions pointing to it are WITHDRAWN by the authors
+// - @TODO It is PURGED (community redacted entry)
+// - @TODO ALL actions pointing to it are WITHDRAWN by the authors
 /// - ALL actions pointing to it are ABANDONED by ALL authorities due to validation failure
 /// - Nobody knows about it on the currently visible network
 ///
@@ -49,8 +49,8 @@ pub fn must_get_entry(entry_hash: EntryHash) -> ExternResult<EntryHashed> {
 ///
 /// A [`SignedActionHashed`] will NOT be returned if:
 ///
-/// - @TODO The action is WITHDRAWN by the author
-/// - @TODO The action is ABANDONED by ALL authorities
+// - @TODO The action is WITHDRAWN by the author
+// - @TODO The action is ABANDONED by ALL authorities
 /// - Nobody knows about it on the currently visible network
 ///
 /// If a [`SignedActionHashed`] fails to be returned:
@@ -82,10 +82,10 @@ pub fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHash
 /// Note though that each "hop" in recursive validation is routed to a completely different set of authorities.
 /// It does not take many hops to reach the point where an attacker needs to eclipse the entire network to lie about [`Record`] validity.
 ///
-/// @TODO We keep signed receipts from authorities serving up "valid records".
-/// - If we ever discover a record we were told is valid is invalid we can retroactively look to warrant authorities
-/// - We can async (e.g. in a background task) be recursively validating [`Record`] dependencies ourselves, following hops until there is no room for lies
-/// - We can with small probability recursively validate to several hops inline to discourage potential eclipse attacks with a credible immediate threat
+// @TODO We keep signed receipts from authorities serving up "valid records".
+// - If we ever discover a record we were told is valid is invalid we can retroactively look to warrant authorities
+// - We can async (e.g. in a background task) be recursively validating [`Record`] dependencies ourselves, following hops until there is no room for lies
+// - We can with small probability recursively validate to several hops inline to discourage potential eclipse attacks with a credible immediate threat
 ///
 /// If you do not care about validity and simply want a pair of [`Action`]+[`Entry`] data, then use both [`must_get_action`] and [`must_get_entry`] together.
 ///
@@ -93,8 +93,8 @@ pub fn must_get_action(action_hash: ActionHash) -> ExternResult<SignedActionHash
 ///
 /// An [`Record`] will not be returned if:
 ///
-/// - @TODO It is WITHDRAWN by the author
-/// - @TODO The Entry is PURGED by the community
+// - @TODO It is WITHDRAWN by the author
+// - @TODO The Entry is PURGED by the community
 /// - It is ABANDONED by ALL authorities due to failed validation
 /// - If ANY authority (1 of N trust) OR ourselves (0 of N trust) believes it INVALID
 /// - Nobody knows about it on the visible network

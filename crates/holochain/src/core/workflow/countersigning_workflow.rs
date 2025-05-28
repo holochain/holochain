@@ -1,11 +1,10 @@
 //! Countersigning workflow to maintain countersigning session state.
 
-use holochain_p2p::{
-    event::CountersigningSessionNegotiationMessage, HolochainP2pDna, HolochainP2pDnaT,
-};
+use crate::core::share::Share;
+use holochain_p2p::{event::CountersigningSessionNegotiationMessage, DynHolochainP2pDna};
 use holochain_state::prelude::*;
-use kitsune_p2p_types::tx_utils::Share;
 use std::time::Duration;
+
 #[cfg(feature = "unstable-countersigning")]
 use {
     super::error::WorkflowResult,
@@ -157,7 +156,7 @@ struct CountersigningWorkspaceInner {
 pub(crate) async fn countersigning_workflow(
     space: Space,
     workspace: Arc<CountersigningWorkspace>,
-    network: Arc<impl HolochainP2pDnaT>,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     cell_id: CellId,
     signal_tx: Sender<Signal>,
@@ -391,7 +390,7 @@ pub(crate) async fn countersigning_workflow(
 async fn try_recover_failed_session(
     space: &Space,
     workspace: Arc<CountersigningWorkspace>,
-    network: Arc<impl HolochainP2pDnaT + Sized>,
+    network: DynHolochainP2pDna,
     cell_id: &CellId,
     signal_tx: &Sender<Signal>,
 ) -> WorkflowResult<()> {
@@ -603,12 +602,7 @@ async fn apply_timeout(
 
     let authored = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
 
-    let current_session = authored
-        .read_async({
-            let author = cell_id.agent_pubkey().clone();
-            move |txn| current_countersigning_session(txn, Arc::new(author))
-        })
-        .await?;
+    let current_session = authored.read_async(current_countersigning_session).await?;
 
     let mut has_committed_session = false;
     if let Some((_, _, session_data)) = current_session {
@@ -718,10 +712,7 @@ async fn force_abandon_session(
     let abandon_fingerprint = preflight_request.fingerprint()?;
 
     let maybe_session_data = authored_db
-        .read_async({
-            let author = author.clone();
-            move |txn| current_countersigning_session(txn, Arc::new(author.clone()))
-        })
+        .read_async(current_countersigning_session)
         .await?;
 
     match maybe_session_data {
@@ -786,9 +777,8 @@ async fn force_abandon_session(
 /// Publish to entry authorities, so they can gather all the signed
 /// actions for this session and respond with a session complete.
 pub async fn countersigning_publish(
-    network: &HolochainP2pDna,
+    network: DynHolochainP2pDna,
     op: ChainOp,
-    _author: AgentPubKey,
 ) -> Result<(), ZomeCallResponse> {
     if let Some(enzyme) = op.enzymatic_countersigning_enzyme() {
         if let Err(e) = network
@@ -806,12 +796,12 @@ pub async fn countersigning_publish(
         }
     } else {
         let basis = op.dht_basis();
-        if let Err(e) = network.publish_countersign(true, basis, op.into()).await {
+        if let Err(err) = network.publish_countersign(basis, op).await {
             tracing::error!(
-                "Failed to publish to entry authorities for countersigning session because of: {:?}",
-                e
+                ?err,
+                "Failed to publish to entry authorities for countersigning session"
             );
-            return Err(ZomeCallResponse::CountersigningSession(e.to_string()));
+            return Err(ZomeCallResponse::CountersigningSession(err.to_string()));
         }
     }
     Ok(())

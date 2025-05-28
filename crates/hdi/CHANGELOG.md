@@ -7,6 +7,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.7.0-dev.4
+
+## 0.7.0-dev.3
+
+## 0.7.0-dev.2
+
+## 0.7.0-dev.1
+
+## 0.7.0-dev.0
+
+## 0.6.0
+
+## 0.6.0-rc.0
+
+## 0.6.0-dev.16
+
+## 0.6.0-dev.15
+
+## 0.6.0-dev.14
+
+- Prevent “TODO” comments from being rendered in cargo docs.
+
+## 0.6.0-dev.13
+
+## 0.6.0-dev.12
+
+## 0.6.0-dev.11
+
+- Update `holochain_wasmer_guest`
+
+## 0.6.0-dev.10
+
+- Update `holochain_wasmer_guest`, remove temporary fork of wasmer and update wasmer to 5.x.
+
+## 0.6.0-dev.9
+
 ## 0.6.0-dev.8
 
 ## 0.6.0-dev.7

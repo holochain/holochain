@@ -13,4 +13,7 @@ pub enum ConductorConfigError {
 
     #[error("Error while performing IO for the Conductor: {0}")]
     IoError(#[from] std::io::Error),
+
+    #[error("Invalid network config: {0}")]
+    InvalidNetworkConfig(String),
 }

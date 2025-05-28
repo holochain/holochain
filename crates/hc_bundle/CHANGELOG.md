@@ -7,6 +7,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.6
+
+## 0.6.0-dev.5
+
+## 0.6.0-dev.4
+
+## 0.6.0-dev.3
+
+## 0.6.0-dev.2
+
+## 0.6.0-dev.1
+
+- Updated to use the new Mr. Bundle API.
+- The ability to include build and bundle WASM modules for iOS that was deprecated in 0.5 has now been removed.
+- Schemas may need updating to facilitate this change, including the removed of the `Location` type that supported `bundled` and `path` options.
+- It will still be possible to open old bundles with the `--raw` option so that you can unpack them and re-pack them with the new manifest format but please be aware that the hashes of the bundles will change\!
+
+## 0.6.0-dev.0
+
+## 0.5.0
+
+## 0.5.0-rc.1
+
+## 0.5.0-rc.0
+
+## 0.5.0-dev.22
+
+## 0.5.0-dev.21
+
+## 0.5.0-dev.20
+
+## 0.5.0-dev.19
+
+## 0.5.0-dev.18
+
+## 0.5.0-dev.17
+
+## 0.5.0-dev.16
+
+## 0.5.0-dev.15
+
+- Update `holochain_wasmer_host`
+
+## 0.5.0-dev.14
+
+- Update `holochain_wasmer_host`, remove temporary fork of wasmer and update wasmer to 5.x.
+
+## 0.5.0-dev.13
+
 ## 0.5.0-dev.12
 
 ## 0.5.0-dev.11

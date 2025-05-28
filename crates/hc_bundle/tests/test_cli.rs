@@ -3,29 +3,35 @@ use holochain_types::web_app::WebAppManifest;
 use holochain_types::{prelude::*, web_app::WebAppBundle};
 use holochain_util::ffs;
 use jsonschema::JSONSchema;
+use mr_bundle::FileSystemBundler;
+use schemars::JsonSchema;
 use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
     process::Command,
-    str::FromStr,
-    time::Duration,
 };
 use walkdir::WalkDir;
 
-fn read_app(path: &Path) -> anyhow::Result<AppBundle> {
-    Ok(AppBundle::decode(&ffs::sync::read(path).unwrap())?)
+async fn read_app(path: &Path) -> anyhow::Result<AppBundle> {
+    Ok(FileSystemBundler::load_from::<AppManifest>(path)
+        .await
+        .map(AppBundle::from)?)
 }
 
-fn read_dna(path: &Path) -> anyhow::Result<DnaBundle> {
-    Ok(DnaBundle::decode(&ffs::sync::read(path).unwrap())?)
+async fn read_dna(path: &Path) -> anyhow::Result<DnaBundle> {
+    Ok(FileSystemBundler::load_from::<ValidatedDnaManifest>(path)
+        .await
+        .map(DnaBundle::from)?)
 }
 
-fn read_web_app(path: &Path) -> anyhow::Result<WebAppBundle> {
-    Ok(WebAppBundle::decode(&ffs::sync::read(path).unwrap())?)
+async fn read_web_app(path: &Path) -> anyhow::Result<WebAppBundle> {
+    Ok(FileSystemBundler::load_from::<WebAppManifest>(path)
+        .await
+        .map(WebAppBundle::from)?)
 }
 
 #[tokio::test]
-async fn roundtrip() {
+async fn round_trip() {
     {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
         let cmd = cmd.args(["pack", "tests/fixtures/my-app/dnas/dna1"]);
@@ -52,10 +58,10 @@ async fn roundtrip() {
     let dna1_path = PathBuf::from("tests/fixtures/my-app/dnas/dna1/a dna.dna");
     let dna2_path = PathBuf::from("tests/fixtures/my-app/dnas/dna2/another dna.dna");
 
-    let _original_web_happ = read_web_app(&web_app_path).unwrap();
-    let _original_happ = read_app(&app_path).unwrap();
-    let _original_dna1 = read_dna(&dna1_path).unwrap();
-    let _original_dna2 = read_dna(&dna2_path).unwrap();
+    let _original_web_happ = read_web_app(&web_app_path).await.unwrap();
+    let _original_happ = read_app(&app_path).await.unwrap();
+    let _original_dna1 = read_dna(&dna1_path).await.unwrap();
+    let _original_dna2 = read_dna(&dna2_path).await.unwrap();
 }
 
 #[tokio::test]
@@ -96,7 +102,7 @@ async fn test_integrity() {
         let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
         let dna_path = PathBuf::from(format!("{}/integrity dna.dna", path));
-        let original_dna = read_dna(&dna_path).unwrap();
+        let original_dna = read_dna(&dna_path).await.unwrap();
         original_dna
             .into_dna_file(DnaModifiersOpt::none())
             .await
@@ -158,17 +164,18 @@ async fn test_integrity() {
     assert_eq!(integrity_def, coordinator_def,);
 }
 
-#[tokio::test]
-#[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
 /// Test that a manifest with multiple integrity zomes and dependencies parses
 /// to the correct dna file.
+#[tokio::test]
+#[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
+#[cfg(not(feature = "unstable-migration"))]
 async fn test_multi_integrity() {
     let pack_dna = |path| async move {
         let mut cmd = Command::cargo_bin("hc-dna").unwrap();
         let cmd = cmd.args(["pack", path]);
         cmd.assert().success();
         let dna_path = PathBuf::from(format!("{}/multi integrity dna.dna", path));
-        let original_dna = read_dna(&dna_path).unwrap();
+        let original_dna = read_dna(&dna_path).await.unwrap();
         original_dna
             .into_dna_file(DnaModifiersOpt::none())
             .await
@@ -188,8 +195,114 @@ async fn test_multi_integrity() {
     ]);
 
     // Create the expected dependencies on the coordinator zomes.
-    let s = "2022-02-11T23:05:19.470323Z";
-    let origin_time = Timestamp::from_str(s).unwrap();
+    let expected = DnaDef {
+        name: "multi integrity dna".into(),
+        modifiers: DnaModifiers {
+            network_seed: "00000000-0000-0000-0000-000000000000".into(),
+            properties: ().try_into().unwrap(),
+        },
+        integrity_zomes: vec![
+            (
+                "zome1".into(),
+                ZomeDef::Wasm(WasmZome {
+                    wasm_hash: wasm_hash.clone(),
+                    dependencies: vec![],
+                })
+                .into(),
+            ),
+            (
+                "zome2".into(),
+                ZomeDef::Wasm(WasmZome {
+                    wasm_hash: wasm_hash.clone(),
+                    dependencies: vec![],
+                })
+                .into(),
+            ),
+        ],
+        coordinator_zomes: vec![
+            (
+                "zome3".into(),
+                ZomeDef::Wasm(WasmZome {
+                    wasm_hash: wasm_hash2.clone(),
+                    dependencies: vec!["zome1".into()],
+                })
+                .into(),
+            ),
+            (
+                "zome4".into(),
+                ZomeDef::Wasm(WasmZome {
+                    wasm_hash: wasm_hash2.clone(),
+                    dependencies: vec!["zome1".into(), "zome2".into()],
+                })
+                .into(),
+            ),
+        ],
+    };
+    assert_eq!(
+        dna.dna_def().integrity_zomes[0]
+            .1
+            .as_any_zome_def()
+            .dependencies(),
+        &[]
+    );
+    assert_eq!(
+        dna.dna_def().integrity_zomes[1]
+            .1
+            .as_any_zome_def()
+            .dependencies(),
+        &[]
+    );
+    assert_eq!(
+        dna.dna_def().coordinator_zomes[0]
+            .1
+            .as_any_zome_def()
+            .dependencies(),
+        &["zome1".into()]
+    );
+    assert_eq!(
+        dna.dna_def().coordinator_zomes[1]
+            .1
+            .as_any_zome_def()
+            .dependencies(),
+        &["zome1".into(), "zome2".into()]
+    );
+    assert_eq!(*dna.dna_def(), expected);
+}
+
+#[tokio::test]
+#[cfg_attr(target_os = "windows", ignore = "theres a hash mismatch - check crlf?")]
+#[cfg(feature = "unstable-migration")]
+/// Test that a manifest with multiple integrity zomes and dependencies parses
+/// to the correct dna file.
+async fn test_multi_integrity() {
+    let pack_dna = |path| async move {
+        let mut cmd = Command::cargo_bin("hc-dna").unwrap();
+        let cmd = cmd.args(["pack", path]);
+        cmd.assert().success();
+        let dna_path = PathBuf::from(format!(
+            "{}/multi integrity dna unstable-migration.dna",
+            path
+        ));
+        let original_dna = read_dna(&dna_path).await.unwrap();
+        original_dna
+            .into_dna_file(DnaModifiersOpt::none())
+            .await
+            .unwrap()
+    };
+
+    let (dna, _) = pack_dna("tests/fixtures/my-app/dnas/dna-unstable-migration").await;
+
+    // The actual wasm hashes of the fake zomes.
+    let wasm_hash = WasmHash::from_raw_39(vec![
+        132, 42, 36, 217, 5, 131, 6, 203, 162, 51, 6, 34, 63, 247, 21, 77, 60, 106, 98, 53, 59, 98,
+        172, 222, 143, 105, 210, 10, 5, 56, 152, 102, 178, 159, 162, 69, 249, 162, 67,
+    ]);
+    let wasm_hash2 = WasmHash::from_raw_39(vec![
+        132, 42, 36, 235, 225, 55, 255, 141, 140, 72, 148, 154, 141, 124, 248, 185, 142, 62, 218,
+        220, 85, 73, 201, 54, 10, 30, 191, 206, 93, 108, 142, 140, 201, 164, 225, 20, 241, 98, 16,
+    ]);
+
+    // Create the expected dependencies on the coordinator zomes.
     let lineage = vec![
         DnaHash::try_from_raw_39(
             holo_hash_decode_unchecked("uhC0kWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm")
@@ -203,12 +316,10 @@ async fn test_multi_integrity() {
         .unwrap(),
     ];
     let expected = DnaDef {
-        name: "multi integrity dna".into(),
+        name: "multi integrity dna unstable-migration".into(),
         modifiers: DnaModifiers {
             network_seed: "00000000-0000-0000-0000-000000000000".into(),
             properties: ().try_into().unwrap(),
-            origin_time,
-            quantum_time: Duration::from_secs(5 * 60),
         },
         integrity_zomes: vec![
             (
@@ -216,7 +327,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash.clone(),
                     dependencies: vec![],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -225,7 +335,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash.clone(),
                     dependencies: vec![],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -236,7 +345,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash2.clone(),
                     dependencies: vec!["zome1".into()],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -245,7 +353,6 @@ async fn test_multi_integrity() {
                 ZomeDef::Wasm(WasmZome {
                     wasm_hash: wasm_hash2.clone(),
                     dependencies: vec!["zome1".into(), "zome2".into()],
-                    preserialized_path: None,
                 })
                 .into(),
             ),
@@ -296,7 +403,7 @@ async fn test_hash_dna_function() {
         let cmd = cmd.args(["hash", "tests/fixtures/my-app/dnas/dna1/a dna.dna"]);
         let stdout = cmd.assert().success().get_output().stdout.clone();
         let actual = String::from_utf8_lossy(&stdout).replace(['\r', '\n'], ""); // Normalize Windows/linux
-        let expected = "uhC0klkazCjMK-V3HooCgXVCB7OGhGEplGD-UWFgCIeXGZfRB7ORO";
+        let expected = "uhC0klF08DnZkYBN3YiE7knVHdl5eK-9f7m9Co1ICK7Xwgaxct8h5";
         assert_eq!(
             expected, actual,
             "Expected: {}\nActual: {}",
@@ -307,14 +414,27 @@ async fn test_hash_dna_function() {
 
 #[test]
 fn test_all_dna_manifests_match_schema() {
-    let schema = load_schema("dna-manifest");
+    let schema = get_schema::<DnaManifest>();
 
     for entry in WalkDir::new("./tests/fixtures")
         .into_iter()
         .filter_map(|e| e.ok())
     {
         let file_name = entry.file_name().to_string_lossy();
-        if file_name.eq("dna.yaml") {
+        let should_check = if cfg!(feature = "unstable-migration") {
+            entry
+                .path()
+                .parent()
+                .unwrap()
+                .ends_with("dna-unstable-migration")
+        } else {
+            !entry
+                .path()
+                .parent()
+                .unwrap()
+                .ends_with("dna-unstable-migration")
+        };
+        if file_name.eq("dna.yaml") && should_check {
             let manifest_content = ffs::sync::read_to_string(entry.path()).unwrap();
             let manifest: Value = serde_yaml::from_str(manifest_content.as_str()).unwrap();
 
@@ -324,12 +444,30 @@ fn test_all_dna_manifests_match_schema() {
 }
 
 #[test]
+#[cfg(not(feature = "unstable-migration"))]
 fn test_default_dna_manifest_matches_schema() {
     let default_manifest = DnaManifest::current(
         "test-dna".to_string(),
         Some("00000000-0000-0000-0000-000000000000".to_string()),
         None,
-        Timestamp::now().into(),
+        vec![],
+        vec![],
+    );
+
+    let default_manifest: Value =
+        serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
+
+    let schema = get_schema::<DnaManifest>();
+    validate_schema(&schema, &default_manifest, "default manifest");
+}
+
+#[test]
+#[cfg(feature = "unstable-migration")]
+fn test_default_dna_manifest_matches_schema() {
+    let default_manifest = DnaManifest::current(
+        "test-dna".to_string(),
+        Some("00000000-0000-0000-0000-000000000000".to_string()),
+        None,
         vec![],
         vec![],
         vec![],
@@ -338,13 +476,13 @@ fn test_default_dna_manifest_matches_schema() {
     let default_manifest: Value =
         serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
 
-    let schema = load_schema("dna-manifest");
+    let schema = get_schema::<DnaManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
 }
 
 #[test]
 fn test_all_app_manifests_match_schema() {
-    let schema = load_schema("happ-manifest");
+    let schema = get_schema::<AppManifest>();
 
     for entry in WalkDir::new("./tests/fixtures")
         .into_iter()
@@ -374,13 +512,13 @@ fn test_default_app_manifest_matches_schema() {
     let default_manifest: Value =
         serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
 
-    let schema = load_schema("happ-manifest");
+    let schema = get_schema::<AppManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
 }
 
 #[test]
 fn test_all_web_app_manifests_match_schema() {
-    let schema = load_schema("web-happ-manifest");
+    let schema = get_schema::<WebAppManifest>();
 
     for entry in WalkDir::new("./tests/fixtures")
         .into_iter()
@@ -403,16 +541,14 @@ fn test_default_web_app_manifest_matches_schema() {
     let default_manifest: Value =
         serde_yaml::from_str(&serde_yaml::to_string(&default_manifest).unwrap()).unwrap();
 
-    let schema = load_schema("web-happ-manifest");
+    let schema = get_schema::<WebAppManifest>();
     validate_schema(&schema, &default_manifest, "default manifest");
 }
 
-fn load_schema(schema_name: &str) -> JSONSchema {
-    let schema_content =
-        ffs::sync::read_to_string(format!("./schema/{}.schema.json", schema_name)).unwrap();
-    let schema: Value = serde_json::from_str(schema_content.as_str()).unwrap();
-    let schema = JSONSchema::compile(&schema).expect("Schema should be valid");
-    schema
+fn get_schema<T: JsonSchema>() -> JSONSchema {
+    let schema = schemars::schema_for!(T);
+    let schema_value = serde_json::to_value(&schema).unwrap();
+    JSONSchema::compile(&schema_value).expect("Schema should be valid")
 }
 
 fn validate_schema(schema: &JSONSchema, manifest: &Value, context: &str) {

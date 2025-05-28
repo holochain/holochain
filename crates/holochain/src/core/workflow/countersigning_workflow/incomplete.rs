@@ -9,7 +9,7 @@ use either::Either;
 use holo_hash::AgentPubKey;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::actor::GetActivityOptions;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::{
     current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
 };
@@ -19,7 +19,6 @@ use holochain_zome_types::prelude::{
     ChainQueryFilter, ChainQueryFilterRange, ChainStatus, SignedAction,
 };
 use itertools::Itertools;
-use std::sync::Arc;
 
 /// Resolve an incomplete countersigning session.
 ///
@@ -30,7 +29,7 @@ use std::sync::Arc;
 /// Otherwise, the function returns false and the cleanup needs to be retried to resolved manually.
 pub async fn inner_countersigning_session_incomplete(
     space: Space,
-    network: Arc<impl HolochainP2pDnaT>,
+    network: DynHolochainP2pDna,
     author: AgentPubKey,
     preflight_request: PreflightRequest,
 ) -> WorkflowResult<(SessionCompletionDecision, Vec<SessionResolutionOutcome>)> {
@@ -38,11 +37,8 @@ pub async fn inner_countersigning_session_incomplete(
 
     let maybe_current_session = authored_db
         .read_async({
-            let author = author.clone();
             move |txn| -> SourceChainResult<CurrentCountersigningSessionOpt> {
-                let maybe_current_session =
-                    current_countersigning_session(txn, Arc::new(author.clone()))?;
-
+                let maybe_current_session = current_countersigning_session(txn)?;
                 Ok(maybe_current_session)
             }
         })

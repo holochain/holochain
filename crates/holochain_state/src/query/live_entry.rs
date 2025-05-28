@@ -132,10 +132,9 @@ impl Query for GetLiveEntryQuery {
         });
         match action {
             Some(action) => {
-                let entry_hash = action
-                    .action()
-                    .entry_hash()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.action().clone()))?;
+                let entry_hash = action.action().entry_hash().ok_or_else(|| {
+                    DhtOpError::ActionWithoutEntry(Box::new(action.action().clone()))
+                })?;
                 // If this action is authored then we can get an authored entry.
                 let author = is_authored.then(|| action.action().author());
                 let record = stores

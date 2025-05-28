@@ -1,14 +1,11 @@
 use std::path::PathBuf;
 
-use hc_sandbox::calls::EnableApp;
-use hc_sandbox::expect_match;
-use hc_sandbox::CmdRunner;
 use holochain_cli_sandbox as hc_sandbox;
-use holochain_conductor_api::AdminRequest;
-use holochain_conductor_api::AdminResponse;
+use holochain_cli_sandbox::run;
+use holochain_client::AdminWebsocket;
+use holochain_trace::Output;
 use holochain_types::prelude::AppBundleSource;
 use holochain_types::prelude::InstallAppPayload;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
 
 use clap::Parser;
 
@@ -25,9 +22,6 @@ async fn main() -> anyhow::Result<()> {
     let input = Input::parse();
     let happ = hc_sandbox::bundles::parse_happ(input.happ)?;
 
-    // Using the default mem network.
-    let network = KitsuneP2pConfig::mem();
-
     // Choose an app id and properties.
     let app_id = "my-cool-app".to_string();
 
@@ -35,55 +29,37 @@ async fn main() -> anyhow::Result<()> {
         let app_id = app_id.clone();
 
         // Create a conductor config with the network.
-        let path = hc_sandbox::generate::generate(
-            Some(network.clone()),
+        let path = holochain_conductor_config::generate::generate(
+            Some(Default::default()),
             None,
             None,
             false,
-            #[cfg(feature = "unstable-dpki")]
-            false,
-            #[cfg(feature = "unstable-dpki")]
-            None,
+            0,
             #[cfg(feature = "chc")]
             None,
         )?;
 
-        // Create a command runner to run admin commands.
-        // This runs the conductor in the background and cleans
-        // up the process when the guard is dropped.
-        let (mut cmd, _conductor_guard) =
-            CmdRunner::from_sandbox_with_bin_path(&input.holochain_path, path.clone()).await?;
+        // Run a conductor and connect to the admin websocket
+        let (admin_port, _, _) =
+            run::run_async(&input.holochain_path, path.clone(), None, Output::Log).await?;
+        let admin_ws = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
 
         let bundle = AppBundleSource::Path(happ.clone()).resolve().await?;
+        let bytes = bundle.pack()?;
 
         // Create the raw InstallAppPayload request.
         let payload = InstallAppPayload {
             installed_app_id: Some(app_id),
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bytes),
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         };
 
-        let r = AdminRequest::InstallApp(Box::new(payload));
+        let installed_app = admin_ws.install_app(payload).await?;
 
-        // Run the command and wait for the response.
-        let installed_app = cmd.command(r).await?;
-
-        // Check you got the correct response and get the inner value.
-        let installed_app =
-            expect_match!(installed_app => AdminResponse::AppInstalled, "Failed to install app");
-
-        // Activate the app using the simple calls api.
-        hc_sandbox::calls::enable_app(
-            &mut cmd,
-            EnableApp {
-                app_id: installed_app.installed_app_id,
-            },
-        )
-        .await?;
+        admin_ws.enable_app(installed_app.installed_app_id).await?;
     }
     Ok(())
 }

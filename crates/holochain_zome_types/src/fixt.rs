@@ -3,14 +3,13 @@
 use crate::prelude::*;
 use ::fixt::prelude::*;
 use ::fixt::*;
+use holo_hash::fixt::*;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::prelude::SerializedBytes;
 use rand::Rng;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::time::Duration;
-
-pub use holo_hash::fixt::*;
 
 fixturator!(
     ExternIO;
@@ -186,17 +185,14 @@ fixturator!(
     AgentInfo;
     curve Empty AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Empty),
-        agent_latest_pubkey: fixt!(AgentPubKey, Empty),
         chain_head: (fixt!(ActionHash, Empty), fixt!(u32, Empty), fixt!(Timestamp, Empty)),
     };
     curve Unpredictable AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Unpredictable),
-        agent_latest_pubkey: fixt!(AgentPubKey, Unpredictable),
         chain_head: (fixt!(ActionHash, Unpredictable), fixt!(u32, Unpredictable), fixt!(Timestamp, Unpredictable)),
     };
     curve Predictable AgentInfo {
         agent_initial_pubkey: fixt!(AgentPubKey, Predictable),
-        agent_latest_pubkey: fixt!(AgentPubKey, Predictable),
         chain_head: (fixt!(ActionHash, Predictable), fixt!(u32, Predictable), fixt!(Timestamp, Predictable)),
     };
 );
@@ -733,8 +729,6 @@ fixturator!(
             properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
                 .next()
                 .unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
@@ -742,6 +736,7 @@ fixturator!(
         coordinator_zomes: CoordinatorZomesFixturator::new_indexed(Empty, get_fixt_index!())
             .next()
             .unwrap(),
+        #[cfg(feature = "unstable-migration")]
         lineage: Default::default(),
     };
 
@@ -756,8 +751,6 @@ fixturator!(
             properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
                 .next()
                 .unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Unpredictable, get_fixt_index!())
             .next()
@@ -766,6 +759,7 @@ fixturator!(
             .next()
             .unwrap(),
         // TODO: non-empty lineage
+        #[cfg(feature = "unstable-migration")]
         lineage: Default::default(),
     };
 
@@ -780,8 +774,6 @@ fixturator!(
             properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
                 .next()
                 .unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            quantum_time: kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME,
         },
         integrity_zomes: IntegrityZomesFixturator::new_indexed(Predictable, get_fixt_index!())
             .next()
@@ -790,6 +782,7 @@ fixturator!(
             .next()
             .unwrap(),
         // TODO: non-empty lineage
+        #[cfg(feature = "unstable-migration")]
         lineage: Default::default(),
     };
 );
@@ -812,8 +805,6 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Empty, get_fixt_index!())
         .next()
         .unwrap(),
-        origin_time: TimestampFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
-        quantum_time: DurationFixturator::new_indexed(Empty, get_fixt_index!()).next().unwrap(),
     };
 
     curve Unpredictable DnaModifiers {
@@ -821,8 +812,6 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Unpredictable, get_fixt_index!())
         .next()
         .unwrap(),
-        origin_time: TimestampFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
-        quantum_time: DurationFixturator::new_indexed(Unpredictable, get_fixt_index!()).next().unwrap(),
     };
 
     curve Predictable DnaModifiers {
@@ -830,8 +819,6 @@ fixturator!(
         properties: SerializedBytesFixturator::new_indexed(Predictable, get_fixt_index!())
         .next()
         .unwrap(),
-        origin_time: TimestampFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
-        quantum_time: DurationFixturator::new_indexed(Predictable, get_fixt_index!()).next().unwrap(),
     };
 );
 

@@ -1,14 +1,17 @@
 use holo_hash::ActionHash;
+#[cfg(not(feature = "wasmer_wamr"))]
 use holochain::conductor::conductor::WASM_CACHE;
-use holochain::sweettest::*;
+use holochain::{sweettest::*, test_utils::retry_fn_until_timeout};
 use holochain_wasm_test_utils::TestWasm;
 
-// make sure the wasm cache at least creates files
+// Make sure the wasm cache at least creates files.
+// This is not run with the `wasmer_wamr` feature flag,
+// as the cache is not used.
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(not(feature = "wasmer_wamr"))]
 async fn wasm_disk_cache() {
     holochain_trace::test_run();
-    let mut conductor =
-        SweetConductor::from_config(SweetConductorConfig::standard().no_dpki()).await;
+    let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
 
     let mut cache_dir = conductor.db_path().to_owned();
     cache_dir.push(WASM_CACHE);
@@ -110,20 +113,15 @@ async fn zome_with_no_link_types_does_not_prevent_delete_links() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn zero_arc_can_link_to_uncached_base() {
-    use hdk::prelude::*;
-
     holochain_trace::test_run();
 
-    let empty_arc_conductor_config = SweetConductorConfig::rendezvous(false)
-        .no_dpki_mustfix()
-        .tune(|t| {
-            t.gossip_arc_clamping = String::from("empty");
-        });
+    let empty_arc_conductor_config =
+        SweetConductorConfig::rendezvous(false).tune_network_config(|nc| nc.target_arc_factor = 0);
 
+    let other_config = SweetConductorConfig::rendezvous(false);
     let mut conductors = SweetConductorBatch::from_configs_rendezvous(vec![
-        SweetConductorConfig::rendezvous(false).no_dpki_mustfix(),
+        other_config,
         empty_arc_conductor_config,
     ])
     .await;
@@ -134,14 +132,26 @@ async fn zero_arc_can_link_to_uncached_base() {
     ])
     .await;
 
-    let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
+    let apps = conductors
+        .setup_app("app", &[dna_file.clone()])
+        .await
+        .unwrap();
+
+    let ((alice,), (carol_empty_arc,)) = apps.into_tuples();
+
+    conductors[0]
+        .declare_full_storage_arcs(dna_file.dna_hash())
+        .await;
+
+    // For initial peer discovery (bootstrap disabled in this test).
+    // Now we want to update agent infos where Alice has declared full arc.
     conductors.exchange_peer_info().await;
 
-    let ((alice,), (bob,)) = apps.into_tuples();
-
     let alice_pk = alice.cell_id().agent_pubkey().clone();
+    let carol_pk = carol_empty_arc.cell_id().agent_pubkey().clone();
 
     println!("@!@!@ alice_pk: {alice_pk:?}");
+    println!("@!@!@ carol_pk: {carol_pk:?}");
 
     let action_hash: ActionHash = conductors[0]
         .call(
@@ -154,11 +164,11 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ -- must_get_valid_record --");
     println!("@!@!@ action_hash: {action_hash:?}");
 
-    // Bob is linking to Alice's action hash, but doesn't have it locally
+    // Carol is linking to Alice's action hash, but doesn't have it locally
     // so the must_get_valid_record in validation will have to do a network get.
     let link_hash: ActionHash = conductors[1]
         .call(
-            &bob.zome(TestWasm::Link.coordinator_zome_name()),
+            &carol_empty_arc.zome(TestWasm::Link.coordinator_zome_name()),
             "link_validation_calls_must_get_valid_record",
             (action_hash.clone(), alice_pk.clone()),
         )
@@ -177,11 +187,11 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ -- must_get_action / must_get_entry --");
     println!("@!@!@ action_hash: {action_hash:?}");
 
-    // Bob is linking to Alice's action hash, but doesn't have it locally
+    // Carol is linking to Alice's action hash, but doesn't have it locally
     // so the must_get_entry/must_get_action in validation will have to do a network get.
     let link_hash: ActionHash = conductors[1]
         .call(
-            &bob.zome(TestWasm::Link.coordinator_zome_name()),
+            &carol_empty_arc.zome(TestWasm::Link.coordinator_zome_name()),
             "link_validation_calls_must_get_action_then_entry",
             (action_hash.clone(), alice_pk.clone()),
         )
@@ -197,20 +207,88 @@ async fn zero_arc_can_link_to_uncached_base() {
         )
         .await;
 
+    retry_fn_until_timeout(
+        || async {
+            conductors[0]
+                .all_ops_of_author_integrated(dna_file.dna_hash(), alice.agent_pubkey())
+                .unwrap()
+        },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
     println!("@!@!@ -- must_get_agent_activity --");
     println!("@!@!@ action_hash: {action_hash:?}");
 
-    // Bob is linking to Alice's action hash, but doesn't have it locally
+    // Carol is linking to Alice's action hash, but doesn't have it locally
     // so the must_get_agent_activity in validation will have to do a network get.
     let link_hash: ActionHash = conductors[1]
         .call(
-            &bob.zome(TestWasm::Link.coordinator_zome_name()),
+            &carol_empty_arc.zome(TestWasm::Link.coordinator_zome_name()),
             "link_validation_calls_must_get_agent_activity",
             (action_hash.clone(), alice_pk.clone()),
         )
         .await;
 
     println!("@!@!@ link_hash: {link_hash:?}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn zero_arc_can_delete_link() {
+    holochain_trace::test_run();
+
+    let empty_arc_conductor_config =
+        SweetConductorConfig::standard().tune_network_config(|nc| nc.target_arc_factor = 0);
+
+    let other_config = SweetConductorConfig::standard();
+    let mut conductors =
+        SweetConductorBatch::from_configs(vec![other_config, empty_arc_conductor_config]).await;
+
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link])
+        .await
+        .0;
+
+    let apps = conductors
+        .setup_app("app", &[dna_file.clone()])
+        .await
+        .unwrap();
+
+    let ((alice,), (bob_empty_arc,)) = apps.into_tuples();
+
+    conductors[0]
+        .declare_full_storage_arcs(dna_file.dna_hash())
+        .await;
+    // Now we want to update agent infos where Alice has declared full arc.
+    conductors.exchange_peer_info().await;
+
+    // Alice creates a link.
+    let link_hash: ActionHash = conductors[0]
+        .call(
+            &alice.zome(TestWasm::Link.coordinator_zome_name()),
+            "create_link",
+            (),
+        )
+        .await;
+
+    // Wait for Alice to integrate all ops.
+    retry_fn_until_timeout(
+        || async { conductors[0].all_ops_integrated(alice.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    // Bob attempts to delete the link.
+    let _: ActionHash = conductors[1]
+        .call(
+            &bob_empty_arc.zome(TestWasm::Link.coordinator_zome()),
+            "delete_link",
+            link_hash,
+        )
+        .await;
 }
 
 pub mod must_get_agent_activity_saturation;

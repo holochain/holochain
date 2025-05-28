@@ -36,15 +36,11 @@ impl From<holo_hash::AgentPubKey> for CapGrant {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 /// The entry for the ZomeCall capability grant.
 /// This data is committed to the callee's source chain as a private entry.
 /// The remote calling agent must provide a secret and we source their pubkey from the active
 /// network connection. This must match the strictness of the CapAccess.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ZomeCallCapGrant {
     /// A string by which to later query for saved grants.
     /// This does not need to be unique within a source chain.
@@ -55,6 +51,36 @@ pub struct ZomeCallCapGrant {
     pub functions: GrantedFunctions,
     // @todo the payloads to curry to the functions
     // pub curry_payloads: CurryPayloads,
+}
+
+/// The outbound DTO of a ZomeCall capability grant info request.
+/// CapAccess secrets are omitted, Access types and assignees are provided under CapAccessInfo.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct DesensitizedZomeCallCapGrant {
+    /// A string by which to later query for saved grants.
+    /// This does not need to be unique within a source chain.
+    pub tag: String,
+    /// Specifies who may claim this capability, and by what means omitting secrets
+    pub access: CapAccessInfo,
+    /// Set of functions to which this capability grants ZomeCall access
+    pub functions: GrantedFunctions,
+}
+
+impl From<ZomeCallCapGrant> for DesensitizedZomeCallCapGrant {
+    /// Create a new Desensitized ZomeCall capability grant
+    fn from(zccg: ZomeCallCapGrant) -> Self {
+        DesensitizedZomeCallCapGrant {
+            tag: zccg.tag,
+            access: CapAccessInfo {
+                access_type: zccg.access.as_variant_string().to_string(),
+                assignees: match &zccg.access {
+                    CapAccess::Assigned { assignees, .. } => Some(assignees.clone()),
+                    _ => None,
+                },
+            },
+            functions: zccg.functions,
+        }
+    }
 }
 
 impl ZomeCallCapGrant {
@@ -126,10 +152,7 @@ impl CapGrant {
 
 /// Represents access requirements for capability grants.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CapAccess {
     /// No restriction: callable by anyone.
     Unrestricted,
@@ -189,15 +212,21 @@ impl CapAccess {
     }
 }
 
+/// Represents access info for capability grants .
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CapAccessInfo {
+    /// The access type.
+    access_type: String,
+    /// Agents who can use this grant.
+    assignees: Option<BTreeSet<AgentPubKey>>,
+}
+
 /// a single zome/function pair
 pub type GrantedFunction = (ZomeName, FunctionName);
 /// A collection of zome/function pairs
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum GrantedFunctions {
     /// grant all zomes all functions
     All,

@@ -15,8 +15,6 @@ use holochain_sqlite::rusqlite::types::FromSql;
 use holochain_sqlite::rusqlite::ToSql;
 use holochain_zome_types::action;
 use holochain_zome_types::prelude::*;
-use kitsune_p2p_dht::region::RegionData;
-use kitsune_p2p_dht::Loc;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -31,24 +29,16 @@ mod tests;
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::From,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub enum DhtOp {
     /// An op representing storage of some record information.
     ChainOp(Box<ChainOp>),
-    /// TODO, new type of op
+    /// A op representing storage of a claim that a ChainOp was invalid
     WarrantOp(Box<WarrantOp>),
 }
 
 /// A unit of DHT gossip concerning source chain data.
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
-)]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
 )]
 pub enum ChainOp {
     #[display(fmt = "StoreRecord")]
@@ -142,24 +132,6 @@ impl From<WarrantOp> for DhtOp {
 impl From<SignedWarrant> for DhtOp {
     fn from(op: SignedWarrant) -> Self {
         DhtOp::WarrantOp(Box::new(WarrantOp::from(op)))
-    }
-}
-
-impl kitsune_p2p_dht::prelude::OpRegion for DhtOp {
-    fn loc(&self) -> Loc {
-        self.dht_basis().get_loc()
-    }
-
-    fn timestamp(&self) -> Timestamp {
-        self.timestamp()
-    }
-
-    fn region_data(&self) -> RegionData {
-        unimplemented!()
-    }
-
-    fn bound(_timestamp: Timestamp, _loc: kitsune_p2p_dht::Loc) -> Self {
-        unimplemented!()
     }
 }
 
@@ -639,7 +611,7 @@ impl ChainOp {
             ChainOpType::StoreEntry => {
                 let entry = entry
                     .into_option()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 let action = match action {
                     Action::Create(c) => NewEntryAction::Create(c),
                     Action::Update(c) => NewEntryAction::Update(c),
@@ -873,7 +845,7 @@ impl ChainOpLite {
                 let entry_hash = action
                     .entry_hash()
                     .cloned()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 Self::StoreEntry(action_hash, entry_hash.clone(), entry_hash.into())
             }
             ChainOpType::RegisterAgentActivity => {
@@ -883,7 +855,7 @@ impl ChainOpLite {
                 let entry_hash = action
                     .entry_hash()
                     .cloned()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 let basis = match action {
                     Action::Update(update) => update.original_entry_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),
@@ -894,7 +866,7 @@ impl ChainOpLite {
                 let entry_hash = action
                     .entry_hash()
                     .cloned()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 let basis = match action {
                     Action::Update(update) => update.original_entry_address.clone(),
                     _ => return Err(DhtOpError::OpActionMismatch(op_type, action.action_type())),

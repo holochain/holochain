@@ -86,6 +86,10 @@ where
 
 /// Delete a specific link creation record.
 ///
+/// Deletes the specified create link record, referenced by its action hash. The second parameter
+/// sets the get strategy to either look up that create link record locally or fetch it from the
+/// network if it doesn't exist locally.
+///
 /// Links are defined by a [OR-Set CRDT](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type#OR-Set_(Observed-Remove_Set))
 /// of "Creates" and "Deletes".
 /// The deletes form a "tombstone set", each of which can nullify one of the creates.
@@ -108,10 +112,13 @@ where
 ///
 /// All of this is bad so link creates point to entries (See [ `create_link` ]) and deletes point to
 /// creates.
-pub fn delete_link(address: ActionHash) -> ExternResult<ActionHash> {
+pub fn delete_link(address: ActionHash, get_options: GetOptions) -> ExternResult<ActionHash> {
     HDK.with(|h| {
-        h.borrow()
-            .delete_link(DeleteLinkInput::new(address, ChainTopOrdering::default()))
+        h.borrow().delete_link(DeleteLinkInput::new(
+            address,
+            get_options,
+            ChainTopOrdering::default(),
+        ))
     })
 }
 

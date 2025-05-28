@@ -3,101 +3,60 @@
 use super::*;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
-use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
+use holochain_sqlite::sql::sql_cell::*;
 use holochain_state::prelude::*;
+use kitsune2_api::StoredOp;
 
-#[cfg(test)]
-mod query_tests;
 #[cfg(test)]
 mod tests;
 
 #[cfg_attr(
     feature = "instrument",
-    tracing::instrument(skip(vault, trigger_receipt, network, dht_query_cache))
+    tracing::instrument(skip(vault, trigger_receipt, network))
 )]
 pub async fn integrate_dht_ops_workflow(
     vault: DbWrite<DbKindDht>,
-    dht_query_cache: DhtDbQueryCache,
     trigger_receipt: TriggerSender,
-    network: HolochainP2pDna,
+    network: DynHolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
     let start = std::time::Instant::now();
     let time = holochain_zome_types::prelude::Timestamp::now();
-    // Get any activity from the cache that is ready to be integrated.
-    let activity_to_integrate = dht_query_cache.get_activity_to_integrate().await?;
-    let (changed, activity_integrated) = vault
+    let stored_ops = vault
         .write_async(move |txn| {
-            let mut total = 0;
-            if !activity_to_integrate.is_empty() {
-                let mut stmt = txn.prepare_cached(
-                    holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_ACTIVITY,
-                )?;
-                for (author, seq_range) in &activity_to_integrate {
-                    let start = seq_range.start();
-                    let end = seq_range.end();
-
-                    total += stmt.execute(named_params! {
-                        ":when_integrated": time,
-                        ":register_activity": ChainOpType::RegisterAgentActivity,
-                        ":seq_start": start,
-                        ":seq_end": end,
-                        ":author": author,
-                    })?;
-                }
+            let mut stored_ops = Vec::new();
+            let mut stmt = txn.prepare_cached(SET_VALIDATED_OPS_TO_INTEGRATED)?;
+            let integrated_ops = stmt.query_map(
+                named_params! {
+                    ":when_integrated": time,
+                },
+                to_stored_op,
+            )?;
+            for integrated_op in integrated_ops {
+                stored_ops.push(integrated_op?);
             }
-            let changed = txn
-                .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_ENTRY)?
-                .execute(named_params! {
-                    ":when_integrated": time,
-                    ":updated_content": ChainOpType::RegisterUpdatedContent,
-                    ":deleted_entry_action": ChainOpType::RegisterDeletedEntryAction,
-                    ":store_entry": ChainOpType::StoreEntry,
-                })?;
-            total += changed;
-            let changed = txn
-                .prepare_cached(
-                    holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_ENTRY_BASIS,
-                )?
-                .execute(named_params! {
-                    ":when_integrated": time,
-                    ":create_link": ChainOpType::RegisterAddLink,
-                    ":store_entry": ChainOpType::StoreEntry,
-                })?;
-            total += changed;
-            let changed = txn
-                .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_STORE_RECORD)?
-                .execute(named_params! {
-                    ":when_integrated": time,
-                    ":store_record": ChainOpType::StoreRecord,
-                    ":updated_record": ChainOpType::RegisterUpdatedRecord,
-                    ":deleted_by": ChainOpType::RegisterDeletedBy,
-                })?;
-            total += changed;
-            let changed = txn
-                .prepare_cached(holochain_sqlite::sql::sql_cell::UPDATE_INTEGRATE_DEP_CREATE_LINK)?
-                .execute(named_params! {
-                    ":when_integrated": time,
-                    ":create_link": ChainOpType::RegisterAddLink,
-                    ":delete_link": ChainOpType::RegisterRemoveLink,
 
-                })?;
-            total += changed;
-            WorkflowResult::Ok((total, activity_to_integrate))
+            WorkflowResult::Ok(stored_ops)
         })
         .await?;
-    // Once the database transaction is committed, update the cache with the
-    // integrated activity.
-    dht_query_cache
-        .set_all_activity_to_integrated(activity_integrated)
-        .await?;
+    let changed = stored_ops.len();
     let ops_ps = changed as f64 / start.elapsed().as_micros() as f64 * 1_000_000.0;
     tracing::debug!(?changed, %ops_ps);
     if changed > 0 {
+        network.new_integrated_data(stored_ops).await?;
         trigger_receipt.trigger(&"integrate_dht_ops_workflow");
-        network.new_integrated_data().await?;
         Ok(WorkComplete::Incomplete(None))
     } else {
         Ok(WorkComplete::Complete)
     }
+}
+
+fn to_stored_op(row: &Row<'_>) -> rusqlite::Result<StoredOp> {
+    let op_hash = row.get::<_, DhtOpHash>(0)?;
+    let created_at = row.get::<_, Timestamp>(1)?;
+    let op = StoredOp {
+        created_at: kitsune2_api::Timestamp::from_micros(created_at.as_micros()),
+        op_id: op_hash.to_k2_op(),
+    };
+    Ok(op)
 }

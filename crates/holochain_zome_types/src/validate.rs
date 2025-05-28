@@ -10,7 +10,6 @@ pub use holochain_integrity_types::validate::*;
 #[derive(
     Clone, Copy, Hash, serde::Serialize, serde::Deserialize, PartialOrd, Ord, Debug, Eq, PartialEq,
 )]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "full", derive(num_enum::TryFromPrimitive))]
 #[cfg_attr(feature = "full", repr(i32))]
 pub enum ValidationStatus {
@@ -36,12 +35,13 @@ impl CallbackResult for ValidateCallbackResult {
             }
             WasmErrorInner::Host(_)
             | WasmErrorInner::HostShortCircuit(_)
-            | WasmErrorInner::Compile(_)
+            | WasmErrorInner::ModuleBuild(_)
+            | WasmErrorInner::ModuleSerialize(_)
+            | WasmErrorInner::ModuleDeserialize(_)
             | WasmErrorInner::CallError(_)
             | WasmErrorInner::PointerMap
             | WasmErrorInner::ErrorWhileError
-            | WasmErrorInner::Memory
-            | WasmErrorInner::UninitializedSerializedModuleCache => Err(wasm_error),
+            | WasmErrorInner::Memory => Err(wasm_error),
         }
     }
 }

@@ -1,12 +1,13 @@
-use std::collections::{BTreeSet, HashMap};
-use std::path::PathBuf;
-
 use crate::{conductor::error::ConductorError, sweettest::*};
 use holo_hash::DnaHash;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+#[cfg(feature = "unstable-migration")]
 use maplit::btreeset;
 use matches::assert_matches;
+#[cfg(feature = "unstable-migration")]
+use std::collections::BTreeSet;
+use std::collections::HashMap;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
@@ -21,13 +22,13 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             TestWasm::GenesisSelfCheckRequiresProperties,
         ])
         .await;
-        let path = PathBuf::from(format!("{}", dna.dna_hash()));
+        let path = format!("{}", dna.dna_hash());
         let modifiers = DnaModifiersOpt::none();
 
         let roles = vec![AppRoleManifest {
             name: "name".into(),
             dna: AppRoleDnaManifest {
-                location: Some(DnaLocation::Bundled(path.clone())),
+                path: Some(path.clone()),
                 modifiers: modifiers.clone(),
                 installed_hash: None,
                 clone_limit,
@@ -43,18 +44,16 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
             .unwrap();
         let dna_bundle = DnaBundle::from_dna_file(dna.clone()).unwrap();
         let resources = vec![(path.clone(), dna_bundle)];
-        let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
-            .await
-            .unwrap();
+        let bundle = AppBundle::new(manifest.clone().into(), resources).unwrap();
 
+        let bundle_bytes = bundle.pack().unwrap();
         InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         }
     }
 
@@ -141,13 +140,13 @@ async fn reject_duplicate_app_for_same_agent() {
     let conductor = SweetConductor::from_standard_config().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let path = PathBuf::from(format!("{}", dna.dna_hash()));
+    let path = format!("{}", dna.dna_hash());
     let modifiers = DnaModifiersOpt::none();
 
     let roles = vec![AppRoleManifest {
         name: "name".into(),
         dna: AppRoleDnaManifest {
-            location: Some(DnaLocation::Bundled(path.clone())),
+            path: Some(path.clone()),
             modifiers: modifiers.clone(),
             installed_hash: None,
             clone_limit: 0,
@@ -162,20 +161,18 @@ async fn reject_duplicate_app_for_same_agent() {
         .build()
         .unwrap();
     let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
-    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
-        .await
-        .unwrap();
+    let bundle = AppBundle::new(manifest.clone().into(), resources).unwrap();
 
+    let bundle_bytes = bundle.pack().unwrap();
     let app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -184,18 +181,16 @@ async fn reject_duplicate_app_for_same_agent() {
     let cell_id = CellId::new(dna.dna_hash().to_owned(), app.agent_key().clone());
 
     let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
-    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
-        .await
-        .unwrap();
+    let bundle = AppBundle::new(manifest.clone().into(), resources).unwrap();
+    let bundle_bytes = bundle.pack().unwrap();
     let duplicate_install_with_app_disabled = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
             network_seed: None,
         })
         .await;
@@ -208,18 +203,16 @@ async fn reject_duplicate_app_for_same_agent() {
     conductor.enable_app("app_1".into()).await.unwrap();
 
     let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
-    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
-        .await
-        .unwrap();
+    let bundle = AppBundle::new(manifest.clone().into(), resources).unwrap();
+    let bundle_bytes = bundle.pack().unwrap();
     let duplicate_install_with_app_enabled = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
             network_seed: None,
         })
         .await;
@@ -229,18 +222,16 @@ async fn reject_duplicate_app_for_same_agent() {
     );
 
     let resources = vec![(path, DnaBundle::from_dna_file(dna.clone()).unwrap())];
-    let bundle = AppBundle::new(manifest.into(), resources, PathBuf::from("."))
-        .await
-        .unwrap();
+    let bundle = AppBundle::new(manifest.into(), resources).unwrap();
+    let bundle_bytes = bundle.pack().unwrap();
     let valid_install_of_second_app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: Some(alice.clone()),
             installed_app_id: Some("app_2".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
             network_seed: Some("network".into()),
         })
         .await;
@@ -252,15 +243,13 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
     let conductor = SweetConductor::from_standard_config().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let path = PathBuf::from(format!("{}", dna.dna_hash()));
-    let modifiers = DnaModifiersOpt::default()
-        .with_network_seed("initial seed".into())
-        .with_origin_time(Timestamp::now());
+    let path = format!("{}", dna.dna_hash());
+    let modifiers = DnaModifiersOpt::default().with_network_seed("initial seed".into());
 
     let roles = vec![AppRoleManifest {
         name: "name".into(),
         dna: AppRoleDnaManifest {
-            location: Some(DnaLocation::Bundled(path.clone())),
+            path: Some(path.clone()),
             modifiers: modifiers.clone(),
             // Note that there is no installed hash provided. We'll check that this changes later.
             installed_hash: None,
@@ -278,20 +267,18 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
 
     let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
 
-    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
-        .await
-        .unwrap();
+    let bundle = AppBundle::new(manifest.clone().into(), resources.clone()).unwrap();
 
+    let bundle_bytes = bundle.pack().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_1".into()),
             network_seed: Some("final seed".into()),
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -322,25 +309,24 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
         Some("final seed".into())
     );
 
-    let bundle = AppBundle::new(manifest, vec![], PathBuf::from("."))
-        .await
-        .unwrap();
+    let bundle = AppBundle::new(manifest, resources).unwrap();
 
+    let bundle_bytes = bundle.pack().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
 }
 
+#[cfg(feature = "unstable-migration")]
 #[tokio::test(flavor = "multi_thread")]
 async fn cells_by_dna_lineage() {
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -441,12 +427,12 @@ async fn use_existing_integration() {
     let (dna2, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI]).await;
 
     let bundle1 = {
-        let path = PathBuf::from(format!("{}", dna1.dna_hash()));
+        let path = format!("{}", dna1.dna_hash());
 
         let roles = vec![AppRoleManifest {
             name: "created".into(),
             dna: AppRoleDnaManifest {
-                location: Some(DnaLocation::Bundled(path.clone())),
+                path: Some(path.clone()),
                 modifiers: DnaModifiersOpt::none(),
                 installed_hash: None,
                 clone_limit: 0,
@@ -465,15 +451,16 @@ async fn use_existing_integration() {
             path.clone(),
             DnaBundle::from_dna_file(dna1.clone()).unwrap(),
         )];
-        AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
-            .await
+        AppBundle::new(manifest.clone().into(), resources)
+            .unwrap()
+            .pack()
             .unwrap()
     };
 
     let bundle2 = |correct: bool| {
         let dna2 = dna2.clone();
         async move {
-            let path = PathBuf::from(format!("{}", dna2.dna_hash()));
+            let path = format!("{}", dna2.dna_hash());
             let installed_hash = if correct {
                 Some(dna2.dna_hash().clone().into())
             } else {
@@ -484,7 +471,7 @@ async fn use_existing_integration() {
                 AppRoleManifest {
                     name: "created".into(),
                     dna: AppRoleDnaManifest {
-                        location: Some(DnaLocation::Bundled(path.clone())),
+                        path: Some(path.clone()),
                         modifiers: DnaModifiersOpt::none(),
                         installed_hash: None,
                         clone_limit: 0,
@@ -494,7 +481,7 @@ async fn use_existing_integration() {
                 AppRoleManifest {
                     name: "extant".into(),
                     dna: AppRoleDnaManifest {
-                        location: None,
+                        path: None,
                         modifiers: DnaModifiersOpt::none(),
                         installed_hash,
                         clone_limit: 0,
@@ -514,8 +501,9 @@ async fn use_existing_integration() {
                 path.clone(),
                 DnaBundle::from_dna_file(dna2.clone()).unwrap(),
             )];
-            AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
-                .await
+            AppBundle::new(manifest.clone().into(), resources)
+                .unwrap()
+                .pack()
                 .unwrap()
         }
     };
@@ -525,12 +513,11 @@ async fn use_existing_integration() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle1),
+            source: AppBundleSource::Bytes(bundle1),
             installed_app_id: Some("app_1".into()),
             network_seed: None,
             roles_settings: Default::default(),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -541,12 +528,11 @@ async fn use_existing_integration() {
             .clone()
             .install_app_bundle(InstallAppPayload {
                 agent_key: None,
-                source: AppBundleSource::Bundle(bundle2(false).await),
+                source: AppBundleSource::Bytes(bundle2(false).await),
                 installed_app_id: Some("app_2".into()),
                 network_seed: None,
                 roles_settings: Default::default(),
                 ignore_genesis_failure: false,
-                allow_throwaway_random_agent_key: true,
             })
             .await
             .unwrap_err();
@@ -562,12 +548,11 @@ async fn use_existing_integration() {
             .clone()
             .install_app_bundle(InstallAppPayload {
                 agent_key: None,
-                source: AppBundleSource::Bundle(bundle2(true).await),
+                source: AppBundleSource::Bytes(bundle2(true).await),
                 installed_app_id: Some("app_2".into()),
                 network_seed: None,
                 roles_settings: Default::default(),
                 ignore_genesis_failure: false,
-                allow_throwaway_random_agent_key: true,
             })
             .await
             .unwrap_err();
@@ -578,16 +563,12 @@ async fn use_existing_integration() {
         ));
     }
 
-    // Get the existing cell id through the normal means
-    let appmap = conductor
-        .cells_by_dna_lineage(dna1.dna_hash())
-        .await
-        .unwrap();
-    assert_eq!(appmap.len(), 1);
-    let (app_name, cells) = appmap.first().unwrap();
-    assert_eq!(app_name, "app_1");
-    assert_eq!(cells.len(), 1);
-    let cell_id = cells.first().unwrap().clone();
+    let cell_id = app_1
+        .all_cells()
+        .collect::<Vec<CellId>>()
+        .first()
+        .unwrap()
+        .to_owned();
 
     let role_settings = ("extant".into(), RoleSettings::UseExisting { cell_id });
 
@@ -595,12 +576,11 @@ async fn use_existing_integration() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle2(true).await),
+            source: AppBundleSource::Bytes(bundle2(true).await),
             installed_app_id: Some("app_2".into()),
             network_seed: None,
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();

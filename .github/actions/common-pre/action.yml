@@ -2,16 +2,29 @@ name: 'Common Test Setup Actions'
 runs:
   using: 'composite'
   steps:
-    - name: free disk space
-      if: matrix.os == 'ubuntu-latest'
-      uses: jlumbroso/free-disk-space@main
+    - name: Maximize build space (Linux)
+      if: runner.os == 'Linux'
+      uses: AdityaGarg8/remove-unwanted-software@v5
       with:
-        tool-cache: false
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-codeql: 'true'
+        remove-docker-images: 'true'
+
+    - name: Maximise build space (Mac OS)
+      if: runner.os == 'macOS'
+      shell: sh
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
     - name: go toolchain
       uses: actions/setup-go@v5
       with:
         go-version: '=1.20.0'
+        cache: 'false'
 
     - name: rust cache
       uses: Swatinem/rust-cache@v2
@@ -31,3 +44,11 @@ runs:
         token: ${{ github.token }}
         manifest-dir: ${{ github.workspace }}/.github/manifest
         github-binarycache: true
+
+    # Thanks to https://github.com/sfackler/rust-openssl/issues/2149#issuecomment-2014064057
+    - name: Set Perl environment variables
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        echo "PERL=$((where.exe perl)[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        echo "OPENSSL_SRC_PERL=$((where.exe perl)[0])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8

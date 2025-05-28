@@ -1,47 +1,47 @@
 //! An App Bundle is an AppManifest bundled together with DNA bundles.
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
-
 use super::{AppManifest, AppManifestValidated};
 use crate::prelude::*;
+use bytes::Buf;
+use mr_bundle::error::MrBundleError;
+use mr_bundle::{Bundle, ResourceIdentifier};
+use std::io::Read;
+use std::{collections::HashMap, sync::Arc};
 
 #[allow(missing_docs)]
 mod error;
 pub use error::*;
-use futures::future::join_all;
 
 #[cfg(test)]
 mod tests;
 
 /// A bundle of an AppManifest and collection of DNAs
 #[derive(Debug, Serialize, Deserialize, Clone, derive_more::From, shrinkwraprs::Shrinkwrap)]
-pub struct AppBundle(mr_bundle::Bundle<AppManifest>);
+pub struct AppBundle(Bundle<AppManifest>);
 
 impl AppBundle {
     /// Create an AppBundle from a manifest and DNA files
-    pub async fn new<R: IntoIterator<Item = (PathBuf, DnaBundle)>>(
+    pub fn new<R: IntoIterator<Item = (String, DnaBundle)>>(
         manifest: AppManifest,
         resources: R,
-        root_dir: PathBuf,
     ) -> AppBundleResult<Self> {
-        let resources = join_all(resources.into_iter().map(|(path, dna_bundle)| async move {
-            dna_bundle.encode().map(|bytes| (path, bytes.into()))
-        }))
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
-        Ok(mr_bundle::Bundle::new(manifest, resources, root_dir)?.into())
+        let resources = resources
+            .into_iter()
+            .map(|(resource_id, dna_bundle)| {
+                dna_bundle.pack().map(|bytes| (resource_id, bytes.into()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Bundle::new(manifest, resources)?.into())
     }
 
     /// Construct from raw bytes
-    pub fn decode(bytes: &[u8]) -> AppBundleResult<Self> {
-        mr_bundle::Bundle::decode(bytes)
-            .map(Into::into)
-            .map_err(Into::into)
+    pub fn unpack(source: impl Read) -> AppBundleResult<Self> {
+        Bundle::unpack(source).map(Into::into).map_err(Into::into)
     }
 
     /// Convert to the inner Bundle
-    pub fn into_inner(self) -> mr_bundle::Bundle<AppManifest> {
+    pub fn into_inner(self) -> Bundle<AppManifest> {
         self.0
     }
 
@@ -126,7 +126,7 @@ impl AppBundle {
     ) -> AppBundleResult<CellProvisioningOp> {
         match role {
             AppRoleManifestValidated::Create {
-                location,
+                path: file,
                 installed_hash,
                 clone_limit,
                 modifiers,
@@ -136,7 +136,7 @@ impl AppBundle {
                     .resolve_dna(
                         role_name,
                         dna_store,
-                        &location,
+                        &file,
                         installed_hash.as_ref(),
                         modifiers,
                     )
@@ -160,7 +160,7 @@ impl AppBundle {
 
             AppRoleManifestValidated::CloneOnly {
                 clone_limit,
-                location,
+                path: file,
                 modifiers,
                 installed_hash,
             } => {
@@ -168,7 +168,7 @@ impl AppBundle {
                     .resolve_dna(
                         role_name,
                         dna_store,
-                        &location,
+                        &file,
                         installed_hash.as_ref(),
                         modifiers,
                     )
@@ -182,7 +182,7 @@ impl AppBundle {
         &self,
         role_name: RoleName,
         dna_store: &impl DnaStore,
-        location: &mr_bundle::Location,
+        resource_id: &ResourceIdentifier,
         expected_hash: Option<&DnaHashB64>,
         modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<DnaFile> {
@@ -194,7 +194,7 @@ impl AppBundle {
                     dna_file = dna_file.update_modifiers(modifiers);
                     (dna_file, original_hash)
                 } else {
-                    self.resolve_location(location, modifiers).await?
+                    self.get_modified_dna_file(resource_id, modifiers).await?
                 };
             if expected_hash != original_hash {
                 return Err(AppBundleError::CellResolutionFailure(
@@ -204,18 +204,22 @@ impl AppBundle {
             }
             dna_file
         } else {
-            self.resolve_location(location, modifiers).await?.0
+            self.get_modified_dna_file(resource_id, modifiers).await?.0
         };
         Ok(dna_file)
     }
 
-    async fn resolve_location(
+    async fn get_modified_dna_file(
         &self,
-        location: &mr_bundle::Location,
+        resource_id: &ResourceIdentifier,
         modifiers: DnaModifiersOpt,
     ) -> AppBundleResult<(DnaFile, DnaHash)> {
-        let bytes = self.resolve(location).await?;
-        let dna_bundle: DnaBundle = mr_bundle::Bundle::decode(&bytes)?.into();
+        let bytes: bytes::Bytes = self
+            .get_resource(resource_id)
+            .ok_or_else(|| MrBundleError::MissingResources(vec![resource_id.clone()]))?
+            .clone()
+            .into();
+        let dna_bundle: DnaBundle = Bundle::unpack(bytes.reader())?.into();
         let (dna_file, original_hash) = dna_bundle.into_dna_file(modifiers).await?;
         Ok((dna_file, original_hash))
     }

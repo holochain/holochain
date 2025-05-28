@@ -6,10 +6,8 @@ use crate::{
 };
 use holo_hash::{ActionHash, AgentPubKey, EntryHash, HashableContent};
 use holochain_serialized_bytes::prelude::*;
-use kitsune_p2p_timestamp::Timestamp;
+use holochain_timestamp::Timestamp;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// These are the operations that can be applied to Holochain data.
 /// Every [`Action`] produces a set of operations.
 /// These operations are each sent to an authority for validation.
@@ -80,6 +78,7 @@ use kitsune_p2p_timestamp::Timestamp;
 /// storing data.
 /// Operations beginning with `Register` are concerned with registering
 /// metadata about the data.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum Op {
     /// Stores a new [`Record`] in the DHT.
     /// This is the act of creating a new [`Action`]
@@ -118,19 +117,17 @@ pub enum Op {
     RegisterDeleteLink(RegisterDeleteLink),
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Stores a new [`Record`] in the DHT.
 /// This is the act of creating a new [`Action`]
 /// and publishing it to the DHT.
 /// Note that not all [`Action`]s contain an [`Entry`].
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct StoreRecord {
     /// The [`Record`] to store.
     pub record: Record,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Stores a new [`Entry`] in the DHT.
 /// This is the act of creating a either a [`Action::Create`] or
 /// a [`Action::Update`] and publishing it to the DHT.
@@ -143,14 +140,13 @@ pub struct StoreEntry {
     pub entry: Entry,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Registers an update from an instance of an [`Entry`] in the DHT.
 /// This is the act of creating a [`Action::Update`] and
 /// publishing it to the DHT.
 /// Note that the [`Action::Update`] stores an new instance
 /// of an [`Entry`] and registers it as an update to the original [`Entry`].
 /// This operation is only concerned with registering the update.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct RegisterUpdate {
     /// The signed and hashed [`Action::Update`] that registers the update.
     pub update: SignedHashed<Update>,
@@ -160,21 +156,19 @@ pub struct RegisterUpdate {
     pub new_entry: Option<Entry>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Registers a deletion of an instance of an [`Entry`] in the DHT.
 /// This is the act of creating a [`Action::Delete`] and
 /// publishing it to the DHT.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct RegisterDelete {
     /// The signed and hashed [`Action::Delete`] that registers the deletion.
     pub delete: SignedHashed<Delete>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Registers a new [`Action`] on an agent source chain.
 /// This is the act of creating any [`Action`] and
 /// publishing it to the DHT.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct RegisterAgentActivity {
     /// The signed and hashed [`Action`] that is being registered.
     pub action: SignedActionHashed,
@@ -191,23 +185,21 @@ impl AsRef<SignedActionHashed> for RegisterAgentActivity {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Registers a link between two [`Entry`]s.
 /// This is the act of creating a [`Action::CreateLink`] and
 /// publishing it to the DHT.
 /// The authority is the entry authority for the base [`Entry`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct RegisterCreateLink {
     /// The signed and hashed [`Action::CreateLink`] that registers the link.
     pub create_link: SignedHashed<CreateLink>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Deletes a link between two [`Entry`]s.
 /// This is the act of creating a [`Action::DeleteLink`] and
 /// publishing it to the DHT.
 /// The delete always references a specific [`Action::CreateLink`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct RegisterDeleteLink {
     /// The signed and hashed [`Action::DeleteLink`] that registers the deletion.
     pub delete_link: SignedHashed<DeleteLink>,
@@ -322,7 +314,6 @@ impl Op {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Eq)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 /// Either a [`Action::Create`] or a [`Action::Update`].
 /// These actions both create a new instance of an [`Entry`].
 pub enum EntryCreationAction {

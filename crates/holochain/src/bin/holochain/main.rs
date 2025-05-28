@@ -39,6 +39,9 @@ struct Opt {
     )]
     config_path: Option<PathBuf>,
 
+    #[structopt(long, help = "Print out the conductor config's json schema")]
+    config_schema: bool,
+
     /// Instead of the normal "interactive" method of passphrase
     /// retrieval, read the passphrase from stdin. Be careful
     /// how you make use of this, as it could be less secure,
@@ -53,6 +56,9 @@ struct Opt {
     )]
     build_info: bool,
 
+    #[structopt(long, help = "Create default conductor configuration.")]
+    create_config: bool,
+
     /// WARNING!! DANGER!! This exposes your database decryption secrets!
     /// Print the database decryption secrets to stderr.
     /// With these PRAGMA commands, you'll be able to run sqlcipher
@@ -62,6 +68,12 @@ struct Opt {
 }
 
 fn main() {
+    if rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .is_err()
+    {
+        tracing::error!("could not set cyrpto provider for tls");
+    }
     // the async_main function should only end if our program is done
     tokio_helper::block_forever_on(async_main());
 }
@@ -76,6 +88,28 @@ async fn async_main() {
 
     if opt.build_info {
         println!("{}", option_env!("BUILD_INFO").unwrap_or("{}"));
+        return;
+    }
+
+    if opt.config_schema {
+        let schema = schemars::schema_for!(ConductorConfig);
+        let schema_string = serde_json::to_string_pretty(&schema).unwrap();
+        println!("{}", schema_string);
+        return;
+    }
+
+    if opt.create_config {
+        holochain_conductor_config::generate::generate(
+            None,
+            std::env::current_dir().ok(),
+            None,
+            true,
+            0,
+            #[cfg(feature = "chc")]
+            None,
+        )
+        .inspect_err(|e| tracing::error!("Failed to generate configurations: {}", e))
+        .unwrap();
         return;
     }
 
@@ -95,8 +129,6 @@ async fn async_main() {
     holochain_metrics::HolochainMetricsConfig::new(data_root_path.as_ref())
         .init()
         .await;
-
-    kitsune_p2p_types::metrics::init_sys_info_poll();
 
     info!("Conductor startup: metrics loop spawned.");
 
@@ -196,7 +228,10 @@ fn display_friendly_missing_config_message(maybe_config_root_path: Option<&Confi
 
         {path}
 
-    but this file doesn't exist. Please create a YAML config file at this path.
+    but this file doesn't exist. Please create a YAML config file at this path or run the following 
+    command to generate starter configurations.
+
+        holochain --create-config
             ",
             path = config_root_path.display(),
         );

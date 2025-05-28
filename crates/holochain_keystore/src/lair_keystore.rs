@@ -1,8 +1,8 @@
 //! Keystore backed by lair_keystore_api.
 
 use crate::*;
+use ::lair_keystore::dependencies::lair_keystore_api;
 use ::lair_keystore::server::StandaloneServer;
-use kitsune_p2p_types::dependencies::{lair_keystore_api, url2};
 use lair_keystore_api::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -11,7 +11,7 @@ use tokio::io::AsyncWriteExt;
 /// Spawn a new keystore backed by lair_keystore_api.
 pub async fn spawn_lair_keystore(
     connection_url: url2::Url2,
-    passphrase: sodoken::BufRead,
+    passphrase: SharedLockedArray,
 ) -> LairResult<MetaLairClient> {
     MetaLairClient::new(connection_url, passphrase).await
 }
@@ -20,7 +20,7 @@ pub async fn spawn_lair_keystore(
 /// @param config_path - path to the lair config yaml file
 pub async fn spawn_lair_keystore_in_proc(
     config_path: &PathBuf,
-    passphrase: sodoken::BufRead,
+    passphrase: SharedLockedArray,
 ) -> LairResult<MetaLairClient> {
     let config = get_config(config_path, passphrase.clone()).await?;
     let connection_url = config.connection_url.clone();
@@ -40,7 +40,7 @@ pub async fn spawn_lair_keystore_in_proc(
 
 async fn get_config(
     config_path: &PathBuf,
-    passphrase: sodoken::BufRead,
+    passphrase: SharedLockedArray,
 ) -> LairResult<LairServerConfig> {
     match read_config(config_path).await {
         Ok(config) => Ok(config),
@@ -58,7 +58,7 @@ async fn read_config(config_path: &PathBuf) -> LairResult<LairServerConfig> {
 
 async fn write_config(
     config_path: &std::path::Path,
-    passphrase: sodoken::BufRead,
+    passphrase: SharedLockedArray,
 ) -> LairResult<LairServerConfig> {
     let lair_root = config_path
         .parent()

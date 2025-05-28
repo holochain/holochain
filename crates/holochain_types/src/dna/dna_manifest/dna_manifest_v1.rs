@@ -1,8 +1,7 @@
-use std::path::PathBuf;
-
 use crate::prelude::*;
 use holo_hash::*;
-// use holochain_zome_types::prelude::*;
+use mr_bundle::{resource_id_for_path, ResourceIdentifier};
+use schemars::JsonSchema;
 use serde_with::serde_as;
 
 /// The structure of data that goes in the DNA bundle manifest "dna.yaml".
@@ -19,27 +18,28 @@ use serde_with::serde_as;
 /// integrity:
 ///   network_seed: 00000000-0000-0000-0000-000000000000
 ///   properties: ~
-///   origin_time: 2022-02-11T23:05:19.470323Z
 ///   zomes:
 ///     - name: zome1
-///       bundled: ../dna1/zomes/zome1.wasm
+///       path: ../dna1/zomes/zome1.wasm
 ///     - name: zome2
-///       bundled: ../dna2/zomes/zome1.wasm
+///       path: ../dna2/zomes/zome1.wasm
 /// coordinator:
 ///   zomes:
 ///     - name: zome3
-///       bundled: ../dna1/zomes/zome2.wasm
+///       path: ../dna1/zomes/zome2.wasm
 ///       dependencies:
 ///         - name: zome1
 ///     - name: zome4
-///       bundled: ../dna2/zomes/zome2.wasm
+///       path: ../dna2/zomes/zome2.wasm
 ///       dependencies:
-///         - name: zome1
 ///         - name: zome2
 /// ```
 ///
 /// When there's only one integrity zome, it will automatically be a dependency
 /// of the coordinator zomes. It doesn't need to be specified explicitly.
+///
+/// Note that while the `dependencies` field is a list, right now there should
+/// be **at most one item in this list**.
 ///
 /// ```yaml
 /// manifest_version: "1"
@@ -47,18 +47,16 @@ use serde_with::serde_as;
 /// integrity:
 ///   network_seed: 00000000-0000-0000-0000-000000000000
 ///   properties: ~
-///   origin_time: 2022-02-11T23:05:19.470323Z
 ///   zomes:
 ///     - name: zome1
-///       bundled: ../dna1/zomes/zome1.wasm
+///       path: ../dna1/zomes/zome1.wasm
 /// coordinator:
 ///   zomes:
 ///     - name: zome3
-///       bundled: ../dna1/zomes/zome2.wasm
+///       path: ../dna1/zomes/zome2.wasm
 ///     - name: zome4
-///       bundled: ../dna2/zomes/zome2.wasm
+///       path: ../dna2/zomes/zome2.wasm
 /// ```
-
 #[serde_as]
 #[derive(
     Serialize,
@@ -67,6 +65,7 @@ use serde_with::serde_as;
     Debug,
     PartialEq,
     Eq,
+    JsonSchema,
     derive_more::Constructor,
     derive_builder::Builder,
 )]
@@ -104,6 +103,7 @@ pub struct DnaManifestV1 {
     ///
     /// Holochain does nothing to ensure the correctness of the lineage, it is up to
     /// the app developer to make the necessary guarantees.
+    #[cfg(feature = "unstable-migration")]
     #[serde(default)]
     #[builder(default)]
     pub lineage: Vec<DnaHashB64>,
@@ -117,6 +117,14 @@ impl DnaManifestV1 {
             .iter()
             .chain(self.coordinator.zomes.iter())
     }
+
+    /// Get a mutable iterator over all integrity and coordinator zomes.
+    pub fn all_zomes_mut(&mut self) -> impl Iterator<Item = &mut ZomeManifest> {
+        self.integrity
+            .zomes
+            .iter_mut()
+            .chain(self.coordinator.zomes.iter_mut())
+    }
 }
 
 #[serde_as]
@@ -127,6 +135,7 @@ impl DnaManifestV1 {
     Debug,
     PartialEq,
     Eq,
+    JsonSchema,
     derive_more::Constructor,
     derive_builder::Builder,
 )]
@@ -139,18 +148,13 @@ pub struct IntegrityManifest {
     /// Any arbitrary application properties can be included in this object.
     pub properties: Option<YamlProperties>,
 
-    /// The time used to denote the origin of the network, used to calculate
-    /// time windows during gossip.
-    /// All Action timestamps must come after this time.
-    pub origin_time: HumanTimestamp,
-
     /// An array of zomes associated with your DNA.
     /// The order is significant: it determines initialization order.
     /// The integrity zome manifests.
     pub zomes: Vec<ZomeManifest>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 /// Coordinator zomes.
 pub struct CoordinatorManifest {
@@ -159,7 +163,7 @@ pub struct CoordinatorManifest {
 }
 
 /// Manifest for an individual Zome
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ZomeManifest {
     /// Just a friendly name, no semantic meaning.
@@ -168,38 +172,28 @@ pub struct ZomeManifest {
     /// The hash of the wasm which defines this zome
     pub hash: Option<WasmHashB64>,
 
-    /// The location of the wasm for this zome
-    #[serde(flatten)]
-    pub location: ZomeLocation,
+    /// The location of the WASM for this zome, relative to the manifest.
+    pub path: String,
 
     /// The integrity zomes this zome depends on.
-    /// The order of these must match the order the types
-    /// are used in the zome.
+    /// Integrity zomes should have no dependencies; leave this field `null`.
+    /// Coordinator zomes may depend on zero or exactly 1 integrity zome.
+    /// Currently, a coordinator zome should have **at most one dependency**.
     pub dependencies: Option<Vec<ZomeDependency>>,
+}
 
-    /// DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
-    ///
-    /// The location of the wasm dylib for this zome
-    /// Useful for iOS.
-    #[serde(default)]
-    pub dylib: Option<PathBuf>,
+impl ZomeManifest {
+    /// Get the [`ResourceIdentifier`] for this zome.
+    pub fn resource_id(&self) -> ResourceIdentifier {
+        resource_id_for_path(&self.path).unwrap_or_else(|| format!("{}.wasm", self.name))
+    }
 }
 
 /// Manifest for integrity zomes that another zome
 /// depends on.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ZomeDependency {
     /// The name of the integrity zome this zome depends on.
     pub name: ZomeName,
-}
-
-/// Alias for a suitable representation of zome location
-pub type ZomeLocation = mr_bundle::Location;
-
-impl ZomeManifest {
-    /// Accessor
-    pub fn location(&self) -> &ZomeLocation {
-        &self.location
-    }
 }

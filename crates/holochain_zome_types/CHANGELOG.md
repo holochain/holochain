@@ -7,6 +7,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.5
+
+## 0.6.0-dev.4
+
+## 0.6.0-dev.3
+
+## 0.6.0-dev.2
+
+## 0.6.0-dev.1
+
+- Update types implementing `Manifest` to use the new Mr. Bundle API.
+- Where the `Location` type has been removed, the `bundled` field that was most commonly used to include resources has been renamed to `file`.
+- The deprecated `dylib` field of a `ZomeManifest` has been removed. Use of this was deprecated in a previous version, and the WAMR runtime is recommended instead.
+- Similarly to above, the `preserialized_path` has been removed since it was deprecated and existed to support the `dylib` field.
+
+## 0.6.0-dev.0
+
+## 0.5.0
+
+## 0.5.0-rc.0
+
+## 0.5.0-dev.18
+
+## 0.5.0-dev.17
+
+## 0.5.0-dev.16
+
+- Prevent “TODO” comments from being rendered in cargo docs.
+
+## 0.5.0-dev.15
+
+## 0.5.0-dev.14
+
+## 0.5.0-dev.13
+
+- Update `holochain_wasmer_common`.
+
+## 0.5.0-dev.12
+
+- Update `holochain_wasmer_common`.
+
+## 0.5.0-dev.11
+
 ## 0.5.0-dev.10
 
 ## 0.5.0-dev.9

@@ -1,10 +1,11 @@
 use crate::conductor::paths::KeystorePath;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
 /// Define how Holochain conductor will connect to a keystore, and how
 /// to collect the passphrase needed to unlock the keystore.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum KeystoreConfig {
     /// Enabling this will use a test keystore instead of lair.
@@ -18,6 +19,7 @@ pub enum KeystoreConfig {
     LairServer {
         /// The "connectionUrl" as defined in your "lair-keystore-config.yaml".
         /// This value is also accessible by running `lair-keystore url`.
+        #[schemars(schema_with = "holochain_util::jsonschema::url2_schema")]
         connection_url: url2::Url2,
     },
 

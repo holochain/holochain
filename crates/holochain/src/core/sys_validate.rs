@@ -3,10 +3,7 @@
 
 use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
-use super::workflow::sys_validation_workflow::SysValidationWorkspace;
 use crate::conductor::space::Space;
-use holochain_conductor_services::DpkiService;
-use holochain_conductor_services::KeyState;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::*;
 use std::sync::Arc;
@@ -16,7 +13,6 @@ pub use holo_hash::*;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
 
-#[allow(missing_docs)]
 mod error;
 #[cfg(test)]
 mod tests;
@@ -39,7 +35,7 @@ pub async fn verify_action_signature(sig: &Signature, action: &Action) -> SysVal
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitAction((*sig).clone(), (*action).clone()),
+            ValidationOutcome::CounterfeitAction((*sig).clone(), Box::new((*action).clone())),
         ))
     }
 }
@@ -54,16 +50,9 @@ pub async fn verify_warrant_signature(warrant_op: &WarrantOp) -> SysValidationRe
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::CounterfeitWarrant(warrant_op.warrant().clone()),
+            ValidationOutcome::CounterfeitWarrant(Box::new(warrant_op.warrant().clone())),
         ))
     }
-}
-
-/// Verify the author key was valid at the time
-/// of signing with dpki
-/// TODO: This is just a stub until we have dpki.
-pub async fn author_key_is_valid(_author: &AgentPubKey) -> SysValidationResult<()> {
-    Ok(())
 }
 
 /// Verify the countersigning session contains the specified action.
@@ -92,8 +81,8 @@ pub fn check_countersigning_session_data_contains_action(
     if !action_is_in_session {
         Err(SysValidationError::ValidationOutcome(
             ValidationOutcome::ActionNotInCounterSigningSession(
-                session_data.to_owned(),
-                action.to_new_entry_action(),
+                Box::new(session_data.to_owned()),
+                Box::new(action.to_new_entry_action()),
             ),
         ))
     } else {
@@ -111,7 +100,7 @@ pub async fn check_countersigning_preflight_response_signature(
         .get(*preflight_response.agent_state().agent_index() as usize)
         .ok_or_else(|| {
             SysValidationError::ValidationOutcome(ValidationOutcome::PreflightResponseSignature(
-                (*preflight_response).clone(),
+                Box::new((*preflight_response).clone()),
             ))
         })?
         .0
@@ -121,9 +110,9 @@ pub async fn check_countersigning_preflight_response_signature(
                 .encode_for_signature()
                 .map_err(|_| {
                     SysValidationError::ValidationOutcome(
-                        ValidationOutcome::PreflightResponseSignature(
+                        ValidationOutcome::PreflightResponseSignature(Box::new(
                             (*preflight_response).clone(),
-                        ),
+                        )),
                     )
                 })?
                 .into(),
@@ -133,7 +122,7 @@ pub async fn check_countersigning_preflight_response_signature(
         Ok(())
     } else {
         Err(SysValidationError::ValidationOutcome(
-            ValidationOutcome::PreflightResponseSignature((*preflight_response).clone()),
+            ValidationOutcome::PreflightResponseSignature(Box::new((*preflight_response).clone())),
         ))
     }
 }
@@ -201,40 +190,11 @@ pub fn check_valid_if_dna(action: &Action, dna_def: &DnaDefHashed) -> SysValidat
             let dna_hash = dna_def.as_hash();
             if a.hash != *dna_hash {
                 Err(ValidationOutcome::WrongDna(a.hash.clone(), dna_hash.clone()).into())
-            } else if action.timestamp() < dna_def.modifiers.origin_time {
-                // If the Dna timestamp is ahead of the origin time, every other action
-                // will be inductively so also due to the prev_action check
-                Err(PrevActionErrorKind::InvalidRootOriginTime).map_err(|e| {
-                    ValidationOutcome::PrevActionError((e, action.clone()).into()).into()
-                })
             } else {
                 Ok(())
             }
         }
         _ => Ok(()),
-    }
-}
-
-/// Check if there are other actions at this
-/// sequence number
-pub async fn check_chain_rollback(
-    action: &Action,
-    workspace: &SysValidationWorkspace,
-) -> SysValidationResult<()> {
-    let empty = workspace.action_seq_is_empty(action).await?;
-
-    // Ok or log warning
-    if empty {
-        Ok(())
-    } else {
-        // TODO: implement real rollback detection once we know what that looks like
-        tracing::error!(
-            "Chain rollback detected at position {} for agent {:?} from action {:?}",
-            action.action_seq(),
-            action.author(),
-            action,
-        );
-        Ok(())
     }
 }
 
@@ -373,79 +333,6 @@ pub fn check_entry_visibility(op: &ChainOp) -> SysValidationResult<()> {
     }
 }
 
-/// Check that the record is valid from the perspective of DPKI.
-pub async fn check_dpki_agent_validity_for_record(
-    dpki: &DpkiService,
-    record: &Record,
-) -> SysValidationResult<()> {
-    let author = record.action().author().clone();
-    let timestamp = if record.action().is_genesis() {
-        None
-    } else {
-        Some(record.action().timestamp())
-    };
-    check_dpki_agent_validity(dpki, author, timestamp).await
-}
-
-/// Check that the op is valid from the perspective of DPKI.
-pub async fn check_dpki_agent_validity_for_op(
-    dpki: &DpkiService,
-    op: &ChainOp,
-) -> SysValidationResult<()> {
-    let author = op.author().clone();
-    let timestamp = if op.is_genesis() {
-        None
-    } else {
-        Some(op.timestamp())
-    };
-    let agent_validity_result = check_dpki_agent_validity(dpki, author, timestamp).await;
-    // If agent key is invalid in Dpki and the op being validated is a `Delete` of that agent key, it must pass
-    // for the delete to succeed. Otherwise Dpki would prevent deletion of an agent key on the source chain.
-    if let Err(SysValidationError::ValidationOutcome(ValidationOutcome::DpkiAgentInvalid(_, _))) =
-        &agent_validity_result
-    {
-        if let Action::Delete(d) = &op.action() {
-            if d.deletes_entry_address == op.author().clone().into() {
-                return Ok(());
-            }
-        }
-    }
-    agent_validity_result
-}
-
-/// Check that the agent is valid from the perspective of DPKI.
-///
-/// There are different rules for genesis actions and all other actions:
-/// - For genesis actions, we use None for the timestamp, and we only check that the key is the
-///   first key in the app's keyset, i.e. that key_index == 0.
-/// - For all other actions, we include the timestamp, and use `key_state` to check that the key
-///   is valid as-at that timestamp.
-async fn check_dpki_agent_validity(
-    dpki: &DpkiService,
-    author: AgentPubKey,
-    timestamp: Option<Timestamp>,
-) -> SysValidationResult<()> {
-    if let Some(timestamp) = timestamp {
-        let key_state = dpki
-            .state()
-            .await
-            .key_state(author.clone(), timestamp)
-            .await?;
-
-        match key_state {
-            KeyState::Valid(_) => Ok(()),
-            KeyState::Invalid(_) => {
-                Err(ValidationOutcome::DpkiAgentInvalid(author, timestamp).into())
-            }
-            KeyState::NotFound => Err(ValidationOutcome::DpkiAgentMissing(author).into()),
-        }
-    } else {
-        // TODO: add check for key_index == 0 once updates are possible
-        tracing::info!("Skipping DPKI check for genesis action until updates are possible");
-        Ok(())
-    }
-}
-
 /// Check the actions entry hash matches the hash of the entry
 pub fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<()> {
     if *hash == EntryHash::with_data_sync(entry) {
@@ -460,7 +347,7 @@ pub fn check_entry_hash(hash: &EntryHash, entry: &Entry) -> SysValidationResult<
 pub fn check_new_entry_action(action: &Action) -> SysValidationResult<()> {
     match action {
         Action::Create(_) | Action::Update(_) => Ok(()),
-        _ => Err(ValidationOutcome::NotNewEntry(action.clone()).into()),
+        _ => Err(ValidationOutcome::NotNewEntry(Box::new(action.clone())).into()),
     }
 }
 
@@ -674,19 +561,55 @@ mod test {
     use super::check_countersigning_preflight_response_signature;
     use crate::core::sys_validate::error::SysValidationError;
     use crate::core::ValidationOutcome;
-    use arbitrary::Arbitrary;
+    use crate::prelude::EntryTypeFixturator;
+    use crate::prelude::{ActionBase, CounterSigningAgentState, CounterSigningSessionTimes};
     use fixt::fixt;
-    use fixt::Predictable;
-    use hdk::prelude::AgentPubKeyFixturator;
+    use hdk::prelude::{PreflightBytes, Signature, SIGNATURE_BYTES};
+    use holo_hash::fixt::ActionHashFixturator;
+    use holo_hash::fixt::EntryHashFixturator;
     use holochain_keystore::AgentPubKeyExt;
+    use holochain_timestamp::Timestamp;
+    use holochain_types::prelude::PreflightRequest;
     use holochain_zome_types::countersigning::PreflightResponse;
+    use holochain_zome_types::prelude::CreateBase;
     use matches::assert_matches;
+    use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_check_countersigning_preflight_response_signature() {
         let keystore = holochain_keystore::test_keystore();
-        let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-        let mut preflight_response = PreflightResponse::arbitrary(&mut u).unwrap();
+
+        let agent_1 = keystore.new_sign_keypair_random().await.unwrap();
+        let agent_2 = keystore.new_sign_keypair_random().await.unwrap();
+
+        let request = PreflightRequest::try_new(
+            fixt!(EntryHash),
+            vec![(agent_1.clone(), vec![]), (agent_2, vec![])],
+            vec![],
+            0,
+            false,
+            CounterSigningSessionTimes::try_new(
+                Timestamp::now(),
+                (Timestamp::now() + Duration::from_secs(30)).unwrap(),
+            )
+            .unwrap(),
+            ActionBase::Create(CreateBase::new(fixt!(EntryType))),
+            PreflightBytes(vec![1, 2, 3]),
+        )
+        .unwrap();
+
+        let agent_state = [
+            CounterSigningAgentState::new(0, fixt!(ActionHash), 100),
+            CounterSigningAgentState::new(1, fixt!(ActionHash), 50),
+        ];
+
+        let preflight_response = PreflightResponse::try_new(
+            request.clone(),
+            agent_state[0].clone(),
+            Signature(vec![0; SIGNATURE_BYTES].try_into().unwrap()),
+        )
+        .unwrap();
+
         assert_matches!(
             check_countersigning_preflight_response_signature(&preflight_response).await,
             Err(SysValidationError::ValidationOutcome(
@@ -694,25 +617,11 @@ mod test {
             ))
         );
 
-        let alice = fixt!(AgentPubKey, Predictable);
-        let bob = fixt!(AgentPubKey, Predictable, 1);
-
-        preflight_response
-            .request_mut()
-            .signing_agents
-            .push((alice.clone(), vec![]));
-        preflight_response
-            .request_mut()
-            .signing_agents
-            .push((bob, vec![]));
-
-        *preflight_response.signature_mut() = alice
-            .sign_raw(
-                &keystore,
-                preflight_response.encode_for_signature().unwrap().into(),
-            )
-            .await
-            .unwrap();
+        let sig_data =
+            PreflightResponse::encode_fields_for_signature(&request, &agent_state[0]).unwrap();
+        let signature = agent_1.sign_raw(&keystore, sig_data.into()).await.unwrap();
+        let preflight_response =
+            PreflightResponse::try_new(request, agent_state[0].clone(), signature).unwrap();
 
         check_countersigning_preflight_response_signature(&preflight_response)
             .await

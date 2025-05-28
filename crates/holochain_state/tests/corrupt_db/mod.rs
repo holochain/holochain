@@ -1,23 +1,20 @@
-use std::{path::Path, sync::Arc};
-
-use contrafact::arbitrary;
-use contrafact::arbitrary::Arbitrary;
-use holo_hash::DnaHash;
+use ::fixt::*;
+use holo_hash::fixt::DnaHashFixturator;
 use holochain_sqlite::prelude::DatabaseError;
 use holochain_sqlite::rusqlite::Connection;
 use holochain_state::prelude::{mutations_helpers, *};
+use std::{path::Path, sync::Arc};
 use tempfile::TempDir;
 
 #[tokio::test(flavor = "multi_thread")]
 /// Checks a corrupt cache will be wiped on load.
 async fn corrupt_cache_creates_new_db() {
-    let mut u = arbitrary::Unstructured::new(&holochain_zome_types::prelude::NOISE);
     holochain_trace::test_run();
 
-    let kind = DbKindCache(Arc::new(DnaHash::arbitrary(&mut u).unwrap()));
+    let kind = DbKindCache(Arc::new(fixt!(DnaHash)));
 
     // - Create a corrupt cache db.
-    let testdir = create_corrupt_db(kind.clone(), &mut u);
+    let testdir = create_corrupt_db(kind.clone());
 
     // - Try to open it.
     let db = DbWrite::test(testdir.path(), kind).unwrap();
@@ -35,13 +32,12 @@ async fn corrupt_cache_creates_new_db() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn corrupt_source_chain_panics() {
-    let mut u = arbitrary::Unstructured::new(&holochain_zome_types::prelude::NOISE);
     holochain_trace::test_run();
 
-    let kind = DbKindAuthored(Arc::new(CellId::arbitrary(&mut u).unwrap()));
+    let kind = DbKindAuthored(Arc::new(fixt!(CellId)));
 
     // - Create a corrupt cell db.
-    let testdir = create_corrupt_db(kind.clone(), &mut u);
+    let testdir = create_corrupt_db(kind.clone());
 
     // - Try to open it.
     let result = DbWrite::test(testdir.path(), kind);
@@ -63,7 +59,7 @@ fn corrupt_db(path: &Path) {
 }
 
 /// Creates a db with some data in it then corrupts the db.
-fn create_corrupt_db<Kind: DbKindT>(kind: Kind, u: &mut arbitrary::Unstructured) -> TempDir {
+fn create_corrupt_db<Kind: DbKindT>(kind: Kind) -> TempDir {
     let testdir = tempfile::Builder::new()
         .prefix("corrupt_source_chain")
         .tempdir()
@@ -75,8 +71,8 @@ fn create_corrupt_db<Kind: DbKindT>(kind: Kind, u: &mut arbitrary::Unstructured)
         .initialize(&mut conn, Some(kind.kind()))
         .unwrap();
     let op = DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(
-        Signature::arbitrary(u).unwrap(),
-        Action::arbitrary(u).unwrap(),
+        Signature(vec![1; 64].try_into().unwrap()),
+        Action::Create(fixt!(Create)),
     ));
     let mut txn = conn
         .transaction_with_behavior(holochain_sqlite::rusqlite::TransactionBehavior::Exclusive)

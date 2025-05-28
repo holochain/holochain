@@ -15,6 +15,7 @@ use crate::{dna::DnaBundle, prelude::*};
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
+use bytes::Buf;
 use derive_more::Into;
 pub use error::*;
 use holo_hash::{AgentPubKey, DnaHash};
@@ -29,8 +30,8 @@ use std::{collections::HashMap, path::PathBuf};
 pub type InstalledAppId = String;
 
 /// The source of the DNA to be installed, either as binary data, or from a path
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum DnaSource {
     /// register the dna loaded from a bundle file on disk
     Path(PathBuf),
@@ -41,8 +42,8 @@ pub enum DnaSource {
 }
 
 /// The source of coordinators to be installed, either as binary data, or from a path
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum CoordinatorSource {
     /// Coordinators loaded from a bundle file on disk
     Path(PathBuf),
@@ -51,36 +52,21 @@ pub enum CoordinatorSource {
 }
 
 /// The instructions on how to get the DNA to be registered
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDnaPayload {
     /// Modifier overrides
     #[serde(default)]
     pub modifiers: DnaModifiersOpt<YamlProperties>,
     /// Where to find the DNA
-    #[serde(flatten)]
     pub source: DnaSource,
 }
 
-/// The instructions on how to request NetworkInfo
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NetworkInfoRequestPayload {
-    /// The calling agent
-    // TODO should this be restricted to the agent for the current app?
-    pub agent_pub_key: AgentPubKey,
-    /// Get gossip info for these DNAs
-    pub dnas: Vec<DnaHash>,
-    /// Timestamp in ms since which received amount of bytes from peers will
-    /// be returned. Defaults to UNIX_EPOCH.
-    pub last_time_queried: Option<Timestamp>,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 /// The instructions on how to update coordinators for a dna file.
 pub struct UpdateCoordinatorsPayload {
     /// The hash of the dna to swap coordinators for.
     pub dna_hash: DnaHash,
     /// Where to find the coordinators.
-    #[serde(flatten)]
     pub source: CoordinatorSource,
 }
 
@@ -120,15 +106,10 @@ pub struct DeleteCloneCellPayload {
 }
 
 /// All the information necessary to install an app
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InstallAppPayload {
     /// Where to obtain the AppBundle, which contains the app manifest and DNA bundles
     /// to be installed. This is the main payload of app installation.
-    ///
-    /// Since this field uses `#[serde(flatten)]`, when using other serialized data formats
-    /// like JSON or YAML, this field will actually show up as one of the variants of
-    /// `AppBundleSource` (e.g. `bundle` or `path`), rather than as a `source` field.
-    #[serde(flatten)]
     pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
@@ -178,15 +159,6 @@ pub struct InstallAppPayload {
     /// This can be useful for using `graft_records_onto_source_chain`, or for diagnostics.
     #[serde(default)]
     pub ignore_genesis_failure: bool,
-
-    /// By default, if an agent key is not specified, the conductor will generate a new one by
-    /// deriving a key from the device seed specified in the config. If the device seed is not set,
-    /// app installation will fail. If this flag is set, a random key will be created if no device
-    /// seed is present. This is a risky decision, because it will mean that if you lose control of
-    /// this device, you will not be able to regenerate your agent key from the device seed.
-    /// Use only in situations where you know that this is a throwaway key!
-    #[serde(default)]
-    pub allow_throwaway_random_agent_key: bool,
 }
 
 /// Alias
@@ -197,10 +169,12 @@ pub type ModifiersMap = HashMap<RoleName, DnaModifiersOpt<YamlProperties>>;
 pub type ExistingCellsMap = HashMap<RoleName, CellId>;
 /// Alias
 pub type RoleSettingsMap = HashMap<RoleName, RoleSettings>;
+/// Alias
+pub type RoleSettingsMapYaml = HashMap<RoleName, RoleSettingsYaml>;
 
 /// Settings for a Role that may be passed on installation of an app
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type")]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum RoleSettings {
     /// If the role has the UseExisting strategy defined in the app manifest
     /// the cell id to use needs to be specified here.
@@ -231,25 +205,64 @@ impl Default for RoleSettings {
     }
 }
 
+impl From<RoleSettingsYaml> for RoleSettings {
+    fn from(role_settings: RoleSettingsYaml) -> Self {
+        match role_settings {
+            RoleSettingsYaml::Provisioned {
+                membrane_proof,
+                modifiers,
+            } => Self::Provisioned {
+                membrane_proof,
+                modifiers,
+            },
+            RoleSettingsYaml::UseExisting { cell_id } => Self::UseExisting { cell_id },
+        }
+    }
+}
+
+/// A version of RoleSettings that serializes to YAML without the content attribute
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RoleSettingsYaml {
+    /// If the role has the UseExisting strategy defined in the app manifest
+    /// the cell id to use needs to be specified here.
+    UseExisting {
+        /// Existing cell id to use
+        cell_id: CellId,
+    },
+    /// Optional settings for a normally provisioned cell
+    Provisioned {
+        /// When the app being installed has the `allow_deferred_memproofs` manifest flag set,
+        /// passing `None` for this field for all roles in the app will allow the app to enter
+        /// the "deferred membrane proofs" state, so that memproofs can be provided later.
+        /// If `Some` is used here, whatever memproofs are
+        /// provided will be used, and the app will be installed as normal.
+        membrane_proof: Option<MembraneProof>,
+        /// Overwrites the dna modifiers from the dna manifest. Only
+        /// modifier fields for which `Some(T)` is provided will be overwritten.
+        modifiers: Option<DnaModifiersOpt<YamlProperties>>,
+    },
+}
+
 /// The possible locations of an AppBundle
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppBundleSource {
-    /// The actual serialized bytes of a bundle
-    Bundle(AppBundle),
+    /// The raw bytes of an app bundle
+    Bytes(bytes::Bytes),
     /// A local file path
     Path(PathBuf),
-    // /// A URL
-    // Url(String),
 }
 
 impl AppBundleSource {
     /// Get the bundle from the source. Consumes the source.
     pub async fn resolve(self) -> Result<AppBundle, AppBundleError> {
         Ok(match self {
-            Self::Bundle(bundle) => bundle,
-            Self::Path(path) => AppBundle::decode(&ffs::read(&path).await?)?,
-            // Self::Url(url) => todo!("reqwest::get"),
+            Self::Bytes(bytes) => AppBundle::unpack(bytes.reader())?,
+            Self::Path(path) => {
+                let content = ffs::read(&path).await?;
+                AppBundle::unpack(content.as_slice())?
+            }
         })
     }
 }
@@ -370,16 +383,8 @@ impl InstalledApp {
     }
 }
 
-impl automap::AutoMapped for InstalledApp {
-    type Key = InstalledAppId;
-
-    fn key(&self) -> &Self::Key {
-        &self.app.installed_app_id
-    }
-}
-
 /// A map from InstalledAppId -> InstalledApp
-pub type InstalledAppMap = automap::AutoHashMap<InstalledApp>;
+pub type InstalledAppMap = IndexMap<InstalledAppId, InstalledApp>;
 
 /// An active app
 #[derive(
@@ -686,7 +691,7 @@ impl InstalledAppCommon {
         if app_role_assignment.is_clone_limit_reached() {
             return Err(AppError::CloneLimitExceeded(
                 app_role_assignment.clone_limit,
-                app_role_assignment.clone(),
+                Box::new(app_role_assignment.clone()),
             ));
         }
         let clone_id = CloneId::new(role_name, app_role_assignment.next_clone_index);
@@ -946,7 +951,7 @@ impl InstalledAppCommon {
 ///
 /// The combinations of these basic states give rise to the unified App Status.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppStatus {
     /// The app is enabled and running normally.
     Running,
@@ -1147,7 +1152,7 @@ impl From<StoppedAppReason> for AppStatus {
 /// The reason for an app being in a Paused state.
 /// NB: there is no way to manually pause an app.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum PausedAppReason {
     /// The pause was due to a RECOVERABLE error
     Error(String),
@@ -1155,7 +1160,7 @@ pub enum PausedAppReason {
 
 /// The reason for an app being in a Disabled state.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum DisabledAppReason {
     /// The app is freshly installed, and never started
     NeverStarted,
@@ -1305,12 +1310,12 @@ mod tests {
     use super::RunningApp;
     use crate::prelude::*;
     use ::fixt::prelude::*;
-    use arbitrary::Arbitrary;
+    use holo_hash::fixt::*;
+    use serde_json;
     use std::collections::HashSet;
 
     #[test]
     fn illegal_role_name_is_rejected() {
-        let mut u = unstructured_noise();
         let result = InstalledAppCommon::new(
             "test_app",
             fixt!(AgentPubKey),
@@ -1318,7 +1323,12 @@ mod tests {
                 CLONE_ID_DELIMITER.into(),
                 AppRolePrimary::new(fixt!(DnaHash), false, 0).into(),
             )],
-            AppManifest::arbitrary(&mut u).unwrap(),
+            AppManifest::V1(AppManifestV1 {
+                name: "test_app".to_string(),
+                description: None,
+                roles: vec![],
+                allow_deferred_memproofs: false,
+            }),
             Timestamp::now(),
         );
         assert!(result.is_err())
@@ -1332,7 +1342,12 @@ mod tests {
         let role1 = AppRolePrimary::new(base_dna_hash, false, clone_limit).into();
         let agent = fixt!(AgentPubKey);
         let role_name: RoleName = "role_name".into();
-        let manifest = AppManifest::arbitrary(&mut unstructured_noise()).unwrap();
+        let manifest = AppManifest::V1(AppManifestV1 {
+            name: "test_app".to_string(),
+            description: None,
+            roles: vec![],
+            allow_deferred_memproofs: false,
+        });
         let mut app: RunningApp = InstalledAppCommon::new(
             "app",
             agent.clone(),
@@ -1413,5 +1428,80 @@ mod tests {
         app.delete_clone_cell(&clone_id_0).unwrap();
         // Assert the deleted cell cannot be enabled
         assert!(app.enable_clone_cell(&clone_id_0).is_err());
+    }
+
+    #[test]
+    fn dna_source_serialization() {
+        use serde_json;
+
+        let dna_source: DnaSource = DnaSource::Path("is the goal".into());
+
+        assert_eq!(
+            serde_json::to_string(&dna_source).unwrap(),
+            "{\"type\":\"path\",\"value\":\"is the goal\"}"
+        );
+    }
+
+    #[test]
+    fn coordinator_source_serialization() {
+        let coordinator_source: CoordinatorSource = CoordinatorSource::Path("is the goal".into());
+        assert_eq!(
+            serde_json::to_string(&coordinator_source).unwrap(),
+            "{\"type\":\"path\",\"value\":\"is the goal\"}"
+        );
+    }
+
+    #[test]
+    fn role_settings_serialization() {
+        let role_settings: RoleSettings = RoleSettings::Provisioned {
+            membrane_proof: None,
+            modifiers: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&role_settings).unwrap(),
+            "{\"type\":\"provisioned\",\"value\":{\"membrane_proof\":null,\"modifiers\":null}}"
+        );
+    }
+
+    #[test]
+    fn app_bundle_source_serialization() {
+        let app_bundle_source: AppBundleSource = AppBundleSource::Path("is the goal".into());
+        assert_eq!(
+            serde_json::to_string(&app_bundle_source).unwrap(),
+            "{\"type\":\"path\",\"value\":\"is the goal\"}"
+        );
+    }
+
+    #[test]
+    fn app_status_serialization() {
+        let app_status: AppStatus = AppStatus::Running;
+        assert_eq!(
+            serde_json::to_string(&app_status).unwrap(),
+            "{\"type\":\"running\"}"
+        );
+
+        let app_status: AppStatus = AppStatus::Disabled(DisabledAppReason::NeverStarted);
+        assert_eq!(
+            serde_json::to_string(&app_status).unwrap(),
+            "{\"type\":\"disabled\",\"value\":{\"type\":\"never_started\"}}"
+        );
+    }
+
+    #[test]
+    fn paused_app_reason_serialization() {
+        let reason = PausedAppReason::Error("s are here to learn from".into());
+        assert_eq!(
+            serde_json::to_string(&reason).unwrap(),
+            "{\"type\":\"error\",\"value\":\"s are here to learn from\"}"
+        );
+    }
+
+    #[test]
+    fn disabled_app_reason_serialization() {
+        let reason = DisabledAppReason::User;
+        assert_eq!(
+            serde_json::to_string(&reason).unwrap(),
+            "{\"type\":\"user\"}"
+        );
     }
 }

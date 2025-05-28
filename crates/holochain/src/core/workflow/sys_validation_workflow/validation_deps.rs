@@ -13,19 +13,12 @@ use std::{
 pub struct SysValDeps {
     /// Dependencies found in the same DHT as the dependent
     pub same_dht: Arc<parking_lot::Mutex<ValidationDependencies<SignedActionHashed>>>,
-    /// Dependencies found in the DPKI service's Deepkey DNA
-    /// (this is not generic for all possible DPKI implementations, only Deepkey)
-    /// (this is also currently unused! It may be useful if we need to be more explicit
-    /// about missing DPKI dependencies, but so far it hasn't been a problem. If it's never
-    /// a problem, this can be removed.)
-    pub _deepkey_dht: Arc<parking_lot::Mutex<ValidationDependencies<EntryHashed>>>,
 }
 
 impl Default for SysValDeps {
     fn default() -> Self {
         Self {
             same_dht: Arc::new(parking_lot::Mutex::new(ValidationDependencies::new())),
-            _deepkey_dht: Arc::new(parking_lot::Mutex::new(ValidationDependencies::new())),
         }
     }
 }
@@ -211,6 +204,9 @@ impl<T> ValidationDependencyState<T> {
         }
     }
 
+    /// Set the source of the dependency.
+    ///
+    /// This is used to track where the dependency was found.
     pub fn set_source(&mut self, new_source: CascadeSource) {
         if let Some(ValidationDependency { fetched_from, .. }) = &mut self.dependency {
             *fetched_from = new_source;
@@ -219,6 +215,7 @@ impl<T> ValidationDependencyState<T> {
 }
 
 impl ValidationDependencyState<SignedActionHashed> {
+    /// Get the action from the dependency state if it is present.
     pub fn as_action(&self) -> Option<&Action> {
         self.dependency.as_ref().map(|d| d.dep.action())
     }

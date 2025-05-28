@@ -7,6 +7,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.4
+
+## 0.6.0-dev.3
+
+## 0.6.0-dev.2
+
+## 0.6.0-dev.1
+
+## 0.6.0-dev.0
+
+## 0.5.0
+
+## 0.5.0-rc.0
+
+## 0.5.0-dev.8
+
+## 0.5.0-dev.7
+
+## 0.5.0-dev.6
+
+- Update `holochain_wasmer_common`.
+
+## 0.5.0-dev.5
+
+- Update `holochain_wasmer_common`.
+
 ## 0.5.0-dev.4
 
 ## 0.5.0-dev.3

@@ -1,4 +1,5 @@
 use crate::conductor::space::TestSpace;
+use holo_hash::fixt::DnaHashFixturator;
 
 use super::*;
 use ::fixt::prelude::*;
@@ -101,52 +102,6 @@ async fn can_retry_failed_op() {
     assert!(space.space.incoming_op_hashes.0.lock().is_empty());
 }
 
-// Verifies that an op which has been republished will allow a new validation receipt to be requested.
-#[tokio::test(flavor = "multi_thread")]
-async fn republish_to_request_validation_receipt() {
-    holochain_trace::test_run();
-
-    let space = TestSpace::new(fixt!(DnaHash));
-    let env = space.space.dht_db.clone();
-    let keystore = test_keystore();
-    let (sys_validation_trigger, _sys_validation_rx) = TriggerSender::new();
-
-    let author = keystore.new_sign_keypair_random().await.unwrap();
-
-    let mut action = fixt!(CreateLink);
-    action.author = author.clone();
-    let action = Action::CreateLink(action);
-    let signature = author.sign(&keystore, &action).await.unwrap();
-    let op: DhtOp = ChainOp::RegisterAgentActivity(signature, action).into();
-    let hash = DhtOpHash::with_data_sync(&op);
-
-    incoming_dht_ops_workflow(
-        space.space.clone(),
-        sys_validation_trigger.clone(),
-        vec![op.clone()],
-        true,
-    )
-    .await
-    .unwrap();
-
-    verify_is_pending_validation_receipt(env.clone(), hash.clone()).await;
-
-    // Clear the status to simulate an attempted validation receipt workflow
-    clear_requires_receipt(env.clone(), vec![hash.clone()]).await;
-
-    // Run the incoming workflow again with the same input
-    incoming_dht_ops_workflow(
-        space.space.clone(),
-        sys_validation_trigger.clone(),
-        vec![op],
-        true,
-    )
-    .await
-    .unwrap();
-
-    verify_is_pending_validation_receipt(env, hash).await;
-}
-
 async fn verify_is_pending_validation_receipt(env: DbWrite<DbKindDht>, hash: DhtOpHash) {
     let pending_hashes = get_pending_op_hashes(env).await;
 
@@ -205,16 +160,4 @@ async fn get_pending_op_hashes(env: DbWrite<DbKindDht>) -> Vec<DhtOpHash> {
     })
     .await
     .unwrap()
-}
-
-async fn clear_requires_receipt(env: DbWrite<DbKindDht>, op_hashes: Vec<DhtOpHash>) {
-    env.write_async(move |txn| -> StateMutationResult<()> {
-        for hash in &op_hashes {
-            set_require_receipt(txn, hash, false)?;
-        }
-
-        Ok(())
-    })
-    .await
-    .unwrap();
 }

@@ -100,10 +100,6 @@ impl SignEphemeral {
     derive_more::From,
     derive_more::Into,
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub struct Signed<T>
 where
     T: serde::Serialize + serde::de::DeserializeOwned,

@@ -3,7 +3,6 @@
 
 use super::app_validation_workflow::AppValidationError;
 use crate::conductor::api::error::ConductorApiError;
-use crate::conductor::conductor::DpkiServiceError;
 use crate::conductor::CellError;
 use crate::core::queue_consumer::QueueTriggerClosedError;
 use crate::core::ribosome::error::RibosomeError;
@@ -13,10 +12,10 @@ use holochain_keystore::KeystoreError;
 use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
-use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use thiserror::Error;
 
+#[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum WorkflowError {
     #[error("The genesis self-check failed. App cannot be installed. Reason: {0}")]
@@ -36,12 +35,6 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
-
-    #[error(transparent)]
-    DpkiServiceError(#[from] DpkiServiceError),
-
-    #[error("Workspace error: {0}")]
-    WorkspaceError(#[from] WorkspaceError),
 
     #[error("Database error: {0}")]
     DatabaseError(#[from] DatabaseError),
@@ -78,9 +71,6 @@ pub enum WorkflowError {
 
     #[error(transparent)]
     DhtOpError(#[from] DhtOpError),
-
-    #[error(transparent)]
-    DbCacheError(#[from] holochain_types::db_cache::DbCacheError),
 
     #[error(transparent)]
     SysValidationError(#[from] SysValidationError),

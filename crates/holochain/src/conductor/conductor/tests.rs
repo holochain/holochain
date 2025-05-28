@@ -1,6 +1,3 @@
-use std::sync::atomic::AtomicU32;
-use std::sync::atomic::Ordering;
-
 use super::Conductor;
 use super::ConductorState;
 use super::*;
@@ -8,10 +5,13 @@ use crate::conductor::api::error::ConductorApiError;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::sweettest::*;
 use crate::test_utils::inline_zomes::simple_crud_zome;
+use crate::test_utils::retry_fn_until_timeout;
 use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
 use ::fixt::prelude::*;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::DnaHashFixturator;
 use holochain_conductor_api::AppInfoStatus;
 use holochain_conductor_api::CellInfo;
 use holochain_keystore::crude_mock_keystore::*;
@@ -22,16 +22,12 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::op::Op;
 use maplit::hashset;
 use matches::assert_matches;
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 
-// Module with tests for agent key revocation. With or without DPKI, an agent can revoke their key,
-// which prevents further modifications of the source chain.
-mod agent_key_revocation;
-// Module with tests related to an agent's key lineage. Agents can update their key. Both old and new
-// key belong to the same key lineage, they belong to the same agent.
-#[cfg(feature = "unstable-functions")]
-pub mod agent_lineage;
-#[cfg(feature = "unstable-dpki")]
-mod test_dpki;
+mod add_agent_infos;
+mod state_dump;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
@@ -48,7 +44,9 @@ async fn can_update_state() {
     let (outcome_tx, _outcome_rx) = futures::channel::mpsc::channel(8);
     let spaces = Spaces::new(
         config.clone().into(),
-        sodoken::BufRead::new_no_lock(b"passphrase"),
+        Arc::new(Mutex::new(sodoken::LockedArray::from(
+            b"passphrase".to_vec(),
+        ))),
     )
     .await
     .unwrap();
@@ -104,7 +102,9 @@ async fn app_ids_are_unique() {
     };
     let spaces = Spaces::new(
         config.clone().into(),
-        sodoken::BufRead::new_no_lock(b"passphrase"),
+        Arc::new(Mutex::new(sodoken::LockedArray::from(
+            b"passphrase".to_vec(),
+        ))),
     )
     .await
     .unwrap();
@@ -165,7 +165,7 @@ async fn can_set_fake_state() {
     let db_dir = test_db_dir();
     let expected = ConductorState::default();
     let conductor = ConductorBuilder::new()
-        .config(SweetConductorConfig::standard().no_dpki().into())
+        .config(SweetConductorConfig::standard().into())
         .fake_state(expected.clone())
         .with_data_root_path(db_dir.path().to_path_buf().into())
         .test(&[])
@@ -252,10 +252,10 @@ async fn common_genesis_test_app(
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_uninstall_app() {
+async fn uninstall_app() {
     holochain_trace::test_run();
     let (dna, _, _) = mk_dna(simple_crud_zome()).await;
-    let mut conductor = SweetConductorConfig::standard().build_conductor().await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let app1 = conductor.setup_app("app1", [&dna]).await.unwrap();
 
@@ -276,6 +276,15 @@ async fn test_uninstall_app() {
             "1".to_string(),
         )
         .await;
+
+    // Await integration of both actions.
+    retry_fn_until_timeout(
+        || async { conductor.all_ops_integrated(dna.dna_hash()).unwrap() },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     assert!(conductor
         .call::<_, Option<Record>>(&app1.cells()[0].zome("coordinator"), "read", hash2.clone())
@@ -395,12 +404,10 @@ async fn test_signing_error_during_genesis() {
     let db_dir = test_db_dir();
     let config = ConductorConfig {
         data_root_path: Some(db_dir.path().to_path_buf().into()),
-        dpki: DpkiConfig::disabled(),
-        device_seed_lair_tag: Some("nonexistent-tag".to_string()),
         ..Default::default()
     };
     let mut conductor = SweetConductor::new(
-        SweetConductor::handle_from_existing(bad_keystore, &config, &[]).await,
+        SweetConductor::handle_from_existing(bad_keystore, &config, &[], false).await,
         db_dir.into(),
         config.into(),
         None,
@@ -428,124 +435,6 @@ async fn test_signing_error_during_genesis() {
         panic!("this should have been an error too");
     }
 }
-
-// async fn make_signing_call(
-//     conductor: &SweetConductor,
-//     client: &mut WebsocketSender,
-//     keystore_control: &MockLairControl,
-//     cell: &SweetCell,
-// ) -> AppResponse {
-//     let reinstate_mock = keystore_control.using_mock();
-//     if reinstate_mock {
-//         keystore_control.use_real();
-//     }
-//     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
-//     let request = AppRequest::CallZome(Box::new(
-//         ZomeCall::try_from_unsigned_zome_call(
-//             conductor.raw_handle().keystore(),
-//             ZomeCallUnsigned {
-//                 cell_id: cell.cell_id().clone(),
-//                 zome_name: "sign".into(),
-//                 fn_name: "sign_ephemeral".into(),
-//                 payload: ExternIO::encode(()).unwrap(),
-//                 cap_secret: None,
-//                 provenance: cell.agent_pubkey().clone(),
-//                 nonce,
-//                 expires_at,
-//             },
-//         )
-//         .await
-//         .unwrap(),
-//     ));
-//     if reinstate_mock {
-//         keystore_control.use_mock();
-//     }
-//     client.request(request).await.unwrap()
-// }
-
-// A test which simulates Keystore errors with a test keystore which is designed
-// to fail.
-//
-// This test was written making the assumption that we could swap out the
-// MetaLairClient for each Cell at runtime, but given our current concurrency
-// model which puts each Cell in an Arc, this is not possible.
-// In order to implement this test, we should probably have the "crude mock
-// keystore" listen on a channel which toggles its behavior from always-correct
-// to always-failing. However, the problem that this test is testing for does
-// not seem to be an issue, therefore I'm not putting the effort into fixing it
-// right now.
-// @todo fix test by using new InstallApp call
-// #[tokio::test(flavor = "multi_thread")]
-// async fn test_signing_error_during_genesis_doesnt_bork_interfaces() {
-//     holochain_trace::test_run();
-//     let (keystore, keystore_control) = spawn_real_or_mock_keystore(|_| Err("test error".into()))
-//         .await
-//         .unwrap();
-
-//     let db_dir = test_db_dir();
-//     let config = standard_config();
-//     let mut conductor = SweetConductor::new(
-//         SweetConductor::handle_from_existing(db_dir.path(), keystore.clone(), &config, &[]).await,
-//         db_dir.into(),
-//         config,
-//     )
-//     .await;
-
-//     let (agent1, agent2, agent3) = SweetAgents::three(keystore.clone()).await;
-
-//     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Sign]).await;
-
-//     let app1 = conductor
-//         .setup_app_for_agent("app1", agent1.clone(), &[dna.clone()])
-//         .await
-//         .unwrap();
-
-//     let app2 = conductor
-//         .setup_app_for_agent("app2", agent2.clone(), &[dna.clone()])
-//         .await
-//         .unwrap();
-
-//     let (cell1,) = app1.into_tuple();
-//     let (cell2,) = app2.into_tuple();
-
-//     let app_port = conductor
-//         .raw_handle()
-//         .add_app_interface(either::Either::Left(0))
-//         .await
-//         .unwrap();
-//     let (mut app_client, _) = websocket_client_by_port(app_port).await.unwrap();
-//     let (mut admin_client, _) = conductor.admin_ws_client().await;
-
-//     // Now use the bad keystore to cause a signing error on the next zome call
-//     keystore_control.use_mock();
-
-//     let response: AdminResponse = admin_client
-//         .request(AdminRequest::InstallApp(Box::new(InstallAppPayload {
-//             installed_app_id: "app3".into(),
-//             agent_key: agent3.clone(),
-//             dnas: vec![InstallAppDnaPayload {
-//                 role_name: "whatever".into(),
-//                 hash: dna.dna_hash().clone(),
-//                 membrane_proof: None,
-//             }],
-//         })))
-//         .await
-//         .unwrap();
-
-// assert_matches!(response, AdminResponse::Error(_));
-// let response = make_signing_call(&conductor, &mut app_client, &keystore_control, &cell2).await;
-
-//     assert_matches!(response, AppResponse::Error(_));
-
-//     // Go back to the good keystore, see if we can proceed
-//     keystore_control.use_real();
-
-// let response = make_signing_call(&conductor, &mut app_client, &keystore_control, &cell2).await;
-// assert_matches!(response, AppResponse::ZomeCall(_));
-
-// let response = make_signing_call(&conductor, &mut app_client, &keystore_control, &cell1).await;
-// assert_matches!(response, AppResponse::ZomeCall(_));
-// }
 
 pub(crate) fn simple_create_entry_zome() -> InlineIntegrityZome {
     let unit_entry_def = EntryDef::default_from_id("unit");
@@ -868,10 +757,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
                 Ok(hash)
             });
 
-    let mut conductor = SweetConductorConfig::standard()
-        .no_dpki()
-        .build_conductor()
-        .await;
+    let mut conductor = SweetConductorConfig::standard().build_conductor().await;
     let app = common_genesis_test_app(&mut conductor, bad_zome)
         .await
         .unwrap();
@@ -1039,7 +925,7 @@ async fn test_cell_and_app_status_reconciliation() {
         mk_dna(mk_zome()).await.0,
     ];
     let app_id = "app".to_string();
-    let config = SweetConductorConfig::standard().no_dpki();
+    let config = SweetConductorConfig::standard();
     let mut conductor = SweetConductor::from_config(config).await;
     conductor.setup_app(&app_id, &dnas).await.unwrap();
 
@@ -1209,18 +1095,18 @@ async fn test_deferred_memproof_provisioning() {
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
     let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
+    let bundle_bytes = bundle.pack().unwrap();
 
     //- Install with deferred memproofs
     let app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: None,
             installed_app_id: Some(app_id.clone()),
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -1276,16 +1162,6 @@ async fn test_deferred_memproof_provisioning() {
         ConductorError::SourceChainError(SourceChainError::ChainEmpty)
     );
 
-    //- Rotate app agent key a few times just for the heck of it
-    // TODO: not yet implemented
-
-    // let agent1 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
-    // let agent2 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
-    // let agent3 = conductor.rotate_app_agent_key(&app_id).await.unwrap();
-    // assert_ne!(agent_key, agent1);
-    // assert_ne!(agent1, agent2);
-    // assert_ne!(agent2, agent3);
-
     //- Now provide the memproofs
     conductor
         .clone()
@@ -1337,18 +1213,18 @@ async fn test_deferred_memproof_provisioning_uninstall() {
     let app_id = "app-id".to_string();
     let role_name = "role".to_string();
     let bundle = app_bundle_from_dnas(&[(role_name.clone(), dna)], true, None).await;
+    let bundle_bytes = bundle.pack().unwrap();
 
     //- Install with deferred memproofs
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: None,
             installed_app_id: Some(app_id.clone()),
             roles_settings: Default::default(),
             network_seed: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();

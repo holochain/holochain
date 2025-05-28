@@ -1,21 +1,17 @@
-use holochain_conductor_services::DpkiServiceError;
-use std::convert::TryFrom;
-
 use super::SourceChainError;
 use super::MAX_ENTRY_SIZE;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::validation::OutcomeOrError;
 use crate::core::workflow::WorkflowError;
-use crate::from_sub_error;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holochain_keystore::KeystoreError;
 use holochain_sqlite::error::DatabaseError;
-use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use holochain_zome_types::countersigning::CounterSigningError;
 use holochain_zome_types::countersigning::CounterSigningSessionData;
+use std::convert::TryFrom;
 use thiserror::Error;
 
 /// Validation can result in either
@@ -27,9 +23,8 @@ use thiserror::Error;
 /// ? try's unfortunately try for custom types is
 /// unstable but when it lands we should use:
 /// <https://docs.rs/try-guard/0.2.0/try_guard/>
+#[allow(missing_docs)]
 #[derive(Error, Debug)]
-// TODO FIXME
-#[allow(clippy::large_enum_variant)]
 pub enum SysValidationError {
     #[error(transparent)]
     CascadeError(#[from] holochain_cascade::error::CascadeError),
@@ -49,13 +44,9 @@ pub enum SysValidationError {
     #[error(transparent)]
     WorkflowError(#[from] Box<WorkflowError>),
     #[error(transparent)]
-    WorkspaceError(#[from] WorkspaceError),
-    #[error(transparent)]
-    DpkiServiceError(#[from] DpkiServiceError),
-    #[error(transparent)]
     ConductorApiError(#[from] Box<ConductorApiError>),
     #[error("Expected Entry-based Action, but got: {0:?}")]
-    NonEntryAction(Action),
+    NonEntryAction(Box<Action>),
 }
 
 impl From<CounterSigningError> for SysValidationError {
@@ -66,7 +57,7 @@ impl From<CounterSigningError> for SysValidationError {
     }
 }
 
-// #[deprecated = "This will be replaced with SysValidationOutcome as we shouldn't treat outcomes as errors"]
+/// A result type for sys validation with the error type [`SysValidationError`]
 pub type SysValidationResult<T> = Result<T, SysValidationError>;
 
 /// Return either:
@@ -74,8 +65,6 @@ pub type SysValidationResult<T> = Result<T, SysValidationError>;
 /// - ValidationOutcome
 /// - SysValidationError
 pub type SysValidationOutcome<T> = Result<T, OutcomeOrError<ValidationOutcome, SysValidationError>>;
-
-from_sub_error!(SysValidationError, WorkspaceError);
 
 impl<T> From<SysValidationError> for OutcomeOrError<T, SysValidationError> {
     fn from(e: SysValidationError) -> Self {
@@ -102,24 +91,21 @@ impl<E> TryFrom<OutcomeOrError<ValidationOutcome, E>> for ValidationOutcome {
 /// All the outcomes that can come from validation
 /// This is not an error type it is the outcome of
 /// failed validation.
+#[allow(missing_docs)]
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ValidationOutcome {
     #[error("The record with signature {0:?} and action {1:?} was found to be counterfeit")]
-    CounterfeitAction(Signature, Action),
+    CounterfeitAction(Signature, Box<Action>),
     #[error("A warrant op was found to be counterfeit. Warrant: {0:?}")]
-    CounterfeitWarrant(Warrant),
+    CounterfeitWarrant(Box<Warrant>),
     #[error("A warrant op was found to be invalid. Reason: {1}, Warrant: {0:?}")]
-    InvalidWarrant(Warrant, String),
+    InvalidWarrant(Box<Warrant>, String),
     #[error("The action {1:?} is not found in the countersigning session data {0:?}")]
-    ActionNotInCounterSigningSession(CounterSigningSessionData, NewEntryAction),
+    ActionNotInCounterSigningSession(Box<CounterSigningSessionData>, Box<NewEntryAction>),
     #[error(transparent)]
     CounterSigningError(#[from] CounterSigningError),
     #[error("The dependency {0:?} was not found on the DHT")]
     DepMissingFromDht(AnyDhtHash),
-    #[error("The agent {0:?} could not be found in DPKI")]
-    DpkiAgentMissing(AgentPubKey),
-    #[error("The agent {0:?} was found to be invalid at {1:?} according to the DPKI service")]
-    DpkiAgentInvalid(AgentPubKey, Timestamp),
     #[error("Agent key {0} invalid")]
     InvalidAgentKey(AgentPubKey),
     #[error("The entry def index for {0:?} was out of range")]
@@ -145,9 +131,9 @@ pub enum ValidationOutcome {
     #[error("The action with {0:?} was expected to be a link add action")]
     NotCreateLink(ActionHash),
     #[error("The action was expected to be a new entry action but was {0:?}")]
-    NotNewEntry(Action),
+    NotNewEntry(Box<Action>),
     #[error("The PreflightResponse signature was not valid {0:?}")]
-    PreflightResponseSignature(PreflightResponse),
+    PreflightResponseSignature(Box<PreflightResponse>),
     #[error(transparent)]
     PrevActionError(#[from] PrevActionError),
     #[error("Private entry data should never be included in any op other than StoreEntry.")]
@@ -158,17 +144,11 @@ pub enum ValidationOutcome {
     UpdateTypeMismatch(EntryType, EntryType),
     #[error("Update original {0:?} doesn't match the {1:?} in the update")]
     UpdateHashMismatch(EntryHash, EntryHash),
-    #[error("Signature {0:?} failed to verify for Action {1:?}")]
-    VerifySignature(Signature, Action),
     #[error("The zome index for {0:?} was out of range")]
     ZomeIndex(AppEntryDef),
 }
 
 impl ValidationOutcome {
-    pub fn not_found<I: Into<AnyDhtHash> + Clone>(h: &I) -> Self {
-        Self::DepMissingFromDht(h.clone().into())
-    }
-
     /// Convert into a OutcomeOrError<ValidationOutcome, SysValidationError>
     /// and exit early
     pub fn into_outcome<T>(self) -> SysValidationOutcome<T> {
@@ -184,6 +164,6 @@ impl ValidationOutcome {
             // Just a helpful assertion for us
             unreachable!("Counterfeit ops are dropped before sys validation")
         }
-        matches!(self, Self::DepMissingFromDht(_) | Self::DpkiAgentMissing(_))
+        matches!(self, Self::DepMissingFromDht(_))
     }
 }

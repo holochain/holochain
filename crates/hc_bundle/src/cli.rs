@@ -1,16 +1,15 @@
-#![forbid(missing_docs)]
-//! Binary `hc-dna` command executable.
+//! CLI definitions.
 
+use crate::error::HcBundleResult;
+use anyhow::Context;
 use clap::{Parser, Subcommand};
 use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::{AppManifest, DnaManifest, ValidatedDnaManifest};
 use holochain_types::web_app::WebAppManifest;
 use holochain_util::ffs;
-use mr_bundle::{Location, Manifest};
+use mr_bundle::{FileSystemBundler, Manifest};
 use std::path::Path;
 use std::path::PathBuf;
-
-use crate::error::HcBundleResult;
 
 /// The file extension to use for DNA bundles.
 pub const DNA_BUNDLE_EXT: &str = "dna";
@@ -51,7 +50,7 @@ pub enum HcDnaBundleSubcommand {
     /// `./some/directory/foo/dna.yaml`.
     Pack {
         /// The path to the working directory containing a `dna.yaml` manifest.
-        path: std::path::PathBuf,
+        path: PathBuf,
 
         /// Specify the output path for the packed bundle file.
         ///
@@ -59,13 +58,6 @@ pub enum HcDnaBundleSubcommand {
         /// provided working directory.
         #[arg(short = 'o', long)]
         output: Option<PathBuf>,
-
-        /// DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
-        ///
-        /// Output shared object "dylib" files
-        /// that can be used to run this happ on iOS
-        #[arg(long)]
-        dylib_ios: bool,
     },
 
     /// Unpack parts of the `.dna` bundle file into a specific directory.
@@ -138,7 +130,7 @@ pub enum HcAppBundleSubcommand {
     /// `./some/directory/foo/happ.yaml`.
     Pack {
         /// The path to the working directory containing a `happ.yaml` manifest.
-        path: std::path::PathBuf,
+        path: PathBuf,
 
         /// Specify the output path for the packed bundle file.
         ///
@@ -166,7 +158,7 @@ pub enum HcAppBundleSubcommand {
     // #[arg(short = 'u', long)]
     Unpack {
         /// The path to the bundle to unpack.
-        path: std::path::PathBuf,
+        path: PathBuf,
 
         /// Specify the directory for the unpacked content.
         ///
@@ -309,15 +301,10 @@ impl HcDnaBundleSubcommand {
             Self::Init { path } => {
                 crate::init::init_dna(path).await?;
             }
-            Self::Pack {
-                path,
-                output,
-                dylib_ios,
-            } => {
+            Self::Pack { path, output } => {
                 let name = get_dna_name(&path).await?;
-                let (bundle_path, _) =
-                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name, dylib_ios)
-                        .await?;
+                let bundle_path =
+                    crate::packing::pack::<ValidatedDnaManifest>(&path, output, name).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -327,30 +314,31 @@ impl HcDnaBundleSubcommand {
                 force,
             } => {
                 let dir_path = if raw {
-                    crate::packing::unpack_raw(
-                        DNA_BUNDLE_EXT,
+                    crate::packing::expand_unknown_bundle(
                         &path,
+                        DNA_BUNDLE_EXT,
+                        ValidatedDnaManifest::file_name(),
                         output,
-                        ValidatedDnaManifest::path().as_ref(),
                         force,
                     )
                     .await?
                 } else {
-                    crate::packing::unpack::<ValidatedDnaManifest>(
-                        DNA_BUNDLE_EXT,
-                        &path,
-                        output,
-                        force,
-                    )
-                    .await?
+                    crate::packing::expand_bundle::<ValidatedDnaManifest>(&path, output, force)
+                        .await?
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
             Self::Schema => {
-                println!("{}", include_str!("../schema/dna-manifest.schema.json"));
+                let schema = schemars::schema_for!(DnaManifest);
+                let schema_string = serde_json::to_string_pretty(&schema)
+                    .context("Failed to pretty print schema")?;
+
+                println!("{}", schema_string);
             }
             Self::Hash { path } => {
-                let bundle = DnaBundle::read_from_file(path.as_path()).await?;
+                let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(path)
+                    .await
+                    .map(DnaBundle::from)?;
                 let dna_hash_b64 = bundle.to_dna_file().await?.0.dna_hash().to_string();
                 println!("{}", dna_hash_b64);
             }
@@ -377,8 +365,7 @@ impl HcAppBundleSubcommand {
                     app_pack_recursive(&path).await?;
                 }
 
-                let (bundle_path, _) =
-                    crate::packing::pack::<AppManifest>(&path, output, name, false).await?;
+                let bundle_path = crate::packing::pack::<AppManifest>(&path, output, name).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -388,22 +375,25 @@ impl HcAppBundleSubcommand {
                 force,
             } => {
                 let dir_path = if raw {
-                    crate::packing::unpack_raw(
-                        APP_BUNDLE_EXT,
+                    crate::packing::expand_unknown_bundle(
                         &path,
+                        APP_BUNDLE_EXT,
+                        AppManifest::file_name(),
                         output,
-                        AppManifest::path().as_ref(),
                         force,
                     )
                     .await?
                 } else {
-                    crate::packing::unpack::<AppManifest>(APP_BUNDLE_EXT, &path, output, force)
-                        .await?
+                    crate::packing::expand_bundle::<AppManifest>(&path, output, force).await?
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
             Self::Schema => {
-                println!("{}", include_str!("../schema/happ-manifest.schema.json"));
+                let schema = schemars::schema_for!(AppManifest);
+                let schema_string = serde_json::to_string_pretty(&schema)
+                    .context("Failed to pretty print schema")?;
+
+                println!("{}", schema_string);
             }
         }
         Ok(())
@@ -428,8 +418,8 @@ impl HcWebAppBundleSubcommand {
                     web_app_pack_recursive(&path).await?;
                 }
 
-                let (bundle_path, _) =
-                    crate::packing::pack::<WebAppManifest>(&path, output, name, false).await?;
+                let bundle_path =
+                    crate::packing::pack::<WebAppManifest>(&path, output, name).await?;
                 println!("Wrote bundle {}", bundle_path.to_string_lossy());
             }
             Self::Unpack {
@@ -439,30 +429,25 @@ impl HcWebAppBundleSubcommand {
                 force,
             } => {
                 let dir_path = if raw {
-                    crate::packing::unpack_raw(
-                        WEB_APP_BUNDLE_EXT,
+                    crate::packing::expand_unknown_bundle(
                         &path,
+                        WEB_APP_BUNDLE_EXT,
+                        WebAppManifest::file_name(),
                         output,
-                        WebAppManifest::path().as_ref(),
                         force,
                     )
                     .await?
                 } else {
-                    crate::packing::unpack::<WebAppManifest>(
-                        WEB_APP_BUNDLE_EXT,
-                        &path,
-                        output,
-                        force,
-                    )
-                    .await?
+                    crate::packing::expand_bundle::<WebAppManifest>(&path, output, force).await?
                 };
                 println!("Unpacked to directory {}", dir_path.to_string_lossy());
             }
             Self::Schema => {
-                println!(
-                    "{}",
-                    include_str!("../schema/web-happ-manifest.schema.json")
-                );
+                let schema = schemars::schema_for!(WebAppManifest);
+                let schema_string = serde_json::to_string_pretty(&schema)
+                    .context("Failed to pretty print schema")?;
+
+                println!("{}", schema_string);
             }
         }
         Ok(())
@@ -472,7 +457,7 @@ impl HcWebAppBundleSubcommand {
 /// Load a [ValidatedDnaManifest] manifest from the given path and return its `name` field.
 pub async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(ValidatedDnaManifest::path());
+    let manifest_path = manifest_path.join(ValidatedDnaManifest::file_name());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: DnaManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.name())
@@ -481,7 +466,7 @@ pub async fn get_dna_name(manifest_path: &Path) -> HcBundleResult<String> {
 /// Load an [AppManifest] manifest from the given path and return its `app_name` field.
 pub async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(AppManifest::path());
+    let manifest_path = manifest_path.join(AppManifest::file_name());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: AppManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.app_name().to_string())
@@ -490,7 +475,7 @@ pub async fn get_app_name(manifest_path: &Path) -> HcBundleResult<String> {
 /// Load a [WebAppManifest] manifest from the given path and return its `app_name` field.
 pub async fn get_web_app_name(manifest_path: &Path) -> HcBundleResult<String> {
     let manifest_path = manifest_path.to_path_buf();
-    let manifest_path = manifest_path.join(WebAppManifest::path());
+    let manifest_path = manifest_path.join(WebAppManifest::file_name());
     let manifest_yaml = ffs::read_to_string(&manifest_path).await?;
     let manifest: WebAppManifest = serde_yaml::from_str(&manifest_yaml)?;
     Ok(manifest.app_name().to_string())
@@ -500,31 +485,30 @@ pub async fn get_web_app_name(manifest_path: &Path) -> HcBundleResult<String> {
 pub async fn web_app_pack_recursive(web_app_workdir_path: &PathBuf) -> anyhow::Result<()> {
     let canonical_web_app_workdir_path = ffs::canonicalize(web_app_workdir_path).await?;
 
-    let web_app_manifest_path = canonical_web_app_workdir_path.join(WebAppManifest::path());
+    let web_app_manifest_path = canonical_web_app_workdir_path.join(WebAppManifest::file_name());
 
     let web_app_manifest: WebAppManifest =
         serde_yaml::from_reader(std::fs::File::open(&web_app_manifest_path)?)?;
 
     let app_bundle_location = web_app_manifest.happ_bundle_location();
 
-    if let Location::Bundled(mut bundled_app_location) = app_bundle_location {
-        // Remove the "APP_NAME.happ" portion of the path
-        bundled_app_location.pop();
+    // Remove the "APP_NAME.happ" portion of the path
+    let mut bundled_app_location = PathBuf::from(app_bundle_location);
+    bundled_app_location.pop();
 
-        // Join the web-app manifest location with the location of the app's workdir location
-        let app_workdir_location = PathBuf::new()
-            .join(web_app_workdir_path)
-            .join(bundled_app_location);
+    // Join the web-app manifest location with the location of the app's workdir location
+    let app_workdir_location = PathBuf::new()
+        .join(web_app_workdir_path)
+        .join(bundled_app_location);
 
-        // Pack all the bundled DNAs and the app's manifest
-        HcAppBundleSubcommand::Pack {
-            path: ffs::canonicalize(app_workdir_location).await?,
-            output: None,
-            recursive: true,
-        }
-        .run()
-        .await?;
+    // Pack all the bundled DNAs and the app's manifest
+    HcAppBundleSubcommand::Pack {
+        path: ffs::canonicalize(app_workdir_location).await?,
+        output: None,
+        recursive: true,
     }
+    .run()
+    .await?;
 
     Ok(())
 }
@@ -533,7 +517,7 @@ pub async fn web_app_pack_recursive(web_app_workdir_path: &PathBuf) -> anyhow::R
 pub async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()> {
     let app_workdir_path = ffs::canonicalize(app_workdir_path).await?;
 
-    let app_manifest_path = app_workdir_path.join(AppManifest::path());
+    let app_manifest_path = app_workdir_path.join(AppManifest::file_name());
     let f = std::fs::File::open(&app_manifest_path)?;
 
     let manifest: AppManifest = serde_yaml::from_reader(f)?;
@@ -545,7 +529,6 @@ pub async fn app_pack_recursive(app_workdir_path: &PathBuf) -> anyhow::Result<()
         HcDnaBundleSubcommand::Pack {
             path: dna_workdir_location,
             output: None,
-            dylib_ios: false,
         }
         .run()
         .await?;
@@ -565,7 +548,9 @@ pub async fn bundled_dnas_workdir_locations(
     app_workdir_location.pop();
 
     for app_role in app_manifest.app_roles() {
-        if let Some(Location::Bundled(mut dna_bundle_location)) = app_role.dna.location {
+        if let Some(file) = app_role.dna.path {
+            let mut dna_bundle_location = PathBuf::from(file);
+
             // Remove the "DNA_NAME.yaml" portion of the path
             dna_bundle_location.pop();
 

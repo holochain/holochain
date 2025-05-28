@@ -1,0 +1,43 @@
+[package]
+name = "holochain_timestamp"
+version = "0.6.0-dev.0"
+description = "Microsecond-precision timestamp datatype for Holochain"
+license = "Apache-2.0"
+homepage = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_timestamp"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+keywords = ["holochain", "p2p", "dht", "networking"]
+categories = ["date-and-time"]
+edition = "2021"
+
+# reminder - do not use workspace deps
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+# Dependencies not needed for integrity.
+chrono = { version = "0.4.22", default-features = false, features = [
+  "clock",
+  "std",
+  "oldtime",
+  "serde",
+], optional = true }
+
+# Dependencies only needed for full.
+rusqlite = { version = "0.32.1", optional = true }
+
+[dev-dependencies]
+holochain_serialized_bytes = "=0.0.55"
+
+[lints]
+workspace = true
+
+[features]
+default = ["now"]
+
+now = ["dep:chrono"]
+
+sqlite-encrypted = [
+  "dep:rusqlite",
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+]
+sqlite = ["dep:rusqlite", "rusqlite/bundled"]

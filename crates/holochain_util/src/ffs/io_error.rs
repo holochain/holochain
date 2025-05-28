@@ -54,21 +54,31 @@ impl IoError {
 
     /// Add a backtrace to the error.
     /// Only has an effect if the `backtrace` feature is enabled.
-    pub fn with_backtrace(mut self) -> Self {
+    pub fn with_backtrace(self) -> Self {
+        let this = self;
+
         #[cfg(feature = "backtrace")]
-        {
-            self.backtrace = Some(backtrace::Backtrace::new());
-        }
-        self
+        let this = {
+            let mut this = this;
+            this.backtrace = Some(backtrace::Backtrace::new());
+            this
+        };
+
+        this
     }
 
     /// Remove an associated backtrace from the error.
     /// Only has an effect if the `backtrace` feature is enabled.
-    pub fn remove_backtrace(mut self) -> Self {
+    pub fn remove_backtrace(self) -> Self {
+        let this = self;
+
         #[cfg(feature = "backtrace")]
-        {
-            self.backtrace = None;
-        }
-        self
+        let this = {
+            let mut this = this;
+            this.backtrace = None;
+            this
+        };
+
+        this
     }
 }

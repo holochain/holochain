@@ -19,14 +19,11 @@ pub(crate) fn initialize_database(conn: &mut Connection, db_kind: DbKind) -> rus
         DbKind::Wasm => {
             crate::schema::SCHEMA_WASM.initialize(conn, Some(db_kind))?;
         }
-        DbKind::P2pAgentStore(_) => {
-            crate::schema::SCHEMA_P2P_STATE.initialize(conn, Some(db_kind))?;
-        }
-        DbKind::P2pMetrics(_) => {
-            crate::schema::SCHEMA_P2P_METRICS.initialize(conn, Some(db_kind))?;
-        }
         DbKind::Cache(_) => {
             crate::schema::SCHEMA_CELL.initialize(conn, Some(db_kind))?;
+        }
+        DbKind::PeerMetaStore(_) => {
+            crate::schema::SCHEMA_PEER_META_STORE.initialize(conn, Some(db_kind))?;
         }
         #[cfg(feature = "test_utils")]
         DbKind::Test(_) => {

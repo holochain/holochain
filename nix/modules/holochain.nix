@@ -13,6 +13,7 @@
       commonArgs = {
         RUST_SODIUM_LIB_DIR = "${pkgs.libsodium}/lib";
         RUST_SODIUM_SHARED = "1";
+        LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib";
 
         pname = "holochain";
         src = flake.config.srcCleanedHolochain;
@@ -21,8 +22,13 @@
 
         CARGO_PROFILE = "";
 
-        buildInputs = (with pkgs; [ openssl self'.packages.opensslStatic sqlcipher cmake clang llvmPackages.libclang.lib ])
-          ++ (lib.optionals pkgs.stdenv.isDarwin
+        buildInputs = (with pkgs; [
+          openssl
+          self'.packages.opensslStatic
+          sqlcipher
+          cmake
+        ])
+        ++ (lib.optionals pkgs.stdenv.isDarwin
           (with pkgs.darwin.apple_sdk_11_0.frameworks; [
             AppKit
             CoreFoundation
@@ -31,8 +37,17 @@
             IOKit
           ]));
 
-        nativeBuildInputs = (with pkgs; [ makeWrapper perl pkg-config self'.packages.goWrapper ])
-          ++ lib.optionals pkgs.stdenv.isDarwin
+        nativeBuildInputs = (with pkgs; [
+          makeWrapper
+          perl
+          pkg-config
+          self'.packages.goWrapper
+          # These packages and env vars are required to build holochain with the 'wasmer_wamr' feature 
+          clang
+          llvmPackages.libclang.lib
+          ninja
+        ])
+        ++ lib.optionals pkgs.stdenv.isDarwin
           (with pkgs; [ xcbuild libiconv ]);
 
         stdenv = config.rustHelper.defaultStdenv pkgs;

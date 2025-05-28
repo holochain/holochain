@@ -289,6 +289,19 @@ async fn remote_signals() -> anyhow::Result<()> {
 
     let apps = conductors.setup_app("app", &[dna_file]).await.unwrap();
 
+    let mut apps_iter = apps.iter();
+    for i in 0..NUM_CONDUCTORS {
+        let app = apps_iter.next().unwrap();
+        conductors[i]
+            .require_initial_gossip_activity_for_cell(
+                app.cells().first().unwrap(),
+                NUM_CONDUCTORS as u32 - 1,
+                std::time::Duration::from_secs(30),
+            )
+            .await
+            .unwrap();
+    }
+
     let all_agents: HashSet<_> = apps
         .cells_flattened()
         .into_iter()
@@ -473,11 +486,7 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
-    let conductor_handle = Conductor::builder()
-        .config(config)
-        .with_test_device_seed()
-        .build()
-        .await?;
+    let conductor_handle = Conductor::builder().config(config).build().await?;
     let (client, rx) = websocket_client(&conductor_handle).await?;
     let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
@@ -504,11 +513,7 @@ async fn list_app_interfaces_succeeds() -> Result<()> {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
-    let conductor_handle = Conductor::builder()
-        .config(config)
-        .with_test_device_seed()
-        .build()
-        .await?;
+    let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
     let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
@@ -553,11 +558,7 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
-    let conductor_handle = Conductor::builder()
-        .config(config)
-        .with_test_device_seed()
-        .build()
-        .await?;
+    let conductor_handle = Conductor::builder().config(config).build().await?;
     let port = admin_port(&conductor_handle).await;
     info!("building conductor");
     let mut ws_config = WebsocketConfig::CLIENT_DEFAULT;
@@ -624,12 +625,7 @@ async fn connection_limit_is_respected() {
     let tmp_dir = TempDir::new().unwrap();
     let environment_path = tmp_dir.path().to_path_buf();
     let config = create_config(0, environment_path.into());
-    let conductor_handle = Conductor::builder()
-        .config(config)
-        .with_test_device_seed()
-        .build()
-        .await
-        .unwrap();
+    let conductor_handle = Conductor::builder().config(config).build().await.unwrap();
     let port = admin_port(&conductor_handle).await;
 
     let addr = format!("localhost:{port}")
@@ -795,17 +791,15 @@ async fn network_stats() {
         .admin_ws_client::<AdminResponse>()
         .await;
 
-    const EXPECT: &str = "backendGoPion";
+    const EXPECT: &str = "kitsune2-core-mem";
 
     let req = AdminRequest::DumpNetworkStats;
     let res: AdminResponse = client.request(req).await.unwrap();
     match res {
-        AdminResponse::NetworkStatsDumped(json) => {
-            println!("{json}");
+        AdminResponse::NetworkStatsDumped(stats) => {
+            println!("{stats:?}");
 
-            let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-            let backend = parsed.as_object().unwrap().get("backend").unwrap();
-            assert_eq!(EXPECT, backend);
+            assert_eq!(EXPECT, stats.backend);
         }
         _ => panic!("unexpected"),
     }
@@ -1161,7 +1155,7 @@ impl TestCase {
         let admin_port = 0;
 
         let tmp_dir = TempDir::new().unwrap();
-        let path = tmp_dir.into_path();
+        let path = tmp_dir.keep();
         let environment_path = path.clone();
         let config = create_config(admin_port, environment_path.into());
         let config_path = write_config(path, &config);

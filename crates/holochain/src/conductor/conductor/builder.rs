@@ -1,5 +1,4 @@
 use super::*;
-use crate::conductor::kitsune_host_impl::KitsuneHostImpl;
 use crate::conductor::manager::OutcomeReceiver;
 use crate::conductor::metrics::{create_post_commit_duration_metric, PostCommitDurationMetric};
 use crate::conductor::paths::DataRootPath;
@@ -7,6 +6,8 @@ use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_p2p::NetworkCompatParams;
+use lair_keystore_api::types::SharedLockedArray;
+use std::sync::Mutex;
 
 /// A configurable Builder for Conductor and sometimes ConductorHandle
 #[derive(Default)]
@@ -18,7 +19,7 @@ pub struct ConductorBuilder {
     pub ribosome_store: RibosomeStore,
 
     /// For new lair, passphrase is required
-    pub passphrase: Option<sodoken::BufRead>,
+    pub passphrase: Option<SharedLockedArray>,
 
     /// Optional keystore override
     pub keystore: Option<MetaLairClient>,
@@ -26,11 +27,6 @@ pub struct ConductorBuilder {
     /// Optional state override (for testing)
     #[cfg(any(test, feature = "test_utils"))]
     pub state: Option<ConductorState>,
-
-    /// Optional DPKI service implementation, used to override the service specified in the config,
-    /// especially for testing with a mock
-    #[cfg(any(test, feature = "test_utils"))]
-    pub dpki: Option<DpkiImpl>,
 
     /// If specified here and a device seed is not already specified in the config,
     /// a new seed will be generated in lair with a random unique tag, and the conductor config
@@ -40,6 +36,10 @@ pub struct ConductorBuilder {
 
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
+
+    /// By default the test builder also uses a test kitsune2 builder.
+    /// You can override that by setting this to true.
+    pub test_builder_uses_production_k2_builder: bool,
 
     /// WARNING!! DANGER!! This exposes your database decryption secrets!
     /// Print the database decryption secrets to stderr.
@@ -63,7 +63,7 @@ impl ConductorBuilder {
     }
 
     /// Set the passphrase for use in keystore initialization
-    pub fn passphrase(mut self, passphrase: Option<sodoken::BufRead>) -> Self {
+    pub fn passphrase(mut self, passphrase: Option<SharedLockedArray>) -> Self {
         self.passphrase = passphrase;
         self
     }
@@ -83,32 +83,17 @@ impl ConductorBuilder {
         self
     }
 
+    /// By default the test builder also uses a test kitsune2 builder.
+    /// You can override that by setting this to true.
+    pub fn test_builder_uses_production_k2_builder(mut self, v: bool) -> Self {
+        self.test_builder_uses_production_k2_builder = v;
+        self
+    }
+
     /// Set the data root path for the conductor that will be built.
     pub fn with_data_root_path(mut self, data_root_path: DataRootPath) -> Self {
         self.config.data_root_path = Some(data_root_path);
         self
-    }
-
-    /// If a device seed is not already specified in the config, one will
-    /// be generated and used for the test keystore.
-    #[cfg(any(test, feature = "test_utils"))]
-    pub fn with_test_device_seed(mut self) -> Self {
-        self.generate_test_device_seed = true;
-        self
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    async fn setup_test_device_seed(mut self, keystore: MetaLairClient) -> ConductorResult<Self> {
-        // Set up device seed if specified
-        if self.generate_test_device_seed && self.config.device_seed_lair_tag.is_none() {
-            let tag = format!("_hc_test_device_seed_{}", nanoid::nanoid!());
-            keystore
-                .lair_client()
-                .new_seed(tag.clone().into(), None, false)
-                .await?;
-            self.config.device_seed_lair_tag = Some(tag);
-        }
-        Ok(self)
     }
 
     /// Initialize a "production" Conductor
@@ -119,7 +104,7 @@ impl ConductorBuilder {
 
         let passphrase = match &builder.passphrase {
             Some(p) => p.clone(),
-            None => sodoken::BufRead::new_no_lock(&[]),
+            None => Arc::new(Mutex::new(sodoken::LockedArray::from(vec![]))),
         };
 
         let keystore = if let Some(keystore) = builder.keystore.clone() {
@@ -134,7 +119,7 @@ impl ConductorBuilder {
                     tracing::warn!("{}", MSG);
                 }
             }
-            let get_passphrase = || -> ConductorResult<sodoken::BufRead> {
+            let get_passphrase = || -> ConductorResult<SharedLockedArray> {
                 match builder.passphrase.as_ref() {
                     None => Err(
                         one_err::OneErr::new("passphrase required for lair keystore api").into(),
@@ -188,9 +173,6 @@ impl ConductorBuilder {
 
         info!("Conductor startup: passphrase obtained.");
 
-        #[cfg(any(test, feature = "test_utils"))]
-        let builder = builder.setup_test_device_seed(keystore.clone()).await?;
-
         let Self {
             ribosome_store,
             config,
@@ -211,71 +193,44 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        let network_config = config.network.clone();
-        let (cert_digest, cert, cert_priv_key) = keystore
-            .get_or_create_tls_cert_by_tag(tag.0.clone())
-            .await?;
-        let tls_config =
-            holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig {
-                cert,
-                cert_priv_key,
-                cert_digest,
-            };
+        let compat = NetworkCompatParams {
+            ..Default::default()
+        };
 
-        info!("Conductor startup: TLS cert created.");
+        let net_spaces1 = spaces.clone();
+        let net_spaces2 = spaces.clone();
+        let p2p_config = holochain_p2p::HolochainP2pConfig {
+            auth_material: config
+                .network
+                .base64_auth_material
+                .as_ref()
+                .map(|m| {
+                    use base64::prelude::*;
+                    BASE64_STANDARD.decode(m).map_err(ConductorError::other)
+                })
+                .transpose()?,
+            get_db_peer_meta: Arc::new(move |dna_hash| {
+                let res = net_spaces1.peer_meta_store_db(&dna_hash);
+                Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
+            }),
+            get_db_op_store: Arc::new(move |dna_hash| {
+                let res = net_spaces2.dht_db(&dna_hash);
+                Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
+            }),
+            target_arc_factor: config.network.target_arc_factor,
+            network_config: Some(config.network.to_k2_config()?),
+            compat,
+            ..Default::default()
+        };
 
-        let strat = network_config.tuning_params.to_arq_strat();
-
-        let host = KitsuneHostImpl::new(
-            spaces.clone(),
-            config.clone(),
-            ribosome_store.clone(),
-            strat,
-            Some(tag_ed),
-            Some(keystore.lair_client()),
-        );
-
-        // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
-        let dpki_config = Some(config.dpki.clone());
-
-        let dpki_dna_to_install = match &dpki_config {
-            Some(config) => {
-                if config.no_dpki {
-                    None
-                } else {
-                    let dna = get_dpki_dna(config)
-                        .await?
-                        .into_dna_file(Default::default())
-                        .await?
-                        .0;
-
-                    Some(dna)
+        let holochain_p2p =
+            match holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone()).await {
+                Ok(r) => r,
+                Err(err) => {
+                    tracing::error!(?err, "Error spawning networking");
+                    return Err(err.into());
                 }
-            }
-            _ => unreachable!(
-                "We currently require DPKI to be used, but this may change in the future"
-            ),
-        };
-
-        let dpki_uuid = dpki_dna_to_install
-            .as_ref()
-            .map(|dna| dna.dna_hash().get_raw_32().try_into().expect("32 bytes"));
-        let network_compat = NetworkCompatParams { dpki_uuid };
-
-        let (holochain_p2p, p2p_evt) = match holochain_p2p::spawn_holochain_p2p(
-            network_config,
-            tls_config,
-            host,
-            network_compat,
-        )
-        .await
-        {
-            Ok(r) => r,
-            Err(err) => {
-                tracing::error!(?err, "Error spawning networking");
-                return Err(err.into());
-            }
-        };
+            };
 
         info!("Conductor startup: networking started.");
 
@@ -288,13 +243,11 @@ impl ConductorBuilder {
             config.clone(),
             ribosome_store,
             keystore,
-            holochain_p2p,
+            holochain_p2p.clone(),
             spaces,
             post_commit_sender,
             outcome_tx,
         );
-
-        let shutting_down = conductor.shutting_down.clone();
 
         #[cfg(any(test, feature = "test_utils"))]
         let conductor = Self::update_fake_state(builder.state, conductor).await?;
@@ -302,23 +255,11 @@ impl ConductorBuilder {
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
 
-        {
-            let handle = handle.clone();
-            tokio::task::spawn(async move {
-                while !shutting_down.load(std::sync::atomic::Ordering::Relaxed) {
-                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                    if let Err(e) = handle.prune_p2p_agents_db().await {
-                        tracing::error!("failed to prune p2p_agents_db: {:?}", e);
-                    }
-                }
-            });
-        }
+        holochain_p2p.register_handler(handle.clone()).await?;
 
         Self::finish(
             handle,
             config,
-            dpki_dna_to_install,
-            p2p_evt,
             post_commit_receiver,
             outcome_rx,
             builder.no_print_setup,
@@ -378,8 +319,6 @@ impl ConductorBuilder {
     pub(crate) async fn finish(
         conductor: ConductorHandle,
         config: Arc<ConductorConfig>,
-        dpki_dna_to_install: Option<DnaFile>,
-        p2p_evt: holochain_p2p::event::HolochainP2pEventReceiver,
         post_commit_receiver: tokio::sync::mpsc::Receiver<PostCommitArgs>,
         outcome_receiver: OutcomeReceiver,
         no_print_setup: bool,
@@ -390,10 +329,6 @@ impl ConductorBuilder {
             .await?;
 
         info!("Conductor startup: scheduler task started.");
-
-        tokio::task::spawn(p2p_event_task(p2p_evt, conductor.clone()).in_current_span());
-
-        info!("Conductor startup: p2p event task started.");
 
         let tm = conductor.task_manager();
         let conductor2 = conductor.clone();
@@ -420,18 +355,6 @@ impl ConductorBuilder {
                 msg = "Failed to create the following active apps",
                 ?cell_startup_errors
             );
-        }
-
-        // Install DPKI from DNA
-        if let Some(dna) = dpki_dna_to_install {
-            let dna_hash = dna.dna_hash().clone();
-            match conductor.clone().install_dpki(dna, true).await {
-                Ok(_) => tracing::info!("Installed DPKI from DNA {}", dna_hash),
-                Err(ConductorError::AppAlreadyInstalled(_)) => {
-                    tracing::debug!("DPKI already installed, skipping installation")
-                }
-                Err(e) => return Err(e),
-            }
         }
 
         if !no_print_setup {
@@ -478,14 +401,14 @@ impl ConductorBuilder {
             .clone()
             .unwrap_or_else(holochain_keystore::test_keystore);
 
-        let builder = builder
-            .with_test_device_seed()
-            .setup_test_device_seed(keystore.clone())
-            .await?;
-
         let config = Arc::new(builder.config);
-        let spaces =
-            Spaces::new(config.clone(), sodoken::BufRead::new_no_lock(b"passphrase")).await?;
+        let spaces = Spaces::new(
+            config.clone(),
+            Arc::new(Mutex::new(sodoken::LockedArray::from(
+                b"passphrase".to_vec(),
+            ))),
+        )
+        .await?;
         let tag = spaces.get_state().await?.tag().clone();
 
         let tag_ed: Arc<str> = format!("{}_ed", tag.0).into_boxed_str().into();
@@ -494,53 +417,46 @@ impl ConductorBuilder {
             .new_seed(tag_ed.clone(), None, false)
             .await;
 
-        let network_config = config.network.clone();
-        let strat = network_config.tuning_params.to_arq_strat();
-
         let ribosome_store = RwShare::new(builder.ribosome_store);
-        let host = KitsuneHostImpl::new(
-            spaces.clone(),
-            config.clone(),
-            ribosome_store.clone(),
-            strat,
-            Some(tag_ed),
-            Some(keystore.lair_client()),
-        );
 
-        // TODO: when we make DPKI optional, we can remove the unwrap_or and just let it be None,
-        let dpki_config = Some(config.dpki.clone());
+        let compat = NetworkCompatParams::default();
 
-        let (dpki_uuid, dpki_dna_to_install) = match (&builder.dpki, &dpki_config) {
-            // If a DPKI impl was provided to the builder, use that
-            (Some(dpki_impl), _) => (Some(dpki_impl.uuid()), None),
-
-            // Otherwise load the DNA from config if specified
-            (None, Some(dpki_config)) => {
-                if dpki_config.no_dpki {
-                    (None, None)
-                } else {
-                    let dna = get_dpki_dna(dpki_config)
-                        .await?
-                        .into_dna_file(Default::default())
-                        .await?
-                        .0;
-                    (
-                        Some(dna.dna_hash().get_raw_32().try_into().expect("32 bytes")),
-                        Some(dna),
-                    )
-                }
-            }
-
-            (None, None) => unreachable!(
-                "We currently require DPKI to be used, but this may change in the future"
-            ),
+        let net_spaces1 = spaces.clone();
+        let net_spaces2 = spaces.clone();
+        let p2p_config = holochain_p2p::HolochainP2pConfig {
+            auth_material: config
+                .network
+                .base64_auth_material
+                .as_ref()
+                .map(|m| {
+                    use base64::prelude::*;
+                    BASE64_STANDARD.decode(m).map_err(ConductorError::other)
+                })
+                .transpose()?,
+            get_db_peer_meta: Arc::new(move |dna_hash| {
+                let res = net_spaces1.peer_meta_store_db(&dna_hash);
+                Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
+            }),
+            get_db_op_store: Arc::new(move |dna_hash| {
+                let res = net_spaces2.dht_db(&dna_hash);
+                Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
+            }),
+            target_arc_factor: config.network.target_arc_factor,
+            network_config: Some(config.network.to_k2_config()?),
+            compat,
+            k2_test_builder: !builder.test_builder_uses_production_k2_builder,
+            #[cfg(feature = "test_utils")]
+            disable_bootstrap: config.network.disable_bootstrap,
+            #[cfg(feature = "test_utils")]
+            disable_publish: config.network.disable_publish,
+            #[cfg(feature = "test_utils")]
+            disable_gossip: config.network.disable_gossip,
+            #[cfg(feature = "test_utils")]
+            mem_bootstrap: config.network.mem_bootstrap,
         };
 
-        let network_compat = NetworkCompatParams { dpki_uuid };
-
-        let (holochain_p2p, p2p_evt) =
-                holochain_p2p::spawn_holochain_p2p(network_config, holochain_p2p::kitsune_p2p::dependencies::kitsune_p2p_types::tls::TlsConfig::new_ephemeral().await.unwrap(), host, network_compat)
-                    .await?;
+        let holochain_p2p =
+            holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone()).await?;
 
         let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
@@ -551,7 +467,7 @@ impl ConductorBuilder {
             config.clone(),
             ribosome_store,
             keystore,
-            holochain_p2p,
+            holochain_p2p.clone(),
             spaces,
             post_commit_sender,
             outcome_tx,
@@ -562,13 +478,7 @@ impl ConductorBuilder {
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
 
-        // Install DPKI from DNA or mock
-        if let Some(dpki_impl) = builder.dpki {
-            // This is a mock DPKI impl, so inject it into the conductor directly
-            handle.running_services_mutex().share_mut(|s| {
-                s.dpki = Some(dpki_impl);
-            });
-        }
+        holochain_p2p.register_handler(handle.clone()).await?;
 
         // Install extra DNAs, in particular:
         // the ones with InlineZomes will not be registered in the Wasm DB
@@ -584,8 +494,6 @@ impl ConductorBuilder {
         Self::finish(
             handle,
             config,
-            dpki_dna_to_install,
-            p2p_evt,
             post_commit_receiver,
             outcome_rx,
             builder.no_print_setup,

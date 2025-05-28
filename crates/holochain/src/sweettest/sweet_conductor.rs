@@ -8,22 +8,24 @@ use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, CellError,
     Conductor, ConductorBuilder,
 };
+use crate::retry_until_timeout;
 use ::fixt::prelude::StdRng;
 use hdk::prelude::*;
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, CellInfo, ProvisionedCell,
 };
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::AgentPubKeyExt;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::source_chain::SourceChain;
 use holochain_state::test_utils::TestDir;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_websocket::*;
-use kitsune_p2p_types::config::TransportConfig;
+use kitsune2_api::DhtArc;
 use nanoid::nanoid;
 use rand::Rng;
+use rusqlite::named_params;
+use std::collections::HashMap;
 use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::sync::atomic::Ordering;
@@ -136,7 +138,7 @@ impl SweetConductor {
         C: Into<SweetConductorConfig>,
         R: Into<DynSweetRendezvous> + Clone,
     {
-        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false).await
+        Self::create_with_defaults_and_metrics(config, keystore, rendezvous, false, false).await
     }
 
     /// Create a SweetConductor with a new set of TestEnvs from the given config
@@ -146,6 +148,7 @@ impl SweetConductor {
         keystore: Option<MetaLairClient>,
         rendezvous: Option<R>,
         with_metrics: bool,
+        test_builder_uses_production_k2_builder: bool,
     ) -> SweetConductor
     where
         C: Into<SweetConductorConfig>,
@@ -169,24 +172,32 @@ impl SweetConductor {
 
         let config: SweetConductorConfig = config.into();
         let mut config: ConductorConfig = if let Some(r) = rendezvous.clone() {
-            config.apply_rendezvous(&r).into()
+            config
+                .tune_network_config(|nc| nc.mem_bootstrap = false)
+                .apply_rendezvous(&r)
+                .into()
         } else {
-            if let Some(b) = config.network.bootstrap_service.as_ref() {
-                if b.to_string().starts_with("rendezvous:") {
-                    panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.bootstrap_service");
-                }
+            if config
+                .network
+                .bootstrap_url
+                .as_str()
+                .starts_with("rendezvous:")
+            {
+                panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.bootstrap_service");
             }
-            if config.network.transport_pool.iter().any(|p| match p {
-                TransportConfig::WebRTC { signal_url, .. } => signal_url.starts_with("rendezvous:"),
-                _ => false,
-            }) {
+            if config
+                .network
+                .signal_url
+                .as_str()
+                .starts_with("rendezvous:")
+            {
                 panic!("Must use rendezvous SweetConductor if rendezvous: is specified in config.network.transport_pool[].signal_url");
             }
             config.into()
         };
 
         if config.tracing_scope().is_none() {
-            config.network.tracing_scope = Some(format!(
+            config.tracing_scope = Some(format!(
                 "{}.{}",
                 NUM_CREATED.load(Ordering::SeqCst),
                 nanoid!(5)
@@ -199,7 +210,15 @@ impl SweetConductor {
 
         let keystore = keystore.unwrap_or_else(holochain_keystore::test_keystore);
 
-        let handle = Self::handle_from_existing(keystore, &config, &[]).await;
+        let handle = Self::handle_from_existing(
+            keystore,
+            &config,
+            &[],
+            test_builder_uses_production_k2_builder,
+        )
+        .await;
+
+        tracing::info!("Starting with config: {:?}", config);
 
         Self::new(handle, dir, Arc::new(config), rendezvous).await
     }
@@ -233,6 +252,7 @@ impl SweetConductor {
         keystore: MetaLairClient,
         config: &ConductorConfig,
         extra_dnas: &[DnaFile],
+        test_builder_uses_production_k2_builder: bool,
     ) -> ConductorHandle {
         NUM_CREATED.fetch_add(1, Ordering::SeqCst);
 
@@ -240,6 +260,7 @@ impl SweetConductor {
             .config(config.clone())
             .with_keystore(keystore)
             .no_print_setup()
+            .test_builder_uses_production_k2_builder(test_builder_uses_production_k2_builder)
             .test(extra_dnas)
             .await
             .unwrap()
@@ -458,7 +479,6 @@ impl SweetConductor {
         installed_app_id: &str,
         dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)> + Clone,
     ) -> ConductorApiResult<SweetApp> {
-        // If DPKI is in use, we must let DPKI generate the agent key
         self.setup_app_for_optional_agent(installed_app_id, None, dnas_with_roles)
             .await
     }
@@ -529,25 +549,6 @@ impl SweetConductor {
         }
 
         Ok(SweetAppBatch(apps))
-    }
-
-    /// Install DPKI a bit more concisely
-    pub async fn install_dpki(&self) {
-        let dpki_config = self.config.dpki.clone();
-        let (dna, _) = crate::conductor::conductor::get_dpki_dna(&dpki_config)
-            .await
-            .unwrap()
-            .into_dna_file(Default::default())
-            .await
-            .unwrap();
-        self.raw_handle().install_dpki(dna, true).await.unwrap()
-    }
-
-    /// Get the cell providing the DPKI service, if applicable
-    pub fn dpki_cell(&self) -> Option<SweetCell> {
-        let dpki = self.raw_handle().running_services().dpki?;
-        let cell_id = dpki.cell_id.clone();
-        Some(self.get_sweet_cell(cell_id).unwrap())
     }
 
     /// Call into the underlying create_clone_cell function, and register the
@@ -651,6 +652,7 @@ impl SweetConductor {
                     self.keystore.clone(),
                     &self.config,
                     self.dnas.as_slice(),
+                    false,
                 )
                 .await,
             ));
@@ -683,87 +685,54 @@ impl SweetConductor {
             .expect("Tried to use a conductor that is offline")
     }
 
-    /// Force trigger all dht ops that haven't received
-    /// enough validation receipts yet.
-    pub async fn force_all_publish_dht_ops(&self) {
-        use futures::stream::StreamExt;
-        if let Some(handle) = self.handle.as_ref() {
-            let iter = handle.running_cell_ids().into_iter().map(|id| async move {
-                let db = self
-                    .get_or_create_authored_db(id.dna_hash(), id.agent_pubkey().clone())
-                    .unwrap();
-                let trigger = self.get_cell_triggers(&id).await.unwrap();
-                (db, trigger)
-            });
-            futures::stream::iter(iter)
-                .then(|f| f)
-                .for_each(|(db, mut triggers)| async move {
-                    // The line below was added when migrating to rust edition 2021, per
-                    // https://doc.rust-lang.org/edition-guide/rust-2021/disjoint-capture-in-closures.html#migration
-                    let _ = &triggers;
-                    crate::test_utils::force_publish_dht_ops(&db, &mut triggers.publish_dht_ops)
-                        .await
-                        .unwrap();
-                })
-                .await;
-        }
-    }
+    /// Let each conductor know about each other's agents so they can do networking.
+    ///
+    /// Returns a boolean indicating whether each space has at least one agent info for each conductor.
+    pub async fn exchange_peer_info(conductors: impl Clone + IntoIterator<Item = &Self>) -> bool {
+        // Combined peer info set across all conductors, separated by DNA hash (space)
+        let mut all = HashMap::<Arc<DnaHash>, HashSet<_>>::new();
 
-    /// Let each conductor know about each others' agents so they can do networking
-    pub async fn exchange_peer_info(conductors: impl Clone + IntoIterator<Item = &Self>) {
-        let mut all = Vec::new();
-        for c in conductors.into_iter() {
+        let conductor_count = conductors.clone().into_iter().count();
+
+        // Collect all the agent infos across the spaces on these conductors.
+        for c in conductors.clone().into_iter() {
             if c.get_config().has_rendezvous_bootstrap() {
                 panic!(
                     "exchange_peer_info cannot reliably be used with rendezvous bootstrap servers"
                 );
             }
 
-            if let Some(dpki_dna_hash) = c
-                .running_services()
-                .dpki
-                .as_ref()
-                .map(|dpki| dpki.cell_id.dna_hash())
-            {
-                // Ensure the space is created for DPKI so the agent db exists
-                c.spaces.get_or_create_space(dpki_dna_hash).unwrap();
-            }
-            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                all.push(env.clone());
+            for dna_hash in c.spaces.get_from_spaces(|s| s.dna_hash.clone()) {
+                let agent_infos = c
+                    .holochain_p2p()
+                    .peer_store((*dna_hash).clone())
+                    .await
+                    .unwrap()
+                    .get_all()
+                    .await
+                    .unwrap();
+
+                all.entry(dna_hash).or_default().extend(agent_infos);
             }
         }
-        crate::conductor::p2p_agent_store::exchange_peer_info(all).await;
-    }
 
-    /// Drop the specified agent keys from each conductor's peer table
-    pub async fn forget_peer_info(
-        conductors: impl IntoIterator<Item = &Self>,
-        agents_to_forget: impl IntoIterator<Item = &AgentPubKey>,
-    ) {
-        let mut all = Vec::new();
+        // Insert the agent infos into each conductor's peer store
         for c in conductors.into_iter() {
-            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                all.push(env.clone());
+            for dna_hash in c.spaces.get_from_spaces(|s| s.dna_hash.clone()) {
+                let inject_agent_infos = all.get(&dna_hash).unwrap().iter().cloned().collect();
+                tracing::info!("Injecting agent infos: {:?}", inject_agent_infos);
+                c.holochain_p2p()
+                    .peer_store((*dna_hash).clone())
+                    .await
+                    .unwrap()
+                    .insert(inject_agent_infos)
+                    .await
+                    .unwrap();
             }
         }
 
-        crate::conductor::p2p_agent_store::forget_peer_info(all, agents_to_forget).await;
-    }
-
-    /// Let each conductor know about each others' agents so they can do networking
-    pub async fn exchange_peer_info_sampled(
-        conductors: impl IntoIterator<Item = &Self>,
-        rng: &mut StdRng,
-        s: usize,
-    ) {
-        let mut all = Vec::new();
-        for c in conductors.into_iter() {
-            for env in c.spaces.get_from_spaces(|s| s.p2p_agents_db.clone()) {
-                all.push(env.clone());
-            }
-        }
-        let connectivity = covering(rng, all.len(), s);
-        crate::conductor::p2p_agent_store::exchange_peer_info_sparse(all, connectivity).await;
+        // Check that each space has at least one agent info for each conductor
+        all.iter().all(|(_, v)| v.len() >= conductor_count)
     }
 
     /// Wait for at least one gossip round to have completed for the given cell
@@ -780,32 +749,28 @@ impl SweetConductor {
     ) -> anyhow::Result<()> {
         let handle = self.raw_handle();
 
-        let installed_app = handle
-            .find_app_containing_cell(cell.cell_id())
-            .await?
-            .ok_or(anyhow::anyhow!("Could not find app containing cell"))?;
-
         let wait_start = Instant::now();
         loop {
             let (number_of_peers, completed_rounds) = handle
-                .network_info(
-                    installed_app.id(),
-                    &NetworkInfoRequestPayload {
-                        agent_pub_key: cell.agent_pubkey().clone(),
-                        dnas: vec![cell.cell_id.dna_hash().clone()],
-                        last_time_queried: None, // Just care about seeing the first data
-                    },
-                )
+                .dump_network_metrics(Kitsune2NetworkMetricsRequest {
+                    dna_hash: Some(cell.cell_id().dna_hash().clone()),
+                    ..Default::default()
+                })
                 .await?
-                .first()
+                .get(cell.cell_id.dna_hash())
                 .map_or((0, 0), |info| {
                     (
-                        info.current_number_of_peers,
-                        info.completed_rounds_since_last_time_queried,
+                        // The number of peers we're holding metadata for
+                        info.gossip_state_summary.peer_meta.len(),
+                        info.gossip_state_summary
+                            .peer_meta
+                            .values()
+                            .map(|meta| meta.completed_rounds.unwrap_or_default())
+                            .sum(),
                     )
                 });
 
-            if number_of_peers >= min_peers && completed_rounds > 0 {
+            if number_of_peers >= min_peers as usize && completed_rounds > 0 {
                 tracing::info!(
                     "Took {}s for cell {} to complete {} gossip rounds",
                     wait_start.elapsed().as_secs(),
@@ -836,7 +801,6 @@ impl SweetConductor {
             self.get_or_create_authored_db(dna_hash, agent_key.clone())
                 .unwrap(),
             self.get_dht_db(dna_hash).unwrap(),
-            self.get_dht_db_cache(dna_hash).unwrap(),
             self.keystore().clone(),
             agent_key.clone(),
         )
@@ -866,7 +830,7 @@ impl SweetConductor {
                     .get_agent_infos(cell_id.clone())
                     .await?
                     .into_iter()
-                    .map(|p| AgentPubKey::from_kitsune(&p.agent))
+                    .map(|p| AgentPubKey::from_k2_agent(&p.agent))
                     .collect::<HashSet<_>>();
                 if infos.is_superset(&peers) {
                     break;
@@ -880,9 +844,95 @@ impl SweetConductor {
         .map_err(|_| ConductorApiError::other("Timeout"))?
     }
 
+    /// Declare full storage arc for all agents of the space and wait until the
+    /// agent infos have been published to the peer store.
+    ///
+    /// # Panics
+    ///
+    /// If peer store cannot be found for DNA hash.
+    /// If publishing to the peer store fails within the timeout of 5 s.
+    pub async fn declare_full_storage_arcs(&self, dna_hash: &DnaHash) {
+        self.holochain_p2p()
+            .test_set_full_arcs(dna_hash.to_k2_space())
+            .await;
+        let local_agents = self
+            .holochain_p2p()
+            .test_kitsune()
+            .space(dna_hash.to_k2_space())
+            .await
+            .unwrap()
+            .local_agent_store()
+            .get_all()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|agent| agent.agent().clone())
+            .collect::<Vec<_>>();
+        let peer_store = self
+            .holochain_p2p()
+            .peer_store(dna_hash.clone())
+            .await
+            .unwrap();
+        retry_until_timeout!(5_000, 500, {
+            if peer_store
+                .get_all()
+                .await
+                .unwrap()
+                .into_iter()
+                // Only check this conductor's local agents for full storage arc.
+                .filter(|agent_info| local_agents.contains(&agent_info.agent))
+                .all(|agent_info| agent_info.storage_arc == DhtArc::FULL)
+            {
+                break;
+            }
+        });
+    }
+
     /// Getter
     pub fn rendezvous(&self) -> Option<&DynSweetRendezvous> {
         self.rendezvous.as_ref()
+    }
+
+    /// Check if all ops in the DHT database have been integrated.
+    pub fn all_ops_integrated(&self, dna_hash: &DnaHash) -> ConductorApiResult<bool> {
+        let dht_db = self.get_dht_db(dna_hash)?;
+        dht_db.test_read(|txn| {
+            let all_integrated = txn
+                .query_row(
+                    "SELECT NOT EXISTS(SELECT 1 FROM DhtOp WHERE when_integrated IS NULL)",
+                    [],
+                    |row| row.get::<_, bool>(0),
+                )
+                .unwrap();
+            Ok(all_integrated)
+        })
+    }
+
+    /// Check if all ops of a specific author have been integrated in the DHT database.
+    pub fn all_ops_of_author_integrated(
+        &self,
+        dna_hash: &DnaHash,
+        author: &AgentPubKey,
+    ) -> ConductorApiResult<bool> {
+        let dht_db = self.get_dht_db(dna_hash)?;
+        let author = author.clone();
+        dht_db.test_read(move |txn| {
+            let all_integrated = txn
+                .query_row(
+                    "SELECT NOT EXISTS(
+                            SELECT 1
+                            FROM DhtOp
+                            JOIN Action
+                            ON Action.hash = DhtOp.action_hash
+                            WHERE Action.author = :author
+                            AND DhtOp.when_integrated IS NULL
+                        )",
+                    named_params! {":author": author},
+                    |row| row.get::<_, bool>(0),
+                )
+                .unwrap();
+            Ok(all_integrated)
+        })
     }
 }
 
@@ -1016,6 +1066,7 @@ impl std::fmt::Debug for SweetConductor {
     }
 }
 
+#[allow(dead_code)]
 fn covering(rng: &mut StdRng, n: usize, s: usize) -> Vec<HashSet<usize>> {
     let nodes: Vec<_> = (0..n)
         .map(|i| {

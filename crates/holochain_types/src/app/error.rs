@@ -5,7 +5,7 @@ use crate::prelude::*;
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("Clone limit of {0} exceeded for app role assignment: {1:?}")]
-    CloneLimitExceeded(u32, AppRolePrimary),
+    CloneLimitExceeded(u32, Box<AppRolePrimary>),
 
     #[error("Tried to create a cell with an existing id '{0}'")]
     DuplicateCellId(CellId),

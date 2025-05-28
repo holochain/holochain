@@ -1,8 +1,7 @@
+use holochain_conductor_api::conductor::NetworkConfig;
 use std::path::PathBuf;
 
 use clap::Parser;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
-use kitsune_p2p_types::config::TransportConfig;
 use url2::Url2;
 
 // This creates a new Holochain sandbox
@@ -39,16 +38,6 @@ pub struct Create {
     /// Use this option to run the sandboxed conductors when you don't have access to the lair binary.
     #[arg(long)]
     pub in_process_lair: bool,
-
-    /// Launch Holochain with the DPKI service disabled.
-    #[cfg(feature = "unstable-dpki")]
-    #[arg(long)]
-    pub no_dpki: bool,
-
-    /// Set the network seed for the DPKI service.
-    #[cfg(feature = "unstable-dpki")]
-    #[arg(long, conflicts_with = "no_dpki")]
-    pub dpki_network_seed: Option<String>,
 
     /// Set the conductor config CHC (Chain Head Coordinator) URL
     #[cfg(feature = "chc")]
@@ -182,17 +171,30 @@ Run `hc sandbox generate --help` for more options."
 }
 
 impl Network {
-    pub async fn to_kitsune(this: &Option<&Self>) -> Option<KitsuneP2pConfig> {
+    pub async fn to_kitsune(this: &Option<&Self>) -> Option<NetworkConfig> {
         let Network {
             transport,
             bootstrap,
         } = match this {
-            None => return None,
+            None => {
+                return Some(NetworkConfig {
+                    advanced: Some(serde_json::json!({
+                        // Allow plaintext signal for hc sandbox to have it work with local
+                        // signaling servers spawned by kitsune2-bootstrap-srv
+                        "tx5Transport": {
+                            "signalAllowPlainText": true,
+                        }
+                    })),
+                    ..NetworkConfig::default()
+                });
+            }
             Some(n) => (*n).clone(),
         };
 
-        let mut kit = KitsuneP2pConfig::mem();
-        kit.bootstrap_service = bootstrap;
+        let mut kit = NetworkConfig::default();
+        if let Some(bootstrap) = bootstrap {
+            kit.bootstrap_url = bootstrap;
+        }
 
         match transport {
             NetworkType::Mem => (),
@@ -211,11 +213,15 @@ impl Network {
                     }
                     None => None,
                 };
-                let transport = TransportConfig::WebRTC {
-                    signal_url,
-                    webrtc_config,
-                };
-                kit.transport_pool = vec![transport];
+                kit.signal_url = url2::url2!("{}", signal_url);
+                kit.webrtc_config = webrtc_config;
+                kit.advanced = Some(serde_json::json!({
+                    // Allow plaintext signal for hc sandbox to have it work with local
+                    // signaling servers spawned by kitsune2-bootstrap-srv
+                    "tx5Transport": {
+                        "signalAllowPlainText": true,
+                    }
+                }));
             }
         }
         Some(kit)
@@ -230,10 +236,6 @@ impl Default for Create {
             root: None,
             directories: Vec::with_capacity(0),
             in_process_lair: false,
-            #[cfg(feature = "unstable-dpki")]
-            no_dpki: false,
-            #[cfg(feature = "unstable-dpki")]
-            dpki_network_seed: None,
             #[cfg(feature = "chc")]
             chc_url: None,
         }

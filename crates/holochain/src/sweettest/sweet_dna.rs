@@ -1,7 +1,7 @@
-use holochain_p2p::dht::spacetime::STANDARD_QUANTUM_TIME;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasmPair;
+use mr_bundle::FileSystemBundler;
 use std::path::Path;
 
 /// Helpful constructors for DnaFiles used in tests
@@ -24,8 +24,11 @@ impl SweetDnaFile {
         P: TryInto<SerializedBytes, Error = E>,
         SerializedBytesError: From<E>,
     {
-        Ok(DnaBundle::read_from_file(path)
-            .await?
+        let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(path)
+            .await
+            .map(DnaBundle::from)?;
+
+        Ok(bundle
             .into_dna_file(modifiers.serialized().map_err(SerializedBytesError::from)?)
             .await?
             .0)
@@ -62,8 +65,6 @@ impl SweetDnaFile {
             .modifiers(DnaModifiers {
                 network_seed,
                 properties: properties.clone(),
-                origin_time: Timestamp::HOLOCHAIN_EPOCH,
-                quantum_time: STANDARD_QUANTUM_TIME,
             })
             .integrity_zomes(iz)
             .coordinator_zomes(cz)

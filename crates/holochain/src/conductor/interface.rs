@@ -5,7 +5,6 @@
 //! Currently, the only InterfaceDriver is a Websocket-based one, whose
 //! implementation can be found in the `websocket` module here.
 
-#[allow(missing_docs)]
 pub mod error;
 pub mod websocket;
 

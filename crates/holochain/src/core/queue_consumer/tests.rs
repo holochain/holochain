@@ -1,7 +1,9 @@
-use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
-
 use super::*;
-use arbitrary::Arbitrary;
+use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
+use ::fixt::*;
+use holo_hash::fixt::ActionHashFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::EntryHashFixturator;
 use holochain_conductor_api::conductor::ConductorTuningParams;
 use holochain_state::mutations;
 use holochain_state::prelude::StateMutationResult;
@@ -222,16 +224,27 @@ async fn test_concurrency() {
 
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
-    let mut u = arbitrary::Unstructured::new(&[0; 1000]);
-    let kind = DbKindAuthored(Arc::new(CellId::arbitrary(&mut u).unwrap()));
+    let kind = DbKindAuthored(Arc::new(fixt!(CellId)));
     let tmpdir = tempfile::Builder::new()
         .prefix("holochain-test-environments")
         .tempdir()
         .unwrap();
     let db = DbWrite::test(tmpdir.path(), kind).expect("Couldn't create test database");
-    let action = Action::arbitrary(&mut u).unwrap();
+    let action = Action::Create(Create {
+        author: fixt!(AgentPubKey),
+        timestamp: Timestamp::now(),
+        action_seq: 5,
+        prev_action: fixt!(ActionHash),
+        entry_type: EntryType::App(AppEntryDef::new(
+            0.into(),
+            0.into(),
+            EntryVisibility::Public,
+        )),
+        entry_hash: fixt!(EntryHash),
+        weight: EntryRateWeight::default(),
+    });
     let author = action.author().clone();
-    let signature = Signature::arbitrary(&mut u).unwrap();
+    let signature = Signature(vec![3; SIGNATURE_BYTES].try_into().unwrap());
     let op = ChainOp::RegisterAgentActivity(signature, action);
     let op = DhtOpHashed::from_content_sync(op);
     let op_hash = op.to_hash();
@@ -244,7 +257,7 @@ async fn publish_loop() {
     let (tx, mut op_published) = tokio::sync::mpsc::channel(100);
     dna_network
         .expect_publish()
-        .returning(move |_, _, _, _, _, _, _| {
+        .returning(move |_, _, _, _, _, _| {
             tx.try_send(()).unwrap();
             Ok(())
         });

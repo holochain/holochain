@@ -4,12 +4,10 @@ use std::time::UNIX_EPOCH;
 
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
-use holochain_p2p::DhtOpHashExt;
 use holochain_sqlite::db::DbKindAuthored;
 use holochain_sqlite::prelude::ReadAccess;
 use holochain_state::prelude::*;
 use holochain_state::query::map_sql_dht_op;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::OpHashSized;
 use rusqlite::named_params;
 use rusqlite::Transaction;
 
@@ -24,7 +22,7 @@ pub async fn get_ops_to_publish<AuthorDb>(
     agent: AgentPubKey,
     db: &AuthorDb,
     min_publish_interval: Duration,
-) -> WorkflowResult<Vec<(OpBasis, OpHashSized, DhtOp)>>
+) -> WorkflowResult<Vec<(OpBasis, DhtOpHash, DhtOp)>>
 where
     AuthorDb: ReadAccess<DbKindAuthored>,
 {
@@ -74,14 +72,9 @@ where
             },
             |row| {
                 let op = map_sql_dht_op(false, "dht_type", row)?;
-                let action_size: usize = row.get("action_size")?;
-                // will be NULL if the op has no associated entry
-                let entry_size: Option<usize> = row.get("entry_size")?;
-                let op_size = (action_size + entry_size.unwrap_or(0)).into();
-                let hash: DhtOpHash = row.get("dht_hash")?;
-                let op_hash_sized = OpHashSized::new(hash.to_kitsune(), Some(op_size));
+                let op_hash: DhtOpHash = row.get("dht_hash")?;
                 let basis = op.dht_basis();
-                WorkflowResult::Ok((basis, op_hash_sized, op))
+                WorkflowResult::Ok((basis, op_hash, op))
             },
         )?;
         WorkflowResult::Ok(r.collect::<Result<Vec<_>, _>>())
@@ -119,6 +112,7 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
 #[cfg(test)]
 mod tests {
     use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
     use holochain_conductor_api::conductor::ConductorTuningParams;
@@ -162,14 +156,12 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(
-            r.into_iter()
-                .map(|t| t.1.into_inner().0)
-                .collect::<Vec<_>>(),
+            r.into_iter().map(|t| t.1).collect::<Vec<_>>(),
             expected
                 .results
                 .iter()
                 .cloned()
-                .map(|op| op.into_inner().1.to_kitsune())
+                .map(|op| op.into_inner().1)
                 .collect::<Vec<_>>(),
         );
 

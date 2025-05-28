@@ -11,7 +11,6 @@ const FILE: &str = "test.txt";
 const CONTENT: &[u8] = b"this is a test\n";
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn demo() {
     run_test(|| async {
@@ -31,7 +30,6 @@ async fn demo() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn demo_multi_sig() {
     run_test(|| async {
@@ -175,6 +173,7 @@ async fn run(
             inbox: std::path::PathBuf::from(format!("{name}-in")),
             signal_url: "not-used".into(),
             bootstrap_url: "not-used".into(),
+            base64_auth_material: None,
         },
     };
 

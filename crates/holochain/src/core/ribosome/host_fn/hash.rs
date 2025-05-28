@@ -5,7 +5,7 @@ use holo_hash::HasHash;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::prelude::*;
 use std::sync::Arc;
-use tiny_keccak::{Hasher, Keccak, Sha3};
+use sha3::Digest;
 use wasmer::RuntimeError;
 
 pub fn hash(
@@ -26,18 +26,25 @@ pub fn hash(
             )?)
         }
         HashInput::Keccak256(data) => HashOutput::Keccak256({
-            let mut output = [0u8; 32];
-            let mut hasher = Keccak::v256();
-            hasher.update(data.as_ref());
-            hasher.finalize(&mut output);
-            output.into()
+            let mut hasher = sha3::Keccak256::new();
+            hasher.update(data);
+
+            hasher.finalize().as_slice().try_into().map_err(|e| {
+                wasm_error!(WasmErrorInner::Host(format!(
+                    "Failed to convert keccak256 output: {:?}",
+                    e
+                )))
+            })?
         }),
         HashInput::Sha3256(data) => HashOutput::Sha3256({
-            let mut output = [0u8; 32];
-            let mut hasher = Sha3::v256();
-            hasher.update(data.as_ref());
-            hasher.finalize(&mut output);
-            output.into()
+            let mut hasher = sha3::Sha3_256::new();
+            hasher.update(data);
+            hasher.finalize().as_slice().try_into().map_err(|e| {
+                wasm_error!(WasmErrorInner::Host(format!(
+                    "Failed to convert sha3-256 output: {:?}",
+                    e
+                )))
+            })?
         }),
         _ => {
             return Err(wasm_error!(WasmErrorInner::Host(format!(
@@ -69,7 +76,7 @@ pub mod wasm_test {
     /// we can get an entry hash out of the fn directly
     async fn hash_test() {
         let ribosome = Arc::new(
-            RealRibosomeFixturator::new(crate::fixt::curve::Zomes(vec![]))
+            RealRibosomeFixturator::new(crate::fixt::Zomes(vec![]))
                 .next()
                 .unwrap(),
         );

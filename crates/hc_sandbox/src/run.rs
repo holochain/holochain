@@ -1,27 +1,25 @@
 //! Helpers for running the conductor.
 
+use crate::cli::LaunchInfo;
 use anyhow::anyhow;
-use std::path::Path;
-use std::process::Stdio;
-
+use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigFilePath;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::conductor::paths::KeystorePath;
 use holochain_conductor_api::conductor::{ConductorConfig, KeystoreConfig};
+use holochain_conductor_config::config::create_config;
+use holochain_conductor_config::config::read_config;
+use holochain_conductor_config::config::write_config;
+use holochain_conductor_config::ports::set_admin_port;
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
+use std::path::Path;
+use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
-
-use crate::calls::attach_app_interface;
-use crate::calls::AddAppWs;
-use crate::cli::LaunchInfo;
-use crate::config::*;
-use crate::ports::random_admin_port;
-use crate::ports::set_admin_port;
-use crate::CmdRunner;
 
 // MAYBE: Export these strings from their respective repos
 //        so that we can be sure to keep them in sync.
@@ -55,18 +53,15 @@ pub async fn run(
     .await?;
     let mut launch_info = LaunchInfo::from_admin_port(admin_port);
     for app_port in app_ports {
-        let mut cmd = CmdRunner::try_new(admin_port).await?;
-        let port = attach_app_interface(
-            &mut cmd,
-            AddAppWs {
-                port: Some(app_port),
-                allowed_origins: AllowedOrigins::Any,
-                installed_app_id: None,
-            },
-        )
-        .await?;
+        let admin_ws = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
+        let port = admin_ws
+            .attach_app_interface(app_port, AllowedOrigins::Any, None)
+            .await?;
         launch_info.app_ports.push(port);
     }
+
+    crate::save::lock_live(std::env::current_dir()?, &sandbox_path, admin_port).await?;
+    msg!("Connected successfully to a running holochain");
 
     msg!(
         "Conductor launched #!{} {}",
@@ -74,10 +69,7 @@ pub async fn run(
         serde_json::to_string(&launch_info)?
     );
 
-    crate::save::lock_live(std::env::current_dir()?, &sandbox_path, admin_port).await?;
-    msg!("Connected successfully to a running holochain");
     let e = format!("Failed to run holochain at {}", sandbox_path.display());
-
     holochain.wait().await.expect(&e);
     if let Some(mut lair) = lair {
         let _ = lair.kill().await;
@@ -104,18 +96,26 @@ pub async fn run_async(
         Some(c) => c,
         None => {
             let passphrase = holochain_util::pw::pw_get()?;
-            let con_url = crate::generate::init_lair(
+            let con_url = holochain_conductor_config::generate::init_lair(
                 &config_root_path.is_also_data_root_path().try_into()?,
                 passphrase,
             )?;
-            create_config(config_root_path.clone(), Some(con_url))?
+            let mut generated_config = create_config(config_root_path.clone(), Some(con_url))?;
+            generated_config.network.advanced = Some(serde_json::json!({
+                // Allow plaintext signal for hc sandbox to have it work with local
+                // signaling servers spawned by kitsune2-bootstrap-srv
+                "tx5Transport": {
+                    "signalAllowPlainText": true,
+                }
+            }));
+            generated_config
         }
     };
     match force_admin_port {
         Some(port) => {
             set_admin_port(&mut config, port);
         }
-        None => random_admin_port(&mut config),
+        None => set_admin_port(&mut config, 0),
     }
     let _config_file_path = write_config(config_root_path.clone(), &config);
     let (tx_config, rx_config) = oneshot::channel();
@@ -148,12 +148,12 @@ async fn start_holochain(
     tx_config: oneshot::Sender<u16>,
 ) -> anyhow::Result<(Child, Option<Child>)> {
     use tokio::io::AsyncWriteExt;
-    let passphrase = holochain_util::pw::pw_get()?.read_lock().to_vec();
+    let passphrase = holochain_util::pw::pw_get()?;
 
     let lair = match config.keystore {
         KeystoreConfig::LairServer { .. } => {
             let lair = start_lair(
-                passphrase.as_slice(),
+                passphrase.clone(),
                 config_root_path.is_also_data_root_path().try_into()?,
             )
             .await?;
@@ -176,7 +176,8 @@ async fn start_holochain(
     let mut holochain = cmd.spawn().expect("Failed to spawn holochain");
 
     let mut stdin = holochain.stdin.take().unwrap();
-    stdin.write_all(&passphrase).await?;
+    let pass = (*passphrase.lock().unwrap().lock()).to_vec();
+    stdin.write_all(&pass).await?;
     stdin.shutdown().await?;
     drop(stdin);
 
@@ -185,7 +186,10 @@ async fn start_holochain(
     Ok((holochain, lair))
 }
 
-async fn start_lair(passphrase: &[u8], lair_path: KeystorePath) -> anyhow::Result<Child> {
+async fn start_lair(
+    passphrase: Arc<Mutex<sodoken::LockedArray>>,
+    lair_path: KeystorePath,
+) -> anyhow::Result<Child> {
     use tokio::io::AsyncWriteExt;
 
     tracing::info!("\n\n----\nstarting lair\n----\n\n");
@@ -204,7 +208,8 @@ async fn start_lair(passphrase: &[u8], lair_path: KeystorePath) -> anyhow::Resul
     let mut lair = cmd.spawn().expect("Failed to spawn lair-keystore");
 
     let mut stdin = lair.stdin.take().unwrap();
-    stdin.write_all(passphrase).await?;
+    let pass = (*passphrase.lock().unwrap().lock()).to_vec();
+    stdin.write_all(&pass).await?;
     stdin.shutdown().await?;
     drop(stdin);
 

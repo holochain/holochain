@@ -1,29 +1,25 @@
-use crate::{
-    error::{BundleError, MrBundleResult},
-    location::Location,
-    manifest::Manifest,
-    resource::ResourceBytes,
-};
-use holochain_util::ffs;
+use crate::error::MrBundleError;
+use crate::manifest::ResourceIdentifier;
+use crate::{error::MrBundleResult, manifest::Manifest};
+use resource::ResourceBytes;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    borrow::Cow,
-    collections::{BTreeMap, HashMap, HashSet},
-    path::{Path, PathBuf},
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt::Debug;
+use std::io::Read;
 
-pub type ResourceMap = BTreeMap<PathBuf, ResourceBytes>;
+pub mod resource;
 
-/// A Manifest bundled together, optionally, with the Resources that it describes.
+/// A map from resource identifiers to their value as byte arrays.
+pub type ResourceMap = BTreeMap<ResourceIdentifier, ResourceBytes>;
+
+/// A [Manifest], bundled with the Resources that it describes.
+///
 /// This is meant to be serialized for standalone distribution, and deserialized
 /// by the receiver.
-///
-/// The manifest may describe locations of resources not included in the Bundle.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Bundle<M>
 where
-    M: Manifest,
+    M: Debug + Serialize + DeserializeOwned,
 {
     /// The manifest describing the resources that compose this bundle.
     #[serde(bound(deserialize = "M: DeserializeOwned"))]
@@ -33,19 +29,40 @@ where
     /// of the Bundled Locations specified by the Manifest. Bundled Locations
     /// are always relative paths (relative to the root_dir).
     resources: ResourceMap,
+}
 
-    /// Since the Manifest may contain local paths referencing unbundled files,
-    /// on the local filesystem, we must have an absolute path at runtime for
-    /// normalizing those locations.
+impl<M> Bundle<M>
+where
+    M: Debug + Serialize + DeserializeOwned,
+{
+    /// Accessor for the Manifest
+    pub fn manifest(&self) -> &M {
+        &self.manifest
+    }
+
+    /// Accessor for the map of resources included in this bundle
+    pub fn get_all_resources(&self) -> HashMap<&ResourceIdentifier, &ResourceBytes> {
+        self.resources.iter().collect()
+    }
+
+    /// Retrieve the bytes for a single resource.
+    pub fn get_resource(&self, resource_identifier: &ResourceIdentifier) -> Option<&ResourceBytes> {
+        self.resources.get(resource_identifier)
+    }
+
+    /// Pack this bundle into a byte array.
     ///
-    /// Passing None is a runtime assertion that the manifest contains only
-    /// absolute local paths. If this assertion fails,
-    /// **resource resolution will panic!**
-    //
-    // MAYBE: Represent this with types more solidly, perhaps breaking this
-    //        struct into two versions for each case.
-    #[serde(skip)]
-    root_dir: Option<PathBuf>,
+    /// Uses [`pack`](fn@crate::pack) to produce the byte array.
+    pub fn pack(&self) -> MrBundleResult<bytes::Bytes> {
+        crate::pack(self)
+    }
+
+    /// Unpack bytes produced by [`pack`](Bundle::pack) into a new [Bundle].
+    ///
+    /// Uses [`unpack`](crate::unpack) to produce the new Bundle.
+    pub fn unpack(source: impl Read) -> MrBundleResult<Self> {
+        crate::unpack(source)
+    }
 }
 
 impl<M> Bundle<M>
@@ -61,212 +78,181 @@ where
     ///
     /// A base directory must also be supplied so that relative paths can be
     /// resolved into absolute ones.
-    pub fn new<R: IntoIterator<Item = (PathBuf, ResourceBytes)>>(
+    pub fn new(
         manifest: M,
-        resources: R,
-        root_dir: PathBuf,
+        resources: impl IntoIterator<Item = (ResourceIdentifier, ResourceBytes)>,
     ) -> MrBundleResult<Self> {
-        Self::from_parts(manifest, resources, Some(root_dir))
+        Self::from_parts(manifest, resources)
     }
 
-    /// Create a bundle, asserting that all paths in the Manifest are absolute.
-    pub fn new_unchecked<R: IntoIterator<Item = (PathBuf, ResourceBytes)>>(
-        manifest: M,
-        resources: R,
+    fn from_parts(
+        mut manifest: M,
+        resources: impl IntoIterator<Item = (ResourceIdentifier, ResourceBytes)>,
     ) -> MrBundleResult<Self> {
-        Self::from_parts(manifest, resources, None)
-    }
+        let resources = resources.into_iter().collect::<ResourceMap>();
+        let manifest_resource_ids: HashSet<_> =
+            manifest.generate_resource_ids().keys().cloned().collect();
 
-    fn from_parts<R: IntoIterator<Item = (PathBuf, ResourceBytes)>>(
-        manifest: M,
-        resources: R,
-        root_dir: Option<PathBuf>,
-    ) -> MrBundleResult<Self> {
-        let resources: ResourceMap = resources.into_iter().collect();
-        let manifest_paths: HashSet<_> = manifest
-            .locations()
-            .into_iter()
-            .filter_map(|loc| match loc {
-                Location::Bundled(path) => Some(path),
-                _ => None,
-            })
-            .collect();
-
-        // Validate that each resource path is contained in the manifest
-        for (resource_path, _) in resources.iter() {
-            if !manifest_paths.contains(resource_path) {
-                return Err(BundleError::BundledPathNotInManifest(resource_path.clone()).into());
-            }
+        let missing_resources = manifest_resource_ids
+            .difference(&resources.keys().cloned().collect())
+            .cloned()
+            .collect::<Vec<_>>();
+        if !missing_resources.is_empty() {
+            return Err(MrBundleError::MissingResources(missing_resources));
         }
 
-        let resources = resources.into_iter().collect();
+        let extra_resources = resources
+            .keys()
+            .cloned()
+            .collect::<HashSet<_>>()
+            .difference(&manifest_resource_ids)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if !extra_resources.is_empty() {
+            return Err(MrBundleError::UnusedResources(extra_resources));
+        }
+
         Ok(Self {
             manifest,
             resources,
-            root_dir,
         })
-    }
-
-    /// Accessor for the Manifest
-    pub fn manifest(&self) -> &M {
-        &self.manifest
     }
 
     /// Return a new Bundle with an updated manifest, subject to the same
     /// validation constraints as creating a new Bundle from scratch.
     pub fn update_manifest(self, manifest: M) -> MrBundleResult<Self> {
-        Self::from_parts(manifest, self.resources, self.root_dir)
-    }
-
-    /// Load a Bundle into memory from a file
-    pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        Self::decode(&ffs::read(path).await?)
-    }
-
-    /// Write a Bundle to a file
-    pub async fn write_to_file(&self, path: &Path) -> MrBundleResult<()> {
-        Ok(ffs::write(path, &self.encode()?).await?)
-    }
-
-    /// Retrieve the bytes for a resource at a Location, downloading it if
-    /// necessary
-    pub async fn resolve(&self, location: &Location) -> MrBundleResult<Cow<'_, ResourceBytes>> {
-        let bytes = match &location.normalize(self.root_dir.as_ref())? {
-            Location::Bundled(path) => Cow::Borrowed(
-                self.resources
-                    .get(path)
-                    .ok_or_else(|| BundleError::BundledResourceMissing(path.clone()))?,
-            ),
-            Location::Path(path) => Cow::Owned(crate::location::resolve_local(path).await?),
-            Location::Url(url) => Cow::Owned(crate::location::resolve_remote(url).await?),
-        };
-        Ok(bytes)
-    }
-
-    /// Return the full set of resources specified by this bundle's manifest.
-    /// References to bundled resources can be returned directly, while all
-    /// others will be fetched from the filesystem or the network.
-    pub async fn resolve_all(&self) -> MrBundleResult<HashMap<Location, Cow<'_, ResourceBytes>>> {
-        futures::future::join_all(
-            self.manifest.locations().into_iter().map(|loc| async move {
-                MrBundleResult::Ok((loc.clone(), self.resolve(&loc).await?))
-            }),
-        )
-        .await
-        .into_iter()
-        .collect::<MrBundleResult<HashMap<Location, Cow<'_, ResourceBytes>>>>()
-    }
-
-    /// Resolve all resources, but with fully owned references
-    pub async fn resolve_all_cloned(&self) -> MrBundleResult<HashMap<Location, ResourceBytes>> {
-        Ok(self
-            .resolve_all()
-            .await?
-            .into_iter()
-            .map(|(k, v)| (k, v.into_owned()))
-            .collect())
-    }
-
-    /// Access the map of resources included in this bundle
-    /// Bundled resources are also accessible via `resolve` or `resolve_all`,
-    /// but using this method prevents a Clone
-    pub fn bundled_resources(&self) -> &ResourceMap {
-        &self.resources
-    }
-
-    /// An arbitrary and opaque encoding of the bundle data into a byte array
-    pub fn encode(&self) -> MrBundleResult<Vec<u8>> {
-        crate::encode(self)
-    }
-
-    /// Decode bytes produced by [`encode`](Bundle::encode)
-    pub fn decode(bytes: &[u8]) -> MrBundleResult<Self> {
-        crate::decode(bytes)
-    }
-
-    /// Given that the Manifest is located at the given absolute `path`, find
-    /// the absolute root directory for the "unpacked" Bundle directory.
-    /// Useful when "imploding" a directory into a bundle to determine the
-    /// default location of the generated Bundle file.
-    ///
-    /// This will only be different than the Manifest path itself if the
-    /// Manifest::path impl specifies a nested path.
-    ///
-    /// Will return None if the `path` does not actually end with the
-    /// manifest relative path, meaning that either the manifest file is
-    /// misplaced within the unpacked directory, or an incorrect path was
-    /// supplied.
-    #[cfg(feature = "packing")]
-    pub fn find_root_dir(&self, path: &Path) -> MrBundleResult<PathBuf> {
-        crate::util::prune_path(path.into(), M::path()).map_err(Into::into)
-    }
-}
-
-/// A manifest bundled together, optionally, with the Resources that it describes.
-/// The manifest may be of any format. This is useful for deserializing a bundle of
-/// an outdated format, so that it may be modified to fit the supported format.
-#[derive(Debug, PartialEq, Eq, Deserialize)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub struct RawBundle<M> {
-    /// The manifest describing the resources that compose this bundle.
-    #[serde(bound(deserialize = "M: DeserializeOwned"))]
-    pub manifest: M,
-
-    /// The full or partial resource data. Each entry must correspond to one
-    /// of the Bundled Locations specified by the Manifest. Bundled Locations
-    /// are always relative paths (relative to the root_dir).
-    pub resources: ResourceMap,
-}
-
-impl<M: serde::de::DeserializeOwned> RawBundle<M> {
-    /// Load a Bundle into memory from a file
-    pub async fn read_from_file(path: &Path) -> MrBundleResult<Self> {
-        crate::decode(&ffs::read(path).await?)
+        Self::from_parts(manifest, self.resources)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::error::MrBundleError;
-
     use super::*;
+    use crate::error::MrBundleError;
+    use bytes::Buf;
 
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-    struct TestManifest(Vec<Location>);
+    struct TestManifest(Vec<ResourceIdentifier>);
 
     impl Manifest for TestManifest {
-        fn locations(&self) -> Vec<Location> {
+        fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
+            self.resource_ids()
+                .iter()
+                .map(|r| (r.clone(), r.clone()))
+                .collect()
+        }
+
+        fn resource_ids(&self) -> Vec<ResourceIdentifier> {
             self.0.clone()
         }
 
-        #[cfg(feature = "packing")]
-        fn path() -> PathBuf {
+        #[cfg(feature = "fs")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
+        fn file_name() -> &'static str {
             unimplemented!()
         }
 
-        #[cfg(feature = "packing")]
+        #[cfg(feature = "fs")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
         fn bundle_extension() -> &'static str {
             unimplemented!()
         }
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-    struct Thing(u32);
+    #[test]
+    fn bundle_validation() {
+        let manifest = TestManifest(vec!["1.thing".into(), "2.thing".into()]);
 
-    #[tokio::test]
-    async fn bundle_validation() {
-        let manifest = TestManifest(vec![
-            Location::Bundled("1.thing".into()),
-            Location::Bundled("2.thing".into()),
-        ]);
+        Bundle::new(
+            manifest.clone(),
+            vec![
+                ("1.thing".into(), vec![1].into()),
+                ("2.thing".into(), vec![2].into()),
+            ],
+        )
+        .unwrap();
+
+        let err =
+            Bundle::new(manifest.clone(), vec![("1.thing".into(), vec![1].into())]).unwrap_err();
         assert!(
-            Bundle::new_unchecked(manifest.clone(), vec![("1.thing".into(), vec![1].into())])
-                .is_ok()
+            matches!(err, MrBundleError::MissingResources(ref resources) if resources.contains(&"2.thing".into())),
+            "Got other error: {err:?}"
         );
 
-        matches::assert_matches!(
-            Bundle::new_unchecked(manifest, vec![("3.thing".into(), vec![3].into())]),
-            Err(MrBundleError::BundleError(BundleError::BundledPathNotInManifest(path))) if path == PathBuf::from("3.thing")
+        let err = Bundle::new(
+            manifest,
+            vec![
+                ("1.thing".into(), vec![1].into()),
+                ("2.thing".into(), vec![2].into()),
+                ("3.thing".into(), vec![3].into()),
+            ],
+        )
+        .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                MrBundleError::UnusedResources(ref resources) if resources.contains(&"3.thing".into())
+            ),
+            "Got other error: {err:?}"
+        );
+    }
+
+    #[test]
+    fn round_trip_pack_unpack() {
+        let manifest = TestManifest(vec!["1.thing".into(), "2.thing".into()]);
+
+        let bundle = Bundle::new(
+            manifest.clone(),
+            vec![
+                ("1.thing".into(), vec![1].into()),
+                ("2.thing".into(), vec![2].into()),
+            ],
+        )
+        .unwrap();
+
+        let packed = bundle.pack().unwrap();
+        let unpacked = Bundle::unpack(packed.reader()).unwrap();
+
+        assert_eq!(bundle, unpacked);
+    }
+
+    #[test]
+    fn consistent_id_generation_in_mem() {
+        #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+        struct TestManifest(String);
+
+        impl Manifest for TestManifest {
+            fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
+                let id = self.0.split(".").last().unwrap().to_string();
+                let original = self.0.clone();
+
+                self.0 = id.clone();
+
+                HashMap::from([(id, original)])
+            }
+
+            fn resource_ids(&self) -> Vec<ResourceIdentifier> {
+                vec![self.0.clone()]
+            }
+
+            fn file_name() -> &'static str {
+                "test.yaml"
+            }
+
+            fn bundle_extension() -> &'static str {
+                "test"
+            }
+        }
+
+        let manifest = TestManifest("test.thing".into());
+
+        let bundle = Bundle::new(manifest.clone(), vec![("thing".into(), vec![1].into())]).unwrap();
+
+        assert_eq!(vec!["thing".to_string()], bundle.manifest.resource_ids());
+        assert_eq!(
+            &ResourceBytes::from(vec![1]),
+            bundle.get_resource(&"thing".into()).unwrap()
         );
     }
 }

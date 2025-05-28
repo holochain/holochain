@@ -4,8 +4,6 @@ use std::sync::Arc;
 
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
-use super::DpkiApi;
-use crate::conductor::conductor::ConductorServices;
 use crate::conductor::error::ConductorResult;
 use crate::conductor::ConductorHandle;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
@@ -53,12 +51,6 @@ impl CellConductorApi {
 impl CellConductorApiT for CellConductorApi {
     fn cell_id(&self) -> &CellId {
         &self.cell_id
-    }
-
-    fn conductor_services(&self) -> ConductorServices {
-        self.conductor_handle
-            .running_services
-            .share_ref(|s| s.clone())
     }
 
     fn keystore(&self) -> &MetaLairClient {
@@ -109,9 +101,6 @@ pub trait CellConductorApiT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
 
-    /// Access to the conductor services
-    fn conductor_services(&self) -> ConductorServices;
-
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &MetaLairClient;
 
@@ -146,7 +135,10 @@ pub trait CellConductorReadHandleT: Send + Sync {
     fn cell_id(&self) -> &CellId;
 
     /// Invoke a zome function on a Cell
-    async fn call_zome(
+    async fn call_zome(&self, params: ZomeCallParams) -> ConductorApiResult<ZomeCallResult>;
+
+    /// Invoke a zome function on a Cell
+    async fn call_zome_with_workspace(
         &self,
         params: ZomeCallParams,
         workspace_lock: SourceChainWorkspace,
@@ -157,9 +149,6 @@ pub trait CellConductorReadHandleT: Send + Sync {
 
     /// Get a [`EntryDef`] from the [`EntryDefBufferKey`]
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef>;
-
-    /// Call into DPKI
-    fn get_dpki(&self) -> DpkiApi;
 
     /// Try to put the nonce from a calling agent in the db. Fails with a stale result if a newer nonce exists.
     async fn witness_nonce_from_calling_agent(
@@ -184,7 +173,8 @@ pub trait CellConductorReadHandleT: Send + Sync {
     async fn unblock(&self, input: Block) -> DatabaseResult<()>;
 
     /// Expose is_blocked functionality to zomes.
-    async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool>;
+    async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp)
+        -> ConductorResult<bool>;
 
     /// Find an installed app by one of its [CellId]s.
     async fn find_app_containing_cell(
@@ -231,7 +221,11 @@ impl CellConductorReadHandleT for CellConductorApi {
         &self.cell_id
     }
 
-    async fn call_zome(
+    async fn call_zome(&self, params: ZomeCallParams) -> ConductorApiResult<ZomeCallResult> {
+        self.conductor_handle.call_zome(params).await
+    }
+
+    async fn call_zome_with_workspace(
         &self,
         params: ZomeCallParams,
         workspace_lock: SourceChainWorkspace,
@@ -251,10 +245,6 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     fn get_entry_def(&self, key: &EntryDefBufferKey) -> Option<EntryDef> {
         CellConductorApiT::get_entry_def(self, key)
-    }
-
-    fn get_dpki(&self) -> DpkiApi {
-        CellConductorApiT::conductor_services(self).dpki
     }
 
     async fn witness_nonce_from_calling_agent(
@@ -287,7 +277,11 @@ impl CellConductorReadHandleT for CellConductorApi {
         self.conductor_handle.unblock(input).await
     }
 
-    async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp) -> DatabaseResult<bool> {
+    async fn is_blocked(
+        &self,
+        input: BlockTargetId,
+        timestamp: Timestamp,
+    ) -> ConductorResult<bool> {
         self.conductor_handle.is_blocked(input, timestamp).await
     }
 

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
 use tracing::*;
 
@@ -29,7 +29,7 @@ mod unit_tests;
 pub async fn validation_receipt_workflow<B>(
     dna_hash: Arc<DnaHash>,
     vault: DbWrite<DbKindDht>,
-    network: impl HolochainP2pDnaT,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     running_cell_ids: HashSet<CellId>,
     apply_block: B,
@@ -76,7 +76,7 @@ where
         // Try to send the validation receipts
         match sign_and_send_receipts_to_author(
             &dna_hash,
-            &network,
+            network.clone(),
             &keystore,
             &validators,
             &author,
@@ -86,18 +86,18 @@ where
         .await
         {
             Ok(()) => {
-                // Success, move on to mark them as sent
+                // Mark them sent so we don't keep trying
+                for receipt in receipts {
+                    vault
+                        .write_async(move |txn| {
+                            set_require_receipt(txn, &receipt.dht_op_hash, false)
+                        })
+                        .await?;
+                }
             }
             Err(e) => {
                 info!(failed_to_sign_and_send_receipt = ?e);
             }
-        }
-
-        // Attempted to send the receipts so we now mark them to not send in the next workflow run.
-        for receipt in receipts {
-            vault
-                .write_async(move |txn| set_require_receipt(txn, &receipt.dht_op_hash, false))
-                .await?;
         }
     }
 
@@ -108,7 +108,7 @@ where
 /// Requires that the receipts to send are all by the same author.
 async fn sign_and_send_receipts_to_author<B>(
     dna_hash: &DnaHash,
-    network: &impl HolochainP2pDnaT,
+    network: DynHolochainP2pDna,
     keystore: &MetaLairClient,
     validators: &HashSet<AgentPubKey>,
     op_author: &AgentPubKey,
@@ -176,17 +176,13 @@ where
         );
     }
 
-    // Send it and don't wait for response.
-    if let Err(e) = holochain_p2p::HolochainP2pDnaT::send_validation_receipts(
-        network,
+    // Actually send the receipt to the author.
+    holochain_p2p::HolochainP2pDnaT::send_validation_receipts(
+        network.as_ref(),
         op_author.clone(),
         receipts.into(),
     )
-    .await
-    {
-        // No one home, they will need to publish again.
-        info!(failed_send_receipt = ?e);
-    }
+    .await?;
 
     Ok(())
 }

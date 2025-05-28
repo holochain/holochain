@@ -8,7 +8,6 @@ use holo_hash::DnaHash;
 use holochain_chc::ChcError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
-use holochain_state::workspace::WorkspaceError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
 use mr_bundle::error::MrBundleError;
@@ -16,6 +15,7 @@ use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 /// Errors occurring during a [`CellConductorApi`](super::CellConductorApi) or [`InterfaceApi`](super::InterfaceApi) call
+#[allow(missing_docs)]
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
     /// The Dna for this Cell is not installed in the conductor.
@@ -48,10 +48,6 @@ pub enum ConductorApiError {
     /// Database error
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
-
-    /// Workspace error.
-    #[error(transparent)]
-    WorkspaceError(#[from] WorkspaceError),
 
     /// Workflow error.
     #[error(transparent)]
@@ -112,6 +108,12 @@ pub enum ConductorApiError {
     #[error(transparent)]
     RibosomeError(#[from] crate::core::ribosome::error::RibosomeError),
 
+    #[error(transparent)]
+    KitsuneError(#[from] kitsune2_api::K2Error),
+
+    #[error(transparent)]
+    HolochainP2pError(#[from] HolochainP2pError),
+
     /// Other
     #[error("Other: {0}")]
     Other(Box<dyn std::error::Error + Send + Sync>),
@@ -146,6 +148,7 @@ pub enum SerializationError {
 pub type ConductorApiResult<T> = Result<T, ConductorApiError>;
 
 pub use holochain_conductor_api::ExternalApiWireError;
+use holochain_p2p::HolochainP2pError;
 
 impl From<ConductorApiError> for ExternalApiWireError {
     fn from(err: ConductorApiError) -> Self {
@@ -168,6 +171,10 @@ impl From<RibosomeError> for ExternalApiWireError {
     }
 }
 
+/// Convert a zome call response into a conductor api result.
+///
+/// This is a convenience function to handle errors when making zome
+/// calls from the conductor.
 pub fn zome_call_response_to_conductor_api_result<T: DeserializeOwned + std::fmt::Debug>(
     zcr: ZomeCallResponse,
 ) -> ConductorApiResult<T> {

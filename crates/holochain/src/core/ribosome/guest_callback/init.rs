@@ -5,9 +5,8 @@ use crate::core::ribosome::Invocation;
 use crate::core::ribosome::InvocationAuth;
 use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
-use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pDna;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_types::prelude::*;
@@ -28,8 +27,7 @@ impl InitInvocation {
 pub struct InitHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
-    pub dpki: Option<DpkiImpl>,
-    pub network: HolochainP2pDna,
+    pub network: DynHolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
 }
@@ -225,13 +223,17 @@ mod test {
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
     use super::InitResult;
+    use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::api::error::ConductorApiResult;
+    use crate::conductor::CellError;
+    use crate::core::ribosome::guest_callback::ValidateCallbackResult;
     use crate::core::ribosome::RibosomeError;
     use crate::core::ribosome::RibosomeT;
-    use crate::fixt::curve::Zomes;
+    use crate::core::workflow::WorkflowError;
     use crate::fixt::InitHostAccessFixturator;
     use crate::fixt::InitInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::fixt::Zomes;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetZome;
@@ -240,10 +242,12 @@ mod slow_tests {
     use assert2::{assert, let_assert};
     use holo_hash::ActionHash;
     use holochain_types::app::DisableCloneCellPayload;
+    use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::clone::CloneCellId;
     use holochain_zome_types::prelude::*;
+    use std::sync::Arc;
     use std::time::Duration;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -319,20 +323,50 @@ mod slow_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_init_implemented_invalid_return() {
-        let ribosome = RealRibosomeFixturator::new(Zomes(vec![TestWasm::InitInvalidReturn]))
-            .next()
-            .unwrap();
-        let mut init_invocation = InitInvocationFixturator::new(::fixt::Empty).next().unwrap();
-        init_invocation.dna_def = ribosome.dna_file.dna_def().clone();
+        let unit_entry_def = EntryDef::default_from_id("unit");
+        let zome = InlineZomeSet::new_unique_single(
+            "integrity",
+            "coordinator",
+            vec![unit_entry_def.clone()],
+            0,
+        )
+        .function("integrity", "validate", |_api, _op: Op| {
+            Ok(ValidateCallbackResult::Valid)
+        })
+        .function("coordinator", "init", |_api, ()| Ok(()))
+        .function("coordinator", "create", move |api, ()| {
+            let entry = Entry::app(().try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        });
 
-        let host_access = fixt!(InitHostAccess);
-        let err = ribosome
-            .run_init(host_access, init_invocation)
+        let dnas = [SweetDnaFile::unique_from_inline_zomes(zome).await.0];
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app = conductor.setup_app("app", &dnas).await.unwrap();
+        let conductor = Arc::new(conductor);
+        let (cell,) = app.into_tuple();
+
+        let err = conductor
+            .call_fallible::<_, ()>(&cell.zome("coordinator"), "create", ())
             .await
             .unwrap_err();
 
-        let_assert!(RibosomeError::CallbackInvalidReturnType(err_msg) = err);
-        assert!(err_msg == "invalid type: unit value, expected variant identifier");
+        let_assert!(ConductorApiError::CellError(CellError::WorkflowError(workflow_err)) = err);
+
+        let_assert!(
+            WorkflowError::RibosomeError(RibosomeError::CallbackInvalidReturnType(err_msg)) =
+                *workflow_err
+        );
+
+        assert_eq!(
+            err_msg,
+            "invalid type: unit value, expected variant identifier"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

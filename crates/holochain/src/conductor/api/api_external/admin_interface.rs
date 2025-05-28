@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::api::error::ConductorApiResult;
 use crate::conductor::api::error::SerializationError;
@@ -10,8 +8,8 @@ use crate::conductor::ConductorHandle;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::dna::DnaBundle;
 use holochain_types::prelude::*;
-use mr_bundle::Bundle;
-
+use mr_bundle::FileSystemBundler;
+use std::collections::HashSet;
 use tracing::*;
 
 pub use holochain_conductor_api::*;
@@ -83,7 +81,7 @@ impl AdminInterfaceApi {
                     DnaSource::Hash(ref hash) => {
                         if !modifiers.has_some_option_set() {
                             return Err(ConductorApiError::DnaReadError(
-                                "DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
+                                "DnaSource::Hash requires `properties` or `network_seed` to create a derived Dna"
                                     .to_string(),
                             ));
                         }
@@ -98,8 +96,9 @@ impl AdminInterfaceApi {
                             .update_modifiers(modifiers)
                     }
                     DnaSource::Path(ref path) => {
-                        let bundle = Bundle::read_from_file(path).await?;
-                        let bundle: DnaBundle = bundle.into();
+                        let bundle = FileSystemBundler::load_from::<ValidatedDnaManifest>(path)
+                            .await
+                            .map(DnaBundle::from)?;
                         let (dna_file, _original_hash) = bundle.into_dna_file(modifiers).await?;
                         dna_file
                     }
@@ -127,8 +126,9 @@ impl AdminInterfaceApi {
                 let UpdateCoordinatorsPayload { dna_hash, source } = *payload;
                 let (coordinator_zomes, wasms) = match source {
                     CoordinatorSource::Path(ref path) => {
-                        let bundle = Bundle::read_from_file(path).await?;
-                        let bundle: CoordinatorBundle = bundle.into();
+                        let bundle = FileSystemBundler::load_from::<CoordinatorManifest>(path)
+                            .await
+                            .map(CoordinatorBundle::from)?;
                         bundle.into_zomes().await?
                     }
                     CoordinatorSource::Bundle(bundle) => bundle.into_zomes().await?,
@@ -174,26 +174,6 @@ impl AdminInterfaceApi {
                     .new_sign_keypair_random()
                     .await?;
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
-            }
-            RevokeAgentKey(payload) => {
-                let RevokeAgentKeyPayload { agent_key, app_id } = *payload;
-                let results = self
-                    .conductor_handle
-                    .clone()
-                    .revoke_agent_key_for_app(agent_key, app_id)
-                    .await?;
-                // Convert errors to strings
-                let results: Vec<(CellId, String)> = results
-                    .into_iter()
-                    .filter_map(|(cell_id, result)| {
-                        if let Err(err) = result {
-                            Some((cell_id, err.to_string()))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                Ok(AdminResponse::AgentKeyRevoked(results))
             }
             ListCellIds => {
                 let cell_ids = self
@@ -281,8 +261,17 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::FullStateDumped(state))
             }
-            DumpNetworkMetrics { dna_hash } => {
-                let dump = self.conductor_handle.dump_network_metrics(dna_hash).await?;
+            DumpNetworkMetrics {
+                dna_hash,
+                include_dht_summary,
+            } => {
+                let dump = self
+                    .conductor_handle
+                    .dump_network_metrics(Kitsune2NetworkMetricsRequest {
+                        dna_hash,
+                        include_dht_summary,
+                    })
+                    .await?;
                 Ok(AdminResponse::NetworkMetricsDumped(dump))
             }
             DumpNetworkStats => {
@@ -295,7 +284,11 @@ impl AdminInterfaceApi {
             }
             AgentInfo { cell_id } => {
                 let r = self.conductor_handle.get_agent_infos(cell_id).await?;
-                Ok(AdminResponse::AgentInfo(r))
+                let mut encoded = Vec::with_capacity(r.len());
+                for info in r {
+                    encoded.push(info.encode()?);
+                }
+                Ok(AdminResponse::AgentInfo(encoded))
             }
             GraftRecords {
                 cell_id,
@@ -315,6 +308,22 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::ZomeCallCapabilityGranted)
             }
+
+            ListCapabilityGrants {
+                installed_app_id,
+                include_revoked,
+            } => {
+                let state = self.conductor_handle.clone().get_state().await?;
+                let app = state.get_app(&installed_app_id)?;
+                let app_cells: HashSet<CellId> = app.required_cells().collect();
+                let cap_info = self
+                    .conductor_handle
+                    .clone()
+                    .capability_grant_info(&app_cells, include_revoked)
+                    .await?;
+                Ok(AdminResponse::CapabilityGrantsInfo(cap_info))
+            }
+
             DeleteCloneCell(payload) => {
                 self.conductor_handle
                     .clone()
@@ -336,6 +345,7 @@ impl AdminInterfaceApi {
                     .revoke_app_authentication_token(token)?;
                 Ok(AdminResponse::AppAuthenticationTokenRevoked)
             }
+            #[cfg(feature = "unstable-migration")]
             GetCompatibleCells(dna_hash) => Ok(AdminResponse::CompatibleCells(
                 self.conductor_handle
                     .cells_by_dna_lineage(&dna_hash)
@@ -416,7 +426,7 @@ mod test {
             .await;
         assert_matches!(
             hash_install_response,
-            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == *"DnaSource::Hash requires `properties` or `network_seed` or `origin_time` to create a derived Dna"
+            AdminResponse::Error(ExternalApiWireError::DnaReadError(e)) if e == *"DnaSource::Hash requires `properties` or `network_seed` to create a derived Dna"
         );
 
         // with a property should install and produce a different hash

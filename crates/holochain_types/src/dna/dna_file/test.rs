@@ -1,21 +1,19 @@
-use std::sync::Arc;
-
 use super::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_update_coordinators() {
     let dna_wasms = vec![
         DnaWasm {
-            code: Arc::new(Box::new([0])),
+            code: vec![0].into(),
         },
         DnaWasm {
-            code: Arc::new(Box::new([1])),
+            code: vec![1].into(),
         },
         DnaWasm {
-            code: Arc::new(Box::new([2])),
+            code: vec![2].into(),
         },
         DnaWasm {
-            code: Arc::new(Box::new([3])),
+            code: vec![3].into(),
         },
     ];
     let init_integrity = vec![
@@ -34,7 +32,6 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&dna_wasms[2]).await,
                 dependencies: vec!["b".into()],
-                preserialized_path: None,
             })),
         ),
         (
@@ -42,7 +39,6 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&dna_wasms[3]).await,
                 dependencies: vec!["b".into(), "a".into()],
-                preserialized_path: None,
             })),
         ),
     ];
@@ -60,14 +56,13 @@ async fn test_update_coordinators() {
 
     // Replace coordinator "c".
     let new_dna_wasms = vec![DnaWasm {
-        code: Arc::new(Box::new([4])),
+        code: vec![4].into(),
     }];
     let new_coordinators = vec![(
         "c".into(),
         CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["b".into()],
-            preserialized_path: None,
         })),
     )];
     let old_wasm = dna
@@ -92,14 +87,13 @@ async fn test_update_coordinators() {
 
     // Add new coordinator "e"
     let new_dna_wasms = vec![DnaWasm {
-        code: Arc::new(Box::new([6])),
+        code: vec![6].into(),
     }];
     let new_coordinators = vec![(
         "e".into(),
         CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["a".into()],
-            preserialized_path: None,
         })),
     )];
     let old_wasm = dna
@@ -121,16 +115,16 @@ async fn test_update_coordinators() {
     // Replace all and add a new coordinator "f".
     let new_dna_wasms = vec![
         DnaWasm {
-            code: Arc::new(Box::new([6])),
+            code: vec![6].into(),
         },
         DnaWasm {
-            code: Arc::new(Box::new([7])),
+            code: vec![7].into(),
         },
         DnaWasm {
-            code: Arc::new(Box::new([8])),
+            code: vec![8].into(),
         },
         DnaWasm {
-            code: Arc::new(Box::new([9])),
+            code: vec![9].into(),
         },
     ];
     let new_coordinators = vec![
@@ -139,7 +133,6 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
                 dependencies: vec!["a".into()],
-                preserialized_path: None,
             })),
         ),
         (
@@ -147,7 +140,6 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[1]).await,
                 dependencies: vec!["a".into()],
-                preserialized_path: None,
             })),
         ),
         (
@@ -155,7 +147,6 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[2]).await,
                 dependencies: vec!["a".into()],
-                preserialized_path: None,
             })),
         ),
         (
@@ -163,7 +154,6 @@ async fn test_update_coordinators() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&new_dna_wasms[3]).await,
                 dependencies: vec!["a".into()],
-                preserialized_path: None,
             })),
         ),
     ];
@@ -207,16 +197,16 @@ async fn test_update_coordinators() {
 async fn test_update_coordinators_checks_deps() {
     let dna_wasms = vec![
         DnaWasm {
-            code: Arc::new(Box::new([0])),
+            code: vec![0].into(),
         },
         DnaWasm {
-            code: Arc::new(Box::new([1])),
+            code: vec![1].into(),
         },
         DnaWasm {
-            code: Arc::new(Box::new([2])),
+            code: vec![2].into(),
         },
         DnaWasm {
-            code: Arc::new(Box::new([3])),
+            code: vec![3].into(),
         },
     ];
     let init_integrity = vec![
@@ -235,7 +225,6 @@ async fn test_update_coordinators_checks_deps() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&dna_wasms[2]).await,
                 dependencies: vec!["b".into()],
-                preserialized_path: None,
             })),
         ),
         (
@@ -243,7 +232,6 @@ async fn test_update_coordinators_checks_deps() {
             CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
                 wasm_hash: WasmHash::with_data(&dna_wasms[3]).await,
                 dependencies: vec!["b".into(), "a".into()],
-                preserialized_path: None,
             })),
         ),
     ];
@@ -259,14 +247,13 @@ async fn test_update_coordinators_checks_deps() {
 
     // Replace coordinator "c" with coordinator that has a dangling reference.
     let new_dna_wasms = vec![DnaWasm {
-        code: Arc::new(Box::new([4])),
+        code: vec![4].into(),
     }];
     let new_coordinators = vec![(
         "c".into(),
         CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["z".into()],
-            preserialized_path: None,
         })),
     )];
     let err = dna
@@ -278,14 +265,13 @@ async fn test_update_coordinators_checks_deps() {
 
     // Add new coordinator "e" with coordinator that has a dangling reference.
     let new_dna_wasms = vec![DnaWasm {
-        code: Arc::new(Box::new([5])),
+        code: vec![5].into(),
     }];
     let new_coordinators = vec![(
         "e".into(),
         CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome {
             wasm_hash: WasmHash::with_data(&new_dna_wasms[0]).await,
             dependencies: vec!["z".into()],
-            preserialized_path: None,
         })),
     )];
     let err = dna

@@ -1,9 +1,10 @@
 use holochain_types::websocket::AllowedOrigins;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
 /// Information neeeded to spawn an admin interface
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 pub struct AdminInterfaceConfig {
     /// By what means the interface will be exposed.
     /// Currently the only option is a local websocket running on a configurable port.
@@ -19,7 +20,7 @@ pub struct AdminInterfaceConfig {
 ///
 /// [`ConductorConfig`]: crate::conductor::ConductorConfig
 /// [`ConductorState`]: https://docs.rs/holochain/latest/holochain/conductor/state/struct.ConductorState.html
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum InterfaceDriver {
     /// An interface implemented via websockets

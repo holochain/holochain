@@ -93,8 +93,6 @@
 
 use super::error::WorkflowResult;
 use super::sys_validation_workflow::validation_query;
-
-use crate::conductor::api::DpkiApi;
 use crate::conductor::entry_def_store::get_entry_def;
 use crate::conductor::Conductor;
 use crate::conductor::ConductorHandle;
@@ -109,22 +107,15 @@ use crate::core::validation::OutcomeOrError;
 use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
-
-pub use error::*;
-pub use types::Outcome;
-
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::actor::GetOptions as NetworkGetOptions;
-use holochain_p2p::GenericNetwork;
-use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
 use holochain_state::prelude::*;
-
 use parking_lot::Mutex;
 use std::collections::HashSet;
 use std::sync::atomic::AtomicUsize;
@@ -132,6 +123,9 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
+
+pub use error::*;
+pub use types::Outcome;
 
 #[cfg(test)]
 mod tests;
@@ -156,7 +150,6 @@ mod types;
         trigger_publish,
         conductor_handle,
         network,
-        dht_query_cache,
     ))
 )]
 #[allow(clippy::too_many_arguments)]
@@ -166,17 +159,10 @@ pub async fn app_validation_workflow(
     trigger_integration: TriggerSender,
     trigger_publish: TriggerSender,
     conductor_handle: ConductorHandle,
-    network: HolochainP2pDna,
-    dht_query_cache: DhtDbQueryCache,
+    network: DynHolochainP2pDna,
 ) -> WorkflowResult<WorkComplete> {
-    let outcome_summary = app_validation_workflow_inner(
-        dna_hash,
-        workspace,
-        conductor_handle,
-        &network,
-        dht_query_cache,
-    )
-    .await?;
+    let outcome_summary =
+        app_validation_workflow_inner(dna_hash, workspace, conductor_handle, network).await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // If ops have been accepted or rejected, trigger integration.
@@ -205,8 +191,7 @@ async fn app_validation_workflow_inner(
     dna_hash: Arc<DnaHash>,
     workspace: Arc<AppValidationWorkspace>,
     conductor: ConductorHandle,
-    network: &HolochainP2pDna,
-    dht_query_cache: DhtDbQueryCache,
+    network: DynHolochainP2pDna,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
     let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
@@ -218,14 +203,13 @@ async fn app_validation_workflow_inner(
     let rejected_ops = Arc::new(AtomicUsize::new(0));
     let warranted_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
-    let mut agent_activity = vec![];
+    let mut agent_activity_ops = vec![];
     #[cfg(feature = "unstable-warrants")]
     let mut warrant_op_hashes = vec![];
 
     // Validate ops sequentially
     for sorted_dht_op in sorted_dht_ops.into_iter() {
         let (dht_op, dht_op_hash) = sorted_dht_op.into_inner();
-        let deps = dht_op.sys_validation_dependencies();
 
         let chain_op = match dht_op {
             DhtOp::ChainOp(chain_op) => chain_op,
@@ -237,18 +221,20 @@ async fn app_validation_workflow_inner(
         let dht_op_lite = chain_op.to_lite();
 
         // If this is agent activity, track it for the cache.
-        let activity = matches!(op_type, ChainOpType::RegisterAgentActivity).then(|| {
-            (
-                action.author().clone(),
-                action.action_seq(),
-                deps.is_empty(),
-            )
-        });
+        let agent_activity_op = matches!(op_type, ChainOpType::RegisterAgentActivity)
+            .then(|| (action.author().clone(), action.action_seq()));
 
         // Validate this op
         let validation_outcome = match chain_op_to_op(*chain_op.clone(), cascade.clone()).await {
             Ok(op) => {
-                validate_op_outer(dna_hash.clone(), &op, &conductor, &workspace, network).await
+                validate_op_outer(
+                    dna_hash.clone(),
+                    &op,
+                    &conductor,
+                    &workspace,
+                    network.clone(),
+                )
+                .await
             }
             Err(e) => Err(e),
         };
@@ -262,10 +248,10 @@ async fn app_validation_workflow_inner(
         match validation_outcome {
             Ok(outcome) => {
                 // Collect all agent activity.
-                if let Some(activity) = activity {
+                if let Some(agent_activity_op) = agent_activity_op {
                     // If the activity is accepted or rejected then it's ready to integrate.
                     if matches!(&outcome, Outcome::Accepted | Outcome::Rejected(_)) {
-                        agent_activity.push(activity);
+                        agent_activity_ops.push(agent_activity_op);
                     }
                 }
                 if let Outcome::AwaitingDeps(_) | Outcome::Rejected(_) = &outcome {
@@ -289,13 +275,16 @@ async fn app_validation_workflow_inner(
 
                     warrant_op_hashes.push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
 
-                    workspace
+                    if let Err(err) = workspace
                         .authored_db
                         .write_async(move |txn| {
                             warn!("Inserting warrant op");
                             insert_op_authored(txn, &warrant_op)
                         })
-                        .await?;
+                        .await
+                    {
+                        tracing::warn!("Error writing warrant op: {err}");
+                    }
 
                     warranted_ops.fetch_add(1, Ordering::SeqCst);
                 }
@@ -305,14 +294,7 @@ async fn app_validation_workflow_inner(
                     .write_async(move|txn| match outcome {
                         Outcome::Accepted => {
                             accepted_ops.fetch_add(1, Ordering::SeqCst);
-
-
-                            if deps.is_empty() {
-
-                                put_integrated(txn, &dht_op_hash, ValidationStatus::Valid)
-                            } else {
-                                put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Valid)
-                            }
+                            put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Valid)
                         }
                         Outcome::AwaitingDeps(_) => {
                             awaiting_ops.fetch_add(1, Ordering::SeqCst);
@@ -324,14 +306,8 @@ async fn app_validation_workflow_inner(
                         }
                         Outcome::Rejected(_) => {
                             rejected_ops.fetch_add(1, Ordering::SeqCst);
-
                             tracing::info!("Received invalid op. The op author will be blocked. Op: {dht_op_lite:?}");
-
-                            if deps.is_empty() {
-                                put_integrated(txn, &dht_op_hash, ValidationStatus::Rejected)
-                            } else {
-                                put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Rejected)
-                            }
+                            put_integration_limbo(txn, &dht_op_hash, ValidationStatus::Rejected)
                         }
                     })
                     .await;
@@ -353,29 +329,12 @@ async fn app_validation_workflow_inner(
     // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
     #[cfg(feature = "unstable-warrants")]
     holochain_state::integrate::authored_ops_to_dht_db(
-        network,
+        network.target_arcs().await?,
         warrant_op_hashes,
         workspace.authored_db.clone().into(),
         workspace.dht_db.clone(),
-        &workspace.dht_db_cache,
     )
     .await?;
-
-    // Once the database transaction is committed, add agent activity to the cache
-    // that is ready for integration.
-    for (author, seq, has_no_dependency) in agent_activity {
-        // Any activity with no dependency is integrated in this workflow.
-        // TODO: This will no longer be true when [#1212](https://github.com/holochain/holochain/pull/1212) lands.
-        if has_no_dependency {
-            dht_query_cache
-                .set_activity_to_integrated(&author, Some(seq))
-                .await?;
-        } else {
-            dht_query_cache
-                .set_activity_ready_to_integrate(&author, Some(seq))
-                .await?;
-        }
-    }
 
     let accepted_ops = accepted_ops.load(Ordering::SeqCst);
     let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
@@ -510,7 +469,7 @@ async fn validate_op_outer(
     op: &Op,
     conductor_handle: &ConductorHandle,
     workspace: &AppValidationWorkspace,
-    network: &HolochainP2pDna,
+    network: DynHolochainP2pDna,
 ) -> AppValidationOutcome<Outcome> {
     // Get the workspace for the validation calls
     let host_fn_workspace = workspace.validation_workspace().await?;
@@ -520,15 +479,12 @@ async fn validate_op_outer(
         .get_ribosome(dna_hash.as_ref())
         .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
-    let dpki = conductor_handle.running_services().dpki;
-
     validate_op(
         op,
         host_fn_workspace,
         network,
         &ribosome,
         conductor_handle,
-        dpki,
         false, // is_inline
     )
     .await
@@ -538,17 +494,14 @@ async fn validate_op_outer(
 pub async fn validate_op(
     op: &Op,
     workspace: HostFnWorkspaceRead,
-    network: &HolochainP2pDna,
+    network: DynHolochainP2pDna,
     ribosome: &impl RibosomeT,
     conductor_handle: &ConductorHandle,
-    dpki: DpkiApi,
     is_inline: bool,
 ) -> AppValidationOutcome<Outcome> {
     check_entry_def(op, &network.dna_hash(), conductor_handle)
         .await
         .map_err(AppValidationError::SysValidationError)?;
-
-    let network = Arc::new(network.clone());
 
     let zomes_to_invoke = get_zomes_to_invoke(op, &workspace, network.clone(), ribosome).await;
     if let Err(OutcomeOrError::Err(err)) = &zomes_to_invoke {
@@ -559,7 +512,7 @@ pub async fn validate_op(
         .map_err(|e| AppValidationError::RibosomeError(e.into()))?;
 
     let outcome =
-        run_validation_callback(invocation, ribosome, workspace, network, dpki, is_inline).await?;
+        run_validation_callback(invocation, ribosome, workspace, network, is_inline).await?;
 
     Ok(outcome)
 }
@@ -626,7 +579,7 @@ async fn check_app_entry_def(
 async fn get_zomes_to_invoke(
     op: &Op,
     workspace: &HostFnWorkspaceRead,
-    network: GenericNetwork,
+    network: DynHolochainP2pDna,
     ribosome: &impl RibosomeT,
 ) -> AppValidationOutcome<ZomesToInvoke> {
     match op {
@@ -719,7 +672,7 @@ async fn get_zomes_to_invoke(
 
 async fn retrieve_deleted_action(
     workspace: &HostFnWorkspaceRead,
-    network: GenericNetwork,
+    network: DynHolochainP2pDna,
     deletes_address: &ActionHash,
 ) -> AppValidationOutcome<SignedActionHashed> {
     let cascade = CascadeImpl::from_workspace_and_network(workspace, network.clone());
@@ -745,13 +698,12 @@ async fn run_validation_callback(
     invocation: ValidateInvocation,
     ribosome: &impl RibosomeT,
     workspace: HostFnWorkspaceRead,
-    network: GenericNetwork,
-    dpki: DpkiApi,
+    network: DynHolochainP2pDna,
     is_inline: bool,
 ) -> AppValidationResult<Outcome> {
     let validate_result = ribosome
         .run_validate(
-            ValidateHostAccess::new(workspace.clone(), network.clone(), dpki, is_inline),
+            ValidateHostAccess::new(workspace.clone(), network.clone(), is_inline),
             invocation.clone(),
         )
         .await?;
@@ -853,7 +805,6 @@ pub struct AppValidationWorkspace {
     // Writeable because of warrants
     authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
-    dht_db_cache: DhtDbQueryCache,
     cache: DbWrite<DbKindCache>,
     keystore: MetaLairClient,
     dna_def: Arc<DnaDef>,
@@ -864,7 +815,6 @@ impl AppValidationWorkspace {
         // Writeable because of warrants
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
-        dht_db_cache: DhtDbQueryCache,
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         dna_def: Arc<DnaDef>,
@@ -872,7 +822,6 @@ impl AppValidationWorkspace {
         Self {
             authored_db,
             dht_db,
-            dht_db_cache,
             cache,
             keystore,
             dna_def,
@@ -883,7 +832,6 @@ impl AppValidationWorkspace {
         Ok(HostFnWorkspace::new(
             self.authored_db.clone().into(),
             self.dht_db.clone().into(),
-            self.dht_db_cache.clone(),
             self.cache.clone(),
             self.keystore.clone(),
             None,
@@ -892,20 +840,20 @@ impl AppValidationWorkspace {
         .await?)
     }
 
-    pub fn full_cascade<Network: HolochainP2pDnaT>(&self, network: Network) -> CascadeImpl {
+    pub fn full_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
         CascadeImpl::empty()
             .with_authored(self.authored_db.clone().into())
             .with_dht(self.dht_db.clone().into())
-            .with_network(Arc::new(network), self.cache.clone())
+            .with_network(network, self.cache.clone())
     }
 }
 
 pub fn put_validation_limbo(
     txn: &mut Txn<DbKindDht>,
     hash: &DhtOpHash,
-    status: ValidationStage,
+    stage: ValidationStage,
 ) -> WorkflowResult<()> {
-    set_validation_stage(txn, hash, status)?;
+    set_validation_stage(txn, hash, stage)?;
     Ok(())
 }
 
@@ -916,25 +864,5 @@ pub fn put_integration_limbo(
 ) -> WorkflowResult<()> {
     set_validation_status(txn, hash, status)?;
     set_validation_stage(txn, hash, ValidationStage::AwaitingIntegration)?;
-    Ok(())
-}
-
-pub fn put_integrated(
-    txn: &mut Txn<DbKindDht>,
-    hash: &DhtOpHash,
-    status: ValidationStatus,
-) -> WorkflowResult<()> {
-    set_validation_status(txn, hash, status)?;
-    // This set the validation stage to pending which is correct when
-    // it's integrated.
-    set_validation_stage(txn, hash, ValidationStage::Pending)?;
-    set_when_integrated(txn, hash, Timestamp::now())?;
-
-    // If the op is rejected then force a receipt to be processed because the
-    // receipt is a warrant, so of course the author won't want it to be
-    // produced.
-    if matches!(status, ValidationStatus::Rejected) {
-        set_require_receipt(txn, hash, true)?;
-    }
     Ok(())
 }

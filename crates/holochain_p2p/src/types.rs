@@ -1,13 +1,18 @@
-/// Type to mock a Holochain P2p network using [`crate::MockHolochainP2pDnaT`].
-pub type GenericNetwork = Arc<dyn HolochainP2pDnaT>;
+pub mod actor;
+pub mod event;
+
+pub(crate) mod wire;
+
+pub use wire::WireDhtOpData;
+pub use wire::WireMessage;
 
 /// Error type for Holochain P2p.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum HolochainP2pError {
-    /// GhostError
+    /// K2Error
     #[error(transparent)]
-    GhostError(#[from] ghost_actor::GhostError),
+    K2Error(#[from] kitsune2_api::K2Error),
 
     /// RoutingDnaError
     #[error("Routing Dna Error: {0}")]
@@ -17,17 +22,18 @@ pub enum HolochainP2pError {
     #[error("Routing Agent Error: {0}")]
     RoutingAgentError(holo_hash::AgentPubKey),
 
-    /// OtherKitsuneP2pError
-    #[error(transparent)]
-    OtherKitsuneP2pError(kitsune_p2p::KitsuneP2pError),
-
-    /// SerializedBytesError
-    #[error(transparent)]
-    SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),
-
     /// Invalid P2p Message
     #[error("InvalidP2pMessage: {0}")]
     InvalidP2pMessage(String),
+
+    /// No peers available for DHT location.
+    ///
+    /// This error is returned when there are no peers available for a given DHT location. If a
+    /// p2p request is allowed to fail when no peers are available then this error can be used to
+    /// filter the error from other network errors. For example, when getting links, and it is
+    /// acceptable to return the links that are already held locally.
+    #[error("{0}: No peers available for DHT location: {1}")]
+    NoPeersForLocation(String, u32),
 
     /// Other
     #[error("Other: {0}")]
@@ -38,6 +44,9 @@ pub enum HolochainP2pError {
     ChcError(#[from] holochain_chc::ChcError),
 }
 
+/// Holochain p2p result type.
+pub type HolochainP2pResult<T> = std::result::Result<T, HolochainP2pError>;
+
 impl HolochainP2pError {
     /// promote a custom error type to a TransportError
     pub fn other(e: impl Into<Box<dyn std::error::Error + Send + Sync>>) -> Self {
@@ -47,34 +56,6 @@ impl HolochainP2pError {
     /// construct an invalid p2p message error variant
     pub fn invalid_p2p_message(s: String) -> Self {
         Self::InvalidP2pMessage(s)
-    }
-}
-
-// do some manual type translation so we get better error displays
-impl From<kitsune_p2p::KitsuneP2pError> for HolochainP2pError {
-    fn from(e: kitsune_p2p::KitsuneP2pError) -> Self {
-        use kitsune_p2p::KitsuneP2pError::*;
-        match e {
-            RoutingSpaceError(space) => {
-                Self::RoutingDnaError(holo_hash::DnaHash::from_kitsune(&space))
-            }
-            RoutingAgentError(agent) => {
-                Self::RoutingAgentError(holo_hash::AgentPubKey::from_kitsune(&agent))
-            }
-            _ => Self::OtherKitsuneP2pError(e),
-        }
-    }
-}
-
-impl From<HolochainP2pError> for kitsune_p2p::KitsuneP2pError {
-    fn from(e: HolochainP2pError) -> Self {
-        use HolochainP2pError::*;
-        match e {
-            RoutingDnaError(dna) => Self::RoutingSpaceError(dna.to_kitsune()),
-            RoutingAgentError(agent) => Self::RoutingAgentError(agent.to_kitsune()),
-            OtherKitsuneP2pError(e) => e,
-            _ => Self::other(e),
-        }
     }
 }
 
@@ -96,111 +77,4 @@ impl From<&str> for HolochainP2pError {
     fn from(s: &str) -> Self {
         s.to_string().into()
     }
-}
-
-/// Turn an [`AgentKey`](holo_hash::AgentPubKey) into a [`KitsuneAgent`](kitsune_p2p::KitsuneAgent)
-pub fn agent_holo_to_kit(a: holo_hash::AgentPubKey) -> kitsune_p2p::KitsuneAgent {
-    a.into_kitsune_raw()
-}
-
-/// Turn a [`DnaHash`](holo_hash::DnaHash) into a [`KitsuneSpace`](kitsune_p2p::KitsuneSpace)
-pub fn space_holo_to_kit(d: holo_hash::DnaHash) -> kitsune_p2p::KitsuneSpace {
-    d.into_kitsune_raw()
-}
-
-pub mod actor;
-pub mod event;
-
-pub(crate) mod wire;
-
-use std::sync::Arc;
-
-pub use wire::WireDhtOpData;
-pub use wire::WireMessage;
-
-use crate::HolochainP2pDnaT;
-
-macro_rules! to_and_from_kitsune {
-    ($($i:ident<$h:ty> -> $k:ty,)*) => {
-        $(
-            /// Extension trait for holo/kitsune conversion
-            pub trait $i: ::std::clone::Clone + Sized {
-                /// convert into `Arc<Kitsune>` type
-                fn into_kitsune(self) -> ::std::sync::Arc<$k>;
-
-                /// convert into Kitsune type
-                fn into_kitsune_raw(self) -> $k;
-
-                /// to `Arc<Kitsune>` type
-                fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
-                    self.clone().into_kitsune()
-                }
-
-                /// from Kitsune type
-                fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self;
-
-                /// from Kitsune type
-                fn from_kitsune_raw(k: $k) -> Self;
-            }
-
-            impl $i for $h {
-                fn into_kitsune(self) -> ::std::sync::Arc<$k> {
-                    ::std::sync::Arc::new(self.into_kitsune_raw())
-                }
-
-                fn into_kitsune_raw(self) -> $k {
-                    <$k as kitsune_p2p::KitsuneBinType>::new(self.get_raw_36().to_vec())
-                }
-
-                fn from_kitsune(k: &::std::sync::Arc<$k>) -> Self {
-                    <$h>::from_raw_36((**k).clone().into()).into()
-                }
-
-                fn from_kitsune_raw(k: $k) -> Self {
-                    <$h>::from_raw_36(k.into()).into()
-                }
-            }
-        )*
-    };
-}
-
-to_and_from_kitsune! {
-    DnaHashExt<holo_hash::DnaHash> -> kitsune_p2p::KitsuneSpace,
-    AgentPubKeyExt<holo_hash::AgentPubKey> -> kitsune_p2p::KitsuneAgent,
-    DhtOpHashExt<holo_hash::DhtOpHash> -> kitsune_p2p::KitsuneOpHash,
-}
-
-macro_rules! to_kitsune {
-    ($($i:ident<$h:ty> -> $k:ty,)*) => {
-        $(
-            /// Extension trait for holo/kitsune conversion
-            pub trait $i: ::std::clone::Clone + Sized {
-                /// convert into `Arc<Kitsune>` type
-                fn into_kitsune(self) -> ::std::sync::Arc<$k>;
-
-                /// convert into Kitsune type
-                fn into_kitsune_raw(self) -> $k;
-
-                /// to `Arc<Kitsune>` type
-                fn to_kitsune(&self) -> ::std::sync::Arc<$k> {
-                    self.clone().into_kitsune()
-                }
-            }
-
-            impl $i for $h {
-                fn into_kitsune(self) -> ::std::sync::Arc<$k> {
-                    ::std::sync::Arc::new(self.into_kitsune_raw())
-                }
-
-                fn into_kitsune_raw(self) -> $k {
-                    <$k as kitsune_p2p::KitsuneBinType>::new(self.get_raw_36().to_vec())
-                }
-            }
-        )*
-    };
-}
-
-to_kitsune! {
-    AnyDhtHashExt<holo_hash::AnyDhtHash> -> kitsune_p2p::KitsuneBasis,
-    AnyLinkableHashExt<holo_hash::AnyLinkableHash> -> kitsune_p2p::KitsuneBasis,
 }

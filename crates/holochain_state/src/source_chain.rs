@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::chain_lock::{get_chain_lock, ChainLock};
 use crate::integrate::authored_ops_to_dht_db;
 use crate::integrate::authored_ops_to_dht_db_without_check;
-use crate::query::chain_head::ChainHeadQuery;
+use crate::query::chain_head::AuthoredChainHeadQuery;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
 use async_recursion::async_recursion;
@@ -16,7 +16,6 @@ use holo_hash::DnaHash;
 use holo_hash::HasHash;
 use holochain_chc::*;
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::HolochainP2pDnaT;
 use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::SELECT_VALID_AGENT_PUB_KEY;
@@ -24,6 +23,7 @@ use holochain_sqlite::sql::sql_conductor::SELECT_VALID_CAP_GRANT_FOR_CAP_SECRET;
 use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_state_types::SourceChainDumpRecord;
 use holochain_types::sql::AsSql;
+use kitsune2_api::DhtArc;
 
 use crate::prelude::*;
 use crate::source_chain;
@@ -39,7 +39,6 @@ pub struct SourceChain<AuthorDb = DbWrite<DbKindAuthored>, DhtDb = DbWrite<DbKin
     scratch: SyncScratch,
     vault: AuthorDb,
     dht_db: DhtDb,
-    dht_db_cache: DhtDbQueryCache,
     keystore: MetaLairClient,
     author: Arc<AgentPubKey>,
     head_info: Option<HeadInfo>,
@@ -108,7 +107,7 @@ impl SourceChain {
                     action: persisted_head,
                     seq: persisted_seq,
                     ..
-                } = chain_head_db_nonempty(txn, author.clone())?;
+                } = chain_head_db_nonempty(txn)?;
                 let countersigning_agent_state =
                     CounterSigningAgentState::new(agent_index, persisted_head, persisted_seq);
                 lock_chain(
@@ -239,7 +238,8 @@ impl SourceChain {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, network)))]
     pub async fn flush(
         &self,
-        network: &(dyn HolochainP2pDnaT + Send + Sync),
+        storage_arcs: Vec<DhtArc>,
+        chc: Option<ChcImpl>,
     ) -> SourceChainResult<Vec<SignedActionHashed>> {
         // Nothing to write
         if self.scratch.apply(|s| s.is_empty())? {
@@ -327,7 +327,7 @@ impl SourceChain {
                 .await?;
 
             // Sync with CHC, if CHC is present
-            if let Some(chc) = network.chc() {
+            if let Some(chc) = chc.clone() {
                 // Skip the CHC sync if this is a countersigning session.
                 // If the session times out, we might roll the chain back to the previous head, and so
                 // we don't want the record to exist remotely.
@@ -368,13 +368,13 @@ impl SourceChain {
                 }
 
                 // As at check.
-                let head_info = chain_head_db(txn, author.clone())?;
+                let head_info = chain_head_db(txn)?;
                 let latest_head = head_info.as_ref().map(|h| h.action.clone());
 
                 if persisted_head != latest_head {
                     return Err(SourceChainError::HeadMoved(
-                        actions,
-                        entries,
+                        Box::new(actions),
+                        Box::new(entries),
                         persisted_head,
                         head_info,
                     ));
@@ -412,22 +412,21 @@ impl SourceChain {
                     let child_chain = Self::new(
                         self.vault.clone(),
                         self.dht_db.clone(),
-                        self.dht_db_cache.clone(),
                         keystore.clone(),
                         (*self.author).clone(),
                     )
                     .await?;
                     let rebased_actions =
-                        rebase_actions_on(&keystore, actions, new_head_info).await?;
+                        rebase_actions_on(&keystore, *actions, new_head_info).await?;
                     child_chain.scratch.apply(move |scratch| {
                         for action in rebased_actions {
                             scratch.add_action(action, ChainTopOrdering::Relaxed);
                         }
-                        for entry in entries {
+                        for entry in *entries {
                             scratch.add_entry(entry, ChainTopOrdering::Relaxed);
                         }
                     })?;
-                    child_chain.flush(network).await
+                    child_chain.flush(storage_arcs, chc).await
                 } else {
                     Err(SourceChainError::HeadMoved(
                         actions,
@@ -441,11 +440,10 @@ impl SourceChain {
                 drop(permit);
 
                 authored_ops_to_dht_db(
-                    network,
+                    storage_arcs,
                     ops_to_integrate,
                     self.vault.clone().into(),
                     self.dht_db.clone(),
-                    &self.dht_db_cache,
                 )
                 .await?;
                 SourceChainResult::Ok(actions)
@@ -523,25 +521,16 @@ where
     pub async fn new(
         vault: AuthorDb,
         dht_db: DhtDb,
-        dht_db_cache: DhtDbQueryCache,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let head_info = Some(
-            vault
-                .read_async({
-                    let author = author.clone();
-                    move |txn| chain_head_db_nonempty(txn, author)
-                })
-                .await?,
-        );
+        let head_info = Some(vault.read_async(chain_head_db_nonempty).await?);
         Ok(Self {
             scratch,
             vault,
             dht_db,
-            dht_db_cache,
             keystore,
             author,
             head_info,
@@ -557,23 +546,16 @@ where
     pub async fn raw_empty(
         vault: AuthorDb,
         dht_db: DhtDb,
-        dht_db_cache: DhtDbQueryCache,
         keystore: MetaLairClient,
         author: AgentPubKey,
     ) -> SourceChainResult<Self> {
         let scratch = Scratch::new().into_sync();
         let author = Arc::new(author);
-        let head_info = vault
-            .read_async({
-                let author = author.clone();
-                move |txn| chain_head_db(txn, author)
-            })
-            .await?;
+        let head_info = vault.read_async(chain_head_db).await?;
         Ok(Self {
             scratch,
             vault,
             dht_db,
-            dht_db_cache,
             keystore,
             author,
             head_info,
@@ -772,7 +754,7 @@ where
                 || query.entry_hashes.is_some()
                 || query.include_entries)
         {
-            return Err(SourceChainError::UnsupportedQuery(query));
+            return Err(SourceChainError::UnsupportedQuery(Box::new(query)));
         }
         let author = self.author.clone();
         let public_only = self.public_only;
@@ -1095,7 +1077,6 @@ async fn rebase_actions_on(
 pub async fn genesis(
     authored: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
-    dht_db_cache: &DhtDbQueryCache,
     keystore: MetaLairClient,
     dna_hash: DnaHash,
     agent_pubkey: AgentPubKey,
@@ -1189,13 +1170,7 @@ pub async fn genesis(
     // We don't check for authorityship here because during genesis we have no opportunity
     // to discover that the network is sharded and that we should not be an authority for
     // these items, so we assume we are an authority.
-    authored_ops_to_dht_db_without_check(
-        ops_to_integrate,
-        authored.clone().into(),
-        dht_db,
-        dht_db_cache,
-    )
-    .await?;
+    authored_ops_to_dht_db_without_check(ops_to_integrate, authored.clone().into(), dht_db).await?;
     Ok(())
 }
 
@@ -1231,27 +1206,21 @@ pub fn put_raw(
     }
     insert_action(txn, &shh)?;
     for (op, (op_hash, op_order, timestamp)) in ops.into_iter().zip(hashes) {
-        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp, None)?;
+        insert_op_lite(txn, &op.into(), &op_hash, &op_order, &timestamp, 0, None)?;
     }
     Ok(ops_to_integrate)
 }
 
 /// Get the current chain head of the database, if the chain is nonempty.
-pub fn chain_head_db(
-    txn: &Transaction,
-    author: Arc<AgentPubKey>,
-) -> SourceChainResult<Option<HeadInfo>> {
-    let chain_head = ChainHeadQuery::new(author);
+pub fn chain_head_db(txn: &Txn<DbKindAuthored>) -> SourceChainResult<Option<HeadInfo>> {
+    let chain_head = AuthoredChainHeadQuery::new();
     Ok(chain_head.run(CascadeTxnWrapper::from(txn))?)
 }
 
 /// Get the current chain head of the database.
 /// Error if the chain is empty.
-pub fn chain_head_db_nonempty(
-    txn: &Transaction,
-    author: Arc<AgentPubKey>,
-) -> SourceChainResult<HeadInfo> {
-    chain_head_db(txn, author)?.ok_or(SourceChainError::ChainEmpty)
+pub fn chain_head_db_nonempty(txn: &Txn<DbKindAuthored>) -> SourceChainResult<HeadInfo> {
+    chain_head_db(txn)?.ok_or(SourceChainError::ChainEmpty)
 }
 
 pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSigningSessionData)>;
@@ -1259,10 +1228,9 @@ pub type CurrentCountersigningSessionOpt = Option<(Record, EntryHash, CounterSig
 /// Check if there is a current countersigning session and if so, return the
 /// session data and the entry hash.
 pub fn current_countersigning_session(
-    txn: &Transaction<'_>,
-    author: Arc<AgentPubKey>,
+    txn: &Txn<DbKindAuthored>,
 ) -> SourceChainResult<CurrentCountersigningSessionOpt> {
-    match chain_head_db(txn, author) {
+    match chain_head_db(txn) {
         // We haven't done genesis so no session can be active.
         Err(e) => Err(e),
         Ok(None) => Ok(None),
@@ -1282,67 +1250,6 @@ pub fn current_countersigning_session(
             })
         }
     }
-}
-
-#[cfg(test)]
-async fn _put_db<H: ActionUnweighed, B: ActionBuilder<H>>(
-    vault: holochain_types::prelude::DbWrite<DbKindAuthored>,
-    keystore: &MetaLairClient,
-    author: Arc<AgentPubKey>,
-    action_builder: B,
-    maybe_entry: Option<Entry>,
-) -> SourceChainResult<ActionHash> {
-    let HeadInfo {
-        action: prev_action,
-        seq: last_action_seq,
-        ..
-    } = vault
-        .read_async({
-            let query_author = author.clone();
-
-            move |txn| chain_head_db_nonempty(txn, query_author.clone())
-        })
-        .await?;
-    let action_seq = last_action_seq + 1;
-
-    let common = ActionBuilderCommon {
-        author: (*author).clone(),
-        timestamp: Timestamp::now(),
-        action_seq,
-        prev_action: prev_action.clone(),
-    };
-    let action = action_builder.build(common).weightless();
-    let action = ActionHashed::from_content_sync(action);
-    let action = SignedActionHashed::sign(keystore, action).await?;
-    let record = Record::new(action, maybe_entry);
-    let ops = produce_op_lites_from_records(vec![&record])?;
-    let (action, entry) = record.into_inner();
-    let entry = entry.into_option();
-    let hash = action.as_hash().clone();
-    vault
-        .write_async(move |txn| -> SourceChainResult<Vec<DhtOpHash>> {
-            let head_info = chain_head_db_nonempty(txn, author.clone())?;
-            if head_info.action != prev_action {
-                let entries = match (entry, action.action().entry_hash()) {
-                    (Some(e), Some(entry_hash)) => {
-                        vec![holochain_types::EntryHashed::with_pre_hashed(
-                            e,
-                            entry_hash.clone(),
-                        )]
-                    }
-                    _ => vec![],
-                };
-                return Err(SourceChainError::HeadMoved(
-                    vec![action],
-                    entries,
-                    Some(prev_action),
-                    Some(head_info),
-                ));
-            }
-            Ok(put_raw(txn, action, ops, entry)?)
-        })
-        .await?;
-    Ok(hash)
 }
 
 /// dump the entire source chain as a pretty-printed json string
@@ -1416,7 +1323,6 @@ impl From<SourceChain> for SourceChainRead {
         SourceChainRead {
             vault: chain.vault.into(),
             dht_db: chain.dht_db.into(),
-            dht_db_cache: chain.dht_db_cache,
             scratch: chain.scratch,
             keystore: chain.keystore,
             author: chain.author,
@@ -1429,13 +1335,14 @@ impl From<SourceChain> for SourceChainRead {
 
 #[cfg(test)]
 mod tests {
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::fixt::DnaHashFixturator;
     use std::collections::BTreeSet;
 
     use super::*;
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holochain_keystore::test_keystore;
-    use holochain_p2p::MockHolochainP2pDnaT;
     use matches::assert_matches;
 
     use crate::source_chain::SourceChainResult;
@@ -1449,47 +1356,22 @@ mod tests {
         let db = test_db.to_db();
         let alice = fixt!(AgentPubKey, Predictable, 0);
 
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
-
         source_chain::genesis(
             db.clone(),
             dht_db.to_db(),
-            &dht_db_cache,
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
             None,
             None,
         )
-        .await
-        .unwrap();
-        let chain_1 = SourceChain::new(
-            db.clone(),
-            dht_db.to_db(),
-            dht_db_cache.clone(),
-            keystore.clone(),
-            alice.clone(),
-        )
         .await?;
-        let chain_2 = SourceChain::new(
-            db.clone(),
-            dht_db.to_db(),
-            dht_db_cache.clone(),
-            keystore.clone(),
-            alice.clone(),
-        )
-        .await?;
-        let chain_3 = SourceChain::new(
-            db.clone(),
-            dht_db.to_db(),
-            dht_db_cache.clone(),
-            keystore.clone(),
-            alice.clone(),
-        )
-        .await?;
+        let chain_1 =
+            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
+        let chain_2 =
+            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
+        let chain_3 =
+            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
 
         let action_builder = builder::CloseChain { new_target: None };
         chain_1
@@ -1502,30 +1384,27 @@ mod tests {
             .put(action_builder, None, ChainTopOrdering::Relaxed)
             .await?;
 
-        let author = Arc::new(alice);
-        chain_1.flush(&mock).await?;
-        let author_1 = Arc::clone(&author);
+        let storage_arcs = vec![DhtArc::Empty];
+        chain_1.flush(storage_arcs.clone(), None).await?;
         let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn, author_1))
+            .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
             .seq;
         assert_eq!(seq, 3);
 
         assert!(matches!(
-            chain_2.flush(&mock).await,
+            chain_2.flush(storage_arcs.clone(), None).await,
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
-        let author_2 = Arc::clone(&author);
         let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn, author_2))
+            .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
             .seq;
         assert_eq!(seq, 3);
 
-        chain_3.flush(&mock).await?;
-        let author_3 = Arc::clone(&author);
+        chain_3.flush(storage_arcs, None).await?;
         let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn, author_3))
+            .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
             .seq;
         assert_eq!(seq, 4);
@@ -1541,15 +1420,9 @@ mod tests {
         let db = test_db.to_db();
         let alice = fixt!(AgentPubKey, Predictable, 0);
 
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
-
         source_chain::genesis(
             db.clone(),
             dht_db.to_db(),
-            &dht_db_cache,
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
@@ -1559,30 +1432,12 @@ mod tests {
         .await
         .unwrap();
 
-        let chain_1 = SourceChain::new(
-            db.clone(),
-            dht_db.to_db(),
-            dht_db_cache.clone(),
-            keystore.clone(),
-            alice.clone(),
-        )
-        .await?;
-        let chain_2 = SourceChain::new(
-            db.clone(),
-            dht_db.to_db(),
-            dht_db_cache.clone(),
-            keystore.clone(),
-            alice.clone(),
-        )
-        .await?;
-        let chain_3 = SourceChain::new(
-            db.clone(),
-            dht_db.to_db(),
-            dht_db_cache.clone(),
-            keystore.clone(),
-            alice.clone(),
-        )
-        .await?;
+        let chain_1 =
+            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
+        let chain_2 =
+            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
+        let chain_3 =
+            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
 
         let entry_1 = Entry::App(fixt!(AppEntryBytes));
         let eh1 = EntryHash::with_data_sync(&entry_1);
@@ -1621,24 +1476,22 @@ mod tests {
             .await
             .unwrap();
 
-        let author = Arc::new(alice);
-        chain_1.flush(&mock).await?;
-        let author_1 = Arc::clone(&author);
+        let storage_arcs = vec![DhtArc::Empty];
+        chain_1.flush(storage_arcs.clone(), None).await?;
         let seq = db
-            .write_async(move |txn| chain_head_db_nonempty(txn, author_1))
+            .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?
             .seq;
         assert_eq!(seq, 3);
 
         assert!(matches!(
-            chain_2.flush(&mock).await,
+            chain_2.flush(storage_arcs.clone(), None).await,
             Err(SourceChainError::HeadMoved(_, _, _, _))
         ));
 
-        chain_3.flush(&mock).await?;
-        let author_2 = Arc::clone(&author);
+        chain_3.flush(storage_arcs, None).await?;
         let head = db
-            .write_async(move |txn| chain_head_db_nonempty(txn, author_2.clone()))
+            .write_async(move |txn| chain_head_db_nonempty(txn))
             .await?;
 
         // not equal since action hash change due to rebasing
@@ -1675,19 +1528,12 @@ mod tests {
     async fn delete_valid_agent_pub_key() {
         let authored_db = test_authored_db().to_db();
         let dht_db = test_dht_db().to_db();
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.clone().into());
         let keystore = test_keystore();
         let agent_key = keystore.new_sign_keypair_random().await.unwrap();
-        let mut mock_network = MockHolochainP2pDnaT::new();
-        mock_network
-            .expect_authority_for_hash()
-            .returning(|_| Ok(false));
-        mock_network.expect_chc().return_const(None);
 
         source_chain::genesis(
             authored_db.clone(),
             dht_db.clone(),
-            &dht_db_cache,
             keystore.clone(),
             fake_dna_hash(1),
             agent_key.clone(),
@@ -1698,12 +1544,12 @@ mod tests {
         .unwrap();
 
         // Delete valid agent pub key should succeed.
-        let chain = SourceChain::new(authored_db, dht_db, dht_db_cache, keystore, agent_key)
+        let chain = SourceChain::new(authored_db, dht_db, keystore, agent_key)
             .await
             .unwrap();
         let result = chain.delete_valid_agent_pub_key().await;
         assert!(result.is_ok());
-        chain.flush(&mock_network).await.unwrap();
+        chain.flush(vec![DhtArc::Empty], None).await.unwrap();
 
         // Valid agent pub key has been deleted. Repeating the operation should fail now as no valid
         // pub key can be found.
@@ -1715,16 +1561,12 @@ mod tests {
     async fn test_get_cap_grant() -> SourceChainResult<()> {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let db = test_db.to_db();
         let secret = Some(CapSecretFixturator::new(Unpredictable).next().unwrap());
         // create transferable cap grant
         #[allow(clippy::unnecessary_literal_unwrap)] // must be this type
         let secret_access = CapAccess::from(secret.unwrap());
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
 
         // @todo curry
         let _curry = CurryPayloadsFixturator::new(Empty).next().unwrap();
@@ -1741,7 +1583,6 @@ mod tests {
         source_chain::genesis(
             db.clone(),
             dht_db.to_db(),
-            &dht_db_cache,
             keystore.clone(),
             fake_dna_hash(1),
             alice.clone(),
@@ -1751,14 +1592,8 @@ mod tests {
         .await
         .unwrap();
 
-        let chain = SourceChain::new(
-            db.clone(),
-            dht_db.to_db(),
-            dht_db_cache.clone(),
-            keystore.clone(),
-            alice.clone(),
-        )
-        .await?;
+        let chain =
+            SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone()).await?;
         // alice as chain author always has a valid cap grant; provided secrets
         // are ignored
         assert_eq!(
@@ -1776,6 +1611,8 @@ mod tests {
             None
         );
 
+        let storage_arcs = vec![DhtArc::Empty];
+
         // write cap grant to alice's source chain
         let (original_action_address, original_entry_address) = {
             let (entry, entry_hash) =
@@ -1787,7 +1624,8 @@ mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-            chain.flush(&mock).await.unwrap();
+
+            chain.flush(storage_arcs.clone(), None).await.unwrap();
             (action, entry_hash)
         };
 
@@ -1832,14 +1670,9 @@ mod tests {
 
         // commit grant update to alice's source chain
         let (updated_action_hash, updated_entry_hash) = {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
+            let chain =
+                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
+                    .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(updated_grant.clone())).into_inner();
             let action_builder = builder::Update {
@@ -1851,7 +1684,7 @@ mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-            chain.flush(&mock).await.unwrap();
+            chain.flush(storage_arcs.clone(), None).await.unwrap();
 
             (action, entry_hash)
         };
@@ -1911,7 +1744,6 @@ mod tests {
             source_chain::genesis(
                 db.clone(),
                 dht_db.to_db(),
-                &dht_db_cache,
                 keystore.clone(),
                 fake_dna_hash(1),
                 carol.clone(),
@@ -1920,15 +1752,10 @@ mod tests {
             )
             .await
             .unwrap();
-            let carol_chain = SourceChain::new(
-                db.clone(),
-                dht_db.clone(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                carol.clone(),
-            )
-            .await
-            .unwrap();
+            let carol_chain =
+                SourceChain::new(db.clone(), dht_db.clone(), keystore.clone(), carol.clone())
+                    .await
+                    .unwrap();
             let maybe_cap_grant = carol_chain
                 .valid_cap_grant(("".into(), "".into()), alice.clone(), secret)
                 .await
@@ -1938,14 +1765,9 @@ mod tests {
 
         // delete updated cap grant
         {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
+            let chain =
+                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
+                    .await?;
             let action_builder = builder::Delete {
                 deletes_address: updated_action_hash,
                 deletes_entry_address: updated_entry_hash,
@@ -1953,7 +1775,7 @@ mod tests {
             chain
                 .put_weightless(action_builder, None, ChainTopOrdering::default())
                 .await?;
-            chain.flush(&mock).await.unwrap();
+            chain.flush(storage_arcs.clone(), None).await.unwrap();
         }
 
         // alice should get her author cap grant as always, independent of
@@ -1992,14 +1814,9 @@ mod tests {
             GrantedFunctions::All,
         );
         let (original_action_address, original_entry_address) = {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
+            let chain =
+                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
+                    .await?;
             let (entry, entry_hash) =
                 EntryHashed::from_content_sync(Entry::CapGrant(unrestricted_grant.clone()))
                     .into_inner();
@@ -2010,7 +1827,7 @@ mod tests {
             let action = chain
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
-            chain.flush(&mock).await.unwrap();
+            chain.flush(storage_arcs.clone(), None).await.unwrap();
             (action, entry_hash)
         };
 
@@ -2041,7 +1858,6 @@ mod tests {
                 source_chain::genesis(
                     db.clone(),
                     dht_db.to_db(),
-                    &dht_db_cache,
                     keystore.clone(),
                     fake_dna_hash(1),
                     bob.clone(),
@@ -2050,15 +1866,10 @@ mod tests {
                 )
                 .await
                 .unwrap();
-                let bob_chain = SourceChain::new(
-                    db.clone(),
-                    dht_db.clone(),
-                    dht_db_cache.clone(),
-                    keystore.clone(),
-                    bob.clone(),
-                )
-                .await
-                .unwrap();
+                let bob_chain =
+                    SourceChain::new(db.clone(), dht_db.clone(), keystore.clone(), bob.clone())
+                        .await
+                        .unwrap();
                 let maybe_cap_grant = bob_chain
                     .valid_cap_grant(("".into(), "".into()), carol.clone(), None)
                     .await
@@ -2069,14 +1880,9 @@ mod tests {
 
         // delete unrestricted cap grant
         {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
+            let chain =
+                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
+                    .await?;
             let action_builder = builder::Delete {
                 deletes_address: original_action_address,
                 deletes_entry_address: original_entry_address,
@@ -2084,7 +1890,7 @@ mod tests {
             chain
                 .put_weightless(action_builder, None, ChainTopOrdering::default())
                 .await?;
-            chain.flush(&mock).await.unwrap();
+            chain.flush(storage_arcs.clone(), None).await.unwrap();
         }
 
         // bob must not get unrestricted cap grant any longer
@@ -2122,14 +1928,9 @@ mod tests {
         );
 
         {
-            let chain = SourceChain::new(
-                db.clone(),
-                dht_db.to_db(),
-                dht_db_cache.clone(),
-                keystore.clone(),
-                alice.clone(),
-            )
-            .await?;
+            let chain =
+                SourceChain::new(db.clone(), dht_db.to_db(), keystore.clone(), alice.clone())
+                    .await?;
 
             // commit first grant to alice's chain
             let (entry, entry_hash) =
@@ -2155,7 +1956,7 @@ mod tests {
                 .put_weightless(action_builder, Some(entry), ChainTopOrdering::default())
                 .await?;
 
-            chain.flush(&mock).await.unwrap();
+            chain.flush(storage_arcs, None).await.unwrap();
         }
 
         let actual_cap_grant = chain
@@ -2215,21 +2016,15 @@ mod tests {
         holochain_trace::test_run();
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
 
         let author = Arc::new(keystore.new_sign_keypair_random().await.unwrap());
 
         vault
             .read_async({
-                let query_author = author.clone();
-
                 move |txn| -> DatabaseResult<()> {
-                    assert_matches!(chain_head_db(txn, query_author.clone()), Ok(None));
+                    assert_matches!(chain_head_db(txn), Ok(None));
 
                     Ok(())
                 }
@@ -2239,7 +2034,6 @@ mod tests {
         genesis(
             vault.clone(),
             dht_db.to_db(),
-            &dht_db_cache,
             keystore.clone(),
             fixt!(DnaHash),
             (*author).clone(),
@@ -2252,7 +2046,6 @@ mod tests {
         let source_chain = SourceChain::new(
             vault.clone(),
             dht_db.to_db(),
-            dht_db_cache.clone(),
             keystore.clone(),
             (*author).clone(),
         )
@@ -2276,21 +2069,15 @@ mod tests {
             .put_weightless(create, Some(entry), ChainTopOrdering::default())
             .await
             .unwrap();
-        source_chain.flush(&mock).await.unwrap();
+        source_chain.flush(vec![DhtArc::Empty], None).await.unwrap();
 
         vault
             .read_async({
                 let check_h1 = h1.clone();
                 let check_h2 = h2.clone();
-                let check_author = author.clone();
 
                 move |txn| -> DatabaseResult<()> {
-                    assert_eq!(
-                        chain_head_db_nonempty(txn, check_author.clone())
-                            .unwrap()
-                            .action,
-                        check_h2
-                    );
+                    assert_eq!(chain_head_db_nonempty(txn).unwrap().action, check_h2);
                     // get the full record
                     let store = CascadeTxnWrapper::from(txn);
                     let h1_record_fetched = store
@@ -2314,7 +2101,6 @@ mod tests {
         let source_chain = SourceChain::new(
             vault.clone(),
             dht_db.to_db(),
-            dht_db_cache.clone(),
             keystore.clone(),
             (*author).clone(),
         )
@@ -2332,14 +2118,12 @@ mod tests {
     async fn source_chain_buffer_dump_entries_json() -> SourceChainResult<()> {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
         let author = keystore.new_sign_keypair_random().await.unwrap();
         genesis(
             vault.clone(),
             dht_db.to_db(),
-            &dht_db_cache,
             keystore.clone(),
             fixt!(DnaHash),
             author.clone(),
@@ -2371,7 +2155,6 @@ mod tests {
     async fn source_chain_query() {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
         let alice = keystore.new_sign_keypair_random().await.unwrap();
@@ -2381,7 +2164,6 @@ mod tests {
         genesis(
             vault.clone(),
             dht_db.to_db(),
-            &dht_db_cache,
             keystore.clone(),
             dna_hash.clone(),
             alice.clone(),
@@ -2394,7 +2176,6 @@ mod tests {
         genesis(
             vault.clone(),
             dht_db.to_db(),
-            &dht_db_cache,
             keystore.clone(),
             dna_hash.clone(),
             bob.clone(),
@@ -2406,7 +2187,7 @@ mod tests {
 
         // test_db.dump_tmp();
 
-        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
+        let chain = SourceChain::new(vault, dht_db.to_db(), keystore, alice.clone())
             .await
             .unwrap();
 
@@ -2516,7 +2297,6 @@ mod tests {
     async fn source_chain_query_ordering() {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
         let alice = keystore.new_sign_keypair_random().await.unwrap();
@@ -2525,7 +2305,6 @@ mod tests {
         genesis(
             vault.clone(),
             dht_db.to_db(),
-            &dht_db_cache,
             keystore.clone(),
             dna_hash.clone(),
             alice.clone(),
@@ -2535,7 +2314,7 @@ mod tests {
         .await
         .unwrap();
 
-        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
+        let chain = SourceChain::new(vault, dht_db.to_db(), keystore, alice.clone())
             .await
             .unwrap();
 
@@ -2557,7 +2336,6 @@ mod tests {
     async fn init_zomes_complete() {
         let test_db = test_authored_db();
         let dht_db = test_dht_db();
-        let dht_db_cache = DhtDbQueryCache::new(dht_db.to_db().into());
         let keystore = test_keystore();
         let vault = test_db.to_db();
         let alice = keystore.new_sign_keypair_random().await.unwrap();
@@ -2566,7 +2344,6 @@ mod tests {
         genesis(
             vault.clone(),
             dht_db.to_db(),
-            &dht_db_cache,
             keystore.clone(),
             dna_hash.clone(),
             alice.clone(),
@@ -2576,7 +2353,7 @@ mod tests {
         .await
         .unwrap();
 
-        let chain = SourceChain::new(vault, dht_db.to_db(), dht_db_cache, keystore, alice.clone())
+        let chain = SourceChain::new(vault, dht_db.to_db(), keystore, alice.clone())
             .await
             .unwrap();
 
@@ -2594,10 +2371,7 @@ mod tests {
             .await;
         assert!(result.is_ok());
 
-        let mut mock = MockHolochainP2pDnaT::new();
-        mock.expect_authority_for_hash().returning(|_| Ok(false));
-        mock.expect_chc().return_const(None);
-        chain.flush(&mock).await.unwrap();
+        chain.flush(vec![DhtArc::Empty], None).await.unwrap();
 
         // zomes initialized should be true after init zomes has run
         let zomes_initialized = chain.zomes_initialized().await.unwrap();

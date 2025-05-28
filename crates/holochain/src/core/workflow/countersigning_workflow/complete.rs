@@ -5,21 +5,20 @@ use crate::core::workflow::{WorkflowError, WorkflowResult};
 use holo_hash::{ActionHash, AgentPubKey, DhtOpHash, EntryHash};
 use holochain_chc::AddRecordPayload;
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_sqlite::db::ReadAccess;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_state::integrate::authored_ops_to_dht_db_without_check;
 use holochain_state::mutations;
 use holochain_state::prelude::*;
+use holochain_timestamp::Timestamp;
 use holochain_types::dht_op::ChainOp;
 use holochain_zome_types::prelude::SignedAction;
-use kitsune_p2p_types::dht::prelude::Timestamp;
 use rusqlite::{named_params, Transaction};
-use std::sync::Arc;
 
 pub(crate) async fn inner_countersigning_session_complete(
     space: Space,
-    network: Arc<impl HolochainP2pDnaT>,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     author: AgentPubKey,
     signed_actions: Vec<SignedAction>,
@@ -49,7 +48,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         move |txn: &Txn<DbKindAuthored>| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
             if let Some((session_record, cs_entry_hash, session_data)) =
-                current_countersigning_session(txn, Arc::new(author.clone()))?
+                current_countersigning_session(txn)?
             {
                 let lock_subject = session_data.preflight_request.fingerprint()?;
 
@@ -155,7 +154,6 @@ pub(crate) async fn inner_countersigning_session_complete(
     )
     .await?;
 
-    // TODO This should be in the publish workflow
     // Publish other signers agent activity ops to their agent activity authorities.
     for sa in signed_actions {
         let (action, signature) = sa.into();
@@ -164,8 +162,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         }
         let op = ChainOp::RegisterAgentActivity(signature, action);
         let basis = op.dht_basis();
-        // TODO this is what flag is for, whether to witness or store - document and rename me
-        if let Err(e) = network.publish_countersign(false, basis, op.into()).await {
+        if let Err(e) = network.publish_countersign(basis, op).await {
             tracing::error!(
                 "Failed to publish to other counter-signers agent authorities because of: {:?}",
                 e
@@ -187,7 +184,7 @@ pub(crate) async fn inner_countersigning_session_complete(
 #[allow(clippy::too_many_arguments)]
 async fn reveal_countersigning_session(
     space: Space,
-    network: Arc<impl HolochainP2pDnaT>,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     session_record: Record,
     author: &AgentPubKey,
@@ -233,7 +230,6 @@ async fn apply_success_state_changes(
 ) -> Result<(), WorkflowError> {
     let authored_db = space.get_or_create_authored_db(author.clone())?;
     let dht_db = space.dht_db.clone();
-    let dht_db_cache = space.dht_query_cache.clone();
 
     // Unlock the chain and remove the withhold publish flag from all ops in this session.
     let this_cell_actions_op_basis_hashes = authored_db
@@ -265,7 +261,6 @@ async fn apply_success_state_changes(
         this_cell_actions_op_basis_hashes,
         authored_db.into(),
         dht_db,
-        &dht_db_cache,
     )
     .await?;
 
@@ -296,7 +291,7 @@ fn get_countersigning_op_hashes(
 /// the session becomes unresolved and can be forcefully completed and published anyway.
 pub(super) async fn force_publish_countersigning_session(
     space: Space,
-    network: Arc<impl HolochainP2pDnaT>,
+    network: DynHolochainP2pDna,
     keystore: MetaLairClient,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
@@ -309,9 +304,7 @@ pub(super) async fn force_publish_countersigning_session(
         let preflight_request = preflight_request.clone();
         move |txn: &Txn<DbKindAuthored>| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
-            if let Some((session_record, _, session_data)) =
-                current_countersigning_session(txn, Arc::new(author.clone()))?
-            {
+            if let Some((session_record, _, session_data)) = current_countersigning_session(txn)? {
                 let lock_subject = session_data.preflight_request.fingerprint()?;
                 if lock_subject != preflight_request.fingerprint()? {
                     return SourceChainResult::Ok(None);

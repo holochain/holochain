@@ -1,14 +1,40 @@
 #![allow(dead_code)]
 
+use ::fixt::*;
 use anyhow::Result;
-use arbitrary::Arbitrary;
+use assert_cmd::prelude::*;
 use ed25519_dalek::{Signer, SigningKey};
+use futures::Future;
+use hdk::prelude::*;
 use holochain::conductor::ConductorHandle;
+use holochain::{
+    conductor::api::ZomeCallParamsSigned,
+    conductor::api::{AdminRequest, AdminResponse, AppRequest},
+};
 use holochain_conductor_api::conductor::paths::DataRootPath;
-use holochain_conductor_api::conductor::DpkiConfig;
+use holochain_conductor_api::conductor::ConductorConfig;
+use holochain_conductor_api::conductor::KeystoreConfig;
+use holochain_conductor_api::AdminInterfaceConfig;
+use holochain_conductor_api::AppResponse;
 use holochain_conductor_api::FullStateDump;
+use holochain_conductor_api::InterfaceDriver;
+use holochain_types::prelude::*;
+use holochain_types::websocket::AllowedOrigins;
+use holochain_util::tokio_helper;
 use holochain_websocket::WebsocketSender;
 use holochain_websocket::{WebsocketReceiver, WebsocketResult};
+use matches::assert_matches;
+use serde::Serialize;
+use std::time::Duration;
+use std::{path::PathBuf, process::Stdio};
+use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::io::BufReader;
+use tokio::process::Child;
+use tokio::process::Command;
+
+pub use holochain::sweettest::websocket_client_by_port;
+use mr_bundle::FileSystemBundler;
 
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor
@@ -23,35 +49,6 @@ pub async fn websocket_client(
     Ok(websocket_client_by_port(port).await?)
 }
 
-pub use holochain::sweettest::websocket_client_by_port;
-
-use assert_cmd::prelude::*;
-use futures::Future;
-use holochain_conductor_api::conductor::ConductorConfig;
-use holochain_conductor_api::conductor::KeystoreConfig;
-use holochain_conductor_api::AdminInterfaceConfig;
-use holochain_conductor_api::InterfaceDriver;
-use kitsune_p2p_types::config::KitsuneP2pConfig;
-use matches::assert_matches;
-use serde::Serialize;
-use std::time::Duration;
-use std::{path::PathBuf, process::Stdio};
-use tokio::io::AsyncBufReadExt;
-use tokio::io::AsyncWriteExt;
-use tokio::io::BufReader;
-use tokio::process::Child;
-use tokio::process::Command;
-
-use hdk::prelude::*;
-use holochain::{
-    conductor::api::ZomeCallParamsSigned,
-    conductor::api::{AdminRequest, AdminResponse, AppRequest},
-};
-use holochain_conductor_api::AppResponse;
-use holochain_types::prelude::*;
-use holochain_types::websocket::AllowedOrigins;
-use holochain_util::tokio_helper;
-
 /// Wrapper that synchronously waits for the Child to terminate on drop.
 pub struct SupervisedChild(String, Child);
 
@@ -64,53 +61,6 @@ impl Drop for SupervisedChild {
                 .unwrap_or_else(|_| panic!("Failed to kill {}", self.0));
         });
     }
-}
-
-pub async fn start_local_services() -> (
-    SupervisedChild,
-    tokio::sync::oneshot::Receiver<String>,
-    tokio::sync::oneshot::Receiver<String>,
-) {
-    tracing::info!("\n----\nstarting local bootstrap server\n----\n");
-    let cmd = std::process::Command::cargo_bin("hc-run-local-services").unwrap();
-    let mut cmd = Command::from(cmd);
-    cmd.stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
-    let mut child = cmd.spawn().expect("Failed to spawn local services");
-    let (tx_bootstrap, rx_bootstrap) = tokio::sync::oneshot::channel();
-    let (tx_signal, rx_signal) = tokio::sync::oneshot::channel();
-    let stdout = child.stdout.take().unwrap();
-    let mut tx_bootstrap = Some(tx_bootstrap);
-    let mut tx_signal = Some(tx_signal);
-    tokio::spawn(async move {
-        let mut reader = BufReader::new(stdout).lines();
-        while let Ok(Some(line)) = reader.next_line().await {
-            println!("hc local services stdout: {line}");
-            if let Some(addr) = line.strip_prefix("# HC BOOTSTRAP - ADDR: ") {
-                if let Some(sender) = tx_bootstrap.take() {
-                    let _ = sender.send(addr.to_string());
-                }
-            }
-            if let Some(addr) = line.strip_prefix("# HC SIGNAL - ADDR: ") {
-                if let Some(sender) = tx_signal.take() {
-                    let _ = sender.send(addr.to_string());
-                }
-            }
-        }
-    });
-    let stderr = child.stderr.take().unwrap();
-    tokio::task::spawn(async move {
-        let mut reader = BufReader::new(stderr).lines();
-        while let Ok(Some(line)) = reader.next_line().await {
-            eprintln!("hc local services stderr: {line}");
-        }
-    });
-    (
-        SupervisedChild("Local Holochain Services".to_string(), child),
-        rx_bootstrap,
-        rx_signal,
-    )
 }
 
 pub async fn start_holochain(
@@ -163,8 +113,7 @@ pub async fn grant_zome_call_capability(
     let mut assignees = BTreeSet::new();
     assignees.insert(signing_key.clone());
 
-    let mut buf = arbitrary::Unstructured::new(&[]);
-    let cap_secret = CapSecret::arbitrary(&mut buf).unwrap();
+    let cap_secret = fixt!(CapSecret);
 
     let request = AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
         cell_id: cell_id.clone(),
@@ -259,18 +208,18 @@ pub async fn attach_app_interface(client: &WebsocketSender, port: Option<u16>) -
     }
 }
 
-pub async fn retry_admin_interface(
+pub async fn retry_websocket_client_by_port(
     port: u16,
     mut attempts: usize,
     delay: Duration,
-) -> WebsocketSender {
+) -> WebsocketResult<(WebsocketSender, WebsocketReceiver)> {
     loop {
         match websocket_client_by_port(port).await {
-            Ok(c) => return c.0,
+            Ok(c) => return Ok(c),
             Err(e) => {
                 attempts -= 1;
                 if attempts == 0 {
-                    panic!("Failed to join admin interface");
+                    return Err(e);
                 }
                 warn!(
                     "Failed with {:?} to open admin interface, trying {} more times",
@@ -328,18 +277,22 @@ pub async fn register_and_install_dna_named(
         ..Default::default()
     };
 
-    let dna_bundle1 = DnaBundle::read_from_file(&dna_path).await.unwrap();
-    let dna_bundle = DnaBundle::read_from_file(&dna_path).await.unwrap();
+    let dna_bundle1 = FileSystemBundler::load_from::<ValidatedDnaManifest>(&dna_path)
+        .await
+        .map(DnaBundle::from)
+        .unwrap();
+    let dna_bundle = dna_bundle1.clone();
     let (dna, _) = dna_bundle1
         .into_dna_file(mods.clone().serialized().unwrap())
         .await
         .unwrap();
     let dna_hash = dna.dna_hash().clone();
 
+    let resource_id = dna_path.file_name().unwrap().to_str().unwrap().to_string();
     let roles = vec![AppRoleManifest {
         name: role_name,
         dna: AppRoleDnaManifest {
-            location: Some(DnaLocation::Bundled(dna_path.clone())),
+            path: Some(resource_id.clone()),
             modifiers: mods,
             installed_hash: None,
             clone_limit: 0,
@@ -354,20 +307,20 @@ pub async fn register_and_install_dna_named(
         .build()
         .unwrap();
 
-    let resources = vec![(dna_path.clone(), dna_bundle)];
+    let resources = vec![(resource_id, dna_bundle)];
 
-    let bundle = AppBundle::new(manifest.clone().into(), resources, dna_path.clone())
-        .await
-        .unwrap();
+    let bundle = AppBundle::new(manifest.clone().into(), resources)
+        .unwrap()
+        .pack()
+        .expect("failed to encode AppBundle to bytes");
 
     let payload = InstallAppPayload {
         agent_key: None,
-        source: AppBundleSource::Bundle(bundle),
+        source: AppBundleSource::Bytes(bundle),
         installed_app_id: Some(name),
         network_seed: None,
         roles_settings: Default::default(),
         ignore_genesis_failure: false,
-        allow_throwaway_random_agent_key: true,
     };
     let request = AdminRequest::InstallApp(Box::new(payload));
     let response = client.request(request);
@@ -420,7 +373,7 @@ pub async fn check_started(holochain: &mut Child) {
     }
 }
 
-/// Create test config with test keystore and DPKI disabled
+/// Create test config with test keystore.
 pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig {
     ConductorConfig {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
@@ -431,8 +384,6 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         }]),
         data_root_path: Some(data_root_path),
         keystore: KeystoreConfig::DangerTestKeystore,
-        dpki: DpkiConfig::disabled(),
-        network: KitsuneP2pConfig::mem(),
         ..Default::default()
     }
 }

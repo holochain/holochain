@@ -1,5 +1,9 @@
 use crate::prelude::*;
-use std::{collections::HashSet, path::PathBuf};
+use mr_bundle::ResourceIdentifier;
+use schemars::JsonSchema;
+use std::collections::HashMap;
+use std::collections::HashSet;
+
 mod dna_manifest_v1;
 
 #[cfg(test)]
@@ -12,7 +16,9 @@ pub use dna_manifest_v1::{
 };
 
 /// The enum which encompasses all versions of the DNA manifest, past and present.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, derive_more::From)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, JsonSchema, derive_more::From,
+)]
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 pub enum DnaManifest {
@@ -28,14 +34,30 @@ pub enum DnaManifest {
 pub struct ValidatedDnaManifest(pub DnaManifest);
 
 impl mr_bundle::Manifest for ValidatedDnaManifest {
-    fn locations(&self) -> Vec<mr_bundle::Location> {
-        match &self.0 {
-            DnaManifest::V1(m) => m.all_zomes().map(|zome| zome.location.clone()).collect(),
+    fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
+        match &mut self.0 {
+            DnaManifest::V1(m) => m
+                .all_zomes_mut()
+                .map(|zome| {
+                    let id = zome.resource_id();
+                    let file = zome.path.clone();
+
+                    zome.path = id.clone();
+
+                    (id, file)
+                })
+                .collect(),
         }
     }
 
-    fn path() -> PathBuf {
-        "dna.yaml".into()
+    fn resource_ids(&self) -> Vec<ResourceIdentifier> {
+        match &self.0 {
+            DnaManifest::V1(m) => m.all_zomes().map(|zome| zome.resource_id()).collect(),
+        }
+    }
+
+    fn file_name() -> &'static str {
+        "dna.yaml"
     }
 
     fn bundle_extension() -> &'static str {
@@ -50,17 +72,17 @@ impl DnaManifest {
         name: String,
         network_seed: Option<String>,
         properties: Option<YamlProperties>,
-        origin_time: HumanTimestamp,
         integrity_zomes: Vec<ZomeManifest>,
         coordinator_zomes: Vec<ZomeManifest>,
-        lineage: Vec<DnaHash>,
+        #[cfg(feature = "unstable-migration")] lineage: Vec<DnaHash>,
     ) -> Self {
         DnaManifestCurrent::new(
             name,
-            IntegrityManifest::new(network_seed, properties, origin_time, integrity_zomes),
+            IntegrityManifest::new(network_seed, properties, integrity_zomes),
             CoordinatorManifest {
                 zomes: coordinator_zomes,
             },
+            #[cfg(feature = "unstable-migration")]
             lineage.into_iter().map(Into::into).collect(),
         )
         .into()
@@ -139,7 +161,6 @@ mod tests {
             .name("my_dna".to_owned())
             .integrity(IntegrityManifest {
                 network_seed: None,
-                origin_time: HumanTimestamp::Micros(Timestamp::now()),
                 properties: None,
                 zomes: vec![],
             })
@@ -150,6 +171,7 @@ mod tests {
         match &manifest {
             DnaManifest::V1(m) => {
                 assert_eq!(m.coordinator, CoordinatorManifest::default());
+                #[cfg(feature = "unstable-migration")]
                 assert_eq!(m.lineage, vec![]);
             }
         }

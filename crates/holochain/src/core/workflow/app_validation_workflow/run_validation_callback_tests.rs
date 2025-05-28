@@ -11,8 +11,9 @@ use crate::{
     sweettest::{SweetDnaFile, SweetInlineZomes},
 };
 use fixt::fixt;
+use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
-use holochain_p2p::{HolochainP2pDnaFixturator, MockHolochainP2pDnaT};
+use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::exports::FallibleIterator;
 use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, prelude::insert_op_cache};
 use holochain_types::{
@@ -26,7 +27,7 @@ use holochain_zome_types::{
     chain::{ChainFilter, ChainFilters, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
     entry::MustGetActionInput,
-    fixt::{AgentPubKeyFixturator, CreateFixturator, DeleteFixturator, SignatureFixturator},
+    fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator},
     judged::Judged,
     op::{Op, RegisterAgentActivity, RegisterDelete},
     record::{SignedActionHashed, SignedHashed},
@@ -73,8 +74,7 @@ async fn validation_callback_must_get_action() {
         ..
     } = TestCase::new(zomes).await;
 
-    let network = Arc::new(fixt!(HolochainP2pDna));
-    let dpki = None;
+    let network = Arc::new(MockHolochainP2pDnaT::new());
 
     // a create by alice
     let mut create = fixt!(Create);
@@ -97,7 +97,6 @@ async fn validation_callback_must_get_action() {
         &ribosome,
         workspace.clone(),
         network.clone(),
-        dpki.clone(),
         false,
     )
     .await
@@ -112,7 +111,7 @@ async fn validation_callback_must_get_action() {
     });
 
     // the same validation should now successfully validate the op
-    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, dpki, false)
+    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, false)
         .await
         .unwrap();
     assert_matches!(outcome, Outcome::Accepted);
@@ -175,7 +174,7 @@ async fn validation_callback_awaiting_deps_hashes() {
     // mock network that returns the requested create action
     let mut network = MockHolochainP2pDnaT::new();
     let action_to_return = create_action_signed_hashed.clone();
-    network.expect_get().returning(move |hash, _| {
+    network.expect_get().returning(move |hash| {
         assert_eq!(hash, action_to_return.as_hash().clone().into());
         Ok(vec![WireOps::Record(WireRecordOps {
             action: Some(Judged::new(
@@ -189,7 +188,6 @@ async fn validation_callback_awaiting_deps_hashes() {
     });
 
     let network = Arc::new(network);
-    let dpki = None;
 
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
@@ -197,7 +195,6 @@ async fn validation_callback_awaiting_deps_hashes() {
         &ribosome,
         workspace.clone(),
         network.clone(),
-        dpki.clone(),
         false,
     )
     .await
@@ -213,7 +210,7 @@ async fn validation_callback_awaiting_deps_hashes() {
 
     // app validation outcome should be accepted, now that the missing record
     // has been fetched
-    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, dpki, false)
+    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, false)
         .await
         .unwrap();
     assert_matches!(outcome, Outcome::Accepted)
@@ -315,15 +312,12 @@ async fn validation_callback_awaiting_deps_agent_activity() {
     });
     let network = Arc::new(network);
 
-    let dpki = None;
-
     // app validation should indicate missing action is being awaited
     let outcome = run_validation_callback(
         invocation.clone(),
         &ribosome,
         workspace.clone(),
         network.clone(),
-        dpki.clone(),
         false,
     )
     .await
@@ -342,7 +336,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
 
     // app validation outcome should be accepted, now that bob's missing agent
     // activity is available in alice's cache
-    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, dpki, false)
+    let outcome = run_validation_callback(invocation, &ribosome, workspace, network, false)
         .await
         .unwrap();
     assert_matches!(outcome, Outcome::Accepted);
@@ -366,7 +360,7 @@ impl TestCase {
         let dna_hash = dna_file.dna_hash().clone();
         let ribosome = RealRibosome::new(
             dna_file.clone(),
-            Arc::new(RwLock::new(ModuleCache::new(None))),
+            Some(Arc::new(RwLock::new(ModuleCache::new(None)))),
         )
         .await
         .unwrap();
@@ -380,7 +374,6 @@ impl TestCase {
                 .unwrap()
                 .into(),
             test_space.space.dht_db.clone().into(),
-            test_space.space.dht_query_cache.clone(),
             test_space.space.cache_db.clone(),
             fixt!(MetaLairClient),
             None,

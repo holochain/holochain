@@ -1,31 +1,25 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-
 use ::fixt::prelude::*;
 use holochain::sweettest::*;
 use holochain_conductor_api::{AppInfoStatus, CellInfo};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
+use std::collections::HashMap;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_install_app_with_custom_modifiers_overridden_correctly() {
     let conductor = SweetConductor::from_standard_config().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let path = PathBuf::from(format!("{}", dna.dna_hash()));
+    let path = format!("{}", dna.dna_hash());
 
     let manifest_network_seed = String::from("initial seed from the manifest");
     let manifest_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
         "some properties in the manifest",
     )));
-    let manifest_origin_time = Timestamp::now().saturating_sub(&std::time::Duration::from_secs(1));
-    let manifest_quantum_time = std::time::Duration::from_secs(60);
 
     let modifiers = DnaModifiersOpt::default()
         .with_network_seed(manifest_network_seed.clone())
-        .with_properties(manifest_properties.clone())
-        .with_origin_time(manifest_origin_time)
-        .with_quantum_time(manifest_quantum_time);
+        .with_properties(manifest_properties.clone());
 
     let role_name_1 = String::from("role1");
     let role_name_2 = String::from("role2");
@@ -34,7 +28,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         AppRoleManifest {
             name: role_name_1.clone(),
             dna: AppRoleDnaManifest {
-                location: Some(DnaLocation::Bundled(path.clone())),
+                path: Some(path.clone()),
                 modifiers: modifiers.clone(),
                 // Note that there is no installed hash provided. We'll check that this changes later.
                 installed_hash: None,
@@ -45,7 +39,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         AppRoleManifest {
             name: role_name_2.clone(),
             dna: AppRoleDnaManifest {
-                location: Some(DnaLocation::Bundled(path.clone())),
+                path: Some(path.clone()),
                 modifiers: modifiers.clone(),
                 // Note that there is no installed hash provided. We'll check that this changes later.
                 installed_hash: None,
@@ -64,9 +58,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
 
     let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
 
-    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
-        .await
-        .unwrap();
+    let bundle = AppBundle::new(manifest.clone().into(), resources).unwrap();
 
     //- Test that installing with custom modifiers correctly overwrites the values and that the dna hash
     //  differs from the dna hash when installed without custom modifiers
@@ -74,13 +66,9 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
     let custom_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
         "some properties provided at install time",
     )));
-    let custom_origin_time = Timestamp::now();
-    let custom_quantum_time = std::time::Duration::from_secs(5 * 60);
 
     let custom_modifiers = DnaModifiersOpt::default()
         .with_network_seed(custom_network_seed.clone())
-        .with_origin_time(custom_origin_time)
-        .with_quantum_time(custom_quantum_time)
         .with_properties(custom_properties.clone());
 
     let role_settings = (
@@ -93,16 +81,16 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
 
     let network_seed_override = "overridden by network_seed field";
 
+    let bundle_bytes = bundle.pack().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle.clone()),
+            source: AppBundleSource::Bytes(bundle_bytes.clone()),
             installed_app_id: Some("app_0".into()),
             network_seed: Some(network_seed_override.into()),
             roles_settings: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -111,12 +99,11 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle.clone()),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_1".into()),
             network_seed: Some(network_seed_override.into()),
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -185,14 +172,6 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         installed_app_role_1.dna.modifiers.properties,
         Some(custom_properties)
     );
-    assert_eq!(
-        installed_app_role_1.dna.modifiers.origin_time,
-        Some(custom_origin_time)
-    );
-    assert_eq!(
-        installed_app_role_1.dna.modifiers.quantum_time,
-        Some(custom_quantum_time)
-    );
 
     assert_eq!(
         installed_app_role_2.dna.modifiers.network_seed,
@@ -202,14 +181,6 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         installed_app_role_2.dna.modifiers.properties,
         Some(manifest_properties.clone())
     );
-    assert_eq!(
-        installed_app_role_2.dna.modifiers.origin_time,
-        Some(manifest_origin_time)
-    );
-    assert_eq!(
-        installed_app_role_2.dna.modifiers.quantum_time,
-        Some(manifest_quantum_time)
-    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -217,27 +188,23 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
     let conductor = SweetConductor::from_standard_config().await;
 
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let path = PathBuf::from(format!("{}", dna.dna_hash()));
+    let path = format!("{}", dna.dna_hash());
 
     let manifest_network_seed = String::from("initial seed from the manifest");
     let manifest_properties = YamlProperties::new(serde_yaml::Value::String(String::from(
         "some properties in the manifest",
     )));
-    let manifest_origin_time = Timestamp::now().saturating_sub(&std::time::Duration::from_secs(1));
-    let manifest_quantum_time = std::time::Duration::from_secs(60);
 
     let modifiers = DnaModifiersOpt::default()
         .with_network_seed(manifest_network_seed.clone())
-        .with_properties(manifest_properties.clone())
-        .with_origin_time(manifest_origin_time)
-        .with_quantum_time(manifest_quantum_time);
+        .with_properties(manifest_properties.clone());
 
     let role_name = String::from("role");
 
     let roles = vec![AppRoleManifest {
         name: role_name.clone(),
         dna: AppRoleDnaManifest {
-            location: Some(DnaLocation::Bundled(path.clone())),
+            path: Some(path.clone()),
             modifiers: modifiers.clone(),
             // Note that there is no installed hash provided. We'll check that this changes later.
             installed_hash: None,
@@ -255,9 +222,7 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
 
     let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
 
-    let bundle = AppBundle::new(manifest.clone().into(), resources, PathBuf::from("."))
-        .await
-        .unwrap();
+    let bundle = AppBundle::new(manifest.clone().into(), resources).unwrap();
 
     //- Test that modifier fields that are None in the modifiers map do not overwrite existing
     //  modifiers from the manifest
@@ -271,16 +236,16 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
         },
     );
 
+    let bundle_bytes = bundle.pack().unwrap();
     conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle.clone()),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app".into()),
             network_seed: None,
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();
@@ -307,14 +272,6 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
         installed_app_role_1.dna.modifiers.properties,
         Some(manifest_properties.clone())
     );
-    assert_eq!(
-        installed_app_role_1.dna.modifiers.origin_time,
-        Some(manifest_origin_time)
-    );
-    assert_eq!(
-        installed_app_role_1.dna.modifiers.quantum_time,
-        Some(manifest_quantum_time)
-    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -332,16 +289,16 @@ async fn installing_with_modifiers_for_non_existing_role_fails() {
         },
     );
 
+    let bundle_bytes = bundle.pack().unwrap();
     let result = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
             agent_key: None,
-            source: AppBundleSource::Bundle(bundle.clone()),
+            source: AppBundleSource::Bytes(bundle_bytes),
             installed_app_id: Some("app_3".into()),
             network_seed: Some("final seed".into()),
             roles_settings: Some(HashMap::from([role_settings])),
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await;
 
@@ -367,17 +324,17 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
         },
     );
 
+    let bundle_bytes = bundle.pack().unwrap();
     //- Install with a membrane proof provided in the roles_settings
     let app = conductor
         .clone()
         .install_app_bundle(InstallAppPayload {
-            source: AppBundleSource::Bundle(bundle),
+            source: AppBundleSource::Bytes(bundle_bytes),
             agent_key: None,
             installed_app_id: Some(app_id.clone()),
             roles_settings: Some(HashMap::from([role_settings])),
             network_seed: None,
             ignore_genesis_failure: false,
-            allow_throwaway_random_agent_key: true,
         })
         .await
         .unwrap();

@@ -21,9 +21,16 @@ mod test;
     derive_more::From,
     derive_more::IntoIterator,
 )]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[serde(from = "WasmMapSerialized", into = "WasmMapSerialized")]
 pub struct WasmMap(BTreeMap<holo_hash::WasmHash, wasm::DnaWasm>);
+
+#[cfg(feature = "test_utils")]
+impl WasmMap {
+    /// Create an iterator over the WasmMap
+    pub fn iter(&self) -> impl Iterator<Item = (&holo_hash::WasmHash, &wasm::DnaWasm)> {
+        self.0.iter()
+    }
+}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
@@ -48,12 +55,11 @@ impl From<WasmMapSerialized> for WasmMap {
 /// That function has been superseded by `DnaBundle`, but we use this type
 /// widely, so there is simply a way to convert from `DnaBundle` to `DnaFile`.
 ///
-/// TODO: Once we remove the `InstallApp` command which accepts a `DnaFile`,
-///       we should remove the Serialize impl on this type, and perhaps rename
-///       to indicate that this is simply a validated, fully-formed DnaBundle
-///       (i.e. all Wasms are bundled and immediately available, not remote.)
+// TODO: Once we remove the `InstallApp` command which accepts a `DnaFile`,
+//       we should remove the Serialize impl on this type, and perhaps rename
+//       to indicate that this is simply a validated, fully-formed DnaBundle
+//       (i.e. all Wasms are bundled and immediately available, not remote.)
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, SerializedBytes, Hash)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct DnaFile {
     /// The hashable portion that can be shared with hApp code.
     pub(super) dna: DnaDefHashed,
@@ -73,10 +79,10 @@ impl From<DnaFile> for (DnaDef, Vec<wasm::DnaWasm>) {
 
 impl DnaFile {
     /// Construct a new DnaFile instance.
-    pub async fn new(dna: DnaDef, wasm: impl IntoIterator<Item = wasm::DnaWasm>) -> Self {
+    pub async fn new(dna: DnaDef, wasm: impl IntoIterator<Item = DnaWasm>) -> Self {
         let mut code = BTreeMap::new();
         for wasm in wasm {
-            let wasm_hash = holo_hash::WasmHash::with_data(&wasm).await;
+            let wasm_hash = WasmHash::with_data(&wasm).await;
             code.insert(wasm_hash, wasm);
         }
 

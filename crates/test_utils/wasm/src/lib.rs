@@ -27,6 +27,7 @@ pub enum TestWasm {
     AppValidation,
     Bench,
     Capability,
+    Client,
     Clone,
     CounterSigning,
     Create,
@@ -47,7 +48,6 @@ pub enum TestWasm {
     HashPath,
     HdkExtern,
     InitFail,
-    InitInvalidReturn,
     InitInvalidParams,
     InitPass,
     InitSingle,
@@ -75,13 +75,13 @@ pub enum TestWasm {
     ValidateValid,
     ValidateCreateLinkValid,
     ValidateRejectAppTypes,
-    ValidateInvalidReturn,
     ValidateInvalidParams,
     WhoAmI,
     ZomeInfo,
 }
+
 /// Utility type for combining a test wasm's coordinator
-/// zome with it's integrity zome.
+/// zome with its integrity zome.
 pub struct TestWasmPair<I, C = I> {
     pub integrity: I,
     pub coordinator: C,
@@ -94,16 +94,19 @@ impl TestWasm {
     pub fn integrity_zome_name(self) -> ZomeName {
         TestWasmPair::<ZomeName>::from(self).integrity
     }
+
     /// Get the [`ZomeName`] for the coordinator zome.
     pub fn coordinator_zome_name(self) -> ZomeName {
         TestWasmPair::<ZomeName>::from(self).coordinator
     }
+
     /// Get the [`Zome`] for the integrity zome.
     pub fn integrity_zome(self) -> Zome {
         TestWasmPair::<IntegrityZome, CoordinatorZome>::from(self)
             .integrity
             .erase_type()
     }
+
     /// Get the [`Zome`] for the coordinator zome.
     pub fn coordinator_zome(self) -> Zome {
         TestWasmPair::<IntegrityZome, CoordinatorZome>::from(self)
@@ -140,6 +143,7 @@ impl From<TestWasm> for ZomeName {
             TestWasm::AppValidation => "app_validation",
             TestWasm::Bench => "bench",
             TestWasm::Capability => "capability",
+            TestWasm::Client => "client",
             TestWasm::Clone => "clone",
             TestWasm::CounterSigning => "countersigning",
             TestWasm::Create => "create_entry",
@@ -162,7 +166,6 @@ impl From<TestWasm> for ZomeName {
             TestWasm::HashPath => "hash_path",
             TestWasm::HdkExtern => "hdk_extern",
             TestWasm::InitFail => "init_fail",
-            TestWasm::InitInvalidReturn => "init_invalid_return",
             TestWasm::InitInvalidParams => "init_invalid_params",
             TestWasm::InitPass => "init_pass",
             TestWasm::InitSingle => "init_single",
@@ -190,7 +193,6 @@ impl From<TestWasm> for ZomeName {
             TestWasm::ValidateValid => "validate_valid",
             TestWasm::ValidateCreateLinkValid => "validate_link_add_valid",
             TestWasm::ValidateRejectAppTypes => "validate_reject_app_types",
-            TestWasm::ValidateInvalidReturn => "validate_invalid_return",
             TestWasm::ValidateInvalidParams => "validate_invalid_params",
             TestWasm::WhoAmI => "whoami",
             TestWasm::ZomeInfo => "zome_info",
@@ -218,6 +220,7 @@ impl From<TestWasm> for PathBuf {
             TestWasm::AppValidation => "wasm32-unknown-unknown/release/test_wasm_app_validation.wasm",
             TestWasm::Bench => "wasm32-unknown-unknown/release/test_wasm_bench.wasm",
             TestWasm::Capability => "wasm32-unknown-unknown/release/test_wasm_capability.wasm",
+            TestWasm::Client => "wasm32-unknown-unknown/release/test_wasm_client.wasm",
             TestWasm::Clone => "wasm32-unknown-unknown/release/test_wasm_clone.wasm",
             TestWasm::CounterSigning => {
                 "wasm32-unknown-unknown/release/test_wasm_countersigning.wasm"
@@ -252,7 +255,6 @@ impl From<TestWasm> for PathBuf {
             TestWasm::HashPath => "wasm32-unknown-unknown/release/test_wasm_hash_path.wasm",
             TestWasm::HdkExtern => "wasm32-unknown-unknown/release/test_wasm_hdk_extern.wasm",
             TestWasm::InitFail => "wasm32-unknown-unknown/release/test_wasm_init_fail.wasm",
-            TestWasm::InitInvalidReturn => "wasm32-unknown-unknown/release/test_wasm_init_invalid_return.wasm",
             TestWasm::InitInvalidParams => "wasm32-unknown-unknown/release/test_wasm_init_invalid_params.wasm",
             TestWasm::InitPass => "wasm32-unknown-unknown/release/test_wasm_init_pass.wasm",
             TestWasm::InitSingle => "wasm32-unknown-unknown/release/test_wasm_init_single.wasm",
@@ -306,7 +308,6 @@ impl From<TestWasm> for PathBuf {
             TestWasm::ValidateRejectAppTypes => {
                 "wasm32-unknown-unknown/release/test_wasm_validate_reject_app_types.wasm"
             }
-            TestWasm::ValidateInvalidReturn => "wasm32-unknown-unknown/release/test_wasm_validate_invalid_return.wasm",
             TestWasm::ValidateInvalidParams => "wasm32-unknown-unknown/release/test_wasm_validate_invalid_params.wasm",
             TestWasm::WhoAmI => "wasm32-unknown-unknown/release/test_wasm_whoami.wasm",
             TestWasm::ZomeInfo => "wasm32-unknown-unknown/release/test_wasm_zome_info.wasm",
@@ -516,6 +517,5 @@ async fn path_to_def(path: PathBuf, dependencies: Vec<ZomeName>) -> ZomeDef {
     ZomeDef::Wasm(WasmZome {
         wasm_hash,
         dependencies,
-        preserialized_path: None,
     })
 }

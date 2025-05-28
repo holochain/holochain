@@ -8,18 +8,83 @@ use holo_hash::encode::blake2b_256;
 use holo_hash::*;
 use holochain_nonce::Nonce256Bits;
 use holochain_sqlite::prelude::DatabaseResult;
+use holochain_sqlite::rusqlite;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::*;
 use holochain_types::sql::AsSql;
-use kitsune_p2p::dependencies::kitsune_p2p_fetch::TransferMethod;
 use std::str::FromStr;
 
 pub use error::*;
 
 mod error;
+
+/// Gossip has two distinct variants which share a lot of similarities but
+/// are fundamentally different and serve different purposes
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub enum GossipType {
+    /// The Recent gossip type is aimed at rapidly syncing the most recent
+    /// data. It runs frequently and expects frequent diffs at each round.
+    Recent,
+    /// The Historical gossip type is aimed at comprehensively syncing the
+    /// entire common history of two nodes, filling in gaps in the historical
+    /// data. It runs less frequently, and expects diffs to be infrequent
+    /// at each round.
+    Historical,
+}
+
+/// The possible methods of transferring op hashes
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub enum TransferMethod {
+    /// Transfer by publishing
+    Publish,
+    /// Transfer by gossiping
+    Gossip(GossipType),
+}
+
+impl rusqlite::ToSql for TransferMethod {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+        let stage = match self {
+            TransferMethod::Publish => 1,
+            TransferMethod::Gossip(GossipType::Recent) => 2,
+            TransferMethod::Gossip(GossipType::Historical) => 3,
+        };
+        Ok(rusqlite::types::ToSqlOutput::Owned(stage.into()))
+    }
+}
+
+impl rusqlite::types::FromSql for TransferMethod {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        i32::column_result(value).and_then(|int| match int {
+            1 => Ok(TransferMethod::Publish),
+            2 => Ok(TransferMethod::Gossip(GossipType::Recent)),
+            3 => Ok(TransferMethod::Gossip(GossipType::Historical)),
+            _ => Err(rusqlite::types::FromSqlError::InvalidType),
+        })
+    }
+}
 
 #[macro_export]
 macro_rules! sql_insert {
@@ -67,7 +132,7 @@ pub fn insert_op_scratch(
             entry.clone(),
             action
                 .entry_hash()
-                .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?
+                .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?
                 .clone(),
         );
         scratch.add_entry(entry_hashed, chain_top_ordering);
@@ -95,7 +160,7 @@ pub fn insert_op_authored(
     txn: &mut Txn<DbKindAuthored>,
     op: &DhtOpHashed,
 ) -> StateMutationResult<()> {
-    insert_op_when(txn, op, None, Timestamp::now())
+    insert_op_when(txn, op, 0, None, Timestamp::now())
 }
 
 /// Insert a [DhtOp] into the DHT database.
@@ -105,9 +170,10 @@ pub fn insert_op_authored(
 pub fn insert_op_dht(
     txn: &mut Txn<DbKindDht>,
     op: &DhtOpHashed,
+    serialized_size: u32,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
-    insert_op_when(txn, op, transfer_data, Timestamp::now())
+    insert_op_when(txn, op, serialized_size, transfer_data, Timestamp::now())
 }
 
 /// Insert a [DhtOp] into the Cache database.
@@ -117,7 +183,7 @@ pub fn insert_op_dht(
 /// - perhaps a TransferMethod could include the method used to get the data, e.g. `get` vs `get_links`
 /// - timestamp is probably unnecessary since `when_stored` will suffice
 pub fn insert_op_cache(txn: &mut Txn<DbKindCache>, op: &DhtOpHashed) -> StateMutationResult<()> {
-    insert_op_when(txn, op, None, Timestamp::now())
+    insert_op_when(txn, op, 0, None, Timestamp::now())
 }
 
 /// Marker for the cases where we could include some transfer data, but this is currently
@@ -132,14 +198,19 @@ pub fn todo_no_cache_transfer_data() -> Option<(AgentPubKey, TransferMethod, Tim
 /// Insert a [DhtOp] into any Op database.
 /// The type is not checked, and transfer data is not set.
 #[cfg(feature = "test_utils")]
-pub fn insert_op_untyped(txn: &mut Transaction, op: &DhtOpHashed) -> StateMutationResult<()> {
-    insert_op_when(txn, op, None, Timestamp::now())
+pub fn insert_op_untyped(
+    txn: &mut Transaction,
+    op: &DhtOpHashed,
+    serialized_size: u32,
+) -> StateMutationResult<()> {
+    insert_op_when(txn, op, serialized_size, None, Timestamp::now())
 }
 
 /// Insert a [DhtOp] into the database.
 pub fn insert_op_when(
     txn: &mut Transaction,
     op: &DhtOpHashed,
+    serialized_size: u32,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
     when_stored: Timestamp,
 ) -> StateMutationResult<()> {
@@ -150,7 +221,6 @@ pub fn insert_op_when(
     let timestamp = op.timestamp();
     let signature = op.signature().clone();
     let op_order = OpOrder::new(op_type, op.timestamp());
-    let deps = op.sys_validation_dependencies();
 
     #[cfg(not(feature = "unstable-warrants"))]
     let create_op = true;
@@ -163,7 +233,7 @@ pub fn insert_op_when(
             if let Some(entry) = op.entry().into_option() {
                 let entry_hash = action
                     .entry_hash()
-                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(action.clone()))?;
+                    .ok_or_else(|| DhtOpError::ActionWithoutEntry(Box::new(action.clone())))?;
                 insert_entry(txn, entry_hash, entry)?;
             }
             let action_hashed = ActionHashed::from_content_sync(action);
@@ -188,10 +258,10 @@ pub fn insert_op_when(
             hash,
             &op_order,
             &timestamp,
+            serialized_size,
             transfer_data,
             when_stored,
         )?;
-        set_dependency(txn, hash, deps)?;
     }
     Ok(())
 }
@@ -209,7 +279,7 @@ pub fn insert_op_lite_into_authored(
     order: &OpOrder,
     authored_timestamp: &Timestamp,
 ) -> StateMutationResult<()> {
-    insert_op_lite(txn, op_lite, hash, order, authored_timestamp, None)?;
+    insert_op_lite(txn, op_lite, hash, order, authored_timestamp, 0, None)?;
     set_validation_status(txn, hash, ValidationStatus::Valid)?;
     set_when_sys_validated(txn, hash, Timestamp::now())?;
     set_when_app_validated(txn, hash, Timestamp::now())?;
@@ -224,6 +294,7 @@ pub fn insert_op_lite(
     hash: &DhtOpHash,
     order: &OpOrder,
     authored_timestamp: &Timestamp,
+    serialized_size: u32,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
 ) -> StateMutationResult<()> {
     insert_op_lite_when(
@@ -232,18 +303,21 @@ pub fn insert_op_lite(
         hash,
         order,
         authored_timestamp,
+        serialized_size,
         transfer_data,
         Timestamp::now(),
     )
 }
 
 /// Insert a [`DhtOpLite`] into the database.
+#[allow(clippy::too_many_arguments)]
 pub fn insert_op_lite_when(
     txn: &mut Transaction,
     op_lite: &DhtOpLite,
     hash: &DhtOpHash,
     order: &OpOrder,
     authored_timestamp: &Timestamp,
+    serialized_size: u32,
     transfer_data: Option<(AgentPubKey, TransferMethod, Timestamp)>,
     when_stored: Timestamp,
 ) -> StateMutationResult<()> {
@@ -267,6 +341,7 @@ pub fn insert_op_lite_when(
                 "transfer_time": transfer_time,
                 "require_receipt": 0,
                 "op_order": order,
+                "serialized_size": serialized_size,
             })?;
         }
         DhtOpLite::Warrant(op) => {
@@ -512,22 +587,6 @@ pub fn set_validation_status(
     })?;
     Ok(())
 }
-/// Set the integration dependency of a [DhtOp] in the database.
-pub fn set_dependency(
-    txn: &mut Transaction,
-    hash: &DhtOpHash,
-    deps: SysValDeps,
-) -> StateMutationResult<()> {
-    // NOTE: this is only the FIRST dependency. This was written at a time when sys validation
-    // only had a notion of one dependency. This db field is not used, so we're not putting too
-    // much effort into getting all deps into the database.
-    if let Some(dep) = deps.first() {
-        dht_op_update!(txn, hash, {
-            "dependency": dep,
-        })?;
-    }
-    Ok(())
-}
 
 /// Set the whether or not a receipt is required of a [DhtOp] in the database.
 pub fn set_require_receipt(
@@ -669,51 +728,32 @@ pub fn set_receipts_complete_redundantly_in_dht_db(
 }
 
 #[cfg(feature = "unstable-warrants")]
-/// Insert a [`Warrant`] into the Action table.
+/// Insert a [`Warrant`] into the Warrant table.
 pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMutationResult<usize> {
     let warrant_type = warrant.get_type();
     let hash = warrant.to_hash();
     let author = &warrant.author;
+    let timestamp = warrant.timestamp;
+    let warrantee = warrant.warrantee.clone();
 
-    // Don't produce a warrant if one, of any kind, already exists
-    let basis = warrant.dht_basis();
-
-    // XXX: this is a terrible misuse of databases. When putting a Warrant in the Action table,
-    //      if it's an InvalidChainOp warrant, we store the action hash in the prev_hash field.
-    let (exists, action_hash) = match &warrant.proof {
-        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp { action, .. }) => {
-            let action_hash = Some(action.0.clone());
-            let exists = txn
-                .prepare_cached(
-                    "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash = :prev_hash",
-                )?
-                .exists(named_params! {
-                    ":type": WarrantType::ChainIntegrityWarrant,                    
-                    ":base_hash": basis,
-                    ":prev_hash": action_hash,
-                })?;
-            (exists, action_hash)
-        }
-        WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork { .. }) => {
-            let exists = txn
-                .prepare_cached(
-                    "SELECT 1 FROM Action WHERE type = :type AND base_hash = :base_hash AND prev_hash IS NULL",
-                )?
-                .exists(named_params! {
-                    ":type": WarrantType::ChainIntegrityWarrant,
-                    ":base_hash": basis
-                })?;
-            (exists, None)
-        }
-    };
+    // Don't produce a warrant if one, of any kind, already exists for the warrantee.
+    // TODO: If warrants were permanent, this would relieve peers from having to store a possibly endless
+    // number of warrants for an agent. However, warrants may be redeemable at some stage, which is when
+    // there needs to be a different check performed here.
+    // TODO: Move this check to the calling function.
+    let exists = txn
+        .prepare_cached("SELECT 1 FROM Warrant WHERE warrantee = :warrantee")?
+        .exists(named_params! {
+            ":warrantee": warrantee,
+        })?;
 
     Ok(if !exists {
-        sql_insert!(txn, Action, {
+        sql_insert!(txn, Warrant, {
             "hash": hash,
-            "type": warrant_type,
             "author": author,
-            "base_hash": basis,
-            "prev_hash": action_hash,
+            "timestamp": timestamp,
+            "warrantee": warrantee,
+            "type": warrant_type,
             "blob": to_blob(&warrant)?,
         })?
     } else {
@@ -1089,76 +1129,4 @@ pub fn remove_countersigning_session(
     tracing::debug!("Removed {} actions", count);
 
     Ok(())
-}
-
-#[cfg(feature = "unstable-warrants")]
-#[cfg(test)]
-mod tests {
-    use ::fixt::fixt;
-    use std::sync::Arc;
-
-    use holochain_types::prelude::*;
-
-    use crate::prelude::{CascadeTxnWrapper, Store};
-
-    use super::insert_op_authored;
-
-    #[test]
-    fn can_write_and_read_warrants() {
-        let dir = tempfile::tempdir().unwrap();
-
-        let cell_id = Arc::new(fixt!(CellId));
-
-        let pair = (fixt!(ActionHash), fixt!(Signature));
-
-        let make_op = |warrant| {
-            let op = SignedWarrant::new(warrant, fixt!(Signature));
-            let op: DhtOp = op.into();
-            op.into_hashed()
-        };
-
-        let action_author = fixt!(AgentPubKey);
-
-        let warrant1 = Warrant::new(
-            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-                action_author: action_author.clone(),
-                action: pair.clone(),
-                validation_type: ValidationType::App,
-            }),
-            fixt!(AgentPubKey),
-            fixt!(Timestamp),
-        );
-
-        let warrant2 = Warrant::new(
-            WarrantProof::ChainIntegrity(ChainIntegrityWarrant::ChainFork {
-                chain_author: action_author.clone(),
-                action_pair: (pair.clone(), pair.clone()),
-            }),
-            fixt!(AgentPubKey),
-            fixt!(Timestamp),
-        );
-
-        let op1 = make_op(warrant1.clone());
-        let op2 = make_op(warrant2.clone());
-
-        let db = DbWrite::<DbKindAuthored>::test(dir.as_ref(), DbKindAuthored(cell_id)).unwrap();
-        db.test_write({
-            let op1 = op1.clone();
-            let op2 = op2.clone();
-            move |txn| {
-                insert_op_authored(txn, &op1).unwrap();
-                insert_op_authored(txn, &op2).unwrap();
-            }
-        });
-
-        db.test_read(move |txn| {
-            let warrants: Vec<DhtOp> = CascadeTxnWrapper::from(txn)
-                .get_warrants_for_basis(&action_author.into(), false)
-                .unwrap()
-                .into_iter()
-                .map(Into::into)
-                .collect();
-            assert_eq!(warrants, vec![op1.into_content(), op2.into_content()]);
-        });
-    }
 }

@@ -1,44 +1,48 @@
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::fmt::Debug;
 
-use crate::location::Location;
+/// The identifier for a resource in the manifest.
+pub type ResourceIdentifier = String;
 
-/// A Manifest describes the resources in a [`Bundle`](crate::Bundle) and how
-/// to pack and unpack them.
+/// A Manifest describes the resources in a [`Bundle`](crate::Bundle).
 ///
-/// Regardless of the format of your Manifest, it must contain a set of Locations
-/// describing where to find resources, and this trait must implement `locations`
-/// properly to match the data contained in the manifest.
+/// A manifest implementation is expected to describe a set of resources that
+/// it intends to be bundled with. The resources are expected to be identifiable
+/// by a [`ResourceIdentifier`], which is a string.
 ///
-/// You must also specify a relative path for the Manifest, and the extension
-/// for the bundle file, if you are using the "packing" feature.
+/// The bundler uses [`generate_resource_ids`](Manifest::generate_resource_ids) to
+/// request that the manifest produce a set of resource ids. The manifest must
+/// replace its resource locators with the generated ids and return the pairs of
+/// ids and resource locations to the bundler.
 pub trait Manifest:
-    Clone + Sized + PartialEq + Eq + serde::Serialize + serde::de::DeserializeOwned
+    Clone + Sized + PartialEq + Eq + Debug + serde::Serialize + serde::de::DeserializeOwned
 {
-    /// The list of Locations referenced in the manifest data. This must be
-    /// correctly implemented to enable resource resolution.
-    fn locations(&self) -> Vec<Location>;
+    /// Ask the manifest to produce resource ids and a locator for the resources.
+    ///
+    /// After the operations complete, the manifest must have replaced its resource
+    /// locators with the generated ids. The returned map must contain the pairs of
+    /// resource ids and their original locators.
+    ///
+    /// This operation is required to be idempotent if it is called multiple times. The first
+    /// call is expected to mutate the manifest so that its resources refer to ids instead of the
+    /// original resource locators. If called again, it can't return useful locators but the ids
+    /// must be the same as the first call.
+    fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String>;
 
-    /// When unpacking the bundle into a directory structure, this becomes
-    /// the relative path of the manifest file.
-    #[cfg(feature = "packing")]
-    fn path() -> PathBuf;
+    /// The list of resources referenced in the manifest data.
+    ///
+    /// This must return the same value before or after the call to [`generate_resource_ids`](Manifest::generate_resource_ids).
+    fn resource_ids(&self) -> Vec<ResourceIdentifier>;
 
-    /// When packing a bundle from a directory structure, the bundle file gets
-    /// this extension.
-    #[cfg(feature = "packing")]
+    /// The file name of the manifest file.
+    ///
+    /// This is recommended to contain a file extension, but it is not required.
+    #[cfg(feature = "fs")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
+    fn file_name() -> &'static str;
+
+    /// The file extension to use when writing the bundle to the filesystem.
+    #[cfg(feature = "fs")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
     fn bundle_extension() -> &'static str;
-
-    /// Get only the Bundled locations
-    fn bundled_paths(&self) -> Vec<PathBuf> {
-        self.locations()
-            .into_iter()
-            .filter_map(|loc| {
-                if let Location::Bundled(path) = loc {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
 }

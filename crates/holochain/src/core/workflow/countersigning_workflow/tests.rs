@@ -12,7 +12,7 @@ use crate::prelude::EntryFixturator;
 use crate::prelude::SignatureFixturator;
 use crate::prelude::SignedAction;
 use crate::prelude::{ActionBase, PreflightBytes, PreflightRequest, PreflightRequestAcceptance};
-use crate::prelude::{ActionHashed, CounterSigningAgentState, DhtDbQueryCache, SignedActionHashed};
+use crate::prelude::{ActionHashed, CounterSigningAgentState, SignedActionHashed};
 use fixt::prelude::*;
 use hdk::prelude::{Action, Entry, EntryTypeFixturator, Record};
 use hdk::prelude::{CounterSigningSessionTimes, Timestamp};
@@ -283,8 +283,7 @@ async fn receive_signatures_and_complete() {
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
         net.expect_chc().return_once(|| None);
-        net.expect_publish_countersign()
-            .return_once(|_, _, _| Ok(()));
+        net.expect_publish_countersign().return_once(|_, _| Ok(()));
         net
     });
 
@@ -373,8 +372,7 @@ async fn receive_valid_and_invalid_signatures_and_complete() {
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
         net.expect_chc().return_once(|| None);
-        net.expect_publish_countersign()
-            .return_once(|_, _, _| Ok(()));
+        net.expect_publish_countersign().return_once(|_, _| Ok(()));
         net
     });
 
@@ -428,7 +426,7 @@ async fn ignore_signature_bundles_from_previous_session() {
 
             net.expect_publish_countersign()
                 .times(2)
-                .returning(|_, _, _| Ok(()));
+                .returning(|_, _| Ok(()));
 
             net
         }
@@ -866,8 +864,7 @@ async fn recover_from_commit_after_restart_when_other_agent_completes() {
 
             net.expect_chc().return_once(|| None);
 
-            net.expect_publish_countersign()
-                .return_once(|_, _, _| Ok(()));
+            net.expect_publish_countersign().return_once(|_, _| Ok(()));
 
             net
         }
@@ -1207,8 +1204,7 @@ async fn timeout_during_accept_does_not_interfere_with_previous_session() {
     // Expect to receive a publish event.
     test_harness.reconfigure_network(|mut net| {
         net.expect_chc().return_once(|| None);
-        net.expect_publish_countersign()
-            .return_once(|_, _, _| Ok(()));
+        net.expect_publish_countersign().return_once(|_, _| Ok(()));
         net
     });
 
@@ -1666,8 +1662,7 @@ async fn recover_and_complete_after_resolution_failures() {
 
             net.expect_chc().return_once(|| None);
 
-            net.expect_publish_countersign()
-                .return_once(|_, _, _| Ok(()));
+            net.expect_publish_countersign().return_once(|_, _| Ok(()));
 
             net
         }
@@ -1701,8 +1696,7 @@ async fn recover_and_complete_after_resolution_failures() {
 
             net.expect_chc().return_once(|| None);
 
-            net.expect_publish_countersign()
-                .return_once(|_, _, _| Ok(()));
+            net.expect_publish_countersign().return_once(|_, _| Ok(()));
 
             net
         }
@@ -1814,7 +1808,6 @@ impl TestHarness {
                 .get_or_create_authored_db(author.clone())
                 .unwrap(),
             test_space.space.dht_db.clone(),
-            &DhtDbQueryCache::new(test_space.space.dht_db.clone().into()),
             keystore.clone(),
             dna_hash.clone(),
             author.clone(),
@@ -2012,13 +2005,7 @@ impl TestHarness {
             .space
             .get_or_create_authored_db(self.author.clone())
             .unwrap();
-        let chain_head = authored
-            .read_async({
-                let author = self.author.clone();
-                move |txn| chain_head_db(txn, Arc::new(author))
-            })
-            .await
-            .unwrap();
+        let chain_head = authored.read_async(chain_head_db).await.unwrap();
 
         chain_head.unwrap()
     }
@@ -2162,10 +2149,7 @@ impl TestHarness {
             .unwrap();
 
         let session = authored
-            .read_async({
-                let author = self.author.clone();
-                move |txn| current_countersigning_session(txn, Arc::new(author))
-            })
+            .read_async(current_countersigning_session)
             .await
             .unwrap();
 

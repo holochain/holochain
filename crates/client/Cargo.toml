@@ -1,0 +1,65 @@
+[package]
+name = "holochain_client"
+version = "0.8.0-dev.3"
+description = "A Rust client for the Holochain Conductor API"
+authors = [
+  "Holochain Core Dev Team <devcore@holochain.org>",
+  "Guillem Cordoba <guillem.cordoba@gmail.com>",
+]
+license = "MIT"
+edition = "2021"
+homepage = "https://github.com/holochain/holochain"
+keywords = ["holochain", "client", "conductor-api"]
+repository = "https://github.com/holochain/holochain"
+documentation = "https://docs.rs/holochain_client"
+
+# reminder - do not use workspace deps
+[dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+event-emitter-rs = "0.1"
+holo_hash = { version = "^0.6.0-dev.4", path = "../holo_hash", features = [
+  "encoding",
+] }
+holochain_conductor_api = { version = "^0.6.0-dev.6", path = "../holochain_conductor_api" }
+holochain_nonce = { version = "^0.6.0-dev.0", path = "../holochain_nonce" }
+holochain_types = { version = "^0.6.0-dev.6", path = "../holochain_types" }
+holochain_websocket = { version = "^0.6.0-dev.6", path = "../holochain_websocket" }
+holochain_zome_types = { version = "^0.6.0-dev.5", path = "../holochain_zome_types" }
+kitsune2_api = "0.2.7"
+lair_keystore_api = { version = "0.6.1", optional = true }
+parking_lot = "0.12.1"
+rand = { version = "0.8" }
+serde = "1.0.193"
+thiserror = "2.0"
+tokio = { version = "1.36", features = ["rt"] }
+
+[dev-dependencies]
+bytes = "1.10.1"
+fixt = { version = "^0.6.0-dev.0", path = "../fixt" }
+futures = "0.3.31"
+mr_bundle = { version = "^0.6.0-dev.1", path = "../mr_bundle" }
+holochain = { version = "^0.6.0-dev.6", path = "../holochain", default-features = false, features = [
+  "sweettest",
+] }
+holochain_wasm_test_utils = { version = "^0.6.0-dev.6", path = "../test_utils/wasm" }
+
+kitsune2_core = "0.2.7"
+serde_yaml = "0.9"
+
+[features]
+default = ["lair_signing", "wasmer_sys"]
+
+lair_signing = ["dep:lair_keystore_api"]
+
+wasmer_sys = ["holochain/wasmer_sys"]
+wasmer_wamr = ["holochain/wasmer_wamr"]
+unstable-migration = [
+  "holochain_conductor_api/unstable-migration",
+  "holochain_types/unstable-migration",
+  "holochain_zome_types/unstable-migration",
+  "holochain/unstable-migration",
+]
+
+build_wasms = ["holochain_wasm_test_utils/build"]

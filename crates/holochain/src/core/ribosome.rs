@@ -7,7 +7,6 @@
 
 // This allow is here because #[automock] automaticaly creates a struct without
 // documentation, and there seems to be no way to add docs to it after the fact
-#[allow(missing_docs)]
 pub mod error;
 
 /// How to version guest callbacks.
@@ -56,10 +55,17 @@ pub mod real_ribosome;
 
 mod check_clone_access;
 
+use self::guest_callback::{
+    entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
+};
+use self::{
+    error::RibosomeError,
+    guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
+};
 use crate::conductor::api::CellConductorHandle;
 use crate::conductor::api::CellConductorReadHandle;
-use crate::conductor::api::DpkiApi;
 use crate::conductor::api::ZomeCallParamsSigned;
+use crate::conductor::error::ConductorResult;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
 use crate::core::ribosome::guest_callback::genesis_self_check::v2::GenesisSelfCheckHostAccessV2;
@@ -71,17 +77,14 @@ use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::CallStream;
 use derive_more::Constructor;
 use error::RibosomeResult;
-use ghost_actor::dependencies::must_future::MustBoxFuture;
 use guest_callback::entry_defs::EntryDefsHostAccess;
 use guest_callback::init::InitHostAccess;
 use guest_callback::post_commit::PostCommitHostAccess;
 use guest_callback::validate::ValidateHostAccess;
 use holo_hash::AgentPubKey;
-use holochain_conductor_services::DpkiImpl;
 use holochain_keystore::MetaLairClient;
 use holochain_nonce::*;
-use holochain_p2p::HolochainP2pDna;
-use holochain_p2p::HolochainP2pDnaT;
+use holochain_p2p::DynHolochainP2pDna;
 use holochain_serialized_bytes::prelude::*;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
@@ -90,17 +93,11 @@ use holochain_types::prelude::*;
 use holochain_types::zome_types::GlobalZomeTypes;
 use holochain_zome_types::block::BlockTargetId;
 use mockall::automock;
+use must_future::MustBoxFuture;
 use std::iter::Iterator;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-
-use self::guest_callback::{
-    entry_defs::EntryDefsInvocation, genesis_self_check::GenesisSelfCheckResult,
-};
-use self::{
-    error::RibosomeError,
-    guest_callback::genesis_self_check::{GenesisSelfCheckHostAccess, GenesisSelfCheckInvocation},
-};
+use wasmer::RuntimeError;
 
 #[derive(Clone)]
 pub struct CallContext {
@@ -140,6 +137,18 @@ impl CallContext {
     pub fn auth(&self) -> InvocationAuth {
         self.auth.clone()
     }
+
+    pub fn switch_host_context(
+        &self,
+        transform: impl Fn(&HostContext) -> Result<HostContext, RuntimeError>,
+    ) -> Result<CallContext, RuntimeError> {
+        Ok(Self {
+            zome: self.zome.clone(),
+            function_name: self.function_name.clone(),
+            host_context: transform(&self.host_context)?,
+            auth: self.auth.clone(),
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -148,7 +157,7 @@ pub enum HostContext {
     GenesisSelfCheckV1(GenesisSelfCheckHostAccessV1),
     GenesisSelfCheckV2(GenesisSelfCheckHostAccessV2),
     Init(InitHostAccess),
-    PostCommit(PostCommitHostAccess), // MAYBE: add emit_signal access here?
+    PostCommit(PostCommitHostAccess),
     Validate(ValidateHostAccess),
     ZomeCall(ZomeCallHostAccess),
 }
@@ -186,17 +195,6 @@ impl HostContext {
         }
     }
 
-    /// Get the DPKI service if installed.
-    pub fn maybe_dpki(&self) -> DpkiApi {
-        match self.clone() {
-            Self::ZomeCall(ZomeCallHostAccess { dpki, .. }) => dpki,
-            Self::Init(InitHostAccess { dpki, .. }) => dpki,
-            _ => {
-                panic!("Gave access to a host function that accesses DPKI without providing DPKI.")
-            }
-        }
-    }
-
     /// Get the workspace, panics if none was provided
     pub fn workspace_write(&self) -> &HostFnWorkspace {
         match self {
@@ -222,11 +220,11 @@ impl HostContext {
     }
 
     /// Get the network, panics if none was provided
-    pub fn network(&self) -> Arc<dyn HolochainP2pDnaT> {
+    pub fn network(&self) -> DynHolochainP2pDna {
         match self {
             Self::ZomeCall(ZomeCallHostAccess { network, .. })
             | Self::Init(InitHostAccess { network, .. })
-            | Self::PostCommit(PostCommitHostAccess { network, .. }) => Arc::new(network.clone()),
+            | Self::PostCommit(PostCommitHostAccess { network, .. }) => network.clone(),
             Self::Validate(ValidateHostAccess { network, .. }) => network.clone(),
             _ => panic!(
                 "Gave access to a host function that uses the network without providing a network"
@@ -254,6 +252,7 @@ impl HostContext {
                 call_zome_handle, ..
             })
             | Self::Init(InitHostAccess { call_zome_handle, .. })
+            | Self::PostCommit(PostCommitHostAccess { call_zome_handle: Some(call_zome_handle), .. })
             => call_zome_handle,
             _ => panic!(
                 "Gave access to a host function that uses the call zome handle without providing a call zome handle"
@@ -300,7 +299,6 @@ impl FnComponents {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(test, derive(arbitrary::Arbitrary))]
 pub enum ZomesToInvoke {
     /// All the integrity zomes.
     AllIntegrity,
@@ -418,7 +416,7 @@ impl ZomeCallInvocation {
     pub async fn verify_blocked_provenance(
         &self,
         host_access: &ZomeCallHostAccess,
-    ) -> RibosomeResult<ZomeCallAuthorization> {
+    ) -> ConductorResult<ZomeCallAuthorization> {
         if host_access
             .call_zome_handle
             .is_blocked(
@@ -447,7 +445,7 @@ impl ZomeCallInvocation {
     pub async fn is_authorized<'a>(
         &self,
         host_access: &ZomeCallHostAccess,
-    ) -> RibosomeResult<ZomeCallAuthorization> {
+    ) -> ConductorResult<ZomeCallAuthorization> {
         Ok(match self.verify_nonce(host_access).await? {
             ZomeCallAuthorization::Authorized => match self.verify_grant(host_access).await? {
                 ZomeCallAuthorization::Authorized => {
@@ -575,8 +573,7 @@ impl From<ZomeCallInvocation> for ZomeCallParams {
 pub struct ZomeCallHostAccess {
     pub workspace: HostFnWorkspace,
     pub keystore: MetaLairClient,
-    pub dpki: Option<DpkiImpl>,
-    pub network: HolochainP2pDna,
+    pub network: DynHolochainP2pDna,
     pub signal_tx: broadcast::Sender<Signal>,
     pub call_zome_handle: CellConductorReadHandle,
 }
@@ -670,14 +667,14 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     /// values without needing to make holochain a dependency.
     async fn get_const_fn(&self, zome: &Zome, name: &str) -> Result<Option<i32>, RibosomeError>;
 
-    /// @todo list out all the available callbacks and maybe cache them somewhere
+    // @todo list out all the available callbacks and maybe cache them somewhere
     fn list_callbacks(&self) {
         unimplemented!()
         // pseudocode
         // self.instance().exports().filter(|e| e.is_callback())
     }
 
-    /// @todo list out all the available zome functions and maybe cache them somewhere
+    // @todo list out all the available zome functions and maybe cache them somewhere
     fn list_zome_fns(&self) {
         unimplemented!()
         // pseudocode

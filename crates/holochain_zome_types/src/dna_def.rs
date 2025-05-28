@@ -1,5 +1,6 @@
 //! Defines DnaDef struct
 
+#[cfg(feature = "unstable-migration")]
 use std::collections::HashSet;
 
 use crate::prelude::*;
@@ -11,9 +12,6 @@ use holochain_integrity_types::DnaModifiersBuilder;
 use crate::zome::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
-
-#[cfg(feature = "full-dna-def")]
-use kitsune_p2p_dht::spacetime::*;
 
 /// Ordered list of integrity zomes in this DNA.
 pub type IntegrityZomes = Vec<(ZomeName, IntegrityZomeDef)>;
@@ -29,7 +27,6 @@ pub type CoordinatorZomes = Vec<(ZomeName, CoordinatorZomeDef)>;
 /// Hence, this type can basically be thought of as a fully validated, normalized
 /// `DnaManifest`
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, SerializedBytes)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(feature = "full-dna-def", derive(derive_builder::Builder))]
 #[cfg_attr(feature = "full-dna-def", builder(public))]
 pub struct DnaDef {
@@ -40,8 +37,8 @@ pub struct DnaDef {
     )]
     pub name: String,
 
-    /// Modifiers of this DNA - the network seed, properties and origin time - as
-    /// opposed to the actual DNA code. The modifiers are included in the DNA hash
+    /// Modifiers of this DNA - the network seed, properties - as opposed to
+    /// the actual DNA code. The modifiers are included in the DNA hash
     /// computation.
     pub modifiers: DnaModifiers,
 
@@ -69,6 +66,7 @@ pub struct DnaDef {
     ///
     /// Holochain does nothing to ensure the correctness of the lineage, it is up to
     /// the app developer to make the necessary guarantees.
+    #[cfg(feature = "unstable-migration")]
     #[serde(default)]
     #[cfg_attr(feature = "full-dna-def", builder(default))]
     pub lineage: HashSet<DnaHash>,
@@ -240,22 +238,12 @@ impl DnaDef {
         clone
     }
 
-    /// Change the DNA modifiers -- the network seed, properties and origin time -- while
+    /// Change the DNA modifiers -- the network seed, properties -- while
     /// leaving the actual DNA code intact.
     pub fn update_modifiers(&self, modifiers: DnaModifiersOpt) -> Self {
         let mut clone = self.clone();
         clone.modifiers = clone.modifiers.update(modifiers);
         clone
-    }
-
-    /// Get the topology to use for kitsune gossip
-    pub fn topology(&self, cutoff: std::time::Duration) -> kitsune_p2p_dht::spacetime::Topology {
-        kitsune_p2p_dht::spacetime::Topology {
-            space: SpaceDimension::standard(),
-            time: TimeDimension::new(self.modifiers.quantum_time),
-            time_origin: self.modifiers.origin_time,
-            time_cutoff: cutoff,
-        }
     }
 }
 
@@ -311,7 +299,6 @@ mod tests {
 
     use super::*;
     use holochain_serialized_bytes::prelude::*;
-    use kitsune_p2p_dht::spacetime::STANDARD_QUANTUM_TIME;
 
     #[test]
     fn test_update_modifiers() {
@@ -320,26 +307,19 @@ mod tests {
 
         let props = SerializedBytes::try_from(Props(42)).unwrap();
 
-        let now = Timestamp::now();
         let mods = DnaModifiers {
             network_seed: "seed".into(),
             properties: ().try_into().unwrap(),
-            origin_time: Timestamp::HOLOCHAIN_EPOCH,
-            quantum_time: STANDARD_QUANTUM_TIME,
         };
 
         let opt = DnaModifiersOpt {
             network_seed: None,
             properties: Some(props.clone()),
-            origin_time: Some(now),
-            quantum_time: Some(core::time::Duration::from_secs(60)),
         };
 
         let expected = DnaModifiers {
             network_seed: "seed".into(),
             properties: props.clone(),
-            origin_time: now,
-            quantum_time: core::time::Duration::from_secs(60),
         };
 
         assert_eq!(mods.update(opt), expected);

@@ -2,6 +2,8 @@ use super::*;
 use crate::here;
 use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use crate::prelude::*;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::EntryHashFixturator;
 use holochain_trace;
 use holochain_types::db::DbWrite;
 use holochain_types::record::SignedActionHashedExt;

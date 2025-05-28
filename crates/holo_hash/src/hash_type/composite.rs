@@ -81,10 +81,6 @@ impl From<AnyDhtSerial> for AnyDht {
     derive(serde::Deserialize, serde::Serialize, SerializedBytes),
     serde(from = "AnyLinkableSerial", into = "AnyLinkableSerial")
 )]
-#[cfg_attr(
-    feature = "fuzzing",
-    derive(arbitrary::Arbitrary, proptest_derive::Arbitrary)
-)]
 pub enum AnyLinkable {
     /// The hash of an Entry
     Entry,
@@ -92,15 +88,6 @@ pub enum AnyLinkable {
     Action,
     /// The hash of an External thing.
     External,
-}
-
-#[cfg(feature = "fuzzing")]
-impl<'a> arbitrary::Arbitrary<'a> for crate::HoloHash<AnyLinkable> {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let any_linkable = AnyLinkable::arbitrary(u)?;
-        let some_hash = crate::HoloHash::<Entry>::arbitrary(u)?;
-        Ok(some_hash.retype(any_linkable))
-    }
 }
 
 impl HashType for AnyLinkable {

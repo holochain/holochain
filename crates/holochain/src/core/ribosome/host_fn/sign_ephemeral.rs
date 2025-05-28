@@ -17,23 +17,21 @@ pub fn sign_ephemeral(
             keystore: Permission::Allow,
             ..
         } => tokio_helper::block_forever_on(async move {
-            let pk = sodoken::BufWriteSized::new_no_lock();
-            let sk = sodoken::BufWriteSized::new_mem_locked()?;
-            sodoken::sign::keypair(pk.clone(), sk.clone()).await?;
-            let pk = pk.read_lock_sized().to_vec();
-            let sk = sk.to_read_sized();
+            let mut pk = [0; sodoken::sign::PUBLICKEYBYTES];
+            let mut sk = sodoken::SizedLockedArray::<{ sodoken::sign::SECRETKEYBYTES }>::new()?;
+            sodoken::sign::keypair(&mut pk, &mut sk.lock())?;
 
             let mut signatures = Vec::new();
 
-            let sig = sodoken::BufWriteSized::new_no_lock();
+            let mut sig = [0; sodoken::sign::SIGNATUREBYTES];
             for data in input.into_inner().into_iter() {
-                sodoken::sign::detached(sig.clone(), data.to_vec(), sk.clone()).await?;
-                signatures.push((*sig.read_lock_sized()).into());
+                sodoken::sign::sign_detached(&mut sig, &data, &sk.lock())?;
+                signatures.push(sig.into());
             }
 
-            sodoken::SodokenResult::Ok(EphemeralSignatures {
+            std::io::Result::Ok(EphemeralSignatures {
                 signatures,
-                key: AgentPubKey::from_raw_32(pk),
+                key: AgentPubKey::from_raw_32(pk.to_vec()),
             })
         })
         .map_err(|error| -> RuntimeError {

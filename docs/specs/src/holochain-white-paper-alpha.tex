@@ -586,7 +586,7 @@ The unknown and also application specific complexity $v(n,m)$ of the validation 
 \section{Implementation}
 \label{sec:implementation}
 
-At the time of this writing we have a fully operational implementation of system as described in this paper, that includes two separate virtual machines for writing \hcdna\ functions in JavaScript, or Lisp, along with proof-of-concept implementations of a number of applications including a twitter clone, a slack-like chat system, DPKI, and a set mix-in libraries useful for building applications.
+At the time of this writing we have a fully operational implementation of system as described in this paper, that includes two separate virtual machines for writing \hcdna\ functions in JavaScript, or Lisp, along with proof-of-concept implementations of a number of applications including a twitter clone, a slack-like chat system, and a set mix-in libraries useful for building applications.
 
 \begin{enumerate}
 \item 30k+ lines of Go code.
@@ -620,12 +620,9 @@ We have yet to implement scalability tests for large scale applications, but it 
   Given the presence of other applications/chains, these can be used to attach the
   identity and its reputation in that chain to the agent that wants to join.
   Since this seems to be a crucial pillar of the ecosystem of Holochain
-  applications, we plan to deliver a system-level application called DPKI
-  (distributed public key infrastructure) that will function as the main
+  applications, we plan to deliver a system-level feature that will function as the main
   identity and reputation platform.
-  A prototype of this app was already developed prior to the writing of
-  this paper.
-  \item \textit{Proof-of-Presence}\\
+    \item \textit{Proof-of-Presence}\\
   Use of notarized national documents/passports/identity cards within the agent
   entry (second entry in $\chain$).
   \item \textit{Proof-of-Service}\\

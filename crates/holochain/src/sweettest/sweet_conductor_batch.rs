@@ -1,10 +1,10 @@
 use super::{SweetAppBatch, SweetConductor, SweetConductorConfig};
 use crate::conductor::api::error::ConductorApiResult;
 use crate::sweettest::*;
-use ::fixt::prelude::StdRng;
 use futures::future;
 use hdk::prelude::*;
 use holochain_types::prelude::*;
+use kitsune2_api::LocalAgent;
 use std::path::PathBuf;
 
 /// A collection of SweetConductors, with methods for operating on the entire collection
@@ -32,59 +32,34 @@ impl SweetConductorBatch {
     }
 
     /// Map the given ConductorConfigs into SweetConductors, each with its own new TestEnvironments
+    #[allow(clippy::let_and_return)]
     pub async fn from_configs<C, I>(configs: I) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig>,
         I: IntoIterator<Item = C>,
     {
-        let conductors = Self::new(
+        Self::new(
             future::join_all(configs.into_iter().map(|c| SweetConductor::from_config(c))).await,
-        );
-
-        let dpki_cells = conductors.dpki_cells();
-        if !dpki_cells.is_empty() {
-            conductors.exchange_peer_info().await;
-            await_consistency(10, dpki_cells.as_slice()).await.unwrap();
-        }
-
-        conductors
+        )
     }
 
     /// Create SweetConductors from the given ConductorConfigs, each with its own new TestEnvironments,
     /// using a "rendezvous" bootstrap server for peer discovery.
-    ///
-    /// Also await consistency for DPKI cells, if DPKI is enabled.
+    #[allow(clippy::let_and_return)]
     pub async fn from_configs_rendezvous<C, I>(configs: I) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig>,
         I: IntoIterator<Item = C>,
     {
         let rendezvous = SweetLocalRendezvous::new().await;
-        let conductors = Self::new(
+        Self::new(
             future::join_all(
                 configs
                     .into_iter()
                     .map(|c| SweetConductor::from_config_rendezvous(c, rendezvous.clone())),
             )
             .await,
-        );
-
-        let not_full_bootstrap = conductors
-            .iter()
-            .any(|c| !c.get_config().has_rendezvous_bootstrap());
-
-        let dpki_cells = conductors.dpki_cells();
-        if !dpki_cells.is_empty() {
-            // Typically we expect either all nodes are using a rendezvous bootstrap, or none are.
-            // To cover all cases, we say if any are not using bootstrap, we'll exchange peer info
-            // for everyone, even though this may be incorrect.
-            if not_full_bootstrap {
-                conductors.exchange_peer_info().await;
-            }
-            await_consistency(15, dpki_cells.as_slice()).await.unwrap();
-        }
-
-        conductors
+        )
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments
@@ -98,8 +73,6 @@ impl SweetConductorBatch {
 
     /// Create a number of SweetConductors from the given ConductorConfig, each with its own new TestEnvironments.
     /// using a "rendezvous" bootstrap server for peer discovery.
-    ///
-    /// Also await consistency for DPKI cells, if DPKI is enabled.
     pub async fn from_config_rendezvous<C>(num: usize, config: C) -> SweetConductorBatch
     where
         C: Into<SweetConductorConfig> + Clone,
@@ -219,54 +192,77 @@ impl SweetConductorBatch {
             .into())
     }
 
-    /// Let each conductor know about each others' agents so they can do networking
+    /// Let each conductor know about each other's agents so they can do networking
     pub async fn exchange_peer_info(&self) {
-        SweetConductor::exchange_peer_info(&self.0).await
-    }
-
-    /// Let each conductor know about each others' agents so they can do networking
-    pub async fn forget_peer_info(&self, agents_to_forget: impl IntoIterator<Item = &AgentPubKey>) {
-        SweetConductor::forget_peer_info(&self.0, agents_to_forget).await
-    }
-
-    /// Let each conductor know about each others' agents so they can do networking
-    pub async fn exchange_peer_info_sampled(&self, rng: &mut StdRng, s: usize) {
-        SweetConductor::exchange_peer_info_sampled(&self.0, rng, s).await
+        tokio::time::timeout(std::time::Duration::from_secs(10), async move {
+            while !SweetConductor::exchange_peer_info(&self.0).await {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("Timeout while exchanging peer info");
     }
 
     /// Let a conductor know about all agents on some other conductor.
+    ///
+    /// Copies from seen to observer.
     pub async fn reveal_peer_info(&self, observer: usize, seen: usize) {
         let observer_conductor = &self.0[observer];
-        let mut observer_envs = Vec::new();
+        let mut observer_dna_hashes = Vec::new();
         for env in observer_conductor
             .spaces
-            .get_from_spaces(|s| s.p2p_agents_db.clone())
+            .get_from_spaces(|s| s.dna_hash.clone())
         {
-            observer_envs.push(env.clone());
+            observer_dna_hashes.push(env.clone());
         }
 
         let seen_conductor = &self.0[seen];
-        let mut seen_envs = Vec::new();
+        let mut seen_dna_hashes = Vec::new();
         for env in seen_conductor
             .spaces
-            .get_from_spaces(|s| s.p2p_agents_db.clone())
+            .get_from_spaces(|s| s.dna_hash.clone())
         {
-            seen_envs.push(env.clone());
+            seen_dna_hashes.push(env.clone());
         }
 
-        crate::conductor::p2p_agent_store::reveal_peer_info(observer_envs, seen_envs).await;
-    }
+        for dna_hash in seen_dna_hashes {
+            let from_local_agents = seen_conductor
+                .holochain_p2p()
+                .test_kitsune()
+                .space(dna_hash.to_k2_space())
+                .await
+                .unwrap()
+                .local_agent_store()
+                .get_all()
+                .await
+                .unwrap();
 
-    /// Get the DPKI cell for each conductor, if applicable
-    pub fn dpki_cells(&self) -> Vec<SweetCell> {
-        self.0.iter().filter_map(|c| c.dpki_cell()).collect()
-    }
+            let from_peer_store = seen_conductor
+                .holochain_p2p()
+                .peer_store((*dna_hash).clone())
+                .await
+                .unwrap();
 
-    /// Force trigger all dht ops that haven't received
-    /// enough validation receipts yet.
-    pub async fn force_all_publish_dht_ops(&self) {
-        for c in self.0.iter() {
-            c.force_all_publish_dht_ops().await;
+            let mut agent_infos_for_local_agents = Vec::with_capacity(from_local_agents.len());
+            for local_agent in from_local_agents {
+                let agent_info = from_peer_store
+                    .get(local_agent.agent().clone())
+                    .await
+                    .unwrap();
+
+                if let Some(agent_info) = agent_info {
+                    agent_infos_for_local_agents.push(agent_info);
+                }
+            }
+
+            observer_conductor
+                .holochain_p2p()
+                .peer_store((*dna_hash).clone())
+                .await
+                .unwrap()
+                .insert(agent_infos_for_local_agents)
+                .await
+                .unwrap();
         }
     }
 

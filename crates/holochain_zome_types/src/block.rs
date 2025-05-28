@@ -3,19 +3,121 @@ use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
 use holochain_integrity_types::Timestamp;
+use holochain_timestamp::InclusiveTimestampInterval;
 use kitsune_p2p_block::NodeSpaceBlockReason;
-use kitsune_p2p_timestamp::InclusiveTimestampInterval;
 #[cfg(feature = "rusqlite")]
 use rusqlite::types::ToSqlOutput;
 #[cfg(feature = "rusqlite")]
 use rusqlite::ToSql;
 
-// Everything required for a coordinator to block some agent on the same DNA.
+mod kitsune_p2p_block {
+    use super::*;
+
+    /// Reason for an Agent/Space Block.
+    #[derive(Clone)]
+    pub enum AgentSpaceBlockReason {
+        /// Cryptography violation.
+        BadCrypto,
+    }
+
+    /// Reason for a Node Block.
+    #[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
+    pub enum NodeBlockReason {
+        /// The node did some bad cryptography.
+        BadCrypto,
+        /// Dos attack.
+        DoS,
+    }
+
+    /// Reason for a Node/Space Block.
+    #[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
+    pub enum NodeSpaceBlockReason {
+        /// Bad message encoding.
+        BadWire,
+    }
+
+    /// Reason for an Ip Block.
+    #[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
+    pub enum IpBlockReason {
+        /// Classic DoS.
+        DoS,
+    }
+
+    /// kitsune2::Url returns a peer id as a &str
+    pub type NodeId = String;
+
+    /// Block Target.
+    #[derive(Clone, Eq, PartialEq, Hash)]
+    pub enum BlockTarget {
+        Node(NodeId, NodeBlockReason),
+        NodeSpace(NodeId, DnaHash, NodeSpaceBlockReason),
+        Ip(std::net::Ipv4Addr, IpBlockReason),
+    }
+
+    /// Block Target Id.
+    #[derive(Eq, PartialEq)]
+    pub enum BlockTargetId {
+        Node(NodeId),
+        NodeSpace(NodeId, DnaHash),
+        Ip(std::net::Ipv4Addr),
+    }
+
+    impl From<BlockTarget> for BlockTargetId {
+        fn from(block_target: BlockTarget) -> Self {
+            match block_target {
+                BlockTarget::NodeSpace(node_id, space, _) => Self::NodeSpace(node_id, space),
+                BlockTarget::Node(node_id, _) => Self::Node(node_id),
+                BlockTarget::Ip(ip_addr, _) => Self::Ip(ip_addr),
+            }
+        }
+    }
+
+    /// Basic block struct.
+    #[derive(Clone, Eq, PartialEq, Hash)]
+    pub struct Block {
+        target: BlockTarget,
+        interval: InclusiveTimestampInterval,
+    }
+
+    impl Block {
+        /// Create a new block.
+        pub fn new(target: BlockTarget, interval: InclusiveTimestampInterval) -> Self {
+            Self { target, interval }
+        }
+
+        /// Access the block target.
+        pub fn target(&self) -> &BlockTarget {
+            &self.target
+        }
+
+        /// Convert into a block target.
+        pub fn into_target(self) -> BlockTarget {
+            self.target
+        }
+
+        /// Convert into an interval.
+        pub fn into_interval(self) -> InclusiveTimestampInterval {
+            self.interval
+        }
+
+        /// Get the block start timestamp.
+        pub fn start(&self) -> Timestamp {
+            self.interval.start()
+        }
+
+        /// Get the block end timestamp.
+        pub fn end(&self) -> Timestamp {
+            self.interval.end()
+        }
+    }
+}
+
+/// Everything required for a coordinator to block some agent on the same DNA.
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct BlockAgentInput {
     pub target: AgentPubKey,
-    // Reason is literally whatever you want it to be.
-    // But unblock must be an exact match.
+    /// Reason is literally whatever you want it to be.
+    /// But unblock must be an exact match.
     #[serde(with = "serde_bytes")]
     pub reason: Vec<u8>,
     pub interval: InclusiveTimestampInterval,
@@ -85,7 +187,7 @@ impl From<kitsune_p2p_block::BlockTarget> for BlockTarget {
     fn from(kblock_target: kitsune_p2p_block::BlockTarget) -> Self {
         match kblock_target {
             kitsune_p2p_block::BlockTarget::NodeSpace(node_id, space, reason) => {
-                Self::NodeDna(node_id, DnaHash::from_raw_36(space.0.clone()), reason)
+                Self::NodeDna(node_id, space.clone(), reason)
             }
             kitsune_p2p_block::BlockTarget::Node(node_id, reason) => {
                 Self::Node(node_id, reason.into())
@@ -107,7 +209,7 @@ impl From<kitsune_p2p_block::BlockTargetId> for BlockTargetId {
     fn from(kblock_target_id: kitsune_p2p_block::BlockTargetId) -> Self {
         match kblock_target_id {
             kitsune_p2p_block::BlockTargetId::NodeSpace(node_id, space) => {
-                Self::NodeDna(node_id, DnaHash::from_raw_36(space.0.clone()))
+                Self::NodeDna(node_id, space.clone())
             }
             kitsune_p2p_block::BlockTargetId::Node(node_id) => Self::Node(node_id),
             kitsune_p2p_block::BlockTargetId::Ip(ip_addr) => Self::Ip(ip_addr),
@@ -184,7 +286,11 @@ impl From<kitsune_p2p_block::Block> for Block {
     fn from(kblock: kitsune_p2p_block::Block) -> Self {
         Self {
             target: kblock.clone().into_target().into(),
-            interval: kblock.into_interval(),
+            interval: InclusiveTimestampInterval::try_new(
+                Timestamp::from_micros(kblock.start().0),
+                Timestamp::from_micros(kblock.end().0),
+            )
+            .unwrap(),
         }
     }
 }

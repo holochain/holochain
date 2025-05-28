@@ -25,10 +25,10 @@ pub use holochain_serialized_bytes::prelude::*;
 /// records to return only. Technically the seq bounded ranges do not imply
 /// any fork disambiguation and so could be a range but for simplicity we left
 /// the API symmetrical in boundedness across all enum variants.
-/// @TODO It may be possible to provide/implement RangeBounds in the case that
-/// a full sequence of records/actions is provided but it would need to be
-/// handled as inclusive first, to enforce the integrity of the query, then the
-/// exclusiveness achieved by simply removing the final record after the fact.
+// TODO It may be possible to provide/implement RangeBounds in the case that
+// a full sequence of records/actions is provided but it would need to be
+// handled as inclusive first, to enforce the integrity of the query, then the
+// exclusiveness achieved by simply removing the final record after the fact.
 #[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone, Debug)]
 pub enum ChainQueryFilterRange {
     /// Do NOT apply any range filtering for this query.
@@ -415,6 +415,7 @@ mod tests {
     use crate::fixt::AppEntryDefFixturator;
     use crate::prelude::*;
     use ::fixt::prelude::*;
+    use holo_hash::fixt::EntryHashFixturator;
     use holo_hash::HasHash;
 
     /// Create three Actions with various properties.

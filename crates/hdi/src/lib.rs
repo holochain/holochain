@@ -271,10 +271,11 @@ pub mod prelude;
 /// This is also repudiable so both participants know the data must have been encrypted by the other (because they didn't encrypt it themselves) but cannot prove this to anybody else (because they _could have_ encrypted it themselves).
 /// If repudiability is not something you want, you need to use a different approach.
 ///
-/// Note that the secrets are located within the secure lair keystore (@todo actually secretbox puts the secret in WASM, but this will be fixed soon) and never touch WASM memory.
+/// Note that the secrets are located within the secure lair keystore and never touch WASM memory.
+// @todo actually secretbox puts the secret in WASM, but this will be fixed soon
 /// The WASM must provide either the public key for box or an opaque _reference_ to the secret key so that lair can encrypt or decrypt as required.
 ///
-/// @todo implement a way to export/send an encrypted shared secret for a peer from lair
+// @todo implement a way to export/send an encrypted shared secret for a peer from lair
 ///
 /// Note that even though the elliptic curve is the same as is used by ed25519, the keypairs cannot be shared because the curve is mathematically translated in the signing vs. encryption algorithms.
 /// In theory the keypairs could also be translated to move between the two algorithms but Holochain doesn't offer a way to do this (yet?).
@@ -331,8 +332,6 @@ pub mod trace;
 /// The `mockall` crate (in prelude with `mock` feature) can be used to generate compatible mocks for unit testing.
 /// See mocking examples in the test WASMs crate, such as `agent_info`.
 pub mod hdi;
-
-pub mod agent;
 
 pub mod link;
 

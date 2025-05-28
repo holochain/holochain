@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use super::retrieve_previous_actions_for_ops;
 use super::validation_deps::SysValDeps;
 use crate::core::workflow::sys_validation_workflow::types::Outcome;
@@ -11,9 +8,15 @@ use crate::prelude::*;
 use ::fixt::prelude::*;
 use futures::FutureExt;
 use hdk::prelude::Dna as HdkDna;
+use holo_hash::fixt::ActionHashFixturator;
+use holo_hash::fixt::AgentPubKeyFixturator;
+use holo_hash::fixt::DnaHashFixturator;
+use holo_hash::fixt::EntryHashFixturator;
 use holochain_cascade::CascadeSource;
 use holochain_cascade::MockCascade;
 use holochain_serialized_bytes::prelude::SerializedBytes;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn validate_valid_dna_op() {
@@ -66,41 +69,6 @@ async fn validate_dna_op_mismatched_dna_hash() {
             ValidationOutcome::WrongDna(
                 mismatched_dna_hash,
                 test_case.dna_def_hash().hash.clone(),
-            )
-            .to_string()
-        ),
-        outcome
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn validate_dna_op_before_origin_time() {
-    holochain_trace::test_run();
-
-    let mut test_case = TestCase::new().await;
-
-    // Put the origin time in the future so that ops created now shouldn't be valid.
-    test_case.dna_def_mut().modifiers.origin_time =
-        (Timestamp::now() + std::time::Duration::from_secs(10)).unwrap();
-
-    let dna_action = HdkDna {
-        author: test_case.agent.clone(),
-        timestamp: Timestamp::now(),
-        hash: test_case.dna_def_hash().hash,
-    };
-    let op =
-        ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Dna(dna_action.clone())).into();
-
-    let outcome = test_case.with_op(op).run().await.unwrap();
-
-    assert_eq!(
-        Outcome::Rejected(
-            ValidationOutcome::PrevActionError(
-                (
-                    PrevActionErrorKind::InvalidRootOriginTime,
-                    Action::Dna(dna_action)
-                )
-                    .into()
             )
             .to_string()
         ),
@@ -187,124 +155,6 @@ async fn validate_valid_agent_validation_package_op() {
         matches!(outcome, Outcome::Accepted),
         "Expected Accepted but actual outcome was {:?}",
         outcome
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn validate_delete_agent_key_op() {
-    holochain_trace::test_run();
-
-    let mut test_case = TestCase::new().await;
-
-    // Create agent pub key action
-    let create_agent_pub_key = Create {
-        author: test_case.agent.clone(),
-        action_seq: 2,
-        entry_type: EntryType::AgentPubKey,
-        entry_hash: test_case.agent.clone().into(),
-        prev_action: fixt!(ActionHash),
-        weight: Default::default(),
-        timestamp: Timestamp::now(),
-    };
-    let create_agent_pub_key_action = test_case
-        .sign_action(Action::Create(create_agent_pub_key))
-        .await;
-
-    // Op to validate
-    let mut action = fixt!(Delete);
-    action.author = test_case.agent.clone();
-    action.prev_action = create_agent_pub_key_action.as_hash().clone();
-    action.action_seq = create_agent_pub_key_action.action().action_seq() + 1;
-    action.deletes_entry_address = test_case.agent.clone().into();
-    action.timestamp = Timestamp::now();
-    let op = ChainOp::RegisterAgentActivity(fixt!(Signature), Action::Delete(action)).into();
-
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![create_agent_pub_key_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
-
-    assert!(
-        matches!(outcome, Outcome::Accepted),
-        "Expected Accepted but actual outcome was {outcome:?}",
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn reject_action_after_deleted_agent_key() {
-    holochain_trace::test_run();
-
-    let mut test_case = TestCase::new().await;
-
-    // Delete agent pub key action
-    let mut delete_agent_pub_key = fixt!(Delete);
-    delete_agent_pub_key.author = test_case.agent.clone();
-    delete_agent_pub_key.deletes_entry_address = test_case.agent.clone().into();
-    delete_agent_pub_key.action_seq = 4;
-    delete_agent_pub_key.timestamp = Timestamp::now();
-    let delete_agent_pub_key_action = test_case
-        .sign_action(Action::Delete(delete_agent_pub_key))
-        .await;
-
-    // An agent activity op to validate
-    let op = test_op(&delete_agent_pub_key_action);
-
-    let outcome = test_case
-        .expect_retrieve_records_from_cascade(vec![delete_agent_pub_key_action])
-        .with_op(op)
-        .run()
-        .await
-        .unwrap();
-
-    assert_eq!(
-        outcome,
-        Outcome::Rejected(ValidationOutcome::InvalidAgentKey(test_case.agent.clone()).to_string()),
-        "Expected Rejected but actual outcome was {outcome:?}",
-    );
-}
-
-// Test that actions after a deleted key, validated by an authority other than the agent authority,
-// are accepted. Only the agent authority will reject ops after a deleted key action.
-#[tokio::test(flavor = "multi_thread")]
-async fn non_agent_authority_accepts_action_after_deleted_agent_key() {
-    holochain_trace::test_run();
-
-    let mut test_case = TestCase::new().await;
-
-    // Delete agent pub key action
-    let mut delete_agent_pub_key = fixt!(Delete);
-    delete_agent_pub_key.author = test_case.agent.clone();
-    delete_agent_pub_key.deletes_entry_address = test_case.agent.clone().into();
-    delete_agent_pub_key.action_seq = 4;
-    delete_agent_pub_key.timestamp = Timestamp::now();
-    let delete_agent_pub_key_action = test_case
-        .sign_action(Action::Delete(delete_agent_pub_key))
-        .await;
-
-    // An agent activity op to validate
-    let mut create_action = fixt!(Create);
-    let entry = Entry::App(fixt!(AppEntryBytes));
-    create_action.author = delete_agent_pub_key_action.action().author().clone();
-    create_action.action_seq = delete_agent_pub_key_action.action().action_seq() + 1;
-    create_action.prev_action = delete_agent_pub_key_action.as_hash().clone();
-    create_action.timestamp = Timestamp::now();
-    create_action.entry_type = EntryType::App(AppEntryDef {
-        entry_index: 0.into(),
-        zome_index: 0.into(),
-        visibility: EntryVisibility::Public,
-    });
-    create_action.entry_hash = entry.to_hash();
-    let action = Action::Create(create_action.clone());
-    let op = ChainOp::StoreRecord(fixt!(Signature), action, RecordEntry::Present(entry)).into();
-
-    let outcome = test_case.with_op(op).run().await.unwrap();
-
-    assert_eq!(
-        outcome,
-        Outcome::Accepted,
-        "Expected Accepted but actual outcome was {outcome:?}",
     );
 }
 
@@ -1211,7 +1061,8 @@ async fn validate_store_record_update_prev_which_is_not_updateable() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(to_update_signed_action.action().clone()).to_string()
+            ValidationOutcome::NotNewEntry(Box::new(to_update_signed_action.action().clone()))
+                .to_string()
         ),
         outcome
     );
@@ -1589,7 +1440,8 @@ async fn validate_store_entry_update_prev_which_is_not_updateable() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(to_update_signed_action.action().clone()).to_string()
+            ValidationOutcome::NotNewEntry(Box::new(to_update_signed_action.action().clone()))
+                .to_string()
         ),
         outcome,
     );
@@ -2007,7 +1859,8 @@ async fn validate_register_deleted_by_wrong_delete_target() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(to_delete_signed_action.action().clone()).to_string()
+            ValidationOutcome::NotNewEntry(Box::new(to_delete_signed_action.action().clone()))
+                .to_string()
         ),
         outcome
     );
@@ -2121,7 +1974,8 @@ async fn validate_register_deleted_entry_action_wrong_delete_target() {
 
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(to_delete_signed_action.action().clone()).to_string()
+            ValidationOutcome::NotNewEntry(Box::new(to_delete_signed_action.action().clone()))
+                .to_string()
         ),
         outcome
     );
@@ -2155,7 +2009,7 @@ async fn validate_delete_a_delete_is_rejected() {
         .unwrap();
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(delete_action_signed_hashed.action().clone())
+            ValidationOutcome::NotNewEntry(Box::new(delete_action_signed_hashed.action().clone()))
                 .to_string()
         ),
         outcome
@@ -2171,7 +2025,7 @@ async fn validate_delete_a_delete_is_rejected() {
         .unwrap();
     assert_eq!(
         Outcome::Rejected(
-            ValidationOutcome::NotNewEntry(delete_action_signed_hashed.action().clone())
+            ValidationOutcome::NotNewEntry(Box::new(delete_action_signed_hashed.action().clone()))
                 .to_string()
         ),
         outcome
@@ -2432,7 +2286,7 @@ async fn crash_case() {
             .boxed()
         });
 
-    let validation_outcome = validate_op(&op, &dna_def, SysValDeps::default(), None)
+    let validation_outcome = validate_op(&op, &dna_def, SysValDeps::default())
         .await
         .unwrap();
 
@@ -2472,10 +2326,6 @@ impl TestCase {
 
     pub fn cascade_mut(&mut self) -> &mut MockCascade {
         &mut self.cascade
-    }
-
-    pub fn dna_def_mut(&mut self) -> &mut DnaDef {
-        &mut self.dna_def
     }
 
     pub fn dna_def_hash(&self) -> HoloHashed<DnaDef> {
@@ -2537,7 +2387,6 @@ impl TestCase {
             self.op.as_ref().expect("No op set, invalid test case"),
             &dna_def,
             self.current_validation_dependencies.clone(),
-            None,
         )
         .await
     }

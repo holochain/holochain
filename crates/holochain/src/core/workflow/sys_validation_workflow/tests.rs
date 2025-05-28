@@ -3,6 +3,8 @@ use crate::sweettest::*;
 use crate::test_utils::host_fn_caller::*;
 use crate::test_utils::wait_for_integration;
 use crate::{conductor::ConductorHandle, core::MAX_TAG_SIZE};
+use holo_hash::fixt::{AgentPubKeyFixturator, EntryHashFixturator};
+use holochain_types::test_utils::ActionRefMut;
 use holochain_wasm_test_utils::TestWasm;
 use rusqlite::named_params;
 use rusqlite::Transaction;
@@ -11,17 +13,17 @@ use std::time::Duration;
 #[cfg(feature = "unstable-warrants")]
 use {
     crate::core::workflow::sys_validation_workflow::types::Outcome,
-    crate::test_utils::inline_zomes::simple_crud_zome, std::convert::TryInto,
+    crate::test_utils::inline_zomes::simple_crud_zome, ::fixt::fixt,
+    holochain_zome_types::fixt::EntryFixturator, std::convert::TryInto,
 };
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(target_os = "macos", ignore = "flaky")]
 async fn sys_validation_workflow_test() {
     holochain_trace::test_run();
 
     let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    let config = SweetConductorConfig::standard().no_dpki_mustfix();
+    let config = SweetConductorConfig::standard();
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
@@ -35,31 +37,24 @@ async fn sys_validation_workflow_test() {
 
 #[cfg(feature = "unstable-warrants")]
 #[tokio::test(flavor = "multi_thread")]
-async fn sys_validation_produces_invalid_chain_warrant() {
+async fn sys_validation_produces_invalid_chain_op_warrant() {
+    use crate::test_utils::retry_fn_until_timeout;
+
     holochain_trace::test_run();
     let zome = SweetInlineZomes::new(vec![], 0);
     let (dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zome).await;
 
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
-    let ((alice,), (bob,)) = conductors
-        .setup_app("app", [&dna])
-        .await
-        .unwrap()
-        .into_tuples();
-    let alice_pubkey = alice.agent_pubkey().clone();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let alice = conductor.setup_app("app", [&dna]).await.unwrap();
 
     // - Create an invalid op
-    let mut action = ::fixt::fixt!(CreateLink);
-    action.author = alice_pubkey.clone();
-    let action = Action::CreateLink(action);
-    let signed_action =
-        SignedActionHashed::sign(&conductors[0].keystore(), action.clone().into_hashed())
-            .await
-            .unwrap();
-    let op = ChainOp::StoreRecord(
-        signed_action.signature().clone(),
-        action,
-        RecordEntry::NotStored,
+    let bob_pubkey = fixt!(AgentPubKey);
+    let mut mismatched_action = fixt!(Create);
+    mismatched_action.author = bob_pubkey.clone();
+    let op = ChainOp::StoreEntry(
+        fixt!(Signature),
+        NewEntryAction::Create(mismatched_action),
+        fixt!(Entry),
     )
     .into();
     let dna_def = dna.dna_def().clone().into_hashed();
@@ -69,7 +64,6 @@ async fn sys_validation_produces_invalid_chain_warrant() {
         &op,
         &dna_def,
         Default::default(),
-        None,
     )
     .await
     .unwrap();
@@ -77,36 +71,40 @@ async fn sys_validation_produces_invalid_chain_warrant() {
 
     //- Inject the invalid op directly into bob's DHT db
     let op = DhtOpHashed::from_content_sync(op);
-    let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
+    let db = conductor.spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op_dht(txn, &op, None).unwrap();
+        insert_op_dht(txn, &op, 0, None).unwrap();
     });
 
     //- Trigger sys validation
-    conductors[1]
-        .get_cell_triggers(bob.cell_id())
+    conductor
+        .get_cell_triggers(alice.cells()[0].cell_id())
         .await
         .unwrap()
         .sys_validation
         .trigger(&"test");
 
-    //- Check that bob authored a warrant
-    crate::assert_eq_retry_1m!(
-        {
-            let basis: AnyLinkableHash = alice_pubkey.clone().into();
-            conductors[1]
+    retry_fn_until_timeout(
+        || async {
+            let key = bob_pubkey.clone();
+            let num_of_warrants = conductor
                 .spaces
                 .get_all_authored_dbs(dna.dna_hash())
                 .unwrap()[0]
                 .test_read(move |txn| {
                     let store = CascadeTxnWrapper::from(txn);
 
-                    let warrants = store.get_warrants_for_basis(&basis, false).unwrap();
+                    let warrants = store.get_warrants_for_agent(&key, false).unwrap();
+
                     warrants.len()
-                })
+                });
+            num_of_warrants == 1
         },
-        1
-    );
+        Some(10000),
+        None,
+    )
+    .await
+    .unwrap();
 }
 
 #[cfg(feature = "unstable-warrants")]
@@ -154,7 +152,6 @@ async fn sys_validation_produces_forked_chain_warrant() {
         &forked_op.clone().into(),
         &dna_def,
         Default::default(),
-        None,
     )
     .await
     .unwrap();
@@ -174,7 +171,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
     let forked_op = DhtOpHashed::from_content_sync(forked_op);
     let db = conductors[1].spaces.dht_db(dna.dna_hash()).unwrap();
     db.test_write(move |txn| {
-        insert_op_dht(txn, &forked_op, None).unwrap();
+        insert_op_dht(txn, &forked_op, 0, None).unwrap();
     });
 
     //- Check that bob authored a chain fork warrant
@@ -188,14 +185,14 @@ async fn sys_validation_produces_forked_chain_warrant() {
                 .sys_validation
                 .trigger(&"test");
 
-            let basis: AnyLinkableHash = alice_pubkey.clone().into();
+            let alice_pubkey = alice_pubkey.clone();
             conductors[1]
                 .spaces
                 .get_or_create_authored_db(dna.dna_hash(), bob_pubkey.clone())
                 .unwrap()
                 .test_read(move |txn| {
                     let store = CascadeTxnWrapper::from(txn);
-                    store.get_warrants_for_basis(&basis, false).unwrap()
+                    store.get_warrants_for_agent(&alice_pubkey, false).unwrap()
                 })
         },
         |warrants: &Vec<WarrantOp>| { !warrants.is_empty() },
@@ -392,6 +389,9 @@ async fn bob_links_in_a_legit_way(
     triggers
         .publish_dht_ops
         .trigger(&"bob_links_in_a_legit_way");
+    triggers
+        .integrate_dht_ops
+        .trigger(&"bob_links_in_a_legit_way");
     link_add_address
 }
 
@@ -457,6 +457,9 @@ async fn bob_makes_a_large_link(
     // Produce and publish these commits
     let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"bob_makes_a_large_link");
+    triggers
+        .integrate_dht_ops
+        .trigger(&"bob_makes_a_large_link");
     (bad_update_action, bad_update_entry_hash, link_add_address)
 }
 

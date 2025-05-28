@@ -64,9 +64,10 @@ enum WasmErrorInner {
     Guest(String),
     Host(String),
     HostShortCircuit(Vec<u8>),
-    Compile(String),
+    ModuleBuild(String),
+    ModuleSerialize(String),
+    ModuleDeserialize(String),
     CallError(String),
-    UninitializedSerializedModuleCache,
 }
 ```
 
@@ -939,12 +940,9 @@ It is the application's responsibility to retrieve a stored capability claim usi
     ```rust
     struct AgentInfo {
         agent_initial_pubkey: AgentHash,
-        agent_latest_pubkey: AgentHash,
         chain_head: (ActionHash, u32, Timestamp),
     }
     ```
-
-    The initial and latest public key may vary throughout the life of the source chain, as an `AgentPubKey` is an entry which may be updated like other entries. Updating a key entry is normally handled through a DPKI implementation (see [Human Error] section of System Correctness: Confidence).
 
 * `call_info() -> ExternResult<CallInfo>`: Get contextual information about the current zome call, where the return value is defined as:
 
@@ -1766,22 +1764,6 @@ publish
         ```rust
         {
             dht_hash: AnyDhtHash,
-            options: GetOptions,
-        }
-
-        struct GetOptions {
-            request_type: GetRequest,
-        }
-
-        enum GetRequest {
-            // Get integrated content and metadata.
-            All,
-            // Get only addressable content.
-            Content,
-            // Get only metadata.
-            Metadata,
-            // Get content even if it hasn't been integrated.
-            Pending,
         }
         ```
 
@@ -2545,10 +2527,6 @@ struct DnaManifestV1 {
     name: String,
     integrity: IntegrityManifest,
     coordinator: CoordinatorManifest,
-    // A list of ancestors of this DNA, used for satisfying dependencies on
-    // prior versions of this DNA. The application's Coordinator interface is
-    // expected to be compatible across the list of ancestors.
-    lineage: Vec<DnaHashB64>,
 }
 
 struct IntegrityManifest {
@@ -2653,7 +2631,7 @@ enum CellProvisioning {
 
     // Require that a Cell be already installed which matches the DNA
     // `installed_hash` spec, and which has an Agent that's associated with
-    // this App's agent via DPKI. If no such Cell exists, *app installation MUST
+    // this App's agent. If no such Cell exists, *app installation MUST
     // fail*. The `protected` flag indicates that the Conductor SHOULD NOT allow
     // the dependency to be disabled or uninstalled until all cells using this
     // DNA are uninstalled.
@@ -2786,7 +2764,6 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             modifiers: DnaModifiers,
             integrity_zomes: Vec<ZomeName>,
             coordinator_zomes: Vec<ZomeName>,
-            lineage: HashSet<DnaHash>,
         }
         ```
 
@@ -3147,8 +3124,6 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
 * `RevokeAppAuthenticationToken(AppAuthenticationToken) -> AppAuthenticationTokenRevoked`: Revoke a previously issued app interface authentication token.
     * **Notes**: Implementations MUST reject all WebSocket connection attempts using this token after the call has completed.
 
-* `GetCompatibleCells(DnaHash) -> CompatibleCellsReturned(BTreeSet<(InstalledAppId, BTreeSet<CellId>)>)`: Find installed cells which use a DNA that is forward-compatible with the given DNA hash, as defined in the contents of the `lineage` field in the DNA manifest.
-    * **Notes**: Implementations SHOULD search DNAs installed by all applications, as well as DNAs installed ad-hoc via `RegisterDna`.
 
 #### App API
 
