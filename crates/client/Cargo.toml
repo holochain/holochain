@@ -46,6 +46,7 @@ holochain = { version = "^0.6.0-dev.6", path = "../holochain", default-features 
 holochain_wasm_test_utils = { version = "^0.6.0-dev.6", path = "../test_utils/wasm" }
 
 kitsune2_core = "0.2.7"
+kitsune2_test_utils = "0.2.7"
 serde_yaml = "0.9"
 
 [features]

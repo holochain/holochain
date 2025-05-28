@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- `AppWebsocket::AgentInfo` call for apps to be able to list the discovered agents in their various DNAs.
+
 ### Changed
 
 ### Fixed

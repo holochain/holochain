@@ -282,8 +282,8 @@ impl AdminInterfaceApi {
                 self.conductor_handle.add_agent_infos(agent_infos).await?;
                 Ok(AdminResponse::AgentInfoAdded)
             }
-            AgentInfo { cell_id } => {
-                let r = self.conductor_handle.get_agent_infos(cell_id).await?;
+            AgentInfo { dna_hashes } => {
+                let r = self.conductor_handle.get_agent_infos(dna_hashes).await?;
                 let mut encoded = Vec::with_capacity(r.len());
                 for info in r {
                     encoded.push(info.encode()?);
