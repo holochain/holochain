@@ -12,6 +12,9 @@ use holochain_websocket::{
     self as ws, ConnectRequest, WebsocketConfig, WebsocketReceiver, WebsocketResult,
     WebsocketSender,
 };
+use kitsune2_api::DynLocalAgent;
+use kitsune2_core::Ed25519LocalAgent;
+use kitsune2_test_utils::agent::AgentBuilder;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
@@ -636,7 +639,14 @@ async fn generate_sandbox_and_add_and_list_agent() {
     .space
     .clone();
 
-    let other_agent = make_agent(space);
+    let other_agent = AgentBuilder {
+        space: Some(space.clone()),
+        ..Default::default()
+    }
+    .build(Arc::new(Ed25519LocalAgent::default()) as DynLocalAgent)
+    .encode()
+    .unwrap();
+
     let agent_infos_to_add = format!("[{}]", other_agent); // add-agents expects a JSON array
 
     let mut cmd = get_sandbox_command();
@@ -936,24 +946,6 @@ async fn shutdown_sandbox(mut child: Child) {
         // simple way.
         child.kill().await.unwrap();
     }
-}
-
-fn make_agent(space: kitsune2_api::SpaceId) -> String {
-    let local = kitsune2_core::Ed25519LocalAgent::default();
-    let created_at = kitsune2_api::Timestamp::now();
-    let expires_at = created_at + std::time::Duration::from_secs(60 * 20);
-    let info = kitsune2_api::AgentInfo {
-        agent: kitsune2_api::LocalAgent::agent(&local).clone(),
-        space,
-        created_at,
-        expires_at,
-        is_tombstone: false,
-        url: None,
-        storage_arc: kitsune2_api::DhtArc::FULL,
-    };
-    let info =
-        futures::executor::block_on(kitsune2_api::AgentInfoSigned::sign(&local, info)).unwrap();
-    info.encode().unwrap()
 }
 
 struct WsPoll(tokio::task::JoinHandle<()>);
