@@ -305,17 +305,14 @@ async fn app_agent_info() {
     assert_eq!(agent_infos_dna3_from_app1.len(), 0,
         "Querying for dna3 from app1 should return no results, even though dna3 exists on conductor");
 
-    let space = AgentInfoSigned::decode(&Ed25519Verifier, agent_infos[0].as_bytes())
-        .unwrap()
-        .space
-        .clone();
+    let space = dna1_hash.to_k2_space();
+
     // test when adding an new "external" agent_info
     let other_agent = make_agent(space.clone());
-
     let (admin_sender, _admin_receiver) = conductor.admin_ws_client::<AdminResponse>().await;
     let _: AdminResponse = admin_sender
         .request(AdminRequest::AddAgentInfo {
-            agent_infos: vec![other_agent],
+            agent_infos: vec![other_agent.clone()],
         })
         .await
         .unwrap();
