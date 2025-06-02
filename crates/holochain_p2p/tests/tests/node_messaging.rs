@@ -536,6 +536,48 @@ async fn test_get() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_get_with_unresponsive_agents() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+    hc4.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+
+            // If we get a response at all then at least one peer completed the request
+            if hc1
+                .get(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                    holochain_p2p::actor::GetOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_get_meta() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
