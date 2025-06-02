@@ -169,6 +169,116 @@ impl HcP2pHandler for Handler {
     }
 }
 
+/// An implementation of [`HcP2pHandler`] that doesn't ever respond to requests
+#[derive(Clone, Debug)]
+struct UnresponsiveHandler;
+
+impl HcP2pHandler for UnresponsiveHandler {
+    fn handle_call_remote(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _zome_call_params_serialized: ExternIO,
+        _signature: Signature,
+    ) -> BoxFut<HolochainP2pResult<SerializedBytes>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_publish(
+        &self,
+        _dna_hash: DnaHash,
+        _request_validation_receipt: bool,
+        _ops: Vec<holochain_types::dht_op::DhtOp>,
+    ) -> BoxFut<HolochainP2pResult<()>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_get(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _dht_hash: holo_hash::AnyDhtHash,
+    ) -> BoxFut<HolochainP2pResult<WireOps>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_get_meta(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _dht_hash: holo_hash::AnyDhtHash,
+        _options: GetMetaOptions,
+    ) -> BoxFut<HolochainP2pResult<MetadataSet>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_get_links(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _link_key: WireLinkKey,
+        _options: GetLinksOptions,
+    ) -> BoxFut<HolochainP2pResult<WireLinkOps>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_count_links(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _query: WireLinkQuery,
+    ) -> BoxFut<HolochainP2pResult<CountLinksResponse>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_get_agent_activity(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _agent: AgentPubKey,
+        _query: ChainQueryFilter,
+        _options: GetActivityOptions,
+    ) -> BoxFut<HolochainP2pResult<AgentActivityResponse>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_must_get_agent_activity(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _author: AgentPubKey,
+        _filter: holochain_zome_types::chain::ChainFilter,
+    ) -> BoxFut<HolochainP2pResult<MustGetAgentActivityResponse>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_validation_receipts_received(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _receipts: ValidationReceiptBundle,
+    ) -> BoxFut<HolochainP2pResult<()>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_publish_countersign(
+        &self,
+        _dna_hash: DnaHash,
+        _op: holochain_types::dht_op::ChainOp,
+    ) -> BoxFut<HolochainP2pResult<()>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_countersigning_session_negotiation(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _message: CountersigningSessionNegotiationMessage,
+    ) -> BoxFut<HolochainP2pResult<()>> {
+        Box::pin(std::future::pending())
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_call_remote() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
@@ -440,6 +550,48 @@ async fn test_get_meta() {
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
+                .get_meta(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                    holochain_p2p::actor::GetMetaOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_meta_with_unresponsive_agents() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+    hc4.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+
+            // If we get a response at all then at least one peer completed the request
+            if hc1
                 .get_meta(
                     dna_hash.clone(),
                     HoloHash::from_raw_36_and_type(
