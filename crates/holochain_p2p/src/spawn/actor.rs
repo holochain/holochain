@@ -883,21 +883,6 @@ impl HolochainP2pActor {
         }))
     }
 
-    async fn get_peer_for_loc(
-        &self,
-        tag: &'static str,
-        space: &DynSpace,
-        loc: u32,
-    ) -> HolochainP2pResult<(AgentPubKey, Url)> {
-        let mut agent_list = self.get_peers_for_location(space, loc).await?;
-
-        rand::seq::SliceRandom::shuffle(&mut agent_list[..], &mut rand::thread_rng());
-        agent_list
-            .into_iter()
-            .next()
-            .ok_or_else(|| HolochainP2pError::NoPeersForLocation(tag.to_string(), loc))
-    }
-
     async fn get_peers_for_location(
         &self,
         space: &DynSpace,
