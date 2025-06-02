@@ -87,7 +87,7 @@ build-workspace-wasmer_wamr:
 
 # execute tests on all crates with wasmer compiler
 test-workspace-wasmer_sys:
-	cargo install cargo-nextest
+	cargo install --version 0.9.96 cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
@@ -96,7 +96,7 @@ test-workspace-wasmer_sys:
 
 # executes tests on all crates with wasmer compiler and unstable dpki feature
 test-workspace-wasmer_sys-unstable:
-	cargo install cargo-nextest
+	cargo install --version 0.9.96 cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
@@ -105,7 +105,7 @@ test-workspace-wasmer_sys-unstable:
 
 # execute tests on all crates with wasmer interpreter
 test-workspace-wasmer_wamr:
-	cargo install cargo-nextest
+	cargo install --version 0.9.96 cargo-nextest
 	$(F) RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
