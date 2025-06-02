@@ -106,7 +106,7 @@ jobs:
       - name: install nextest
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-nextest
+          tool: cargo-nextest@0.9.96
 
       - name: test (windows-latest)
         if: matrix.os == 'windows-latest'
