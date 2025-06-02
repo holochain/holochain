@@ -1497,28 +1497,51 @@ impl actor::HcP2p for HolochainP2pActor {
             let space_id = dna_hash.to_k2_space();
             let space = self.kitsune.space(space_id.clone()).await?;
             let loc = link_key.base.get_loc();
-
-            let (to_agent, to_url) = self.get_peer_for_loc("get_links", &space, loc).await?;
-
-            let r_options: event::GetLinksOptions = (&options).into();
-
-            let (msg_id, req) =
-                crate::wire::WireMessage::get_links_req(to_agent, link_key, r_options);
+            let agents = self.get_peers_for_location(&space, loc).await?;
+            if agents.is_empty() {
+                return Err(HolochainP2pError::NoPeersForLocation(
+                    String::from("get_links"),
+                    loc,
+                ));
+            }
 
             let start = std::time::Instant::now();
 
-            let out =
-                self.send_request("get_links", &space, to_url, msg_id, req, dna_hash, |res| {
-                    match res {
-                        crate::wire::WireMessage::GetLinksRes { response, .. } => {
-                            Ok(vec![response])
-                        }
-                        _ => Err(HolochainP2pError::other(format!(
-                            "invalid response to get_links: {res:?}"
-                        ))),
-                    }
-                })
-                .await;
+            let (out, _) =
+                futures::future::select_ok(agents.into_iter().take(PARALLEL_GET_AGENTS_COUNT).map(
+                    |(to_agent, to_url)| {
+                        Box::pin(async {
+                            let r_options: event::GetLinksOptions = (&options).into();
+
+                            let (msg_id, req) = crate::wire::WireMessage::get_links_req(
+                                to_agent,
+                                link_key.clone(),
+                                r_options,
+                            );
+
+                            self.send_request(
+                                "get_links",
+                                &space,
+                                to_url,
+                                msg_id,
+                                req,
+                                dna_hash.clone(),
+                                |res| match res {
+                                    crate::wire::WireMessage::GetLinksRes { response, .. } => {
+                                        Ok(vec![response])
+                                    }
+                                    _ => Err(HolochainP2pError::other(format!(
+                                        "invalid response to get_links: {res:?}"
+                                    ))),
+                                },
+                            )
+                            .await
+                        })
+                    },
+                ))
+                .await?;
+
+            let out = Ok(out);
 
             timing_trace_out!(out, start, a = "send_get_links");
 
