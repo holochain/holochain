@@ -5,6 +5,7 @@ use holochain_sqlite::db::{DbKindPeerMetaStore, DbWrite, ReadAccess};
 use holochain_sqlite::error::DatabaseResult;
 use kitsune2_api::{PeerMetaStore, Timestamp, Url};
 use std::sync::Arc;
+use std::time::Duration;
 
 #[tokio::test]
 async fn peer_meta_crd() {
@@ -100,12 +101,53 @@ async fn mark_peer_unresponsive_in_peer_meta_store() {
     .unwrap();
     let store = Arc::new(HolochainPeerMetaStore::create(db.clone()).await.unwrap());
     let peer_url = Url::from_str("ws://test:80/1").unwrap();
-    let is_unresponsive = store.is_peer_unresponsive(peer_url.clone()).await.unwrap();
-    assert!(!is_unresponsive);
-    store
-        .mark_peer_unresponsive(peer_url.clone(), Timestamp::now())
+    let when_peer_marked_unresponsive = store
+        .get_when_peer_marked_unresponsive(peer_url.clone())
         .await
         .unwrap();
-    let is_unresponsive = store.is_peer_unresponsive(peer_url).await.unwrap();
-    assert!(is_unresponsive);
+    assert!(when_peer_marked_unresponsive.is_none());
+    let when = Timestamp::now();
+    store
+        .mark_peer_unresponsive(peer_url.clone(), Timestamp::now(), when)
+        .await
+        .unwrap();
+    let when_peer_marked_unresponsive = store
+        .get_when_peer_marked_unresponsive(peer_url)
+        .await
+        .unwrap();
+    assert_eq!(when_peer_marked_unresponsive, Some(when));
+}
+
+#[tokio::test]
+async fn unresponsive_peers_are_removed_from_store_after_expiry() {
+    let db = DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(DnaHash::from_raw_36(
+        vec![0x0a; 36],
+    ))))
+    .unwrap();
+    // Set pruning interval to 100 ms.
+    let store = Arc::new(HolochainPeerMetaStore::create(db.clone()).await.unwrap());
+
+    let peer_url = Url::from_str("ws://test:80/1").unwrap();
+    // Expiry after 100 ms
+    let expiry = Timestamp::from_micros(Timestamp::now().as_micros() + 100_000);
+    let when = Timestamp::now();
+    store
+        .mark_peer_unresponsive(peer_url.clone(), expiry, when)
+        .await
+        .unwrap();
+    let after_marked_unresponsive = Timestamp::now();
+
+    // Waiting until the next pruning, but before the expiry, to make sure expiry is respected.
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    let when_peer_marked_unresponsive = store.get_unresponsive_url(peer_url.clone()).await.unwrap();
+    assert_eq!(when_peer_marked_unresponsive, Some(when));
+
+    // Waiting until the next pruning, after expiry.
+    // Test has to wait at least until the next second, because the expiry is compared with the unixepoch function in SQLite which returns
+    // the timestamp in full seconds.
+    let micros_to_wait =
+        1_000_000_u64.saturating_sub(after_marked_unresponsive.as_micros() as u64 % 1_000_000);
+    tokio::time::sleep(Duration::from_micros(micros_to_wait)).await;
+    let when_peer_marked_unresponsive = store.get_unresponsive_url(peer_url).await.unwrap();
+    assert!(when_peer_marked_unresponsive.is_none());
 }
