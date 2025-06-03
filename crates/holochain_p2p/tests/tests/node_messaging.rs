@@ -10,6 +10,7 @@ use std::{
 };
 
 const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(5);
+const WAIT_BETWEEN_CALLS: Duration = Duration::from_millis(1);
 
 #[derive(Clone, Debug)]
 struct Handler(pub Arc<Mutex<Vec<String>>>);
@@ -297,7 +298,7 @@ async fn test_call_remote() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // make sure hc2 has its own address
             #[allow(clippy::len_zero)] // !<7 lines>.is_empty() is NOT clearer!
@@ -316,7 +317,7 @@ async fn test_call_remote() {
         }
 
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             let resp = hc2
                 .call_remote(
@@ -433,7 +434,7 @@ async fn test_publish() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             hc2.publish(
                 dna_hash.clone(),
@@ -474,7 +475,7 @@ async fn test_publish_reflect() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             let op = test_dht_op(holochain_types::prelude::Timestamp::now());
             let op_hash = op.as_hash();
@@ -518,7 +519,7 @@ async fn test_get() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -559,7 +560,7 @@ async fn test_get_with_unresponsive_agents() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // If we get a response at all then at least one peer completed the request
             if hc1
@@ -598,7 +599,7 @@ async fn test_get_meta() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -640,7 +641,7 @@ async fn test_get_meta_with_unresponsive_agents() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // If we get a response at all then at least one peer completed the request
             if hc1
@@ -680,7 +681,7 @@ async fn test_get_links() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -730,7 +731,7 @@ async fn test_get_links_with_unresponsive_agents() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // If we get a response at all then at least one peer completed the request
             if hc1
@@ -778,7 +779,7 @@ async fn test_count_links() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -827,7 +828,7 @@ async fn test_count_links_with_unresponsive_agents() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // If we get a response at all then at least one peer completed the request
             if hc1
@@ -874,7 +875,7 @@ async fn test_get_agent_activity() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -921,7 +922,7 @@ async fn test_get_agent_activity_with_unresponsive_agents() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // If we get a response at all then at least one peer completed the request
             if hc1
@@ -966,7 +967,7 @@ async fn test_must_get_agent_activity() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -1009,7 +1010,7 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // If we get a response at all then at least one peer completed the request
             if hc1
@@ -1118,7 +1119,7 @@ async fn bridged_call_remote() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // Make sure we know about both agents
             if hc1
@@ -1189,7 +1190,7 @@ async fn bridged_remote_signal() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // Make sure we know about both agents
             if hc1
