@@ -307,7 +307,7 @@ async fn app_agent_info() {
 
     let space = dna1_hash.to_k2_space();
 
-    // test when adding an new "external" agent_info
+    // test when adding a new "external" agent_info
     let other_agent = make_agent(space.clone());
     let (admin_sender, _admin_receiver) = conductor.admin_ws_client::<AdminResponse>().await;
     let _: AdminResponse = admin_sender
