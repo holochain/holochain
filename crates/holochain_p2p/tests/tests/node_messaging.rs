@@ -10,7 +10,7 @@ use std::{
 };
 
 const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(5);
-const WAIT_BETWEEN_CALLS: Duration = Duration::from_millis(1);
+const WAIT_BETWEEN_CALLS: Duration = Duration::from_millis(10);
 
 #[derive(Clone, Debug)]
 struct Handler(pub Arc<Mutex<Vec<String>>>);
@@ -387,7 +387,7 @@ async fn test_remote_signal() {
                 assert_eq!("got_call_remote: hello", res);
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
         }
     })
     .await
@@ -1063,7 +1063,7 @@ async fn test_validation_receipts() {
                 assert_eq!("validation_receipts", res);
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
         }
     })
     .await
@@ -1242,7 +1242,7 @@ async fn bridged_remote_signal() {
                 assert_eq!("got_call_remote: hello", res);
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
         }
     })
     .await
