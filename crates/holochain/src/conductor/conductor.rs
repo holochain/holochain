@@ -901,8 +901,8 @@ mod network_impls {
 
         /// Get signed agent info from the conductor by DNA
         ///
-        /// This function is here for the backport of the breaking change in the 0.6 branch of
-        /// that changes the `get_agent_infos` call to take dna_hashes instead of cell_id.
+        // This function is here for the backport of the breaking change in the 0.6 branch of
+        // that changes the `get_agent_infos` call to take dna_hashes instead of cell_id.
         async fn get_agent_infos_by_dna(
             &self,
             maybe_dna_hashes: Option<Vec<DnaHash>>,
