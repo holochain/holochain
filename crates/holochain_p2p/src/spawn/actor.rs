@@ -916,7 +916,8 @@ impl HolochainP2pActor {
             .collect::<Vec<_>>())
     }
 
-    /// Randomly selects [`PARALLEL_GET_AGENTS_COUNT`] peers containing the op at the given location.
+    /// Randomly selects and returns [`PARALLEL_GET_AGENTS_COUNT`] agents with a peer URL whose
+    /// storage arcs contain the given location.
     ///
     /// Returns an error if failed to get peers or no peers are found.
     async fn get_random_peers_for_location(
