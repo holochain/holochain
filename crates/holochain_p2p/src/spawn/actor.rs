@@ -4,6 +4,7 @@ use crate::metrics::create_p2p_request_duration_metric;
 use crate::*;
 use kitsune2_api::*;
 use kitsune2_core::get_remote_agents_near_location;
+use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::sync::{Mutex, Weak};
 
@@ -915,6 +916,29 @@ impl HolochainP2pActor {
             .collect::<Vec<_>>())
     }
 
+    /// Randomly selects [`PARALLEL_GET_AGENTS_COUNT`] peers containing the op at the given location.
+    ///
+    /// Returns an error if failed to get peers or no peers are found.
+    async fn get_random_peers_for_location(
+        &self,
+        tag: &'static str,
+        space: &DynSpace,
+        loc: u32,
+    ) -> HolochainP2pResult<Vec<(AgentPubKey, Url)>> {
+        let agents = self.get_peers_for_location(space, loc).await?;
+        if agents.is_empty() {
+            return Err(HolochainP2pError::NoPeersForLocation(
+                String::from(tag),
+                loc,
+            ));
+        }
+
+        Ok(agents
+            .choose_multiple(&mut rand::thread_rng(), PARALLEL_GET_AGENTS_COUNT)
+            .cloned()
+            .collect())
+    }
+
     /// Check whether a message should be bridged locally to some other agent on this node.
     ///
     /// Checks whether this message is destined for our own URL.
@@ -1364,48 +1388,42 @@ impl actor::HcP2p for HolochainP2pActor {
             let space_id = dna_hash.to_k2_space();
             let space = self.kitsune.space(space_id.clone()).await?;
             let loc = dht_hash.get_loc();
-            let agents = self.get_peers_for_location(&space, loc).await?;
-            if agents.is_empty() {
-                return Err(HolochainP2pError::NoPeersForLocation(
-                    String::from("get"),
-                    loc,
-                ));
-            }
+            let agents = self
+                .get_random_peers_for_location("get", &space, loc)
+                .await?;
 
             let start = std::time::Instant::now();
 
             let (out, _) =
-                futures::future::select_ok(agents.into_iter().take(PARALLEL_GET_AGENTS_COUNT).map(
-                    |(to_agent, to_url)| {
-                        Box::pin(async {
-                            let r_options: event::GetOptions = (&options).into();
+                futures::future::select_ok(agents.into_iter().map(|(to_agent, to_url)| {
+                    Box::pin(async {
+                        let r_options: event::GetOptions = (&options).into();
 
-                            let (msg_id, req) = crate::wire::WireMessage::get_req(
-                                to_agent,
-                                dht_hash.clone(),
-                                r_options,
-                            );
+                        let (msg_id, req) = crate::wire::WireMessage::get_req(
+                            to_agent,
+                            dht_hash.clone(),
+                            r_options,
+                        );
 
-                            self.send_request(
-                                "get",
-                                &space,
-                                to_url,
-                                msg_id,
-                                req,
-                                dna_hash.clone(),
-                                |res| match res {
-                                    crate::wire::WireMessage::GetRes { response, .. } => {
-                                        Ok(vec![response])
-                                    }
-                                    _ => Err(HolochainP2pError::other(format!(
-                                        "invalid response to get: {res:?}"
-                                    ))),
-                                },
-                            )
-                            .await
-                        })
-                    },
-                ))
+                        self.send_request(
+                            "get",
+                            &space,
+                            to_url,
+                            msg_id,
+                            req,
+                            dna_hash.clone(),
+                            |res| match res {
+                                crate::wire::WireMessage::GetRes { response, .. } => {
+                                    Ok(vec![response])
+                                }
+                                _ => Err(HolochainP2pError::other(format!(
+                                    "invalid response to get: {res:?}"
+                                ))),
+                            },
+                        )
+                        .await
+                    })
+                }))
                 .await?;
 
             let out = Ok(out);
@@ -1426,48 +1444,42 @@ impl actor::HcP2p for HolochainP2pActor {
             let space_id = dna_hash.to_k2_space();
             let space = self.kitsune.space(space_id.clone()).await?;
             let loc = dht_hash.get_loc();
-            let agents = self.get_peers_for_location(&space, loc).await?;
-            if agents.is_empty() {
-                return Err(HolochainP2pError::NoPeersForLocation(
-                    String::from("get_meta"),
-                    loc,
-                ));
-            }
+            let agents = self
+                .get_random_peers_for_location("get_meta", &space, loc)
+                .await?;
 
             let start = std::time::Instant::now();
 
             let (out, _) =
-                futures::future::select_ok(agents.into_iter().take(PARALLEL_GET_AGENTS_COUNT).map(
-                    |(to_agent, to_url)| {
-                        Box::pin(async {
-                            let r_options: event::GetMetaOptions = (&options).into();
+                futures::future::select_ok(agents.into_iter().map(|(to_agent, to_url)| {
+                    Box::pin(async {
+                        let r_options: event::GetMetaOptions = (&options).into();
 
-                            let (msg_id, req) = crate::wire::WireMessage::get_meta_req(
-                                to_agent,
-                                dht_hash.clone(),
-                                r_options,
-                            );
+                        let (msg_id, req) = crate::wire::WireMessage::get_meta_req(
+                            to_agent,
+                            dht_hash.clone(),
+                            r_options,
+                        );
 
-                            self.send_request(
-                                "get_meta",
-                                &space,
-                                to_url,
-                                msg_id,
-                                req,
-                                dna_hash.clone(),
-                                |res| match res {
-                                    crate::wire::WireMessage::GetMetaRes { response, .. } => {
-                                        Ok(vec![response])
-                                    }
-                                    _ => Err(HolochainP2pError::other(format!(
-                                        "invalid response to get_meta: {res:?}"
-                                    ))),
-                                },
-                            )
-                            .await
-                        })
-                    },
-                ))
+                        self.send_request(
+                            "get_meta",
+                            &space,
+                            to_url,
+                            msg_id,
+                            req,
+                            dna_hash.clone(),
+                            |res| match res {
+                                crate::wire::WireMessage::GetMetaRes { response, .. } => {
+                                    Ok(vec![response])
+                                }
+                                _ => Err(HolochainP2pError::other(format!(
+                                    "invalid response to get_meta: {res:?}"
+                                ))),
+                            },
+                        )
+                        .await
+                    })
+                }))
                 .await?;
 
             let out = Ok(out);
@@ -1488,48 +1500,42 @@ impl actor::HcP2p for HolochainP2pActor {
             let space_id = dna_hash.to_k2_space();
             let space = self.kitsune.space(space_id.clone()).await?;
             let loc = link_key.base.get_loc();
-            let agents = self.get_peers_for_location(&space, loc).await?;
-            if agents.is_empty() {
-                return Err(HolochainP2pError::NoPeersForLocation(
-                    String::from("get_links"),
-                    loc,
-                ));
-            }
+            let agents = self
+                .get_random_peers_for_location("get_links", &space, loc)
+                .await?;
 
             let start = std::time::Instant::now();
 
             let (out, _) =
-                futures::future::select_ok(agents.into_iter().take(PARALLEL_GET_AGENTS_COUNT).map(
-                    |(to_agent, to_url)| {
-                        Box::pin(async {
-                            let r_options: event::GetLinksOptions = (&options).into();
+                futures::future::select_ok(agents.into_iter().map(|(to_agent, to_url)| {
+                    Box::pin(async {
+                        let r_options: event::GetLinksOptions = (&options).into();
 
-                            let (msg_id, req) = crate::wire::WireMessage::get_links_req(
-                                to_agent,
-                                link_key.clone(),
-                                r_options,
-                            );
+                        let (msg_id, req) = crate::wire::WireMessage::get_links_req(
+                            to_agent,
+                            link_key.clone(),
+                            r_options,
+                        );
 
-                            self.send_request(
-                                "get_links",
-                                &space,
-                                to_url,
-                                msg_id,
-                                req,
-                                dna_hash.clone(),
-                                |res| match res {
-                                    crate::wire::WireMessage::GetLinksRes { response, .. } => {
-                                        Ok(vec![response])
-                                    }
-                                    _ => Err(HolochainP2pError::other(format!(
-                                        "invalid response to get_links: {res:?}"
-                                    ))),
-                                },
-                            )
-                            .await
-                        })
-                    },
-                ))
+                        self.send_request(
+                            "get_links",
+                            &space,
+                            to_url,
+                            msg_id,
+                            req,
+                            dna_hash.clone(),
+                            |res| match res {
+                                crate::wire::WireMessage::GetLinksRes { response, .. } => {
+                                    Ok(vec![response])
+                                }
+                                _ => Err(HolochainP2pError::other(format!(
+                                    "invalid response to get_links: {res:?}"
+                                ))),
+                            },
+                        )
+                        .await
+                    })
+                }))
                 .await?;
 
             let out = Ok(out);
@@ -1549,43 +1555,37 @@ impl actor::HcP2p for HolochainP2pActor {
             let space_id = dna_hash.to_k2_space();
             let space = self.kitsune.space(space_id.clone()).await?;
             let loc = query.base.get_loc();
-            let agents = self.get_peers_for_location(&space, loc).await?;
-            if agents.is_empty() {
-                return Err(HolochainP2pError::NoPeersForLocation(
-                    String::from("count_links"),
-                    loc,
-                ));
-            }
+            let agents = self
+                .get_random_peers_for_location("count_links", &space, loc)
+                .await?;
 
             let start = std::time::Instant::now();
 
             let (out, _) =
-                futures::future::select_ok(agents.into_iter().take(PARALLEL_GET_AGENTS_COUNT).map(
-                    |(to_agent, to_url)| {
-                        Box::pin(async {
-                            let (msg_id, req) =
-                                crate::wire::WireMessage::count_links_req(to_agent, query.clone());
+                futures::future::select_ok(agents.into_iter().map(|(to_agent, to_url)| {
+                    Box::pin(async {
+                        let (msg_id, req) =
+                            crate::wire::WireMessage::count_links_req(to_agent, query.clone());
 
-                            self.send_request(
-                                "count_links",
-                                &space,
-                                to_url,
-                                msg_id,
-                                req,
-                                dna_hash.clone(),
-                                |res| match res {
-                                    crate::wire::WireMessage::CountLinksRes {
-                                        response, ..
-                                    } => Ok(response),
-                                    _ => Err(HolochainP2pError::other(format!(
-                                        "invalid response to count_links: {res:?}"
-                                    ))),
-                                },
-                            )
-                            .await
-                        })
-                    },
-                ))
+                        self.send_request(
+                            "count_links",
+                            &space,
+                            to_url,
+                            msg_id,
+                            req,
+                            dna_hash.clone(),
+                            |res| match res {
+                                crate::wire::WireMessage::CountLinksRes { response, .. } => {
+                                    Ok(response)
+                                }
+                                _ => Err(HolochainP2pError::other(format!(
+                                    "invalid response to count_links: {res:?}"
+                                ))),
+                            },
+                        )
+                        .await
+                    })
+                }))
                 .await?;
 
             let out = Ok(out);
@@ -1607,50 +1607,43 @@ impl actor::HcP2p for HolochainP2pActor {
             let space_id = dna_hash.to_k2_space();
             let space = self.kitsune.space(space_id.clone()).await?;
             let loc = agent.get_loc();
-            let agents = self.get_peers_for_location(&space, loc).await?;
-            if agents.is_empty() {
-                return Err(HolochainP2pError::NoPeersForLocation(
-                    String::from("get_agent_activity"),
-                    loc,
-                ));
-            }
+            let agents = self
+                .get_random_peers_for_location("get_agent_activity", &space, loc)
+                .await?;
 
             let start = std::time::Instant::now();
 
             let (out, _) =
-                futures::future::select_ok(agents.into_iter().take(PARALLEL_GET_AGENTS_COUNT).map(
-                    |(to_agent, to_url)| {
-                        Box::pin(async {
-                            let r_options: event::GetActivityOptions = (&options).into();
+                futures::future::select_ok(agents.into_iter().map(|(to_agent, to_url)| {
+                    Box::pin(async {
+                        let r_options: event::GetActivityOptions = (&options).into();
 
-                            let (msg_id, req) = crate::wire::WireMessage::get_agent_activity_req(
-                                to_agent,
-                                agent.clone(),
-                                query.clone(),
-                                r_options,
-                            );
+                        let (msg_id, req) = crate::wire::WireMessage::get_agent_activity_req(
+                            to_agent,
+                            agent.clone(),
+                            query.clone(),
+                            r_options,
+                        );
 
-                            self.send_request(
-                                "get_agent_activity",
-                                &space,
-                                to_url,
-                                msg_id,
-                                req,
-                                dna_hash.clone(),
-                                |res| match res {
-                                    crate::wire::WireMessage::GetAgentActivityRes {
-                                        response,
-                                        ..
-                                    } => Ok(vec![response]),
-                                    _ => Err(HolochainP2pError::other(format!(
-                                        "invalid response to get_agent_activity: {res:?}"
-                                    ))),
-                                },
-                            )
-                            .await
-                        })
-                    },
-                ))
+                        self.send_request(
+                            "get_agent_activity",
+                            &space,
+                            to_url,
+                            msg_id,
+                            req,
+                            dna_hash.clone(),
+                            |res| match res {
+                                crate::wire::WireMessage::GetAgentActivityRes {
+                                    response, ..
+                                } => Ok(vec![response]),
+                                _ => Err(HolochainP2pError::other(format!(
+                                    "invalid response to get_agent_activity: {res:?}"
+                                ))),
+                            },
+                        )
+                        .await
+                    })
+                }))
                 .await?;
 
             let out = Ok(out);
@@ -1671,48 +1664,41 @@ impl actor::HcP2p for HolochainP2pActor {
             let space_id = dna_hash.to_k2_space();
             let space = self.kitsune.space(space_id.clone()).await?;
             let loc = author.get_loc();
-            let agents = self.get_peers_for_location(&space, loc).await?;
-            if agents.is_empty() {
-                return Err(HolochainP2pError::NoPeersForLocation(
-                    String::from("must_get_agent_activity"),
-                    loc,
-                ));
-            }
+            let agents = self
+                .get_random_peers_for_location("must_get_agent_activity", &space, loc)
+                .await?;
 
             let start = std::time::Instant::now();
 
             let (out, _) =
-                futures::future::select_ok(agents.into_iter().take(PARALLEL_GET_AGENTS_COUNT).map(
-                    |(to_agent, to_url)| {
-                        Box::pin(async {
-                            let (msg_id, req) =
-                                crate::wire::WireMessage::must_get_agent_activity_req(
-                                    to_agent,
-                                    author.clone(),
-                                    filter.clone(),
-                                );
+                futures::future::select_ok(agents.into_iter().map(|(to_agent, to_url)| {
+                    Box::pin(async {
+                        let (msg_id, req) = crate::wire::WireMessage::must_get_agent_activity_req(
+                            to_agent,
+                            author.clone(),
+                            filter.clone(),
+                        );
 
-                            self.send_request(
-                                "must_get_agent_activity",
-                                &space,
-                                to_url,
-                                msg_id,
-                                req,
-                                dna_hash.clone(),
-                                |res| match res {
-                                    crate::wire::WireMessage::MustGetAgentActivityRes {
-                                        response,
-                                        ..
-                                    } => Ok(vec![response]),
-                                    _ => Err(HolochainP2pError::other(format!(
-                                        "invalid response to must_get_agent_activity: {res:?}"
-                                    ))),
-                                },
-                            )
-                            .await
-                        })
-                    },
-                ))
+                        self.send_request(
+                            "must_get_agent_activity",
+                            &space,
+                            to_url,
+                            msg_id,
+                            req,
+                            dna_hash.clone(),
+                            |res| match res {
+                                crate::wire::WireMessage::MustGetAgentActivityRes {
+                                    response,
+                                    ..
+                                } => Ok(vec![response]),
+                                _ => Err(HolochainP2pError::other(format!(
+                                    "invalid response to must_get_agent_activity: {res:?}"
+                                ))),
+                            },
+                        )
+                        .await
+                    })
+                }))
                 .await?;
 
             let out = Ok(out);
