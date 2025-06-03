@@ -926,6 +926,7 @@ mod network_impls {
             }
             Ok(out.into_iter().collect())
         }
+
         /// Get signed agent info from the conductor for a given app
         pub async fn get_app_agent_infos(
             &self,
