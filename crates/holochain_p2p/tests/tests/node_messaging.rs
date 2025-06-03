@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(20);
+const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Debug)]
 struct Handler(pub Arc<Mutex<Vec<String>>>);
@@ -295,7 +295,7 @@ async fn test_call_remote() {
     let (agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
     let (agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -1116,7 +1116,7 @@ async fn bridged_call_remote() {
         .await
         .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -1187,7 +1187,7 @@ async fn bridged_remote_signal() {
         .await
         .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
