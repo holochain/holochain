@@ -134,7 +134,10 @@ impl HcP2pHandler for Handler {
         _filter: holochain_zome_types::chain::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("get_agent_activity".into());
+            self.0
+                .lock()
+                .unwrap()
+                .push("must_get_agent_activity".into());
             Ok(MustGetAgentActivityResponse::EmptyRange)
         })
     }
