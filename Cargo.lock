@@ -2528,7 +2528,7 @@ dependencies = [
  "holochain_util",
  "holochain_websocket",
  "kitsune2_api",
- "kitsune2_bootstrap_client",
+ "kitsune2_bootstrap_client 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "kitsune2_core",
  "once_cell",
  "ratatui",
@@ -4107,15 +4107,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4219,8 +4210,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_api"
 version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6365f118aa584b685068a37546d793099b600755a4d6cd10b5ab774fb2e551cb"
+source = "git+https://github.com/holochain/kitsune2#50e483fd0da7892200b4e3d1330616066a1910f4"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4238,6 +4228,20 @@ name = "kitsune2_bootstrap_client"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e65538b35555ba7a16976675cf45cf1f9c2ebc425c1d532390bfbcfc2883bfd"
+dependencies = [
+ "base64 0.22.1",
+ "kitsune2_api",
+ "serde",
+ "serde_json",
+ "tracing",
+ "ureq 2.12.1",
+ "url",
+]
+
+[[package]]
+name = "kitsune2_bootstrap_client"
+version = "0.2.7"
+source = "git+https://github.com/holochain/kitsune2#50e483fd0da7892200b4e3d1330616066a1910f4"
 dependencies = [
  "base64 0.22.1",
  "kitsune2_api",
@@ -4278,15 +4282,14 @@ dependencies = [
 [[package]]
 name = "kitsune2_core"
 version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cf2e2a322438fbc3fb85294eb9dcdf4b8ec33a716f11d89c791634afec5f282"
+source = "git+https://github.com/holochain/kitsune2#50e483fd0da7892200b4e3d1330616066a1910f4"
 dependencies = [
  "backon",
  "bytes",
  "ed25519-dalek",
  "futures",
  "kitsune2_api",
- "kitsune2_bootstrap_client",
+ "kitsune2_bootstrap_client 0.2.7 (git+https://github.com/holochain/kitsune2)",
  "prost",
  "rand 0.8.5",
  "schemars",
@@ -5497,7 +5500,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "syn 2.0.101",

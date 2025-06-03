@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Add `AgentInfo` call to the conductor’s app interface to retrieve the discovered peers of the app’s various DNAs.
 - **Breaking**: admin interface `AgentInfo` call now takes an optional list of DNA hashes to filter by instead of a `CellId`.
+- Add methods to the peer meta store that mark a peer URL as unresponsive and check if a peer URL is marked unresponsive. This change enables marking peers as unresponsive when connecting to or sending messages to, so that they can be omitted from future requests until the URL expires.
 
 ## 0.6.0-dev.6
 
