@@ -4,7 +4,12 @@ use holochain_p2p::*;
 use holochain_trace::test_run;
 use holochain_types::prelude::*;
 use kitsune2_api::*;
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
+const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Clone, Debug)]
 struct Handler(pub Arc<Mutex<Vec<String>>>);
@@ -375,7 +380,7 @@ async fn test_remote_signal() {
     .await
     .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             if let Some(res) = handler.0.lock().unwrap().first() {
                 assert_eq!("got_call_remote: hello", res);
@@ -428,7 +433,7 @@ async fn test_publish() {
         .await
         .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -469,7 +474,7 @@ async fn test_publish_reflect() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -513,7 +518,7 @@ async fn test_get() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -555,7 +560,7 @@ async fn test_get_with_unresponsive_agents() {
     hc3.test_set_full_arcs(space.clone()).await;
     hc4.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -595,7 +600,7 @@ async fn test_get_meta() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -637,7 +642,7 @@ async fn test_get_meta_with_unresponsive_agents() {
     hc3.test_set_full_arcs(space.clone()).await;
     hc4.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -677,7 +682,7 @@ async fn test_get_links() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -727,7 +732,7 @@ async fn test_get_links_with_unresponsive_agents() {
     hc3.test_set_full_arcs(space.clone()).await;
     hc4.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -775,7 +780,7 @@ async fn test_count_links() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -824,7 +829,7 @@ async fn test_count_links_with_unresponsive_agents() {
     hc3.test_set_full_arcs(space.clone()).await;
     hc4.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -871,7 +876,7 @@ async fn test_get_agent_activity() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -918,7 +923,7 @@ async fn test_get_agent_activity_with_unresponsive_agents() {
     hc3.test_set_full_arcs(space.clone()).await;
     hc4.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -963,7 +968,7 @@ async fn test_must_get_agent_activity() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -1006,7 +1011,7 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
     hc3.test_set_full_arcs(space.clone()).await;
     hc4.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(1)).await;
 
@@ -1051,7 +1056,7 @@ async fn test_validation_receipts() {
     .await
     .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             if let Some(res) = handler.0.lock().unwrap().first() {
                 assert_eq!("validation_receipts", res);
@@ -1230,7 +1235,7 @@ async fn bridged_remote_signal() {
     .await
     .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             if let Some(res) = handler.0.lock().unwrap().first() {
                 assert_eq!("got_call_remote: hello", res);
