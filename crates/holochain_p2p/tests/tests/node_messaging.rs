@@ -545,7 +545,7 @@ async fn test_get_with_unresponsive_agents() {
     let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
     let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
     let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -574,6 +574,9 @@ async fn test_get_with_unresponsive_agents() {
     })
     .await
     .unwrap();
+
+    let requests = handler.0.lock().unwrap();
+    assert_eq!(*requests, ["get"]);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -623,7 +626,7 @@ async fn test_get_meta_with_unresponsive_agents() {
     let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
     let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
     let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -653,6 +656,9 @@ async fn test_get_meta_with_unresponsive_agents() {
     })
     .await
     .unwrap();
+
+    let requests = handler.0.lock().unwrap();
+    assert_eq!(*requests, ["get_meta"]);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -708,7 +714,7 @@ async fn test_get_links_with_unresponsive_agents() {
     let unresponsive_handler = Arc::new(UnresponsiveHandler);
 
     let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
     let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
     let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
 
@@ -748,6 +754,9 @@ async fn test_get_links_with_unresponsive_agents() {
     })
     .await
     .unwrap();
+
+    let requests = handler.0.lock().unwrap();
+    assert_eq!(*requests, ["get_links"]);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -802,7 +811,7 @@ async fn test_count_links_with_unresponsive_agents() {
     let unresponsive_handler = Arc::new(UnresponsiveHandler);
 
     let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
-    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
     let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
     let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
 
@@ -841,6 +850,9 @@ async fn test_count_links_with_unresponsive_agents() {
     })
     .await
     .unwrap();
+
+    let requests = handler.0.lock().unwrap();
+    assert_eq!(*requests, ["count_links"]);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -895,7 +907,7 @@ async fn test_get_agent_activity_with_unresponsive_agents() {
     let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
     let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
     let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -930,6 +942,9 @@ async fn test_get_agent_activity_with_unresponsive_agents() {
     })
     .await
     .unwrap();
+
+    let requests = handler.0.lock().unwrap();
+    assert_eq!(*requests, ["get_agent_activity"]);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -980,7 +995,7 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
     let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
     let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
     let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
-    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
 
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
@@ -1011,6 +1026,9 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
     })
     .await
     .unwrap();
+
+    let requests = handler.0.lock().unwrap();
+    assert_eq!(*requests, ["must_get_agent_activity"]);
 }
 
 #[tokio::test(flavor = "multi_thread")]
