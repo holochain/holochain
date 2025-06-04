@@ -101,20 +101,14 @@ async fn mark_peer_unresponsive_in_peer_meta_store() {
     .unwrap();
     let store = Arc::new(HolochainPeerMetaStore::create(db.clone()).await.unwrap());
     let peer_url = Url::from_str("ws://test:80/1").unwrap();
-    let when_peer_marked_unresponsive = store
-        .get_when_peer_marked_unresponsive(peer_url.clone())
-        .await
-        .unwrap();
+    let when_peer_marked_unresponsive = store.get_unresponsive_url(peer_url.clone()).await.unwrap();
     assert!(when_peer_marked_unresponsive.is_none());
     let when = Timestamp::now();
     store
         .mark_peer_unresponsive(peer_url.clone(), Timestamp::now(), when)
         .await
         .unwrap();
-    let when_peer_marked_unresponsive = store
-        .get_when_peer_marked_unresponsive(peer_url)
-        .await
-        .unwrap();
+    let when_peer_marked_unresponsive = store.get_unresponsive_url(peer_url).await.unwrap();
     assert_eq!(when_peer_marked_unresponsive, Some(when));
 }
 

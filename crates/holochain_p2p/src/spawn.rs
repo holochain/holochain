@@ -36,6 +36,11 @@ pub struct HolochainP2pConfig {
     /// Callback function to retrieve a peer meta database handle for a dna hash.
     pub get_db_peer_meta: GetDbPeerMeta,
 
+    /// Interval for a pruning task to remove expired values from the peer meta store.
+    ///
+    /// Default: 10 s
+    pub peer_meta_pruning_interval_ms: u64,
+
     /// Callback function to retrieve an op store database handle for a dna hash.
     pub get_db_op_store: GetDbOpStore,
 
@@ -103,6 +108,7 @@ impl Default for HolochainP2pConfig {
     fn default() -> Self {
         Self {
             get_db_peer_meta: Arc::new(|_| unimplemented!()),
+            peer_meta_pruning_interval_ms: 10_000,
             get_db_op_store: Arc::new(|_| unimplemented!()),
             target_arc_factor: 1,
             auth_material: None,
