@@ -433,6 +433,7 @@ impl ConductorBuilder {
                     BASE64_STANDARD.decode(m).map_err(ConductorError::other)
                 })
                 .transpose()?,
+            peer_meta_pruning_interval_ms: Default::default(),
             get_db_peer_meta: Arc::new(move |dna_hash| {
                 let res = net_spaces1.peer_meta_store_db(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
