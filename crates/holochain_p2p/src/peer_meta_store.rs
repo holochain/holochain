@@ -61,7 +61,7 @@ pub struct HolochainPeerMetaStore {
     db: DbWrite<DbKindPeerMetaStore>,
 }
 
-struct BytesSql(Bytes);
+pub(crate) struct BytesSql(pub(crate) Bytes);
 
 impl ToSql for BytesSql {
     #[inline]

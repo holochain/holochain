@@ -4210,7 +4210,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_api"
 version = "0.2.7"
-source = "git+https://github.com/holochain/kitsune2#50e483fd0da7892200b4e3d1330616066a1910f4"
+source = "git+https://github.com/holochain/kitsune2?branch=feat%2Fmark-peers-unresponsive-in-peer-meta-store#0fa5f322dd82f038c1067f8e26a69747621fff3e"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4241,7 +4241,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_bootstrap_client"
 version = "0.2.7"
-source = "git+https://github.com/holochain/kitsune2#50e483fd0da7892200b4e3d1330616066a1910f4"
+source = "git+https://github.com/holochain/kitsune2?branch=feat%2Fmark-peers-unresponsive-in-peer-meta-store#0fa5f322dd82f038c1067f8e26a69747621fff3e"
 dependencies = [
  "base64 0.22.1",
  "kitsune2_api",
@@ -4282,14 +4282,14 @@ dependencies = [
 [[package]]
 name = "kitsune2_core"
 version = "0.2.7"
-source = "git+https://github.com/holochain/kitsune2#50e483fd0da7892200b4e3d1330616066a1910f4"
+source = "git+https://github.com/holochain/kitsune2?branch=feat%2Fmark-peers-unresponsive-in-peer-meta-store#0fa5f322dd82f038c1067f8e26a69747621fff3e"
 dependencies = [
  "backon",
  "bytes",
  "ed25519-dalek",
  "futures",
  "kitsune2_api",
- "kitsune2_bootstrap_client 0.2.7 (git+https://github.com/holochain/kitsune2)",
+ "kitsune2_bootstrap_client 0.2.7 (git+https://github.com/holochain/kitsune2?branch=feat%2Fmark-peers-unresponsive-in-peer-meta-store)",
  "prost",
  "rand 0.8.5",
  "schemars",
@@ -5500,7 +5500,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "syn 2.0.101",

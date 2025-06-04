@@ -87,8 +87,8 @@ opt-level = "z"
 lto = true
 
 [patch.crates-io]
-kitsune2_api = { git = "https://github.com/holochain/kitsune2" }
-kitsune2_core = { git = "https://github.com/holochain/kitsune2" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", branch = "feat/mark-peers-unresponsive-in-peer-meta-store" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2", branch = "feat/mark-peers-unresponsive-in-peer-meta-store" }
 # kitsune2_api = { path = "../kitsune2/crates/api" }
 # kitsune2_core = { path = "../kitsune2/crates/core" }
 # kitsune2 = { path = "../kitsune2/crates/kitsune2" }
