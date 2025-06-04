@@ -6,7 +6,10 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-- Add `AgentInfo` call to the conductor's app interface to retrieve the discovered peers of the app's various DNAs.
+
+## 0.6.0-dev.7
+
+- Add `AgentInfo` call to the conductor’s app interface to retrieve the discovered peers of the app’s various DNAs.
 - **Breaking**: admin interface `AgentInfo` call now takes an optional list of DNA hashes to filter by instead of a `CellId`.
 
 ## 0.6.0-dev.6
