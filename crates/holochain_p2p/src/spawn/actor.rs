@@ -1087,6 +1087,28 @@ macro_rules! timing_trace_out {
     };
 }
 
+fn is_empty_op(wire_ops: &WireOps) -> bool {
+    match wire_ops {
+        WireOps::Entry(WireEntryOps {
+            creates,
+            deletes,
+            updates,
+            entry,
+        }) if creates.is_empty() && deletes.is_empty() && updates.is_empty() && entry.is_none() => {
+            true
+        }
+        WireOps::Record(WireRecordOps {
+            action,
+            deletes,
+            updates,
+            entry,
+        }) if action.is_none() && deletes.is_empty() && updates.is_empty() && entry.is_none() => {
+            true
+        }
+        _ => false,
+    }
+}
+
 impl actor::HcP2p for HolochainP2pActor {
     #[cfg(feature = "test_utils")]
     fn test_kitsune(&self) -> &DynKitsune {
@@ -1394,8 +1416,9 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let start = std::time::Instant::now();
 
-            let (out, _) =
-                futures::future::select_ok(agents.into_iter().map(|(to_agent, to_url)| {
+            let mut futures = agents
+                .into_iter()
+                .map(|(to_agent, to_url)| {
                     Box::pin(async {
                         let (msg_id, req) =
                             crate::wire::WireMessage::get_req(to_agent, dht_hash.clone());
@@ -1418,14 +1441,24 @@ impl actor::HcP2p for HolochainP2pActor {
                         )
                         .await
                     })
-                }))
-                .await?;
+                })
+                .collect();
 
-            let out = Ok(out);
+            loop {
+                let (out, _, remaining): (HolochainP2pResult<Vec<WireOps>>, _, _) =
+                    futures::future::select_all(futures).await;
 
-            timing_trace_out!(out, start, a = "send_get");
+                if out
+                    .as_ref()
+                    .is_ok_and(|ops| !is_empty_op(ops.first().unwrap()))
+                    || remaining.is_empty()
+                {
+                    timing_trace_out!(out, start, a = "send_get");
+                    return out;
+                }
 
-            out
+                futures = remaining;
+            }
         })
     }
 
