@@ -15,12 +15,14 @@ const WAIT_BETWEEN_CALLS: Duration = Duration::from_millis(10);
 #[derive(Clone, Debug)]
 struct Handler {
     pub calls: Arc<Mutex<Vec<String>>>,
+    get_response: WireOps,
 }
 
 impl Default for Handler {
     fn default() -> Self {
         Handler {
             calls: Arc::new(Mutex::new(Vec::new())),
+            get_response: WireOps::Entry(WireEntryOps::new()),
         }
     }
 }
@@ -63,8 +65,7 @@ impl HcP2pHandler for Handler {
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         Box::pin(async move {
             self.calls.lock().unwrap().push("get".into());
-            let ops = WireOps::Entry(WireEntryOps::new());
-            Ok(ops)
+            Ok(self.get_response.clone())
         })
     }
 
