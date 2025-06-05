@@ -724,6 +724,49 @@ async fn test_get_when_not_all_agents_have_data_and_unresponsive_agent() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_get_empty_data_better_than_no_response() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let empty_handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+
+    // One agent will respond with empty data so we need to wait for the other one to timeout
+    // before we will get the empty data.
+    tokio::time::timeout(Duration::from_secs(70), async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            if hc1
+                .get(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                )
+                .await
+                .is_ok()
+            {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = empty_handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_get_meta() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
