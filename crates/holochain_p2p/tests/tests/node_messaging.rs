@@ -662,6 +662,62 @@ async fn test_get_when_not_all_agents_have_data() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_get_when_not_all_agents_have_data_and_unresponsive_agent() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let wire_ops = WireOps::Record(WireRecordOps {
+        entry: Some(Entry::Agent(fake_agent_pubkey_1())),
+        ..Default::default()
+    });
+    let handler = Arc::new(Handler::new(
+        wire_ops.clone(),
+        Some(Duration::from_millis(500)),
+    ));
+    let empty_handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+    hc4.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            // Wait until we get the response we want
+            if let Ok(response) = hc1
+                .get(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                )
+                .await
+            {
+                if response.first().unwrap() == &wire_ops {
+                    break;
+                }
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = empty_handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get"]);
+
+    let requests = handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_get_meta() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
