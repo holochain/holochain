@@ -13,11 +13,15 @@ const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(5);
 const WAIT_BETWEEN_CALLS: Duration = Duration::from_millis(10);
 
 #[derive(Clone, Debug)]
-struct Handler(pub Arc<Mutex<Vec<String>>>);
+struct Handler {
+    pub calls: Arc<Mutex<Vec<String>>>,
+}
 
 impl Default for Handler {
     fn default() -> Self {
-        Handler(Arc::new(Mutex::new(Vec::new())))
+        Handler {
+            calls: Arc::new(Mutex::new(Vec::new())),
+        }
     }
 }
 
@@ -34,7 +38,7 @@ impl HcP2pHandler for Handler {
                 "got_call_remote: {}",
                 String::from_utf8_lossy(&zome_call_params_serialized.0),
             );
-            self.0.lock().unwrap().push(respond.clone());
+            self.calls.lock().unwrap().push(respond.clone());
             Ok(UnsafeBytes::from(respond.into_bytes()).into())
         })
     }
@@ -46,7 +50,7 @@ impl HcP2pHandler for Handler {
         _ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("publish".into());
+            self.calls.lock().unwrap().push("publish".into());
             Ok(())
         })
     }
@@ -58,7 +62,7 @@ impl HcP2pHandler for Handler {
         _dht_hash: holo_hash::AnyDhtHash,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("get".into());
+            self.calls.lock().unwrap().push("get".into());
             let ops = WireOps::Entry(WireEntryOps::new());
             Ok(ops)
         })
@@ -72,7 +76,7 @@ impl HcP2pHandler for Handler {
         _options: GetMetaOptions,
     ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("get_meta".into());
+            self.calls.lock().unwrap().push("get_meta".into());
             Ok(MetadataSet {
                 actions: Default::default(),
                 invalid_actions: Default::default(),
@@ -91,7 +95,7 @@ impl HcP2pHandler for Handler {
         _options: GetLinksOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("get_links".into());
+            self.calls.lock().unwrap().push("get_links".into());
             Ok(WireLinkOps {
                 creates: Vec::new(),
                 deletes: Vec::new(),
@@ -106,7 +110,7 @@ impl HcP2pHandler for Handler {
         _query: WireLinkQuery,
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("count_links".into());
+            self.calls.lock().unwrap().push("count_links".into());
             Ok(CountLinksResponse::new(Vec::new()))
         })
     }
@@ -120,7 +124,7 @@ impl HcP2pHandler for Handler {
         _options: GetActivityOptions,
     ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("get_agent_activity".into());
+            self.calls.lock().unwrap().push("get_agent_activity".into());
             Ok(AgentActivityResponse {
                 agent: AgentPubKey::from_raw_36(vec![2; 36]),
                 valid_activity: ChainItems::NotRequested,
@@ -140,7 +144,7 @@ impl HcP2pHandler for Handler {
         _filter: holochain_zome_types::chain::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
         Box::pin(async move {
-            self.0
+            self.calls
                 .lock()
                 .unwrap()
                 .push("must_get_agent_activity".into());
@@ -155,7 +159,10 @@ impl HcP2pHandler for Handler {
         _receipts: ValidationReceiptBundle,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("validation_receipts".into());
+            self.calls
+                .lock()
+                .unwrap()
+                .push("validation_receipts".into());
             Ok(())
         })
     }
@@ -381,7 +388,7 @@ async fn test_remote_signal() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            if let Some(res) = handler.0.lock().unwrap().first() {
+            if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("got_call_remote: hello", res);
                 break;
             }
@@ -451,7 +458,7 @@ async fn test_publish() {
             .await
             .unwrap();
 
-            if let Some(res) = handler.0.lock().unwrap().first() {
+            if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("publish", res);
                 break;
             }
@@ -495,7 +502,7 @@ async fn test_publish_reflect() {
             .await
             .unwrap();
 
-            if let Some(res) = handler.0.lock().unwrap().first() {
+            if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("publish", res);
                 break;
             }
@@ -581,7 +588,7 @@ async fn test_get_with_unresponsive_agents() {
     .await
     .unwrap();
 
-    let requests = handler.0.lock().unwrap();
+    let requests = handler.calls.lock().unwrap();
     assert_eq!(*requests, ["get"]);
 }
 
@@ -663,7 +670,7 @@ async fn test_get_meta_with_unresponsive_agents() {
     .await
     .unwrap();
 
-    let requests = handler.0.lock().unwrap();
+    let requests = handler.calls.lock().unwrap();
     assert_eq!(*requests, ["get_meta"]);
 }
 
@@ -761,7 +768,7 @@ async fn test_get_links_with_unresponsive_agents() {
     .await
     .unwrap();
 
-    let requests = handler.0.lock().unwrap();
+    let requests = handler.calls.lock().unwrap();
     assert_eq!(*requests, ["get_links"]);
 }
 
@@ -857,7 +864,7 @@ async fn test_count_links_with_unresponsive_agents() {
     .await
     .unwrap();
 
-    let requests = handler.0.lock().unwrap();
+    let requests = handler.calls.lock().unwrap();
     assert_eq!(*requests, ["count_links"]);
 }
 
@@ -949,7 +956,7 @@ async fn test_get_agent_activity_with_unresponsive_agents() {
     .await
     .unwrap();
 
-    let requests = handler.0.lock().unwrap();
+    let requests = handler.calls.lock().unwrap();
     assert_eq!(*requests, ["get_agent_activity"]);
 }
 
@@ -1033,7 +1040,7 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
     .await
     .unwrap();
 
-    let requests = handler.0.lock().unwrap();
+    let requests = handler.calls.lock().unwrap();
     assert_eq!(*requests, ["must_get_agent_activity"]);
 }
 
@@ -1055,7 +1062,7 @@ async fn test_validation_receipts() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            if let Some(res) = handler.0.lock().unwrap().first() {
+            if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("validation_receipts", res);
                 break;
             }
@@ -1234,7 +1241,7 @@ async fn bridged_remote_signal() {
 
     tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            if let Some(res) = handler.0.lock().unwrap().first() {
+            if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("got_call_remote: hello", res);
                 break;
             }
