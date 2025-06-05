@@ -1444,15 +1444,22 @@ impl actor::HcP2p for HolochainP2pActor {
                 })
                 .collect();
 
+            let mut best_response = None;
             loop {
                 let (out, _, remaining): (HolochainP2pResult<Vec<WireOps>>, _, _) =
                     futures::future::select_all(futures).await;
 
-                if out
-                    .as_ref()
-                    .is_ok_and(|ops| !is_empty_op(ops.first().unwrap()))
-                    || remaining.is_empty()
-                {
+                if let Ok(ops) = out.as_ref() {
+                    if is_empty_op(ops.first().unwrap()) {
+                        best_response = Some(ops.clone());
+                    } else {
+                        timing_trace_out!(out, start, a = "send_get");
+                        return out;
+                    }
+                }
+
+                if remaining.is_empty() {
+                    let out = best_response.map_or(out, Ok);
                     timing_trace_out!(out, start, a = "send_get");
                     return out;
                 }
