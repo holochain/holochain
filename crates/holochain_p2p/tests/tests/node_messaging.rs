@@ -571,7 +571,13 @@ async fn test_get() {
 async fn test_get_with_unresponsive_agents() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
-    let handler = Arc::new(Handler::default());
+    let handler = Arc::new(Handler::new(
+        WireOps::Record(WireRecordOps {
+            entry: Some(Entry::Agent(fake_agent_pubkey_1())),
+            ..Default::default()
+        }),
+        Some(Duration::from_millis(500)),
+    ));
     let unresponsive_handler = Arc::new(UnresponsiveHandler);
 
     let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
