@@ -5,7 +5,7 @@ use holochain_p2p::{
     actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
     HolochainP2pLocalAgent, KEY_PREFIX_ROOT,
 };
-use holochain_state::prelude::named_params;
+use holochain_state::prelude::{named_params, test_db_dir};
 use holochain_types::db::{DbKindDht, DbKindPeerMetaStore, DbWrite};
 use kitsune2_api::{
     AgentId, AgentInfo, AgentInfoSigned, DhtArc, DynPeerMetaStore, Id, SpaceId, Timestamp, Url,
@@ -161,8 +161,14 @@ impl TestCase {
     pub async fn spawn() -> Self {
         let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
         let space_id = dna_hash.to_k2_space();
+        // Using a temp file for the peer meta DB, because the in memory one produced errors
+        // of shared cache access.
+        // The DB logic expects the folder to have a parent folder.
+        let dir = test_db_dir();
+        let db_dir = dir.path().join("tmp_database");
+        std::fs::create_dir(db_dir.clone()).unwrap();
         let db_peer_meta =
-            DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
+            DbWrite::test(&db_dir, DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
         let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let lair_client = test_keystore();
         let db_peer_meta2 = db_peer_meta.clone();
@@ -172,7 +178,7 @@ impl TestCase {
                     let db_peer_meta2 = db_peer_meta2.clone();
                     Box::pin(async move { Ok(db_peer_meta2.clone()) })
                 }),
-                peer_meta_pruning_interval_ms: 100,
+                peer_meta_pruning_interval_ms: 1,
                 get_db_op_store: Arc::new(move |_| {
                     let db_op = db_op.clone();
                     Box::pin(async move { Ok(db_op) })

@@ -56,6 +56,9 @@ holochain_p2p = { path = ".", features = ["test_utils"] }
 holochain_sqlite = { version = "^0.6.0-dev.7", path = "../holochain_sqlite", features = [
   "test_utils",
 ] }
+holochain_state = { version = "^0.6.0-dev.7", path = "../holochain_state", features = [
+  "test_utils",
+] }
 
 [lints]
 workspace = true
