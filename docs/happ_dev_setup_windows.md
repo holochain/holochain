@@ -8,27 +8,10 @@ if you do!
 
 #### 1. Install the Rust toolchain
 
-Get `rustup` from [here](https://www.rust-lang.org/tools/install). This will set up the latest version of Rust, but it is 
-preferable to use the same version that Holochain is using. You can optionally install a specific version of rust using
-
-```shell
-rustup toolchain install 1.75.0
-```
-
-Find the installed toolchain with `rustup toolchain list`, then select it using a command like this, with your toolchain 
-in place of the example given here.
-
-```shell
-rustup default 1.75.0-x86_64-pc-windows-msvc
-```
-
-You can find the current version used by Holochain [here](https://github.com/holochain/holochain/blob/develop/nix/modules/holochain.nix#L8).
-
-You'll need to add the wasm32 target to be able to compile hApps, add this using
-
-```
-rustup target add wasm32-unknown-unknown
-```
+Get `rustup` from [here](https://www.rust-lang.org/tools/install). Rather than installing a specific Rust version  after
+installing `rustup`, we recommend using a toolchain file. You can find an [example file](https://github.com/holochain/holochain/blob/develop/rust-toolchain.toml)
+in the Holochain repository. Place a copy of this file in your project root and Cargo will read it, then install the
+correct Rust version and tools for you.
 
 #### 2. Set up build dependencies
 
@@ -46,15 +29,14 @@ build configuration of Holochain, so please [let us know](https://github.com/hol
 Install Holochain and the other binaries you'll need to work with it:
 
 ```shell
-cargo install --version 0.1.5 holochain
-cargo install --version 0.1.5 holochain_cli
-cargo install --version 0.2.4 lair_keystore
-cargo install --version 0.1.7 holochain_scaffolding_cli
-cargo install --version 0.0.12 holochain_cli_launch
+cargo install --version 0.5.2 holochain
+cargo install --version 0.5.2 holochain_cli
+cargo install --version 0.6.1 lair_keystore
+cargo install --version 0.500.0 holochain_scaffolding_cli
+cargo install --version 0.500.0 holochain_cli_launch
 ```
 
-For the 0.1 series of Holochain releases, you can find the current version [here](https://github.com/holochain/holochain/blob/develop/versions/0_1/flake.nix#L5)
-and the matching Lair keystore version [here](https://github.com/holochain/holochain/blob/develop/versions/0_1/flake.nix#L10).
+To find the latest versions of these tools, you can check crates.io. For example, [lair_keystore](https://crates.io/crates/lair_keystore)
 
 Check that your Cargo installed binaries are in your path and that you have the right versions by doing
 

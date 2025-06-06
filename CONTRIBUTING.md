@@ -1,19 +1,22 @@
 # Contributing
 
 [![Project](https://img.shields.io/badge/project-holochain-blue.svg?style=flat-square)](http://holochain.org/)
-[![Discuss](https://img.shields.io/badge/chat-forum%2eholochain%2eorg-blue.svg?style=flat-square)](https://forum.holochain.org)
 
-As an Open Source project, Holochain welcomes contributions of all sorts. Bug reports (and fixes), code and documention contributions, tests, feedback, and more are welcome. This document describes how to most effectively make each type of contribution.
+As an Open Source project, Holochain welcomes contributions of all sorts. Bug reports (and fixes), code and 
+documentation contributions, tests, feedback, and more are welcome. This document describes how to most effectively 
+make each type of contribution.
 
 ## Social
 
-We are committed to foster a vibrant thriving community, including growing a culture that breaks cycles of marginalization and dominance behavior. In support of this, some open source communities adopt [Codes of Conduct](http://contributor-covenant.org/version/1/3/0/). We are still working on our social protocols, and empower each team to describe its own *Protocols for Inclusion*. Until our teams have published their guidelines, please use the link above as a general guideline.
+We are committed to foster a vibrant thriving community, including growing a culture that breaks cycles of 
+marginalization and dominance behavior. In support of this, some open source communities adopt [Codes of Conduct](http://contributor-covenant.org/version/1/3/0/). 
+We are still working on our social protocols, and empower each team to describe its own *Protocols for Inclusion*. 
+Until our teams have published their guidelines, please use the link above as a general guideline.
 
 ## Coordination
 
 * For support be sure to explore our [Developer Resources and Documentation](https://developer.holochain.org)
 * Chat with us on our [DEV.HC channel on Discord](https://discord.gg/MwPvM4Vffg)
-* Ask and answer questions on our [online forums](https://forum.holochain.org)
 
 Please make use of these resources to support your contributions, or simply to contribute your voice.
 
@@ -99,22 +102,17 @@ If you are facing a warning locally you can try:
 
 If you don't know the best approach, please ask for help!
 
-It is NOT OK to disable `deny` for warnings globally at the CI or makefile/nix level.
+It is NOT OK to disable `deny` for warnings globally at the CI or Makefile level.
 
 You can allow warnings locally during development by setting the `RUSTFLAGS` environment variable.
 
 #### Code style
+
 We use rust-fmt to enforce code style so that we don't spend time arguing about this.
 
 Run the formatter with:
 
 ``` shell
-nix develop .#coreDev --command cargo fmt
-```
-
-or, if you have a version of `cargo` locally installed which matches the version used in the `nix develop` environment:
-
-```shell
 cargo fmt
 ```
 
