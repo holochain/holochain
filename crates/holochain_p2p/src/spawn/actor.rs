@@ -935,7 +935,7 @@ impl HolochainP2pActor {
                             .await
                             .map_err(HolochainP2pError::other)?;
 
-                            // Get up to date agent infos and compare if there are any up to date ones with
+                            // Get agent infos from peer store and compare if there are any up to date ones with
                             // any of the unresponsive URLs.
                             // That would indicate that the URL was unresponsive temporarily and has become
                             // responsive again.
