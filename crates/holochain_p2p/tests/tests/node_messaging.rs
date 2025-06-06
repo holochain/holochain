@@ -99,7 +99,7 @@ impl HcP2pHandler for Handler {
                 invalid_actions: Default::default(),
                 deletes: Default::default(),
                 updates: Default::default(),
-                entry_dht_status: None,
+                entry_dht_status: Some(EntryDhtStatus::Live),
             })
         })
     }
