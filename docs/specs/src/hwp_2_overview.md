@@ -40,7 +40,7 @@ Games have these properties:
 
     1. A deterministic description of the types of data that are used to record some "play" in the game. Such data is called an Entry, where the act of generating such data is called an Action, which is also recorded. Note: both types of data, the content of the play (Entry) and the meta-data about the play (Action), when taken together, are called a Record.
 
-    2. A deterministic description of of the types of relations between Entries or Actions. Such a relation is called a Link.
+    2. A deterministic description of the types of relations between Entries or Actions. Such a relation is called a Link.
 
     3. A deterministic description of a properly formed Membrane Proof, a credential that grants an Agent permission to join a Game. This description may not be able to fully validate a Membrane Proof if its validity depends on data elsewhere on the Game Board, as the Agent's Membrane Proof is checked against this description before they join.
 
