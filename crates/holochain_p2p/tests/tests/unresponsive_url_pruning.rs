@@ -161,8 +161,9 @@ impl TestCase {
     pub async fn spawn() -> Self {
         let dna_hash = DnaHash::from_raw_32(vec![0xaa; 32]);
         let space_id = dna_hash.to_k2_space();
-        // Using a temp file for the peer meta DB, because the in memory one produced errors
-        // of shared cache access.
+        // Using a temp file for the peer meta DB, because the in memory one uses shared cache
+        // which can't be accessed from two connections at the same time.
+
         // The DB logic expects the folder to have a parent folder.
         let dir = test_db_dir();
         let db_dir = dir.path().join("tmp_database");
