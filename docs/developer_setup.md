@@ -75,7 +75,7 @@ see the next section for how to run the tests like CI does.
 
 ### Run the tests like CI does
 
-This is optional, but if you make changes and your changes are not passing the tests locally but not on CI, then this 
+This is optional, but if you make changes and your changes are passing the tests locally but not on CI, then this 
 is a useful way to check what's going on.
 
 You would have to check which CI checks are failing, but as an example, you might run the tests with the default Wasmer
