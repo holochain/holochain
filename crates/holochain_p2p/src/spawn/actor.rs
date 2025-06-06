@@ -973,7 +973,7 @@ impl HolochainP2pActor {
                             db.write_async(|txn| -> DatabaseResult<()> {
                                 let values = Rc::new(urls_to_prune);
                                 let mut stmt = txn.prepare(sql_peer_meta_store::DELETE_URLS)?;
-                                stmt.execute([values])?;
+                                stmt.execute(named_params!{":urls": values, ":meta_key": format!("{KEY_PREFIX_ROOT}:unresponsive")})?;
                                 Ok(())
                             })
                             .await
