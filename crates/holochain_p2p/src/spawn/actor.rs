@@ -3,11 +3,13 @@
 use crate::metrics::create_p2p_request_duration_metric;
 use crate::*;
 use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_peer_meta_store;
 use holochain_state::prelude::named_params;
 use kitsune2_api::*;
 use kitsune2_core::get_remote_agents_near_location;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::{Mutex, Weak};
 use std::time::Duration;
 use tokio::task::AbortHandle;
@@ -916,65 +918,70 @@ impl HolochainP2pActor {
                 tokio::time::sleep(Duration::from_millis(interval_ms)).await;
 
                 let spaces = kitsune2.list_spaces();
-                let pruning_futs = spaces.into_iter().map(|space_id| {
-                    let db_getter = db_getter.clone();
-                    let kitsune2 = kitsune2.clone();
-                    async move {
-                        let space = kitsune2.clone().space(space_id.clone()).await?;
-                        let peer_store = space.peer_store().clone();
-                        let db = db_getter(DnaHash::from_k2_space(&space_id)).await?;
-                        // Prune any expired entries.
-                        db.write_async(|txn| -> DatabaseResult<()> {
-                            let prune_count = txn.execute(sql_peer_meta_store::PRUNE, [])?;
-                            tracing::debug!("pruned {prune_count} rows from meta peer store");
-                            Ok(())
-                        })
-                        .await
-                        .map_err(HolochainP2pError::other)?;
+                let pruning_futs =
+                    spaces.into_iter().map(|space_id| {
+                        let db_getter = db_getter.clone();
+                        let kitsune2 = kitsune2.clone();
+                        async move {
+                            let space = kitsune2.clone().space(space_id.clone()).await?;
+                            let peer_store = space.peer_store().clone();
+                            let db = db_getter(DnaHash::from_k2_space(&space_id)).await?;
+                            // Prune any expired entries.
+                            db.write_async(|txn| -> DatabaseResult<()> {
+                                let prune_count = txn.execute(sql_peer_meta_store::PRUNE, [])?;
+                                tracing::debug!("pruned {prune_count} rows from meta peer store");
+                                Ok(())
+                            })
+                            .await
+                            .map_err(HolochainP2pError::other)?;
 
-                        // Get up to date agent infos and compare if there are any up to date ones with
-                        // any of the unresponsive URLs.
-                        // That would indicate that the URL was unresponsive temporarily and has become
-                        // responsive again.
-                        let agents = peer_store.get_all().await?;
-                        let urls_to_prune = db
-                        .read_async(move |txn| -> DatabaseResult<Vec<Url>> {
-                            let mut stmt = txn.prepare(sql_peer_meta_store::SELECT_URLS)?;
-                            let mut rows = stmt.query(
-                            named_params! {":meta_key":format!("{KEY_PREFIX_ROOT}:unresponsive")},
-                        )?;
-                            let mut urls = Vec::new();
-                            while let Some(row) = rows.next()? {
-                                // Expecting is safe here, because the inserted values must have been URLs.
-                                let peer_url = Url::from_str(row.get::<_, String>(0)?)
-                                    .expect("expected valid URL");
-                                let timestamp = rmp_serde::from_slice::<kitsune2_api::Timestamp>(
-                                    &(row.get::<_, BytesSql>(1)?.0),
-                                )?;
-                                if let Some(agent) = agents
-                                    .iter()
-                                    .find(|agent| agent.url == Some(peer_url.clone()))
-                                {
-                                    if agent.created_at > timestamp {
-                                        urls.push(peer_url);
+                            // Get up to date agent infos and compare if there are any up to date ones with
+                            // any of the unresponsive URLs.
+                            // That would indicate that the URL was unresponsive temporarily and has become
+                            // responsive again.
+                            let agents = peer_store.get_all().await?;
+                            let urls_to_prune = db
+                                .read_async(move |txn| -> DatabaseResult<Vec<Value>> {
+                                    let mut stmt = txn.prepare(sql_peer_meta_store::SELECT_URLS)?;
+                                    let mut rows = stmt.query(
+                                    named_params! {":meta_key":format!("{KEY_PREFIX_ROOT}:unresponsive")},
+                                    )?;
+                                    let mut urls = Vec::new();
+                                    while let Some(row) = rows.next()? {
+                                        // Expecting is safe here, because the inserted values must have been URLs.
+                                        let peer_url = Url::from_str(row.get::<_, String>(0)?)
+                                            .expect("expected valid URL");
+                                        let timestamp =
+                                            rmp_serde::from_slice::<kitsune2_api::Timestamp>(
+                                                &(row.get::<_, BytesSql>(1)?.0),
+                                            )?;
+                                        if let Some(agent) = agents
+                                            .iter()
+                                            .find(|agent| agent.url == Some(peer_url.clone()))
+                                        {
+                                            if agent.created_at > timestamp {
+                                                urls.push(Value::Text(peer_url.to_string()));
+                                            }
+                                        }
                                     }
-                                }
-                            }
-                            Ok(urls)
-                        })
-                        .await
-                        .map_err(HolochainP2pError::other)?;
+                                    Ok(urls)
+                                })
+                                .await
+                                .map_err(HolochainP2pError::other)?;
 
-                        for url in urls_to_prune {
-                            space
-                                .peer_meta_store()
-                                .delete(url, format!("{KEY_PREFIX_ROOT}:unresponsive"))
-                                .await?;
+                            // Delete all urls to be pruned from the table.
+                            db.write_async(|txn| -> DatabaseResult<()> {
+                                let values = Rc::new(urls_to_prune);
+                                let mut stmt = txn.prepare(sql_peer_meta_store::DELETE_URLS)?;
+                                stmt.execute([values])?;
+                                Ok(())
+                            })
+                            .await
+                            .map_err(HolochainP2pError::other)?;
+
+                            Ok::<_, HolochainP2pError>(())
                         }
-
-                        Ok::<_, HolochainP2pError>(())
-                    }
-                });
+                    });
                 let results = futures::future::join_all(pruning_futs).await;
                 for err in results.into_iter().filter_map(Result::err) {
                     tracing::warn!("Pruning peer meta store failed: {err}");
