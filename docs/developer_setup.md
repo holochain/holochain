@@ -12,10 +12,10 @@ using the Windows Subsystem for Linux (WSL) with Ubuntu, which is expected to wo
 You will need:
 - Git installed, either [directly](https://git-scm.com/downloads) or via your package manager.
 - Rust installed via [rustup](https://www.rust-lang.org/tools/install).
+- [cargo-nextest](https://nexte.st/) which is recommended to run Holochain's tests. Though you can use `cargo test` if you prefer.
 
 You may find more tools useful:
 - [Make](https://www.gnu.org/software/make/), which may already be on your system, or you can install it via your package manager.
-- [cargo-nextest](https://nexte.st/) which is recommended to run Holochain's tests. Though you can use `cargo test` if you prefer.
 
 ### Finding your way around
 
