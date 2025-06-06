@@ -10,7 +10,7 @@ if you do!
 
 Get `rustup` from [here](https://www.rust-lang.org/tools/install). Rather than installing a specific Rust version  after
 installing `rustup`, we recommend using a toolchain file. You can find an [example file](https://github.com/holochain/holochain/blob/develop/rust-toolchain.toml)
-in the Holochain repository. Place a copy of this file in your project root and Cargo will it, then install the
+in the Holochain repository. Place a copy of this file in your project root and Cargo will read it, then install the
 correct Rust version and tools for you.
 
 #### 2. Set up build dependencies
