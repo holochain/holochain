@@ -1089,28 +1089,6 @@ macro_rules! timing_trace_out {
     };
 }
 
-fn is_empty_op(wire_ops: &WireOps) -> bool {
-    match wire_ops {
-        WireOps::Entry(WireEntryOps {
-            creates,
-            deletes,
-            updates,
-            entry,
-        }) if creates.is_empty() && deletes.is_empty() && updates.is_empty() && entry.is_none() => {
-            true
-        }
-        WireOps::Record(WireRecordOps {
-            action,
-            deletes,
-            updates,
-            entry,
-        }) if action.is_none() && deletes.is_empty() && updates.is_empty() && entry.is_none() => {
-            true
-        }
-        _ => false,
-    }
-}
-
 /// Select the first successful response that has non-empty data.
 ///
 /// Await all of the futures at once and return one of (in order of priority):
@@ -1494,7 +1472,33 @@ impl actor::HcP2p for HolochainP2pActor {
                         })
                     })
                     .collect(),
-                is_empty_op,
+                |wire_ops| match wire_ops {
+                    WireOps::Entry(WireEntryOps {
+                        creates,
+                        deletes,
+                        updates,
+                        entry,
+                    }) if creates.is_empty()
+                        && deletes.is_empty()
+                        && updates.is_empty()
+                        && entry.is_none() =>
+                    {
+                        true
+                    }
+                    WireOps::Record(WireRecordOps {
+                        action,
+                        deletes,
+                        updates,
+                        entry,
+                    }) if action.is_none()
+                        && deletes.is_empty()
+                        && updates.is_empty()
+                        && entry.is_none() =>
+                    {
+                        true
+                    }
+                    _ => false,
+                },
             )
             .await;
 
