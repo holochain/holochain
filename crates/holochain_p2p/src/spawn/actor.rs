@@ -7,7 +7,6 @@ use kitsune2_core::get_remote_agents_near_location;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::{Mutex, Weak};
 
 /// Hard-code for now.
@@ -1099,10 +1098,15 @@ macro_rules! timing_trace_out {
 /// Note: If one or more future does not produce a response, thus timeout, and one or more produces
 /// a valid but empty response, an empty response will not be returned until all the futures
 /// complete, including the ones that timeout.
-async fn select_ok_none_empty<O>(
-    mut futures: Vec<Pin<Box<impl Future<Output = Result<Vec<O>, HolochainP2pError>>>>>,
+async fn select_ok_none_empty<I, O>(
+    futures: I,
     is_empty: fn(&O) -> bool,
-) -> HolochainP2pResult<Vec<O>> {
+) -> HolochainP2pResult<Vec<O>>
+where
+    I: IntoIterator,
+    I::Item: Future<Output = HolochainP2pResult<Vec<O>>> + Unpin,
+{
+    let mut futures: Vec<_> = futures.into_iter().collect();
     let mut best_response = None;
     loop {
         let (out, _, remaining): (HolochainP2pResult<Vec<O>>, _, _) =
@@ -1439,33 +1443,30 @@ impl actor::HcP2p for HolochainP2pActor {
             let start = std::time::Instant::now();
 
             let out = select_ok_none_empty(
-                agents
-                    .into_iter()
-                    .map(|(to_agent, to_url)| {
-                        Box::pin(async {
-                            let (msg_id, req) =
-                                crate::wire::WireMessage::get_req(to_agent, dht_hash.clone());
+                agents.into_iter().map(|(to_agent, to_url)| {
+                    Box::pin(async {
+                        let (msg_id, req) =
+                            crate::wire::WireMessage::get_req(to_agent, dht_hash.clone());
 
-                            self.send_request(
-                                "get",
-                                &space,
-                                to_url,
-                                msg_id,
-                                req,
-                                dna_hash.clone(),
-                                |res| match res {
-                                    crate::wire::WireMessage::GetRes { response, .. } => {
-                                        Ok(vec![response])
-                                    }
-                                    _ => Err(HolochainP2pError::other(format!(
-                                        "invalid response to get: {res:?}"
-                                    ))),
-                                },
-                            )
-                            .await
-                        })
+                        self.send_request(
+                            "get",
+                            &space,
+                            to_url,
+                            msg_id,
+                            req,
+                            dna_hash.clone(),
+                            |res| match res {
+                                crate::wire::WireMessage::GetRes { response, .. } => {
+                                    Ok(vec![response])
+                                }
+                                _ => Err(HolochainP2pError::other(format!(
+                                    "invalid response to get: {res:?}"
+                                ))),
+                            },
+                        )
+                        .await
                     })
-                    .collect(),
+                }),
                 |wire_ops| match wire_ops {
                     WireOps::Entry(WireEntryOps {
                         creates,
