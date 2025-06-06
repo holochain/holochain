@@ -6,6 +6,8 @@ use kitsune2_api::*;
 use kitsune2_core::get_remote_agents_near_location;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Mutex, Weak};
 
 /// Hard-code for now.
@@ -1109,6 +1111,48 @@ fn is_empty_op(wire_ops: &WireOps) -> bool {
     }
 }
 
+/// Select the first successful response that has non-empty data.
+///
+/// Await all of the futures at once and return one of (in order of priority):
+/// 1. The first valid, non-empty response, as deemed by the `is_empty` function.
+/// 2. The last valid but empty response, once all futures have completed.
+/// 3. The last error if none of the futures produce a valid response.
+///
+/// Note: If one or more future does not produce a response, thus timeout, and one or more produces
+/// a valid but empty response, an empty response will not be returned until all the futures
+/// complete, including the ones that timeout.
+async fn select_ok_none_empty<O>(
+    mut futures: Vec<Pin<Box<impl Future<Output = Result<Vec<O>, HolochainP2pError>>>>>,
+    is_empty: fn(&O) -> bool,
+) -> HolochainP2pResult<Vec<O>> {
+    let mut best_response = None;
+    loop {
+        let (out, _, remaining): (HolochainP2pResult<Vec<O>>, _, _) =
+            futures::future::select_all(futures).await;
+
+        if let Ok(ops) = out.as_ref() {
+            if is_empty(ops.first().unwrap()) {
+                if remaining.is_empty() {
+                    // Valid but empty response. And there are no more so just return it.
+                    return out;
+                }
+
+                // Valid but empty response. Save it in case we don't get a better one.
+                best_response = Some(out);
+            } else {
+                // First valid, non-empty response so just return it.
+                return out;
+            }
+        } else if remaining.is_empty() {
+            // No valid, non-empty response received so return the last non-empty response, if we
+            // have one, otherwise return the last error.
+            return best_response.unwrap_or(out);
+        }
+
+        futures = remaining;
+    }
+}
+
 impl actor::HcP2p for HolochainP2pActor {
     #[cfg(feature = "test_utils")]
     fn test_kitsune(&self) -> &DynKitsune {
@@ -1416,56 +1460,40 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let start = std::time::Instant::now();
 
-            let mut futures = agents
-                .into_iter()
-                .map(|(to_agent, to_url)| {
-                    Box::pin(async {
-                        let (msg_id, req) =
-                            crate::wire::WireMessage::get_req(to_agent, dht_hash.clone());
+            let out = select_ok_none_empty(
+                agents
+                    .into_iter()
+                    .map(|(to_agent, to_url)| {
+                        Box::pin(async {
+                            let (msg_id, req) =
+                                crate::wire::WireMessage::get_req(to_agent, dht_hash.clone());
 
-                        self.send_request(
-                            "get",
-                            &space,
-                            to_url,
-                            msg_id,
-                            req,
-                            dna_hash.clone(),
-                            |res| match res {
-                                crate::wire::WireMessage::GetRes { response, .. } => {
-                                    Ok(vec![response])
-                                }
-                                _ => Err(HolochainP2pError::other(format!(
-                                    "invalid response to get: {res:?}"
-                                ))),
-                            },
-                        )
-                        .await
+                            self.send_request(
+                                "get",
+                                &space,
+                                to_url,
+                                msg_id,
+                                req,
+                                dna_hash.clone(),
+                                |res| match res {
+                                    crate::wire::WireMessage::GetRes { response, .. } => {
+                                        Ok(vec![response])
+                                    }
+                                    _ => Err(HolochainP2pError::other(format!(
+                                        "invalid response to get: {res:?}"
+                                    ))),
+                                },
+                            )
+                            .await
+                        })
                     })
-                })
-                .collect();
+                    .collect(),
+                is_empty_op,
+            )
+            .await;
 
-            let mut best_response = None;
-            loop {
-                let (out, _, remaining): (HolochainP2pResult<Vec<WireOps>>, _, _) =
-                    futures::future::select_all(futures).await;
-
-                if let Ok(ops) = out.as_ref() {
-                    if is_empty_op(ops.first().unwrap()) {
-                        best_response = Some(ops.clone());
-                    } else {
-                        timing_trace_out!(out, start, a = "send_get");
-                        return out;
-                    }
-                }
-
-                if remaining.is_empty() {
-                    let out = best_response.map_or(out, Ok);
-                    timing_trace_out!(out, start, a = "send_get");
-                    return out;
-                }
-
-                futures = remaining;
-            }
+            timing_trace_out!(out, start, a = "send_get");
+            out
         })
     }
 
