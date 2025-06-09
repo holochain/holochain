@@ -2,7 +2,7 @@
 
 use crate::metrics::create_p2p_request_duration_metric;
 use crate::*;
-use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_peer_meta_store;
 use holochain_state::prelude::named_params;
@@ -935,7 +935,7 @@ impl HolochainP2pActor {
                             .await
                             .map_err(HolochainP2pError::other)?;
 
-                            // Get agent infos from peer store and compare if there are any up to date ones with
+                            // Get agent infos from peer store and compare if there are any up-to-date ones with
                             // any of the unresponsive URLs.
                             // That would indicate that the URL was unresponsive temporarily and has become
                             // responsive again.
@@ -944,13 +944,12 @@ impl HolochainP2pActor {
                                 .read_async(move |txn| -> DatabaseResult<Vec<Value>> {
                                     let mut stmt = txn.prepare(sql_peer_meta_store::SELECT_URLS)?;
                                     let mut rows = stmt.query(
-                                    named_params! {":meta_key":format!("{KEY_PREFIX_ROOT}:unresponsive")},
+                                    named_params! {":meta_key":format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")},
                                     )?;
                                     let mut urls = Vec::new();
                                     while let Some(row) = rows.next()? {
                                         // Expecting is safe here, because the inserted values must have been URLs.
-                                        let peer_url = Url::from_str(row.get::<_, String>(0)?)
-                                            .expect("expected valid URL");
+                                        let peer_url = Url::from_str(row.get::<_, String>(0)?).map_err(|err|DatabaseError::Other(err.into()))?;
                                         let timestamp =
                                             rmp_serde::from_slice::<kitsune2_api::Timestamp>(
                                                 &(row.get::<_, BytesSql>(1)?.0),
@@ -973,7 +972,7 @@ impl HolochainP2pActor {
                             db.write_async(|txn| -> DatabaseResult<()> {
                                 let values = Rc::new(urls_to_prune);
                                 let mut stmt = txn.prepare(sql_peer_meta_store::DELETE_URLS)?;
-                                stmt.execute(named_params!{":urls": values, ":meta_key": format!("{KEY_PREFIX_ROOT}:unresponsive")})?;
+                                stmt.execute(named_params!{":urls": values, ":meta_key": format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")})?;
                                 Ok(())
                             })
                             .await
