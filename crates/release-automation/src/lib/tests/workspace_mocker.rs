@@ -145,7 +145,7 @@ impl WorkspaceMocker {
                                 authors = []
                                 {description}
                                 {license}
-                                homepage = "https://github.com/holochain/holochain"
+                                repository = "https://github.com/holochain/holochain"
                                 documentation = "https://github.com/holochain/holochain"
                                 keywords = [{keywords}]
 

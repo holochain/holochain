@@ -3,9 +3,8 @@ name = "holochain_integrity_types"
 version = "0.6.0-dev.4"
 description = "Holochain integrity types"
 license = "Apache-2.0"
-homepage = "https://github.com/holochain/holochain"
+repository = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_integrity_types"
-readme = "README.md"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 

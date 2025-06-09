@@ -1,7 +1,7 @@
 [package]
 name = "holochain_cli_sandbox"
 version = "0.6.0-dev.7"
-homepage = "https://github.com/holochain/holochain"
+repository = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_sandbox"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo"]
