@@ -853,7 +853,7 @@ mod network_impls {
         zome_call_response_to_conductor_api_result, ConductorApiError,
     };
     use futures::future::join_all;
-    use holochain_conductor_api::ZomeCallParamsSigned;
+    use holochain_conductor_api::{CellInfo, ZomeCallParamsSigned};
     use holochain_conductor_api::{DnaStorageInfo, StorageBlob, StorageInfo};
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
@@ -884,7 +884,7 @@ mod network_impls {
                     let dna_hashes = self
                         .spaces
                         .get_from_spaces(|space| (*space.dna_hash).clone());
-                    let mut out = Vec::new();
+                    let mut out = HashSet::new();
                     for dna_hash in dna_hashes {
                         let peer_store = self
                             .holochain_p2p
@@ -894,9 +894,70 @@ mod network_impls {
                         let all_peers = peer_store.get_all().await?;
                         out.extend(all_peers);
                     }
-                    Ok(out)
+                    Ok(out.into_iter().collect())
                 }
             }
+        }
+
+        /// Get signed agent info from the conductor by DNA
+        ///
+        // This function is here for the backport of the breaking change in the 0.6 branch of
+        // that changes the `get_agent_infos` call to take dna_hashes instead of cell_id.
+        async fn get_agent_infos_by_dna(
+            &self,
+            maybe_dna_hashes: Option<Vec<DnaHash>>,
+        ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
+            let dna_hashes = match maybe_dna_hashes {
+                Some(hashes) => hashes,
+                None => self
+                    .spaces
+                    .get_from_spaces(|space| (*space.dna_hash).clone()),
+            };
+
+            let mut out = HashSet::new();
+            for dna_hash in dna_hashes {
+                let peer_store = self
+                    .holochain_p2p
+                    .peer_store(dna_hash.clone())
+                    .await
+                    .map_err(|err| ConductorApiError::CellError(err.into()))?;
+                let all_peers = peer_store.get_all().await?;
+                out.extend(all_peers);
+            }
+            Ok(out.into_iter().collect())
+        }
+
+        /// Get signed agent info from the conductor for a given app
+        pub async fn get_app_agent_infos(
+            &self,
+            installed_app_id: &InstalledAppId,
+            maybe_dna_hashes: Option<Vec<DnaHash>>,
+        ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
+            // Get app info to know which DNAs belong to this app
+            let app_info = self.get_app_info(installed_app_id).await?.ok_or_else(|| {
+                ConductorApiError::other(format!("App not installed: {}", installed_app_id))
+            })?;
+
+            let mut app_dnas: HashSet<DnaHash> = HashSet::new();
+            for cell_infos in app_info.cell_info.values() {
+                for cell_info in cell_infos {
+                    let dna = match cell_info {
+                        CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
+                        CellInfo::Cloned(cell) => cell.cell_id.dna_hash().clone(),
+                        CellInfo::Stem(cell) => cell.original_dna_hash.clone(),
+                    };
+                    app_dnas.insert(dna);
+                }
+            }
+
+            let hashes = match maybe_dna_hashes {
+                Some(mut dna_hashes) => {
+                    dna_hashes.retain(|h| app_dnas.contains(h));
+                    dna_hashes
+                }
+                None => app_dnas.into_iter().collect(),
+            };
+            self.get_agent_infos_by_dna(Some(hashes)).await
         }
 
         pub(crate) async fn witness_nonce_from_calling_agent(
