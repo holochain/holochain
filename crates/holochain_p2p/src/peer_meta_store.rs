@@ -9,9 +9,6 @@ use holochain_sqlite::sql::sql_peer_meta_store;
 use kitsune2_api::{BoxFut, K2Error, K2Result, PeerMetaStore, Timestamp, Url};
 use std::sync::Arc;
 
-/// Key prefix for items at the root level of the peer meta store.
-pub const KEY_PREFIX_ROOT: &str = "root";
-
 /// Holochain implementation of the Kitsune2 [kitsune2_api::OpStoreFactory].
 pub struct HolochainPeerMetaStoreFactory {
     /// The database connection getter.
@@ -163,36 +160,6 @@ impl PeerMetaStore for HolochainPeerMetaStore {
             })
             .await
             .map_err(|e| K2Error::other_src("Failed to delete peer meta", e))
-        })
-    }
-
-    /// Note that expired peer URLs are pruned at a fixed interval, not precisely when the expiry elapsed.
-    fn mark_peer_unresponsive(
-        &self,
-        peer: Url,
-        expiry: Timestamp,
-        when: Timestamp,
-    ) -> BoxFuture<'_, K2Result<()>> {
-        Box::pin(async move {
-            self.put(
-                peer.clone(),
-                format!("{KEY_PREFIX_ROOT}:unresponsive"),
-                rmp_serde::to_vec(&when).expect("expected Timestamp").into(),
-                Some(expiry),
-            )
-            .await?;
-            Ok(())
-        })
-    }
-
-    fn get_unresponsive_url(&self, peer: Url) -> BoxFuture<'_, K2Result<Option<Timestamp>>> {
-        Box::pin(async move {
-            self.get(peer, format!("{KEY_PREFIX_ROOT}:unresponsive"))
-                .await
-                .map(|maybe_value| {
-                    maybe_value
-                        .map(|value| rmp_serde::from_slice(&value).expect("expected Timestamp"))
-                })
         })
     }
 }
