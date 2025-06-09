@@ -3,12 +3,13 @@ use holo_hash::DnaHash;
 use holochain_keystore::{test_keystore, MetaLairClient};
 use holochain_p2p::{
     actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
-    HolochainP2pLocalAgent, KEY_PREFIX_ROOT,
+    HolochainP2pLocalAgent,
 };
 use holochain_state::prelude::{named_params, test_db_dir};
 use holochain_types::db::{DbKindDht, DbKindPeerMetaStore, DbWrite};
 use kitsune2_api::{
     AgentId, AgentInfo, AgentInfoSigned, DhtArc, DynPeerMetaStore, Id, SpaceId, Timestamp, Url,
+    KEY_PREFIX_ROOT, META_KEY_UNRESPONSIVE,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -217,7 +218,7 @@ fn count_rows_in_peer_meta_store(db: DbWrite<DbKindPeerMetaStore>) -> usize {
             .prepare("SELECT COUNT(*) FROM peer_meta WHERE meta_key = :meta_key")
             .unwrap();
         stmt.query_row(
-            named_params! {":meta_key": format!("{KEY_PREFIX_ROOT}:unresponsive")},
+            named_params! {":meta_key": format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")},
             |row| row.get::<_, usize>(0),
         )
         .unwrap()
