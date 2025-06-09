@@ -243,7 +243,7 @@ pub enum WebsocketError {
     Deserialize(#[from] SerializedBytesError),
     /// A websocket error from the underlying tungstenite library.
     #[error("Websocket error: {0}")]
-    Websocket(#[from] tokio_tungstenite::tungstenite::Error),
+    Websocket(#[from] Box<tokio_tungstenite::tungstenite::Error>),
     /// A timeout occurred.
     #[error("Timeout")]
     Timeout(#[from] tokio::time::error::Elapsed),
@@ -349,7 +349,7 @@ impl WebsocketRespond {
             .exec(move |_, core| async move {
                 tokio::time::timeout(core.timeout, async {
                     let s = WireMessage::response(self.id, s)?;
-                    core.send.lock().await.send(s).await?;
+                    core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
                 .await?
@@ -458,12 +458,18 @@ impl WebsocketReceiver {
                         .await
                         .ok_or::<WebsocketError>(WebsocketError::Other(
                             "ReceiverClosed".to_string(),
-                        ))??;
+                        ))?
+                        .map_err(Box::new)?;
                     let msg = match msg {
                         Message::Text(s) => s.into_bytes(),
                         Message::Binary(b) => b,
                         Message::Ping(b) => {
-                            core.send.lock().await.send(Message::Pong(b)).await?;
+                            core.send
+                                .lock()
+                                .await
+                                .send(Message::Pong(b))
+                                .await
+                                .map_err(Box::new)?;
                             return Ok(None);
                         }
                         Message::Pong(_) => return Ok(None),
@@ -540,7 +546,7 @@ impl WebsocketSender {
             .exec(move |_, core| async move {
                 tokio::time::timeout(timeout, async {
                     let s = WireMessage::authenticate(s)?;
-                    core.send.lock().await.send(s).await?;
+                    core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
                 .await?
@@ -599,7 +605,7 @@ impl WebsocketSender {
 
                 tokio::time::timeout_at(timeout_at, async move {
                     // send the actual message
-                    core.send.lock().await.send(s).await?;
+                    core.send.lock().await.send(s).await.map_err(Box::new)?;
 
                     Ok(drop)
                 })
@@ -645,7 +651,7 @@ impl WebsocketSender {
             .exec(move |_, core| async move {
                 tokio::time::timeout(timeout, async {
                     let s = WireMessage::signal(s)?;
-                    core.send.lock().await.send(s).await?;
+                    core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
                 .await?
@@ -695,7 +701,8 @@ pub async fn connect(
         stream,
         Some(config.as_tungstenite()),
     )
-    .await?;
+    .await
+    .map_err(Box::new)?;
     split(stream, config.default_request_timeout, peer_addr)
 }
 

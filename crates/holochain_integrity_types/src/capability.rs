@@ -9,9 +9,9 @@
 //! Capabilities come with three possible degrees of access control:
 //! - Unrestricted: anybody can exercise this capability
 //! - Transferable: a secret must be provided, but anybody with the secret may
-//!     exercise the capability
+//!   exercise the capability
 //! - Assigned: Like Transferable, but there is a list of approved AgentPubKeys,
-//!     and requests from any other agents are ignored.
+//!   and requests from any other agents are ignored.
 //!
 //! Capabilities are declared by a Grantor via a **`CapGrant`**. `CapGrant`s
 //! are not directly committed to a source chain, but can be constructed from
