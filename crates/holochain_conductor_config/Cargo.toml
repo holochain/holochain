@@ -2,7 +2,7 @@
 name = "holochain_conductor_config"
 version = "0.6.0-dev.7"
 description = "Provides utilities for generating holochain conductor configuration."
-homepage = "https://github.com/holochain/holochain"
+repository = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_conductor_config"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo"]

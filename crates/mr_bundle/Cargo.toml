@@ -5,7 +5,7 @@ authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "Implements the un-/packing of bundles that either embed or reference a set of resources"
 license = "Apache-2.0"
-homepage = "https://github.com/holochain/holochain"
+repository = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/mr_bundle"
 
 # RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open

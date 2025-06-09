@@ -7,7 +7,7 @@ categories = ["cryptography"]
 edition = "2021"
 description = "hashing helpers supporting dht sharding"
 license = "Apache-2.0"
-homepage = "https://github.com/holochain/holochain"
+repository = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holo_hash"
 
 [package.metadata.cargo-udeps.ignore]
