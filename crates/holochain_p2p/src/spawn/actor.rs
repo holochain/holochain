@@ -1101,7 +1101,7 @@ macro_rules! timing_trace_out {
 /// 2. The last valid but empty response, once all futures have completed.
 /// 3. The last error if none of the futures produce a valid response.
 ///
-/// Note: If one or more future does not produce a response, thus timeout, and one or more produces
+/// Note: If one or more futures do not produce a response, thus time out, and one or more produce
 /// a valid but empty response, an empty response will not be returned until all the futures
 /// complete, including the ones that timeout.
 async fn select_ok_none_empty<I, O>(futures: I, is_empty: fn(&O) -> bool) -> HolochainP2pResult<O>
