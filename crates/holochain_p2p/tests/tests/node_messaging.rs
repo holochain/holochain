@@ -1,4 +1,5 @@
 use ::fixt::fixt;
+use holo_hash::fixt::ActionHashFixturator;
 use holochain_keystore::*;
 use holochain_p2p::event::*;
 use holochain_p2p::*;
@@ -133,7 +134,7 @@ impl HcP2pHandler for Handler {
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
         Box::pin(async move {
             self.calls.lock().unwrap().push("count_links".into());
-            Ok(CountLinksResponse::new(Vec::new()))
+            Ok(CountLinksResponse::new(vec![fixt!(ActionHash)]))
         })
     }
 
