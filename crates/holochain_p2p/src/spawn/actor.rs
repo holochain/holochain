@@ -8,9 +8,9 @@ use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Mutex, Weak};
+use std::time::Duration;
 
 /// Hard-code for now.
-const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 const PARALLEL_GET_AGENTS_COUNT: usize = 3;
 
 macro_rules! timing_trace {
@@ -228,11 +228,11 @@ struct Pending {
 }
 
 impl Pending {
-    fn register(&mut self, msg_id: u64, resp: Respond) {
+    fn register(&mut self, msg_id: u64, resp: Respond, timeout: Duration) {
         if let Some(this) = self.this.upgrade() {
             self.map.insert(msg_id, resp);
             tokio::task::spawn(async move {
-                tokio::time::sleep(REQUEST_TIMEOUT).await;
+                tokio::time::sleep(timeout).await;
                 let _ = this.lock().unwrap().respond(msg_id);
             });
         }
@@ -253,6 +253,7 @@ pub(crate) struct HolochainP2pActor {
     kitsune: DynKitsune,
     pending: Arc<Mutex<Pending>>,
     request_duration_metric: metrics::P2pRequestDurationMetric,
+    request_timeout: Duration,
 }
 
 impl std::fmt::Debug for HolochainP2pActor {
@@ -759,6 +760,7 @@ impl HolochainP2pActor {
     pub async fn create(
         config: HolochainP2pConfig,
         lair_client: holochain_keystore::MetaLairClient,
+        request_timeout: Duration,
     ) -> HolochainP2pResult<actor::DynHcP2p> {
         static K2_CONFIG: std::sync::Once = std::sync::Once::new();
         K2_CONFIG.call_once(|| {
@@ -882,6 +884,7 @@ impl HolochainP2pActor {
             kitsune,
             pending,
             request_duration_metric: create_p2p_request_duration_metric(),
+            request_timeout,
         }))
     }
 
@@ -1004,7 +1007,10 @@ impl HolochainP2pActor {
         let req = WireMessage::encode_batch(&[&req])?;
 
         let (s, r) = tokio::sync::oneshot::channel();
-        self.pending.lock().unwrap().register(msg_id, s);
+        self.pending
+            .lock()
+            .unwrap()
+            .register(msg_id, s, self.request_timeout);
 
         let start = std::time::Instant::now();
 
@@ -2045,11 +2051,17 @@ impl actor::HcP2p for HolochainP2pActor {
 mod tests {
     use super::*;
 
+    const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
     #[tokio::test(flavor = "multi_thread")]
     async fn correct_id_loc_calc() {
         // make sure our "Once" kitsune2 setup is executed
-        let _ = HolochainP2pActor::create(Default::default(), holochain_keystore::test_keystore())
-            .await;
+        let _ = HolochainP2pActor::create(
+            Default::default(),
+            holochain_keystore::test_keystore(),
+            REQUEST_TIMEOUT,
+        )
+        .await;
 
         let h_space = DnaHash::from_raw_32(vec![0xdb; 32]);
         let k_space = h_space.to_k2_space();
@@ -2070,8 +2082,12 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn correct_id_display() {
         // make sure our "Once" kitsune2 setup is executed
-        let _ = HolochainP2pActor::create(Default::default(), holochain_keystore::test_keystore())
-            .await;
+        let _ = HolochainP2pActor::create(
+            Default::default(),
+            holochain_keystore::test_keystore(),
+            REQUEST_TIMEOUT,
+        )
+        .await;
 
         let h_space = DnaHash::from_raw_32(vec![0xdb; 32]);
         let k_space = h_space.to_k2_space();
