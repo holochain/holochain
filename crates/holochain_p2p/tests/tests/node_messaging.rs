@@ -151,7 +151,10 @@ impl HcP2pHandler for Handler {
                 agent: AgentPubKey::from_raw_36(vec![2; 36]),
                 valid_activity: ChainItems::NotRequested,
                 rejected_activity: ChainItems::NotRequested,
-                status: ChainStatus::Empty,
+                status: ChainStatus::Valid(ChainHead {
+                    action_seq: fixt!(Action).action_seq(),
+                    hash: fixt!(ActionHash),
+                }),
                 highest_observed: None,
                 warrants: Vec::new(),
             })

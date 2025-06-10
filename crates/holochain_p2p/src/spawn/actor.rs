@@ -1684,8 +1684,8 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let start = std::time::Instant::now();
 
-            let (out, _) =
-                futures::future::select_ok(agents.into_iter().map(|(to_agent, to_url)| {
+            let out = select_ok_none_empty(
+                agents.into_iter().map(|(to_agent, to_url)| {
                     Box::pin(async {
                         let r_options: event::GetActivityOptions = (&options).into();
 
@@ -1706,7 +1706,7 @@ impl actor::HcP2p for HolochainP2pActor {
                             |res| match res {
                                 crate::wire::WireMessage::GetAgentActivityRes {
                                     response, ..
-                                } => Ok(vec![response]),
+                                } => Ok(response),
                                 _ => Err(HolochainP2pError::other(format!(
                                     "invalid response to get_agent_activity: {res:?}"
                                 ))),
@@ -1714,14 +1714,26 @@ impl actor::HcP2p for HolochainP2pActor {
                         )
                         .await
                     })
-                }))
-                .await?;
-
-            let out = Ok(out);
+                }),
+                |agent_activity| {
+                    matches!(
+                        agent_activity,
+                        AgentActivityResponse {
+                            valid_activity: ChainItems::NotRequested,
+                            rejected_activity: ChainItems::NotRequested,
+                            status: ChainStatus::Empty,
+                            highest_observed: None,
+                            warrants,
+                            ..
+                        } if warrants.is_empty()
+                    )
+                },
+            )
+            .await;
 
             timing_trace_out!(out, start, a = "send_get_agent_activity");
 
-            out
+            out.map(|x| vec![x])
         })
     }
 
