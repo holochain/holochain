@@ -1,3 +1,4 @@
+use ::fixt::fixt;
 use holochain_keystore::*;
 use holochain_p2p::event::*;
 use holochain_p2p::*;
@@ -113,7 +114,11 @@ impl HcP2pHandler for Handler {
         Box::pin(async move {
             self.calls.lock().unwrap().push("get_links".into());
             Ok(WireLinkOps {
-                creates: Vec::new(),
+                creates: vec![WireCreateLink::condense_base_only(
+                    fixt!(CreateLink),
+                    fixt!(Signature),
+                    ValidationStatus::Valid,
+                )],
                 deletes: Vec::new(),
             })
         })
