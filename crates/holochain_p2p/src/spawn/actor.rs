@@ -1453,9 +1453,7 @@ impl actor::HcP2p for HolochainP2pActor {
                             req,
                             dna_hash.clone(),
                             |res| match res {
-                                crate::wire::WireMessage::GetRes { response, .. } => {
-                                    Ok(vec![response])
-                                }
+                                crate::wire::WireMessage::GetRes { response, .. } => Ok(response),
                                 _ => Err(HolochainP2pError::other(format!(
                                     "invalid response to get: {res:?}"
                                 ))),
@@ -1464,7 +1462,7 @@ impl actor::HcP2p for HolochainP2pActor {
                         .await
                     })
                 }),
-                |wire_ops| match wire_ops.first().expect("should always be a vector of one") {
+                |wire_ops| match wire_ops {
                     WireOps::Entry(WireEntryOps {
                         creates,
                         deletes,
@@ -1495,7 +1493,7 @@ impl actor::HcP2p for HolochainP2pActor {
             .await;
 
             timing_trace_out!(out, start, a = "send_get");
-            out
+            out.map(|x| vec![x])
         })
     }
 
@@ -1535,7 +1533,7 @@ impl actor::HcP2p for HolochainP2pActor {
                             dna_hash.clone(),
                             |res| match res {
                                 crate::wire::WireMessage::GetMetaRes { response, .. } => {
-                                    Ok(vec![response])
+                                    Ok(response)
                                 }
                                 _ => Err(HolochainP2pError::other(format!(
                                     "invalid response to get_meta: {res:?}"
@@ -1546,9 +1544,6 @@ impl actor::HcP2p for HolochainP2pActor {
                     })
                 }),
                 |metadata_set| {
-                    let metadata_set = metadata_set
-                        .first()
-                        .expect("should always be a vector of one");
                     metadata_set.actions.is_empty()
                         && metadata_set.invalid_actions.is_empty()
                         && metadata_set.deletes.is_empty()
@@ -1560,7 +1555,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             timing_trace_out!(out, start, a = "send_get_meta");
 
-            out
+            out.map(|x| vec![x])
         })
     }
 
@@ -1600,7 +1595,7 @@ impl actor::HcP2p for HolochainP2pActor {
                             dna_hash.clone(),
                             |res| match res {
                                 crate::wire::WireMessage::GetLinksRes { response, .. } => {
-                                    Ok(vec![response])
+                                    Ok(response)
                                 }
                                 _ => Err(HolochainP2pError::other(format!(
                                     "invalid response to get_links: {res:?}"
@@ -1611,9 +1606,6 @@ impl actor::HcP2p for HolochainP2pActor {
                     })
                 }),
                 |wire_link_ops| {
-                    let wire_link_ops = wire_link_ops
-                        .first()
-                        .expect("should always be a vector of one");
                     wire_link_ops.creates.is_empty() && wire_link_ops.deletes.is_empty()
                 },
             )
@@ -1621,7 +1613,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             timing_trace_out!(out, start, a = "send_get_links");
 
-            out
+            out.map(|x| vec![x])
         })
     }
 
