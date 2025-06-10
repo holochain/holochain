@@ -1467,6 +1467,7 @@ async fn spawn_test(
             ..Default::default()
         },
         lair_client.clone(),
+        Duration::from_secs(1),
     )
     .await
     .unwrap();
