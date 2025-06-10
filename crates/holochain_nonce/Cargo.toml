@@ -16,3 +16,6 @@ holochain_secure_primitive = { version = "^0.5.2", path = "../holochain_secure_p
 
 [lints]
 workspace = true
+
+[features]
+subtle-encoding = []
