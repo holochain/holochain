@@ -1098,22 +1098,19 @@ macro_rules! timing_trace_out {
 /// Note: If one or more future does not produce a response, thus timeout, and one or more produces
 /// a valid but empty response, an empty response will not be returned until all the futures
 /// complete, including the ones that timeout.
-async fn select_ok_none_empty<I, O>(
-    futures: I,
-    is_empty: fn(&O) -> bool,
-) -> HolochainP2pResult<Vec<O>>
+async fn select_ok_none_empty<I, O>(futures: I, is_empty: fn(&O) -> bool) -> HolochainP2pResult<O>
 where
     I: IntoIterator,
-    I::Item: Future<Output = HolochainP2pResult<Vec<O>>> + Unpin,
+    I::Item: Future<Output = HolochainP2pResult<O>> + Unpin,
 {
     let mut futures: Vec<_> = futures.into_iter().collect();
     let mut best_response = None;
     loop {
-        let (out, _, remaining): (HolochainP2pResult<Vec<O>>, _, _) =
+        let (out, _, remaining): (HolochainP2pResult<O>, _, _) =
             futures::future::select_all(futures).await;
 
         if let Ok(ops) = out.as_ref() {
-            if is_empty(ops.first().unwrap()) {
+            if is_empty(ops) {
                 if remaining.is_empty() {
                     // Valid but empty response. And there are no more so just return it.
                     return out;
@@ -1467,7 +1464,7 @@ impl actor::HcP2p for HolochainP2pActor {
                         .await
                     })
                 }),
-                |wire_ops| match wire_ops {
+                |wire_ops| match wire_ops.first().expect("should always be a vector of one") {
                     WireOps::Entry(WireEntryOps {
                         creates,
                         deletes,
@@ -1549,6 +1546,9 @@ impl actor::HcP2p for HolochainP2pActor {
                     })
                 }),
                 |metadata_set| {
+                    let metadata_set = metadata_set
+                        .first()
+                        .expect("should always be a vector of one");
                     metadata_set.actions.is_empty()
                         && metadata_set.invalid_actions.is_empty()
                         && metadata_set.deletes.is_empty()
@@ -1611,6 +1611,9 @@ impl actor::HcP2p for HolochainP2pActor {
                     })
                 }),
                 |wire_link_ops| {
+                    let wire_link_ops = wire_link_ops
+                        .first()
+                        .expect("should always be a vector of one");
                     wire_link_ops.creates.is_empty() && wire_link_ops.deletes.is_empty()
                 },
             )
