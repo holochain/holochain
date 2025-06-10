@@ -290,7 +290,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn delete_entry<'env>(&self, input: DeleteInput) -> ActionHash {
+    pub async fn delete_entry(&self, input: DeleteInput) -> ActionHash {
         let (ribosome, call_context, workspace) = self.unpack().await;
         let output = {
             let r = host_fn::delete::delete(ribosome, call_context, input);
@@ -347,7 +347,7 @@ impl HostFnCaller {
         host_fn::get::get(ribosome, call_context, vec![input]).unwrap()
     }
 
-    pub async fn get_details<'env>(
+    pub async fn get_details(
         &self,
         entry_hash: AnyDhtHash,
         options: GetOptions,
@@ -357,7 +357,7 @@ impl HostFnCaller {
         host_fn::get_details::get_details(ribosome, call_context, vec![input]).unwrap()
     }
 
-    pub async fn create_link<'env>(
+    pub async fn create_link(
         &self,
         base: AnyLinkableHash,
         target: AnyLinkableHash,
@@ -389,7 +389,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn delete_link<'env>(&self, link_add_hash: ActionHash) -> ActionHash {
+    pub async fn delete_link(&self, link_add_hash: ActionHash) -> ActionHash {
         let (ribosome, call_context, workspace) = self.unpack().await;
         let output = {
             host_fn::delete_link::delete_link(
@@ -413,7 +413,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn get_links<'env>(
+    pub async fn get_links(
         &self,
         base: AnyLinkableHash,
         type_query: LinkTypeFilter,
@@ -446,7 +446,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn get_link_details<'env>(
+    pub async fn get_link_details(
         &self,
         base: AnyLinkableHash,
         type_query: LinkTypeFilter,

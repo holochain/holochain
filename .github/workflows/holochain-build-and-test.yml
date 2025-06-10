@@ -51,7 +51,7 @@ jobs:
           - cmd:
               pkgs:
                 - build-release-automation-tests-unit
-              extra_arg: "--override-input versions './versions/weekly' --override-input holochain ${{ inputs.repo_path }}"
+              extra_arg: "--override-input versions 'github:holochain/holochain?dir=versions/0_5' --override-input holochain ${{ inputs.repo_path }}"
             platform:
               system: x86_64-linux
 
@@ -59,7 +59,7 @@ jobs:
           - cmd:
               pkgs:
                 - build-release-automation-tests-repo
-              extra_arg: "--override-input versions ./versions/weekly --override-input repo-git 'path:.git'"
+              extra_arg: "--override-input versions 'github:holochain/holochain?dir=versions/0_5' --override-input repo-git 'path:.git'"
             platform:
               system: x86_64-linux
 
