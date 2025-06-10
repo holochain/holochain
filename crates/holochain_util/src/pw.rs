@@ -29,9 +29,7 @@ static PASSPHRASE: Lazy<std::result::Result<Arc<Mutex<sodoken::LockedArray>>, St
 /// Capture a passphrase from the user. Either captures from tty, or
 /// reads stdin if [pw_set_piped] was called with `true`.
 pub fn pw_get() -> Result<Arc<Mutex<sodoken::LockedArray>>> {
-    PASSPHRASE
-        .clone()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    PASSPHRASE.clone().map_err(std::io::Error::other)
 }
 
 fn read_interactive_passphrase(prompt: &str) -> Result<Arc<Mutex<sodoken::LockedArray>>> {

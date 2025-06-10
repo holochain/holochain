@@ -80,10 +80,10 @@ pub fn init_lair(
 ) -> anyhow::Result<url2::Url2> {
     match init_lair_inner(dir, passphrase) {
         Ok(url) => Ok(url),
-        Err(err) => Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Failed to execute 'lair-keystore init': {:?}", err),
-        )
+        Err(err) => Err(std::io::Error::other(format!(
+            "Failed to execute 'lair-keystore init': {:?}",
+            err
+        ))
         .into()),
     }
 }
@@ -107,7 +107,7 @@ pub(crate) fn init_lair_inner(
     drop(stdin);
 
     if !proc.wait()?.success() {
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, "LairInitFail").into());
+        return Err(std::io::Error::other("LairInitFail").into());
     }
     let conf = dir.as_ref().join("lair-keystore-config.yaml");
 

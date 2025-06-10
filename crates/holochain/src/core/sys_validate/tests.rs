@@ -4,7 +4,7 @@
 //! - Mismatched signatures are rejected
 //! - Any action other than DNA cannot be at seq 0
 //! - The DNA action can only be validated if the chain is empty,
-//!     and its timestamp must not be less than the origin time
+//!   and its timestamp must not be less than the origin time
 //! - Timestamps must increase monotonically
 //! - Sequence numbers must increment by 1 for each new action
 //! - Entry type in the action matches the entry variant

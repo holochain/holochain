@@ -68,7 +68,7 @@ impl SweetConductorBatch {
         config: C,
     ) -> SweetConductorBatch {
         let config = config.into();
-        Self::from_configs(std::iter::repeat(config).take(num)).await
+        Self::from_configs(std::iter::repeat_n(config, num)).await
     }
 
     /// Create a number of SweetConductors from the given ConductorConfig, each with its own new TestEnvironments.
@@ -77,7 +77,7 @@ impl SweetConductorBatch {
     where
         C: Into<SweetConductorConfig> + Clone,
     {
-        Self::from_configs_rendezvous(std::iter::repeat(config).take(num)).await
+        Self::from_configs_rendezvous(std::iter::repeat_n(config, num)).await
     }
 
     /// Create the given number of new SweetConductors, each with its own new TestEnvironments

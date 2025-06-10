@@ -128,7 +128,7 @@ mod tests {
 
         // Check all the expected ops were returned
         for op in ops {
-            assert!(expected.to_sys_validate.iter().any(|i| *i == op));
+            assert!(expected.to_sys_validate.contains(&op));
         }
     }
 
@@ -144,7 +144,7 @@ mod tests {
 
         // Check all the expected ops were returned
         for op in ops {
-            assert!(expected.to_app_validate.iter().any(|i| *i == op));
+            assert!(expected.to_app_validate.contains(&op));
         }
     }
 

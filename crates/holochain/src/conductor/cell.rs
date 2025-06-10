@@ -732,7 +732,7 @@ impl Cell {
         // an already running init call.
         if workspace_lock
             .as_ref()
-            .map_or(true, |w| !w.called_from_init())
+            .is_none_or(|w| !w.called_from_init())
         {
             // Check if init has run. If not, run it.
             self.check_or_run_zome_init().await?;

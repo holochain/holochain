@@ -117,14 +117,10 @@ fn check_prev_action_chain<A: ChainItem>(
     // The root cannot appear later in the chain
     if action.prev_hash().is_none() {
         Err((PrevActionErrorKind::MissingPrev, action).into())
-    } else if action.prev_hash().map_or(true, |p| p != prev_action_hash) {
+    } else if action.prev_hash() != Some(prev_action_hash) {
         // Check the prev hash matches.
         Err((PrevActionErrorKind::HashMismatch(action.seq()), action).into())
-    } else if action
-        .seq()
-        .checked_sub(1)
-        .map_or(true, |s| prev_action_seq != s)
-    {
+    } else if action.seq().checked_sub(1) != Some(prev_action_seq) {
         // Check the prev seq is one less.
         Err((
             PrevActionErrorKind::InvalidSeq(action.seq(), prev_action_seq),

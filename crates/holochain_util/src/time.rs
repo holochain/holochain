@@ -5,8 +5,6 @@ macro_rules! log_elapsed {
     }};
 
     ($intervals:expr, $start:expr, $what:expr) => {{
-        // use $crate::colored::Colorize;
-
         let intervals = $intervals;
         let elapsed = $start.elapsed();
         let elapsed_ms = elapsed.as_millis();
@@ -37,10 +35,7 @@ macro_rules! timed {
     }};
 
     ($intervals:expr, $what:expr, $block:expr) => {{
-        #[cfg(feature = "tokio")]
         let start = tokio::time::Instant::now();
-        #[cfg(not(feature = "tokio"))]
-        let start = std::time::Instant::now();
 
         let result = $block;
 

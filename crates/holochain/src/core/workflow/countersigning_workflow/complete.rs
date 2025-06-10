@@ -128,7 +128,7 @@ pub(crate) async fn inner_countersigning_session_complete(
         // Check all stored action hashes match an incoming action hash.
         if stored_actions.iter().all(|a| {
             let a = ActionHash::with_data_sync(a);
-            incoming_actions.iter().any(|i| *i == a)
+            incoming_actions.contains(&a)
         }) {
             tracing::debug!("All hashes are correct");
             // All checks have passed, proceed to update the session state.
