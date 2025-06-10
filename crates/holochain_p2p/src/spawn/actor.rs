@@ -1640,8 +1640,8 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let start = std::time::Instant::now();
 
-            let (out, _) =
-                futures::future::select_ok(agents.into_iter().map(|(to_agent, to_url)| {
+            let out = select_ok_none_empty(
+                agents.into_iter().map(|(to_agent, to_url)| {
                     Box::pin(async {
                         let (msg_id, req) =
                             crate::wire::WireMessage::count_links_req(to_agent, query.clone());
@@ -1664,10 +1664,10 @@ impl actor::HcP2p for HolochainP2pActor {
                         )
                         .await
                     })
-                }))
-                .await?;
-
-            let out = Ok(out);
+                }),
+                |count_links_res| count_links_res.create_link_actions().is_empty(),
+            )
+            .await;
 
             timing_trace_out!(out, start, a = "send_count_links");
 
