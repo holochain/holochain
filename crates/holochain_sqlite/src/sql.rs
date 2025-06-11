@@ -85,5 +85,10 @@ pub mod sql_peer_meta_store {
 
     pub const GET: &str = include_str!("sql/peer_meta_store/get.sql");
 
+    /// Does not filter expired values.
+    pub const SELECT_URLS: &str = include_str!("sql/peer_meta_store/select_urls.sql");
+
     pub const DELETE: &str = include_str!("sql/peer_meta_store/delete.sql");
+
+    pub const DELETE_URLS: &str = include_str!("sql/peer_meta_store/delete_urls.sql");
 }
