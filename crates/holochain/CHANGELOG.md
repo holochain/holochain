@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-dev.8
+
 ## 0.6.0-dev.7
 
 - Add `AgentInfo` call to the conductor’s app interface to retrieve the discovered peers of the app’s various DNAs.
