@@ -1611,9 +1611,7 @@ impl actor::HcP2p for HolochainP2pActor {
                         .await
                     })
                 }),
-                |wire_link_ops| {
-                    wire_link_ops.creates.is_empty() && wire_link_ops.deletes.is_empty()
-                },
+                |wire_link_ops| wire_link_ops.creates.is_empty(),
             )
             .await;
 
