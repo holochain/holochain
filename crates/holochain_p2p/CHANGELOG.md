@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Calling functions that get data from other agents now try to get from 3 agents in parallel and return the result of the first agent to respond with valid data ([#5025](https://github.com/holochain/holochain/pull/5025))
+- The request timeout is now passed in when a `HolochainP2pActor` is created ([#5025](https://github.com/holochain/holochain/pull/5025))
+
 ## 0.6.0-dev.8
 
 ## 0.6.0-dev.7
