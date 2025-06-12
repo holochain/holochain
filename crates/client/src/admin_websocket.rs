@@ -19,6 +19,7 @@ use holochain_zome_types::{
     capability::GrantedFunctions,
     prelude::{DnaDef, GrantZomeCallCapabilityPayload, Record},
 };
+use kitsune2_api::Url;
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use std::{net::ToSocketAddrs, sync::Arc};
@@ -541,6 +542,31 @@ impl AdminWebsocket {
         let response = self.send(msg).await?;
         match response {
             AdminResponse::AgentInfoAdded => Ok(()),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
+    /// Request the contents of the peer meta store(s) related to
+    /// the given dna hashes for the agent at the given Url.
+    ///
+    /// If `dna_hashes` is set to `None` it returns the contents
+    /// for all spaces (dna hashes) that the agent is part of.
+    /// Returns the contents of the peer meta store(s) related to the given
+    /// dna hashes and for the agent at the given Url.
+    ///
+    /// If `dna_hashes` is set to `None` it returns the contents for all spaces
+    /// (dna hashes) that the agent is part of.
+    ///
+    /// The return value is a JSON formatted string.
+    pub async fn agent_meta_info(
+        &self,
+        url: Url,
+        dna_hashes: Option<Vec<DnaHash>>,
+    ) -> ConductorApiResult<String> {
+        let msg = AdminRequest::AgentMetaInfo { url, dna_hashes };
+        let response = self.send(msg).await?;
+        match response {
+            AdminResponse::AgentMetaInfo(info) => Ok(info),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

@@ -4,6 +4,7 @@ use holochain_keystore::LairResult;
 use holochain_keystore::MetaLairClient;
 use holochain_types::prelude::*;
 use indexmap::IndexMap;
+use kitsune2_api::Url;
 use std::collections::HashMap;
 
 /// Represents the available conductor functions to call over an app interface
@@ -33,6 +34,20 @@ pub enum AppRequest {
     /// [`AppResponse::AgentInfo`]
     AgentInfo {
         /// Optionally limit the results to specific DNA hashes
+        dna_hashes: Option<Vec<DnaHash>>,
+    },
+
+    /// Request the contents of the peer meta store(s) related to
+    /// the given dna hashes for the agent at the given Url.
+    ///
+    /// If `dna_hashes` is set to `None` it returns the contents
+    /// for all spaces (dna hashes) that the agent is part of.
+    ///
+    /// # Returns
+    ///
+    /// [`AppResponse::AgentMetaInfo`]
+    AgentMetaInfo {
+        url: Url,
         dna_hashes: Option<Vec<DnaHash>>,
     },
 
@@ -253,6 +268,11 @@ pub enum AppResponse {
 
     /// The successful response to an [`AppRequest::AgentInfo`].
     AgentInfo(Vec<String>),
+
+    /// The successful response to an [`AppRequest::AgentMetaInfo`].
+    ///
+    /// A JSON formatted string.
+    AgentMetaInfo(String),
 
     /// The successful response to an [`AppRequest::CallZome`].
     ///

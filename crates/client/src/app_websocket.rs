@@ -17,6 +17,7 @@ use holochain_zome_types::{
     clone::ClonedCell,
     prelude::{CellId, ExternIO, FunctionName, RoleName, Timestamp, ZomeCallParams, ZomeName},
 };
+use kitsune2_api::Url;
 use std::fmt::Formatter;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
@@ -440,6 +441,26 @@ impl AppWebsocket {
         let response = self.inner.send(msg).await?;
         match response {
             AppResponse::AgentInfo(infos) => Ok(infos),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
+    /// Returns the contents of the peer meta store(s) related to the given
+    /// dna hashes for the agent at the given Url.
+    ///
+    /// If `dna_hashes` is set to `None` it returns the contents
+    /// for all spaces (dna hashes) of this app that the agent is part of.
+    ///
+    /// The return value is a JSON formatted string.
+    pub async fn agent_meta_info(
+        &self,
+        url: Url,
+        dna_hashes: Option<Vec<DnaHash>>,
+    ) -> ConductorApiResult<String> {
+        let msg = AppRequest::AgentMetaInfo { url, dna_hashes };
+        let response = self.inner.send(msg).await?;
+        match response {
+            AppResponse::AgentMetaInfo(info) => Ok(info),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

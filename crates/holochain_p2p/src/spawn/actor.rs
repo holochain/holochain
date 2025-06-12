@@ -3,6 +3,7 @@
 use crate::metrics::create_p2p_request_duration_metric;
 use crate::*;
 use holochain_sqlite::error::{DatabaseError, DatabaseResult};
+use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_peer_meta_store;
 use holochain_state::prelude::named_params;
@@ -1197,6 +1198,20 @@ impl actor::HcP2p for HolochainP2pActor {
                 .space(dna_hash.to_k2_space())
                 .await?
                 .peer_store()
+                .clone())
+        })
+    }
+
+    fn peer_meta_store(
+        &self,
+        dna_hash: DnaHash,
+    ) -> BoxFut<'_, HolochainP2pResult<DynPeerMetaStore>> {
+        Box::pin(async move {
+            Ok(self
+                .kitsune
+                .space(dna_hash.to_k2_space())
+                .await?
+                .peer_meta_store()
                 .clone())
         })
     }
