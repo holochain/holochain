@@ -450,7 +450,7 @@ pub struct ConductorTuningParams {
     ///
     /// Holochain will always try once, whatever value you set. The possible values for this setting are:
     /// - `None`: Not set, then Holochain will just make a single attempt and then consider the session failed
-    ///    if it can't make a decision.
+    ///   if it can't make a decision.
     /// - `Some(0)`: Holochain will treat this the same as a session that failed after a crash. It will retry
     ///   until it can make a decision or until the user forces a decision.
     /// - `Some(n)`, n > 0: Holochain will retry `n` times, including the required first attempt. If

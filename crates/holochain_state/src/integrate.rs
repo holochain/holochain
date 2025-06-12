@@ -113,9 +113,10 @@ pub fn insert_locally_validated_op(
 fn filter_private_entry(dht_op: DhtOpHashed) -> DhtOpResult<DhtOpHashed> {
     #[allow(irrefutable_let_patterns)]
     if let DhtOp::ChainOp(op) = dht_op.as_content() {
-        let is_private = op.action().entry_type().map_or(false, |et| {
-            matches!(et.visibility(), EntryVisibility::Private)
-        });
+        let is_private = op
+            .action()
+            .entry_type()
+            .is_some_and(|et| matches!(et.visibility(), EntryVisibility::Private));
         let is_entry = op.entry().into_option().is_some();
         if is_private && is_entry {
             let op_type = op.get_type();
@@ -138,7 +139,7 @@ fn is_private_store_entry(op: &DhtOp) -> bool {
     if let DhtOp::ChainOp(op) = op {
         op.action()
             .entry_type()
-            .map_or(false, |et| *et.visibility() == EntryVisibility::Private)
+            .is_some_and(|et| *et.visibility() == EntryVisibility::Private)
             && op.get_type() == ChainOpType::StoreEntry
     } else {
         false

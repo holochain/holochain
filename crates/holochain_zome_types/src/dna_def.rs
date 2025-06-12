@@ -59,10 +59,10 @@ pub struct DnaDef {
     /// The meaning of the "ancestor" relationship is as follows:
     /// - For any DNA, there is a migration path from any of its ancestors to itself.
     /// - When an app depends on a DnaHash via UseExisting, it means that any installed
-    ///     DNA in the lineage which contains that DnaHash can be used.
+    ///   DNA in the lineage which contains that DnaHash can be used.
     /// - The app's Coordinator interface is expected to be compatible across the lineage.
-    ///     (Though this cannot be enforced, since Coordinators can be swapped out at
-    ///      will by the user, the intention is still there.)
+    ///   (Though this cannot be enforced, since Coordinators can be swapped out at
+    ///   will by the user, the intention is still there.)
     ///
     /// Holochain does nothing to ensure the correctness of the lineage, it is up to
     /// the app developer to make the necessary guarantees.

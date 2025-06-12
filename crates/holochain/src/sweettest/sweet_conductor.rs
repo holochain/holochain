@@ -32,14 +32,6 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// Standin until std::io::Error::other is stablized.
-pub fn err_other<E>(error: E) -> std::io::Error
-where
-    E: Into<Box<dyn std::error::Error + Send + Sync>>,
-{
-    std::io::Error::new(std::io::ErrorKind::Other, error.into())
-}
-
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
 
@@ -630,8 +622,8 @@ impl SweetConductor {
             handle
                 .shutdown()
                 .await
-                .map_err(err_other)?
-                .map_err(err_other)
+                .map_err(Error::other)?
+                .map_err(Error::other)
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }

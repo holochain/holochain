@@ -2051,9 +2051,9 @@ mod app_status_impls {
         /// reality of which Cells are present in the conductor.
         /// - Do not change state for Disabled apps. For all others:
         /// - If an app is Paused but all of its (required) Cells are on,
-        ///     then set it to Running
+        ///   then set it to Running
         /// - If an app is Running but at least one of its (required) Cells are off,
-        ///     then set it to Paused
+        ///   then set it to Paused
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn reconcile_app_status_with_cell_status(
             &self,

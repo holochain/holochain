@@ -58,7 +58,7 @@ impl Query for GetLinkDetailsQuery {
                     && type_query_filter.contains(zome_index, link_type)
                     && tag_filter
                         .as_ref()
-                        .map_or(true, |t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
+                        .is_none_or(|t| LinksQuery::tag_to_hex(tag).starts_with(&(**t)))
             }
             Action::DeleteLink(DeleteLink { base_address, .. }) => *base_address == *base_filter,
             _ => false,

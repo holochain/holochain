@@ -25,7 +25,7 @@ pub fn get_unit_ident(attrs: &[syn::Attribute]) -> syn::Ident {
             a.path
                 .segments
                 .last()
-                .map_or(false, |s| s.ident == "unit_enum")
+                .is_some_and(|s| s.ident == "unit_enum")
         })
         .and_then(|a| darling::util::parse_attribute_to_meta_list(a).ok())
         .and_then(|syn::MetaList { path, nested, .. }| {

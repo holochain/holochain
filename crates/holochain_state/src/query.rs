@@ -436,9 +436,10 @@ impl Store for CascadeTxnWrapper<'_, '_> {
             AnyDhtHashPrimitive::Action(hash) => {
                 Ok(self.get_exact_record(&hash)?.map(|el| {
                     // Filter out the entry if it's private.
-                    let is_private_entry = el.action().entry_type().map_or(false, |et| {
-                        matches!(et.visibility(), EntryVisibility::Private)
-                    });
+                    let is_private_entry = el
+                        .action()
+                        .entry_type()
+                        .is_some_and(|et| matches!(et.visibility(), EntryVisibility::Private));
                     if is_private_entry {
                         Record::new(el.into_inner().0, None)
                     } else {
@@ -1083,7 +1084,7 @@ pub fn map_sql_dht_op_common(
     match op_type {
         DhtOpType::Chain(op_type) => {
             let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-            if action.entry_type().map_or(false, |et| {
+            if action.entry_type().is_some_and(|et| {
                 !return_private_entry_ops && *et.visibility() == EntryVisibility::Private
             }) && op_type == ChainOpType::StoreEntry
             {

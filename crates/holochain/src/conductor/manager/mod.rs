@@ -21,7 +21,7 @@
 //!
 //! 1. Stop all other tasks related to the cell, so they don't continue in the background.
 //! 2. Pause or disable any apps which depend on the cell, because the app cannot
-//!     function without the proper functioning of that cell.
+//!    function without the proper functioning of that cell.
 
 mod error;
 pub use error::*;

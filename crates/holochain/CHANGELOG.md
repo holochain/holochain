@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Add `AgentMetaInfo` calls to the conductor’s app and admin interfaces to retrieve data from the peer meta store for a given agent by their Url [#5043](https://github.com/holochain/holochain/pull/5043)
 
+## 0.6.0-dev.8
+
 ## 0.6.0-dev.7
 
 - Add `AgentInfo` call to the conductor’s app interface to retrieve the discovered peers of the app’s various DNAs.

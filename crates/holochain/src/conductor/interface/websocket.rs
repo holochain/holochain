@@ -1229,7 +1229,7 @@ mod test {
                     }
                 }
             })
-            .last()
+            .next_back()
             .unwrap()
     }
 }
