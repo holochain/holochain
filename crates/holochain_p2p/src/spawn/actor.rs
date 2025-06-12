@@ -1104,7 +1104,7 @@ macro_rules! timing_trace_out {
 /// Note: If one or more futures do not produce a response, thus time out, and one or more produce
 /// a valid but empty response, an empty response will not be returned until all the futures
 /// complete, including the ones that timeout.
-async fn select_ok_none_empty<I, O>(futures: I, is_empty: fn(&O) -> bool) -> HolochainP2pResult<O>
+async fn select_ok_non_empty<I, O>(futures: I, is_empty: fn(&O) -> bool) -> HolochainP2pResult<O>
 where
     I: IntoIterator,
     I::Item: Future<Output = HolochainP2pResult<O>> + Unpin,
@@ -1445,7 +1445,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let start = std::time::Instant::now();
 
-            let out = select_ok_none_empty(
+            let out = select_ok_non_empty(
                 agents.into_iter().map(|(to_agent, to_url)| {
                     Box::pin(async {
                         let (msg_id, req) =
@@ -1519,7 +1519,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let start = std::time::Instant::now();
 
-            let out = select_ok_none_empty(
+            let out = select_ok_non_empty(
                 agents.into_iter().map(|(to_agent, to_url)| {
                     Box::pin(async {
                         let r_options: event::GetMetaOptions = (&options).into();
@@ -1581,7 +1581,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let start = std::time::Instant::now();
 
-            let out = select_ok_none_empty(
+            let out = select_ok_non_empty(
                 agents.into_iter().map(|(to_agent, to_url)| {
                     Box::pin(async {
                         let r_options: event::GetLinksOptions = (&options).into();
@@ -1636,7 +1636,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let start = std::time::Instant::now();
 
-            let out = select_ok_none_empty(
+            let out = select_ok_non_empty(
                 agents.into_iter().map(|(to_agent, to_url)| {
                     Box::pin(async {
                         let (msg_id, req) =
@@ -1688,7 +1688,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let start = std::time::Instant::now();
 
-            let out = select_ok_none_empty(
+            let out = select_ok_non_empty(
                 agents.into_iter().map(|(to_agent, to_url)| {
                     Box::pin(async {
                         let r_options: event::GetActivityOptions = (&options).into();
@@ -1757,7 +1757,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let start = std::time::Instant::now();
 
-            let out = select_ok_none_empty(
+            let out = select_ok_non_empty(
                 agents.into_iter().map(|(to_agent, to_url)| {
                     Box::pin(async {
                         let (msg_id, req) = crate::wire::WireMessage::must_get_agent_activity_req(
