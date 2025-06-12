@@ -749,7 +749,7 @@ async fn test_get_empty_data_better_than_no_response() {
 
     // One agent will respond with empty data so we need to wait for the other one to timeout
     // before we will get the empty data.
-    tokio::time::timeout(Duration::from_secs(70), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
             tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
