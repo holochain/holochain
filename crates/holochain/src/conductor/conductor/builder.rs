@@ -453,6 +453,7 @@ impl ConductorBuilder {
             disable_gossip: config.network.disable_gossip,
             #[cfg(feature = "test_utils")]
             mem_bootstrap: config.network.mem_bootstrap,
+            ..Default::default()
         };
 
         let holochain_p2p =

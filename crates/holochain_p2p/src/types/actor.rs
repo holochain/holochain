@@ -214,6 +214,12 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         dna_hash: DnaHash,
     ) -> BoxFut<'_, HolochainP2pResult<kitsune2_api::DynPeerStore>>;
 
+    /// Access the k2 peer meta store for a particular dna hash.
+    fn peer_meta_store(
+        &self,
+        dna_hash: DnaHash,
+    ) -> BoxFut<'_, HolochainP2pResult<kitsune2_api::DynPeerMetaStore>>;
+
     /// Call this exactly once before any other invocations on this
     /// instance in order to register the HcP2pHandler.
     fn register_handler(
