@@ -113,7 +113,7 @@ mod tests {
 
         let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
     network_seed: blablabla

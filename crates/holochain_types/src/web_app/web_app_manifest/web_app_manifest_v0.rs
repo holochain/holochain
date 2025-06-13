@@ -1,11 +1,11 @@
-//! WebApp Manifest format, version 1.
+//! WebApp Manifest format, version 0.
 //!
 //! NB: After stabilization, *do not modify this file*! Create a new version of
 //! the spec and leave this one alone to maintain backwards compatibility.
 
 use schemars::JsonSchema;
 
-/// Version 1 of the App manifest schema
+/// Version 0 of the WebApp manifest schema
 #[derive(
     Clone,
     Debug,
@@ -17,7 +17,7 @@ use schemars::JsonSchema;
     derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
-pub struct WebAppManifestV1 {
+pub struct WebAppManifestV0 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
 

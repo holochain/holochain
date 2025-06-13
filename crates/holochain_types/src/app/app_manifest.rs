@@ -41,12 +41,12 @@ use mr_bundle::{resource_id_for_path, Manifest, ResourceIdentifier};
 use schemars::JsonSchema;
 use std::collections::HashMap;
 
-pub(crate) mod app_manifest_v1;
+pub(crate) mod app_manifest_v0;
 pub mod app_manifest_validated;
 mod current;
 mod error;
 
-pub use app_manifest_v1::{AppRoleDnaManifest, CellProvisioning};
+pub use app_manifest_v0::{AppRoleDnaManifest, CellProvisioning};
 pub use current::*;
 pub use error::*;
 
@@ -62,14 +62,14 @@ use super::{InstalledCell, ModifiersMap};
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 pub enum AppManifest {
-    #[serde(rename = "1")]
-    V1(AppManifestV1),
+    #[serde(rename = "0")]
+    V0(AppManifestV0),
 }
 
 impl Manifest for AppManifest {
     fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
         match self {
-            AppManifest::V1(m) => m
+            AppManifest::V0(m) => m
                 .roles
                 .iter_mut()
                 .filter_map(|role| {
@@ -90,7 +90,7 @@ impl Manifest for AppManifest {
 
     fn resource_ids(&self) -> Vec<ResourceIdentifier> {
         match self {
-            AppManifest::V1(m) => m
+            AppManifest::V0(m) => m
                 .roles
                 .iter()
                 .filter_map(|role| role.dna.path.clone().and_then(resource_id_for_path))
@@ -111,14 +111,14 @@ impl AppManifest {
     /// Get the supplied name of the app
     pub fn app_name(&self) -> &str {
         match self {
-            Self::V1(AppManifestV1 { name, .. }) => name,
+            Self::V0(AppManifestV0 { name, .. }) => name,
         }
     }
 
     /// Convert this human-focused manifest into a validated, concise representation
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
         match self {
-            Self::V1(manifest) => manifest.validate(),
+            Self::V0(manifest) => manifest.validate(),
         }
     }
 
@@ -126,7 +126,7 @@ impl AppManifest {
     /// Cells with other provisioning strategies are not affected.
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
         match self {
-            Self::V1(manifest) => manifest.set_network_seed(network_seed),
+            Self::V0(manifest) => manifest.set_network_seed(network_seed),
         }
     }
 
@@ -135,14 +135,14 @@ impl AppManifest {
     /// the corresponding value in the manifest will remain untouched.
     pub fn override_modifiers(&mut self, modifiers: ModifiersMap) -> AppManifestResult<()> {
         match self {
-            Self::V1(manifest) => manifest.override_modifiers(modifiers),
+            Self::V0(manifest) => manifest.override_modifiers(modifiers),
         }
     }
 
     /// Returns the list of app roles that this manifest declares
     pub fn app_roles(&self) -> Vec<AppRoleManifest> {
         match self {
-            Self::V1(manifest) => manifest.roles.clone(),
+            Self::V0(manifest) => manifest.roles.clone(),
         }
     }
 
@@ -179,28 +179,28 @@ impl AppManifest {
 mod tests {
     use mr_bundle::{resource_id_for_path, Manifest};
 
-    use crate::app::app_manifest::{AppManifest, AppManifestV1Builder, AppRoleManifest};
+    use crate::app::app_manifest::{AppManifest, AppManifestV0Builder, AppRoleManifest};
 
     #[test]
     /// Replicate this test for any new version of the manifest that gets created
-    fn app_manifest_v1_helper_functions() {
+    fn app_manifest_v0_helper_functions() {
         let app_name = String::from("sample-app");
 
         let role_name = String::from("sample-dna");
         let role_manifest = AppRoleManifest::sample(role_name);
 
-        let sample_app_manifest_v1 = AppManifestV1Builder::default()
+        let sample_app_manifest_v0 = AppManifestV0Builder::default()
             .name(app_name.clone())
             .description(Some(String::from("Some description")))
             .roles(vec![role_manifest.clone()])
             .build()
             .unwrap();
-        let sample_app_manifest = AppManifest::V1(sample_app_manifest_v1.clone());
+        let sample_app_manifest = AppManifest::V0(sample_app_manifest_v0.clone());
 
         assert_eq!(app_name, sample_app_manifest.app_name());
         assert_eq!(vec![role_manifest], sample_app_manifest.app_roles());
         assert_eq!(
-            vec![sample_app_manifest_v1
+            vec![sample_app_manifest_v0
                 .roles
                 .first()
                 .unwrap()

@@ -1,4 +1,4 @@
-manifest_version: '1'
+manifest_version: '0'
 name: my-fixture-app
 allow_deferred_memproofs: false
 roles:

@@ -8,8 +8,8 @@ use std::path::PathBuf;
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 enum TestManifest {
-    #[serde(rename = "1")]
-    V1(ManifestV1),
+    #[serde(rename = "0")]
+    V0(ManifestV0),
 }
 
 impl Manifest for TestManifest {
@@ -17,7 +17,7 @@ impl Manifest for TestManifest {
         let mut out = HashMap::new();
 
         match self {
-            Self::V1(manifest) => {
+            Self::V0(manifest) => {
                 for thing in &mut manifest.things {
                     let id = resource_id_for_path(&thing.location).unwrap();
                     out.insert(id.clone(), thing.location.clone());
@@ -31,7 +31,7 @@ impl Manifest for TestManifest {
 
     fn resource_ids(&self) -> Vec<ResourceIdentifier> {
         match self {
-            Self::V1(manifest) => manifest
+            Self::V0(manifest) => manifest
                 .things
                 .iter()
                 .map(|b| resource_id_for_path(&b.location).unwrap())
@@ -51,7 +51,7 @@ impl Manifest for TestManifest {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-struct ManifestV1 {
+struct ManifestV0 {
     name: String,
     things: Vec<ThingManifest>,
 }
@@ -85,7 +85,7 @@ async fn file_system_bundler() {
         .unwrap();
 
     // Create a Manifest that references these resources
-    let manifest = TestManifest::V1(ManifestV1 {
+    let manifest = TestManifest::V0(ManifestV0 {
         name: "name".to_string(),
         things: vec![ThingManifest {
             location: resource_path.to_str().unwrap().to_string(),
@@ -152,7 +152,7 @@ async fn file_system_bundler_with_raw_bundle() {
         .unwrap();
 
     // Create a Manifest that references these resources
-    let mut manifest = TestManifest::V1(ManifestV1 {
+    let mut manifest = TestManifest::V0(ManifestV0 {
         name: "name".to_string(),
         things: vec![ThingManifest {
             location: resource_path.to_str().unwrap().to_string(),
