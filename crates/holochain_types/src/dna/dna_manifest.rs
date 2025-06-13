@@ -4,15 +4,15 @@ use schemars::JsonSchema;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-mod dna_manifest_v1;
+mod dna_manifest_v0;
 
 #[cfg(test)]
 mod test;
 
 /// Re-export the current version. When creating a new version, just re-export
 /// the new version, and update the code accordingly.
-pub use dna_manifest_v1::{
-    DnaManifestV1 as DnaManifestCurrent, DnaManifestV1Builder as DnaManifestCurrentBuilder, *,
+pub use dna_manifest_v0::{
+    DnaManifestV0 as DnaManifestCurrent, DnaManifestV0Builder as DnaManifestCurrentBuilder, *,
 };
 
 /// The enum which encompasses all versions of the DNA manifest, past and present.
@@ -22,8 +22,8 @@ pub use dna_manifest_v1::{
 #[serde(tag = "manifest_version")]
 #[allow(missing_docs)]
 pub enum DnaManifest {
-    #[serde(rename = "1")]
-    V1(DnaManifestV1),
+    #[serde(rename = "0")]
+    V0(DnaManifestV0),
 }
 
 #[derive(
@@ -36,7 +36,7 @@ pub struct ValidatedDnaManifest(pub DnaManifest);
 impl mr_bundle::Manifest for ValidatedDnaManifest {
     fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
         match &mut self.0 {
-            DnaManifest::V1(m) => m
+            DnaManifest::V0(m) => m
                 .all_zomes_mut()
                 .map(|zome| {
                     let id = zome.resource_id();
@@ -52,7 +52,7 @@ impl mr_bundle::Manifest for ValidatedDnaManifest {
 
     fn resource_ids(&self) -> Vec<ResourceIdentifier> {
         match &self.0 {
-            DnaManifest::V1(m) => m.all_zomes().map(|zome| zome.resource_id()).collect(),
+            DnaManifest::V0(m) => m.all_zomes().map(|zome| zome.resource_id()).collect(),
         }
     }
 
@@ -91,21 +91,21 @@ impl DnaManifest {
     /// Getter for properties
     pub fn properties(&self) -> Option<YamlProperties> {
         match self {
-            DnaManifest::V1(manifest) => manifest.integrity.properties.clone(),
+            DnaManifest::V0(manifest) => manifest.integrity.properties.clone(),
         }
     }
 
     /// Getter for network_seed
     pub fn network_seed(&self) -> Option<String> {
         match self {
-            DnaManifest::V1(manifest) => manifest.integrity.network_seed.clone(),
+            DnaManifest::V0(manifest) => manifest.integrity.network_seed.clone(),
         }
     }
 
     /// Getter for name
     pub fn name(&self) -> String {
         match self {
-            DnaManifest::V1(manifest) => manifest.name.clone(),
+            DnaManifest::V0(manifest) => manifest.name.clone(),
         }
     }
 }
@@ -115,7 +115,7 @@ impl TryFrom<DnaManifest> for ValidatedDnaManifest {
 
     fn try_from(value: DnaManifest) -> Result<Self, Self::Error> {
         match &value {
-            DnaManifest::V1(m) => {
+            DnaManifest::V0(m) => {
                 let integrity_zome_names: HashSet<_> =
                     m.integrity.zomes.iter().map(|z| z.name.clone()).collect();
                 // Check there are no duplicate zome names.
@@ -143,10 +143,10 @@ impl TryFrom<DnaManifest> for ValidatedDnaManifest {
     }
 }
 
-impl TryFrom<DnaManifestV1> for ValidatedDnaManifest {
+impl TryFrom<DnaManifestV0> for ValidatedDnaManifest {
     type Error = DnaError;
 
-    fn try_from(value: DnaManifestV1) -> Result<Self, Self::Error> {
+    fn try_from(value: DnaManifestV0) -> Result<Self, Self::Error> {
         DnaManifest::from(value).try_into()
     }
 }
@@ -169,7 +169,7 @@ mod tests {
             .into();
 
         match &manifest {
-            DnaManifest::V1(m) => {
+            DnaManifest::V0(m) => {
                 assert_eq!(m.coordinator, CoordinatorManifest::default());
                 #[cfg(feature = "unstable-migration")]
                 assert_eq!(m.lineage, vec![]);

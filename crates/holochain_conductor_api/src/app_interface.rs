@@ -450,7 +450,7 @@ impl AppInfo {
 
                     // Update the manifest with the installed hash
                     match &mut manifest {
-                        AppManifest::V1(manifest) => {
+                        AppManifest::V0(manifest) => {
                             if let Some(role) =
                                 manifest.roles.iter_mut().find(|r| r.name == *role_name)
                             {

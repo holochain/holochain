@@ -5,7 +5,7 @@ use matches::assert_matches;
 fn duplicate_zome_names_is_an_error() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
   zomes:
@@ -30,7 +30,7 @@ coordinator:
 fn dependency_not_pointing_at_integrity_zome_is_error() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
   zomes:
@@ -59,7 +59,7 @@ coordinator:
     // Fails when depending on a coordinator.
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
   zomes:
@@ -89,7 +89,7 @@ coordinator:
     // Fails when pointing to self.
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
   zomes:
