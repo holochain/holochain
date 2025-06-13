@@ -227,9 +227,7 @@ impl ConductorBuilder {
         };
 
         let holochain_p2p =
-            match holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone(), REQUEST_TIMEOUT)
-                .await
-            {
+            match holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone()).await {
                 Ok(r) => r,
                 Err(err) => {
                     tracing::error!(?err, "Error spawning networking");
@@ -449,6 +447,7 @@ impl ConductorBuilder {
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             compat,
+            request_timeout: REQUEST_TIMEOUT,
             k2_test_builder: !builder.test_builder_uses_production_k2_builder,
             #[cfg(feature = "test_utils")]
             disable_bootstrap: config.network.disable_bootstrap,
@@ -461,8 +460,7 @@ impl ConductorBuilder {
         };
 
         let holochain_p2p =
-            holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone(), REQUEST_TIMEOUT)
-                .await?;
+            holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone()).await?;
 
         let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);

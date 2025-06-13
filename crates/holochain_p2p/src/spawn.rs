@@ -10,10 +10,9 @@ pub use actor::WrapEvtSender;
 pub async fn spawn_holochain_p2p(
     config: HolochainP2pConfig,
     lair_client: holochain_keystore::MetaLairClient,
-    request_timeout: Duration,
 ) -> HolochainP2pResult<DynHcP2p> {
     tracing::info!(?config, "Launching HolochainP2p");
-    actor::HolochainP2pActor::create(config, lair_client, request_timeout).await
+    actor::HolochainP2pActor::create(config, lair_client).await
 }
 
 /// Callback function to retrieve a peer meta database handle for a dna hash.

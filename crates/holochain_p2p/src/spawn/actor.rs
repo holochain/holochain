@@ -760,7 +760,6 @@ impl HolochainP2pActor {
     pub async fn create(
         config: HolochainP2pConfig,
         lair_client: holochain_keystore::MetaLairClient,
-        request_timeout: Duration,
     ) -> HolochainP2pResult<actor::DynHcP2p> {
         static K2_CONFIG: std::sync::Once = std::sync::Once::new();
         K2_CONFIG.call_once(|| {
@@ -884,7 +883,7 @@ impl HolochainP2pActor {
             kitsune,
             pending,
             request_duration_metric: create_p2p_request_duration_metric(),
-            request_timeout,
+            request_timeout: config.request_timeout,
         }))
     }
 
@@ -2049,17 +2048,11 @@ impl actor::HcP2p for HolochainP2pActor {
 mod tests {
     use super::*;
 
-    const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
-
     #[tokio::test(flavor = "multi_thread")]
     async fn correct_id_loc_calc() {
         // make sure our "Once" kitsune2 setup is executed
-        let _ = HolochainP2pActor::create(
-            Default::default(),
-            holochain_keystore::test_keystore(),
-            REQUEST_TIMEOUT,
-        )
-        .await;
+        let _ = HolochainP2pActor::create(Default::default(), holochain_keystore::test_keystore())
+            .await;
 
         let h_space = DnaHash::from_raw_32(vec![0xdb; 32]);
         let k_space = h_space.to_k2_space();
@@ -2080,12 +2073,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn correct_id_display() {
         // make sure our "Once" kitsune2 setup is executed
-        let _ = HolochainP2pActor::create(
-            Default::default(),
-            holochain_keystore::test_keystore(),
-            REQUEST_TIMEOUT,
-        )
-        .await;
+        let _ = HolochainP2pActor::create(Default::default(), holochain_keystore::test_keystore())
+            .await;
 
         let h_space = DnaHash::from_raw_32(vec![0xdb; 32]);
         let k_space = h_space.to_k2_space();
