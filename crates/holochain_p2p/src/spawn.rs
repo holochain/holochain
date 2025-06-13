@@ -54,6 +54,11 @@ pub struct HolochainP2pConfig {
     /// The compat params to use.
     pub compat: NetworkCompatParams,
 
+    /// The amount of time to elapse before a request times out.
+    ///
+    /// Defaults to 60 seconds.
+    pub request_timeout: Duration,
+
     /// If true, will use kitsune core test bootstrap / transport / etc.
     #[cfg(feature = "test_utils")]
     pub k2_test_builder: bool,
@@ -87,6 +92,7 @@ impl std::fmt::Debug for HolochainP2pConfig {
         let mut dbg = f.debug_struct("HolochainP2pConfig");
         dbg.field("compat", &self.compat);
         dbg.field("auth_material", &self.auth_material);
+        dbg.field("request_timeout", &self.request_timeout);
 
         #[cfg(feature = "test_utils")]
         {
@@ -109,6 +115,7 @@ impl Default for HolochainP2pConfig {
             auth_material: None,
             network_config: None,
             compat: Default::default(),
+            request_timeout: Duration::from_secs(60),
             #[cfg(feature = "test_utils")]
             k2_test_builder: false,
             #[cfg(feature = "test_utils")]
