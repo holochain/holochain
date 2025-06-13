@@ -602,7 +602,7 @@ pub async fn install_app_bundle(
     let installed_app = client.install_app(payload).await?;
 
     match &installed_app.manifest {
-        AppManifest::V1(manifest) => {
+        AppManifest::V0(manifest) => {
             if !manifest.allow_deferred_memproofs {
                 client
                     .enable_app(installed_app.installed_app_id.clone())

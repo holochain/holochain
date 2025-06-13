@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Change versions of `DnaManifest`, `AppManifest` and `WebAppManifest` to `0`.
+
 ## 0.6.0-dev.8
 
 ## 0.6.0-dev.7

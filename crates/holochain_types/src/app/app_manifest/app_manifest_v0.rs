@@ -1,4 +1,4 @@
-//! App Manifest format, installed_hash 1.
+//! App Manifest format version 0.
 //!
 //! **NB: do not modify the types in this file**!
 //! (at least not after this initial schema has been stabilized).
@@ -20,7 +20,7 @@ use holochain_zome_types::prelude::*;
 use schemars::JsonSchema;
 use std::collections::HashMap;
 
-/// Version 1 of the App manifest schema
+/// Version 0 of the App manifest schema
 #[derive(
     Clone,
     Debug,
@@ -32,7 +32,7 @@ use std::collections::HashMap;
     derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case")]
-pub struct AppManifestV1 {
+pub struct AppManifestV0 {
     /// Name of the App. This may be used as the installed_app_id.
     pub name: String,
 
@@ -164,7 +164,7 @@ impl Default for CellProvisioning {
     }
 }
 
-impl AppManifestV1 {
+impl AppManifestV0 {
     /// Update the network seed for all DNAs used in Create-provisioned Cells.
     /// Cells with other provisioning strategies are not affected.
     pub fn set_network_seed(&mut self, network_seed: NetworkSeed) {
@@ -213,7 +213,7 @@ impl AppManifestV1 {
 
     /// Convert this human-focused manifest into a validated, concise representation
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
-        let AppManifestV1 {
+        let AppManifestV0 {
             name,
             roles,
             description: _,
@@ -297,7 +297,7 @@ pub mod tests {
         file: Option<String>,
         installed_hash: DnaHash,
         modifiers: DnaModifiersOpt<YamlProperties>,
-    ) -> AppManifestV1 {
+    ) -> AppManifestV0 {
         let roles = vec![AppRoleManifest {
             name: "role_name".into(),
             dna: AppRoleDnaManifest {
@@ -308,7 +308,7 @@ pub mod tests {
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
         }];
-        AppManifestV1 {
+        AppManifestV0 {
             name: "Test app".to_string(),
             description: Some("Serialization round trip test".to_string()),
             roles,
@@ -317,7 +317,7 @@ pub mod tests {
     }
 
     #[tokio::test]
-    async fn manifest_v1_roundtrip() {
+    async fn manifest_v0_roundtrip() {
         let file = Some("/tmp/test.dna".to_string());
         let modifiers = DnaModifiersOpt {
             properties: Some(app_manifest_properties_fixture()),
@@ -334,7 +334,7 @@ pub mod tests {
         let expected_yaml = format!(
             r#"---
 
-manifest_version: "1"
+manifest_version: "0"
 name: "Test app"
 description: "Serialization roundtrip test"
 roles:
@@ -374,8 +374,8 @@ roles:
     }
 
     #[tokio::test]
-    async fn manifest_v1_set_network_seed() {
-        let mut manifest = AppManifestV1 {
+    async fn manifest_v0_set_network_seed() {
+        let mut manifest = AppManifestV0 {
             name: "test".to_string(),
             description: None,
             roles: vec![],
