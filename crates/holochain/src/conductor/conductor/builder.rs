@@ -9,9 +9,6 @@ use holochain_p2p::NetworkCompatParams;
 use lair_keystore_api::types::SharedLockedArray;
 use std::sync::Mutex;
 
-/// Hard-code for now.
-const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
-
 /// A configurable Builder for Conductor and sometimes ConductorHandle
 #[derive(Default)]
 pub struct ConductorBuilder {
@@ -223,6 +220,7 @@ impl ConductorBuilder {
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             compat,
+            request_timeout: std::time::Duration::from_secs(config.request_timeout_seconds),
             ..Default::default()
         };
 
@@ -447,7 +445,7 @@ impl ConductorBuilder {
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             compat,
-            request_timeout: REQUEST_TIMEOUT,
+            request_timeout: std::time::Duration::from_secs(config.request_timeout_seconds),
             k2_test_builder: !builder.test_builder_uses_production_k2_builder,
             #[cfg(feature = "test_utils")]
             disable_bootstrap: config.network.disable_bootstrap,
