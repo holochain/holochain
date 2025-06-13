@@ -1,17 +1,43 @@
+use ::fixt::fixt;
+use holo_hash::fixt::ActionHashFixturator;
 use holochain_keystore::*;
 use holochain_p2p::event::*;
 use holochain_p2p::*;
 use holochain_trace::test_run;
 use holochain_types::prelude::*;
 use kitsune2_api::*;
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
+const UNRESPONSIVE_TIMEOUT: Duration = Duration::from_secs(5);
+const WAIT_BETWEEN_CALLS: Duration = Duration::from_millis(10);
 
 #[derive(Clone, Debug)]
-struct Handler(pub Arc<Mutex<Vec<String>>>);
+struct Handler {
+    pub calls: Arc<Mutex<Vec<String>>>,
+    get_response: WireOps,
+    get_response_delay: Option<Duration>,
+}
+
+impl Handler {
+    fn new(get_response: WireOps, get_response_delay: Option<Duration>) -> Self {
+        Self {
+            calls: Default::default(),
+            get_response,
+            get_response_delay,
+        }
+    }
+}
 
 impl Default for Handler {
     fn default() -> Self {
-        Handler(Arc::new(Mutex::new(Vec::new())))
+        Handler {
+            calls: Arc::new(Mutex::new(Vec::new())),
+            get_response: WireOps::Entry(WireEntryOps::new()),
+            get_response_delay: None,
+        }
     }
 }
 
@@ -28,7 +54,7 @@ impl HcP2pHandler for Handler {
                 "got_call_remote: {}",
                 String::from_utf8_lossy(&zome_call_params_serialized.0),
             );
-            self.0.lock().unwrap().push(respond.clone());
+            self.calls.lock().unwrap().push(respond.clone());
             Ok(UnsafeBytes::from(respond.into_bytes()).into())
         })
     }
@@ -40,7 +66,7 @@ impl HcP2pHandler for Handler {
         _ops: Vec<holochain_types::dht_op::DhtOp>,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("publish".into());
+            self.calls.lock().unwrap().push("publish".into());
             Ok(())
         })
     }
@@ -53,9 +79,11 @@ impl HcP2pHandler for Handler {
         _options: holochain_p2p::event::GetOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("get".into());
-            let ops = WireOps::Entry(WireEntryOps::new());
-            Ok(ops)
+            self.calls.lock().unwrap().push("get".into());
+            if let Some(delay) = self.get_response_delay {
+                tokio::time::sleep(delay).await;
+            }
+            Ok(self.get_response.clone())
         })
     }
 
@@ -67,13 +95,13 @@ impl HcP2pHandler for Handler {
         _options: GetMetaOptions,
     ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("get_meta".into());
+            self.calls.lock().unwrap().push("get_meta".into());
             Ok(MetadataSet {
                 actions: Default::default(),
                 invalid_actions: Default::default(),
                 deletes: Default::default(),
                 updates: Default::default(),
-                entry_dht_status: None,
+                entry_dht_status: Some(EntryDhtStatus::Live),
             })
         })
     }
@@ -86,9 +114,13 @@ impl HcP2pHandler for Handler {
         _options: GetLinksOptions,
     ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("get_links".into());
+            self.calls.lock().unwrap().push("get_links".into());
             Ok(WireLinkOps {
-                creates: Vec::new(),
+                creates: vec![WireCreateLink::condense_base_only(
+                    fixt!(CreateLink),
+                    fixt!(Signature),
+                    ValidationStatus::Valid,
+                )],
                 deletes: Vec::new(),
             })
         })
@@ -101,8 +133,8 @@ impl HcP2pHandler for Handler {
         _query: WireLinkQuery,
     ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("count_links".into());
-            Ok(CountLinksResponse::new(Vec::new()))
+            self.calls.lock().unwrap().push("count_links".into());
+            Ok(CountLinksResponse::new(vec![fixt!(ActionHash)]))
         })
     }
 
@@ -115,12 +147,15 @@ impl HcP2pHandler for Handler {
         _options: GetActivityOptions,
     ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("get_agent_activity".into());
+            self.calls.lock().unwrap().push("get_agent_activity".into());
             Ok(AgentActivityResponse {
                 agent: AgentPubKey::from_raw_36(vec![2; 36]),
                 valid_activity: ChainItems::NotRequested,
                 rejected_activity: ChainItems::NotRequested,
-                status: ChainStatus::Empty,
+                status: ChainStatus::Valid(ChainHead {
+                    action_seq: fixt!(Action).action_seq(),
+                    hash: fixt!(ActionHash),
+                }),
                 highest_observed: None,
                 warrants: Vec::new(),
             })
@@ -135,8 +170,11 @@ impl HcP2pHandler for Handler {
         _filter: holochain_zome_types::chain::ChainFilter,
     ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("get_agent_activity".into());
-            Ok(MustGetAgentActivityResponse::EmptyRange)
+            self.calls
+                .lock()
+                .unwrap()
+                .push("must_get_agent_activity".into());
+            Ok(MustGetAgentActivityResponse::activity(Vec::new()))
         })
     }
 
@@ -147,7 +185,10 @@ impl HcP2pHandler for Handler {
         _receipts: ValidationReceiptBundle,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
-            self.0.lock().unwrap().push("validation_receipts".into());
+            self.calls
+                .lock()
+                .unwrap()
+                .push("validation_receipts".into());
             Ok(())
         })
     }
@@ -170,6 +211,117 @@ impl HcP2pHandler for Handler {
     }
 }
 
+/// An implementation of [`HcP2pHandler`] that doesn't ever respond to requests
+#[derive(Clone, Debug)]
+struct UnresponsiveHandler;
+
+impl HcP2pHandler for UnresponsiveHandler {
+    fn handle_call_remote(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _zome_call_params_serialized: ExternIO,
+        _signature: Signature,
+    ) -> BoxFut<HolochainP2pResult<SerializedBytes>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_publish(
+        &self,
+        _dna_hash: DnaHash,
+        _request_validation_receipt: bool,
+        _ops: Vec<holochain_types::dht_op::DhtOp>,
+    ) -> BoxFut<HolochainP2pResult<()>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_get(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _dht_hash: holo_hash::AnyDhtHash,
+        _options: holochain_p2p::event::GetOptions,
+    ) -> BoxFut<HolochainP2pResult<WireOps>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_get_meta(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _dht_hash: holo_hash::AnyDhtHash,
+        _options: GetMetaOptions,
+    ) -> BoxFut<HolochainP2pResult<MetadataSet>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_get_links(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _link_key: WireLinkKey,
+        _options: GetLinksOptions,
+    ) -> BoxFut<HolochainP2pResult<WireLinkOps>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_count_links(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _query: WireLinkQuery,
+    ) -> BoxFut<HolochainP2pResult<CountLinksResponse>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_get_agent_activity(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _agent: AgentPubKey,
+        _query: ChainQueryFilter,
+        _options: GetActivityOptions,
+    ) -> BoxFut<HolochainP2pResult<AgentActivityResponse>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_must_get_agent_activity(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _author: AgentPubKey,
+        _filter: holochain_zome_types::chain::ChainFilter,
+    ) -> BoxFut<HolochainP2pResult<MustGetAgentActivityResponse>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_validation_receipts_received(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _receipts: ValidationReceiptBundle,
+    ) -> BoxFut<HolochainP2pResult<()>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_publish_countersign(
+        &self,
+        _dna_hash: DnaHash,
+        _op: holochain_types::dht_op::ChainOp,
+    ) -> BoxFut<HolochainP2pResult<()>> {
+        Box::pin(std::future::pending())
+    }
+
+    fn handle_countersigning_session_negotiation(
+        &self,
+        _dna_hash: DnaHash,
+        _to_agent: AgentPubKey,
+        _message: CountersigningSessionNegotiationMessage,
+    ) -> BoxFut<HolochainP2pResult<()>> {
+        Box::pin(std::future::pending())
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_call_remote() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
@@ -178,9 +330,9 @@ async fn test_call_remote() {
     let (agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
     let (agent2, hc2, _) = spawn_test(dna_hash.clone(), handler).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // make sure hc2 has its own address
             #[allow(clippy::len_zero)] // !<7 lines>.is_empty() is NOT clearer!
@@ -199,7 +351,7 @@ async fn test_call_remote() {
         }
 
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             let resp = hc2
                 .call_remote(
@@ -261,13 +413,13 @@ async fn test_remote_signal() {
     .await
     .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            if let Some(res) = handler.0.lock().unwrap().first() {
+            if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("got_call_remote: hello", res);
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
         }
     })
     .await
@@ -314,9 +466,9 @@ async fn test_publish() {
         .await
         .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             hc2.publish(
                 dna_hash.clone(),
@@ -333,7 +485,7 @@ async fn test_publish() {
             .await
             .unwrap();
 
-            if let Some(res) = handler.0.lock().unwrap().first() {
+            if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("publish", res);
                 break;
             }
@@ -355,9 +507,9 @@ async fn test_publish_reflect() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             let op = test_dht_op(holochain_types::prelude::Timestamp::now());
             let op_hash = op.as_hash();
@@ -377,7 +529,7 @@ async fn test_publish_reflect() {
             .await
             .unwrap();
 
-            if let Some(res) = handler.0.lock().unwrap().first() {
+            if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("publish", res);
                 break;
             }
@@ -399,9 +551,9 @@ async fn test_get() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -425,6 +577,212 @@ async fn test_get() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_get_with_unresponsive_agents() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::new(
+        WireOps::Record(WireRecordOps {
+            entry: Some(Entry::Agent(fake_agent_pubkey_1())),
+            ..Default::default()
+        }),
+        Some(Duration::from_millis(500)),
+    ));
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+    hc4.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            // If we get a response at all then at least one peer completed the request
+            if hc1
+                .get(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                    holochain_p2p::actor::GetOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_when_not_all_agents_have_data() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let wire_ops = WireOps::Record(WireRecordOps {
+        entry: Some(Entry::Agent(fake_agent_pubkey_1())),
+        ..Default::default()
+    });
+    let handler = Arc::new(Handler::new(
+        wire_ops.clone(),
+        Some(Duration::from_millis(500)),
+    ));
+    let empty_handler = Arc::new(Handler::default());
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            // Wait until we get the response we want
+            if let Ok(response) = hc1
+                .get(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                    holochain_p2p::actor::GetOptions::default(),
+                )
+                .await
+            {
+                if response.first().unwrap() == &wire_ops {
+                    break;
+                }
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = empty_handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get"]);
+
+    let requests = handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_when_not_all_agents_have_data_and_unresponsive_agent() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let wire_ops = WireOps::Record(WireRecordOps {
+        entry: Some(Entry::Agent(fake_agent_pubkey_1())),
+        ..Default::default()
+    });
+    let handler = Arc::new(Handler::new(
+        wire_ops.clone(),
+        Some(Duration::from_millis(500)),
+    ));
+    let empty_handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+    hc4.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            // Wait until we get the response we want
+            if let Ok(response) = hc1
+                .get(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                    holochain_p2p::actor::GetOptions::default(),
+                )
+                .await
+            {
+                if response.first().unwrap() == &wire_ops {
+                    break;
+                }
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = empty_handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get"]);
+
+    let requests = handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_get_empty_data_better_than_no_response() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let empty_handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), empty_handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), empty_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+
+    // One agent will respond with empty data so we need to wait for the other one to timeout
+    // before we will get the empty data.
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            if hc1
+                .get(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                    holochain_p2p::actor::GetOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = empty_handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_get_meta() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
@@ -436,9 +794,9 @@ async fn test_get_meta() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -462,6 +820,51 @@ async fn test_get_meta() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_get_meta_with_unresponsive_agents() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+    hc4.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            // If we get a response at all then at least one peer completed the request
+            if hc1
+                .get_meta(
+                    dna_hash.clone(),
+                    HoloHash::from_raw_36_and_type(
+                        vec![1; 36],
+                        holo_hash::hash_type::AnyDht::Entry,
+                    ),
+                    holochain_p2p::actor::GetMetaOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get_meta"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_get_links() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
@@ -473,9 +876,9 @@ async fn test_get_links() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -507,6 +910,59 @@ async fn test_get_links() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_get_links_with_unresponsive_agents() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+    hc4.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            // If we get a response at all then at least one peer completed the request
+            if hc1
+                .get_links(
+                    dna_hash.clone(),
+                    WireLinkKey {
+                        base: HoloHash::from_raw_36_and_type(
+                            vec![1; 36],
+                            holo_hash::hash_type::AnyDht::Entry,
+                        )
+                        .into(),
+                        type_query: LinkTypeFilter::Types(Vec::new()),
+                        tag: None,
+                        after: None,
+                        before: None,
+                        author: None,
+                    },
+                    holochain_p2p::actor::GetLinksOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get_links"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_count_links() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
@@ -518,9 +974,9 @@ async fn test_count_links() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -551,6 +1007,58 @@ async fn test_count_links() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_count_links_with_unresponsive_agents() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+    hc4.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            // If we get a response at all then at least one peer completed the request
+            if hc1
+                .count_links(
+                    dna_hash.clone(),
+                    WireLinkQuery {
+                        base: HoloHash::from_raw_36_and_type(
+                            vec![1; 36],
+                            holo_hash::hash_type::AnyDht::Entry,
+                        )
+                        .into(),
+                        link_type: LinkTypeFilter::Types(Vec::new()),
+                        tag_prefix: None,
+                        before: None,
+                        after: None,
+                        author: None,
+                    },
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["count_links"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_get_agent_activity() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
@@ -562,9 +1070,9 @@ async fn test_get_agent_activity() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -593,6 +1101,56 @@ async fn test_get_agent_activity() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_get_agent_activity_with_unresponsive_agents() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+    hc4.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            // If we get a response at all then at least one peer completed the request
+            if hc1
+                .get_agent_activity(
+                    dna_hash.clone(),
+                    AgentPubKey::from_raw_36(vec![2; 36]),
+                    ChainQueryFilter {
+                        sequence_range: ChainQueryFilterRange::Unbounded,
+                        entry_type: None,
+                        entry_hashes: None,
+                        action_type: None,
+                        include_entries: false,
+                        order_descending: false,
+                    },
+                    holochain_p2p::actor::GetActivityOptions::default(),
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["get_agent_activity"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_must_get_agent_activity() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let space = dna_hash.to_k2_space();
@@ -604,9 +1162,9 @@ async fn test_must_get_agent_activity() {
     hc1.test_set_full_arcs(space.clone()).await;
     hc2.test_set_full_arcs(space.clone()).await;
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // if we get a response at all, the full back-n-forth succeeded
             if hc2
@@ -631,6 +1189,52 @@ async fn test_must_get_agent_activity() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_must_get_agent_activity_with_unresponsive_agents() {
+    let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
+    let space = dna_hash.to_k2_space();
+    let handler = Arc::new(Handler::default());
+    let unresponsive_handler = Arc::new(UnresponsiveHandler);
+
+    let (_agent1, hc1, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+    let (_agent2, hc2, _) = spawn_test(dna_hash.clone(), unresponsive_handler.clone()).await;
+    let (_agent3, hc3, _) = spawn_test(dna_hash.clone(), unresponsive_handler).await;
+    let (_agent4, hc4, _) = spawn_test(dna_hash.clone(), handler.clone()).await;
+
+    hc1.test_set_full_arcs(space.clone()).await;
+    hc2.test_set_full_arcs(space.clone()).await;
+    hc3.test_set_full_arcs(space.clone()).await;
+    hc4.test_set_full_arcs(space.clone()).await;
+
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
+        loop {
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
+
+            // If we get a response at all then at least one peer completed the request
+            if hc1
+                .must_get_agent_activity(
+                    dna_hash.clone(),
+                    AgentPubKey::from_raw_36(vec![2; 36]),
+                    ChainFilter {
+                        chain_top: ActionHash::from_raw_36(vec![3; 36]),
+                        filters: ChainFilters::ToGenesis,
+                        include_cached_entries: false,
+                    },
+                )
+                .await
+                .is_ok()
+            {
+                return;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    let requests = handler.calls.lock().unwrap();
+    assert_eq!(*requests, ["must_get_agent_activity"]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_validation_receipts() {
     let dna_hash = DnaHash::from_raw_36(vec![0; 36]);
     let handler = Arc::new(Handler::default());
@@ -646,13 +1250,13 @@ async fn test_validation_receipts() {
     .await
     .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            if let Some(res) = handler.0.lock().unwrap().first() {
+            if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("validation_receipts", res);
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
         }
     })
     .await
@@ -710,9 +1314,9 @@ async fn bridged_call_remote() {
         .await
         .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // Make sure we know about both agents
             if hc1
@@ -781,9 +1385,9 @@ async fn bridged_remote_signal() {
         .await
         .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
 
             // Make sure we know about both agents
             if hc1
@@ -825,13 +1429,13 @@ async fn bridged_remote_signal() {
     .await
     .unwrap();
 
-    tokio::time::timeout(std::time::Duration::from_secs(20), async {
+    tokio::time::timeout(UNRESPONSIVE_TIMEOUT, async {
         loop {
-            if let Some(res) = handler.0.lock().unwrap().first() {
+            if let Some(res) = handler.calls.lock().unwrap().first() {
                 assert_eq!("got_call_remote: hello", res);
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            tokio::time::sleep(WAIT_BETWEEN_CALLS).await;
         }
     })
     .await
@@ -863,6 +1467,7 @@ async fn spawn_test(
             ..Default::default()
         },
         lair_client.clone(),
+        Duration::from_secs(1),
     )
     .await
     .unwrap();
