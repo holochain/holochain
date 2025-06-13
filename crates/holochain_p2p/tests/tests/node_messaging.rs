@@ -1457,10 +1457,10 @@ async fn spawn_test(
                 Box::pin(async move { Ok(db_op.clone()) })
             }),
             k2_test_builder: true,
+            request_timeout: Duration::from_secs(1),
             ..Default::default()
         },
         lair_client.clone(),
-        Duration::from_secs(1),
     )
     .await
     .unwrap();
