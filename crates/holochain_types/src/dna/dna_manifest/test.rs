@@ -4,7 +4,7 @@ use super::*;
 fn can_deserialize_dna_manifest_integrity_zomes() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
   network_seed: blablabla
@@ -25,7 +25,7 @@ integrity:
 fn can_deserialize_dna_manifest_all_zomes() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
   network_seed: blablabla
@@ -52,9 +52,9 @@ coordinator:
 fn deserialize_dna_manifest_coordinator_only() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
-integrity: 
+integrity:
   network_seed: blablabla
   properties: ~
   zomes: ~
@@ -74,7 +74,7 @@ coordinator:
 fn rejects_manifest_with_unknown_fields() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
   network_seed: blablabla
@@ -100,7 +100,7 @@ not_a_real_field: ~"#;
 fn rejects_manifest_with_coordinators_defined_under_integrity() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
   network_seed: blablabla
@@ -132,7 +132,7 @@ integrity:
 fn rejects_manifest_with_integrity_defined_under_coordinators() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 coordinator:
   zomes:
@@ -164,7 +164,7 @@ coordinator:
 fn rejects_manifest_with_unknown_integrity_fields() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
   network_seed: blablabla
@@ -191,7 +191,7 @@ integrity:
 fn rejects_manifest_with_unknown_coordinator_fields() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 coordinator:
   not_a_real_field: ~
@@ -214,7 +214,7 @@ coordinator:
 fn rejects_manifest_with_unknown_zome_fields_in_integrity() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 integrity:
   network_seed: blablabla
@@ -241,7 +241,7 @@ integrity:
 fn rejects_manifest_with_unknown_zome_field_in_coordinator() {
     let manifest_yaml = r#"
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: test_dna
 coordinator:
   zomes:

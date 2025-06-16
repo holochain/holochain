@@ -13,7 +13,7 @@ use serde_with::serde_as;
 /// An example "dna.yaml" with 2 integrity and 2 coordinator zomes:
 ///
 /// ```yaml
-/// manifest_version: "1"
+/// manifest_version: "0"
 /// name: multi integrity dna
 /// integrity:
 ///   network_seed: 00000000-0000-0000-0000-000000000000
@@ -42,7 +42,7 @@ use serde_with::serde_as;
 /// be **at most one item in this list**.
 ///
 /// ```yaml
-/// manifest_version: "1"
+/// manifest_version: "0"
 /// name: single integrity dna
 /// integrity:
 ///   network_seed: 00000000-0000-0000-0000-000000000000
@@ -70,7 +70,7 @@ use serde_with::serde_as;
     derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub struct DnaManifestV1 {
+pub struct DnaManifestV0 {
     /// The friendly "name" of a Holochain DNA.
     pub name: String,
 
@@ -109,7 +109,7 @@ pub struct DnaManifestV1 {
     pub lineage: Vec<DnaHashB64>,
 }
 
-impl DnaManifestV1 {
+impl DnaManifestV0 {
     /// Get all integrity and coordinator zomes.
     pub fn all_zomes(&self) -> impl Iterator<Item = &ZomeManifest> {
         self.integrity

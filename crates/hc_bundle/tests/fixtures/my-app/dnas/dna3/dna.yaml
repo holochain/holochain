@@ -1,5 +1,5 @@
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: integrity dna
 integrity:
   network_seed: 00000000-0000-0000-0000-000000000000
