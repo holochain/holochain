@@ -639,6 +639,12 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_config_uses_default_values() {
+        let result: ConductorConfig = config_from_yaml("").unwrap();
+        pretty_assertions::assert_eq!(result, ConductorConfig::default());
+    }
+
+    #[test]
     #[allow(clippy::field_reassign_with_default)]
     fn test_config_complete_config() {
         holochain_trace::test_run();
