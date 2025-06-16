@@ -68,7 +68,7 @@ pub use error::*;
 pub use keystore_config::KeystoreConfig;
 
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default, JsonSchema)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -90,6 +90,12 @@ pub struct ConductorConfig {
     /// Optional config for the network module.
     #[serde(default)]
     pub network: NetworkConfig,
+
+    /// The amount of time, in seconds, to elapse before a request times out.
+    ///
+    /// Defaults to 60 seconds.
+    #[serde(default = "default_request_timeout_s")]
+    pub request_timeout_s: u64,
 
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
@@ -115,6 +121,24 @@ pub struct ConductorConfig {
 
     /// Tracing scope.
     pub tracing_scope: Option<String>,
+}
+
+impl Default for ConductorConfig {
+    fn default() -> Self {
+        Self {
+            tracing_override: Default::default(),
+            data_root_path: Default::default(),
+            keystore: Default::default(),
+            admin_interfaces: Default::default(),
+            network: Default::default(),
+            request_timeout_s: default_request_timeout_s(),
+            #[cfg(feature = "chc")]
+            chc_url: Default::default(),
+            db_sync_strategy: Default::default(),
+            tuning_params: Default::default(),
+            tracing_scope: Default::default(),
+        }
+    }
 }
 
 /// Helper function to load a config from a YAML string.
@@ -168,6 +192,10 @@ impl ConductorConfig {
     pub fn has_rendezvous_bootstrap(&self) -> bool {
         self.network.bootstrap_url == url2::url2!("rendezvous:")
     }
+}
+
+const fn default_request_timeout_s() -> u64 {
+    60
 }
 
 #[inline(always)]
@@ -598,6 +626,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
+                request_timeout_s: 60,
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
@@ -607,6 +636,12 @@ mod tests {
                 tracing_scope: None,
             }
         );
+    }
+
+    #[test]
+    fn test_empty_config_uses_default_values() {
+        let result: ConductorConfig = config_from_yaml("").unwrap();
+        pretty_assertions::assert_eq!(result, ConductorConfig::default());
     }
 
     #[test]
@@ -649,6 +684,8 @@ mod tests {
         }
       }
 
+    request_timeout_s: 70
+
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
@@ -685,6 +722,7 @@ mod tests {
                     }
                 }]),
                 network: network_config,
+                request_timeout_s: 70,
                 db_sync_strategy: DbSyncStrategy::Fast,
                 #[cfg(feature = "chc")]
                 chc_url: None,
@@ -710,6 +748,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
+                request_timeout_s: default_request_timeout_s(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
