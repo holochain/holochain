@@ -94,8 +94,8 @@ pub struct ConductorConfig {
     /// The amount of time, in seconds, to elapse before a request times out.
     ///
     /// Defaults to 60 seconds.
-    #[serde(default = "default_request_timeout_seconds")]
-    pub request_timeout_seconds: u64,
+    #[serde(default = "default_request_timeout_s")]
+    pub request_timeout_s: u64,
 
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
@@ -131,7 +131,7 @@ impl Default for ConductorConfig {
             keystore: Default::default(),
             admin_interfaces: Default::default(),
             network: Default::default(),
-            request_timeout_seconds: default_request_timeout_seconds(),
+            request_timeout_s: default_request_timeout_s(),
             #[cfg(feature = "chc")]
             chc_url: Default::default(),
             db_sync_strategy: Default::default(),
@@ -194,7 +194,7 @@ impl ConductorConfig {
     }
 }
 
-const fn default_request_timeout_seconds() -> u64 {
+const fn default_request_timeout_s() -> u64 {
     60
 }
 
@@ -626,7 +626,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
-                request_timeout_seconds: 60,
+                request_timeout_s: 60,
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
@@ -684,7 +684,7 @@ mod tests {
         }
       }
 
-    request_timeout_seconds: 70
+    request_timeout_s: 70
 
     db_sync_strategy: Fast
     "#;
@@ -722,7 +722,7 @@ mod tests {
                     }
                 }]),
                 network: network_config,
-                request_timeout_seconds: 70,
+                request_timeout_s: 70,
                 db_sync_strategy: DbSyncStrategy::Fast,
                 #[cfg(feature = "chc")]
                 chc_url: None,
@@ -748,7 +748,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
-                request_timeout_seconds: default_request_timeout_seconds(),
+                request_timeout_s: default_request_timeout_s(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },
