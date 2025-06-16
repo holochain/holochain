@@ -9,9 +9,6 @@ use holochain_p2p::NetworkCompatParams;
 use lair_keystore_api::types::SharedLockedArray;
 use std::sync::Mutex;
 
-/// Hard-code for now.
-const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
-
 /// A configurable Builder for Conductor and sometimes ConductorHandle
 #[derive(Default)]
 pub struct ConductorBuilder {
@@ -223,13 +220,12 @@ impl ConductorBuilder {
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             compat,
+            request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
             ..Default::default()
         };
 
         let holochain_p2p =
-            match holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone(), REQUEST_TIMEOUT)
-                .await
-            {
+            match holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone()).await {
                 Ok(r) => r,
                 Err(err) => {
                     tracing::error!(?err, "Error spawning networking");
@@ -449,6 +445,7 @@ impl ConductorBuilder {
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             compat,
+            request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
             k2_test_builder: !builder.test_builder_uses_production_k2_builder,
             #[cfg(feature = "test_utils")]
             disable_bootstrap: config.network.disable_bootstrap,
@@ -461,8 +458,7 @@ impl ConductorBuilder {
         };
 
         let holochain_p2p =
-            holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone(), REQUEST_TIMEOUT)
-                .await?;
+            holochain_p2p::spawn_holochain_p2p(p2p_config, keystore.clone()).await?;
 
         let (post_commit_sender, post_commit_receiver) =
             tokio::sync::mpsc::channel(POST_COMMIT_CHANNEL_BOUND);
