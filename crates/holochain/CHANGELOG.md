@@ -6,7 +6,8 @@ default_semver_increment_mode: !pre_patch rc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-
+- Filter out unresponsive agents when publishing ops. Any URL that is set as unresponsive in the peer meta store will be filtered out when determining the agents
+  near a location to publish to.
 - Integrate all app validated ops, regardless of type and order
 - Remove DHT DB query cache, a premature optimization that made integration complicated and error-prone without any appreciable benefit.
 - Adds the `--origin` option to the `hc sandbox call` command in order to allow making admin calls to deployed conductors with restricted `allowed_origins`.
