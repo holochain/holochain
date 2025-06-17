@@ -85,5 +85,7 @@ pub mod sql_peer_meta_store {
 
     pub const GET: &str = include_str!("sql/peer_meta_store/get.sql");
 
+    pub const GET_ALL_BY_KEY: &str = include_str!("sql/peer_meta_store/get_all_by_key.sql");
+
     pub const DELETE: &str = include_str!("sql/peer_meta_store/delete.sql");
 }
