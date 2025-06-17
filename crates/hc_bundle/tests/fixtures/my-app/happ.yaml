@@ -16,7 +16,7 @@ roles:
         properties: ~
       clone_limit: 0
     coordinators:
-      zomes: ~
+      zomes: []
   - name: role-2
     provisioning:
       strategy: clone_only
