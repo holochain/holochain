@@ -6,6 +6,9 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Implement new call `get_all_by_key` for `PeerMetaStore`. Adds the call to retrieve all URLs and values for a given key from the store.
+- Filter out unresponsive agents when publishing ops. Any URL that is set as unresponsive in the peer meta store will be filtered out when determining the agents
+  near a location to publish to.
 
 - Change versions of `DnaManifest`, `AppManifest` and `WebAppManifest` to `0`.
 
