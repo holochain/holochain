@@ -14,4 +14,4 @@ roles:
       version: null
       clone_limit: 0
     coordinators:
-      zomes: ~
+      zomes: []
