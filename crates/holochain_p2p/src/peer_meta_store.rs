@@ -59,7 +59,7 @@ pub struct HolochainPeerMetaStore {
     db: DbWrite<DbKindPeerMetaStore>,
 }
 
-struct BytesSql(Bytes);
+pub(crate) struct BytesSql(pub(crate) Bytes);
 
 impl ToSql for BytesSql {
     #[inline]
@@ -78,10 +78,10 @@ impl FromSql for BytesSql {
 impl HolochainPeerMetaStore {
     /// Create a new [HolochainPeerMetaStore] from a database handle.
     pub async fn create(db: DbWrite<DbKindPeerMetaStore>) -> DatabaseResult<Self> {
-        // Prune any expired entries on startup
+        // Prune any expired entries on startup.
         db.write_async(|txn| -> DatabaseResult<()> {
-            txn.execute(sql_peer_meta_store::PRUNE, [])?;
-
+            let prune_count = txn.execute(sql_peer_meta_store::PRUNE, [])?;
+            tracing::debug!("pruned {prune_count} rows from meta peer store");
             Ok(())
         })
         .await?;
@@ -123,7 +123,7 @@ impl PeerMetaStore for HolochainPeerMetaStore {
         let db = self.db.clone();
 
         Box::pin(async move {
-            db.write_async(move |txn| -> DatabaseResult<Option<Bytes>> {
+            db.read_async(move |txn| -> DatabaseResult<Option<Bytes>> {
                 let value = match txn.query_row(
                     sql_peer_meta_store::GET,
                     named_params! {
