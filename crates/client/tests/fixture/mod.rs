@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use holochain::prelude::DnaModifiersOpt;
+use holochain::prelude::{CoordinatorManifest, DnaModifiersOpt};
 use holochain_types::app::{
     AppManifest, AppManifestV0, AppRoleDnaManifest, AppRoleManifest, CellProvisioning,
 };
