@@ -2,13 +2,19 @@
 
 use crate::metrics::create_p2p_request_duration_metric;
 use crate::*;
+use holochain_sqlite::error::{DatabaseError, DatabaseResult};
+use holochain_sqlite::rusqlite::types::Value;
+use holochain_sqlite::sql::sql_peer_meta_store;
+use holochain_state::prelude::named_params;
 use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::future::Future;
+use std::rc::Rc;
 use std::sync::{Mutex, Weak};
 use std::time::Duration;
+use tokio::task::AbortHandle;
 
 /// Hard-code for now.
 const PARALLEL_GET_AGENTS_COUNT: usize = 3;
@@ -253,6 +259,7 @@ pub(crate) struct HolochainP2pActor {
     kitsune: DynKitsune,
     pending: Arc<Mutex<Pending>>,
     request_duration_metric: metrics::P2pRequestDurationMetric,
+    pruning_task_abort_handle: AbortHandle,
     request_timeout: Duration,
 }
 
@@ -755,6 +762,12 @@ impl kitsune2_api::BootstrapFactory for BootWrapFact {
     }
 }
 
+impl Drop for HolochainP2pActor {
+    fn drop(&mut self) {
+        self.pruning_task_abort_handle.abort();
+    }
+}
+
 impl HolochainP2pActor {
     /// constructor
     pub async fn create(
@@ -873,6 +886,14 @@ impl HolochainP2pActor {
 
         let kitsune = builder.build().await?;
 
+        let kitsune2 = kitsune.clone();
+        let db_getter = config.get_db_peer_meta.clone();
+        let pruning_task_abort_handle = HolochainP2pActor::spawn_pruning_task(
+            config.peer_meta_pruning_interval_ms,
+            kitsune2,
+            db_getter,
+        );
+
         Ok(Arc::new_cyclic(|this| Self {
             this: this.clone(),
             target_arc_factor: config.target_arc_factor,
@@ -883,8 +904,94 @@ impl HolochainP2pActor {
             kitsune,
             pending,
             request_duration_metric: create_p2p_request_duration_metric(),
+            pruning_task_abort_handle,
             request_timeout: config.request_timeout,
         }))
+    }
+
+    // Prunes expired URLs at an interval and checks the peer store for agent infos of unresponsive
+    // URLs. If there is an updated agent info since the URL was marked unresponsive, the URL will
+    // be pruned.
+    fn spawn_pruning_task(
+        interval_ms: u64,
+        kitsune2: DynKitsune,
+        db_getter: GetDbPeerMeta,
+    ) -> AbortHandle {
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_millis(interval_ms)).await;
+
+                let spaces = kitsune2.list_spaces();
+                let pruning_futs =
+                    spaces.into_iter().map(|space_id| {
+                        let db_getter = db_getter.clone();
+                        let kitsune2 = kitsune2.clone();
+                        async move {
+                            let space = kitsune2.clone().space(space_id.clone()).await?;
+                            let peer_store = space.peer_store().clone();
+                            let db = db_getter(DnaHash::from_k2_space(&space_id)).await?;
+                            // Prune any expired entries.
+                            db.write_async(|txn| -> DatabaseResult<()> {
+                                let prune_count = txn.execute(sql_peer_meta_store::PRUNE, [])?;
+                                tracing::debug!("pruned {prune_count} rows from meta peer store");
+                                Ok(())
+                            })
+                            .await
+                            .map_err(HolochainP2pError::other)?;
+
+                            // Get agent infos from peer store and compare if there are any up-to-date ones with
+                            // any of the unresponsive URLs.
+                            // That would indicate that the URL was unresponsive temporarily and has become
+                            // responsive again.
+                            let agents = peer_store.get_all().await?;
+                            let urls_to_prune = db
+                                .read_async(move |txn| -> DatabaseResult<Vec<Value>> {
+                                    let mut stmt = txn.prepare(sql_peer_meta_store::SELECT_URLS)?;
+                                    let mut rows = stmt.query(
+                                    named_params! {":meta_key":format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")},
+                                    )?;
+                                    let mut urls = Vec::new();
+                                    while let Some(row) = rows.next()? {
+                                        // Expecting is safe here, because the inserted values must have been URLs.
+                                        let peer_url = Url::from_str(row.get::<_, String>(0)?).map_err(|err|DatabaseError::Other(err.into()))?;
+                                        let timestamp =
+                                            rmp_serde::from_slice::<kitsune2_api::Timestamp>(
+                                                &(row.get::<_, BytesSql>(1)?.0),
+                                            )?;
+                                        if let Some(agent) = agents
+                                            .iter()
+                                            .find(|agent| agent.url == Some(peer_url.clone()))
+                                        {
+                                            if agent.created_at > timestamp {
+                                                urls.push(Value::Text(peer_url.to_string()));
+                                            }
+                                        }
+                                    }
+                                    Ok(urls)
+                                })
+                                .await
+                                .map_err(HolochainP2pError::other)?;
+
+                            // Delete all urls to be pruned from the table.
+                            db.write_async(|txn| -> DatabaseResult<()> {
+                                let values = Rc::new(urls_to_prune);
+                                let mut stmt = txn.prepare(sql_peer_meta_store::DELETE_URLS)?;
+                                stmt.execute(named_params!{":urls": values, ":meta_key": format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")})?;
+                                Ok(())
+                            })
+                            .await
+                            .map_err(HolochainP2pError::other)?;
+
+                            Ok::<_, HolochainP2pError>(())
+                        }
+                    });
+                let results = futures::future::join_all(pruning_futs).await;
+                for err in results.into_iter().filter_map(Result::err) {
+                    tracing::warn!("Pruning peer meta store failed: {err}");
+                }
+            }
+        })
+        .abort_handle()
     }
 
     async fn get_peers_for_location(
