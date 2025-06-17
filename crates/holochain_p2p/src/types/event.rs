@@ -71,6 +71,7 @@ pub enum CountersigningSessionNegotiationMessage {
 }
 
 /// Handle requests made by remote peers.
+#[cfg_attr(feature = "test_utils", automock)]
 pub trait HcP2pHandler: 'static + Send + Sync + std::fmt::Debug {
     /// A remote node is attempting to make a remote call on us.
     fn handle_call_remote(
