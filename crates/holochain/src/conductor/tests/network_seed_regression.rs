@@ -20,7 +20,7 @@ async fn network_seed_regression() {
     .await;
 
     let dna_path = tmp.as_ref().join("the.dna");
-    let bundle = DnaBundle::from_dna_file(dna).unwrap();
+    let bundle = DnaBundle::from_dna_file(dna.clone()).unwrap();
     tokio::fs::write(&dna_path, bundle.pack().unwrap())
         .await
         .unwrap();
@@ -36,6 +36,7 @@ async fn network_seed_regression() {
                 clone_limit: 0,
             },
             provisioning: None,
+            coordinator: dna.coordinator_manifest(),
         }];
 
         AppManifestCurrentBuilder::default()
@@ -231,6 +232,7 @@ impl TestCase {
                 clone_limit: 10,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
+            coordinator: dna.coordinator_manifest(),
         }];
         let manifest = AppManifestCurrentBuilder::default()
             .name(case_str.clone())

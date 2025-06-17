@@ -34,6 +34,7 @@ async fn clone_only_provisioning_creates_no_cell_and_allows_cloning() {
                 clone_limit,
             },
             provisioning: Some(CellProvisioning::CloneOnly),
+            coordinator: dna.coordinator_manifest(),
         }];
 
         let manifest = AppManifestCurrentBuilder::default()
@@ -152,6 +153,7 @@ async fn reject_duplicate_app_for_same_agent() {
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
+        coordinator: dna.coordinator_manifest(),
     }];
 
     let manifest = AppManifestCurrentBuilder::default()
@@ -256,6 +258,7 @@ async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_i
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
+        coordinator: dna.coordinator_manifest(),
     }];
 
     let manifest = AppManifestCurrentBuilder::default()
@@ -438,6 +441,7 @@ async fn use_existing_integration() {
                 clone_limit: 0,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
+            coordinator: dna1.coordinator_manifest(),
         }];
 
         let manifest = AppManifestCurrentBuilder::default()
@@ -459,6 +463,7 @@ async fn use_existing_integration() {
 
     let bundle2 = |correct: bool| {
         let dna2 = dna2.clone();
+        let dna1 = dna1.clone();
         async move {
             let path = format!("{}", dna2.dna_hash());
             let installed_hash = if correct {
@@ -477,6 +482,7 @@ async fn use_existing_integration() {
                         clone_limit: 0,
                     },
                     provisioning: Some(CellProvisioning::Create { deferred: false }),
+                    coordinator: dna1.coordinator_manifest(),
                 },
                 AppRoleManifest {
                     name: "extant".into(),
@@ -487,6 +493,7 @@ async fn use_existing_integration() {
                         clone_limit: 0,
                     },
                     provisioning: Some(CellProvisioning::UseExisting { protected: true }),
+                    coordinator: dna2.coordinator_manifest(),
                 },
             ];
 

@@ -229,6 +229,10 @@ impl CoordinatorZomeDef {
             ZomeDef::Inline { dependencies, .. } => dependencies.push(zome_name.into()),
         }
     }
+
+    pub fn dependencies(&self) -> &[ZomeName] {
+        self.0.dependencies()
+    }
 }
 
 #[cfg(feature = "full-dna-def")]

@@ -46,7 +46,7 @@ pub mod app_manifest_validated;
 mod current;
 mod error;
 
-pub use app_manifest_v0::{AppRoleDnaManifest, CellProvisioning};
+pub use app_manifest_v0::{AppRoleDnaManifest, CellProvisioning, CoordinatorManifest};
 pub use current::*;
 pub use error::*;
 
@@ -148,7 +148,7 @@ impl AppManifest {
 
     /// Derive a manifest from a list of InstalledCells, filling in some values
     /// with defaults.
-    pub fn from_legacy(cells: impl Iterator<Item = InstalledCell>) -> Self {
+    pub fn sample(cells: impl Iterator<Item = InstalledCell>) -> Self {
         let roles = cells
             .map(|InstalledCell { role_name, .. }| {
                 let file = role_name.clone();
@@ -161,6 +161,7 @@ impl AppManifest {
                         installed_hash: None,
                         clone_limit: 256,
                     },
+                    coordinator: CoordinatorManifest::sample(),
                 }
             })
             .collect();

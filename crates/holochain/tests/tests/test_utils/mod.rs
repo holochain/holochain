@@ -298,6 +298,7 @@ pub async fn register_and_install_dna_named(
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
+        coordinator: dna.coordinator_manifest(),
     }];
 
     let manifest = AppManifestCurrentBuilder::default()

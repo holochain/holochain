@@ -35,6 +35,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
                 clone_limit: 0,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
+            coordinator: dna.coordinator_manifest(),
         },
         AppRoleManifest {
             name: role_name_2.clone(),
@@ -46,6 +47,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
                 clone_limit: 0,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
+            coordinator: dna.coordinator_manifest(),
         },
     ];
 
@@ -211,6 +213,7 @@ async fn install_app_with_custom_modifier_fields_none_does_not_override_existing
             clone_limit: 0,
         },
         provisioning: Some(CellProvisioning::Create { deferred: false }),
+        coordinator: dna.coordinator_manifest(),
     }];
 
     let manifest = AppManifestCurrentBuilder::default()

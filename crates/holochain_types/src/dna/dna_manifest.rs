@@ -1,3 +1,4 @@
+use crate::app::app_manifest_v0::CoordinatorManifest;
 use crate::prelude::*;
 use mr_bundle::ResourceIdentifier;
 use schemars::JsonSchema;

@@ -14,9 +14,10 @@ use super::{
     app_manifest_validated::{AppManifestValidated, AppRoleManifestValidated},
     error::{AppManifestError, AppManifestResult},
 };
-use crate::prelude::{RoleName, YamlProperties};
+use crate::dna::ZomeManifest;
 use holo_hash::DnaHashB64;
 use holochain_zome_types::prelude::*;
+use mr_bundle::{Manifest, ResourceIdentifier};
 use schemars::JsonSchema;
 use std::collections::HashMap;
 
@@ -71,6 +72,11 @@ pub struct AppRoleManifest {
     /// Declares where to find the DNA, and options to modify it before
     /// inclusion in a Cell
     pub dna: AppRoleDnaManifest,
+
+    /// Coordinator zomes to install with this DNA.
+    ///
+    /// Does not affect the [`DnaHash`].
+    pub coordinator: CoordinatorManifest,
 }
 
 impl AppRoleManifest {
@@ -80,6 +86,7 @@ impl AppRoleManifest {
             name,
             provisioning: Some(CellProvisioning::default()),
             dna: AppRoleDnaManifest::sample(),
+            coordinator: CoordinatorManifest::sample(),
         }
     }
 }
@@ -226,6 +233,7 @@ impl AppManifestV0 {
                      name,
                      provisioning,
                      dna,
+                     coordinator,
                  }| {
                     let AppRoleDnaManifest {
                         path,
@@ -271,11 +279,48 @@ impl AppManifestV0 {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default, JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+/// Coordinator zomes.
+pub struct CoordinatorManifest {
+    /// Coordinator zomes to install with this dna.
+    pub zomes: Vec<ZomeManifest>,
+}
+
+impl CoordinatorManifest {
+    /// Create a sample CoordinatorManifest as a template to be followed
+    pub fn sample() -> Self {
+        Self {
+            zomes: vec![ZomeManifest::sample()],
+        }
+    }
+}
+
+impl Manifest for CoordinatorManifest {
+    fn generate_resource_ids(&mut self) -> HashMap<ResourceIdentifier, String> {
+        self.zomes
+            .iter()
+            .map(|zome| (zome.resource_id(), zome.path.clone()))
+            .collect()
+    }
+
+    fn resource_ids(&self) -> Vec<ResourceIdentifier> {
+        self.zomes.iter().map(|zome| zome.resource_id()).collect()
+    }
+
+    fn file_name() -> &'static str {
+        "coordinators.yaml"
+    }
+
+    fn bundle_extension() -> &'static str {
+        "coordinators"
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
     use crate::app::app_manifest::AppManifest;
-    use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
 
@@ -307,6 +352,7 @@ pub mod tests {
                 clone_limit: 50,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
+            coordinator: CoordinatorManifest::sample(),
         }];
         AppManifestV0 {
             name: "Test app".to_string(),
@@ -336,7 +382,7 @@ pub mod tests {
 
 manifest_version: "0"
 name: "Test app"
-description: "Serialization roundtrip test"
+description: "Serialization round trip test"
 roles:
   - name: "role_name"
     provisioning:
@@ -350,8 +396,13 @@ roles:
       modifiers:
         properties:
           salad: "bar"
-
-        "#,
+    coordinator:
+      zomes:
+        - name: "sample-zome"
+          hash: ~
+          path: "./path/to/my/zome.wasm"
+          dependencies: ~
+    "#,
             installed_hash
         );
         let actual = serde_yaml::to_value(&manifest).unwrap();
@@ -361,10 +412,14 @@ roles:
         // entire structure would be too fragile for testing.
 
         for getter in [
+            |v: &serde_yaml::Value| v["manifest_version"].clone(),
+            |v: &serde_yaml::Value| v["name"].clone(),
+            |v: &serde_yaml::Value| v["description"].clone(),
             |v: &serde_yaml::Value| v["roles"][0]["name"].clone(),
             |v: &serde_yaml::Value| v["roles"][0]["provisioning"]["deferred"].clone(),
             |v: &serde_yaml::Value| v["roles"][0]["dna"]["installed_hash"].clone(),
             |v: &serde_yaml::Value| v["roles"][0]["dna"]["modifiers"]["properties"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["coordinator"].clone(),
         ] {
             let left = getter(&actual);
             let right = getter(&expected);
@@ -391,6 +446,7 @@ roles:
                     installed_hash: None,
                     clone_limit: 0,
                 },
+                coordinator: CoordinatorManifest::sample(),
             },
             AppRoleManifest {
                 name: "test-role-2".to_string(),
@@ -401,6 +457,7 @@ roles:
                     installed_hash: None,
                     clone_limit: 0,
                 },
+                coordinator: CoordinatorManifest::sample(),
             },
         ];
         manifest.roles[0].provisioning = Some(CellProvisioning::Create { deferred: false });

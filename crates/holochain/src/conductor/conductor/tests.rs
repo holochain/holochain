@@ -66,7 +66,7 @@ async fn can_update_state() {
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "role_name".to_string());
-    let app = InstalledAppCommon::new_legacy("fake app", vec![installed_cell]).unwrap();
+    let app = InstalledAppCommon::sample("fake app", vec![installed_cell]).unwrap();
 
     conductor
         .update_state(|mut state| {
@@ -121,7 +121,7 @@ async fn app_ids_are_unique() {
     let cell_id = fake_cell_id(1);
 
     let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
-    let app = InstalledAppCommon::new_legacy("id".to_string(), vec![installed_cell]).unwrap();
+    let app = InstalledAppCommon::sample("id".to_string(), vec![installed_cell]).unwrap();
 
     conductor.add_disabled_app_to_db(app.clone()).await.unwrap();
 
@@ -153,7 +153,7 @@ async fn role_names_are_unique() {
         InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "1".into()),
         InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "2".into()),
     ];
-    let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
+    let result = InstalledAppCommon::sample("id", cells.into_iter());
     matches::assert_matches!(
         result,
         Err(AppError::DuplicateRoleNames(_, role_names)) if role_names == vec!["1".to_string()]

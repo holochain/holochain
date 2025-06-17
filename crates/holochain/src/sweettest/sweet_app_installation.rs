@@ -15,6 +15,26 @@ pub async fn app_bundle_from_dnas(
 
             let modifiers = DnaModifiersOpt::none();
             let path = format!("{}", dna.dna_hash());
+            let mut coordinators: Vec<ZomeManifest> = Vec::new();
+            for coordinator_def in dna.dna().get_all_coordinators().iter() {
+                let wasm_hash = coordinator_def
+                    .wasm_hash(&coordinator_def.name)
+                    .expect("Failed to get wasm hash. May be an inline zome.");
+                let zome_manifest = ZomeManifest {
+                    name: coordinator_def.name.clone(),
+                    hash: Some(wasm_hash.clone().into()),
+                    path: format!("{}", wasm_hash),
+                    dependencies: Some(
+                        coordinator_def
+                            .dependencies()
+                            .iter()
+                            .map(|name| ZomeDependency { name: name.clone() })
+                            .collect(),
+                    ),
+                };
+                coordinators.push(zome_manifest);
+            }
+
             let manifest = AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {
@@ -29,6 +49,9 @@ pub async fn app_bundle_from_dnas(
                     clone_limit: 255,
                 },
                 provisioning: Some(CellProvisioning::Create { deferred: false }),
+                coordinator: CoordinatorManifest {
+                    zomes: coordinators,
+                },
             };
             let bundle = DnaBundle::from_dna_file(dna.clone()).unwrap();
             (manifest, (path, bundle))
