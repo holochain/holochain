@@ -7,6 +7,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::DnaHash;
 use holochain_nonce::Nonce256Bits;
 use holochain_zome_types::fixt::ActionFixturator;
+use kitsune2_api::DynPeerMetaStore;
 use kitsune2_api::{
     Bootstrap, BootstrapFactory, Builder, Config, DhtArc, DynBootstrap, DynFetch, DynPeerStore,
     DynPublish, DynTransport, K2Result, OpId, Publish, PublishFactory, SpaceId, Url,
@@ -52,6 +53,7 @@ impl PublishFactory for NoopPublishFactory {
         _space_id: SpaceId,
         _fetch: DynFetch,
         _peer_store: DynPeerStore,
+        _peer_meta_store: DynPeerMetaStore,
         _transport: DynTransport,
     ) -> BoxFut<'static, K2Result<DynPublish>> {
         Box::pin(async {
