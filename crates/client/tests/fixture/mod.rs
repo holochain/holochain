@@ -4,8 +4,8 @@ use holochain_types::app::{
     AppManifest, AppManifestV0, AppRoleDnaManifest, AppRoleManifest, CellProvisioning,
 };
 use holochain_types::dna::{
-    CoordinatorManifest, DnaBundle, DnaManifest, DnaManifestV0, IntegrityManifest,
-    ValidatedDnaManifest, ZomeDependency, ZomeManifest,
+    DnaBundle, DnaManifest, DnaManifestV0, IntegrityManifest, ValidatedDnaManifest, ZomeDependency,
+    ZomeManifest,
 };
 use holochain_types::prelude::AppBundle;
 use holochain_wasm_test_utils::{TestWasm, TestWasmPair};
@@ -20,18 +20,19 @@ pub fn get_fixture_app_bundle() -> Bytes {
 }
 
 fn make_fixture_app_bundle() -> Bytes {
+    let coordinator_manifest = CoordinatorManifest {
+        zomes: vec![ZomeManifest {
+            name: "foo".into(),
+            hash: None,
+            dependencies: Some(vec![ZomeDependency {
+                name: "foo_integrity".into(),
+            }]),
+            path: "test_wasm_client.wasm".to_string(),
+        }],
+    };
     let dna_manifest = ValidatedDnaManifest::try_from(DnaManifest::V0(DnaManifestV0 {
         name: "test-dna".to_string(),
-        coordinator: CoordinatorManifest {
-            zomes: vec![ZomeManifest {
-                name: "foo".into(),
-                hash: None,
-                dependencies: Some(vec![ZomeDependency {
-                    name: "foo_integrity".into(),
-                }]),
-                path: "test_wasm_client.wasm".to_string(),
-            }],
-        },
+        coordinator: coordinator_manifest,
         integrity: IntegrityManifest {
             network_seed: None,
             properties: None,
@@ -70,6 +71,7 @@ fn make_fixture_app_bundle() -> Bytes {
                 installed_hash: None,
                 clone_limit: 10,
             },
+            coordinators: coordinator_manifest,
         }],
     });
 

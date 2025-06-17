@@ -76,7 +76,7 @@ pub struct AppRoleManifest {
     /// Coordinator zomes to install with this DNA.
     ///
     /// Does not affect the [`DnaHash`].
-    pub coordinator: CoordinatorManifest,
+    pub coordinators: CoordinatorManifest,
 }
 
 impl AppRoleManifest {
@@ -86,7 +86,7 @@ impl AppRoleManifest {
             name,
             provisioning: Some(CellProvisioning::default()),
             dna: AppRoleDnaManifest::sample(),
-            coordinator: CoordinatorManifest::sample(),
+            coordinators: CoordinatorManifest::sample(),
         }
     }
 }
@@ -233,7 +233,7 @@ impl AppManifestV0 {
                      name,
                      provisioning,
                      dna,
-                     coordinator,
+                     coordinators,
                  }| {
                     let AppRoleDnaManifest {
                         path,
@@ -352,7 +352,7 @@ pub mod tests {
                 clone_limit: 50,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
-            coordinator: CoordinatorManifest::sample(),
+            coordinators: CoordinatorManifest::sample(),
         }];
         AppManifestV0 {
             name: "Test app".to_string(),
@@ -396,7 +396,7 @@ roles:
       modifiers:
         properties:
           salad: "bar"
-    coordinator:
+    coordinators:
       zomes:
         - name: "sample-zome"
           hash: ~
@@ -446,7 +446,7 @@ roles:
                     installed_hash: None,
                     clone_limit: 0,
                 },
-                coordinator: CoordinatorManifest::sample(),
+                coordinators: CoordinatorManifest::sample(),
             },
             AppRoleManifest {
                 name: "test-role-2".to_string(),
@@ -457,7 +457,7 @@ roles:
                     installed_hash: None,
                     clone_limit: 0,
                 },
-                coordinator: CoordinatorManifest::sample(),
+                coordinators: CoordinatorManifest::sample(),
             },
         ];
         manifest.roles[0].provisioning = Some(CellProvisioning::Create { deferred: false });

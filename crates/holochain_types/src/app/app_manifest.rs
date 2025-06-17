@@ -161,7 +161,7 @@ impl AppManifest {
                         installed_hash: None,
                         clone_limit: 256,
                     },
-                    coordinator: CoordinatorManifest::sample(),
+                    coordinators: CoordinatorManifest::sample(),
                 }
             })
             .collect();

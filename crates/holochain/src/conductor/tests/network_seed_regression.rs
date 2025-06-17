@@ -36,7 +36,7 @@ async fn network_seed_regression() {
                 clone_limit: 0,
             },
             provisioning: None,
-            coordinator: dna.coordinator_manifest(),
+            coordinators: dna.coordinator_manifest(),
         }];
 
         AppManifestCurrentBuilder::default()
@@ -232,7 +232,7 @@ impl TestCase {
                 clone_limit: 10,
             },
             provisioning: Some(CellProvisioning::Create { deferred: false }),
-            coordinator: dna.coordinator_manifest(),
+            coordinators: dna.coordinator_manifest(),
         }];
         let manifest = AppManifestCurrentBuilder::default()
             .name(case_str.clone())

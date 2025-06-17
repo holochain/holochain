@@ -49,7 +49,7 @@ pub async fn app_bundle_from_dnas(
                     clone_limit: 255,
                 },
                 provisioning: Some(CellProvisioning::Create { deferred: false }),
-                coordinator: CoordinatorManifest {
+                coordinators: CoordinatorManifest {
                     zomes: coordinators,
                 },
             };
