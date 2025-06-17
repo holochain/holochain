@@ -15,6 +15,8 @@ roles:
         network_seed: "0123456"
         properties: ~
       clone_limit: 0
+    coordinators:
+      zomes: ~
   - name: role-2
     provisioning:
       strategy: clone_only
@@ -26,3 +28,5 @@ roles:
           foo: 1111
           bar: it could be anything
       clone_limit: 10
+    coordinators:
+      zomes: ~

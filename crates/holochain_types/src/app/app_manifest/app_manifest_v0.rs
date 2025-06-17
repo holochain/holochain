@@ -233,7 +233,7 @@ impl AppManifestV0 {
                      name,
                      provisioning,
                      dna,
-                     coordinators,
+                     ..
                  }| {
                     let AppRoleDnaManifest {
                         path,
@@ -419,7 +419,7 @@ roles:
             |v: &serde_yaml::Value| v["roles"][0]["provisioning"]["deferred"].clone(),
             |v: &serde_yaml::Value| v["roles"][0]["dna"]["installed_hash"].clone(),
             |v: &serde_yaml::Value| v["roles"][0]["dna"]["modifiers"]["properties"].clone(),
-            |v: &serde_yaml::Value| v["roles"][0]["coordinator"].clone(),
+            |v: &serde_yaml::Value| v["roles"][0]["coordinators"].clone(),
         ] {
             let left = getter(&actual);
             let right = getter(&expected);

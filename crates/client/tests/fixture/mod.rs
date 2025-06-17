@@ -32,7 +32,7 @@ fn make_fixture_app_bundle() -> Bytes {
     };
     let dna_manifest = ValidatedDnaManifest::try_from(DnaManifest::V0(DnaManifestV0 {
         name: "test-dna".to_string(),
-        coordinator: coordinator_manifest,
+        coordinator: coordinator_manifest.clone(),
         integrity: IntegrityManifest {
             network_seed: None,
             properties: None,
