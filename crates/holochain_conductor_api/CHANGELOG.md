@@ -7,7 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Add `request_timeout_s` as a field to `ConductorConfig` which is converted to a `Duration`, from seconds, and passed as the `request_timeout` to `HolochainP2pConfig`. Defaults to 60. ([#5046](https://github.com/holochain/holochain/pull/5046))
+## 0.6.0-dev.9
+
+- Add `request_timeout_s` as a field to `ConductorConfig` which is converted to a `Duration`, from seconds, and passed as the `request_timeout` to `HolochainP2pConfig`. Defaults to 60. ([\#5046](https://github.com/holochain/holochain/pull/5046))
 
 ## 0.6.0-dev.8
 
