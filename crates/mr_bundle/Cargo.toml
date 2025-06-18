@@ -1,6 +1,6 @@
 [package]
 name = "mr_bundle"
-version = "0.6.0-dev.2"
+version = "0.6.0-dev.3"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 edition = "2021"
 description = "Implements the un-/packing of bundles that either embed or reference a set of resources"

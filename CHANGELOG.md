@@ -14,6 +14,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250618.001210
+
+## [hcterm-0.6.0-dev.9](crates/hcterm/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_cli-0.6.0-dev.9](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_cli\_bundle-0.6.0-dev.9](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.9](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_client-0.8.0-dev.6](crates/holochain_client/CHANGELOG.md#0.8.0-dev.6)
+
+## [holochain-0.6.0-dev.9](crates/holochain/CHANGELOG.md#0.6.0-dev.9)
+
+- Implement new call `get_all_by_key` for `PeerMetaStore`. Adds the call to retrieve all URLs and values for a given key from the store.
+
+- Filter out unresponsive agents when publishing ops. Any URL that is set as unresponsive in the peer meta store will be filtered out when determining the agents near a location to publish to.
+
+- Change versions of `DnaManifest`, `AppManifest` and `WebAppManifest` to `0`.
+
+## [holochain\_cascade-0.6.0-dev.9](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_conductor\_config-0.6.0-dev.9](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.9](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_websocket-0.6.0-dev.9](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_conductor\_api-0.6.0-dev.9](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.9)
+
+- Add `request_timeout_s` as a field to `ConductorConfig` which is converted to a `Duration`, from seconds, and passed as the `request_timeout` to `HolochainP2pConfig`. Defaults to 60. ([\#5046](https://github.com/holochain/holochain/pull/5046))
+
+## [holochain\_p2p-0.6.0-dev.9](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.9)
+
+- Calling functions that get data from other agents now try to get from 3 agents in parallel and return the result of the first agent to respond with valid data ([\#5025](https://github.com/holochain/holochain/pull/5025))
+- Add `request_timeout` as a field to `HolochainP2pConfig` which is used when sending requests to other agents. Defaults to 60 seconds. ([\#5046](https://github.com/holochain/holochain/pull/5046))
+
+## [holochain\_state-0.6.0-dev.9](crates/holochain_state/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_chc-0.3.0-dev.9](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.9)
+
+## [holochain\_types-0.6.0-dev.9](crates/holochain_types/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_sqlite-0.6.0-dev.9](crates/holochain_sqlite/CHANGELOG.md#0.6.0-dev.9)
+
+## [mr\_bundle-0.6.0-dev.3](crates/mr_bundle/CHANGELOG.md#0.6.0-dev.3)
+
 # 20250611.001856
 
 ## [hcterm-0.6.0-dev.8](crates/hcterm/CHANGELOG.md#0.6.0-dev.8)
