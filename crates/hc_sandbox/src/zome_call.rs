@@ -278,7 +278,7 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
 
     match response {
         AppResponse::ZomeCalled(response) => {
-            let response: serde_json::Value = response.decode()?;
+            let response: hc_serde_json::Value = response.decode()?;
             serde_json::to_writer(std::io::stdout(), &response)?;
             println!(); // Add newline
         }

@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Adds the `--origin` option to the `hc sandbox call` command in order to allow making admin calls to deployed conductors with restricted `allowed_origins`.
 - Add `AgentInfo` call to the conductor's app interface to retrieve the discovered peers of the app's various DNAs.
 - Add `AgentMetaInfo` calls to the conductor’s app and admin interfaces to retrieve data from the peer meta store for a given agent by their Url [#5043](https://github.com/holochain/holochain/pull/5043)
+- Patch `serde_json` to enable byte arrays to be converted to JSON arrays.
 
 ## 0.5.2
 
