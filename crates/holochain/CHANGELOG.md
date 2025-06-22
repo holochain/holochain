@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Update `AgentInfo` call in `hc-sandbox` to take an optional vector of DNA hashes instead of one optional cell ID, e. g. `hc s call list-agents --dna uhC0kScOJk1aw9a5Kc8jqs0jieGCi4LoeW7vUehsTLvMI455-2hF1 --dna uhC0kScOJk1aw9a5Kc8jqs0jieGCi4LoeW7vUehsTLvMI455-2hF1`.
+- Patch `serde_json` to enable byte arrays to be converted to JSON arrays.
 
 ## 0.6.0-dev.9
 
