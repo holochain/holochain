@@ -1179,7 +1179,7 @@ mod network_impls {
 /// Common install app flags.
 #[derive(Default)]
 pub struct InstallAppCommonFlags {
-    /// From [`AppManifestV1::allow_deferred_memproofs`]
+    /// From [`AppManifestV0::allow_deferred_memproofs`]
     pub defer_memproofs: bool,
     /// From [`InstallAppPayload::ignore_genesis_failure`]
     pub ignore_genesis_failure: bool,
@@ -1366,7 +1366,7 @@ mod app_impls {
             // If a memproof is provided for any of the roles, it will override the app wide
             // allow_deferred_memproofs setting and the provided memproofs will be used immediately.
             let defer_memproofs = match &manifest {
-                AppManifest::V1(m) => m.allow_deferred_memproofs && membrane_proofs.is_empty(),
+                AppManifest::V0(m) => m.allow_deferred_memproofs && membrane_proofs.is_empty(),
             };
 
             let flags = InstallAppCommonFlags {

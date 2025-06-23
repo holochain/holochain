@@ -27,17 +27,17 @@ async fn urls_are_pruned_at_an_interval() {
     let expiry = Timestamp::from_micros(Timestamp::now().as_micros() + 500_000); // 500 ms from now
     let when = Timestamp::now();
     peer_meta_store
-        .mark_peer_unresponsive(unresponsive_peer.clone(), expiry, when)
+        .set_unresponsive(unresponsive_peer.clone(), expiry, when)
         .await
         .unwrap();
 
     // Waiting until the next pruning, but before the expiry, to make sure expiry is respected.
     tokio::time::sleep(Duration::from_millis(100)).await;
-    let when_peer_marked_unresponsive = peer_meta_store
-        .get_unresponsive_url(unresponsive_peer.clone())
+    let when_peer_set_unresponsive = peer_meta_store
+        .get_unresponsive(unresponsive_peer.clone())
         .await
         .unwrap();
-    assert_eq!(when_peer_marked_unresponsive, Some(when));
+    assert_eq!(when_peer_set_unresponsive, Some(when));
 
     let unresponsive_urls = count_rows_in_peer_meta_store(db_peer_meta.clone());
     assert_eq!(unresponsive_urls, 1);
@@ -50,7 +50,7 @@ async fn urls_are_pruned_at_an_interval() {
             tokio::time::sleep(Duration::from_millis(100)).await;
             // This query filters expired rows.
             let when_peer_marked_unresponsive = peer_meta_store
-                .get_unresponsive_url(unresponsive_peer.clone())
+                .get_unresponsive(unresponsive_peer.clone())
                 .await
                 .unwrap();
             // Check the row has actually been deleted from the table.
@@ -79,27 +79,27 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
     let unresponsive_url = Url::from_str("ws://under.water:80").unwrap();
     let expiry = Timestamp::from_micros(Timestamp::now().as_micros() + 10_000_000); // 10 s from now
     peer_meta_store
-        .mark_peer_unresponsive(unresponsive_url.clone(), expiry, Timestamp::now())
+        .set_unresponsive(unresponsive_url.clone(), expiry, Timestamp::now())
         .await
         .unwrap();
     peer_meta_store
-        .mark_peer_unresponsive(unresponsive_url.clone(), expiry, Timestamp::now())
+        .set_unresponsive(unresponsive_url.clone(), expiry, Timestamp::now())
         .await
         .unwrap();
     // Mark another URL unresponsive, for which there won't be an updated agent info.
     let other_unresponsive_url = Url::from_str("ws://under.earth:80").unwrap();
     peer_meta_store
-        .mark_peer_unresponsive(other_unresponsive_url.clone(), expiry, Timestamp::now())
+        .set_unresponsive(other_unresponsive_url.clone(), expiry, Timestamp::now())
         .await
         .unwrap();
 
     let maybe_unresponsive_url = peer_meta_store
-        .get_unresponsive_url(unresponsive_url.clone())
+        .get_unresponsive(unresponsive_url.clone())
         .await
         .unwrap();
     assert!(maybe_unresponsive_url.is_some());
     let maybe_other_unresponsive_url = peer_meta_store
-        .get_unresponsive_url(other_unresponsive_url.clone())
+        .get_unresponsive(other_unresponsive_url.clone())
         .await
         .unwrap();
     assert!(maybe_other_unresponsive_url.is_some());
@@ -136,7 +136,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
 
             // URL should have been removed from the store.
             let when_marked_unresponsive = peer_meta_store
-                .get_unresponsive_url(unresponsive_url.clone())
+                .get_unresponsive(unresponsive_url.clone())
                 .await
                 .unwrap();
             // Check the row has actually been deleted from the table. The other URL should still be present.

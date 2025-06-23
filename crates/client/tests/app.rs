@@ -10,7 +10,7 @@ use holochain_client::{
 };
 use holochain_conductor_api::{AppInfoStatus, CellInfo, IssueAppAuthenticationTokenPayload};
 use holochain_types::{
-    app::{AppBundle, AppManifestV1, DisabledAppReason},
+    app::{AppBundle, AppManifestV0, DisabledAppReason},
     websocket::AllowedOrigins,
 };
 use holochain_websocket::ConnectRequest;
@@ -190,7 +190,7 @@ async fn deferred_memproof_installation() {
     // Modify app bundle to enable deferred membrane proofs.
     let app_bundle_source = AppBundleSource::Bytes(fixture::get_fixture_app_bundle());
     let original_bundle = app_bundle_source.resolve().await.unwrap();
-    let manifest = AppManifestV1 {
+    let manifest = AppManifestV0 {
         allow_deferred_memproofs: true,
         description: None,
         name: "".to_string(),

@@ -1,10 +1,10 @@
 use bytes::Bytes;
 use holochain::prelude::DnaModifiersOpt;
 use holochain_types::app::{
-    AppManifest, AppManifestV1, AppRoleDnaManifest, AppRoleManifest, CellProvisioning,
+    AppManifest, AppManifestV0, AppRoleDnaManifest, AppRoleManifest, CellProvisioning,
 };
 use holochain_types::dna::{
-    CoordinatorManifest, DnaBundle, DnaManifest, DnaManifestV1, IntegrityManifest,
+    CoordinatorManifest, DnaBundle, DnaManifest, DnaManifestV0, IntegrityManifest,
     ValidatedDnaManifest, ZomeDependency, ZomeManifest,
 };
 use holochain_types::prelude::AppBundle;
@@ -20,7 +20,7 @@ pub fn get_fixture_app_bundle() -> Bytes {
 }
 
 fn make_fixture_app_bundle() -> Bytes {
-    let dna_manifest = ValidatedDnaManifest::try_from(DnaManifest::V1(DnaManifestV1 {
+    let dna_manifest = ValidatedDnaManifest::try_from(DnaManifest::V0(DnaManifestV0 {
         name: "test-dna".to_string(),
         coordinator: CoordinatorManifest {
             zomes: vec![ZomeManifest {
@@ -57,7 +57,7 @@ fn make_fixture_app_bundle() -> Bytes {
     )
     .unwrap();
 
-    let app_manifest = AppManifest::V1(AppManifestV1 {
+    let app_manifest = AppManifest::V0(AppManifestV0 {
         name: "fixture".to_string(),
         description: None,
         allow_deferred_memproofs: false,

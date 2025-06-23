@@ -2522,7 +2522,7 @@ Holochain implementations must be able to load Holochain applications that have 
 A DNA bundle manifest specifies the components that are critical to the operation of the DNA and affect its hash (the `IntegrityManifest` property) as well as the components that are supplied to facilitate the operation of a cell (the `CoordinatorManifest` property).
 
 ```rust
-struct DnaManifestV1 {
+struct DnaManifestV0 {
     // A user-facing label for the DNA.
     name: String,
     integrity: IntegrityManifest,
@@ -2591,7 +2591,7 @@ There is a number of ways that application developers MUST be able to specify co
 * Finally, Conductors MUST provide a way for an App to be installed without supplying membrane proofs and instantiating Cells, in cases where membrane proof values are dependent on the agent's public key which is generated at application installation time. This MUST be accompanied by a method of supplying those membrane proofs when they become available. (Note that this method of deferred instantiation is distinct from the deferred option for the preceding strategies in two ways: first, its purpose is to enable an instantiation process which requires information that isn't available until after installation rather than to enable lazy loading, and second, the Cells are instantiated but not active.)
 
 ```rust
-struct AppManifestV1 {
+struct AppManifestV0 {
     // User-facing name of the App. This may be used as the `installed_app_id`
     // in the Admin API.
     name: String,
@@ -2666,7 +2666,7 @@ struct AppRoleDnaManifest {
 A `WebAppBundle` combines together a specific user interface together with an `AppBundle` as follows:
 
 ```rust
-struct WebAppManifestV1 {
+struct WebAppManifestV0 {
     // Name of the App. This may be used as the `installed_app_id`.
     name: String,
 
