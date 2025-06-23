@@ -19,6 +19,7 @@ holo_hash = { version = "^0.5.2", path = "../holo_hash", features = [
 holochain_integrity_types = { version = "^0.5.2", path = "../holochain_integrity_types" }
 rmpv = { version = "1", features = ["with-serde"] }
 serde = "1"
+holochain_serialized_bytes = "=0.0.56"
 
 [features]
 fuzzing = [

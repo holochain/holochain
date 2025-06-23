@@ -16,3 +16,4 @@ path = "src/lib.rs"
 [dependencies]
 hdk = { path = "../../hdk", version = "^0.5.2"}
 serde = "1.0"
+holochain_serialized_bytes = "=0.0.56"

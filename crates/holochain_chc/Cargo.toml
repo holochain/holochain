@@ -27,7 +27,7 @@ thiserror = "1.0.22"
 tracing = "0.1"
 url = "2.4"
 
-holochain_serialized_bytes = { version = "=0.0.55", optional = true }
+holochain_serialized_bytes = { version = "=0.0.56", optional = true }
 holo_hash = { version = "^0.5.2", path = "../holo_hash", optional = true }
 reqwest = { version = "0.12", default-features = false, features = [
   "json",

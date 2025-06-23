@@ -30,10 +30,9 @@ pub fn get_used_metering_points(instance_with_store: Arc<InstanceWithStore>) -> 
 /// DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.
 pub fn get_prebuilt_module(wasm_zome: &WasmZome) -> RibosomeResult<Option<Arc<Module>>> {
     match &wasm_zome.preserialized_path {
-        Some(path) => {
-            eprintln!("DEPRECATED: Bundling precompiled and preserialized wasm for iOS is deprecated. Please use the wasm interpreter instead.");
-            let module = holochain_wasmer_host::module::get_ios_module_from_file(path.as_path())?;
-            Ok(Some(Arc::new(module)))
+        Some(_) => {
+            eprintln!("DEPRECATED: Bundling precompiled and preserialized wasm for iOS is no longer supported. Please use the wasm interpreter instead.");
+            Ok(None)
         }
         None => Ok(None),
     }

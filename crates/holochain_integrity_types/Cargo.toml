@@ -14,7 +14,7 @@ edition = "2021"
 holo_hash = { version = "^0.5.2", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_serialized_bytes = "=0.0.55"
+holochain_serialized_bytes = "=0.0.56"
 holochain_util = { version = "^0.5.2", path = "../holochain_util", default-features = false }
 holochain_secure_primitive = { version = "^0.5.2", path = "../holochain_secure_primitive" }
 serde = { version = "1.0", features = ["derive", "rc"] }
