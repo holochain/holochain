@@ -24,7 +24,7 @@ holo_hash = { version = "^0.6.0-dev.5", path = "../holo_hash", features = [
 fallible-iterator = "0.3.0"
 holochain_chc = { version = "^0.3.0-dev.9", path = "../holochain_chc" }
 holochain_keystore = { version = "^0.6.0-dev.6", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.55"
+holochain_serialized_bytes = "=0.0.56"
 holochain_types = { version = "^0.6.0-dev.9", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.6.0-dev.6", path = "../holochain_zome_types", features = [
   "full",
@@ -34,14 +34,14 @@ holochain_nonce = { version = "^0.6.0-dev.1", path = "../holochain_nonce" }
 one_err = "0.0.8"
 shrinkwraprs = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0.51", features = ["preserve_order"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
 thiserror = "2.0"
 tokio = { version = "1.36.0", features = ["full"] }
 tracing = "0.1.26"
 cron = "0.15"
 async-recursion = "1.1"
 
-kitsune2_api = "0.2.7"
+kitsune2_api = "0.2.9"
 
 tempfile = { version = "3.3", optional = true }
 base64 = { version = "0.22", optional = true }
@@ -49,7 +49,6 @@ nanoid = { version = "0.4", optional = true }
 
 # contrafact
 contrafact = { version = "0.2.0-rc.1", optional = true }
-
 
 [dev-dependencies]
 holochain_state = { path = ".", features = ["test_utils", "sqlite"] }
@@ -60,10 +59,8 @@ holochain_wasm_test_utils = { path = "../test_utils/wasm", features = [
 ] }
 holochain_trace = { version = "^0.6.0-dev.0", path = "../holochain_trace" }
 matches = "0.1.8"
-pretty_assertions = "1.4"
-
 tempfile = "3.3"
-test-case = "3.3.1"
+rand = "0.9"
 
 [lints]
 workspace = true

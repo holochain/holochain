@@ -1,11 +1,11 @@
 SELECT
-  ACTION.hash,
-  ACTION.blob
+  Action.hash,
+  Action.blob
 FROM
   DhtOp
-  JOIN ACTION ON DhtOp.action_hash = ACTION.hash
+  JOIN Action ON DhtOp.action_hash = Action.hash
 WHERE
   DhtOp.type = :op_type
   AND DhtOp.when_integrated IS NOT NULL
-  AND ACTION.author = :author
-  AND ACTION.seq BETWEEN :lower_seq AND :upper_seq
+  AND Action.author = :author
+  AND Action.seq BETWEEN :lower_seq AND :upper_seq

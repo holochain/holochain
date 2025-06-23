@@ -15,8 +15,9 @@ crate-type = ["cdylib", "rlib"]
 
 # reminder - do not use workspace deps
 [dependencies]
-derive_more = "0.99"
+derive_more = { version = "2.0", features = ["constructor"] }
 serde = "1.0"
+holochain_serialized_bytes = "0.0.56"
 hdk = { path = "../../../../hdk" }
 hdi = { path = "../../../../hdi" }
 

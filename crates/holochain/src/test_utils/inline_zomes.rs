@@ -42,7 +42,7 @@ pub fn batch_create_zome() -> InlineIntegrityZome {
 
     impl Default for RandNum {
         fn default() -> Self {
-            Self(rand::thread_rng().gen())
+            Self(rand::rng().random())
         }
     }
 

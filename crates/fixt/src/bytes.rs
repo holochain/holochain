@@ -15,7 +15,7 @@ fixturator!(
     curve Empty vec![];
     curve Unpredictable {
         let mut rng = crate::rng();
-        let len = rng.gen_range(UNPREDICTABLE_MIN_LEN..UNPREDICTABLE_MAX_LEN);
+        let len = rng.random_range(UNPREDICTABLE_MIN_LEN..UNPREDICTABLE_MAX_LEN);
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];
         for _ in 0..len {
@@ -45,7 +45,7 @@ fixturator!(
     curve Empty vec![0u8];
     curve Unpredictable {
         let mut rng = crate::rng();
-        let len = rng.gen_range(1..UNPREDICTABLE_MAX_LEN);
+        let len = rng.random_range(1..UNPREDICTABLE_MAX_LEN);
         let mut u8_fixturator = U8Fixturator::new(Unpredictable);
         let mut bytes = vec![];
         for _ in 0..len {
@@ -101,7 +101,7 @@ fixturator!(
     ThirtyTwoBytes;
     curve Empty [0; 32];
     curve Unpredictable {
-        rand::thread_rng().gen::<[u8; 32]>()
+        rand::rng().random::<[u8; 32]>()
     };
     curve Predictable {
         let mut u8_fixturator = U8Fixturator::new_indexed(Predictable, get_fixt_index!());

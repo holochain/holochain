@@ -2,7 +2,7 @@ use holo_hash::ActionHash;
 use holochain::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::Record;
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 
 // Intended to keep https://github.com/holochain/holochain/issues/3028 fixed.
 // ensure that multiple `must_get_agent_activity` calls do not oversaturate the
@@ -15,7 +15,7 @@ async fn must_get_agent_activity_saturation() {
 
     holochain_trace::test_run();
 
-    let mut rng = thread_rng();
+    let mut rng = rng();
     let (dna, _, _) =
         SweetDnaFile::unique_from_test_wasms(vec![TestWasm::MustGetAgentActivity]).await;
     let mut conductors =
@@ -31,7 +31,7 @@ async fn must_get_agent_activity_saturation() {
 
     let mut hash = ActionHash::from_raw_32(vec![0; 32]);
     for _ in 0..100 {
-        let content: u32 = rng.gen();
+        let content: u32 = rng.random();
         let record: Record = conductors[0]
             .call(
                 &alice_cell.zome(TestWasm::MustGetAgentActivity.coordinator_zome_name()),

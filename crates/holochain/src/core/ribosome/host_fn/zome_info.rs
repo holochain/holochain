@@ -100,7 +100,7 @@ pub mod test {
             zome_info.extern_fns,
             vec![
                 FunctionName::new("__data_end"),
-                FunctionName::new("__getrandom_custom"),
+                FunctionName::new("__getrandom_v03_custom"),
                 FunctionName::new("__hc__allocate_1"),
                 FunctionName::new("__hc__deallocate_1"),
                 FunctionName::new("__heap_base"),
@@ -130,7 +130,7 @@ pub mod test {
             zome_info.extern_fns,
             vec![
                 FunctionName::new("__data_end"),
-                FunctionName::new("__getrandom_custom"),
+                FunctionName::new("__getrandom_v03_custom"),
                 FunctionName::new("__hc__allocate_1"),
                 FunctionName::new("__hc__deallocate_1"),
                 FunctionName::new("__heap_base"),

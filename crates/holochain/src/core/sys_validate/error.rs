@@ -1,5 +1,4 @@
 use super::SourceChainError;
-use super::MAX_ENTRY_SIZE;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::validation::OutcomeOrError;
@@ -113,8 +112,8 @@ pub enum ValidationOutcome {
     #[error("The entry has a different hash to the action's entry hash")]
     EntryHash,
     #[error(
-        "The entry size {0} was larger than the MAX_ENTRY_SIZE {}",
-        MAX_ENTRY_SIZE
+        "The entry size {0} was larger than the MAX_ENTRY_SIZE {max}",
+        max = super::MAX_ENTRY_SIZE
     )]
     EntryTooLarge(usize),
     #[error("The entry has a different type to the action's entry type")]
@@ -122,8 +121,8 @@ pub enum ValidationOutcome {
     #[error("The visibility for {0:?} didn't match the zome")]
     EntryVisibility(AppEntryDef),
     #[error(
-        "The link tag size {0} was larger than the MAX_TAG_SIZE {}",
-        super::MAX_TAG_SIZE
+        "The link tag size {0} was larger than the MAX_TAG_SIZE {max}",
+        max = super::MAX_TAG_SIZE
     )]
     TagTooLarge(usize),
     #[error("An op with non-private entry type is missing its entry data. Action: {0:?}, Op type: {1:?} Reason: {2}")]

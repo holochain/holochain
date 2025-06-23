@@ -250,7 +250,7 @@ impl DnaDef {
 /// Get a random network seed
 #[cfg(feature = "full-dna-def")]
 pub fn random_network_seed() -> String {
-    nanoid::nanoid!()
+    uuid::Uuid::new_v4().to_string()
 }
 
 #[cfg(feature = "full-dna-def")]

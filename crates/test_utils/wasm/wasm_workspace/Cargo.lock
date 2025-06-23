@@ -3,15 +3,6 @@
 version = 4
 
 [[package]]
-name = "aho-corasick"
-version = "1.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e60d3430d3a69478ad0993f19238d2df97c507009a52b3c10addcd7f6bcb916"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "android-tzdata"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -25,6 +16,12 @@ checksum = "819e7219dbd41043ac279b19830f2efc897156490d7fd6ea916720117ee66311"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "anstyle"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "862ed96ca487e809f1c8e5a8447f6ee2cf102f846893800b20cebdf541fc6bbd"
 
 [[package]]
 name = "arrayref"
@@ -124,11 +121,10 @@ dependencies = [
 
 [[package]]
 name = "colored"
-version = "2.2.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
+checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "lazy_static",
  "windows-sys",
 ]
 
@@ -137,12 +133,6 @@ name = "constant_time_eq"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
-
-[[package]]
-name = "convert_case"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
 name = "core-foundation-sys"
@@ -272,22 +262,24 @@ dependencies = [
 
 [[package]]
 name = "derive_more"
-version = "0.99.20"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6edb4b64a43d977b8e99788fe3a04d483834fba1215a7e02caa415b626497f7f"
+checksum = "093242cf7570c207c83073cf82f79706fe7b8317e98620a47d5be7c3d8497678"
 dependencies = [
- "convert_case",
- "proc-macro2",
- "quote",
- "rustc_version",
- "syn 2.0.103",
+ "derive_more-impl",
 ]
 
 [[package]]
-name = "difflib"
-version = "0.4.0"
+name = "derive_more-impl"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6184e33543162437515c2e2b48714794e37845ec9851711914eec9d308f6ebe8"
+checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.103",
+ "unicode-xid",
+]
 
 [[package]]
 name = "digest"
@@ -335,6 +327,7 @@ version = "0.0.1"
 dependencies = [
  "files_integrity",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -343,6 +336,7 @@ name = "files_integrity"
 version = "0.0.1"
 dependencies = [
  "hdi",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -355,19 +349,9 @@ dependencies = [
  "parking_lot",
  "paste",
  "rand",
- "rand_core",
  "serde",
  "strum",
  "strum_macros",
-]
-
-[[package]]
-name = "float-cmp"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
-dependencies = [
- "num-traits",
 ]
 
 [[package]]
@@ -483,12 +467,13 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.16"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "335ff9f135e4384c8150d6f27c6daed433577f86b4750418338c01a1a2528592"
+checksum = "26145e563e54f2cadc477553f1ec5ee650b00862f0a58bcd12cbdc5f0ea2d2f4"
 dependencies = [
  "cfg-if",
  "libc",
+ "r-efi",
  "wasi",
 ]
 
@@ -506,6 +491,8 @@ dependencies = [
  "hdk_derive",
  "holo_hash",
  "holochain_integrity_types",
+ "holochain_serialized_bytes",
+ "holochain_serialized_bytes_derive",
  "holochain_wasmer_guest",
  "paste",
  "serde",
@@ -527,8 +514,6 @@ dependencies = [
  "mockall",
  "paste",
  "serde",
- "serde_bytes",
- "thiserror 1.0.69",
  "tracing",
  "tracing-core",
 ]
@@ -579,7 +564,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "sha2",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -628,9 +613,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_serialized_bytes"
-version = "0.0.55"
+version = "0.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "719fa847cf9f772f7e8e1a6f11d801e1383cc5af043292042665da9a6ce5c742"
+checksum = "ad33bcab89bdceca5498f1b2fd5c4d1c07d35749deba965c2911494001845ac8"
 dependencies = [
  "holochain_serialized_bytes_derive",
  "rmp-serde",
@@ -638,17 +623,17 @@ dependencies = [
  "serde-transcode",
  "serde_bytes",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "holochain_serialized_bytes_derive"
-version = "0.0.55"
+version = "0.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e6a221b5650251e09ef0b9223cf39e72b5222492cffc6bb4bdf36b2a6bc91aa"
+checksum = "01865625f72d8b6a05487440dfce3c03b0fc83ae03bba7ed6bfbc2f6f8143d14"
 dependencies = [
  "quote",
- "syn 1.0.109",
+ "syn 2.0.103",
 ]
 
 [[package]]
@@ -656,6 +641,7 @@ name = "holochain_test_wasm_common"
 version = "0.6.0-dev.6"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -680,9 +666,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_common"
-version = "0.0.100"
+version = "0.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b841825431e94ab716b86468a0e0f3a36fa237aaf815c8fa6be4ead508aef03"
+checksum = "2246138152bef3637f773399fb7118527715f3d03bea85c442d299a518f2bfd1"
 dependencies = [
  "holochain_serialized_bytes",
  "serde",
@@ -692,9 +678,9 @@ dependencies = [
 
 [[package]]
 name = "holochain_wasmer_guest"
-version = "0.0.100"
+version = "0.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe80c70be39ff8d6f318bbef8c7ad22e15cacde4c7d7a0a59692204d8c7d4541"
+checksum = "b408ee73bd97b4daeae9a420fe3c321063d0aeaeee08bbbb3f7d9ae25d6f87a4"
 dependencies = [
  "holochain_serialized_bytes",
  "holochain_wasmer_common",
@@ -716,7 +702,6 @@ dependencies = [
  "holochain_serialized_bytes",
  "holochain_timestamp",
  "holochain_wasmer_common",
- "nanoid",
  "rand",
  "serde",
  "serde_bytes",
@@ -725,8 +710,9 @@ dependencies = [
  "strum",
  "strum_macros",
  "subtle",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -774,15 +760,6 @@ name = "itertools"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f56a2d0bc861f9165be4eb3442afd3c236d8a98afd426f65d92324ae1091a484"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.10.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
 dependencies = [
  "either",
 ]
@@ -839,14 +816,13 @@ checksum = "32a282da65faaf38286cf3be983213fcf1d2e2a58700e808f83f4ea9a4804bc0"
 
 [[package]]
 name = "mockall"
-version = "0.11.4"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c84490118f2ee2d74570d114f3d0493cbf02790df303d2707606c3e14e07c96"
+checksum = "39a6bfcc6c8c7eed5ee98b9c3e33adc726054389233e201c95dab2d41a3839d2"
 dependencies = [
  "cfg-if",
  "downcast",
  "fragile",
- "lazy_static",
  "mockall_derive",
  "predicates",
  "predicates-tree",
@@ -854,14 +830,14 @@ dependencies = [
 
 [[package]]
 name = "mockall_derive"
-version = "0.11.4"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22ce75669015c4f47b289fd4d4f56e894e4c96003ffdf3ac51313126f94c6cbb"
+checksum = "25ca3004c2efe9011bd4e461bd8256445052b9615405b4f7ea43fc8ca5c20898"
 dependencies = [
  "cfg-if",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.103",
 ]
 
 [[package]]
@@ -873,21 +849,6 @@ dependencies = [
  "futures",
  "pin-utils",
 ]
-
-[[package]]
-name = "nanoid"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ffa00dec017b5b1a8b7cf5e2c008bfda1aa7e0697ac1508b491fdf2622fb4d8"
-dependencies = [
- "rand",
-]
-
-[[package]]
-name = "normalize-line-endings"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
 name = "num-traits"
@@ -956,16 +917,12 @@ dependencies = [
 
 [[package]]
 name = "predicates"
-version = "2.1.5"
+version = "3.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59230a63c37f3e18569bdb90e4a89cbf5bf8b06fea0b84e65ea10cc4df47addd"
+checksum = "a5d19ee57562043d37e82899fade9a22ebab7be9cef5026b07fda9cdd4293573"
 dependencies = [
- "difflib",
- "float-cmp",
- "itertools 0.10.5",
- "normalize-line-endings",
+ "anstyle",
  "predicates-core",
- "regex",
 ]
 
 [[package]]
@@ -1027,21 +984,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand"
-version = "0.8.5"
+name = "r-efi"
+version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
+
+[[package]]
+name = "rand"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fbfd9d094a40bf3ae768db9361049ace4c0e04a4fd6b359518bd7b73a73dd97"
 dependencies = [
- "libc",
  "rand_chacha",
  "rand_core",
 ]
 
 [[package]]
 name = "rand_chacha"
-version = "0.3.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
+checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
 dependencies = [
  "ppv-lite86",
  "rand_core",
@@ -1049,9 +1011,9 @@ dependencies = [
 
 [[package]]
 name = "rand_core"
-version = "0.6.4"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
+checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
 dependencies = [
  "getrandom",
 ]
@@ -1066,33 +1028,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "regex"
-version = "1.11.1"
+name = "ref-cast"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b544ef1b4eac5dc2db33ea63606ae9ffcfac26c1416a2806ae0bf5f56b201191"
+checksum = "4a0ae411dbe946a674d89546582cea4ba2bb8defac896622d6496f14c23ba5cf"
 dependencies = [
- "aho-corasick",
- "memchr",
- "regex-automata",
- "regex-syntax",
+ "ref-cast-impl",
 ]
 
 [[package]]
-name = "regex-automata"
-version = "0.4.9"
+name = "ref-cast-impl"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "809e8dc61f6de73b46c85f4c96486310fe304c434cfa43669d7b40f711150908"
+checksum = "1165225c21bff1f3bbce98f5a1f889949bc902d3575308cc7b0de30b4f6d27c7"
 dependencies = [
- "aho-corasick",
- "memchr",
- "regex-syntax",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.103",
 ]
-
-[[package]]
-name = "regex-syntax"
-version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "rmp"
@@ -1117,15 +1070,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustc_version"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
-dependencies = [
- "semver",
-]
-
-[[package]]
 name = "rustversion"
 version = "1.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1139,11 +1083,12 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "schemars"
-version = "0.8.22"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
+checksum = "4cd191f9397d57d581cddd31014772520aa448f65ef991055d7f61582c65165f"
 dependencies = [
  "dyn-clone",
+ "ref-cast",
  "schemars_derive",
  "serde",
  "serde_json",
@@ -1151,9 +1096,9 @@ dependencies = [
 
 [[package]]
 name = "schemars_derive"
-version = "0.8.22"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
+checksum = "5016d94c77c6d32f0b8e08b781f7dc8a90c2007d4e77472cc2807bc10a8438fe"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1168,16 +1113,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
-name = "semver"
-version = "1.0.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56e6fa9c48d24d85fb3de5ad847117517440f6beceb7798af16b4a87d616b8d0"
-
-[[package]]
 name = "serde"
-version = "1.0.203"
+version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7253ab4de971e72fb7be983802300c30b5a7f0c2e56fab8abfc6a214307c0094"
+checksum = "5f0e2c6ed6606019b4e29e69dbaba95b11854410e5347d525002456dbbb786b6"
 dependencies = [
  "serde_derive",
 ]
@@ -1202,9 +1141,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.203"
+version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "500cbc0ebeb6f46627f50f3f5811ccf6bf00643be300b4c3eabc0ef55dc5b5ba"
+checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1272,7 +1211,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e63e6744142336dfb606fe2b068afa2e1cca1ee6a5d8377277a92945d81fa331"
 dependencies = [
  "bitflags 1.3.2",
- "itertools 0.8.2",
+ "itertools",
  "proc-macro2",
  "quote",
  "syn 1.0.109",
@@ -1370,6 +1309,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1379,6 +1319,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1389,6 +1330,7 @@ version = "0.1.0"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1399,6 +1341,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1407,6 +1350,7 @@ name = "test_wasm_capability"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1415,6 +1359,7 @@ name = "test_wasm_client"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1424,6 +1369,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1432,6 +1378,7 @@ name = "test_wasm_coordinator_zome"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
  "test_wasm_integrity_zome",
@@ -1442,6 +1389,7 @@ name = "test_wasm_coordinator_zome_update"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
  "test_wasm_integrity_zome",
@@ -1453,6 +1401,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1464,6 +1413,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1474,6 +1424,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1484,6 +1435,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1494,6 +1446,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
  "tracing",
  "tracing-core",
@@ -1506,6 +1459,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1515,6 +1469,7 @@ name = "test_wasm_emit_signal"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1525,6 +1480,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1533,6 +1489,7 @@ name = "test_wasm_foo"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1543,6 +1500,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1552,6 +1510,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1561,6 +1520,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1570,6 +1530,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
  "serde_yaml",
 ]
@@ -1580,6 +1541,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1590,6 +1552,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1598,6 +1561,7 @@ name = "test_wasm_hash_path"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1607,6 +1571,7 @@ name = "test_wasm_hdk_extern"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1616,6 +1581,7 @@ name = "test_wasm_init_fail"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1624,6 +1590,7 @@ name = "test_wasm_init_invalid_params"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1632,6 +1599,7 @@ name = "test_wasm_init_pass"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1641,6 +1609,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1650,6 +1619,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "holochain_mock_hdi",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1659,6 +1629,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1669,6 +1640,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1679,6 +1651,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1689,6 +1662,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1699,6 +1673,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
  "thiserror 1.0.69",
@@ -1710,6 +1685,7 @@ version = "0.1.0"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1718,6 +1694,7 @@ name = "test_wasm_post_commit_signal"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1727,6 +1704,7 @@ name = "test_wasm_post_commit_success"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1736,6 +1714,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1744,6 +1723,7 @@ name = "test_wasm_query"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1754,6 +1734,7 @@ version = "0.0.1"
 dependencies = [
  "fixt",
  "hdk",
+ "holochain_serialized_bytes",
  "rand",
  "serde",
 ]
@@ -1765,6 +1746,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1775,6 +1757,7 @@ dependencies = [
  "derive_more",
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1784,6 +1767,7 @@ version = "0.0.1"
 dependencies = [
  "fixt",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1792,6 +1776,7 @@ name = "test_wasm_sys_time"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1801,6 +1786,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1810,6 +1796,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1820,6 +1807,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1829,6 +1817,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1837,6 +1826,7 @@ name = "test_wasm_validate_invalid_params"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1846,6 +1836,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1855,6 +1846,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1864,6 +1856,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1873,6 +1866,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1882,6 +1876,7 @@ version = "0.0.1"
 dependencies = [
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1890,6 +1885,7 @@ name = "test_wasm_whoami"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "holochain_test_wasm_common",
  "serde",
 ]
@@ -1899,6 +1895,7 @@ name = "test_wasm_x_salsa20_poly1305"
 version = "0.0.1"
 dependencies = [
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
 ]
 
@@ -1909,6 +1906,7 @@ dependencies = [
  "fixt",
  "hdi",
  "hdk",
+ "holochain_serialized_bytes",
  "serde",
  "serde_yaml",
 ]
@@ -2004,10 +2002,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6ccf251212114b54433ec949fd6a7841275f9ada20dddd2f29e9ceea4501493"
 
 [[package]]
+name = "unicode-xid"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
+
+[[package]]
 name = "unsafe-libyaml"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
+
+[[package]]
+name = "uuid"
+version = "1.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cf4199d1e5d15ddd86a694e4d0dffa9c323ce759fea589f00fef9d81cc1931d"
+dependencies = [
+ "getrandom",
+ "js-sys",
+ "uuid-rng-internal",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "uuid-rng-internal"
+version = "1.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11c277e43528edc5dd4660d28b2e61d70dff7f4f91502fe6a9a917eb61e427e9"
+dependencies = [
+ "getrandom",
+]
 
 [[package]]
 name = "valuable"
@@ -2023,9 +2048,12 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "wasi"
-version = "0.11.1+wasi-snapshot-preview1"
+version = "0.14.2+wasi-0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
+checksum = "9683f9a5a998d873c0d21fcbe3c083009670149a8fab228644b8bd36b2c48cb3"
+dependencies = [
+ "wit-bindgen-rt",
+]
 
 [[package]]
 name = "wasm-bindgen"
@@ -2216,6 +2244,15 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "wit-bindgen-rt"
+version = "0.39.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f42320e61fe2cfd34354ecb597f86f413484a798ba44a8ca1165c58d42da6c1"
+dependencies = [
+ "bitflags 2.9.1",
+]
 
 [[package]]
 name = "zerocopy"

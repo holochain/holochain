@@ -107,15 +107,8 @@ pub trait TryFromDnaProperties {
 }
 
 #[cfg(feature = "schema")]
-fn properties_schema(_: &mut schemars::SchemaGenerator) -> schemars::schema::Schema {
-    schemars::schema::Schema::Object(schemars::schema::SchemaObject {
-        instance_type: Some(
-            vec![
-                schemars::schema::InstanceType::Object,
-                schemars::schema::InstanceType::Null,
-            ]
-            .into(),
-        ),
-        ..Default::default()
+fn properties_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    schemars::json_schema!({
+        "type": ["object", "null"],
     })
 }

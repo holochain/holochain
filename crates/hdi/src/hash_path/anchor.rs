@@ -1,13 +1,12 @@
 use crate::hash_path::path::Component;
 use crate::hash_path::path::Path;
-use holochain_wasmer_guest::*;
+use holochain_serialized_bytes::prelude::SerializedBytes;
 
 /// This is the root of the [`Path`] tree.
 ///
 /// Forms the entry point to all anchors so that agents can navigate down the tree from here.
 pub const ROOT: &[u8; 2] = &[0x00, 0x00];
 
-#[derive(PartialEq, SerializedBytes, serde::Serialize, serde::Deserialize, Debug, Clone)]
 /// An anchor can only be 1 or 2 levels deep as "type" and "text".
 ///
 /// The second level is optional and the Strings use the standard [`TryInto`] for path [`Component`] internally.
@@ -18,6 +17,7 @@ pub const ROOT: &[u8; 2] = &[0x00, 0x00];
 /// e.g. `entry_defs![Anchor::entry_def()]`
 ///
 /// The methods implemented on anchor follow the patterns that predate the Path module but `Path::from(&anchor)` is always possible to use the newer APIs.
+#[derive(PartialEq, SerializedBytes, serde::Serialize, serde::Deserialize, Debug, Clone)]
 pub struct Anchor {
     pub anchor_type: String,
     pub anchor_text: Option<String>,
