@@ -290,6 +290,13 @@ impl AdminInterfaceApi {
                 }
                 Ok(AdminResponse::AgentInfo(encoded))
             }
+            AgentMetaInfo { url, dna_hashes } => {
+                let r = self
+                    .conductor_handle
+                    .agent_meta_info(url, dna_hashes)
+                    .await?;
+                Ok(AdminResponse::AgentMetaInfo(r))
+            }
             GraftRecords {
                 cell_id,
                 validate,

@@ -4,8 +4,8 @@ use crate::{signing::sign_zome_call, ConductorApiError, ConductorApiResult};
 use anyhow::{anyhow, Result};
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_conductor_api::{
-    AppAuthenticationToken, AppInfo, AppRequest, AppResponse, CellInfo, ProvisionedCell,
-    ZomeCallParamsSigned,
+    AgentMetaInfo, AppAuthenticationToken, AppInfo, AppRequest, AppResponse, CellInfo,
+    ProvisionedCell, ZomeCallParamsSigned,
 };
 use holochain_nonce::fresh_nonce;
 use holochain_types::app::{
@@ -17,6 +17,8 @@ use holochain_zome_types::{
     clone::ClonedCell,
     prelude::{CellId, ExternIO, FunctionName, RoleName, Timestamp, ZomeCallParams, ZomeName},
 };
+use kitsune2_api::Url;
+use std::collections::BTreeMap;
 use std::fmt::Formatter;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
@@ -440,6 +442,24 @@ impl AppWebsocket {
         let response = self.inner.send(msg).await?;
         match response {
             AppResponse::AgentInfo(infos) => Ok(infos),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
+    /// Returns the contents of the peer meta store(s) related to the given
+    /// dna hashes for the agent at the given Url.
+    ///
+    /// If `dna_hashes` is set to `None` it returns the contents
+    /// for all dnas of the app.
+    pub async fn agent_meta_info(
+        &self,
+        url: Url,
+        dna_hashes: Option<Vec<DnaHash>>,
+    ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>> {
+        let msg = AppRequest::AgentMetaInfo { url, dna_hashes };
+        let response = self.inner.send(msg).await?;
+        match response {
+            AppResponse::AgentMetaInfo(info) => Ok(info),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

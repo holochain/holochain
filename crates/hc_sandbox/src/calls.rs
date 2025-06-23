@@ -3,6 +3,7 @@
 //! This module is designed for use in a CLI so it is more simplified
 //! than calling the [`AdminWebsocket`] directly.
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -10,8 +11,10 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use anyhow::bail;
+use holo_hash::DnaHashB64;
 use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use holochain_conductor_api::AgentMetaInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
@@ -25,6 +28,7 @@ use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
+use kitsune2_api::Url;
 use kitsune2_core::Ed25519Verifier;
 use std::convert::TryFrom;
 
@@ -88,6 +92,7 @@ pub enum AdminRequestCli {
     /// Calls AdminRequest::AddAgentInfo.
     AddAgents(AgentInfos),
     ListAgents(ListAgents),
+    AgentMetaInfo(AgentMetaInfoArgs),
 }
 
 /// Calls AdminRequest::AddAdminInterfaces
@@ -278,6 +283,19 @@ pub struct ListApps {
     /// Optionally request agent info for a particular cell ID.
     #[arg(short, long, value_parser = parse_status_filter)]
     pub status: Option<AppStatusFilter>,
+}
+
+/// Calls AdminRequest::AgentMetaInfo
+/// and prints the agent meta info related to the specified Url
+#[derive(Debug, Args, Clone)]
+pub struct AgentMetaInfoArgs {
+    /// The kitsune Url of the agent to get meta info about.
+    #[arg(long)]
+    pub url: Url,
+
+    /// Optionally request agent meta info for a list of DNA hashes.
+    #[arg(short, long, num_args = 0.., value_parser = parse_dna_hash)]
+    pub dna: Option<Vec<DnaHash>>,
 }
 
 #[doc(hidden)]
@@ -524,6 +542,16 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 writeln!(out, "URLs: {:?}", info.url)?;
                 msg!("{}\n", out);
             }
+        }
+        AdminRequestCli::AgentMetaInfo(args) => {
+            let info = client.agent_meta_info(args.url, args.dna).await?;
+            let string_key_info = info
+                .into_iter()
+                .map(|(k, v)| (DnaHashB64::from(k).to_string(), v))
+                .collect::<BTreeMap<String, BTreeMap<String, AgentMetaInfo>>>();
+
+            let info_json = serde_json::to_string_pretty(&string_key_info)?;
+            println!("{}", info_json);
         }
     }
     Ok(())
