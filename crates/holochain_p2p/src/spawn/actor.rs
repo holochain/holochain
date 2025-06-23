@@ -3,7 +3,7 @@
 use crate::metrics::create_p2p_request_duration_metric;
 use crate::*;
 use kitsune2_api::*;
-use kitsune2_core::get_remote_agents_near_location;
+use kitsune2_core::get_responsive_remote_agents_near_location;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::future::Future;
@@ -893,9 +893,10 @@ impl HolochainP2pActor {
         space: &DynSpace,
         loc: u32,
     ) -> HolochainP2pResult<Vec<(AgentPubKey, Url)>> {
-        let agent_list = get_remote_agents_near_location(
+        let agent_list = get_responsive_remote_agents_near_location(
             space.peer_store().clone(),
             space.local_agent_store().clone(),
+            space.peer_meta_store().clone(),
             loc,
             1024,
         )
@@ -1352,9 +1353,10 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let op_hash_list: Vec<OpId> = op_hash_list.into_iter().map(|h| h.to_k2_op()).collect();
 
-            let urls: std::collections::HashSet<Url> = get_remote_agents_near_location(
+            let urls: std::collections::HashSet<Url> = get_responsive_remote_agents_near_location(
                 space.peer_store().clone(),
                 space.local_agent_store().clone(),
+                space.peer_meta_store().clone(),
                 basis_hash.get_loc(),
                 usize::MAX,
             )
