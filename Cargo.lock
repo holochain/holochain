@@ -2519,7 +2519,7 @@ dependencies = [
  "holochain_util",
  "holochain_websocket",
  "kitsune2_api",
- "kitsune2_bootstrap_client 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "kitsune2_bootstrap_client",
  "kitsune2_core",
  "once_cell",
  "ratatui",
@@ -4238,20 +4238,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kitsune2_bootstrap_client"
-version = "0.2.7"
-source = "git+https://github.com/holochain/kitsune2?branch=feat%2Fmark-peers-unresponsive-in-peer-meta-store#907b86cc0a1ef928700ee0939a7cf06219eec03b"
-dependencies = [
- "base64 0.22.1",
- "kitsune2_api",
- "serde",
- "serde_json",
- "tracing",
- "ureq 2.12.1",
- "url",
-]
-
-[[package]]
 name = "kitsune2_bootstrap_srv"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4288,7 +4274,7 @@ dependencies = [
  "ed25519-dalek",
  "futures",
  "kitsune2_api",
- "kitsune2_bootstrap_client 0.2.7 (git+https://github.com/holochain/kitsune2?branch=feat%2Fmark-peers-unresponsive-in-peer-meta-store)",
+ "kitsune2_bootstrap_client",
  "prost",
  "rand 0.8.5",
  "schemars 0.8.22",
