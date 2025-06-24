@@ -1,3 +1,4 @@
+use holo_hash::DnaHash;
 use holochain_cli_sandbox::cli::LaunchInfo;
 use holochain_client::{AdminWebsocket, AllowedOrigins};
 use holochain_conductor_api::{
@@ -920,6 +921,134 @@ async fn call_zome_function() {
         .unwrap();
 
     assert_eq!(output, "\"foo\"\n");
+
+    shutdown_sandbox(hc_admin).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn zome_function_can_return_hash() {
+    clean_sandboxes().await;
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg("--run=0")
+        .arg("tests/fixtures/my-app/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let launch_info = get_launch_info(&mut hc_admin).await;
+
+    println!("Got launch info: {:?}", launch_info);
+
+    // Wait for the app to be available
+    let app_info = get_app_info(
+        launch_info.admin_port,
+        "test-app".into(),
+        *launch_info.app_ports.first().expect("No app ports found"),
+    )
+    .await;
+
+    let dna_hash = match app_info {
+        AppResponse::AppInfo(Some(info)) => {
+            match info.cell_info.first().unwrap().1.first().unwrap() {
+                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
+                _ => panic!("Cell not provisioned"),
+            }
+        }
+        r => panic!("AppResponse does not contain app info: {:?}", r),
+    };
+
+    // Generate signing credentials
+    let mut cmd = get_sandbox_command();
+    let mut child = cmd
+        .arg("zome-call-auth")
+        .arg("--running")
+        .arg(launch_info.admin_port.to_string())
+        .arg("--piped")
+        .arg("test-app")
+        .kill_on_drop(true)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"test-phrase\n")
+        .await
+        .unwrap();
+
+    let exit_code = child.wait().await.unwrap();
+    assert!(exit_code.success(), "Failed with exit code {:?}", exit_code);
+
+    // Call function that returns the DNA hash
+    let mut cmd = get_sandbox_command();
+    let mut child = cmd
+        .arg("zome-call")
+        .arg("--running")
+        .arg(launch_info.admin_port.to_string())
+        .arg("--piped")
+        .arg("test-app")
+        .arg(dna_hash.to_string())
+        .arg("zome1")
+        .arg("get_dna_hash")
+        .arg("null")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"test-phrase\n")
+        .await
+        .unwrap();
+
+    child.wait().await.unwrap();
+
+    let mut output = String::new();
+    child
+        .stdout
+        .take()
+        .unwrap()
+        .read_to_string(&mut output)
+        .await
+        .unwrap();
+
+    // Convert the output string into a DNA hash by splitting the string and parsing the
+    // individual bytes.
+    let dna_hash_parsed = DnaHash::from_raw_39(
+        output
+            .split("[")
+            .last()
+            .unwrap()
+            .split("]")
+            .next()
+            .unwrap()
+            .split(",")
+            .map(|byte| byte.trim().parse().unwrap())
+            .collect::<Vec<u8>>(),
+    );
+
+    assert_eq!(dna_hash_parsed, dna_hash);
 
     shutdown_sandbox(hc_admin).await;
 }
