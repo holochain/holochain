@@ -946,7 +946,7 @@ impl HolochainP2pActor {
                             let agents = peer_store.get_all().await?;
                             let urls_to_prune = db
                                 .read_async(move |txn| -> DatabaseResult<Vec<Value>> {
-                                    let mut stmt = txn.prepare(sql_peer_meta_store::SELECT_URLS)?;
+                                    let mut stmt = txn.prepare(sql_peer_meta_store::GET_ALL_BY_KEY)?;
                                     let mut rows = stmt.query(
                                     named_params! {":meta_key":format!("{KEY_PREFIX_ROOT}:{META_KEY_UNRESPONSIVE}")},
                                     )?;
