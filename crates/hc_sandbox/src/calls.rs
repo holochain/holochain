@@ -265,13 +265,9 @@ pub struct AgentInfos {
 /// this conductor.
 #[derive(Debug, Args, Clone)]
 pub struct ListAgents {
-    /// Optionally request agent info for a particular cell ID.
-    #[arg(short, long, value_parser = parse_agent_key, requires = "dna")]
-    pub agent_key: Option<AgentPubKey>,
-
-    /// Optionally request agent info for a particular cell ID.
-    #[arg(short, long, value_parser = parse_dna_hash, requires = "agent_key")]
-    pub dna: Option<DnaHash>,
+    /// Optionally request agent info for a list of DNA hashes.
+    #[arg(short, long, num_args = 0.., value_parser = parse_dna_hash)]
+    pub dna: Option<Vec<DnaHash>>,
 }
 
 /// Calls AdminRequest::ListApps
@@ -633,7 +629,7 @@ async fn request_agent_info(
     client: &mut AdminWebsocket,
     args: ListAgents,
 ) -> anyhow::Result<Vec<Arc<AgentInfoSigned>>> {
-    let resp = client.agent_info(args.dna.map(|dna| vec![dna])).await?;
+    let resp = client.agent_info(args.dna).await?;
     let mut out = Vec::new();
     for info in resp {
         out.push(AgentInfoSigned::decode(
@@ -674,16 +670,5 @@ impl From<CellId> for DumpState {
 impl From<DumpState> for CellId {
     fn from(ds: DumpState) -> Self {
         CellId::new(ds.dna, ds.agent_key)
-    }
-}
-
-impl From<ListAgents> for Option<CellId> {
-    fn from(la: ListAgents) -> Self {
-        let ListAgents {
-            agent_key: a,
-            dna: d,
-        } = la;
-        d.and_then(|d| a.map(|a| (d, a)))
-            .map(|(d, a)| CellId::new(d, a))
     }
 }
