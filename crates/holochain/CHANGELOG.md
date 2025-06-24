@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update `AgentInfo` call in `hc-sandbox` to take an optional vector of DNA hashes instead of one optional cell ID, e. g. `hc s call list-agents --dna uhC0kScOJk1aw9a5Kc8jqs0jieGCi4LoeW7vUehsTLvMI455-2hF1 --dna uhC0kScOJk1aw9a5Kc8jqs0jieGCi4LoeW7vUehsTLvMI455-2hF1`.
+
 ## 0.6.0-dev.9
 
 - Implement new call `get_all_by_key` for `PeerMetaStore`. Adds the call to retrieve all URLs and values for a given key from the store.

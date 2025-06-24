@@ -18,9 +18,10 @@ use kitsune2_test_utils::agent::AgentBuilder;
 use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use std::process::Stdio;
+use std::process::{Output, Stdio};
+use std::str::from_utf8;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 
@@ -600,6 +601,16 @@ async fn generate_sandbox_and_add_and_list_agent() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
+    // Helper fn to parse process output for agent pub keys.
+    fn get_agent_keys_from_process_output(output: Output) -> Vec<String> {
+        let mut agents_output = from_utf8(&output.stdout).unwrap().split("AgentPubKey(");
+        // Discard characters before the first agent pub key.
+        agents_output.next();
+        agents_output
+            .map(|pub_key| pub_key.split(")").next().unwrap().to_string())
+            .collect::<Vec<_>>()
+    }
+
     holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -612,6 +623,8 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg("--in-process-lair")
         .arg("--run=0")
         .arg("tests/fixtures/my-app/")
+        .arg("--network-seed")
+        .arg(format!("{}", UNIX_EPOCH.elapsed().unwrap().as_millis()))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -628,8 +641,73 @@ async fn generate_sandbox_and_add_and_list_agent() {
     .await
     .unwrap();
 
+    // Get all agent infos.
     let agent_infos = admin_ws.agent_info(None).await.unwrap();
     assert_eq!(agent_infos.len(), 2);
+
+    // List all agents over hc-sandbox CLI.
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("call")
+        .arg("list-agents")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit());
+
+    let hc_call = input_piped_password(&mut cmd).await;
+
+    let output = hc_call.wait_with_output().await.unwrap();
+    let agent_keys = get_agent_keys_from_process_output(output);
+    assert_eq!(agent_keys.len(), 2);
+
+    // Get DNA hashes
+    let mut dna_hashes = admin_ws.list_dnas().await.unwrap();
+
+    // List agents of all DNA hashes over hc-sandbox CLI. Should also be two agents.
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("call")
+        .arg("list-agents")
+        .arg("--dna")
+        .arg(dna_hashes[0].to_string())
+        .arg("--dna")
+        .arg(dna_hashes[1].to_string())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit());
+
+    let hc_call = input_piped_password(&mut cmd).await;
+
+    let output = hc_call.wait_with_output().await.unwrap();
+    let agent_keys = get_agent_keys_from_process_output(output);
+    assert_eq!(agent_keys.len(), 2);
+
+    // Drop one of the two DNA hashes.
+    dna_hashes.pop().unwrap();
+
+    // Get agent infos for a specific DNA.
+    let agent_infos = admin_ws.agent_info(Some(dna_hashes.clone())).await.unwrap();
+    assert_eq!(agent_infos.len(), 1);
+
+    // List agents of a specific DNA hash over hc-sandbox CLI.
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg("call")
+        .arg("list-agents")
+        .arg("--dna")
+        .arg(dna_hashes[0].to_string())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit());
+
+    let hc_call = input_piped_password(&mut cmd).await;
+
+    let output = hc_call.wait_with_output().await.unwrap();
+    let agent_keys = get_agent_keys_from_process_output(output);
+    assert_eq!(agent_keys.len(), 1);
 
     let space = kitsune2_api::AgentInfoSigned::decode(
         &kitsune2_core::Ed25519Verifier,
@@ -651,7 +729,6 @@ async fn generate_sandbox_and_add_and_list_agent() {
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
-        // .env("RUST_LOG", "warn")
         .arg("--piped")
         .arg("call")
         .arg("add-agents")
