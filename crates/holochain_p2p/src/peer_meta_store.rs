@@ -2,9 +2,9 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use holochain_sqlite::db::DbWrite;
 use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::prelude::DbKindPeerMetaStore;
-use holochain_sqlite::rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef};
-use holochain_sqlite::rusqlite::{named_params, ToSql};
+use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::sql::sql_peer_meta_store;
 use kitsune2_api::{BoxFut, K2Error, K2Result, PeerMetaStore, Timestamp, Url};
 use std::sync::Arc;
@@ -56,22 +56,6 @@ impl kitsune2_api::PeerMetaStoreFactory for HolochainPeerMetaStoreFactory {
 #[derive(Debug)]
 pub struct HolochainPeerMetaStore {
     db: DbWrite<DbKindPeerMetaStore>,
-}
-
-struct BytesSql(Bytes);
-
-impl ToSql for BytesSql {
-    #[inline]
-    fn to_sql(&self) -> holochain_sqlite::rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(&self.0[..]))
-    }
-}
-
-impl FromSql for BytesSql {
-    #[inline]
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        Ok(BytesSql(Bytes::copy_from_slice(value.as_blob()?)))
-    }
 }
 
 impl HolochainPeerMetaStore {

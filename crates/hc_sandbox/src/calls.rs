@@ -5,6 +5,7 @@
 //! For simple calls like [`AdminRequest::ListDnas`] this is probably easier
 //! but if you want more control use [`CmdRunner::command`].
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -13,8 +14,10 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use anyhow::bail;
 use anyhow::ensure;
+use holo_hash::DnaHashB64;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::AdminResponse;
+use holochain_conductor_api::AgentMetaInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
@@ -30,6 +33,7 @@ use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
+use kitsune2_api::Url;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
@@ -97,6 +101,7 @@ pub enum AdminRequestCli {
     /// _Unimplemented_.
     AddAgents,
     ListAgents(ListAgents),
+    AgentMetaInfo(AgentMetaInfoArgs),
 }
 
 /// Calls AdminRequest::AddAdminInterfaces
@@ -283,6 +288,19 @@ pub struct ListApps {
     /// Optionally request agent info for a particular cell ID.
     #[arg(short, long, value_parser = parse_status_filter)]
     pub status: Option<AppStatusFilter>,
+}
+
+/// Calls AdminRequest::AgentMetaInfo
+/// and prints the agent meta info related to the specified Url
+#[derive(Debug, Args, Clone)]
+pub struct AgentMetaInfoArgs {
+    /// The kitsune Url of the agent to get meta info about.
+    #[arg(long)]
+    pub url: Url,
+
+    /// Optionally request agent meta info for a list of DNA hashes.
+    #[arg(short, long, num_args = 0.., value_parser = parse_dna_hash)]
+    pub dna: Option<Vec<DnaHash>>,
 }
 
 #[doc(hidden)]
@@ -513,6 +531,16 @@ async fn call_inner(cmd: &mut CmdRunner, call: AdminRequestCli) -> anyhow::Resul
                 writeln!(out, "URLs: {:?}", info.url)?;
                 msg!("{}\n", out);
             }
+        }
+        AdminRequestCli::AgentMetaInfo(args) => {
+            let info = request_agent_meta_info(cmd, args).await?;
+            let string_key_info = info
+                .into_iter()
+                .map(|(k, v)| (DnaHashB64::from(k).to_string(), v))
+                .collect::<BTreeMap<String, BTreeMap<String, AgentMetaInfo>>>();
+
+            let info_json = serde_json::to_string_pretty(&string_key_info)?;
+            println!("{}", info_json);
         }
     }
     Ok(())
@@ -827,6 +855,21 @@ pub async fn request_agent_info(
     }
 
     Ok(out)
+}
+
+/// Calls [`AdminRequest::AgentMetaInfo`]
+pub async fn request_agent_meta_info(
+    cmd: &mut CmdRunner,
+    args: AgentMetaInfoArgs,
+) -> anyhow::Result<BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>> {
+    let resp = cmd
+        .command(AdminRequest::AgentMetaInfo {
+            url: args.url,
+            dna_hashes: args.dna,
+        })
+        .await?;
+
+    Ok(expect_match!(resp => AdminResponse::AgentMetaInfo, "Failed to request agent meta info"))
 }
 
 fn parse_agent_key(arg: &str) -> anyhow::Result<AgentPubKey> {

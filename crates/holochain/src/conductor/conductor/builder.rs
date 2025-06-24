@@ -5,6 +5,7 @@ use crate::conductor::paths::DataRootPath;
 use crate::conductor::ribosome_store::RibosomeStore;
 use crate::conductor::ConductorHandle;
 use holochain_conductor_api::conductor::paths::KeystorePath;
+use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_p2p::NetworkCompatParams;
 use lair_keystore_api::types::SharedLockedArray;
 use std::sync::Mutex;

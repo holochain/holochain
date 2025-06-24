@@ -1,9 +1,11 @@
+use crate::peer_meta::AgentMetaInfo;
 use crate::{AppInfo, FullStateDump, RevokeAgentKeyPayload, StorageInfo};
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::cell::CellId;
-use std::collections::HashMap;
+use kitsune2_api::Url;
+use std::collections::{BTreeMap, HashMap};
 
 /// Represents the available conductor functions to call over an admin interface.
 ///
@@ -311,8 +313,8 @@ pub enum AdminRequest {
     /// peer store.
     ///
     /// You can:
-    /// - Get all agent info by leaving `cell_id` to `None`.
-    /// - Get a specific agent info by setting the `cell_id`.
+    /// - Get all agent info by leaving `dna_hashes` to `None`.
+    /// - Get agent info for specific dna hashes by setting the `dna_hashes` argument.
     ///
     /// This is how you can send your agent info to another agent.
     /// It is also useful for testing across networks.
@@ -323,6 +325,20 @@ pub enum AdminRequest {
     AgentInfo {
         /// Optionally choose the agent info of a specific cell.
         cell_id: Option<CellId>,
+    },
+
+    /// Request the contents of the peer meta store(s) related to
+    /// the given dna hashes for the agent at the given Url.
+    ///
+    /// If `dna_hashes` is set to `None` it returns the contents
+    /// for all dnas that the agent is part of.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::AgentMetaInfo`]
+    AgentMetaInfo {
+        url: Url,
+        dna_hashes: Option<Vec<DnaHash>>,
     },
 
     /// "Graft" [`Record`]s onto the source chain of the specified [`CellId`].
@@ -560,6 +576,11 @@ pub enum AdminResponse {
     ///
     /// This is all the agent info that was found for the request.
     AgentInfo(Vec<String>),
+
+    /// The successful response to an [`AdminRequest::AgentMetaInfo`].
+    ///
+    /// A JSON formatted string.
+    AgentMetaInfo(BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>),
 
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,
