@@ -1066,7 +1066,7 @@ impl std::fmt::Debug for SweetConductor {
 fn covering(rng: &mut StdRng, n: usize, s: usize) -> Vec<HashSet<usize>> {
     let nodes: Vec<_> = (0..n)
         .map(|i| {
-            let peers: HashSet<_> = std::iter::repeat_with(|| rng.gen_range(0..n))
+            let peers: HashSet<_> = std::iter::repeat_with(|| rng.random_range(0..n))
                 .filter(|j| i != *j)
                 .take(s)
                 .collect();

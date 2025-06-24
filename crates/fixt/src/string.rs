@@ -4,7 +4,7 @@ use rand::Rng;
 pub const EMPTY_CHAR: char = '\u{0000}';
 pub const PREDICTABLE_CHARS: &str = "💯❤💩.!foobarbaz!.💩❤💯";
 
-fixturator!(char, EMPTY_CHAR, crate::rng().gen(), {
+fixturator!(char, EMPTY_CHAR, crate::rng().random(), {
     let mut index = get_fixt_index!();
     let ret = PREDICTABLE_CHARS
         .chars()
@@ -37,8 +37,8 @@ fixturator!(
     String::from(EMPTY_STR),
     {
         let mut rng = crate::rng();
-        let len = rng.gen_range(UNPREDICTABLE_MIN_LEN..UNPREDICTABLE_MAX_LEN);
-        let vec: Vec<char> = (0..len).map(|_| rng.gen()).collect();
+        let len = rng.random_range(UNPREDICTABLE_MIN_LEN..UNPREDICTABLE_MAX_LEN);
+        let vec: Vec<char> = (0..len).map(|_| rng.random()).collect();
         let string: String = vec.iter().collect();
         string
     },

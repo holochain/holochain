@@ -45,11 +45,9 @@
 
 use crate::conductor::process::ERROR_CODE;
 use crate::config::conductor::paths::DataRootPath;
-use gen::SchemaGenerator;
 use holochain_types::prelude::DbSyncStrategy;
 use kitsune2_transport_tx5::WebRtcConfig;
-use schemars::schema::Schema;
-use schemars::{gen, JsonSchema};
+use schemars::{JsonSchema, Schema};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -543,16 +541,17 @@ impl Default for ConductorTuningParams {
     }
 }
 
-fn webrtc_config_schema(_: &mut SchemaGenerator) -> Schema {
+fn webrtc_config_schema(_: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<WebRtcConfig>);
 
     // Note that the definitions for this type are not being copied. This type is embedded in the
     // K2 config, so the definitions are already present in the schema.
 
-    Schema::Object(schema.schema)
+    Schema::try_from(schema.get("schema").expect("Missing schema field").clone())
+        .expect("Failed to convert schema")
 }
 
-fn kitsune2_config_schema(generator: &mut SchemaGenerator) -> Schema {
+fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
     #[allow(dead_code)]
     #[derive(JsonSchema)]
     #[schemars(rename_all = "camelCase")]
@@ -577,13 +576,22 @@ fn kitsune2_config_schema(generator: &mut SchemaGenerator) -> Schema {
 
     let schema = schemars::schema_for!(Option<K2Config>);
 
-    for (k, v) in schema.definitions {
-        if generator.definitions_mut().insert(k.clone(), v).is_some() {
+    for (k, v) in schema
+        .get("definitions")
+        .and_then(|d| d.as_object())
+        .expect("No definitions")
+    {
+        if generator
+            .definitions_mut()
+            .insert(k.clone(), v.clone())
+            .is_some()
+        {
             tracing::warn!("Conflicting definition for {k} in K2Config");
         }
     }
 
-    Schema::Object(schema.schema)
+    Schema::try_from(schema.get("schema").expect("Missing schema field").clone())
+        .expect("Failed to convert schema")
 }
 
 #[cfg(test)]

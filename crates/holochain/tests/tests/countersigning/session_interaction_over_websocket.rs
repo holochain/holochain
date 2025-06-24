@@ -32,7 +32,7 @@ use holochain_websocket::{ReceiveMessage, WebsocketReceiver, WebsocketSender};
 use kitsune2_api::{AgentInfoSigned, DhtArc};
 use kitsune2_core::Ed25519Verifier;
 use matches::assert_matches;
-use rand::rngs::OsRng;
+use rand_dalek::rngs::OsRng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;

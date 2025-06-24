@@ -197,7 +197,7 @@ impl<R: Report> HcStressTestRunner<R> {
             let shutdown_at = match lifetime {
                 BehaviorLifetime::Forever => now.checked_add(MAX).unwrap(),
                 BehaviorLifetime::Shutdown { wait_min, wait_max } => now
-                    .checked_add(rand::thread_rng().gen_range(wait_min..=wait_max))
+                    .checked_add(rand::rng().random_range(wait_min..=wait_max))
                     .unwrap(),
             };
 
@@ -301,7 +301,7 @@ impl<R: Report> HcStressTestRunner<R> {
 
                     let should_publish = if now >= p.next_at {
                         p.next_at = now
-                            .checked_add(rand::thread_rng().gen_range(p.w_min..=p.w_max))
+                            .checked_add(rand::rng().random_range(p.w_min..=p.w_max))
                             .unwrap();
                         if p.count > 0 {
                             p.count -= 1;
@@ -320,8 +320,8 @@ impl<R: Report> HcStressTestRunner<R> {
 
                     if should_publish {
                         let bytes = {
-                            let mut rng = rand::thread_rng();
-                            let count = rng.gen_range(p.bc_min..=p.bc_max);
+                            let mut rng = rand::rng();
+                            let count = rng.random_range(p.bc_min..=p.bc_max);
                             rand_utf8::rand_utf8(&mut rng, count)
                         };
 
@@ -342,7 +342,7 @@ impl<R: Report> HcStressTestRunner<R> {
 
                     if now >= q.next_at {
                         q.next_at = now
-                            .checked_add(rand::thread_rng().gen_range(q.w_min..=q.w_max))
+                            .checked_add(rand::rng().random_range(q.w_min..=q.w_max))
                             .unwrap();
 
                         let shallow_list = node.get_all_images(q.cell).await;
@@ -386,7 +386,7 @@ impl<R: Report> HcStressTestRunner<R> {
 
 fn uid() -> i64 {
     use rand::Rng;
-    rand::thread_rng().gen()
+    rand::rng().random()
 }
 
 /// A conductor running the hc_stress_test app.

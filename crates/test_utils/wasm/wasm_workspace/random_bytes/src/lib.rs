@@ -1,3 +1,4 @@
+use rand::TryRngCore;
 use hdk::prelude::*;
 
 #[hdk_extern]
@@ -7,9 +8,12 @@ fn random_bytes(bytes: u32) -> ExternResult<Bytes> {
 
 #[hdk_extern]
 fn rand_random_bytes(bytes: u32) -> ExternResult<Bytes> {
-    use rand::Rng;
     let mut bytes = vec![0; bytes as usize];
-    rand::rngs::OsRng.fill(&mut bytes[..]);
+    rand::rngs::OsRng.try_fill_bytes(&mut bytes[..]).map_err(|e| {
+        wasm_error!(
+            WasmErrorInner::Host(format!("Failed to fill bytes with random data: {}", e))
+        )
+    })?;
     Ok(Bytes::from(bytes))
 }
 

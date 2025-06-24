@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-fixturator!(bool, false, crate::rng().gen(), {
+fixturator!(bool, false, crate::rng().random(), {
     let mut index = get_fixt_index!();
     index += 1;
     set_fixt_index!(index);

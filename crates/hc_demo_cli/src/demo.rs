@@ -176,7 +176,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
     .await;
     let c_zome = CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome::new(c_wasm.hash.clone())));
 
-    let network_seed = rand_utf8::rand_utf8(&mut rand::thread_rng(), 32);
+    let network_seed = rand_utf8::rand_utf8(&mut rand::rng(), 32);
 
     let dna_def = DnaDefBuilder::default()
         .name("hc_demo_cli".to_string())

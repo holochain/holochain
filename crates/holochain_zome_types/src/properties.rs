@@ -44,14 +44,13 @@ impl Default for YamlProperties {
 
 #[cfg(feature = "schema")]
 impl schemars::JsonSchema for YamlProperties {
-    fn schema_name() -> String {
-        "YamlProperties".to_string()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "YamlProperties".into()
     }
 
-    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::schema::Schema {
-        schemars::schema::Schema::Object(schemars::schema::SchemaObject {
-            instance_type: Some(schemars::schema::InstanceType::Object.into()),
-            ..Default::default()
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "object",
         })
     }
 }

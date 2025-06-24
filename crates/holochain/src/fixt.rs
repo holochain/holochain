@@ -32,8 +32,8 @@ use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 #[cfg(feature = "wasmer_sys")]
 use holochain_wasmer_host::module::ModuleCache;
+use rand::rng;
 use rand::seq::IteratorRandom;
-use rand::thread_rng;
 use rand::Rng;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -88,7 +88,7 @@ fixturator!(
     DnaWasm;
     // note that an empty wasm will not compile
     curve Empty DnaWasm { code: Default::default() };
-    curve Unpredictable TestWasm::iter().choose(&mut thread_rng()).unwrap().into();
+    curve Unpredictable TestWasm::iter().choose(&mut rng()).unwrap().into();
     curve Predictable TestWasm::iter().cycle().nth(get_fixt_index!()).unwrap().into();
 );
 
@@ -96,8 +96,8 @@ fixturator!(
     WasmMap;
     curve Empty BTreeMap::new().into();
     curve Unpredictable {
-        let mut rng = rand::thread_rng();
-        let number_of_wasms = rng.gen_range(0..5);
+        let mut rng = rand::rng();
+        let number_of_wasms = rng.random_range(0..5);
 
         let mut wasms = BTreeMap::new();
         let mut dna_wasm_fixturator = DnaWasmFixturator::new(Unpredictable);

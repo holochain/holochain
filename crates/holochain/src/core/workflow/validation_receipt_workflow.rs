@@ -62,7 +62,7 @@ where
 
     let grouped_by_author = receipts
         .into_iter()
-        .group_by(|(_, author)| author.clone())
+        .chunk_by(|(_, author)| author.clone())
         .into_iter()
         .map(|(author, receipts)| {
             (

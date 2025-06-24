@@ -10,7 +10,7 @@ documentation = "https://docs.rs/holochain_nonce"
 
 # reminder - do not use workspace deps
 [dependencies]
-getrandom = { version = "0.2.7", default-features = false, features = ["std"] }
+getrandom = { version = "0.3", default-features = false, features = ["std"] }
 holochain_timestamp = { version = "^0.6.0-dev.1", path = "../timestamp" }
 holochain_secure_primitive = { version = "^0.6.0-dev.1", path = "../holochain_secure_primitive", default-features = false }
 

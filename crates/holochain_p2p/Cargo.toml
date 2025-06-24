@@ -14,7 +14,6 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 blake2b_simd = "1.0.3"
-derive_more = "0.99"
 fixt = { path = "../fixt", version = "^0.6.0-dev.1" }
 futures = "0.3"
 holo_hash = { version = "^0.6.0-dev.5", path = "../holo_hash", features = [
@@ -24,29 +23,28 @@ holo_hash = { version = "^0.6.0-dev.5", path = "../holo_hash", features = [
 ] }
 holochain_chc = { version = "^0.3.0-dev.9", path = "../holochain_chc" }
 holochain_keystore = { version = "^0.6.0-dev.6", path = "../holochain_keystore" }
-holochain_serialized_bytes = "=0.0.55"
+holochain_serialized_bytes = "=0.0.56"
 holochain_types = { version = "^0.6.0-dev.9", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.6.0-dev.6", path = "../holochain_zome_types" }
 holochain_nonce = { version = "^0.6.0-dev.1", path = "../holochain_nonce" }
-mockall = "0.11.3"
+mockall = "0.13"
 holochain_trace = { version = "^0.6.0-dev.0", path = "../holochain_trace" }
-rand = "0.8.5"
+rand = "0.9"
 rmp-serde = "1.3"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0.51", features = ["preserve_order"] }
-thiserror = "1.0.22"
+serde_json = { version = "1.0", features = ["preserve_order"] }
+thiserror = "2.0"
 tokio = { version = "1.27", features = ["full"] }
-tokio-stream = "0.1"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = "0.2.8"
-kitsune2_api = "0.2.8"
-kitsune2_core = "0.2.8"
-kitsune2_gossip = "0.2.8"
+kitsune2 = "0.2.9"
+kitsune2_api = "0.2.9"
+kitsune2_core = "0.2.9"
+kitsune2_gossip = "0.2.9"
 bytes = "1.10"
 holochain_sqlite = { version = "^0.6.0-dev.9", path = "../holochain_sqlite" }
-lair_keystore_api = "=0.6.1"
+lair_keystore_api = "=0.6.2"
 parking_lot = "0.12.3"
 holochain_state = { version = "^0.6.0-dev.9", path = "../holochain_state" }
 holochain_timestamp = { version = "^0.6.0-dev.1", path = "../timestamp" }

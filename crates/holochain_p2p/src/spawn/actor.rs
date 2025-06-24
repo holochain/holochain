@@ -8,7 +8,7 @@ use holochain_sqlite::sql::sql_peer_meta_store;
 use holochain_state::prelude::named_params;
 use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
-use rand::seq::SliceRandom;
+use rand::prelude::IndexedRandom;
 use std::collections::HashMap;
 use std::future::Future;
 use std::rc::Rc;
@@ -1046,7 +1046,7 @@ impl HolochainP2pActor {
         }
 
         Ok(agents
-            .choose_multiple(&mut rand::thread_rng(), PARALLEL_GET_AGENTS_COUNT)
+            .choose_multiple(&mut rand::rng(), PARALLEL_GET_AGENTS_COUNT)
             .cloned()
             .collect())
     }
