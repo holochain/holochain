@@ -7,13 +7,13 @@ ADD
 -- Populate the serialized_size column with approximate values
 UPDATE
   DhtOp
-set
+SET
   serialized_size = (
     SELECT
       LENGTH(blob)
-    from
+    FROM
       Action
-    where
+    WHERE
       Action.hash = DhtOp.action_hash
   );
 

@@ -111,7 +111,7 @@ pub trait ChainHeadCoordinatorExt:
         let (keystore, agent) = self.signing_info();
         async move {
             let mut bytes = [0; 32];
-            getrandom::getrandom(&mut bytes).map_err(|e| ChcError::Other(e.to_string()))?;
+            getrandom::fill(&mut bytes).map_err(|e| ChcError::Other(e.to_string()))?;
             let nonce = Nonce256Bits::from(bytes);
             let payload = GetRecordsPayload { since_hash, nonce };
             let signature = agent.sign(&keystore, &payload).await?;

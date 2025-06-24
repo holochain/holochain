@@ -19,7 +19,7 @@ pub fn random_bytes(
             ..
         } => {
             let mut bytes = vec![0; input as _];
-            getrandom::getrandom(&mut bytes)
+            getrandom::fill(&mut bytes)
                 .map_err(|error| -> RuntimeError {
                     wasm_error!(WasmErrorInner::Host(error.to_string())).into()
                 })?;

@@ -7,5 +7,5 @@ WHERE
   AND meta_key = :meta_key
   AND (
     expires_at IS NULL
-    or expires_at >= unixepoch() * 1000000
+    OR expires_at >= unixepoch() * 1000000
   );

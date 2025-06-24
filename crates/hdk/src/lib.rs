@@ -267,27 +267,24 @@ pub use hdi::HDI_VERSION;
 pub const HDK_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-const ERAND_INTERNAL: u32 = getrandom::Error::CUSTOM_START + 1;
+const ERAND_INTERNAL: u16 = 1;
 
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-const ERAND_TOO_LONG: u32 = getrandom::Error::CUSTOM_START + 2;
+const ERAND_TOO_LONG: u16 = 2;
 
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 fn wasm_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
     if buf.len() > u32::MAX as usize {
-        let code = core::num::NonZeroU32::new(ERAND_TOO_LONG).unwrap();
-        return Err(getrandom::Error::from(code));
+        return Err(getrandom::Error::new_custom(ERAND_TOO_LONG));
     }
     let number_of_bytes = buf.len() as u32;
     match crate::hdk::HDK.with(|h| h.borrow().random_bytes(number_of_bytes)) {
         Err(_) => {
-            let code = core::num::NonZeroU32::new(ERAND_INTERNAL).unwrap();
-            return Err(getrandom::Error::from(code));
+            return Err(getrandom::Error::new_custom(ERAND_INTERNAL));
         }
         Ok(bytes) => {
             if bytes.len() != buf.len() {
-                let code = core::num::NonZeroU32::new(ERAND_INTERNAL).unwrap();
-                return Err(getrandom::Error::from(code));
+                return Err(getrandom::Error::new_custom(ERAND_INTERNAL));
             }
             buf.copy_from_slice(&bytes);
         }
@@ -296,7 +293,13 @@ fn wasm_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
 }
 
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-getrandom::register_custom_getrandom!(wasm_getrandom);
+#[no_mangle]
+unsafe extern "Rust" fn __getrandom_v03_custom(
+    dest: *mut u8,
+    len: usize,
+) -> Result<(), getrandom::Error> {
+    wasm_getrandom(std::slice::from_raw_parts_mut(dest, len))
+}
 
 /// Capability claims and grants.
 ///

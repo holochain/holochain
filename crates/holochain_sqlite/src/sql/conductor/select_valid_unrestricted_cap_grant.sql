@@ -11,7 +11,7 @@ WHERE
     SELECT
       COUNT(UpdateActions.hash)
     FROM
-      Action as UpdateActions
+      Action AS UpdateActions
     WHERE
       UpdateActions.author = ?2
       AND (

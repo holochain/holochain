@@ -2,7 +2,6 @@ use assert_cmd::prelude::*;
 use holochain_types::web_app::WebAppManifest;
 use holochain_types::{prelude::*, web_app::WebAppBundle};
 use holochain_util::ffs;
-use jsonschema::JSONSchema;
 use mr_bundle::FileSystemBundler;
 use schemars::JsonSchema;
 use serde_json::Value;
@@ -545,19 +544,16 @@ fn test_default_web_app_manifest_matches_schema() {
     validate_schema(&schema, &default_manifest, "default manifest");
 }
 
-fn get_schema<T: JsonSchema>() -> JSONSchema {
+fn get_schema<T: JsonSchema>() -> Value {
     let schema = schemars::schema_for!(T);
-    let schema_value = serde_json::to_value(&schema).unwrap();
-    JSONSchema::compile(&schema_value).expect("Schema should be valid")
+    serde_json::to_value(&schema).unwrap()
 }
 
-fn validate_schema(schema: &JSONSchema, manifest: &Value, context: &str) {
-    let result = schema.validate(manifest);
-    if let Err(errors) = result {
-        for error in errors {
-            println!("Validation error: {}", error);
-            println!("At path: {}", error.instance_path);
-        }
+fn validate_schema(schema: &Value, manifest: &Value, context: &str) {
+    let result = jsonschema::validate(schema, manifest);
+    if let Err(error) = result {
+        println!("Validation error: {}", error);
+
         panic!("There were schema validation errors for {}", context);
     }
 }

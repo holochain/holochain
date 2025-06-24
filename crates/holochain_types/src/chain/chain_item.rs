@@ -138,7 +138,7 @@ pub type PrevActionResult<T> = Result<T, PrevActionError>;
 /// Context information for an invalid action to make it easier to trace in errors.
 #[derive(Error, Debug, Display, PartialEq, Eq)]
 #[display(
-    fmt = "{} - with context seq={}, action_hash={:?}, action=[{}]",
+    "{} - with context seq={}, action_hash={:?}, action=[{}]",
     source,
     seq,
     action_hash,

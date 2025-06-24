@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use rand::seq::SliceRandom;
 
 macro_rules! fixturator_unsigned {
     ( $t:ident ) => {
@@ -8,8 +7,8 @@ macro_rules! fixturator_unsigned {
             0,
             {
                 let mut rng = crate::rng();
-                if rng.gen() {
-                    rng.gen()
+                if rng.random() {
+                    rng.random()
                 } else {
                     vec![<$t>::MAX, <$t>::MIN, 1]
                         .choose(&mut rng)
@@ -31,7 +30,6 @@ fixturator_unsigned!(u16);
 fixturator_unsigned!(u32);
 fixturator_unsigned!(u64);
 fixturator_unsigned!(u128);
-fixturator_unsigned!(usize);
 
 // we can exhaustively enumerate u8 wrapping, which should give us confidence in the u16 behaviour
 // given that it uses the same macro
@@ -44,7 +42,6 @@ basic_test!(u16, vec![0; 40], (0..1000).collect::<Vec<u16>>());
 basic_test!(u32, vec![0; 40], (0..1000).collect::<Vec<u32>>());
 basic_test!(u64, vec![0; 40], (0..1000).collect::<Vec<u64>>());
 basic_test!(u128, vec![0; 40], (0..1000).collect::<Vec<u128>>());
-basic_test!(usize, vec![0; 40], (0..1000).collect::<Vec<usize>>());
 
 macro_rules! fixturator_signed {
     ( $t:ident ) => {
@@ -53,8 +50,8 @@ macro_rules! fixturator_signed {
             0,
             {
                 let mut rng = crate::rng();
-                if rng.gen() {
-                    rng.gen()
+                if rng.random() {
+                    rng.random()
                 } else {
                     vec![<$t>::MAX, <$t>::MIN, 1]
                         .choose(&mut rng)
@@ -78,7 +75,6 @@ fixturator_signed!(i16);
 fixturator_signed!(i32);
 fixturator_signed!(i64);
 fixturator_signed!(i128);
-fixturator_signed!(isize);
 
 basic_test!(
     i8,
@@ -120,14 +116,6 @@ basic_test!(
         .take(1000)
         .collect::<Vec<i128>>()
 );
-basic_test!(
-    isize,
-    vec![0; 40],
-    (0..1000)
-        .map(|i| if i % 2 == 0 { i } else { -i })
-        .take(1000)
-        .collect::<Vec<isize>>()
-);
 
 macro_rules! fixturator_float {
     ( $t:ident ) => {
@@ -136,8 +124,8 @@ macro_rules! fixturator_float {
             0.0,
             {
                 let mut rng = crate::rng();
-                if rng.gen() {
-                    rng.gen()
+                if rng.random() {
+                    rng.random()
                 } else {
                     vec![$t::NEG_INFINITY, $t::INFINITY, $t::NAN, -1.0, 0.0, 1.0]
                         .choose(&mut rng)

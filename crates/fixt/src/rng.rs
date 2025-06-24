@@ -46,10 +46,6 @@ impl RngCore for FixtRng {
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         self.0.lock().fill_bytes(dest)
     }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
-        self.0.lock().try_fill_bytes(dest)
-    }
 }
 
 /// Access the seeded random number generator. This should be used in all places where

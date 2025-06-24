@@ -16,7 +16,7 @@ path = "src/main.rs"
 # reminder - do not use workspace deps
 [dependencies]
 anyhow = "1.0"
-crossterm = "0.28.0"
+crossterm = "0.29"
 ratatui = "0.29"
 clap = { version = "4", features = ["derive"] }
 url = "2"
@@ -29,12 +29,11 @@ holo_hash = { version = "^0.6.0-dev.5", path = "../holo_hash", features = [
 holochain_client = { version = "^0.8.0-dev.6", path = "../client", default-features = false }
 holochain_util = { version = "^0.6.0-dev.1", path = "../holochain_util" }
 holochain_conductor_api = { version = "^0.6.0-dev.9", path = "../holochain_conductor_api" }
-holochain_websocket = { version = "^0.6.0-dev.9", path = "../holochain_websocket" }
 holochain_types = { version = "^0.6.0-dev.9", path = "../holochain_types" }
 tokio = { version = "1.36.0", features = ["full"] }
-kitsune2_api = "0.2.7"
-kitsune2_core = "0.2.7"
-kitsune2_bootstrap_client = "0.2.7"
+kitsune2_api = "0.2.9"
+kitsune2_core = "0.2.9"
+kitsune2_bootstrap_client = "0.2.9"
 
 [lints]
 workspace = true

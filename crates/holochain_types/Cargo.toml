@@ -15,7 +15,7 @@ anyhow = "1.0"
 async-trait = "0.1"
 backtrace = "0.3.27"
 derive_builder = "0.20"
-derive_more = "0.99"
+derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }
 futures = "0.3"
 holo_hash = { version = "^0.6.0-dev.5", path = "../holo_hash", features = [
   "encoding",
@@ -23,7 +23,7 @@ holo_hash = { version = "^0.6.0-dev.5", path = "../holo_hash", features = [
 ] }
 holochain_keystore = { version = "^0.6.0-dev.6", path = "../holochain_keystore" }
 holochain_nonce = { version = "^0.6.0-dev.1", path = "../holochain_nonce" }
-holochain_serialized_bytes = "=0.0.55"
+holochain_serialized_bytes = "=0.0.56"
 holochain_sqlite = { path = "../holochain_sqlite", version = "^0.6.0-dev.9" }
 holochain_trace = { version = "^0.6.0-dev.0", path = "../holochain_trace" }
 holochain_util = { version = "^0.6.0-dev.1", path = "../holochain_util", features = [
@@ -33,17 +33,17 @@ holochain_zome_types = { path = "../holochain_zome_types", version = "^0.6.0-dev
   "full",
 ] }
 holochain_timestamp = { version = "^0.6.0-dev.1", path = "../timestamp" }
-kitsune2_api = "0.2.7"
-itertools = { version = "0.12" }
+kitsune2_api = "0.2.9"
+itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",
 ], version = "^0.6.0-dev.3" }
 must_future = "0.1.1"
 nanoid = "0.4"
 parking_lot = "0.12"
-rand = "0.8.5"
+rand = "0.9"
 regex = "1.4"
-rusqlite = { version = "0.32.1" }
+rusqlite = { version = "0.36" }
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_derive = "1.0"
 serde_json = "1.0"
@@ -53,11 +53,11 @@ shrinkwraprs = "0.3.0"
 strum = "0.18.0"
 strum_macros = "0.18.0"
 tempfile = "3"
-thiserror = "1.0.22"
+thiserror = "2.0"
 tokio = { version = "1.27", features = ["rt"] }
 tracing = "0.1.26"
 indexmap = { version = "2.6.0", features = ["serde"] }
-schemars = "0.8.21"
+schemars = "0.9"
 bytes = { version = "1.10.1", features = ["serde"] }
 
 fixt = { path = "../fixt", version = "^0.6.0-dev.1", optional = true }

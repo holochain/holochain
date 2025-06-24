@@ -23,7 +23,6 @@ unstable-functions = []
 holochain_types = { version = "^0.6.0-dev.9", path = "../../holochain_types" }
 strum = "0.18.0"
 strum_macros = "0.18.0"
-holochain_util = { version = "^0.6.0-dev.1", path = "../../holochain_util" }
 
 [build-dependencies]
 toml = "0.8"

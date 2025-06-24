@@ -31,7 +31,7 @@ use holochain_types::{
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
-use rand::rngs::OsRng;
+use rand_dalek::rngs::OsRng;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;

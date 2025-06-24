@@ -9,6 +9,7 @@ use crate::error::{DatabaseError, DatabaseResult};
 use derive_more::Into;
 use holochain_util::log_elapsed;
 use parking_lot::Mutex;
+use rusqlite::trace::{TraceEvent, TraceEventCodes};
 use rusqlite::*;
 use shrinkwraprs::Shrinkwrap;
 use std::marker::PhantomData;
@@ -107,7 +108,7 @@ pub struct DbRead<Kind: DbKindT> {
     write_semaphore: Arc<Semaphore>,
     read_semaphore: Arc<Semaphore>,
     long_read_semaphore: Arc<Semaphore>,
-    statement_trace_fn: Option<fn(&str)>,
+    statement_trace_fn: Option<fn(TraceEvent)>,
     max_readers: usize,
     num_readers: Arc<AtomicUsize>,
     use_time_metric: UseTimeMetric,
@@ -201,9 +202,12 @@ impl<Kind: DbKindT> DbRead<Kind> {
 
         self.num_readers.fetch_sub(1, Ordering::Relaxed);
 
-        let mut conn = self.get_connection_from_pool()?;
+        let conn = self.get_connection_from_pool()?;
         if self.statement_trace_fn.is_some() {
-            conn.trace(self.statement_trace_fn);
+            conn.trace_v2(
+                TraceEventCodes::SQLITE_TRACE_PROFILE,
+                self.statement_trace_fn,
+            );
         }
 
         Ok(PConnGuard::new(conn, permit, self.use_time_metric.clone()))
@@ -260,7 +264,7 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
         path_prefix: Option<&Path>,
         kind: Kind,
         pool_config: PoolConfig,
-        statement_trace_fn: Option<fn(&str)>,
+        statement_trace_fn: Option<fn(TraceEvent)>,
     ) -> DatabaseResult<Self> {
         let path = match path_prefix {
             Some(path_prefix) => {
@@ -452,8 +456,15 @@ impl<Kind: DbKindT + Send + Sync + 'static> DbWrite<Kind> {
             None,
             kind,
             PoolConfig::default(),
-            Some(|sql| {
-                tracing::trace!("SQL: {}", sql);
+            Some(|trace_event| {
+                match trace_event {
+                    TraceEvent::Profile(stmt, dur) => {
+                        tracing::debug!("SQLITE TRACE: {} took {:?}", stmt.sql(), dur);
+                    }
+                    _ => {
+                        // Ignored for now.
+                    }
+                }
             }),
         )
     }

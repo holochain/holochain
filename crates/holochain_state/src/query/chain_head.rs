@@ -127,7 +127,7 @@ mod tests {
         // The 5th action should be the head for our author's chain.
         let expected_head = actions[4].clone();
         // Shuffle so the head will sometimes be in scratch and sometimes be in the database and not always the last action by our author.
-        actions.shuffle(&mut thread_rng());
+        actions.shuffle(&mut rand::rng());
 
         for action in &actions[..2] {
             let hash = action.action_address();
