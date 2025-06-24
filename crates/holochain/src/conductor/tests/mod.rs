@@ -1,4 +1,5 @@
 mod agent_info;
+mod agent_meta_info;
 mod app_info;
 mod cell_cloning;
 mod install_app_bundle;
