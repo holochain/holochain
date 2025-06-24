@@ -19,14 +19,14 @@ holochain_integrity_types = { version = "^0.5.2", path = "../holochain_integrity
   "tracing",
 ] }
 holochain_nonce = { version = "^0.5.2", path = "../holochain_nonce" }
-holochain_serialized_bytes = "=0.0.55"
+holochain_serialized_bytes = "=0.0.56"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_bytes = "0.11"
 serde_yaml = { version = "0.9", optional = true }
 subtle = "2"
 thiserror = "1.0.22"
 tracing = "0.1"
-holochain_wasmer_common = "=0.0.99"
+holochain_wasmer_common = "=0.0.101"
 derive_more = "0.99"
 
 # fixturator dependencies
@@ -35,7 +35,7 @@ strum = { version = "0.18.0", optional = true }
 rand = { version = "0.8.5", optional = true }
 
 # sqlite dependencies
-rusqlite = { version = "0.32.1", optional = true }
+rusqlite = { version = "0.36", optional = true }
 num_enum = { version = "0.7", optional = true }
 
 # full-dna-def dependencies

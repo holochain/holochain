@@ -1,6 +1,6 @@
 use crate::error::HcBundleError;
 use holochain_util::ffs;
-use holochain_wasmer_host::module::build_ios_module;
+use holochain_wasmer_host::module::build_module;
 use mr_bundle::{Bundle, Manifest};
 use std::path::Path;
 use tracing::info;
@@ -30,7 +30,7 @@ pub(super) async fn build_preserialized_wasm<M: Manifest>(
                     ffs::create_dir_all(ios_folder_path).await?;
                     ffs::write(&resource_path_adjoined, vec![].as_slice()).await?;
                     let resource_path = ffs::canonicalize(resource_path_adjoined).await?;
-                    match build_ios_module(bytes.as_slice()) {
+                    match build_module(bytes.as_slice()) {
                         Ok(module) => match module.serialize_to_file(resource_path.clone()) {
                             Ok(()) => {
                                 info!("wrote ios dylib to {:?}", resource_path);
@@ -38,7 +38,7 @@ pub(super) async fn build_preserialized_wasm<M: Manifest>(
                             }
                             Err(e) => Err(HcBundleError::SerializedModuleError(e)),
                         },
-                        Err(e) => Err(HcBundleError::ModuleCompileError(e)),
+                        Err(e) => Err(HcBundleError::MiscError(Box::new(e))),
                     }
                 } else {
                     Ok(())

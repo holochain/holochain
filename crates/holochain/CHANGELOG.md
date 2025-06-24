@@ -6,6 +6,11 @@ default_semver_increment_mode: !pre_patch rc
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Updates rusqlite to 0.36.
+- Updates holochain_serialized_bytes to 0.0.56 which updates serde to 1.0.219, now requires projects using serialized 
+  bytes to have a direct dependency on it similarly to serde itself.
+- Updates holochain-wasmer to 0.0.101, which updates to wasmer to v6 and drops support for precompiled iOS modules 
+  which was deprecated at 0.4.
 - Filter out unresponsive agents when publishing ops. Any URL that is set as unresponsive in the peer meta store will be filtered out when determining the agents
   near a location to publish to.
 - Integrate all app validated ops, regardless of type and order

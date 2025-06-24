@@ -14,7 +14,7 @@ cfg-if = "1.0"
 derive_more = "0.99"
 holo_hash = { version = "^0.5.2", path = "../holo_hash", features = ["full"] }
 holochain_state_types = { version = "^0.5.2", path = "../holochain_state_types" }
-holochain_serialized_bytes = "=0.0.55"
+holochain_serialized_bytes = "=0.0.56"
 holochain_types = { version = "^0.5.2", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.5.2", path = "../holochain_zome_types" }
 holochain_util = { version = "^0.5.2", default-features = false, path = "../holochain_util", features = [

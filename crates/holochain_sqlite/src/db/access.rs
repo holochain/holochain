@@ -203,6 +203,7 @@ impl<Kind: DbKindT> DbRead<Kind> {
 
         let mut conn = self.get_connection_from_pool()?;
         if self.statement_trace_fn.is_some() {
+            #[allow(deprecated)]
             conn.trace(self.statement_trace_fn);
         }
 
