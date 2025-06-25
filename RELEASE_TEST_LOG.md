@@ -2,6 +2,23 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2025-06-25: v0.5.3-rc.0
+
+*Success*
+- Ran a test with dino-adventure for the first time.
+- Ran a test with 4 nodes and observed:
+  - Fast peer discovery.
+  - Fast initial sync, with "Full" arc showing within the first 30 seconds.
+  - Signals were sent with 100% reliability.
+  - Entries created by all nodes were received by all peers, mostly instantly.
+  - A node going offline and then coming back online received all entries created while it was offline, within 10 seconds.
+- Started a 5th node and then took two people and the spare node offline to confirm:
+  - Offline nodes are marked unreachable and Holochain stops contacting them.
+  - Online nodes are able to create and sync data, and send signals to each other, without interruption caused by Holochain
+    trying to contact the offline nodes.
+- Started two instances on a different network and confirmed that with a small network of 2 peers that the initial sync is
+  fast for both peers.
+
 ## 2025-05-08: v0.5.2-rc.2
 
 *Success*
