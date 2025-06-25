@@ -674,7 +674,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
     )
     .await;
 
-    let mut dna_hashes = match app_info {
+    let dna_hashes = match app_info {
         AppResponse::AppInfo(Some(info)) => {
             let cell_ids: Vec<Vec<CellInfo>> = info
                 .cell_info
@@ -705,8 +705,14 @@ async fn generate_sandbox_and_call_agent_meta_info() {
         r => panic!("AppResponse does not contain app info: {:?}", r),
     };
 
+    // Needs to get converted to String (not DnaHashB64) so that the sorting will
+    // match the sorting of the JSON output from the `hc sandbox agent-meta-info` call
+    let mut dna_hashes_b64: Vec<String> = dna_hashes
+        .into_iter()
+        .map(|h| DnaHashB64::from(h).to_string())
+        .collect();
     // ...and sort to get a consistent order to compare with output
-    dna_hashes.sort();
+    dna_hashes_b64.sort();
 
     // Get agent meta info for all dnas
     let mut cmd = get_sandbox_command();
@@ -743,8 +749,8 @@ async fn generate_sandbox_and_call_agent_meta_info() {
   "{}": {{}}
 }}
 "#,
-        DnaHashB64::from(dna_hashes[0].clone()),
-        DnaHashB64::from(dna_hashes[1].clone())
+        dna_hashes_b64[0].clone(),
+        dna_hashes_b64[1].clone()
     );
 
     assert_eq!(output, expected_output);
@@ -762,7 +768,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
         .arg("--url")
         .arg("wss://someurl:443")
         .arg("--dna")
-        .arg(format!("{}", DnaHashB64::from(dna_hashes[0].clone())))
+        .arg(dna_hashes_b64[0].clone())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -785,10 +791,12 @@ async fn generate_sandbox_and_call_agent_meta_info() {
   "{}": {{}}
 }}
 "#,
-        DnaHashB64::from(dna_hashes[0].clone()),
+        dna_hashes_b64[0].clone(),
     );
 
     assert_eq!(output, expected_output);
+
+    shutdown_sandbox(hc_generate).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

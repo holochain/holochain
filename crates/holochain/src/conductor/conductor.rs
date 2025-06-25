@@ -998,9 +998,6 @@ mod network_impls {
                 ));
             }
 
-            // Sort to get consistently ordered BTreeMap
-            space_ids.sort();
-
             let mut all_infos = BTreeMap::new();
 
             for dna_hash in space_ids {
