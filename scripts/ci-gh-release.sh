@@ -10,7 +10,7 @@ else
   export IS_HOLOCHAIN_RELEASE="true"
 fi
 
-# this configuers a single, hardcoded branch to publish "latest" release's
+# this configures a single, hardcoded branch to publish "latest" release's
 # this makes the release stand out on the right side in the github repository landing page
 if [[ "${HOLOCHAIN_TARGET_BRANCH}" == "main-0.1" && "${IS_HOLOCHAIN_RELEASE}" == "true" ]]; then
   export IS_LATEST="true"
@@ -18,7 +18,7 @@ else
   export IS_LATEST="false"
 fi
 
-# simply check for the delimeter between the version number and a pre-release suffix
+# simply check for the delimiter between the version number and a pre-release suffix
 if [[ "${LATEST_HOLOCHAIN_RELEASE_VERSION}" == *"-"* ]]; then
   export IS_PRE_RELEASE="true"
 else

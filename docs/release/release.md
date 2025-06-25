@@ -71,7 +71,7 @@ For any of the _pre_ modes, if at the time of release a pre-release suffix is fo
         * if **it is not followed** by a dot and an integer: ".0" will be added to the suffix
     * if the **existing suffix is different** than the requested one: replace it with `-<pre-release-suffix>.0`
 
-### Artifical examples of consecutive releases
+### Artificial examples of consecutive releases
 
 For an almost exhaustive list of tested transition cases look at the `fn increment_semver_consistency` test in [../../crates/release-automation/src/lib/common.rs](../../crates/release-automation/src/lib/common.rs).
 
