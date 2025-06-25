@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.10
+
 ## 0.6.0-dev.9
 
 - Calling functions that get data from other agents now try to get from 3 agents in parallel and return the result of the first agent to respond with valid data ([\#5025](https://github.com/holochain/holochain/pull/5025))
