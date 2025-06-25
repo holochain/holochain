@@ -2,7 +2,7 @@
 //!
 //! We have only one instance of this: [crate::core::ribosome::real_ribosome::RealRibosome]. The abstract trait exists
 //! so that we can write mocks against the `RibosomeT` interface, as well as
-//! opening the possiblity that we might support applications written in other
+//! opening the possibility that we might support applications written in other
 //! languages and environments.
 
 // This allow is here because #[automock] automaticaly creates a struct without
