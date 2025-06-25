@@ -14,6 +14,90 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250625.083606
+
+## [hcterm-0.5.3-rc.0](crates/hcterm/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_cli-0.5.3-rc.0](crates/holochain_cli/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain-0.5.3-rc.0](crates/holochain/CHANGELOG.md#0.5.3-rc.0)
+
+- Updates rusqlite to 0.36.
+- Updates holochain\_serialized\_bytes to 0.0.56 which updates serde to 1.0.219, now requires projects using serialized bytes to have a direct dependency on it similarly to serde itself.
+- Updates holochain-wasmer to 0.0.101, which updates to wasmer to v6 and drops support for precompiled iOS modules which was deprecated at 0.4.
+- Filter out unresponsive agents when publishing ops. Any URL that is set as unresponsive in the peer meta store will be filtered out when determining the agents near a location to publish to.
+- Integrate all app validated ops, regardless of type and order
+- Remove DHT DB query cache, a premature optimization that made integration complicated and error-prone without any appreciable benefit.
+- Adds the `--origin` option to the `hc sandbox call` command in order to allow making admin calls to deployed conductors with restricted `allowed_origins`.
+- Add `AgentInfo` call to the conductor’s app interface to retrieve the discovered peers of the app’s various DNAs.
+- Add `AgentMetaInfo` calls to the conductor’s app and admin interfaces to retrieve data from the peer meta store for a given agent by their Url [\#5043](https://github.com/holochain/holochain/pull/5043)
+- Patch `serde_json` to enable byte arrays to be converted to JSON arrays.
+
+## [holochain\_cli\_bundle-0.5.3-rc.0](crates/holochain_cli_bundle/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_cli\_sandbox-0.5.3-rc.0](crates/holochain_cli_sandbox/CHANGELOG.md#0.5.3-rc.0)
+
+- Add `hc sandbox call agent-meta-info` command
+
+## [holochain\_cascade-0.5.3-rc.0](crates/holochain_cascade/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_conductor\_config-0.5.3-rc.0](crates/holochain_conductor_config/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_conductor\_services-0.4.3-rc.0](crates/holochain_conductor_services/CHANGELOG.md#0.4.3-rc.0)
+
+## [holochain\_test\_wasm\_common-0.5.3-rc.0](crates/holochain_test_wasm_common/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_wasm\_test\_utils-0.5.3-rc.0](crates/holochain_wasm_test_utils/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_websocket-0.5.3-rc.0](crates/holochain_websocket/CHANGELOG.md#0.5.3-rc.0)
+
+## [hc\_deepkey\_sdk-0.8.3-rc.0](crates/hc_deepkey_sdk/CHANGELOG.md#0.8.3-rc.0)
+
+## [holochain\_conductor\_api-0.5.3-rc.0](crates/holochain_conductor_api/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_p2p-0.5.3-rc.0](crates/holochain_p2p/CHANGELOG.md#0.5.3-rc.0)
+
+- Calling functions that get data from other agents now try to get from 3 agents in parallel and return the result of the first agent to respond with valid data ([\#5044](https://github.com/holochain/holochain/pull/5044))
+- The request timeout is now passed in when a `HolochainP2pActor` is created ([\#5044](https://github.com/holochain/holochain/pull/5044))
+
+## [hc\_deepkey\_types-0.9.3-rc.0](crates/hc_deepkey_types/CHANGELOG.md#0.9.3-rc.0)
+
+## [hdk-0.5.3-rc.0](crates/hdk/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_state-0.5.3-rc.0](crates/holochain_state/CHANGELOG.md#0.5.3-rc.0)
+
+## [hdi-0.6.3-rc.0](crates/hdi/CHANGELOG.md#0.6.3-rc.0)
+
+## [holochain\_chc-0.2.3-rc.0](crates/holochain_chc/CHANGELOG.md#0.2.3-rc.0)
+
+## [holochain\_state\_types-0.5.3-rc.0](crates/holochain_state_types/CHANGELOG.md#0.5.3-rc.0)
+
+## [hdk\_derive-0.5.3-rc.0](crates/hdk_derive/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_types-0.5.3-rc.0](crates/holochain_types/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_keystore-0.5.3-rc.0](crates/holochain_keystore/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_sqlite-0.5.3-rc.0](crates/holochain_sqlite/CHANGELOG.md#0.5.3-rc.0)
+
+- Remove queries for filtering out particular ops for integration. Instead use a single query that gets all ops ready to be integrated.
+
+## [mr\_bundle-0.5.3-rc.0](crates/mr_bundle/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_zome\_types-0.5.3-rc.0](crates/holochain_zome_types/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_integrity\_types-0.5.3-rc.0](crates/holochain_integrity_types/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_nonce-0.5.3-rc.0](crates/holochain_nonce/CHANGELOG.md#0.5.3-rc.0)
+
+## [holo\_hash-0.5.3-rc.0](crates/holo_hash/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_timestamp-0.5.3-rc.0](crates/holochain_timestamp/CHANGELOG.md#0.5.3-rc.0)
+
+## [fixt-0.5.3-rc.0](crates/fixt/CHANGELOG.md#0.5.3-rc.0)
+
+## [holochain\_util-0.5.3-rc.0](crates/holochain_util/CHANGELOG.md#0.5.3-rc.0)
+
 # 20250508.152048
 
 ## [hc\_service\_check-0.2.2](crates/hc_service_check/CHANGELOG.md#0.2.2)
