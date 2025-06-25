@@ -743,8 +743,8 @@ async fn generate_sandbox_and_call_agent_meta_info() {
   "{}": {{}}
 }}
 "#,
-        DnaHashB64::from(dna_hashes[1].clone()),
-        DnaHashB64::from(dna_hashes[0].clone())
+        DnaHashB64::from(dna_hashes[0].clone()),
+        DnaHashB64::from(dna_hashes[1].clone())
     );
 
     assert_eq!(output, expected_output);
