@@ -2458,6 +2458,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hc_serde_json"
+version = "1.0.141"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "049eba3ff81c89d682e35e0b6de79cb6d359fe37198f686213915ad57b694b42"
+dependencies = [
+ "itoa",
+ "memchr",
+ "ryu",
+ "serde",
+]
+
+[[package]]
 name = "hc_service_check"
 version = "0.2.2"
 dependencies = [
@@ -2857,6 +2869,7 @@ dependencies = [
  "clap 4.5.40",
  "ed25519-dalek",
  "futures",
+ "hc_serde_json",
  "holo_hash",
  "holochain_chc",
  "holochain_conductor_api",
