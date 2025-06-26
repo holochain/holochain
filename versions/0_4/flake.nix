@@ -26,6 +26,6 @@
 
   outputs = { ... }: {
     stub = true;
-    rustVersion = "1.81.0";
+    rustVersion = "1.85.0";
   };
 }
