@@ -258,14 +258,12 @@ impl FromSql for DhtOpType {
     fn column_result(
         value: holochain_sqlite::rusqlite::types::ValueRef<'_>,
     ) -> holochain_sqlite::rusqlite::types::FromSqlResult<Self> {
-        String::column_result(value)
-            .and_then(|string| {
-                ChainOpType::from_str(&string)
-                    .map(DhtOpType::from)
-                    .or_else(|_| WarrantOpType::from_str(&string).map(DhtOpType::from))
-                    .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
-            })
-            .map(Into::into)
+        String::column_result(value).and_then(|string| {
+            ChainOpType::from_str(&string)
+                .map(DhtOpType::from)
+                .or_else(|_| WarrantOpType::from_str(&string).map(DhtOpType::from))
+                .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
+        })
     }
 }
 

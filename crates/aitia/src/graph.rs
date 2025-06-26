@@ -13,7 +13,7 @@ pub struct GraphNode<'c, T: Fact> {
     pub ctx: &'c T::Context,
 }
 
-impl<'c, T: Fact> Clone for GraphNode<'c, T> {
+impl<T: Fact> Clone for GraphNode<'_, T> {
     fn clone(&self) -> Self {
         Self {
             dep: self.dep.clone(),
@@ -22,7 +22,7 @@ impl<'c, T: Fact> Clone for GraphNode<'c, T> {
     }
 }
 
-impl<'c, T: Fact> DepGraph<'c, T> {
+impl<T: Fact> DepGraph<'_, T> {
     pub fn deps(&self) -> HashSet<Dep<T>> {
         self.node_weights()
             .map(|n| n.dep.clone())
@@ -74,13 +74,13 @@ impl<'c, T: Fact> DepGraph<'c, T> {
     }
 }
 
-impl<'c, T: Fact> Debug for GraphNode<'c, T> {
+impl<T: Fact> Debug for GraphNode<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.dep.explain(self.ctx))
     }
 }
 
-impl<'c, T: Fact> Default for DepGraph<'c, T> {
+impl<T: Fact> Default for DepGraph<'_, T> {
     fn default() -> Self {
         Self(Default::default())
     }

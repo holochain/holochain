@@ -355,7 +355,7 @@ impl<'lt> From<&'lt Arc<KitsuneAgent>> for AgentLike<'lt> {
     }
 }
 
-impl<'lt> AgentLike<'lt> {
+impl AgentLike<'_> {
     /// Get a raw agent pubkey from any variant type
     pub fn agent(&self) -> &Arc<KitsuneAgent> {
         match self {
@@ -756,7 +756,7 @@ fn record_item<T>(buffer: &mut VecDeque<T>, item: T) {
 impl std::fmt::Display for Metrics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         static TRACE: once_cell::sync::Lazy<bool> = once_cell::sync::Lazy::new(|| {
-            std::env::var("GOSSIP_METRICS").map_or(false, |s| s == "trace")
+            std::env::var("GOSSIP_METRICS").is_ok_and(|s| s == "trace")
         });
         let trace = *TRACE;
         write!(f, "Metrics:")?;

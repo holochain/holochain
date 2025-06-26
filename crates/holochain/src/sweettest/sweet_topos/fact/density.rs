@@ -75,7 +75,7 @@ impl<'a> Fact<'a, NetworkTopology> for DenseNetworkFact {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use super::DenseNetworkFact;
     use crate::prelude::unstructured_noise;
     use crate::sweettest::fact::partition::StrictlyPartitionedNetworkFact;

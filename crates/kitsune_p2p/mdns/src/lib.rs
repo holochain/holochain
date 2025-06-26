@@ -4,9 +4,9 @@
 //!
 //! Uses libmdns crate for broadcasting
 //! Uses mdns crate for discovery
-use err_derive::Error;
 use mdns::RecordKind;
 use std::time::Duration;
+use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 
 use base64::Engine;
@@ -19,10 +19,10 @@ const MAX_TXT_SIZE: usize = 192;
 
 #[derive(Debug, Error)]
 pub enum MdnsError {
-    #[error(display = "Regular Mdns error {}", _0)]
-    Mdns(#[error(source)] mdns::Error),
-    #[error(display = "Base64 decoding error {}", _0)]
-    Base64(#[error(source)] base64::DecodeError),
+    #[error("Regular Mdns error {0}")]
+    Mdns(#[from] mdns::Error),
+    #[error("Base64 decoding error {0}")]
+    Base64(#[from] base64::DecodeError),
 }
 
 /// Stop thread created by `mdns_create_broadcast_thread()`

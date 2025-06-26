@@ -157,7 +157,7 @@ impl ShardedGossipLocal {
             if inner
                 .initiate_tgt
                 .as_ref()
-                .map_or(true, |tgt| tgt.cert != peer_cert)
+                .is_none_or(|tgt| tgt.cert != peer_cert)
             {
                 let mut metrics = inner.metrics.write();
 

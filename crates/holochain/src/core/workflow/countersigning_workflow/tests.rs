@@ -2230,11 +2230,8 @@ impl TestHarness {
         self.workspace
             .inner
             .share_ref(|inner| {
-                match &inner.next_trigger {
-                    Some(next_trigger) => {
-                        assert!(next_trigger.trigger_at < Timestamp::now());
-                    }
-                    None => {}
+                if let Some(next_trigger) = &inner.next_trigger {
+                    assert!(next_trigger.trigger_at < Timestamp::now());
                 }
 
                 Ok(())
