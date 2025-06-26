@@ -5,8 +5,7 @@
     let
       rustToolchain = config.rustHelper.mkRust {
         track = "stable";
-        # TODO version = inputs.versions.rustVersion;
-        version = "1.81.0";
+        version = inputs.versions.rustVersion;
       };
 
       craneLib = (inputs.crane.mkLib pkgs).overrideToolchain rustToolchain;
@@ -35,9 +34,10 @@
         ])
         ++ (lib.optionals pkgs.stdenv.isLinux
           (with pkgs; [
-            webkitgtk.dev
+            webkitgtk_4_0.dev
             gdk-pixbuf
             gtk3
+            libsoup_2_4
           ]))
         ++ lib.optionals pkgs.stdenv.isDarwin
           (with self'.legacyPackages.apple_sdk'.frameworks; [
