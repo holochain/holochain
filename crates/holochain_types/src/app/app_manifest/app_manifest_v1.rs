@@ -256,7 +256,6 @@ impl AppManifestV1 {
                     } = dna;
                     let modifiers = modifiers.serialized()?;
                     // Go from "flexible" enum into proper DnaVersionSpec.
-                    let installed_hash = installed_hash.map(Into::into);
                     let validated = match provisioning.unwrap_or_default() {
                         CellProvisioning::Create { deferred } => AppRoleManifestValidated::Create {
                             deferred,

@@ -203,7 +203,7 @@ impl DhtDbQueryCache {
         Ok(self.get_or_try_init().await?.share_ref(|activity| {
             activity
                 .get(author)
-                .map_or(true, |state| state.bounds.integrated.is_none())
+                .is_none_or(|state| state.bounds.integrated.is_none())
         }))
     }
 
@@ -311,8 +311,8 @@ fn prev_is_empty_new_is_zero(
     prev_bounds: Option<&ActivityBounds>,
     new_bounds: &ActivityBounds,
 ) -> bool {
-    prev_bounds.map_or(false, |p| p.integrated.is_some())
-        || new_bounds.integrated.map_or(true, |i| i == 0)
+    prev_bounds.is_some_and(|p| p.integrated.is_some())
+        || new_bounds.integrated.is_none_or(|i| i == 0)
 }
 
 /// If there's already activity marked integrated
@@ -324,9 +324,7 @@ fn integrated_is_consecutive(
     prev_bounds
         .and_then(|p| p.integrated)
         .zip(new_bounds.integrated)
-        .map_or(true, |(p, n)| {
-            (p == n) || p.checked_add(1).map(|p1| n == p1).unwrap_or(false)
-        })
+        .is_none_or(|(p, n)| (p == n) || p.checked_add(1).map(|p1| n == p1).unwrap_or(false))
 }
 
 /// Updates the activity state of an author with new bounds.
@@ -347,7 +345,7 @@ fn update_activity(
         None => {
             // If the new bounds have `ready_to_integrate` and do not equal zero
             // then they are awaiting dependencies.
-            if new_bounds.ready_to_integrate.map_or(false, |i| i != 0) {
+            if new_bounds.ready_to_integrate.is_some_and(|i| i != 0) {
                 activity.insert(
                     Arc::new(agent.clone()),
                     ActivityState {
@@ -423,9 +421,7 @@ fn update_ready_to_integrate(prev_state: &mut ActivityState, new_ready: Option<u
                 //
                 // If ready_to_integrate + 1 == new_ready then we know this
                 // new ready is consecutive from the previous ready_to_integrate.
-                if x.checked_add(1)
-                    .map_or(false, |x_prime| x_prime == new_ready)
-                {
+                if x.checked_add(1) == Some(new_ready) {
                     let check_awaiting_deps =
                         |x_prime_prime| awaiting_deps.first().map(|first| x_prime_prime == *first);
                     // (Ready(x), Out(x''..=y), x') -> Ready(y)
@@ -465,9 +461,7 @@ fn update_ready_to_integrate(prev_state: &mut ActivityState, new_ready: Option<u
                 //
                 // If the new ready is consecutive from the integrated then we
                 // can set the new ready_to_integrate to the new ready.
-                if x.checked_add(1)
-                    .map_or(false, |x_prime| x_prime == new_ready)
-                {
+                if x.checked_add(1) == Some(new_ready) {
                     *ready = Some(new_ready);
                 // (Integrated(x), a) -> (Integrated(x), Out(y)) where a != 'x
                 //
@@ -531,7 +525,7 @@ fn update_ready_to_integrate(prev_state: &mut ActivityState, new_ready: Option<u
                 },
             awaiting_deps,
         } => {
-            if awaiting_deps.first().map_or(false, |first| *first == 0) {
+            if awaiting_deps.first().is_some_and(|first| *first == 0) {
                 if let Some(y) = find_consecutive(awaiting_deps) {
                     *ready = Some(y);
                 }

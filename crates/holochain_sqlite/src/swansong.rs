@@ -8,7 +8,7 @@ pub struct SwanSong<'a, T> {
     song: Option<Box<dyn FnOnce(&mut T) + 'a>>,
 }
 
-impl<'a, T> Drop for SwanSong<'a, T> {
+impl<T> Drop for SwanSong<'_, T> {
     fn drop(&mut self) {
         self.song.take().unwrap()(&mut self.inner);
     }

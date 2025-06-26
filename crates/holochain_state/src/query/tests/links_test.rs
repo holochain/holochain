@@ -107,7 +107,7 @@ impl TestData {
         td
     }
 
-    async fn empty<'a>(&'a self, test: &'static str) {
+    async fn empty(&self, test: &'static str) {
         let val = self
             .env
             .read_async({
@@ -126,7 +126,7 @@ impl TestData {
         assert!(val, "{}", test);
     }
 
-    async fn only_on_full_key<'a>(&'a self, test: &'static str) {
+    async fn only_on_full_key(&self, test: &'static str) {
         let val = self
             .env
             .read_async({
@@ -142,7 +142,7 @@ impl TestData {
         assert_eq!(val, &[self.expected_link.clone()], "{}", test);
     }
 
-    async fn not_on_full_key<'a>(&'a self, test: &'static str) {
+    async fn not_on_full_key(&self, test: &'static str) {
         let val = self
             .env
             .read_async({
@@ -163,7 +163,7 @@ impl TestData {
         );
     }
 
-    async fn only_on_base<'a>(&'a self, test: &'static str) {
+    async fn only_on_base(&self, test: &'static str) {
         let val = self
             .env
             .read_async({
@@ -179,7 +179,7 @@ impl TestData {
         assert_eq!(val, &[self.expected_link.clone()], "{}", test);
     }
 
-    async fn is_on_type<'a>(&'a self, test: &'static str) {
+    async fn is_on_type(&self, test: &'static str) {
         let query = GetLinksQuery::new(
             self.base_hash.clone().into(),
             LinkTypeFilter::single_type(self.zome_index, self.link_type),
@@ -206,7 +206,7 @@ impl TestData {
         );
     }
 
-    async fn is_on_type_query<'a>(&'a self, type_query: LinkTypeFilter, test: &'static str) {
+    async fn is_on_type_query(&self, type_query: LinkTypeFilter, test: &'static str) {
         let query = GetLinksQuery::new(
             self.base_hash.clone().into(),
             type_query,
@@ -233,7 +233,7 @@ impl TestData {
         );
     }
 
-    async fn only_on_half_tag<'a>(&'a self, test: &'static str) {
+    async fn only_on_half_tag(&self, test: &'static str) {
         let tag_len = self.tag.0.len();
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
@@ -259,7 +259,7 @@ impl TestData {
         assert_eq!(val, &[self.expected_link.clone()], "{}", test);
     }
 
-    async fn is_on_half_tag<'a>(&'a self, test: &'static str) {
+    async fn is_on_half_tag(&self, test: &'static str) {
         let tag_len = self.tag.0.len();
         // Make sure there is at least some tag
         let half_tag = if tag_len > 1 { tag_len / 2 } else { tag_len };
@@ -343,7 +343,7 @@ impl TestData {
         self.scratch.drain_actions().for_each(|_| ());
     }
 
-    async fn only_these_on_base<'a>(td: &'a [Self], test: &'static str) {
+    async fn only_these_on_base(td: &[Self], test: &'static str) {
         // Check all base hash are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
@@ -381,8 +381,8 @@ impl TestData {
         assert_eq!(val, expected, "{}", test);
     }
 
-    async fn only_these_on_query<'a>(
-        td: &'a [Self],
+    async fn only_these_on_query(
+        td: &[Self],
         scratch: &Scratch,
         query: impl Into<LinkTypeFilter>,
         test: &str,
@@ -422,7 +422,7 @@ impl TestData {
         assert_eq!(val, expected, "{}", test);
     }
 
-    async fn only_these_on_full_key<'a>(td: &'a [Self], test: &'static str) {
+    async fn only_these_on_full_key(td: &[Self], test: &'static str) {
         // Check all base hash, link type, tag are the same
         for d in td {
             assert_eq!(d.base_hash, td[0].base_hash, "{}", test);
@@ -464,7 +464,7 @@ impl TestData {
         assert_eq!(val, expected, "{}", test);
     }
 
-    async fn only_these_on_half_key<'a>(td: &'a [Self], test: &'static str) {
+    async fn only_these_on_half_key(td: &[Self], test: &'static str) {
         let tag_len = td[0].tag.0.len();
         // Make sure there is at least some tag
         let tag_len = if tag_len > 1 { tag_len / 2 } else { tag_len };

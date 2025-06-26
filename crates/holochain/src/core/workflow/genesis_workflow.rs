@@ -39,7 +39,7 @@ where
 }
 
 // #[cfg_attr(feature = "instrument", tracing::instrument(skip(workspace, api, args)))]
-pub async fn genesis_workflow<'env, Api: CellConductorApiT, Ribosome>(
+pub async fn genesis_workflow<Api: CellConductorApiT, Ribosome>(
     mut workspace: GenesisWorkspace,
     api: Api,
     args: GenesisWorkflowArgs<Ribosome>,

@@ -12,7 +12,7 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 
 #[cfg(all(test, feature = "test_utils"))]
-pub mod test;
+mod test;
 
 mod chain_item;
 pub use chain_item::*;

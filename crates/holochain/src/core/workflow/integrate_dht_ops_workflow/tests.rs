@@ -311,7 +311,7 @@ impl Db {
 
     // Sets the database to a certain state
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(pre_state, env)))]
-    async fn set<'env>(pre_state: Vec<Self>, env: DbWrite<DbKindDht>) {
+    async fn set(pre_state: Vec<Self>, env: DbWrite<DbKindDht>) {
         env.write_async(move |txn| -> DatabaseResult<()> {
             for state in pre_state {
                 match state {
@@ -349,7 +349,7 @@ impl Db {
 }
 
 #[allow(unused)]
-async fn call_workflow<'env>(env: DbWrite<DbKindDht>) {
+async fn call_workflow(env: DbWrite<DbKindDht>) {
     let (qt, _rx) = TriggerSender::new();
     let test_network = test_network(None, None).await;
     let holochain_p2p_cell = test_network.dna_network();

@@ -6,8 +6,8 @@ use holochain_keystore::MetaLairClient;
 /// Generate a chain of Records which constitutes a valid source chain:
 /// - Each action will refer to the one prior
 /// - Each Record will have a valid signature
-pub async fn valid_arbitrary_chain<'a>(
-    g: &mut contrafact::Generator<'a>,
+pub async fn valid_arbitrary_chain(
+    g: &mut contrafact::Generator<'_>,
     keystore: MetaLairClient,
     author: AgentPubKey,
     n: usize,

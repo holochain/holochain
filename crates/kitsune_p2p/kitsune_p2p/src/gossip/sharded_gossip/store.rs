@@ -275,7 +275,7 @@ pub(super) fn hash_chunks_query(
     Box::pin(f)
 }
 
-pub(super) async fn query_region_set<'a>(
+pub(super) async fn query_region_set(
     host_api: HostApi,
     space: Arc<KitsuneSpace>,
     common_arq_set: ArqSet,

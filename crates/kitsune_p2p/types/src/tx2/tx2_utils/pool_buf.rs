@@ -62,7 +62,7 @@ impl serde::Serialize for PoolBuf {
 
 struct VisitBytes;
 
-impl<'de> serde::de::Visitor<'de> for VisitBytes {
+impl serde::de::Visitor<'_> for VisitBytes {
     type Value = PoolBuf;
 
     fn expecting(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {

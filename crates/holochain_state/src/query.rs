@@ -237,7 +237,7 @@ impl<'stmt, Q: Query> Stores<Q> for Txn<'stmt, '_> {
     }
 }
 
-impl<'stmt> Store for Txn<'stmt, '_> {
+impl Store for Txn<'_, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         get_entry_from_db(self.txn, hash)
     }
@@ -436,9 +436,10 @@ impl<'stmt> Store for Txn<'stmt, '_> {
             AnyDhtHashPrimitive::Action(hash) => {
                 Ok(self.get_exact_record(&hash)?.map(|el| {
                     // Filter out the entry if it's private.
-                    let is_private_entry = el.action().entry_type().map_or(false, |et| {
-                        matches!(et.visibility(), EntryVisibility::Private)
-                    });
+                    let is_private_entry = el
+                        .action()
+                        .entry_type()
+                        .is_some_and(|et| matches!(et.visibility(), EntryVisibility::Private));
                     if is_private_entry {
                         Record::new(el.into_inner().0, None)
                     } else {
@@ -450,7 +451,7 @@ impl<'stmt> Store for Txn<'stmt, '_> {
     }
 }
 
-impl<'stmt> Txn<'stmt, '_> {
+impl Txn<'_, '_> {
     fn get_exact_record(&self, hash: &ActionHash) -> StateQueryResult<Option<Record>> {
         let record = self.txn.query_row(
             "
@@ -612,7 +613,7 @@ impl<'stmt> Txn<'stmt, '_> {
     }
 }
 
-impl<'stmt, Q: Query> StoresIter<Q::Item> for QueryStmt<'stmt, Q> {
+impl<Q: Query> StoresIter<Q::Item> for QueryStmt<'_, Q> {
     fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Item>> {
         self.iter()
     }
@@ -632,7 +633,7 @@ impl<'stmt, Q: Query> Stores<Q> for Txns<'stmt, '_> {
     }
 }
 
-impl<'stmt> Store for Txns<'stmt, '_> {
+impl Store for Txns<'_, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         for txn in &self.txns {
             let r = txn.get_entry(hash)?;
@@ -725,7 +726,7 @@ impl<'stmt> Store for Txns<'stmt, '_> {
     }
 }
 
-impl<'stmt, Q: Query> StoresIter<Q::Item> for QueryStmts<'stmt, Q> {
+impl<Q: Query> StoresIter<Q::Item> for QueryStmts<'_, Q> {
     fn iter(&mut self) -> StateQueryResult<StmtIter<'_, Q::Item>> {
         Ok(Box::new(
             fallible_iterator::convert(self.stmts.iter_mut().map(Ok)).flat_map(|stmt| stmt.iter()),
@@ -733,7 +734,7 @@ impl<'stmt, Q: Query> StoresIter<Q::Item> for QueryStmts<'stmt, Q> {
     }
 }
 
-impl<'borrow, 'txn, Q> Stores<Q> for DbScratch<'borrow, 'txn>
+impl<'borrow, Q> Stores<Q> for DbScratch<'borrow, '_>
 where
     Q: Query<Item = Judged<SignedActionHashed>>,
 {
@@ -747,7 +748,7 @@ where
     }
 }
 
-impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
+impl Store for DbScratch<'_, '_> {
     fn get_entry(&self, hash: &EntryHash) -> StateQueryResult<Option<Entry>> {
         let r = self.txns.get_entry(hash)?;
         if r.is_none() {
@@ -831,7 +832,7 @@ impl<'borrow, 'txn> Store for DbScratch<'borrow, 'txn> {
     }
 }
 
-impl<'stmt, Q> StoresIter<Q::Item> for DbScratchIter<'stmt, Q>
+impl<Q> StoresIter<Q::Item> for DbScratchIter<'_, Q>
 where
     Q: Query<Item = Judged<SignedActionHashed>>,
 {
@@ -1068,7 +1069,7 @@ pub fn map_sql_dht_op_common(
     match op_type {
         DhtOpType::Chain(op_type) => {
             let action = from_blob::<SignedAction>(row.get("action_blob")?)?;
-            if action.entry_type().map_or(false, |et| {
+            if action.entry_type().is_some_and(|et| {
                 !return_private_entry_ops && *et.visibility() == EntryVisibility::Private
             }) && op_type == ChainOpType::StoreEntry
             {

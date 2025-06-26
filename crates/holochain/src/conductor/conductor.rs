@@ -152,7 +152,7 @@ mod agent_key_operations;
 pub(crate) mod app_broadcast;
 
 #[cfg(test)]
-pub mod tests;
+pub(crate) mod tests;
 
 /// How long we should attempt to achieve a "network join" when first activating a cell,
 /// before moving on and letting the network health activity go on in the background.

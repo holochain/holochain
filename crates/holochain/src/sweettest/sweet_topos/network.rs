@@ -500,7 +500,7 @@ impl PartialEq for NetworkTopology {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use super::*;
     use holochain_zome_types::entropy::unstructured_noise;
 

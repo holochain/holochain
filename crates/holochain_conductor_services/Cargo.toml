@@ -41,5 +41,7 @@ test_utils = ["fuzzing"]
 
 fuzzing = ["arbitrary", "hc_deepkey_sdk/fuzzing"]
 
+tokio = []
+
 [lints]
 workspace = true

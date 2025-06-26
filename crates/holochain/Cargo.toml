@@ -336,3 +336,5 @@ unstable-countersigning = [
   "hdk/unstable-countersigning",
   "holochain_zome_types/unstable-countersigning",
 ]
+
+tokio = []

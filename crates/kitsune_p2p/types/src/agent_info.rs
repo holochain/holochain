@@ -215,7 +215,7 @@ impl<'de> serde::Deserialize<'de> for AgentInfoSigned {
 
 impl AgentInfoSigned {
     /// Construct and sign a new AgentInfoSigned instance.
-    pub async fn sign<'a, R, F>(
+    pub async fn sign<R, F>(
         space: Arc<KitsuneSpace>,
         agent: Arc<KitsuneAgent>,
         meta: impl Into<AgentMetaInfoEncode>,

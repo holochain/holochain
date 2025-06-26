@@ -549,7 +549,7 @@ async fn check_expected_data_inner(
         }
 
         // If it's time to send a keep alive then do so now.
-        if keep_alive.map_or(false, |k| last_keep_alive.elapsed() > k) {
+        if keep_alive.is_some_and(|k| last_keep_alive.elapsed() > k) {
             reporter
                 .send_report(SessionReport::KeepAlive {
                     missing_agents: missing_agents.len() as u32,

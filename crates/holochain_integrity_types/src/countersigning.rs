@@ -672,7 +672,7 @@ impl CounterSigningSessionData {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use crate::CounterSigningAgentState;
     use crate::CounterSigningSessionData;
     use crate::Signature;

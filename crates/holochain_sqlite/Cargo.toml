@@ -120,3 +120,5 @@ sqlite = [
 # Enables tracing instrumentation 
 # (we experience segfaults in some tests if there is too much instrumentation)
 instrument = []
+
+tokio = []

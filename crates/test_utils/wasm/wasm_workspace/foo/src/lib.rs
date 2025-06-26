@@ -1,7 +1,7 @@
 use hdk::prelude::*;
 
 #[hdk_extern]
-fn init(_: ()) -> ExternResult<InitCallbackResult> {
+fn init() -> ExternResult<InitCallbackResult> {
     // grant unrestricted access to accept_cap_claim so other agents can send us claims
     let mut fns = BTreeSet::new();
     fns.insert((zome_info()?.name, "foo".into()));
@@ -18,6 +18,11 @@ fn init(_: ()) -> ExternResult<InitCallbackResult> {
 }
 
 #[hdk_extern]
-fn foo(_: ()) -> ExternResult<String> {
+fn foo() -> ExternResult<String> {
     Ok(String::from("foo"))
+}
+
+#[hdk_extern]
+fn get_dna_hash() -> ExternResult<DnaHash> {
+    Ok(dna_info()?.hash)
 }

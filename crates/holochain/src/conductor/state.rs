@@ -114,6 +114,7 @@ impl ConductorState {
         &self.tag
     }
 
+    /// Set the unique identifier for this conductor
     #[cfg(test)]
     pub fn set_tag(&mut self, tag: ConductorStateTag) {
         self.tag = tag;

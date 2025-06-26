@@ -68,7 +68,7 @@ impl<'a> Fact<'a, NetworkTopology> for StrictlyPartitionedNetworkFact {
 }
 
 #[cfg(test)]
-pub mod test {
+mod test {
     use super::*;
     use crate::prelude::unstructured_noise;
     use crate::sweettest::fact::partition::StrictlyPartitionedNetworkFact;
