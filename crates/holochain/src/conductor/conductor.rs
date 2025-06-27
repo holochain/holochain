@@ -38,7 +38,7 @@ pub const WASM_CACHE: &str = "wasm-cache";
 pub use self::share::RwShare;
 use super::api::error::ConductorApiError;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -60,6 +60,7 @@ use tracing::*;
 pub use builder::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
+use holochain_conductor_api::AgentMetaInfo;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
@@ -828,11 +829,14 @@ mod network_impls {
         zome_call_response_to_conductor_api_result, ConductorApiError,
     };
     use futures::future::join_all;
-    use holochain_conductor_api::{CellInfo, ZomeCallParamsSigned};
+    use holochain_conductor_api::ZomeCallParamsSigned;
     use holochain_conductor_api::{DnaStorageInfo, StorageBlob, StorageInfo};
+    use holochain_sqlite::helpers::BytesSql;
+    use holochain_sqlite::sql::sql_peer_meta_store;
     use holochain_sqlite::stats::{get_size_on_disk, get_used_size};
     use holochain_zome_types::block::Block;
     use holochain_zome_types::block::BlockTargetId;
+    use kitsune2_api::Url;
     use zome_call_signature_verification::is_valid_signature;
 
     impl Conductor {
@@ -854,7 +858,7 @@ mod network_impls {
                     .holochain_p2p
                     .peer_store(dna_hash.clone())
                     .await
-                    .map_err(|err| ConductorApiError::CellError(err.into()))?;
+                    .map_err(|err| ConductorApiError::Other(err.into()))?;
                 let all_peers = peer_store.get_all().await?;
                 out.extend(all_peers);
             }
@@ -867,31 +871,96 @@ mod network_impls {
             installed_app_id: &InstalledAppId,
             maybe_dna_hashes: Option<Vec<DnaHash>>,
         ) -> ConductorApiResult<Vec<Arc<AgentInfoSigned>>> {
-            // Get app info to know which DNAs belong to this app
-            let app_info = self.get_app_info(installed_app_id).await?.ok_or_else(|| {
-                ConductorApiError::other(format!("App not installed: {}", installed_app_id))
-            })?;
+            let mut app_dnas = self.get_dna_hashes_for_app(installed_app_id).await?;
 
-            let mut app_dnas: HashSet<DnaHash> = HashSet::new();
-            for cell_infos in app_info.cell_info.values() {
-                for cell_info in cell_infos {
-                    let dna = match cell_info {
-                        CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
-                        CellInfo::Cloned(cell) => cell.cell_id.dna_hash().clone(),
-                        CellInfo::Stem(cell) => cell.original_dna_hash.clone(),
-                    };
-                    app_dnas.insert(dna);
-                }
+            if let Some(dna_hashes) = maybe_dna_hashes {
+                app_dnas.retain(|h| dna_hashes.contains(h));
+            };
+
+            self.get_agent_infos(Some(app_dnas)).await
+        }
+
+        /// Get the content of the peer meta store(s) for an agent at a given Url
+        /// for spaces (dna hashes) of a specific app
+        pub async fn app_agent_meta_info(
+            &self,
+            installed_app_id: &InstalledAppId,
+            url: Url,
+            maybe_dna_hashes: Option<Vec<DnaHash>>,
+        ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>> {
+            let mut app_hashes = self.get_dna_hashes_for_app(installed_app_id).await?;
+            if let Some(dna_hashes) = maybe_dna_hashes {
+                app_hashes.retain(|h| dna_hashes.contains(h));
+            }
+            self.agent_meta_info(url, Some(app_hashes)).await
+        }
+
+        /// Get the content of the peer meta store(s) for an agent at a given Url
+        pub async fn agent_meta_info(
+            &self,
+            url: Url,
+            maybe_dna_hashes: Option<Vec<DnaHash>>,
+        ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>> {
+            let mut space_ids = self
+                .spaces
+                .get_from_spaces(|space| (*space.dna_hash).clone());
+
+            if let Some(dna_hashes) = maybe_dna_hashes {
+                space_ids.retain(|dna_hash| dna_hashes.contains(dna_hash));
             }
 
-            let hashes = match maybe_dna_hashes {
-                Some(mut dna_hashes) => {
-                    dna_hashes.retain(|h| app_dnas.contains(h));
-                    dna_hashes
-                }
-                None => app_dnas.into_iter().collect(),
-            };
-            self.get_agent_infos(Some(hashes)).await
+            if space_ids.is_empty() {
+                return Err(ConductorApiError::Other(
+                    "No cell found for the provided dna hashes.".into(),
+                ));
+            }
+
+            let mut all_infos = BTreeMap::new();
+
+            for dna_hash in space_ids {
+                let db = self.spaces.peer_meta_store_db(&dna_hash)?;
+                let url2 = url.clone();
+
+                let infos = db
+                    .read_async(
+                        move |txn| -> DatabaseResult<BTreeMap<String, AgentMetaInfo>> {
+                            let mut infos: BTreeMap<String, AgentMetaInfo> = BTreeMap::new();
+
+                            let mut stmt = txn.prepare(sql_peer_meta_store::GET_ALL_BY_URL)?;
+                            let mut rows = stmt.query(named_params! {
+                                ":peer_url": url2.as_str()
+                            })?;
+
+                            while let Some(row) = rows.next()? {
+                                let meta_key = row.get::<_, String>(0)?;
+                                let meta_value: serde_json::Value =
+                                    serde_json::from_slice(&(row.get::<_, BytesSql>(1)?.0))
+                                        .map_err(|e| {
+                                            rusqlite::Error::FromSqlConversionFailure(
+                                                2,
+                                                rusqlite::types::Type::Blob,
+                                                e.into(),
+                                            )
+                                        })?;
+                                let expires_at = row.get::<_, i64>(2)?;
+
+                                let agent_meta_info = AgentMetaInfo {
+                                    meta_value,
+                                    expires_at: Timestamp(expires_at),
+                                };
+
+                                infos.insert(meta_key, agent_meta_info);
+                            }
+
+                            Ok(infos)
+                        },
+                    )
+                    .await?;
+
+                all_infos.insert(dna_hash, infos);
+            }
+
+            Ok(all_infos)
         }
 
         pub(crate) async fn witness_nonce_from_calling_agent(
@@ -1116,6 +1185,8 @@ pub struct InstallAppCommonFlags {
 ///
 /// Tests related to app installation can be found in ../../tests/tests/app_installation/mod.rs
 mod app_impls {
+    use holochain_conductor_api::CellInfo;
+
     use super::*;
 
     impl Conductor {
@@ -1523,6 +1594,29 @@ mod app_impls {
                     Ok(Some(AppInfo::from_installed_app(app, &dna_definitions)))
                 }
             }
+        }
+
+        pub(crate) async fn get_dna_hashes_for_app(
+            &self,
+            installed_app_id: &InstalledAppId,
+        ) -> ConductorResult<Vec<DnaHash>> {
+            let app_info = self.get_app_info(installed_app_id).await?.ok_or_else(|| {
+                ConductorError::other(format!("App not installed: {}", installed_app_id))
+            })?;
+
+            let mut app_dnas: HashSet<DnaHash> = HashSet::new();
+            for cell_infos in app_info.cell_info.values() {
+                for cell_info in cell_infos {
+                    let dna = match cell_info {
+                        CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
+                        CellInfo::Cloned(cell) => cell.cell_id.dna_hash().clone(),
+                        CellInfo::Stem(cell) => cell.original_dna_hash.clone(),
+                    };
+                    app_dnas.insert(dna);
+                }
+            }
+
+            Ok(app_dnas.into_iter().collect())
         }
     }
 }
