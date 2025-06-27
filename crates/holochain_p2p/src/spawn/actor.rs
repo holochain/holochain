@@ -3,6 +3,7 @@
 use crate::metrics::create_p2p_request_duration_metric;
 use crate::*;
 use holochain_sqlite::error::{DatabaseError, DatabaseResult};
+use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_peer_meta_store;
 use holochain_state::prelude::named_params;

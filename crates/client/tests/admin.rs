@@ -9,6 +9,7 @@ use holochain_client::{
 use holochain_conductor_api::{CellInfo, StorageBlob};
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::prelude::ExternIO;
+use kitsune2_api::Url;
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr};
 
@@ -215,6 +216,57 @@ async fn agent_info() {
     let agent_infos = admin_ws.agent_info(None).await.unwrap();
     assert_eq!(agent_infos.len(), 2);
     assert!(agent_infos.contains(&other_agent));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn agent_meta_info() {
+    // This is just a rudimentary test. More detailed functionality is tested in
+    // conductor tests in the holochain crate where the peer meta store is
+    // accessible on the SweetConductor.
+
+    let conductor = SweetConductor::from_standard_config().await;
+    let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
+    let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
+        .await
+        .unwrap();
+    let app_id: InstalledAppId = "test-app".into();
+    let agent_key = admin_ws.generate_agent_pub_key().await.unwrap();
+    admin_ws
+        .install_app(InstallAppPayload {
+            agent_key: Some(agent_key.clone()),
+            installed_app_id: Some(app_id.clone()),
+            roles_settings: None,
+            network_seed: None,
+            source: AppBundleSource::Bytes(fixture::get_fixture_app_bundle()),
+            ignore_genesis_failure: false,
+        })
+        .await
+        .unwrap();
+    admin_ws.enable_app(app_id.clone()).await.unwrap();
+
+    let app_info = admin_ws
+        .list_apps(None)
+        .await
+        .unwrap()
+        .first()
+        .unwrap()
+        .clone();
+
+    let dna_hash = match app_info.cell_info.first().unwrap().1.first().unwrap() {
+        CellInfo::Provisioned(c) => c.cell_id.dna_hash().clone(),
+        _ => panic!("Wrong CellInfo type."),
+    };
+
+    let url = Url::from_str("ws://test.com:80/test-url").unwrap();
+
+    // Get the agent meta info for all spaces
+    let response = admin_ws.agent_meta_info(url.clone(), None).await.unwrap();
+    assert_eq!(response.len(), 1);
+
+    let meta_infos = response
+        .get(&dna_hash)
+        .expect("No meta infos found for dna hash.");
+    assert_eq!(meta_infos.len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]

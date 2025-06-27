@@ -3107,6 +3107,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
+ "bytes",
  "derive_more 2.0.1",
  "fallible-iterator",
  "futures",
