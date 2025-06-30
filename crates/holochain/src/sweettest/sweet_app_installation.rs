@@ -15,6 +15,7 @@ pub async fn app_bundle_from_dnas(
 
             let modifiers = DnaModifiersOpt::none();
             let path = format!("{}", dna.dna_hash());
+
             let manifest = AppRoleManifest {
                 name: dr.role(),
                 dna: AppRoleDnaManifest {
@@ -29,6 +30,7 @@ pub async fn app_bundle_from_dnas(
                     clone_limit: 255,
                 },
                 provisioning: Some(CellProvisioning::Create { deferred: false }),
+                coordinators: dna.coordinator_manifest(),
             };
             let bundle = DnaBundle::from_dna_file(dna.clone()).unwrap();
             (manifest, (path, bundle))

@@ -3444,6 +3444,7 @@ pub fn app_manifest_from_dnas(
                     clone_limit,
                 },
                 provisioning: Some(CellProvisioning::Create { deferred: false }),
+                coordinators: dna.coordinator_manifest(),
             }
         })
         .collect();

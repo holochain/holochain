@@ -159,6 +159,8 @@ impl DnaBundle {
 
     #[cfg(feature = "test_utils")]
     fn manifest_from_dna_def(dna_def: DnaDef) -> DnaResult<DnaManifest> {
+        use crate::app::app_manifest_v0::CoordinatorManifest;
+
         let integrity = dna_def
             .integrity_zomes
             .into_iter()
@@ -225,7 +227,7 @@ impl DnaBundle {
     }
 }
 
-pub(super) async fn hash_bytes(
+pub(crate) async fn hash_bytes(
     zomes: impl Iterator<Item = ZomeManifest>,
     resources: &mut HashMap<&ResourceIdentifier, &ResourceBytes>,
 ) -> DnaResult<Vec<(ZomeName, WasmHash, DnaWasm, Vec<ZomeName>)>> {
@@ -267,6 +269,8 @@ pub(super) async fn hash_bytes(
 
 #[cfg(test)]
 mod tests {
+    use crate::app::app_manifest_v0::CoordinatorManifest;
+
     use super::*;
 
     #[tokio::test(flavor = "multi_thread")]
