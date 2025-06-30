@@ -593,11 +593,11 @@ impl GetActivityTestScenario {
     => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 2; "1 to genesis with scratch 0 till 2")]
 #[test_case(
     Data { authored: agent_chain(&[(0, 0..3)]), scratch: Some(agent_chain(&[(0, 3..6)])), ..Default::default() },
-    agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).take(4).until(action_hash(&[0]))
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).take(4).until_hash(action_hash(&[0]))
     => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 4; "4 take 4 until 0 with authored 0 till 2 and scratch 3 till 5")]
 #[test_case(
     Data { authored: agent_chain(&[(0, 0..6)]), ..Default::default() },
-    agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).take(4).until(action_hash(&[0]))
+    agent_hash(&[0]), ChainFilter::new(action_hash(&[4])).take(4).until_hash(action_hash(&[0]))
     => matches MustGetAgentActivityResponse::Activity { activity, .. } if activity.len() == 4; "4 take 4 until 0 with authored 0 till 5")]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_must_get_agent_activity(

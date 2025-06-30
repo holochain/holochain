@@ -57,8 +57,8 @@ fn can_until_hash(len: u32, chain_top: u32, until: TestHash) -> Vec<TestChainIte
 #[test_case(10, 5, 1 => using pretty(chain(1..6)))]
 #[test_case(10, 9, 1 => using pretty(chain(0..10)))]
 /// Check taking until some timestamp is reached works.
-fn can_until_timestamp(len: u32, chain_top: u32, until: Timestamp) -> Vec<TestChainItem> {
-    let filter = TestFilter::new(hash(chain_top)).until_timestamp(until);
+fn can_until_timestamp(len: u32, chain_top: u32, until_us: i64) -> Vec<TestChainItem> {
+    let filter = TestFilter::new(hash(chain_top)).until_timestamp(Timestamp::from_micros(until_us));
     build_chain(chain(0..len), filter)
 }
 
@@ -136,7 +136,7 @@ fn test_filter_then_check(
     mut f: impl FnMut(&ActionHash) -> Option<u32>,
 ) -> MustGetAgentActivityResponse {
     let chain = chain_to_ops(chain);
-    match Sequences::find_sequences::<_, ()>(filter, |a| Ok(f(a))) {
+    match Sequences::find_sequences::<_, _, ()>(filter, |a| Ok(f(a)), |_ts| Ok(None)) {
         Ok(Sequences::Found(s)) => s.filter_then_check(chain, vec![]),
         _ => unreachable!(),
     }
@@ -218,7 +218,7 @@ fn test_find_sequences(
     filter: ChainFilter,
     mut f: impl FnMut(&ActionHash) -> Option<u32>,
 ) -> Sequences {
-    match Sequences::find_sequences::<_, ()>(filter, |a| Ok(f(a))) {
+    match Sequences::find_sequences::<_, _, ()>(filter, |a| Ok(f(a)), |_ts| Ok(None)) {
         Ok(r) => r,
         Err(_) => unreachable!(),
     }

@@ -423,7 +423,7 @@ impl Sequences {
 
         // Check if there is an until timestamp filter and get the distance from the position
         if let Some(ts) = filter.get_until_timestamp() {
-            let mut ts_distance = std::u32::MAX;
+            let mut ts_distance = u32::MAX;
             // A timestamp of zero will produce an empty range.
             if ts.0 == 0 {
                 return Ok(Self::EmptyRange);
