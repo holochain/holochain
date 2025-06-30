@@ -127,7 +127,7 @@ impl AsRef<Self> for TestChainItem {
 fn hash(i: &[u8]) -> Vec<u8> {
     let mut i = i.iter().copied().take(36).collect::<Vec<_>>();
     let num_needed = 36 - i.len();
-    i.extend(std::iter::repeat(0).take(num_needed));
+    i.extend(std::iter::repeat_n(0, num_needed));
     i
 }
 

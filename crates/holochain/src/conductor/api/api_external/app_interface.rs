@@ -79,6 +79,22 @@ impl AppInterfaceApi {
                     .get_app_info(&installed_app_id)
                     .await?,
             )),
+            AppRequest::AgentInfo { dna_hashes } => {
+                let agent_infos = self
+                    .conductor_handle
+                    .get_app_agent_infos(&installed_app_id, dna_hashes)
+                    .await?;
+                let items: Result<Vec<_>, _> =
+                    agent_infos.into_iter().map(|info| info.encode()).collect();
+                Ok(AppResponse::AgentInfo(items?))
+            }
+            AppRequest::AgentMetaInfo { url, dna_hashes } => {
+                let r = self
+                    .conductor_handle
+                    .app_agent_meta_info(&installed_app_id, url, dna_hashes)
+                    .await?;
+                Ok(AppResponse::AgentMetaInfo(r))
+            }
             AppRequest::CallZome(zome_call_params_signed) => {
                 match self.conductor_handle.handle_external_zome_call(*zome_call_params_signed).await? {
                     Ok(ZomeCallResponse::Ok(output)) => Ok(AppResponse::ZomeCalled(Box::new(output))),

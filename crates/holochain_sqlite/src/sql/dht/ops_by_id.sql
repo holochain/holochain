@@ -9,5 +9,5 @@ FROM
   JOIN Action ON DhtOp.action_hash = Action.hash
   LEFT JOIN Entry ON Action.entry_hash = Entry.hash
 WHERE
-  DhtOp.hash in rarray(:hashes)
+  DhtOp.hash IN rarray(:hashes)
   AND DhtOp.when_integrated IS NOT NULL

@@ -1,7 +1,7 @@
 [package]
 name = "hc_service_check"
 description = "A tool for checking the health of tx5 network services"
-version = "0.3.0-dev.2"
+version = "0.3.0-dev.4"
 edition = "2021"
 license = "Apache-2.0"
 
@@ -9,7 +9,7 @@ license = "Apache-2.0"
 [dependencies]
 clap = { version = "4.5.3", features = ["derive", "wrap_help"] }
 tokio = { version = "1.36.0", features = ["full"] }
-tx5-signal = { version = "0.4.3" }
+tx5-signal = { version = "0.4.4" }
 url2 = "0.0.6"
 ureq = { version = "3.0.8", features = ["json"] }
 

@@ -1,9 +1,9 @@
 SELECT
   seq
 FROM
-  ACTION
-  JOIN DhtOp ON DhtOp.action_hash = ACTION.hash
+  Action
+  JOIN DhtOp ON DhtOp.action_hash = Action.hash
 WHERE
-  ACTION.hash = :hash
+  Action.hash = :hash
   AND DhtOp.type = :activity
-  AND ACTION.author = :author
+  AND Action.author = :author

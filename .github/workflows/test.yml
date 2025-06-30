@@ -104,7 +104,9 @@ jobs:
           make build-workspace-${{ matrix.target }}
 
       - name: install nextest
-        run: cargo install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.96
 
       - name: test (windows-latest)
         if: matrix.os == 'windows-latest'

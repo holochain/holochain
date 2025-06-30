@@ -1,12 +1,13 @@
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use holochain_sqlite::db::DbWrite;
-use holochain_sqlite::error::DatabaseResult;
+use holochain_sqlite::error::{DatabaseError, DatabaseResult};
+use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::prelude::DbKindPeerMetaStore;
-use holochain_sqlite::rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, ValueRef};
-use holochain_sqlite::rusqlite::{named_params, ToSql};
+use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::sql::sql_peer_meta_store;
 use kitsune2_api::{BoxFut, K2Error, K2Result, PeerMetaStore, Timestamp, Url};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Holochain implementation of the Kitsune2 [kitsune2_api::OpStoreFactory].
@@ -58,29 +59,13 @@ pub struct HolochainPeerMetaStore {
     db: DbWrite<DbKindPeerMetaStore>,
 }
 
-struct BytesSql(Bytes);
-
-impl ToSql for BytesSql {
-    #[inline]
-    fn to_sql(&self) -> holochain_sqlite::rusqlite::Result<ToSqlOutput<'_>> {
-        Ok(ToSqlOutput::from(&self.0[..]))
-    }
-}
-
-impl FromSql for BytesSql {
-    #[inline]
-    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        Ok(BytesSql(Bytes::copy_from_slice(value.as_blob()?)))
-    }
-}
-
 impl HolochainPeerMetaStore {
     /// Create a new [HolochainPeerMetaStore] from a database handle.
     pub async fn create(db: DbWrite<DbKindPeerMetaStore>) -> DatabaseResult<Self> {
-        // Prune any expired entries on startup
+        // Prune any expired entries on startup.
         db.write_async(|txn| -> DatabaseResult<()> {
-            txn.execute(sql_peer_meta_store::PRUNE, [])?;
-
+            let prune_count = txn.execute(sql_peer_meta_store::PRUNE, [])?;
+            tracing::debug!("pruned {prune_count} rows from meta peer store");
             Ok(())
         })
         .await?;
@@ -122,7 +107,7 @@ impl PeerMetaStore for HolochainPeerMetaStore {
         let db = self.db.clone();
 
         Box::pin(async move {
-            db.write_async(move |txn| -> DatabaseResult<Option<Bytes>> {
+            db.read_async(move |txn| -> DatabaseResult<Option<Bytes>> {
                 let value = match txn.query_row(
                     sql_peer_meta_store::GET,
                     named_params! {
@@ -140,6 +125,26 @@ impl PeerMetaStore for HolochainPeerMetaStore {
             })
             .await
             .map_err(|e| K2Error::other_src("Failed to get peer meta", e))
+        })
+    }
+
+    fn get_all_by_key(&self, key: String) -> BoxFuture<'_, K2Result<HashMap<Url, Bytes>>> {
+        let db = self.db.clone();
+        Box::pin(async move {
+            db.read_async(move |txn| -> DatabaseResult<HashMap<Url, Bytes>> {
+                let mut stmt = txn.prepare(sql_peer_meta_store::GET_ALL_BY_KEY)?;
+                let mut rows = stmt.query(named_params! {":meta_key": key})?;
+                let mut all_values = HashMap::new();
+                while let Some(row) = rows.next()? {
+                    let peer_url = Url::from_str(row.get::<_, String>(0)?)
+                        .map_err(|err| DatabaseError::Other(err.into()))?;
+                    let value = row.get::<_, BytesSql>(1)?;
+                    all_values.insert(peer_url, value.0);
+                }
+                Ok(all_values)
+            })
+            .await
+            .map_err(|e| K2Error::other_src("Failed to get all values", e))
         })
     }
 

@@ -56,6 +56,11 @@ async fn run_test(alice_cell_id: CellId, handle: ConductorHandle) {
         new_zome_call_params(&alice_cell_id, "update_entry", (), TestWasm::Update).unwrap();
     handle.call_zome(zome_call_params).await.unwrap().unwrap();
 
+    // Valid update of a private entry should work
+    let zome_call_params =
+        new_zome_call_params(&alice_cell_id, "update_private_entry", (), TestWasm::Update).unwrap();
+    handle.call_zome(zome_call_params).await.unwrap().unwrap();
+
     // Invalid update should fail work
     let zome_call_params =
         new_zome_call_params(&alice_cell_id, "invalid_update_entry", (), TestWasm::Update).unwrap();

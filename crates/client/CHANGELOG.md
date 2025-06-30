@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Add `agent_meta_info()` call to the `AdminWebsocket` and `AppWebsocket` to retrieve data from the peer meta store for a given agent by their Url [#5043](https://github.com/holochain/holochain/pull/5043)
+
+## 0.8.0-dev.7
+
+## 0.8.0-dev.6
+
+## 0.8.0-dev.5
+
+## 0.8.0-dev.4
+
+## 0.8.0-dev.3
+
 ## 0.8.0-dev.2
 
 - Add `origin` argument to `AdminWebsocket::connect()` and `AppWebsocket::connect()`.
@@ -16,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 0.8.0-dev.0
 
 ### Added
+
+- `AppWebsocket::AgentInfo` call for apps to be able to list the discovered agents in their various DNAs.
 
 ### Changed
 

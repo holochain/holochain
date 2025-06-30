@@ -120,6 +120,75 @@ async fn multi_conductor() -> anyhow::Result<()> {
 #[cfg(feature = "test_utils")]
 #[tokio::test(flavor = "multi_thread")]
 #[cfg_attr(target_os = "windows", ignore = "flaky")]
+async fn private_entries_update_consistency() {
+    use holochain::sweettest::SweetInlineZomes;
+    use holochain_types::inline_zome::InlineZomeSet;
+
+    holochain_trace::test_run();
+    let mut entry_def = EntryDef::default_from_id("entrydef");
+    entry_def.visibility = EntryVisibility::Private;
+
+    #[derive(Serialize, Deserialize, Debug, SerializedBytes)]
+    struct PrivateEntry;
+
+    let zome = SweetInlineZomes::new(vec![entry_def.clone()], 0)
+        .function("create", move |api, _: ()| {
+            let entry = Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap();
+            let hash = api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                EntryVisibility::Private,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+            Ok(hash)
+        })
+        .function("update", |api, hash: ActionHash| {
+            let updated_entry = Entry::app(PrivateEntry {}.try_into().unwrap()).unwrap();
+            api.update(UpdateInput {
+                original_action_address: hash,
+                entry: updated_entry,
+                chain_top_ordering: ChainTopOrdering::Strict,
+            })
+            .map_err(Into::into)
+        });
+
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+
+    let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(zome.0).await;
+    let dnas = vec![dna_file];
+
+    let apps = conductors.setup_app("app", &dnas).await.unwrap();
+    let ((alice,), (bobbo,)) = apps.into_tuples();
+
+    conductors[0]
+        .require_initial_gossip_activity_for_cell(&alice, 1, std::time::Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    conductors[1]
+        .require_initial_gossip_activity_for_cell(&bobbo, 1, std::time::Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    // Call the "create" zome fn on Alice's app
+    let hash: ActionHash = conductors[0]
+        .call(&alice.zome(SweetInlineZomes::COORDINATOR), "create", ())
+        .await;
+
+    await_consistency(10, [&alice, &bobbo]).await.unwrap();
+
+    // Call the "update" zome fn on Alice's app to update the previously created private entry
+    let _: ActionHash = conductors[0]
+        .call(&alice.zome(SweetInlineZomes::COORDINATOR), "update", hash)
+        .await;
+
+    // Make sure that the update of the private entry reaches consistency
+    await_consistency(10, [&alice, &bobbo]).await.unwrap();
+}
+
+#[cfg(feature = "test_utils")]
+#[tokio::test(flavor = "multi_thread")]
+#[cfg_attr(target_os = "windows", ignore = "flaky")]
 async fn private_entries_dont_leak() {
     use holochain::sweettest::SweetInlineZomes;
     use holochain_types::inline_zome::InlineZomeSet;

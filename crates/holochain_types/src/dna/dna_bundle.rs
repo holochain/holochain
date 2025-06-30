@@ -60,7 +60,7 @@ impl DnaBundle {
     async fn inner_maps(&self) -> DnaResult<(IntegrityZomes, CoordinatorZomes, WasmMap)> {
         let mut resources = self.get_all_resources().clone();
         let data = match &self.manifest().0 {
-            DnaManifest::V1(manifest) => {
+            DnaManifest::V0(manifest) => {
                 let integrity =
                     hash_bytes(manifest.integrity.zomes.iter().cloned(), &mut resources).await?;
                 let coordinator =
@@ -108,7 +108,7 @@ impl DnaBundle {
         modifiers: DnaModifiersOpt,
     ) -> DnaResult<(DnaDefHashed, DnaHash)> {
         match &self.manifest().0 {
-            DnaManifest::V1(manifest) => {
+            DnaManifest::V0(manifest) => {
                 let dna_def = DnaDef {
                     name: manifest.name.clone(),
                     modifiers: DnaModifiers {

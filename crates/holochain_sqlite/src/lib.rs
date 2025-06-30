@@ -89,6 +89,7 @@ pub mod db;
 pub mod error;
 pub mod exports;
 pub mod fatal;
+pub mod helpers;
 #[cfg(not(loom))]
 pub mod nonce;
 pub mod prelude;
@@ -96,7 +97,6 @@ pub mod schema;
 #[cfg(not(loom))]
 pub mod sql;
 pub mod stats;
-pub mod swansong;
 
 mod table;
 

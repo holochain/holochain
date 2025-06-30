@@ -166,7 +166,7 @@ macro_rules! fixturator {
                 curve Unpredictable {
                     let mut index = get_fixt_index!();
                     let mut rng = $crate::rng();
-                    let len = rng.gen_range($min..$max);
+                    let len = rng.random_range($min..$max);
                     let mut fixturator = [<$type:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, index);
                     let mut v = vec![];
                     for _ in 0..len {
@@ -628,7 +628,7 @@ macro_rules! newtype_fixturator {
             $outer(vec![]),
             {
                 let mut rng = $crate::rng();
-                let vec_len = rng.gen_range(0..5);
+                let vec_len = rng.random_range(0..5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
                     $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Unpredictable, get_fixt_index!()) };
@@ -640,7 +640,7 @@ macro_rules! newtype_fixturator {
             },
             {
                 let mut rng = $crate::rng();
-                let vec_len = rng.gen_range(0..5);
+                let vec_len = rng.random_range(0..5);
                 let mut ret = vec![];
                 let mut inner_fixturator =
                     $crate::prelude::paste! { [<$inner:camel Fixturator>]::new_indexed($crate::prelude::Predictable, get_fixt_index!()) };
@@ -804,13 +804,13 @@ mod tests {
     #[derive(PartialEq, Debug, Clone)]
     pub enum VariantFoo {
         A(String),
-        B(usize),
+        B(u64),
         C(bool),
     }
 
     fixturator!(
         VariantFoo;
-        variants [ A(String) B(usize) C(bool) ];
+        variants [ A(String) B(u64) C(bool) ];
     );
 
     #[test]

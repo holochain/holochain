@@ -1,6 +1,6 @@
 use super::AppBundle;
 use crate::prelude::*;
-use app_manifest_v1::tests::{app_manifest_fixture, app_manifest_properties_fixture};
+use app_manifest_v0::tests::{app_manifest_fixture, app_manifest_properties_fixture};
 
 async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppBundle, DnaFile) {
     let dna_wasm = DnaWasmHashed::from_content(DnaWasm::new_invalid()).await;

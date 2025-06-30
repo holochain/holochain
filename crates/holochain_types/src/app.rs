@@ -1323,7 +1323,7 @@ mod tests {
                 CLONE_ID_DELIMITER.into(),
                 AppRolePrimary::new(fixt!(DnaHash), false, 0).into(),
             )],
-            AppManifest::V1(AppManifestV1 {
+            AppManifest::V0(AppManifestV0 {
                 name: "test_app".to_string(),
                 description: None,
                 roles: vec![],
@@ -1342,7 +1342,7 @@ mod tests {
         let role1 = AppRolePrimary::new(base_dna_hash, false, clone_limit).into();
         let agent = fixt!(AgentPubKey);
         let role_name: RoleName = "role_name".into();
-        let manifest = AppManifest::V1(AppManifestV1 {
+        let manifest = AppManifest::V0(AppManifestV0 {
             name: "test_app".to_string(),
             description: None,
             roles: vec![],

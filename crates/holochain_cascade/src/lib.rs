@@ -15,11 +15,11 @@
 //! They mean distinct things:
 //!
 //! - "get" ignores invalid data, and sometimes takes into account CRUD metadata
-//!     before returning the data, so for instance, Deletes
-//!     are allowed to annihilate Creates so that neither is returned. This is a more
-//!     "refined" form of fetching data.
+//!   before returning the data, so for instance, Deletes
+//!   are allowed to annihilate Creates so that neither is returned. This is a more
+//!   "refined" form of fetching data.
 //! - "retrieve" only fetches the data if it exists, without regard to validation status.
-//!     This is a more "raw" form of fetching data.
+//!   This is a more "raw" form of fetching data.
 //!
 #![warn(missing_docs)]
 

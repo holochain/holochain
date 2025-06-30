@@ -19,7 +19,7 @@ pub fn x_salsa20_poly1305_shared_secret_create_random(
             let key_ref = match input {
                 Some(key_ref) => key_ref,
                 None => rand_utf8::rand_utf8(
-                    &mut rand::thread_rng(),
+                    &mut rand::rng(),
                     DEF_REF_SIZE,
                 ).as_bytes().to_vec().into(),
             };

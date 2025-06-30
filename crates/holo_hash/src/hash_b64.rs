@@ -54,14 +54,13 @@ impl<T: HashType> serde::Serialize for HoloHashB64<T> {
 
 #[cfg(feature = "schema")]
 impl<T: HashType> schemars::JsonSchema for HoloHashB64<T> {
-    fn schema_name() -> String {
-        "HoloHashB64".to_string()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "HoloHashB64".into()
     }
 
-    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::schema::Schema {
-        schemars::schema::Schema::Object(schemars::schema::SchemaObject {
-            instance_type: Some(schemars::schema::InstanceType::String.into()),
-            ..Default::default()
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
         })
     }
 }

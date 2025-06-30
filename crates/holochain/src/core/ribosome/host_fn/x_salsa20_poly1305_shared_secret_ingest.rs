@@ -20,7 +20,7 @@ pub fn x_salsa20_poly1305_shared_secret_ingest(
                 let key_ref = match input.as_key_ref_ref() {
                     Some(key_ref) => key_ref.clone(),
                     None => rand_utf8::rand_utf8(
-                        &mut rand::thread_rng(),
+                        &mut rand::rng(),
                         DEF_REF_SIZE,
                     ).as_bytes().to_vec().into(),
                 };

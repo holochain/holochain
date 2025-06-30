@@ -4,6 +4,7 @@ use holochain::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use holochain::conductor::CellError;
 use holochain::core::workflow::WorkflowError;
 use holochain::prelude::CountersigningSessionState;
+use holochain::retry_until_timeout;
 use holochain::sweettest::{
     await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile,
 };
@@ -286,43 +287,41 @@ async fn retry_countersigning_commit_on_missing_deps() {
     conductors.exchange_peer_info().await;
 
     // Bob should be able to get Alice's chain head when we commit, so let's do that.
-    for _ in 0..5 {
-        let ok = conductors[1]
+    retry_until_timeout!({
+        if conductors[1]
             .call_fallible::<_, (ActionHash, EntryHash)>(
                 &bob_zome,
                 "create_a_countersigned_thing_with_entry_hash",
                 vec![alice_response.clone(), bob_response.clone()],
             )
             .await
-            .is_ok();
-
-        if ok {
+            .is_ok()
+        {
             break;
         }
-    }
+    });
+
+    let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
+    let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
 
     // Now that Bob is available again, Alice should also be able to get his chain head and complete
     // her commit
-    for _ in 0..5 {
-        let ok = conductors[0]
+    retry_until_timeout!({
+        if conductors[0]
             .call_fallible::<_, (ActionHash, EntryHash)>(
                 &alice_zome,
                 "create_a_countersigned_thing_with_entry_hash",
                 vec![alice_response.clone(), bob_response.clone()],
             )
             .await
-            .is_ok();
-
-        if ok {
+            .is_ok()
+        {
             break;
         }
-    }
+    });
 
     // Listen for the session to complete, which it should in spite of the error that
     // Alice had initially.
-
-    let alice_rx = conductors[0].subscribe_to_app_signals("app".into());
-    let bob_rx = conductors[1].subscribe_to_app_signals("app".into());
 
     wait_for_completion(alice_rx, preflight_request.app_entry_hash.clone()).await;
     wait_for_completion(bob_rx, preflight_request.app_entry_hash).await;

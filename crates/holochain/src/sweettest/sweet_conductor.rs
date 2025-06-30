@@ -32,14 +32,6 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// Standin until std::io::Error::other is stablized.
-pub fn err_other<E>(error: E) -> std::io::Error
-where
-    E: Into<Box<dyn std::error::Error + Send + Sync>>,
-{
-    std::io::Error::new(std::io::ErrorKind::Other, error.into())
-}
-
 /// A stream of signals.
 pub type SignalStream = Box<dyn tokio_stream::Stream<Item = Signal> + Send + Sync + Unpin>;
 
@@ -630,8 +622,8 @@ impl SweetConductor {
             handle
                 .shutdown()
                 .await
-                .map_err(err_other)?
-                .map_err(err_other)
+                .map_err(Error::other)?
+                .map_err(Error::other)
         } else {
             panic!("Attempted to shutdown conductor which was already shutdown");
         }
@@ -827,7 +819,11 @@ impl SweetConductor {
         tokio::time::timeout(max_wait, async move {
             loop {
                 let infos = handle
-                    .get_agent_infos(cell_id.clone())
+                    .get_agent_infos(
+                        cell_id
+                            .clone()
+                            .map(|cell_id| vec![cell_id.dna_hash().clone()]),
+                    )
                     .await?
                     .into_iter()
                     .map(|p| AgentPubKey::from_k2_agent(&p.agent))
@@ -1070,7 +1066,7 @@ impl std::fmt::Debug for SweetConductor {
 fn covering(rng: &mut StdRng, n: usize, s: usize) -> Vec<HashSet<usize>> {
     let nodes: Vec<_> = (0..n)
         .map(|i| {
-            let peers: HashSet<_> = std::iter::repeat_with(|| rng.gen_range(0..n))
+            let peers: HashSet<_> = std::iter::repeat_with(|| rng.random_range(0..n))
                 .filter(|j| i != *j)
                 .take(s)
                 .collect();

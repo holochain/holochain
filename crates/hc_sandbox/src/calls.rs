@@ -3,6 +3,7 @@
 //! This module is designed for use in a CLI so it is more simplified
 //! than calling the [`AdminWebsocket`] directly.
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -10,8 +11,10 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use anyhow::bail;
+use holo_hash::DnaHashB64;
 use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use holochain_conductor_api::AgentMetaInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
@@ -25,6 +28,7 @@ use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
+use kitsune2_api::Url;
 use kitsune2_core::Ed25519Verifier;
 use std::convert::TryFrom;
 
@@ -88,6 +92,7 @@ pub enum AdminRequestCli {
     /// Calls AdminRequest::AddAgentInfo.
     AddAgents(AgentInfos),
     ListAgents(ListAgents),
+    AgentMetaInfo(AgentMetaInfoArgs),
 }
 
 /// Calls AdminRequest::AddAdminInterfaces
@@ -265,13 +270,9 @@ pub struct AgentInfos {
 /// this conductor.
 #[derive(Debug, Args, Clone)]
 pub struct ListAgents {
-    /// Optionally request agent info for a particular cell ID.
-    #[arg(short, long, value_parser = parse_agent_key, requires = "dna")]
-    pub agent_key: Option<AgentPubKey>,
-
-    /// Optionally request agent info for a particular cell ID.
-    #[arg(short, long, value_parser = parse_dna_hash, requires = "agent_key")]
-    pub dna: Option<DnaHash>,
+    /// Optionally request agent info for a list of DNA hashes.
+    #[arg(short, long, num_args = 0.., value_parser = parse_dna_hash)]
+    pub dna: Option<Vec<DnaHash>>,
 }
 
 /// Calls AdminRequest::ListApps
@@ -282,6 +283,19 @@ pub struct ListApps {
     /// Optionally request agent info for a particular cell ID.
     #[arg(short, long, value_parser = parse_status_filter)]
     pub status: Option<AppStatusFilter>,
+}
+
+/// Calls AdminRequest::AgentMetaInfo
+/// and prints the agent meta info related to the specified Url
+#[derive(Debug, Args, Clone)]
+pub struct AgentMetaInfoArgs {
+    /// The kitsune Url of the agent to get meta info about.
+    #[arg(long)]
+    pub url: Url,
+
+    /// Optionally request agent meta info for a list of DNA hashes.
+    #[arg(short, long, num_args = 0.., value_parser = parse_dna_hash)]
+    pub dna: Option<Vec<DnaHash>>,
 }
 
 #[doc(hidden)]
@@ -529,6 +543,16 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 msg!("{}\n", out);
             }
         }
+        AdminRequestCli::AgentMetaInfo(args) => {
+            let info = client.agent_meta_info(args.url, args.dna).await?;
+            let string_key_info = info
+                .into_iter()
+                .map(|(k, v)| (DnaHashB64::from(k).to_string(), v))
+                .collect::<BTreeMap<String, BTreeMap<String, AgentMetaInfo>>>();
+
+            let info_json = serde_json::to_string_pretty(&string_key_info)?;
+            println!("{}", info_json);
+        }
     }
     Ok(())
 }
@@ -602,7 +626,7 @@ pub async fn install_app_bundle(
     let installed_app = client.install_app(payload).await?;
 
     match &installed_app.manifest {
-        AppManifest::V1(manifest) => {
+        AppManifest::V0(manifest) => {
             if !manifest.allow_deferred_memproofs {
                 client
                     .enable_app(installed_app.installed_app_id.clone())
@@ -633,7 +657,7 @@ async fn request_agent_info(
     client: &mut AdminWebsocket,
     args: ListAgents,
 ) -> anyhow::Result<Vec<Arc<AgentInfoSigned>>> {
-    let resp = client.agent_info(args.into()).await?;
+    let resp = client.agent_info(args.dna).await?;
     let mut out = Vec::new();
     for info in resp {
         out.push(AgentInfoSigned::decode(
@@ -674,16 +698,5 @@ impl From<CellId> for DumpState {
 impl From<DumpState> for CellId {
     fn from(ds: DumpState) -> Self {
         CellId::new(ds.dna, ds.agent_key)
-    }
-}
-
-impl From<ListAgents> for Option<CellId> {
-    fn from(la: ListAgents) -> Self {
-        let ListAgents {
-            agent_key: a,
-            dna: d,
-        } = la;
-        d.and_then(|d| a.map(|a| (d, a)))
-            .map(|(d, a)| CellId::new(d, a))
     }
 }

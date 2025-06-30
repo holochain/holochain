@@ -12,6 +12,7 @@ name = "files"
 hdk = { path = "../../../../hdk" }
 
 serde = "1.0"
+holochain_serialized_bytes = "0.0.56"
 
 # workaround to make it slightly easier to import hc-scress-test zomes
 files_integrity = { path = "../hc-stress-test-integrity" }

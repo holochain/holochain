@@ -1,6 +1,6 @@
-use crate::actor::*;
-
 use super::*;
+use crate::actor::*;
+use std::time::Duration;
 
 mod actor;
 pub use actor::WrapEvtSender;
@@ -36,6 +36,11 @@ pub struct HolochainP2pConfig {
     /// Callback function to retrieve a peer meta database handle for a dna hash.
     pub get_db_peer_meta: GetDbPeerMeta,
 
+    /// Interval for a pruning task to remove expired values from the peer meta store.
+    ///
+    /// Default: 10 s
+    pub peer_meta_pruning_interval_ms: u64,
+
     /// Callback function to retrieve an op store database handle for a dna hash.
     pub get_db_op_store: GetDbOpStore,
 
@@ -52,6 +57,11 @@ pub struct HolochainP2pConfig {
 
     /// The compat params to use.
     pub compat: NetworkCompatParams,
+
+    /// The amount of time to elapse before a request times out.
+    ///
+    /// Defaults to 60 seconds.
+    pub request_timeout: Duration,
 
     /// If true, will use kitsune core test bootstrap / transport / etc.
     #[cfg(feature = "test_utils")]
@@ -86,6 +96,7 @@ impl std::fmt::Debug for HolochainP2pConfig {
         let mut dbg = f.debug_struct("HolochainP2pConfig");
         dbg.field("compat", &self.compat);
         dbg.field("auth_material", &self.auth_material);
+        dbg.field("request_timeout", &self.request_timeout);
 
         #[cfg(feature = "test_utils")]
         {
@@ -103,11 +114,13 @@ impl Default for HolochainP2pConfig {
     fn default() -> Self {
         Self {
             get_db_peer_meta: Arc::new(|_| unimplemented!()),
+            peer_meta_pruning_interval_ms: 10_000,
             get_db_op_store: Arc::new(|_| unimplemented!()),
             target_arc_factor: 1,
             auth_material: None,
             network_config: None,
             compat: Default::default(),
+            request_timeout: Duration::from_secs(60),
             #[cfg(feature = "test_utils")]
             k2_test_builder: false,
             #[cfg(feature = "test_utils")]

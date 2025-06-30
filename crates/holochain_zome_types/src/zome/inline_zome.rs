@@ -126,7 +126,7 @@ impl InlineIntegrityZome {
     }
     /// Create a new integrity zome with a unique random network seed
     pub fn new_unique<E: IntoIterator<Item = EntryDef>>(entry_defs: E, num_link_types: u8) -> Self {
-        Self::new(nanoid::nanoid!(), entry_defs, num_link_types)
+        Self::new(uuid::Uuid::new_v4(), entry_defs, num_link_types)
     }
 }
 
@@ -137,7 +137,7 @@ impl InlineCoordinatorZome {
     }
     /// Create a new coordinator zome with a unique random network seed
     pub fn new_unique() -> Self {
-        Self::new(nanoid::nanoid!())
+        Self::new(uuid::Uuid::new_v4())
     }
 }
 

@@ -3,6 +3,7 @@
 //! This is currently a thin wrapper around tokio-tungstenite that
 //! provides rpc-style request/responses via u64 message ids.
 
+use bytes::Bytes;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
 use std::io::ErrorKind;
@@ -75,7 +76,9 @@ impl WireMessage {
             data: UnsafeBytes::from(s1).into(),
         };
         let s3: SerializedBytes = s2.try_into()?;
-        Ok(Message::Binary(UnsafeBytes::from(s3).into()))
+        Ok(Message::Binary(Bytes::copy_from_slice(
+            s3.bytes().as_slice(),
+        )))
     }
 
     /// Create a new request message (with new unique msg id).
@@ -93,7 +96,10 @@ impl WireMessage {
             data: UnsafeBytes::from(s1).into(),
         };
         let s3: SerializedBytes = s2.try_into()?;
-        Ok((Message::Binary(UnsafeBytes::from(s3).into()), id))
+        Ok((
+            Message::Binary(Bytes::copy_from_slice(s3.bytes().as_slice())),
+            id,
+        ))
     }
 
     /// Create a new response message.
@@ -108,7 +114,9 @@ impl WireMessage {
             data: Some(UnsafeBytes::from(s1).into()),
         };
         let s3: SerializedBytes = s2.try_into()?;
-        Ok(Message::Binary(UnsafeBytes::from(s3).into()))
+        Ok(Message::Binary(Bytes::copy_from_slice(
+            s3.bytes().as_slice(),
+        )))
     }
 
     /// Create a new signal message.
@@ -123,7 +131,9 @@ impl WireMessage {
             data: UnsafeBytes::from(s1).into(),
         };
         let s3: SerializedBytes = s2.try_into()?;
-        Ok(Message::Binary(UnsafeBytes::from(s3).into()))
+        Ok(Message::Binary(Bytes::copy_from_slice(
+            s3.bytes().as_slice(),
+        )))
     }
 }
 
@@ -166,11 +176,9 @@ impl WebsocketConfig {
     pub(crate) fn as_tungstenite(
         &self,
     ) -> tokio_tungstenite::tungstenite::protocol::WebSocketConfig {
-        tokio_tungstenite::tungstenite::protocol::WebSocketConfig {
-            max_message_size: Some(self.max_message_size),
-            max_frame_size: Some(self.max_frame_size),
-            ..Default::default()
-        }
+        tokio_tungstenite::tungstenite::protocol::WebSocketConfig::default()
+            .max_message_size(Some(self.max_message_size))
+            .max_frame_size(Some(self.max_frame_size))
     }
 }
 
@@ -243,7 +251,7 @@ pub enum WebsocketError {
     Deserialize(#[from] SerializedBytesError),
     /// A websocket error from the underlying tungstenite library.
     #[error("Websocket error: {0}")]
-    Websocket(#[from] tokio_tungstenite::tungstenite::Error),
+    Websocket(#[from] Box<tokio_tungstenite::tungstenite::Error>),
     /// A timeout occurred.
     #[error("Timeout")]
     Timeout(#[from] tokio::time::error::Elapsed),
@@ -349,7 +357,7 @@ impl WebsocketRespond {
             .exec(move |_, core| async move {
                 tokio::time::timeout(core.timeout, async {
                     let s = WireMessage::response(self.id, s)?;
-                    core.send.lock().await.send(s).await?;
+                    core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
                 .await?
@@ -405,7 +413,7 @@ impl WebsocketReceiver {
                         .send
                         .lock()
                         .await
-                        .send(Message::Ping(Vec::new()))
+                        .send(Message::Ping(Bytes::new()))
                         .await
                         .is_err()
                     {
@@ -458,12 +466,18 @@ impl WebsocketReceiver {
                         .await
                         .ok_or::<WebsocketError>(WebsocketError::Other(
                             "ReceiverClosed".to_string(),
-                        ))??;
+                        ))?
+                        .map_err(Box::new)?;
                     let msg = match msg {
-                        Message::Text(s) => s.into_bytes(),
-                        Message::Binary(b) => b,
+                        Message::Text(s) => s.as_bytes().to_vec(),
+                        Message::Binary(b) => b.to_vec(),
                         Message::Ping(b) => {
-                            core.send.lock().await.send(Message::Pong(b)).await?;
+                            core.send
+                                .lock()
+                                .await
+                                .send(Message::Pong(b))
+                                .await
+                                .map_err(Box::new)?;
                             return Ok(None);
                         }
                         Message::Pong(_) => return Ok(None),
@@ -540,7 +554,7 @@ impl WebsocketSender {
             .exec(move |_, core| async move {
                 tokio::time::timeout(timeout, async {
                     let s = WireMessage::authenticate(s)?;
-                    core.send.lock().await.send(s).await?;
+                    core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
                 .await?
@@ -599,7 +613,7 @@ impl WebsocketSender {
 
                 tokio::time::timeout_at(timeout_at, async move {
                     // send the actual message
-                    core.send.lock().await.send(s).await?;
+                    core.send.lock().await.send(s).await.map_err(Box::new)?;
 
                     Ok(drop)
                 })
@@ -645,7 +659,7 @@ impl WebsocketSender {
             .exec(move |_, core| async move {
                 tokio::time::timeout(timeout, async {
                     let s = WireMessage::signal(s)?;
-                    core.send.lock().await.send(s).await?;
+                    core.send.lock().await.send(s).await.map_err(Box::new)?;
                     Ok(())
                 })
                 .await?
@@ -695,7 +709,8 @@ pub async fn connect(
         stream,
         Some(config.as_tungstenite()),
     )
-    .await?;
+    .await
+    .map_err(Box::new)?;
     split(stream, config.default_request_timeout, peer_addr)
 }
 

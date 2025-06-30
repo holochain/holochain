@@ -7,6 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- Add `hc sandbox call agent-meta-info` command
+
+## 0.6.0-dev.10
+
+## 0.6.0-dev.9
+
+## 0.6.0-dev.8
+
+## 0.6.0-dev.7
+
+## 0.6.0-dev.6
+
 ## 0.6.0-dev.5
 
 - Add `--origin` option to `hc sandbox call` command

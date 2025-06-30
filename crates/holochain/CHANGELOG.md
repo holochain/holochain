@@ -7,6 +7,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-dev.10
+
+- Update `AgentInfo` call in `hc-sandbox` to take an optional vector of DNA hashes instead of one optional cell ID, e. g. `hc s call list-agents --dna uhC0kScOJk1aw9a5Kc8jqs0jieGCi4LoeW7vUehsTLvMI455-2hF1 --dna uhC0kScOJk1aw9a5Kc8jqs0jieGCi4LoeW7vUehsTLvMI455-2hF1`.
+- Patch `serde_json` to enable byte arrays to be converted to JSON arrays.
+
+- Add `AgentMetaInfo` calls to the conductor’s app and admin interfaces to retrieve data from the peer meta store for a given agent by their Url [#5043](https://github.com/holochain/holochain/pull/5043)
+
+## 0.6.0-dev.9
+
+- Implement new call `get_all_by_key` for `PeerMetaStore`. Adds the call to retrieve all URLs and values for a given key from the store.
+
+- Filter out unresponsive agents when publishing ops. Any URL that is set as unresponsive in the peer meta store will be filtered out when determining the agents near a location to publish to.
+
+- Change versions of `DnaManifest`, `AppManifest` and `WebAppManifest` to `0`.
+
+## 0.6.0-dev.8
+
+## 0.6.0-dev.7
+
+- Add `AgentInfo` call to the conductor’s app interface to retrieve the discovered peers of the app’s various DNAs.
+- **Breaking**: admin interface `AgentInfo` call now takes an optional list of DNA hashes to filter by instead of a `CellId`.
+- Add methods to the peer meta store that mark a peer URL as unresponsive and check if a peer URL is marked unresponsive. This change enables marking peers as unresponsive when connecting to or sending messages to, so that they can be omitted from future requests until the URL expires.
+
+## 0.6.0-dev.6
+
 - Bump holochain-wasmer and wasmer to v6.
 
 ## 0.6.0-dev.5

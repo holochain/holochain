@@ -45,11 +45,9 @@
 
 use crate::conductor::process::ERROR_CODE;
 use crate::config::conductor::paths::DataRootPath;
-use gen::SchemaGenerator;
 use holochain_types::prelude::DbSyncStrategy;
 use kitsune2_transport_tx5::WebRtcConfig;
-use schemars::schema::Schema;
-use schemars::{gen, JsonSchema};
+use schemars::{JsonSchema, Schema};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -68,7 +66,7 @@ pub use error::*;
 pub use keystore_config::KeystoreConfig;
 
 /// All the config information for the conductor
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Default, JsonSchema)]
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 pub struct ConductorConfig {
     /// Override the environment specified tracing config.
     #[serde(default)]
@@ -90,6 +88,12 @@ pub struct ConductorConfig {
     /// Optional config for the network module.
     #[serde(default)]
     pub network: NetworkConfig,
+
+    /// The amount of time, in seconds, to elapse before a request times out.
+    ///
+    /// Defaults to 60 seconds.
+    #[serde(default = "default_request_timeout_s")]
+    pub request_timeout_s: u64,
 
     /// Optional specification of Chain Head Coordination service URL.
     /// If set, each cell's commit workflow will include synchronizing with the specified CHC service.
@@ -115,6 +119,24 @@ pub struct ConductorConfig {
 
     /// Tracing scope.
     pub tracing_scope: Option<String>,
+}
+
+impl Default for ConductorConfig {
+    fn default() -> Self {
+        Self {
+            tracing_override: Default::default(),
+            data_root_path: Default::default(),
+            keystore: Default::default(),
+            admin_interfaces: Default::default(),
+            network: Default::default(),
+            request_timeout_s: default_request_timeout_s(),
+            #[cfg(feature = "chc")]
+            chc_url: Default::default(),
+            db_sync_strategy: Default::default(),
+            tuning_params: Default::default(),
+            tracing_scope: Default::default(),
+        }
+    }
 }
 
 /// Helper function to load a config from a YAML string.
@@ -168,6 +190,10 @@ impl ConductorConfig {
     pub fn has_rendezvous_bootstrap(&self) -> bool {
         self.network.bootstrap_url == url2::url2!("rendezvous:")
     }
+}
+
+const fn default_request_timeout_s() -> u64 {
+    60
 }
 
 #[inline(always)]
@@ -450,7 +476,7 @@ pub struct ConductorTuningParams {
     ///
     /// Holochain will always try once, whatever value you set. The possible values for this setting are:
     /// - `None`: Not set, then Holochain will just make a single attempt and then consider the session failed
-    ///    if it can't make a decision.
+    ///   if it can't make a decision.
     /// - `Some(0)`: Holochain will treat this the same as a session that failed after a crash. It will retry
     ///   until it can make a decision or until the user forces a decision.
     /// - `Some(n)`, n > 0: Holochain will retry `n` times, including the required first attempt. If
@@ -515,16 +541,17 @@ impl Default for ConductorTuningParams {
     }
 }
 
-fn webrtc_config_schema(_: &mut SchemaGenerator) -> Schema {
+fn webrtc_config_schema(_: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<WebRtcConfig>);
 
     // Note that the definitions for this type are not being copied. This type is embedded in the
     // K2 config, so the definitions are already present in the schema.
 
-    Schema::Object(schema.schema)
+    Schema::try_from(schema.get("schema").expect("Missing schema field").clone())
+        .expect("Failed to convert schema")
 }
 
-fn kitsune2_config_schema(generator: &mut SchemaGenerator) -> Schema {
+fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
     #[allow(dead_code)]
     #[derive(JsonSchema)]
     #[schemars(rename_all = "camelCase")]
@@ -549,13 +576,22 @@ fn kitsune2_config_schema(generator: &mut SchemaGenerator) -> Schema {
 
     let schema = schemars::schema_for!(Option<K2Config>);
 
-    for (k, v) in schema.definitions {
-        if generator.definitions_mut().insert(k.clone(), v).is_some() {
+    for (k, v) in schema
+        .get("definitions")
+        .and_then(|d| d.as_object())
+        .expect("No definitions")
+    {
+        if generator
+            .definitions_mut()
+            .insert(k.clone(), v.clone())
+            .is_some()
+        {
             tracing::warn!("Conflicting definition for {k} in K2Config");
         }
     }
 
-    Schema::Object(schema.schema)
+    Schema::try_from(schema.get("schema").expect("Missing schema field").clone())
+        .expect("Failed to convert schema")
 }
 
 #[cfg(test)]
@@ -598,6 +634,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
+                request_timeout_s: 60,
                 keystore: KeystoreConfig::DangerTestKeystore,
                 admin_interfaces: None,
                 db_sync_strategy: DbSyncStrategy::default(),
@@ -607,6 +644,12 @@ mod tests {
                 tracing_scope: None,
             }
         );
+    }
+
+    #[test]
+    fn test_empty_config_uses_default_values() {
+        let result: ConductorConfig = config_from_yaml("").unwrap();
+        pretty_assertions::assert_eq!(result, ConductorConfig::default());
     }
 
     #[test]
@@ -649,6 +692,8 @@ mod tests {
         }
       }
 
+    request_timeout_s: 70
+
     db_sync_strategy: Fast
     "#;
         let result: ConductorConfigResult<ConductorConfig> = config_from_yaml(yaml);
@@ -685,6 +730,7 @@ mod tests {
                     }
                 }]),
                 network: network_config,
+                request_timeout_s: 70,
                 db_sync_strategy: DbSyncStrategy::Fast,
                 #[cfg(feature = "chc")]
                 chc_url: None,
@@ -710,6 +756,7 @@ mod tests {
                 tracing_override: None,
                 data_root_path: Some(PathBuf::from("/path/to/env").into()),
                 network: NetworkConfig::default(),
+                request_timeout_s: default_request_timeout_s(),
                 keystore: KeystoreConfig::LairServer {
                     connection_url: url2::url2!("unix:///var/run/lair-keystore/socket?k=EcRDnP3xDIZ9Rk_1E-egPE0mGZi5CcszeRxVkb2QXXQ"),
                 },

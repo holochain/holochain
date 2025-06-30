@@ -896,7 +896,7 @@ where
                                 let (action, signature) = action.into();
                                 let private_entry = action
                                     .entry_type()
-                                    .map_or(false, |e| *e.visibility() == EntryVisibility::Private);
+                                    .is_some_and(|e| *e.visibility() == EntryVisibility::Private);
                                 let hash: ActionHash = row.get("action_hash")?;
                                 let action = ActionHashed::with_pre_hashed(action, hash);
                                 let shh = SignedActionHashed::with_presigned(action, signature);

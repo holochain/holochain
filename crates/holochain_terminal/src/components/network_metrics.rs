@@ -190,10 +190,6 @@ impl Widget for NetworkMetricsWidget {
                     "Pending fetch requests : {:?}",
                     metrics.fetch_state_summary.pending_requests.len(),
                 )),
-                ListItem::new(format!(
-                    "Fetch peers on backoff : {:?}",
-                    metrics.fetch_state_summary.peers_on_backoff.len(),
-                )),
                 // Gossip
                 ListItem::new(format!(
                     "Gossip peers           : {:?}",

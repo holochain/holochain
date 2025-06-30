@@ -17,7 +17,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 hdk = { path = "../../../../hdk" }
 serde = "1.0"
-rand = "0.8.5"
+holochain_serialized_bytes = "0.0.56"
+rand = "0.9"
 
 [dev-dependencies]
 hdk = { path = "../../../../hdk", features = ["fixturators"] }

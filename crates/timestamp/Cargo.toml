@@ -1,9 +1,9 @@
 [package]
 name = "holochain_timestamp"
-version = "0.6.0-dev.0"
+version = "0.6.0-dev.2"
 description = "Microsecond-precision timestamp datatype for Holochain"
 license = "Apache-2.0"
-homepage = "https://github.com/holochain/holochain"
+repository = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_timestamp"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "p2p", "dht", "networking"]
@@ -23,10 +23,10 @@ chrono = { version = "0.4.22", default-features = false, features = [
 ], optional = true }
 
 # Dependencies only needed for full.
-rusqlite = { version = "0.32.1", optional = true }
+rusqlite = { version = "0.36", optional = true }
 
 [dev-dependencies]
-holochain_serialized_bytes = "=0.0.55"
+holochain_serialized_bytes = "=0.0.56"
 
 [lints]
 workspace = true

@@ -41,7 +41,7 @@ pub enum DhtOp {
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
 )]
 pub enum ChainOp {
-    #[display(fmt = "StoreRecord")]
+    #[display("StoreRecord")]
     /// Used to notify the authority for an action that it has been created.
     ///
     /// Conceptually, authorities receiving this `ChainOp` do three things:
@@ -53,7 +53,7 @@ pub enum ChainOp {
     ///     references from that entry up-to-date.
     StoreRecord(Signature, Action, RecordEntry),
 
-    #[display(fmt = "StoreEntry")]
+    #[display("StoreEntry")]
     /// Used to notify the authority for an entry that it has been created
     /// anew. (The same entry can be created more than once.)
     ///
@@ -70,7 +70,7 @@ pub enum ChainOp {
     // reality.
     StoreEntry(Signature, NewEntryAction, Entry),
 
-    #[display(fmt = "RegisterAgentActivity")]
+    #[display("RegisterAgentActivity")]
     /// Used to notify the authority for an agent's public key that that agent
     /// has committed a new action.
     ///
@@ -86,7 +86,7 @@ pub enum ChainOp {
     // reality.
     RegisterAgentActivity(Signature, Action),
 
-    #[display(fmt = "RegisterUpdatedContent")]
+    #[display("RegisterUpdatedContent")]
     /// Op for updating an entry.
     /// This is sent to the entry authority.
     // TODO: This entry is here for validation by the entry update action holder
@@ -94,25 +94,25 @@ pub enum ChainOp {
     // need to remove the Entry here or add it to link.
     RegisterUpdatedContent(Signature, action::Update, RecordEntry),
 
-    #[display(fmt = "RegisterUpdatedRecord")]
+    #[display("RegisterUpdatedRecord")]
     /// Op for updating a record.
     /// This is sent to the record authority.
     RegisterUpdatedRecord(Signature, action::Update, RecordEntry),
 
-    #[display(fmt = "RegisterDeletedBy")]
+    #[display("RegisterDeletedBy")]
     /// Op for registering an action deletion with the Action authority
     RegisterDeletedBy(Signature, action::Delete),
 
-    #[display(fmt = "RegisterDeletedEntryAction")]
+    #[display("RegisterDeletedEntryAction")]
     /// Op for registering an action deletion with the Entry authority, so that
     /// the Entry can be marked Dead if all of its Actions have been deleted
     RegisterDeletedEntryAction(Signature, action::Delete),
 
-    #[display(fmt = "RegisterAddLink")]
+    #[display("RegisterAddLink")]
     /// Op for adding a link
     RegisterAddLink(Signature, action::CreateLink),
 
-    #[display(fmt = "RegisterRemoveLink")]
+    #[display("RegisterRemoveLink")]
     /// Op for removing a link
     RegisterRemoveLink(Signature, action::DeleteLink),
 }
@@ -150,23 +150,23 @@ pub enum DhtOpLite {
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Serialize, Deserialize, derive_more::Display)]
 pub enum ChainOpLite {
-    #[display(fmt = "StoreRecord")]
+    #[display("StoreRecord")]
     StoreRecord(ActionHash, Option<EntryHash>, OpBasis),
-    #[display(fmt = "StoreEntry")]
+    #[display("StoreEntry")]
     StoreEntry(ActionHash, EntryHash, OpBasis),
-    #[display(fmt = "RegisterAgentActivity")]
+    #[display("RegisterAgentActivity")]
     RegisterAgentActivity(ActionHash, OpBasis),
-    #[display(fmt = "RegisterUpdatedContent")]
+    #[display("RegisterUpdatedContent")]
     RegisterUpdatedContent(ActionHash, EntryHash, OpBasis),
-    #[display(fmt = "RegisterUpdatedRecord")]
+    #[display("RegisterUpdatedRecord")]
     RegisterUpdatedRecord(ActionHash, EntryHash, OpBasis),
-    #[display(fmt = "RegisterDeletedBy")]
+    #[display("RegisterDeletedBy")]
     RegisterDeletedBy(ActionHash, OpBasis),
-    #[display(fmt = "RegisterDeletedEntryAction")]
+    #[display("RegisterDeletedEntryAction")]
     RegisterDeletedEntryAction(ActionHash, OpBasis),
-    #[display(fmt = "RegisterAddLink")]
+    #[display("RegisterAddLink")]
     RegisterAddLink(ActionHash, OpBasis),
-    #[display(fmt = "RegisterRemoveLink")]
+    #[display("RegisterRemoveLink")]
     RegisterRemoveLink(ActionHash, OpBasis),
 }
 
@@ -229,14 +229,12 @@ impl FromSql for DhtOpType {
     fn column_result(
         value: holochain_sqlite::rusqlite::types::ValueRef<'_>,
     ) -> holochain_sqlite::rusqlite::types::FromSqlResult<Self> {
-        String::column_result(value)
-            .and_then(|string| {
-                ChainOpType::from_str(&string)
-                    .map(DhtOpType::from)
-                    .or_else(|_| WarrantOpType::from_str(&string).map(DhtOpType::from))
-                    .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
-            })
-            .map(Into::into)
+        String::column_result(value).and_then(|string| {
+            ChainOpType::from_str(&string)
+                .map(DhtOpType::from)
+                .or_else(|_| WarrantOpType::from_str(&string).map(DhtOpType::from))
+                .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
+        })
     }
 }
 
@@ -258,23 +256,23 @@ pub type SysValDeps = Vec<ActionHash>;
     strum_macros::EnumString,
 )]
 pub enum ChainOpType {
-    #[display(fmt = "StoreRecord")]
+    #[display("StoreRecord")]
     StoreRecord,
-    #[display(fmt = "StoreEntry")]
+    #[display("StoreEntry")]
     StoreEntry,
-    #[display(fmt = "RegisterAgentActivity")]
+    #[display("RegisterAgentActivity")]
     RegisterAgentActivity,
-    #[display(fmt = "RegisterUpdatedContent")]
+    #[display("RegisterUpdatedContent")]
     RegisterUpdatedContent,
-    #[display(fmt = "RegisterUpdatedRecord")]
+    #[display("RegisterUpdatedRecord")]
     RegisterUpdatedRecord,
-    #[display(fmt = "RegisterDeletedBy")]
+    #[display("RegisterDeletedBy")]
     RegisterDeletedBy,
-    #[display(fmt = "RegisterDeletedEntryAction")]
+    #[display("RegisterDeletedEntryAction")]
     RegisterDeletedEntryAction,
-    #[display(fmt = "RegisterAddLink")]
+    #[display("RegisterAddLink")]
     RegisterAddLink,
-    #[display(fmt = "RegisterRemoveLink")]
+    #[display("RegisterRemoveLink")]
     RegisterRemoveLink,
 }
 impl ChainOpType {

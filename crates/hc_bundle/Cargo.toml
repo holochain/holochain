@@ -1,9 +1,9 @@
 [package]
 name = "holochain_cli_bundle"
-version = "0.6.0-dev.5"
+version = "0.6.0-dev.10"
 description = "DNA and hApp bundling functionality for the `hc` Holochain CLI utility"
 license = "Apache-2.0"
-homepage = "https://github.com/holochain/holochain"
+repository = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_cli_bundle"
 authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
 keywords = ["holochain", "holo"]
@@ -26,26 +26,26 @@ path = "src/bin/hc-dna.rs"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
-holochain_util = { version = "^0.6.0-dev.0", path = "../holochain_util", features = [
+holochain_util = { version = "^0.6.0-dev.2", path = "../holochain_util", features = [
   "backtrace",
 ] }
-holochain_serialized_bytes = "=0.0.55"
-holochain_types = { version = "^0.6.0-dev.5", path = "../holochain_types" }
-mr_bundle = { version = "^0.6.0-dev.1", path = "../mr_bundle", features = [
+holochain_serialized_bytes = "=0.0.56"
+holochain_types = { version = "^0.6.0-dev.10", path = "../holochain_types" }
+mr_bundle = { version = "^0.6.0-dev.4", path = "../mr_bundle", features = [
   "fs",
 ] }
 serde_yaml = "0.9"
-thiserror = "1.0.22"
+thiserror = "2.0"
 tokio = { version = "1.27", features = ["full"] }
-schemars = "0.8.22"
-serde_json = "1.0.140"
+schemars = "0.9"
+serde_json = "1.0"
 
 [dev-dependencies]
 assert_cmd = "2.0"
 matches = "0.1"
 tempfile = "3"
 serde_json = "1.0"
-jsonschema = "0.17"
+jsonschema = "0.30"
 walkdir = "2"
 
 [lints]

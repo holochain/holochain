@@ -220,6 +220,7 @@ impl ConductorBuilder {
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             compat,
+            request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
             ..Default::default()
         };
 
@@ -444,6 +445,7 @@ impl ConductorBuilder {
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
             compat,
+            request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
             k2_test_builder: !builder.test_builder_uses_production_k2_builder,
             #[cfg(feature = "test_utils")]
             disable_bootstrap: config.network.disable_bootstrap,
@@ -453,6 +455,7 @@ impl ConductorBuilder {
             disable_gossip: config.network.disable_gossip,
             #[cfg(feature = "test_utils")]
             mem_bootstrap: config.network.mem_bootstrap,
+            ..Default::default()
         };
 
         let holochain_p2p =
