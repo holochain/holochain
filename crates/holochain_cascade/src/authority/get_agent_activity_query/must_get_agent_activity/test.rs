@@ -60,7 +60,7 @@ async fn returns_full_sequence_from_filter(
                      cached_entry: _,
                  }| TestChainItem {
                     seq: a.hashed.action_seq(),
-                    timestamp: Timestamp(0),
+                    timestamp: Timestamp(a.hashed.action_seq().into()),
                     hash: TestChainHash::test(a.as_hash()),
                     prev: a.hashed.prev_action().map(TestChainHash::test),
                 },

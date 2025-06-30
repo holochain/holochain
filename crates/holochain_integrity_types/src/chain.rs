@@ -41,7 +41,7 @@ pub enum ChainFilters<H: Eq + Ord + std::hash::Hash = ActionHash> {
     UntilTimestamp(Timestamp),
     /// Continue until one of these hashes is found.
     UntilHash(HashSet<H>),
-    /// Combination of take and both until.
+    /// Combination of take, until_hash and until_timestamp.
     /// Whichever is the smaller set.
     Multiple(u32, HashSet<H>, Timestamp),
 }
@@ -53,7 +53,7 @@ impl<H: Eq + Ord + std::hash::Hash> core::hash::Hash for ChainFilters<H> {
         match self {
             ChainFilters::ToGenesis => (),
             ChainFilters::Take(t) => t.hash(state),
-            ChainFilters::UntilTimestamp(t) => t.hash(state),
+            ChainFilters::UntilTimestamp(ts) => ts.hash(state),
             ChainFilters::UntilHash(u) => {
                 let mut u: Vec<_> = u.iter().collect();
                 u.sort_unstable();
