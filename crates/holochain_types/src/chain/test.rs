@@ -55,7 +55,7 @@ fn can_until_hash(len: u32, chain_top: u32, until: TestHash) -> Vec<TestChainIte
 #[test_case(1, 0, 1 => chain(0..1))]
 #[test_case(2, 1, 1 => chain(1..2))]
 #[test_case(10, 5, 1 => using pretty(chain(1..6)))]
-#[test_case(10, 9, 1 => using pretty(chain(0..10)))]
+#[test_case(10, 9, 0 => using pretty(chain(0..10)))]
 /// Check taking until some timestamp is reached works.
 fn can_until_timestamp(len: u32, chain_top: u32, until_us: i64) -> Vec<TestChainItem> {
     let filter = TestFilter::new(hash(chain_top)).until_timestamp(Timestamp::from_micros(until_us));
@@ -66,6 +66,11 @@ fn can_until_timestamp(len: u32, chain_top: u32, until_us: i64) -> Vec<TestChain
 #[test_case(10, TestFilter::new(hash(9)).take(2).until_hash(hash(4)) => chain(8..10))]
 #[test_case(10, TestFilter::new(hash(9)).take(20).take(2).until_hash(hash(4)) => chain(8..10))]
 #[test_case(10, TestFilter::new(hash(9)).take(20).take(2).until_hash(hash(4)).until_hash(hash(9)) => chain(9..10))]
+#[test_case(10, TestFilter::new(hash(9)).take(10).until_timestamp(Timestamp::from_micros(4)) => chain(4..10))]
+#[test_case(10, TestFilter::new(hash(9)).take(20).take(2).until_timestamp(Timestamp::from_micros(4)).until_timestamp(Timestamp::from_micros(9)) => chain(9..10))]
+#[test_case(10, TestFilter::new(hash(9)).take(20).take(2).until_hash(hash(4)).until_timestamp(Timestamp::from_micros(9)) => chain(9..10))]
+#[test_case(10, TestFilter::new(hash(9)).take(20).take(2).until_hash(hash(4)).until_timestamp(Timestamp::from_micros(4)) => chain(8..10))]
+#[test_case(10, TestFilter::new(hash(9)).take(20).until_hash(hash(9)).until_timestamp(Timestamp::from_micros(4)) => chain(9..10))]
 /// Check take and until can be combined and the first to be
 /// reached ends the iterator.
 fn can_combine(len: u32, filter: TestFilter) -> Vec<TestChainItem> {
