@@ -22,6 +22,10 @@ use test_case::test_case;
     => agent_chain(&[(0, 2..9)]) ; "Until 2")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2))
+    => agent_chain(&[(0, 2..9)]) ; "Until timestamp 2")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
     ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[2])).until_hash(action_hash(&[4]))
     => agent_chain(&[(0, 4..9)]) ; "Until 2 Until 4")]
 #[test_case(
