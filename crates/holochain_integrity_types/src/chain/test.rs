@@ -29,8 +29,8 @@ fn take_n_is_min() {
 fn until_hash_is_a_set() {
     assert_eq!(
         ChainFilter::new(hash(0))
-        .until_hash(hash(0))
-        .until_hash(hash(1)),
+            .until_hash(hash(0))
+            .until_hash(hash(1)),
         ChainFilter::new(hash(0))
             .until_hash(hash(0))
             .until_hash(hash(0))

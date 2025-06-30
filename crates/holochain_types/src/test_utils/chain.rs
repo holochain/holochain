@@ -104,7 +104,7 @@ impl ChainItem for TestChainItem {
         &self.hash
     }
 
-    fn get_timestamp(&self) -> Timestamp  {
+    fn get_timestamp(&self) -> Timestamp {
         self.timestamp
     }
 

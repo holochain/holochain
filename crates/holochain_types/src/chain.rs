@@ -77,7 +77,7 @@ enum ChainBottomType {
     /// The bottom of the chain is the action where `take`
     /// has reached zero.
     Take,
-    /// The bottom of the chain is the oldest action before 
+    /// The bottom of the chain is the oldest action before
     /// `until_timestamp` is reached.
     UntilTimestamp,
     /// The bottom of the chain is the action where an
@@ -326,7 +326,7 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
             ChainFilters::Take(n) => *n = n.checked_sub(1)?,
             // Check if the timestamp has been reached
             ChainFilters::UntilTimestamp(ts) => {
-                if op.as_ref().get_timestamp() < *ts  {
+                if op.as_ref().get_timestamp() < *ts {
                     // If it has, don't return it.
                     self.end = true;
                     return None;
@@ -349,7 +349,7 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
                     self.end = true;
                 }
 
-                if op.as_ref().get_timestamp() < *ts  {
+                if op.as_ref().get_timestamp() < *ts {
                     // Timestamp reached, don't return it.
                     self.end = true;
                     return None;
@@ -362,7 +362,11 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
 
 impl Sequences {
     /// Find the action sequences for all hashes in the filter.
-    pub fn find_sequences<F,F2, E>(filter: ChainFilter, mut get_seq_for_hash: F, mut get_seq_for_ts: F2) -> Result<Self, E>
+    pub fn find_sequences<F, F2, E>(
+        filter: ChainFilter,
+        mut get_seq_for_hash: F,
+        mut get_seq_for_ts: F2,
+    ) -> Result<Self, E>
     where
         F: FnMut(&ActionHash) -> Result<Option<u32>, E>,
         F2: FnMut(Timestamp) -> Result<Option<u32>, E>,
