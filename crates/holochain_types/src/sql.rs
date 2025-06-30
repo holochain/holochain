@@ -29,7 +29,7 @@ pub trait ToSqlStatement {
 /// for types defined outside this crate.
 pub struct SqlOutput<'a>(pub ToSqlOutput<'a>);
 
-impl<'a> rusqlite::ToSql for SqlOutput<'a> {
+impl rusqlite::ToSql for SqlOutput<'_> {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
         rusqlite::ToSql::to_sql(&self.0)
     }
@@ -40,7 +40,7 @@ where
     SqlOutput<'a>: From<&'a T>,
     T: 'a,
 {
-    fn as_sql(&'a self) -> SqlOutput {
+    fn as_sql(&'a self) -> SqlOutput<'a> {
         self.into()
     }
 }
@@ -50,7 +50,7 @@ where
     SqlOutput<'a>: From<&'a T>,
     T: 'a,
 {
-    fn as_sql(&'a self) -> SqlOutput {
+    fn as_sql(&'a self) -> SqlOutput<'a> {
         match self {
             Some(d) => d.into(),
             None => SqlOutput(ToSqlOutput::Owned(rusqlite::types::Value::Null)),
@@ -80,13 +80,13 @@ impl<'a> From<&'a LinkTag> for SqlOutput<'a> {
     }
 }
 
-impl<'a, 'b> From<&'b ZomeIndex> for SqlOutput<'a> {
+impl<'b> From<&'b ZomeIndex> for SqlOutput<'_> {
     fn from(d: &'b ZomeIndex) -> Self {
         Self(d.0.into())
     }
 }
 
-impl<'a> From<&CapAccess> for SqlOutput<'a> {
+impl From<&CapAccess> for SqlOutput<'_> {
     fn from(value: &CapAccess) -> Self {
         SqlOutput(ToSqlOutput::Owned(
             value.as_variant_string().to_owned().into(),

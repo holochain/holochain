@@ -623,9 +623,10 @@ impl TriggerReceiver {
 
     /// Check whether the backoff loop is paused. Will always return false if there is no backoff for this receiver.
     pub fn is_paused(&self) -> bool {
-        self.back_off.as_ref().map_or(false, |b| b.is_paused())
+        self.back_off.as_ref().is_some_and(|b| b.is_paused())
     }
 
+    /// Try to receive a trigger without blocking.
     #[cfg(test)]
     pub fn try_recv(&mut self) -> Option<&'static &'static str> {
         self.rx.try_recv().ok()

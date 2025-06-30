@@ -62,10 +62,7 @@ impl CellConductorApiT for CellConductorApi {
         call: ZomeCall,
     ) -> ConductorApiResult<ZomeCallResult> {
         if *cell_id == call.cell_id {
-            self.conductor_handle
-                .call_zome(call)
-                .await
-                .map_err(Into::into)
+            self.conductor_handle.call_zome(call).await
         } else {
             Err(ConductorApiError::ZomeCallCellMismatch {
                 api_cell_id: cell_id.clone(),

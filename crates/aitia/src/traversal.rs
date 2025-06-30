@@ -26,7 +26,7 @@ pub struct Traversal<'c, T: Fact> {
     pub(crate) ctx: &'c T::Context,
 }
 
-impl<'c, T: Fact> Traversal<'c, T> {}
+impl<T: Fact> Traversal<'_, T> {}
 
 pub type TraversalResult<'c, F> = Result<Traversal<'c, F>, TraversalError<'c, F>>;
 

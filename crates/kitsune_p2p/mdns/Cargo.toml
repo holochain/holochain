@@ -23,7 +23,7 @@ path = "examples/discover.rs"
 libmdns = "=0.7.4"
 mdns = "=3.0.0"
 base64 = "0.22"
-err-derive = "0.3.1"
+thiserror = "2.0"
 tokio = { version = "1.27", features = ["full"] }
 tokio-stream = { version = "0.1" }
 

@@ -409,7 +409,7 @@ impl OpsBatchQueueInner {
 
     // Check if a particular queue is empty.
     fn is_empty(&self, id: &usize) -> bool {
-        self.queues.get(id).map_or(true, |q| q.is_empty())
+        self.queues.get(id).is_none_or(|q| q.is_empty())
     }
 }
 
