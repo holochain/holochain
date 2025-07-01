@@ -21,7 +21,7 @@ Each release involves three branches:
 2. For the main crates and all of there dependencies in the workspace:
     - Determine candidates by all of the positive indicators signaling:
         * they have changed since their last release by looking at their CHANGELOG.md OR they haven't had a release
-        * version number is allowed by a the requirement
+        * version number is allowed by a requirement
     - Skip candidates by any of these negative indicators signalling:
         * CHANGELOG.md contains `unreleaseable = true` in its front matter
         * version number is disallowed by a requirement

@@ -354,7 +354,7 @@ async fn call_non_existing_zome_fails_gracefully() -> anyhow::Result<()> {
 
     let (alice,) = app.into_tuple();
 
-    // Call the a zome fn on a non existing zome on Alice's app
+    // Call a zome fn on a non existing zome on Alice's app
     let result: ConductorApiResult<ActionHash> = conductor
         .call_fallible(&alice.zome("non_existing_zome"), "create_unit", ())
         .await;

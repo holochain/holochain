@@ -71,7 +71,7 @@ pub enum ChainOp {
     StoreEntry(Signature, NewEntryAction, Entry),
 
     #[display("RegisterAgentActivity")]
-    /// Used to notify the authority for an agent's public key that that agent
+    /// Used to notify the authority for an agent's public key that agent
     /// has committed a new action.
     ///
     /// Conceptually, authorities receiving this `ChainOp` do three things:

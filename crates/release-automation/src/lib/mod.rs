@@ -271,7 +271,7 @@ pub mod cli {
         pub minimum_crate_owners: Vec<String>,
     }
 
-    /// Parses a commad separated input string to a set of strings.
+    /// Parses a command separated input string to a set of strings.
     pub fn parse_string_set(input: &str) -> HashSet<String> {
         use std::str::FromStr;
 
