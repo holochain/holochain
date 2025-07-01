@@ -27,7 +27,7 @@
 /// - sbd-client
 /// - tx5-connection
 /// - tx5
-/// - kitsune_p2p
+/// - holochain_p2p
 ///
 /// Where appropriate, try to set some standardized properties on the trace:
 ///
