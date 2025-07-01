@@ -28,7 +28,6 @@
 /// - tx5-connection
 /// - tx5
 /// - kitsune_p2p
-/// - and holochain itself
 ///
 /// Where appropriate, try to set some standardized properties on the trace:
 ///
