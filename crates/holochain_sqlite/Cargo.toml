@@ -22,7 +22,7 @@ derive_more = { version = "2.0", features = [
 ] }
 fallible-iterator = "0.3.0"
 futures = "0.3"
-holo_hash = { path = "../holo_hash", version = "^0.6.0-dev.7"}
+holo_hash = { path = "../holo_hash", version = "^0.6.0-dev.7" }
 holochain_serialized_bytes = "=0.0.56"
 holochain_util = { version = "^0.6.0-dev.3", path = "../holochain_util", features = [
   "backtrace",
