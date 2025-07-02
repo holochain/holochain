@@ -327,7 +327,7 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
             // Check if the timestamp has been reached
             ChainFilters::UntilTimestamp(ts) => {
                 if op.as_ref().get_timestamp() < *ts {
-                    // If it has, don't return it.
+                    // If timestamp has been passed, end search and don't return this action.
                     self.end = true;
                     return None;
                 }

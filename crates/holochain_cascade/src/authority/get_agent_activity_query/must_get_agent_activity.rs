@@ -90,7 +90,7 @@ fn find_bounds(
     author: &AgentPubKey,
     filter: ChainFilter,
 ) -> StateQueryResult<Sequences> {
-    let mut statement = txn.prepare(ACTION_HASH_TO_SEQ)?;
+    let mut hash_statement = txn.prepare(ACTION_HASH_TO_SEQ)?;
 
     // Map an action hash to its sequence.
     let get_seq_from_hash = |hash: &ActionHash| {
@@ -99,7 +99,7 @@ fn find_bounds(
                 return Ok(Some(action.action().action_seq()));
             }
         }
-        let result = statement
+        let result = hash_statement
                 .query_row(named_params! {":hash": hash, ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
                     row.get(0)
                 })
@@ -108,15 +108,15 @@ fn find_bounds(
     };
 
     // Map a timestamp to its sequence.
-    let mut statement2 = txn.prepare(ACTION_HASH_TO_SEQ)?;
+    let mut ts_statement = txn.prepare(ACTION_TS_TO_SEQ)?;
     let get_seq_from_ts = |ts: Timestamp| {
         if let Some(scratch) = scratch {
             if let Some(action) = scratch.actions().find(|a| a.get_timestamp() == ts) {
                 return Ok(Some(action.action().action_seq()));
             }
         }
-        let result = statement2
-          .query_row(named_params! {":timestamp": ts, ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
+        let result = ts_statement
+          .query_row(named_params! {":authored_timestamp": ts.as_micros(), ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
               row.get(0)
           })
           .optional()?;
