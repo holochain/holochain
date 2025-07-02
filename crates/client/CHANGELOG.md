@@ -7,7 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- Add `agent_meta_info()` call to the `AdminWebsocket` and `AppWebsocket` to retrieve data from the peer meta store for a given agent by their Url [#5043](https://github.com/holochain/holochain/pull/5043)
+## 0.8.0-dev.8
+
+- Add `agent_meta_info()` call to the `AdminWebsocket` and `AppWebsocket` to retrieve data from the peer meta store for a given agent by their Url [\#5043](https://github.com/holochain/holochain/pull/5043)
 
 ## 0.8.0-dev.7
 
