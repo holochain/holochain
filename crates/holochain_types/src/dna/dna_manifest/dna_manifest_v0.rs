@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{app::app_manifest_v0::CoordinatorManifest, prelude::*};
 use holo_hash::*;
 use mr_bundle::{resource_id_for_path, ResourceIdentifier};
 use schemars::JsonSchema;
@@ -154,14 +154,6 @@ pub struct IntegrityManifest {
     pub zomes: Vec<ZomeManifest>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default, JsonSchema)]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-/// Coordinator zomes.
-pub struct CoordinatorManifest {
-    /// Coordinator zomes to install with this dna.
-    pub zomes: Vec<ZomeManifest>,
-}
-
 /// Manifest for an individual Zome
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -186,6 +178,16 @@ impl ZomeManifest {
     /// Get the [`ResourceIdentifier`] for this zome.
     pub fn resource_id(&self) -> ResourceIdentifier {
         resource_id_for_path(&self.path).unwrap_or_else(|| format!("{}.wasm", self.name))
+    }
+
+    /// Create a sample ZomeManifest as a template to be followed
+    pub fn sample() -> Self {
+        Self {
+            name: "sample-zome".into(),
+            hash: None,
+            path: "./path/to/my/zome.wasm".to_string(),
+            dependencies: None,
+        }
     }
 }
 

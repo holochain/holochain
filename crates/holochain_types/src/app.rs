@@ -9,13 +9,15 @@
 
 mod app_bundle;
 mod app_manifest;
+mod coordinator_bundle;
 mod error;
 
-use crate::{dna::DnaBundle, prelude::*};
+use crate::dna::DnaBundle;
 pub use app_bundle::*;
 pub use app_manifest::app_manifest_validated::*;
 pub use app_manifest::*;
 use bytes::Buf;
+pub use coordinator_bundle::*;
 use derive_more::Into;
 pub use error::*;
 use holo_hash::{AgentPubKey, DnaHash};
@@ -858,7 +860,7 @@ impl InstalledAppCommon {
     /// Constructor for apps not using a manifest.
     /// Allows for cloning up to 256 times and implies immediate provisioning.
     #[cfg(feature = "test_utils")]
-    pub fn new_legacy<S: ToString, I: IntoIterator<Item = InstalledCell>>(
+    pub fn sample<S: ToString, I: IntoIterator<Item = InstalledCell>>(
         installed_app_id: S,
         installed_cells: I,
     ) -> AppResult<Self> {
@@ -899,7 +901,7 @@ impl InstalledAppCommon {
             return Err(AppError::DuplicateRoleNames(installed_app_id, duplicates));
         }
 
-        let manifest = AppManifest::from_legacy(installed_cells.clone().into_iter());
+        let manifest = AppManifest::sample(installed_cells.clone().into_iter());
 
         let role_assignments = installed_cells
             .into_iter()

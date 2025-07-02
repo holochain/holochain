@@ -161,6 +161,28 @@ impl DnaFile {
         Ok(old_wasm_hashes)
     }
 
+    /// Generate a coordinator manifest. Uses zome names as paths in the ZomeManifest.
+    pub fn coordinator_manifest(&self) -> CoordinatorManifest {
+        let coordinators = self.dna.get_all_coordinators();
+        let zome_manifests = coordinators
+            .iter()
+            .map(|cdef| ZomeManifest {
+                name: cdef.name.clone(),
+                hash: None,
+                path: cdef.name.to_string(),
+                dependencies: Some(
+                    cdef.dependencies()
+                        .iter()
+                        .map(|name| ZomeDependency { name: name.clone() })
+                        .collect(),
+                ),
+            })
+            .collect();
+        CoordinatorManifest {
+            zomes: zome_manifests,
+        }
+    }
+
     /// Construct a DnaFile from its constituent parts
     #[cfg(feature = "test_utils")]
     pub fn from_parts(dna: DnaDefHashed, code: WasmMap) -> Self {
