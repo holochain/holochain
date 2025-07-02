@@ -179,7 +179,7 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = ["sqlite-encrypted", "metrics_influxive", "wasmer_sys"]
+default = ["sqlite-encrypted", "metrics_influxive", "schema", "wasmer_sys"]
 
 # Use the "Influxive" opentelemetry metrics binding to write metrics
 # to an InfluxDB time series database.
@@ -221,6 +221,9 @@ glacial_tests = []
 # Includes the wasm build script, which we don't need when not building wasms
 build_wasms = ["holochain_wasm_test_utils/build"]
 only_check_wasms = ["holochain_wasm_test_utils/only_check"]
+
+# Enable schema generation for kitsune2 related types in the conductor config
+schema = ["holochain_conductor_api/schema"]
 
 # Enables at-rest encryption of the SQLite database.
 # Incompatible with "sqlite".

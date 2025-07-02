@@ -46,8 +46,11 @@
 use crate::conductor::process::ERROR_CODE;
 use crate::config::conductor::paths::DataRootPath;
 use holochain_types::prelude::DbSyncStrategy;
+#[cfg(feature = "schema")]
 use kitsune2_transport_tx5::WebRtcConfig;
-use schemars::{JsonSchema, Schema};
+use schemars::JsonSchema;
+#[cfg(feature = "schema")]
+use schemars::Schema;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
@@ -224,7 +227,7 @@ pub struct NetworkConfig {
     pub signal_url: url2::Url2,
 
     /// The Kitsune2 webrtc_config to use for connecting to peers.
-    #[schemars(schema_with = "webrtc_config_schema")]
+    #[cfg_attr(feature = "schema", schemars(schema_with = "webrtc_config_schema"))]
     pub webrtc_config: Option<serde_json::Value>,
 
     /// The target arc factor to apply when receiving hints from kitsune2.
@@ -238,7 +241,7 @@ pub struct NetworkConfig {
     ///
     /// The above options actually just set specific values in this config.
     /// Use only if you know what you are doing!
-    #[schemars(schema_with = "kitsune2_config_schema")]
+    #[cfg_attr(feature = "schema", schemars(schema_with = "kitsune2_config_schema"))]
     pub advanced: Option<serde_json::Value>,
 
     /// Disable the bootstrap module.
@@ -541,6 +544,7 @@ impl Default for ConductorTuningParams {
     }
 }
 
+#[cfg(feature = "schema")]
 fn webrtc_config_schema(_: &mut schemars::SchemaGenerator) -> Schema {
     let schema = schemars::schema_for!(Option<WebRtcConfig>);
 
@@ -551,6 +555,7 @@ fn webrtc_config_schema(_: &mut schemars::SchemaGenerator) -> Schema {
         .expect("Failed to convert schema")
 }
 
+#[cfg(feature = "schema")]
 fn kitsune2_config_schema(generator: &mut schemars::SchemaGenerator) -> Schema {
     #[allow(dead_code)]
     #[derive(JsonSchema)]
