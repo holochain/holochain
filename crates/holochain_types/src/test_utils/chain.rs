@@ -228,7 +228,6 @@ pub fn chain_item_to_action(i: &impl ChainItem) -> SignedActionHashed {
     let action_seq = i.seq();
     let prev_action = i.prev_hash().cloned().map(Into::into);
     let hash: ActionHash = i.get_hash().clone().into();
-    let ts: Timestamp = i.get_timestamp().clone().into();
     let mut action = fixt!(SignedActionHashed);
     match (action_seq, prev_action) {
         (_, None) => {
@@ -240,7 +239,7 @@ pub fn chain_item_to_action(i: &impl ChainItem) -> SignedActionHashed {
             let mut create = fixt!(Create);
             create.action_seq = action_seq;
             create.prev_action = prev_action;
-            create.timestamp = ts;
+            create.timestamp = i.get_timestamp();
             action.hashed.content = Action::Create(create);
             action.hashed.hash = hash;
         }

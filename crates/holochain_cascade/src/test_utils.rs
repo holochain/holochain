@@ -353,7 +353,7 @@ pub fn commit_chain<Kind: DbKindT>(
                         .into(),
                 );
 
-                let timestamp = op.action.get_timestamp().clone();
+                let timestamp = op.action.get_timestamp();
                 let op_type = op_lite.get_type();
                 let (_, hash) =
                     ChainOpUniqueForm::op_hash(op_type, op.action.hashed.content.clone()).unwrap();
