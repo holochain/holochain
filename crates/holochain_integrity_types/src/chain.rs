@@ -143,7 +143,7 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
             ChainFilters::ToGenesis => ChainFilters::UntilTimestamp(timestamp),
             ChainFilters::Take(n) => ChainFilters::Multiple(n, HashSet::new(), timestamp),
             ChainFilters::UntilTimestamp(_) => ChainFilters::UntilTimestamp(timestamp),
-            ChainFilters::UntilHash(u) => ChainFilters::Multiple(0, u, timestamp),
+            ChainFilters::UntilHash(u) => ChainFilters::Multiple(u32::MAX, u, timestamp),
             ChainFilters::Multiple(n, u, _) => ChainFilters::Multiple(n, u, timestamp),
         };
         self
@@ -163,7 +163,7 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
                 ChainFilters::Multiple(n, Some(action_hash).into_iter().collect(), Timestamp(0))
             }
             ChainFilters::UntilTimestamp(t) => {
-                ChainFilters::Multiple(0, Some(action_hash).into_iter().collect(), t)
+                ChainFilters::Multiple(u32::MAX, Some(action_hash).into_iter().collect(), t)
             }
             ChainFilters::UntilHash(mut u) => {
                 u.insert(action_hash);
@@ -191,7 +191,7 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
         match &self.filters {
             ChainFilters::Take(n) => Some(*n),
             ChainFilters::Multiple(n, _, _) => {
-                if *n > 0 {
+                if *n != u32::MAX {
                     Some(*n)
                 } else {
                     None
