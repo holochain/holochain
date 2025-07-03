@@ -60,8 +60,9 @@ pub fn accept_countersigning_preflight_request<'a>(
 }
 
 #[cfg(test)]
-#[cfg(all(feature = "slow_tests", feature = "unstable-countersigning"))]
+// #[cfg(all(feature = "slow_tests", feature = "unstable-countersigning"))]
 pub mod wasm_test {
+    use assert2::let_assert;
     use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::CellError;
     use crate::core::ribosome::error::RibosomeError;
@@ -484,8 +485,8 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
-    #[cfg_attr(target_os = "windows", ignore = "stack overflow on windows")]
+    // #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
+    // #[cfg_attr(target_os = "windows", ignore = "stack overflow on windows")]
     async fn lock_chain() {
         holochain_trace::test_run();
 
@@ -573,9 +574,10 @@ pub mod wasm_test {
                 expires_at,
             })
             .await;
+        let_assert!(Err(ConductorApiError::CellError(CellError::WorkflowError(err))) = preflight_acceptance_fail);
         assert_matches!(
-            preflight_acceptance_fail,
-            Ok(Err(RibosomeError::WasmRuntimeError(RuntimeError { .. })))
+            *err,
+            WorkflowError::RibosomeError(RibosomeError::WasmRuntimeError(RuntimeError { .. }))
         );
 
         // Bob can also accept the preflight request.

@@ -228,7 +228,7 @@ async fn call_init_with_invalid_return_type_across_cells() {
         .await
         .unwrap_err();
 
-    let_assert!(ConductorApiError::Other(other_err) = err);
+    let_assert!(ConductorApiError::CellError(other_err) = err);
     // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
     assert!(other_err
         .to_string()
@@ -370,7 +370,7 @@ async fn call_init_with_invalid_parameters_across_cells() {
         .await
         .unwrap_err();
 
-    let_assert!(ConductorApiError::Other(other_err) = err);
+    let_assert!(ConductorApiError::CellError(other_err) = err);
     // Can't downcast the `Box<dyn Error>` to a concrete type so just compare the error message.
     assert!(other_err
         .to_string()
