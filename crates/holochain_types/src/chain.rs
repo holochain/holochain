@@ -321,11 +321,11 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
             }
         };
 
-        match &mut self.filter.filters {
+        match &mut self.filter.stop_conditions {
             // Check if there is any left to take.
-            ChainFilters::Take(n) => *n = n.checked_sub(1)?,
-            // Check if the timestamp has been reached
-            ChainFilters::UntilTimestamp(ts) => {
+            StopConditions::Take(n) => *n = n.checked_sub(1)?,
+            // Check if the timestamp has been reached.
+            StopConditions::UntilTimestamp(ts) => {
                 if op.as_ref().get_timestamp() < *ts {
                     // If timestamp has been passed, end search and don't return this action.
                     self.end = true;
@@ -333,16 +333,16 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
                 }
             }
             // Check if the `until_hash` hash has been found.
-            ChainFilters::UntilHash(until_hashes) => {
+            StopConditions::UntilHash(until_hashes) => {
                 if until_hashes.contains(op.as_ref().get_hash()) {
                     // If it has, include it and return on the next call to `next`.
                     self.end = true;
                 }
             }
             // Just keep going till genesis.
-            ChainFilters::ToGenesis => (),
+            StopConditions::ToGenesis => (),
             // Both filters are active. Return on the first to be hit.
-            ChainFilters::Multiple(n, until_hashes, ts) => {
+            StopConditions::Multiple(n, until_hashes, ts) => {
                 *n = n.checked_sub(1)?;
 
                 if until_hashes.contains(op.as_ref().get_hash()) {
