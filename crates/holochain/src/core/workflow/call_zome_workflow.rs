@@ -167,6 +167,9 @@ where
         call_zome_function_authorized(ribosome, host_access, invocation).await?;
     tracing::trace!("After zome call");
 
+    // If the zome call failed, don't try to validate and store any data it created.
+    let result = result?;
+
     let validation_result =
         inline_validation(workspace.clone(), network, conductor_handle, ribosome).await;
 
@@ -211,7 +214,7 @@ where
     }
 
     validation_result?;
-    Ok(result)
+    Ok(Ok(result))
 }
 
 /// First check if we are authorized to call
