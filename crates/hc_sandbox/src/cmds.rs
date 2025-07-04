@@ -168,7 +168,7 @@ Run `hc sandbox generate --help` for more options."
             );
             return Ok(vec![]);
         }
-        
+
         if provided.is_empty() {
             // There are no sandboxes
             msg!(
