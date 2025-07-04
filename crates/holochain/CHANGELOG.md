@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.4.4-rc.0
+
 - Patch `serde_json` to enable byte arrays to be converted to JSON arrays.
 
 ## 0.4.3
