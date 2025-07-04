@@ -547,9 +547,14 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
+        let err = match preflight_acceptance_fail {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(err))) => err,
+            _ => panic!("Expected CellError, got: {:?}", preflight_acceptance_fail),
+        };
+
         assert_matches!(
-            preflight_acceptance_fail,
-            Ok(Err(RibosomeError::WasmRuntimeError(RuntimeError { .. })))
+            *err,
+            WorkflowError::RibosomeError(RibosomeError::WasmRuntimeError(RuntimeError { .. }))
         );
 
         // Bob can also accept the preflight request.
