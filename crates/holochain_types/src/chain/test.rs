@@ -52,11 +52,11 @@ fn can_until_hash(len: u32, chain_top: u32, until: TestHash) -> Vec<TestChainIte
 }
 
 #[test_case(1, 0, 0 => chain(0..1))]
-#[test_case(1, 0, 1 => chain(0..0))] // don't return if timestamp has been passed
+#[test_case(1, 0, 1 => chain(0..0))]
 #[test_case(2, 1, 1 => chain(1..2))]
 #[test_case(10, 5, 1 => using pretty(chain(1..6)))]
 #[test_case(10, 9, 0 => using pretty(chain(0..10)))]
-/// Check taking until some timestamp is reached works.
+/// Check taking until some timestamp is passed works.
 fn can_until_timestamp(len: u32, chain_top: u32, until_us: i64) -> Vec<TestChainItem> {
     let filter = TestFilter::new(hash(chain_top)).until_timestamp(Timestamp::from_micros(until_us));
     build_chain(chain(0..len), filter)

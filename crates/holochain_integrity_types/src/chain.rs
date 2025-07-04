@@ -17,11 +17,12 @@ mod test;
 /// Starting from some chain position given as an [`ActionHash`]
 /// the chain is walked backwards to genesis.
 /// The filter can stop early by specifying stop conditions:
-/// A maximum number of items is reached, a given [`ActionHash`] is found, or until
-/// a given timestamp has been reached.
+/// A maximum number of items is reached, a given [`ActionHash`] is found, or
+/// a given timestamp has been passed.
 /// Multiple `[`ActionHash`] can be provided. The filter will stop at and take the first one found.
 /// When providing a Timestamp, the filter will stop at and take the last item that has a
-/// Timestamp younger than the provided one.
+/// Timestamp younger than the provided one. In the edge case of multiple actions having the same
+/// Timestamp as the stop condition, only one of the actions will be included.
 pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// The starting position of the filter.
     pub chain_top: H,
@@ -140,7 +141,7 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
         self
     }
 
-    /// Take all actions until this timestamp is reached
+    /// Take all actions until this timestamp is passed.
     pub fn until_timestamp(mut self, timestamp: Timestamp) -> Self {
         self.stop_conditions = match self.stop_conditions {
             StopConditions::ToGenesis => StopConditions::UntilTimestamp(timestamp),

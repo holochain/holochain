@@ -87,7 +87,6 @@ impl ChainItem for SignedActionHashed {
 
 /// Validate that a sequence of actions forms a valid hash chain via `prev_action`,
 /// with an optional starting point.
-/// TODO: check timestamp are in order?
 pub fn validate_chain<'iter, A: 'iter + ChainItem>(
     mut actions: impl Iterator<Item = &'iter A>,
     persisted_chain_head: &Option<(A::Hash, u32)>,
@@ -121,7 +120,6 @@ pub fn validate_chain<'iter, A: 'iter + ChainItem>(
 }
 
 // Check the action is valid for the previous action.
-/// TODO: check timestamp are in order?
 fn check_prev_action_chain<A: ChainItem>(
     prev_action_hash: &A::Hash,
     prev_action_seq: u32,

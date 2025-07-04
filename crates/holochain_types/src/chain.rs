@@ -324,10 +324,10 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
         match &mut self.filter.stop_conditions {
             // Check if there is any left to take.
             StopConditions::Take(n) => *n = n.checked_sub(1)?,
-            // Check if the timestamp has been reached.
+            // Check if the timestamp has been passed.
             StopConditions::UntilTimestamp(ts) => {
                 if op.as_ref().get_timestamp() < *ts {
-                    // If timestamp has been passed, end search and don't return this action.
+                    // If timestamp has been passed, end search and don't return this item.
                     self.end = true;
                     return None;
                 }
@@ -350,7 +350,7 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
                 }
 
                 if op.as_ref().get_timestamp() < *ts {
-                    // Timestamp reached, don't return it.
+                    // Timestamp passed, don't return item.
                     self.end = true;
                     return None;
                 }
@@ -379,10 +379,10 @@ impl Sequences {
             None => return Ok(Self::ChainTopNotFound(filter.chain_top)),
         };
 
-        // Track why the sequence start of the range was chosen.
+        // Track how the sequence start of the range was chosen.
         let mut chain_bottom_type = ChainBottomType::Genesis;
 
-        // If there are any until hashes in the filter,
+        // If there are any until hash conditions in the filter,
         // then find the highest sequence of the set
         // and find the distance from the position.
         let mut distance = match filter.get_until_hash() {
@@ -421,13 +421,12 @@ impl Sequences {
             None => chain_top,
         };
 
-        // Check if there is an until timestamp filter and get the distance from the position
+        // Check if there is an until timestamp condition in the filter
+        // and get the distance from the position.
         if let Some(ts) = filter.get_until_timestamp() {
             let mut ts_distance = u32::MAX;
             // A timestamp of zero will produce an empty range.
-            if ts.0 == 0 {
-                return Ok(Self::EmptyRange);
-            } else {
+            if ts.0 != 0 {
                 let seq = get_seq_for_ts(ts)?;
                 // Ignore any until timestamp that could not be found.
                 if let Some(s) = seq {
@@ -444,15 +443,15 @@ impl Sequences {
             }
         }
 
-        // Check if there is a take filter and if that
-        // will be reached before any until or genesis.
+        // Check if there is a take condition in the filter and if that
+        // will be reached before any other condition.
         let start = match filter.get_take() {
             Some(take) => {
                 // A take of zero will produce an empty range.
                 if take == 0 {
                     return Ok(Self::EmptyRange);
                 } else if take <= distance {
-                    // The take will be reached before genesis or until hashes.
+                    // The take will be reached first.
                     chain_bottom_type = ChainBottomType::Take;
                     // Add one to include the "position" in the number of
                     // "take". This matches the rust iterator "take".
