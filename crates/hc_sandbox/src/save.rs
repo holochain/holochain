@@ -79,18 +79,20 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
 
 /// Load sandbox paths from the `.hc` file.
 pub fn load(mut hc_dir: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
-    let mut paths = Vec::new();
     hc_dir.push(".hc");
-    if hc_dir.exists() {
-        let existing = std::fs::read_to_string(hc_dir)?;
-        for sandbox in existing.lines() {
-            let path = PathBuf::from(sandbox);
-            let config_file_path = ConfigFilePath::from(ConfigRootPath::from(path.clone()));
-            if config_file_path.as_ref().exists() {
-                paths.push(path);
-            } else {
-                tracing::error!("Failed to load path {} from existing .hc", path.display());
-            }
+    if !hc_dir.is_file() {
+        return Ok(Vec::new());
+    };
+    let mut paths = Vec::new();
+    let existing = std::fs::read_to_string(&hc_dir)
+        .with_context(|| format!("Failed to read file: {}", hc_dir.display()))?;
+    for sandbox in existing.lines() {
+        let path = PathBuf::from(sandbox);
+        let config_file_path = ConfigFilePath::from(ConfigRootPath::from(path.clone()));
+        if config_file_path.as_ref().exists() {
+            paths.push(path);
+        } else {
+            tracing::error!("Failed to load path {} from existing .hc", path.display());
         }
     }
     Ok(paths)

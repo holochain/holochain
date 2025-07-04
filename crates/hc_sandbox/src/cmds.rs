@@ -117,33 +117,38 @@ pub struct Existing {
 }
 
 impl Existing {
-    pub fn load(mut self) -> anyhow::Result<Vec<PathBuf>> {
-        let sandboxes = crate::save::load(std::env::current_dir()?)?;
+    /// Determine all sandbox paths to use based on .hc and given options.
+    /// Returns at minimum all paths in self.existing_paths.
+    pub fn load(&self) -> anyhow::Result<Vec<PathBuf>> {
+        let saved_sandboxes = crate::save::load(std::env::current_dir()?)?;
+        let mut provided = self.existing_paths.clone();
         if self.all {
-            // Get all the sandboxes
-            self.existing_paths.extend(sandboxes)
-        } else if self.last && sandboxes.last().is_some() {
-            // Get just the last sandbox
-            self.existing_paths
-                .push(sandboxes.last().cloned().expect("Safe due to check above"));
+            // Add all sandboxes in .hc
+            provided.extend(saved_sandboxes);
+        } else if self.last {
+            // Get the last sandbox in .hc
+            if let Some(last) = saved_sandboxes.last() {
+                provided.push(last.clone());
+            }
         } else if !self.indices.is_empty() {
             // Get the indices
-            let e = self
-                .indices
-                .into_iter()
-                .filter_map(|i| sandboxes.get(i).cloned());
-            self.existing_paths.extend(e);
-        } else if !self.existing_paths.is_empty() {
-            // If there is existing paths then use those
-        } else if sandboxes.len() == 1 {
-            // If there is only one sandbox then use that
-            self.existing_paths
-                .push(sandboxes.last().cloned().expect("Safe due to check above"));
-        } else if sandboxes.len() > 1 {
-            // There is multiple sandboxes, the use must disambiguate
+            for i in self.indices.clone() {
+                let Some(selected) = saved_sandboxes.get(i) else {
+                    msg!("Warning. No sandbox found at index {}.", i);
+                    continue;
+                };
+                provided.push(selected.clone());
+            }
+        } else if !provided.is_empty() {
+            // If there are existing paths provided then use those.
+        } else if saved_sandboxes.len() == 1 {
+            // If there is only one saved sandbox then use that.
+            provided.push(saved_sandboxes[0].clone());
+        } else if saved_sandboxes.len() > 1 {
+            // There are multiple saved sandboxes, the user must disambiguate
             msg!(
                 "
-There are multiple sandboxes and hc doesn't know which to run.
+There are multiple sandboxes and hc doesn't know which one to run.
 You can run:
     - `--all` `-a` run all sandboxes.
     - `--last` `-l` run the last created sandbox.
@@ -161,10 +166,23 @@ Before running or calling you need to generate a sandbox.
 You can use `hc sandbox generate` to do this.
 Run `hc sandbox generate --help` for more options."
             );
+            return Ok(vec![]);
         }
-        Ok(self.existing_paths)
+        
+        if provided.is_empty() {
+            // There are no sandboxes
+            msg!(
+                "
+No sandbox found.
+You can use `hc sandbox generate` to generate a sandbox.
+Run `hc sandbox --help` for more options."
+            );
+        }
+
+        Ok(provided)
     }
 
+    /// Returns true if no "existing" parameter has been set
     pub fn is_empty(&self) -> bool {
         self.existing_paths.is_empty() && self.indices.is_empty() && !self.all && !self.last
     }
