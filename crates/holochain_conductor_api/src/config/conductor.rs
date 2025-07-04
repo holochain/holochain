@@ -391,6 +391,18 @@ impl NetworkConfig {
                     webrtc_config.clone(),
                 )?;
             }
+
+            if tracing::enabled!(target: "NETAUDIT", tracing::Level::WARN) {
+                tracing::info!(
+                    "The NETAUDIT target is enabled, turning on network backend tracing"
+                );
+                Self::insert_module_config(
+                    module_config,
+                    "tx5Transport",
+                    "tracingEnabled",
+                    serde_json::Value::Bool(true),
+                )?;
+            }
         } else {
             return Err(ConductorConfigError::InvalidNetworkConfig(
                 "advanced field must be an object".to_string(),
