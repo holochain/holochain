@@ -60,7 +60,7 @@ pub fn accept_countersigning_preflight_request<'a>(
 }
 
 #[cfg(test)]
-// #[cfg(all(feature = "slow_tests", feature = "unstable-countersigning"))]
+#[cfg(all(feature = "slow_tests", feature = "unstable-countersigning"))]
 pub mod wasm_test {
     use assert2::let_assert;
     use crate::conductor::api::error::ConductorApiError;
@@ -485,8 +485,8 @@ pub mod wasm_test {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    // #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
-    // #[cfg_attr(target_os = "windows", ignore = "stack overflow on windows")]
+    #[cfg_attr(target_os = "macos", ignore = "flaky on macos")]
+    #[cfg_attr(target_os = "windows", ignore = "stack overflow on windows")]
     async fn lock_chain() {
         holochain_trace::test_run();
 
