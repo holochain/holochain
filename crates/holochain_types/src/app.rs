@@ -113,26 +113,8 @@ pub struct InstallAppPayload {
     pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
-    /// If None, a new agent key will be generated in the right circumstances (read on).
     ///
-    /// It's always OK to provide a pregenerated agent key here, but there is at least one
-    /// major benefit to letting Holochain generate keys for you (other than
-    /// the sheer convenience of not having to generate your own):
-    ///
-    /// If you are using a device seed in your conductor config, the agent key will be derived
-    /// from that seed using a sensible scheme based on the total number of app installations
-    /// in this conductor, which means you can fairly easily regenerate all of your auto-generated
-    /// agent keys if you lose access to the device with your conductor data
-    /// (as long as you retain exclusive access to the device seed of course).
-    ///
-    /// Holochain will only generate an agent key for you if a device seed tag
-    /// is set and pointing to a seed present in lair. If this config is not set, installation
-    /// will fail if no agent key is provided. This safety mechanism can however be overridden
-    /// by setting the `allow_throwaway_random_agent_key` flag on this payload, which will cause
-    /// Holochain to generate a totally random (non-recoverable) agent key.
-    ///
-    /// If you are not using a device seed, or if your app has special requirements for agent keys,
-    /// you can always provide your own here, no matter what setting you're using.
+    /// If None, a new agent key will be generated.
     #[serde(default)]
     pub agent_key: Option<AgentPubKey>,
 
@@ -1171,8 +1153,6 @@ pub enum DisabledAppReason {
     NotStartedAfterProvidingMemproofs,
     /// The disabling was done manually by the user (via admin interface)
     User,
-    /// Disabling app in order to revoke its agent key and render all chains read-only.
-    DeletingAgentKey,
     /// The disabling was due to an UNRECOVERABLE error
     Error(String),
 }
