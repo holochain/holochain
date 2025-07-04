@@ -59,7 +59,6 @@ pub fn accept_countersigning_preflight_request<'a>(
 #[cfg(test)]
 #[cfg(all(feature = "slow_tests", feature = "unstable-countersigning"))]
 pub mod wasm_test {
-    use assert2::let_assert;
     use matches::assert_matches;
     use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::api::ZomeCall;
@@ -548,7 +547,11 @@ pub mod wasm_test {
                 .unwrap(),
             )
             .await;
-        let_assert!(Err(ConductorApiError::CellError(CellError::WorkflowError(err))) = preflight_acceptance_fail);
+        let err = match preflight_acceptance_fail {
+            Err(ConductorApiError::CellError(CellError::WorkflowError(err))) => err,
+            _ => panic!("Expected CellError, got: {:?}", preflight_acceptance_fail),
+        };
+
         assert_matches!(
             *err,
             WorkflowError::RibosomeError(RibosomeError::WasmRuntimeError(RuntimeError { .. }))

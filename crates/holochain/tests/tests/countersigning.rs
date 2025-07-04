@@ -12,7 +12,6 @@ use holochain_types::prelude::Signal;
 use holochain_types::signal::SystemSignal;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::countersigning::Role;
-use matches::assert_matches;
 use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
@@ -1135,7 +1134,10 @@ async fn should_be_able_to_schedule_functions_during_session() {
         )
         .await
         .unwrap();
-    assert_matches!(alice_acceptance, PreflightRequestAcceptance::Accepted(_));
+    assert!(matches!(
+        alice_acceptance,
+        PreflightRequestAcceptance::Accepted(_)
+    ));
 
     conductors[0]
         .call_fallible::<_, ()>(&alice_zome, "schedule_signal", ())
@@ -1150,7 +1152,10 @@ async fn should_be_able_to_schedule_functions_during_session() {
         )
         .await
         .unwrap();
-    assert_matches!(bob_acceptance, PreflightRequestAcceptance::Accepted(_));
+    assert!(matches!(
+        bob_acceptance,
+        PreflightRequestAcceptance::Accepted(_)
+    ));
 
     conductors[1]
         .call_fallible::<_, ()>(&bob_zome, "schedule_signal", ())
