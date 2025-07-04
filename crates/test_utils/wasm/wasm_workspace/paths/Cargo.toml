@@ -1,0 +1,25 @@
+[package]
+name = "test_wasm_paths"
+version = "0.0.1"
+authors = ["Holochain Core Dev Team <devcore@holochain.org>"]
+edition = "2021"
+
+[lib]
+name = "test_wasm_paths"
+crate-type = ["cdylib", "rlib"]
+
+[[example]]
+name = "integrity_test_wasm_paths"
+path = "src/integrity.rs"
+crate-type = ["cdylib", "rlib"]
+
+# reminder - do not use workspace deps
+[dependencies]
+hdk = { path = "../../../../hdk" }
+hdi = { path = "../../../../hdi" }
+holochain_serialized_bytes = "0.0.56"
+serde = "1.0"
+
+[features]
+default = []
+mock = ["hdk/mock"]
