@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- It's possible to configure an advanced setting for the network layer that shows tracing information about network
+  connectivity and state changes. Rather than having to configure that in Holochain runtimes, it is now automatically
+  enabled when the `NETAUDIT` tracing target is enabled at `WARN` level or lower.
 - Test app operations (install/enable/disable/uninstall) with regards to app state and cell state.
 - **BREAKING CHANGE**: Remove `start_app` from conductor. Use `enable_app` instead.
 
