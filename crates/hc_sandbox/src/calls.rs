@@ -393,48 +393,48 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                     },
                 }])
                 .await?;
-            msg!("Added admin port {}", port);
+            println!("{}", serde_json::to_value(&port)?);
         }
         AdminRequestCli::AddAppWs(args) => {
             let port = args.port.unwrap_or(0);
             let port = client
                 .attach_app_interface(port, args.allowed_origins, args.installed_app_id)
                 .await?;
-            msg!("Added app port {}", port);
+            println!("{}", serde_json::to_value(&port)?);
         }
         AdminRequestCli::ListAppWs => {
             let interface_infos = client.list_app_interfaces().await?;
-            msg!("Attached app interfaces {:?}", interface_infos);
+            println!("{}", serde_json::to_value(&interface_infos)?);
         }
         AdminRequestCli::RegisterDna(args) => {
             let dnas = register_dna(client, args).await?;
-            msg!("Registered DNA: {:?}", dnas);
+            println!("{}", serde_json::to_value(&dnas)?);
         }
         AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(client, args).await?;
-            msg!("Installed app: {}", app.installed_app_id,);
+            println!("{}", serde_json::to_value(&app)?);
         }
         AdminRequestCli::UninstallApp(args) => {
             client
                 .uninstall_app(args.app_id.clone(), args.force)
                 .await?;
-            msg!("Uninstalled app: {}", args.app_id,);
+            println!("{}", serde_json::to_value(&args.app_id)?);
         }
         AdminRequestCli::ListDnas => {
             let dnas = client.list_dnas().await?;
-            msg!("DNAs: {:?}", dnas);
+            println!("{}", serde_json::to_value(&dnas)?);
         }
         AdminRequestCli::NewAgent => {
             let agent = client.generate_agent_pub_key().await?;
-            msg!("Added agent {}", agent);
+            println!("{}", serde_json::to_value(&agent)?);
         }
         AdminRequestCli::ListCells => {
             let cells = client.list_cell_ids().await?;
-            msg!("Cell IDs: {:?}", cells);
+            println!("{}", serde_json::to_value(&cells)?);
         }
         AdminRequestCli::ListApps(args) => {
             let apps = client.list_apps(args.status).await?;
-            msg!("List apps: {:?}", apps);
+            println!("{}", serde_json::to_value(&apps)?);
         }
         AdminRequestCli::EnableApp(args) => {
             client.enable_app(args.app_id.clone()).await?;
