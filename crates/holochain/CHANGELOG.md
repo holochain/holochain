@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Test app operations (install/enable/disable/uninstall) with regards to app state and cell state.
+
 ## 0.6.0-dev.11
 
 ## 0.6.0-dev.10
