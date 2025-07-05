@@ -22,6 +22,9 @@ pub trait ChainItem: Clone + PartialEq + Eq + std::fmt::Debug + Send + Sync {
     fn seq(&self) -> u32;
 
     /// The hash of this item
+    fn get_timestamp(&self) -> Timestamp;
+
+    /// The hash of this item
     fn get_hash(&self) -> &Self::Hash;
 
     /// The hash of the previous item
@@ -39,6 +42,10 @@ impl ChainItem for ActionHashed {
 
     fn seq(&self) -> u32 {
         self.action_seq()
+    }
+
+    fn get_timestamp(&self) -> Timestamp {
+        self.timestamp()
     }
 
     fn get_hash(&self) -> &Self::Hash {
@@ -59,6 +66,10 @@ impl ChainItem for SignedActionHashed {
 
     fn seq(&self) -> u32 {
         self.hashed.seq()
+    }
+
+    fn get_timestamp(&self) -> Timestamp {
+        self.hashed.timestamp()
     }
 
     fn get_hash(&self) -> &Self::Hash {
