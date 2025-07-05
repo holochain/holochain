@@ -27,6 +27,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Mutex;
 
 mod add_agent_infos;
+mod app_state;
 mod state_dump;
 
 #[tokio::test(flavor = "multi_thread")]
