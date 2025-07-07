@@ -148,7 +148,7 @@ impl Existing {
             // There are multiple saved sandboxes, the user must disambiguate
             msg!(
                 "
-There are multiple sandboxes and hc doesn't know which one to run.
+There are multiple sandboxes and hc doesn't know which of them to run.
 You can run:
     - `--all` `-a` run all sandboxes.
     - `--last` `-l` run the last created sandbox.
