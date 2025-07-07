@@ -392,9 +392,6 @@ mod startup_shutdown_impls {
 
             info!("Conductor startup: app interfaces started.");
 
-            // We don't care what fx are returned here, since all cells need to
-            // be spun up
-            let _ = self.start_paused_apps().await?;
             let res = self.process_app_status_fx(AppStatusFx::SpinUp, None).await;
 
             info!("Conductor startup: apps started.");
@@ -717,32 +714,6 @@ mod dna_impls {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
             }
-        }
-
-        /// Restart every paused app
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub(crate) async fn start_paused_apps(&self) -> ConductorResult<AppStatusFx> {
-            let (_, delta) = self
-                .update_state_prime(|mut state| {
-                    let ids = state.paused_apps().map(first).cloned().collect::<Vec<_>>();
-                    if !ids.is_empty() {
-                        tracing::info!("Restarting {} paused apps: {:#?}", ids.len(), ids);
-                    }
-                    let deltas: Vec<AppStatusFx> = ids
-                        .into_iter()
-                        .map(|id| {
-                            state
-                                .transition_app_status(&id, AppStatusTransition::Enable)
-                                .map(second)
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    let delta = deltas
-                        .into_iter()
-                        .fold(AppStatusFx::default(), AppStatusFx::combine);
-                    Ok((state, delta))
-                })
-                .await?;
-            Ok(delta)
         }
 
         pub(crate) async fn put_wasm(
@@ -1455,9 +1426,6 @@ mod app_impls {
             let apps_ids: Vec<&String> = match status_filter {
                 Some(Enabled) => conductor_state.enabled_apps().map(|(id, _)| id).collect(),
                 Some(Disabled) => conductor_state.disabled_apps().map(|(id, _)| id).collect(),
-                Some(Running) => conductor_state.running_apps().map(|(id, _)| id).collect(),
-                Some(Stopped) => conductor_state.stopped_apps().map(|(id, _)| id).collect(),
-                Some(Paused) => conductor_state.paused_apps().map(|(id, _)| id).collect(),
                 None => conductor_state.installed_apps().keys().collect(),
             };
 
@@ -1942,22 +1910,6 @@ mod app_status_impls {
                 .1)
         }
 
-        /// Pause an app
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-        #[cfg(any(test, feature = "test_utils"))]
-        pub async fn pause_app(
-            self: Arc<Self>,
-            app_id: InstalledAppId,
-            reason: PausedAppReason,
-        ) -> ConductorResult<InstalledApp> {
-            let (app, delta) = self
-                .transition_app_status(app_id.clone(), AppStatusTransition::Pause(reason))
-                .await?;
-            self.process_app_status_fx(delta, Some(vec![app_id.clone()].into_iter().collect()))
-                .await?;
-            Ok(app)
-        }
-
         /// Create any Cells which are missing for any running apps, then initialize
         /// and join them. (Joining could take a while.)
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -2031,18 +1983,13 @@ mod app_status_impls {
 
         /// Adjust app statuses (via state transitions) to match the current
         /// reality of which Cells are present in the conductor.
-        /// - Do not change state for Disabled apps. For all others:
-        /// - If an app is Paused but all of its (required) Cells are on,
-        ///   then set it to Running
-        /// - If an app is Running but at least one of its (required) Cells are off,
-        ///   then set it to Paused
+        /// Do not change state for Disabled apps.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn reconcile_app_status_with_cell_status(
             &self,
             app_ids: Option<HashSet<InstalledAppId>>,
         ) -> ConductorResult<AppStatusFx> {
             use AppStatus::*;
-            use AppStatusTransition::*;
 
             // NOTE: this is checking all *live* cells, meaning all cells
             // which have fully joined the network. This could lead to a race condition
@@ -2055,7 +2002,6 @@ mod app_status_impls {
             // we might consider relaxing this check so that this race condition isn't
             // possible, and let ourselves be optimistic that all cells will join soon after
             // the app starts.
-            let cell_ids: HashSet<CellId> = self.running_cell_ids();
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -2070,28 +2016,9 @@ mod app_status_impls {
                         .map(|(_app_id, app)| {
                             match app.status().clone() {
                                 Running => {
-                                    // If not all required cells are running, pause the app
-                                    let missing: Vec<_> = app
-                                        .required_cells()
-                                        .filter(|id| !cell_ids.contains(id))
-                                        .collect();
-                                    if !missing.is_empty() {
-                                        let reason = PausedAppReason::Error(format!(
-                                            "Some cells are missing / not able to run: {:#?}",
-                                            missing
-                                        ));
-                                        app.status.transition(Pause(reason))
-                                    } else {
-                                        AppStatusFx::NoChange
-                                    }
-                                }
-                                Paused(_) => {
-                                    // If all required cells are now running, restart the app
-                                    if app.required_cells().all(|id| cell_ids.contains(&id)) {
-                                        app.status.transition(Enable)
-                                    } else {
-                                        AppStatusFx::NoChange
-                                    }
+                                    // If not all required cells are running, temporarily do nothing, until the next PR removes
+                                    // state machinery altogether.
+                                    AppStatusFx::NoChange
                                 }
                                 Disabled(_) => {
                                     // Disabled status should never automatically change.
@@ -2932,7 +2859,6 @@ impl Conductor {
     }
 
     /// Remove all Cells which are not referenced by any Enabled app.
-    /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed).
     ///
     /// Additionally, if the cell is being removed because the last app referencing it was uninstalled,
     /// all data used by that cell (across Authored, DHT, and Cache databases) will also be removed.

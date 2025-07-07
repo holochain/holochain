@@ -20,7 +20,7 @@
 //! accomplish that:
 //!
 //! 1. Stop all other tasks related to the cell, so they don't continue in the background.
-//! 2. Pause or disable any apps which depend on the cell, because the app cannot
+//! 2. Disable any apps which depend on the cell, because the app cannot
 //!    function without the proper functioning of that cell.
 
 mod error;
@@ -220,10 +220,10 @@ pub enum TaskOutcome {
     MinorError(Box<ManagedTaskError>, String),
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
-    /// Either pause or disable all apps which contain the problematic Cell,
+    /// Disable all apps which contain the problematic Cell,
     /// depending upon the specific error.
     StopApps(CellId, Box<ManagedTaskError>, String),
-    /// Either pause or disable all apps which contain the problematic Dna,
+    /// Disable all apps which contain the problematic DNA,
     /// depending upon the specific error.
     StopAppsWithDna(Arc<DnaHash>, Box<ManagedTaskError>, String),
 }

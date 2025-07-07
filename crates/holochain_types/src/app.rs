@@ -406,7 +406,7 @@ impl From<RunningApp> for InstalledApp {
     }
 }
 
-/// An app which is either Paused or Disabled, i.e. not Running
+/// An app which is [AppStatus::Disabled], i.e. not running
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
 )]
@@ -938,13 +938,6 @@ pub enum AppStatus {
     /// The app is enabled and running normally.
     Running,
 
-    /// Enabled, but stopped due to some recoverable problem.
-    /// The app "hopes" to be Running again as soon as possible.
-    /// Holochain may restart the app automatically if it can. It may also be
-    /// restarted manually via the `StartApp` admin method.
-    /// Paused apps will be automatically set to Running when the conductor restarts.
-    Paused(PausedAppReason),
-
     /// Disabled and stopped, either manually by the user, or automatically due
     /// to an unrecoverable error. App must be Enabled before running again,
     /// and will not restart automaticaly on conductor reboot.
@@ -960,7 +953,6 @@ pub enum AppStatus {
 #[allow(missing_docs)]
 pub enum AppStatusKind {
     Running,
-    Paused,
     Disabled,
     AwaitingMemproofs,
 }
@@ -969,7 +961,6 @@ impl From<AppStatus> for AppStatusKind {
     fn from(status: AppStatus) -> Self {
         match status {
             AppStatus::Running => Self::Running,
-            AppStatus::Paused(_) => Self::Paused,
             AppStatus::Disabled(_) => Self::Disabled,
             AppStatus::AwaitingMemproofs => Self::AwaitingMemproofs,
         }
@@ -979,8 +970,6 @@ impl From<AppStatus> for AppStatusKind {
 /// Represents a state transition operation from one state to another
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AppStatusTransition {
-    /// Attempt to pause a Running app
-    Pause(PausedAppReason),
     /// Gets an app running no matter what
     Enable,
     /// Disables an app, no matter what
@@ -991,18 +980,13 @@ impl AppStatus {
     /// Does this status correspond to an Enabled state?
     /// If false, this indicates a Disabled state.
     pub fn is_enabled(&self) -> bool {
-        matches!(self, Self::Running | Self::Paused(_))
+        matches!(self, Self::Running)
     }
 
     /// Does this status correspond to a Running state?
     /// If false, this indicates a Stopped state.
     pub fn is_running(&self) -> bool {
         matches!(self, Self::Running)
-    }
-
-    /// Does this status correspond to a Paused state?
-    pub fn is_paused(&self) -> bool {
-        matches!(self, Self::Paused(_))
     }
 
     /// Transition a status from one state to another.
@@ -1012,16 +996,11 @@ impl AppStatus {
         use AppStatusFx::*;
         use AppStatusTransition::*;
         match (&self, transition) {
-            (Running, Pause(reason)) => Some((Paused(reason), SpinDown)),
             (Running, Disable(reason)) => Some((Disabled(reason), SpinDown)),
             (Running, Enable) => None,
 
-            (Paused(_), Enable) => Some((Running, SpinUp)),
-            (Paused(_), Disable(reason)) => Some((Disabled(reason), SpinDown)),
-            (Paused(_), Pause(_)) => None,
-
             (Disabled(_), Enable) => Some((Running, SpinUp)),
-            (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) => None,
+            (Disabled(_), Disable(_)) => None,
 
             (AwaitingMemproofs, Enable) => Some((
                 AwaitingMemproofs,
@@ -1095,9 +1074,6 @@ impl AppStatusFx {
 )]
 #[serde(rename_all = "snake_case")]
 pub enum StoppedAppReason {
-    /// Same meaning as [`AppStatus::Paused`].
-    Paused(PausedAppReason),
-
     /// Same meaning as [`AppStatus::Disabled`].
     Disabled(DisabledAppReason),
 
@@ -1110,7 +1086,6 @@ impl StoppedAppReason {
     /// If the status is Running, returns None.
     pub fn from_status(status: &AppStatus) -> Option<Self> {
         match status {
-            AppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
             AppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
             AppStatus::AwaitingMemproofs => Some(Self::AwaitingMemproofs),
             AppStatus::Running => None,
@@ -1121,20 +1096,10 @@ impl StoppedAppReason {
 impl From<StoppedAppReason> for AppStatus {
     fn from(reason: StoppedAppReason) -> Self {
         match reason {
-            StoppedAppReason::Paused(reason) => Self::Paused(reason),
             StoppedAppReason::Disabled(reason) => Self::Disabled(reason),
             StoppedAppReason::AwaitingMemproofs => Self::AwaitingMemproofs,
         }
     }
-}
-
-/// The reason for an app being in a Paused state.
-/// NB: there is no way to manually pause an app.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
-pub enum PausedAppReason {
-    /// The pause was due to a RECOVERABLE error
-    Error(String),
 }
 
 /// The reason for an app being in a Disabled state.
@@ -1461,15 +1426,6 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&app_status).unwrap(),
             "{\"type\":\"disabled\",\"value\":{\"type\":\"never_started\"}}"
-        );
-    }
-
-    #[test]
-    fn paused_app_reason_serialization() {
-        let reason = PausedAppReason::Error("s are here to learn from".into());
-        assert_eq!(
-            serde_json::to_string(&reason).unwrap(),
-            "{\"type\":\"error\",\"value\":\"s are here to learn from\"}"
         );
     }
 

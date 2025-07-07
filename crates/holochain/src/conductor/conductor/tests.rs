@@ -855,19 +855,6 @@ async fn test_app_status_states() {
 
     let get_status = || async { conductor.list_apps(None).await.unwrap()[0].status.clone() };
 
-    // RUNNING -pause-> PAUSED
-
-    conductor
-        .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
-        .await
-        .unwrap();
-    assert_matches!(get_status().await, AppInfoStatus::Paused { .. });
-
-    // PAUSED  --start->  RUNNING
-
-    conductor.enable_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, AppInfoStatus::Running);
-
     // RUNNING  --disable->  DISABLED
 
     conductor
@@ -876,28 +863,7 @@ async fn test_app_status_states() {
         .unwrap();
     assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
-    // DISABLED  --pause->  DISABLED
-
-    conductor
-        .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
-        .await
-        .unwrap();
-    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
-
     // DISABLED  --enable->  ENABLED
-
-    conductor.enable_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, AppInfoStatus::Running);
-
-    // RUNNING  --pause->  PAUSED
-
-    conductor
-        .pause_app("app".to_string(), PausedAppReason::Error("because".into()))
-        .await
-        .unwrap();
-    assert_matches!(get_status().await, AppInfoStatus::Paused { .. });
-
-    // PAUSED  --enable->  RUNNING
 
     conductor.enable_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, AppInfoStatus::Running);
@@ -943,13 +909,12 @@ async fn test_cell_and_app_status_reconciliation() {
     conductor.remove_cells(cell1).await;
     assert_eq!(check().await, (Running, 2));
 
-    // - Again, app state should be reconciled to Paused due to missing cell
+    // - App status won't change.
     let delta = conductor
         .reconcile_app_status_with_cell_status(None)
         .await
         .unwrap();
-    assert_eq!(delta, SpinDown);
-    assert_eq!(check().await, (Paused, 2));
+    assert_eq!(delta, NoChange);
 
     // - Disabling the app causes all cells to be removed
     conductor
@@ -972,18 +937,9 @@ async fn test_app_status_filters() {
     let mut conductor = SweetConductor::from_standard_config().await;
 
     conductor.setup_app("running", &dnas).await.unwrap();
-    conductor.setup_app("paused", &dnas).await.unwrap();
     conductor.setup_app("disabled", &dnas).await.unwrap();
 
     // put apps in the proper states for testing
-
-    conductor
-        .pause_app(
-            "paused".to_string(),
-            PausedAppReason::Error("because".into()),
-        )
-        .await
-        .unwrap();
 
     conductor
         .disable_app("disabled".to_string(), DisabledAppReason::User)
@@ -999,33 +955,27 @@ async fn test_app_status_filters() {
     // Check the counts returned by each filter
     use AppStatusFilter::*;
 
-    assert_eq!(list_apps!(None).len(), 3);
+    assert_eq!(list_apps!(None).len(), 2);
     assert_eq!(
         (
-            list_apps!(Some(Running)).len(),
-            list_apps!(Some(Stopped)).len(),
             list_apps!(Some(Enabled)).len(),
             list_apps!(Some(Disabled)).len(),
-            list_apps!(Some(Paused)).len(),
         ),
-        (1, 2, 2, 1, 1,)
+        (1, 1)
     );
 
-    // check that paused apps move to Running state on conductor restart
+    // check that counts are still accurate after a restart
 
     conductor.shutdown().await;
     conductor.startup().await;
 
-    assert_eq!(list_apps!(None).len(), 3);
+    assert_eq!(list_apps!(None).len(), 2);
     assert_eq!(
         (
-            list_apps!(Some(Running)).len(),
-            list_apps!(Some(Stopped)).len(),
             list_apps!(Some(Enabled)).len(),
             list_apps!(Some(Disabled)).len(),
-            list_apps!(Some(Paused)).len(),
         ),
-        (2, 1, 2, 1, 0,)
+        (1, 1)
     );
 }
 

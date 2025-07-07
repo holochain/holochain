@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Remove unused field `dna_def` the `HostFnWorkspace` struct ([\#5102](https://github.com/holochain/holochain/pull/5102))
 - Replace the `dna_def` field of the `SysValidationWorkspace` with a `dna_hash` field.
 - Remove unnecessary uses of `LinkType` and `EntryDefIndex` types
+- **BREAKING CHANGE**: Remove `pause_app` and `Paused` state from conductor. Pausing an app was used when enabling an app partially failed and could be re-attempted. Now the app is only enabled if all cells successfully started up.
 
 ## 0.6.0-dev.11
 

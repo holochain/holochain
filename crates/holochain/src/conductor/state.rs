@@ -138,18 +138,7 @@ impl ConductorState {
         })
     }
 
-    /// Iterate over only the paused apps
-    pub fn paused_apps(&self) -> impl Iterator<Item = (&InstalledAppId, StoppedApp)> + '_ {
-        self.installed_apps.iter().filter_map(|(id, app)| {
-            if app.status.is_paused() {
-                StoppedApp::from_app(app).map(|stopped| (id, stopped))
-            } else {
-                None
-            }
-        })
-    }
-
-    /// Iterate over only the "stopped" apps (paused OR disabled)
+    /// Iterate over only the "stopped" apps (disabled)
     pub fn stopped_apps(&self) -> impl Iterator<Item = (&InstalledAppId, StoppedApp)> + '_ {
         self.installed_apps
             .iter()
@@ -212,7 +201,7 @@ impl ConductorState {
         transition: AppStatusTransition,
     ) -> ConductorResult<(&InstalledApp, AppStatusFx)> {
         match transition {
-            AppStatusTransition::Disable(_) | AppStatusTransition::Pause(_) => {
+            AppStatusTransition::Disable(_) => {
                 let dependents: Vec<_> = self
                     .get_dependent_apps(id, true)?
                     .into_iter()
