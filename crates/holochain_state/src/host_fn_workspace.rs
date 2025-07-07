@@ -38,13 +38,6 @@ pub struct HostFnStores {
 
 pub type HostFnWorkspaceRead = HostFnWorkspace<DbRead<DbKindAuthored>, DbRead<DbKindDht>>;
 
-impl HostFnWorkspace {
-    /// Get a reference to the host fn workspace's dna def.
-    pub fn dna_def(&self) -> Arc<DnaDef> {
-        self.dna_def.clone()
-    }
-}
-
 impl SourceChainWorkspace {
     pub async fn new(
         authored: DbWrite<DbKindAuthored>,
