@@ -979,8 +979,6 @@ impl From<AppStatus> for AppStatusKind {
 /// Represents a state transition operation from one state to another
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AppStatusTransition {
-    /// Attempt to unpause a Paused app
-    Start,
     /// Attempt to pause a Running app
     Pause(PausedAppReason),
     /// Gets an app running no matter what
@@ -1016,17 +1014,16 @@ impl AppStatus {
         match (&self, transition) {
             (Running, Pause(reason)) => Some((Paused(reason), SpinDown)),
             (Running, Disable(reason)) => Some((Disabled(reason), SpinDown)),
-            (Running, Start) | (Running, Enable) => None,
+            (Running, Enable) => None,
 
-            (Paused(_), Start) => Some((Running, SpinUp)),
             (Paused(_), Enable) => Some((Running, SpinUp)),
             (Paused(_), Disable(reason)) => Some((Disabled(reason), SpinDown)),
             (Paused(_), Pause(_)) => None,
 
             (Disabled(_), Enable) => Some((Running, SpinUp)),
-            (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) | (Disabled(_), Start) => None,
+            (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) => None,
 
-            (AwaitingMemproofs, Enable | Start) => Some((
+            (AwaitingMemproofs, Enable) => Some((
                 AwaitingMemproofs,
                 Error("Cannot enable an app which is AwaitingMemproofs".to_string()),
             )),
