@@ -314,7 +314,6 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
 }
 
 struct TestCase {
-    dna_def: DnaDef,
     dna_hash: DnaDefHashed,
     test_space: TestSpace,
     keystore: MetaLairClient,
@@ -337,7 +336,6 @@ impl TestCase {
         let agent = keystore.new_sign_keypair_random().await.unwrap();
 
         Self {
-            dna_def,
             dna_hash,
             test_space,
             keystore,
@@ -402,7 +400,7 @@ impl TestCase {
                 .unwrap(),
             self.test_space.space.dht_db.clone(),
             self.test_space.space.cache_db.clone(),
-            Arc::new(self.dna_def.clone()),
+            self.dna_hash.hash.clone(),
             std::time::Duration::from_secs(10),
         );
 

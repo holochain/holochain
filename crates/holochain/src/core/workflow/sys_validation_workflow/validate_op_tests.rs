@@ -2286,7 +2286,7 @@ async fn crash_case() {
             .boxed()
         });
 
-    let validation_outcome = validate_op(&op, &dna_def, SysValDeps::default())
+    let validation_outcome = validate_op(&op, &dna_def.hash, SysValDeps::default())
         .await
         .unwrap();
 
@@ -2362,7 +2362,7 @@ impl TestCase {
     }
 
     async fn run(&mut self) -> WorkflowResult<Outcome> {
-        let dna_def = self.dna_def_hash();
+        let dna_hash = self.dna_def_hash().hash;
 
         // Swap out the cascade so we can move it into the workflow
         let mut new_cascade = MockCascade::new();
@@ -2385,7 +2385,7 @@ impl TestCase {
 
         validate_op(
             self.op.as_ref().expect("No op set, invalid test case"),
-            &dna_def,
+            &dna_hash,
             self.current_validation_dependencies.clone(),
         )
         .await
