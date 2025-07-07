@@ -718,11 +718,6 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    //
-    // TODO: when we had CellStatus to track whether a cell had joined the network or not,
-    // we would disallow zome calls for cells which had not joined. If we want that behavior,
-    // we can do that check at the time of the zome call, rather than at the time of trying
-    // to access the Cell itself, as it was previously done.
     pub async fn call_zome(
         &self,
         params: ZomeCallParams,

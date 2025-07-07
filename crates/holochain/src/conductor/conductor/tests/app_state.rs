@@ -1,4 +1,3 @@
-use crate::conductor::conductor::CellStatus;
 use crate::sweettest::{SweetConductor, SweetDnaFile};
 use hdk::prelude::{CellId, DnaModifiersOpt, NetworkSeed, RoleName};
 use holochain_types::app::{
@@ -97,7 +96,6 @@ async fn app_operations() {
             *cell_id,
             CellId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone())
         );
-        assert_eq!(cell_item.status, CellStatus::Joined);
         assert_eq!(cell_id, cell_item.cell.id());
     });
 
@@ -137,7 +135,6 @@ async fn app_operations() {
             CellId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone())
         );
         assert_eq!(cell_id, cell_item.cell.id());
-        assert_eq!(cell_item.status, CellStatus::Joined);
     });
 
     // Install another app with 2 DNAs
@@ -219,19 +216,16 @@ async fn app_operations() {
             CellId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone());
         let cell_item = cells.get(&expected_cell_id).unwrap();
         assert_eq!(*cell_item.cell.id(), expected_cell_id);
-        assert_eq!(cell_item.status, CellStatus::Joined);
         // Cell 1 of app 2
         let expected_cell_id =
             CellId::new(dna_files_2[0].dna_hash().clone(), app_2.agent_key.clone());
         let cell_item = cells.get(&expected_cell_id).unwrap();
         assert_eq!(*cell_item.cell.id(), expected_cell_id);
-        assert_eq!(cell_item.status, CellStatus::Joined);
         // Cell 2 of app 2
         let expected_cell_id =
             CellId::new(dna_files_2[1].dna_hash().clone(), app_2.agent_key.clone());
         let cell_item = cells.get(&expected_cell_id).unwrap();
         assert_eq!(*cell_item.cell.id(), expected_cell_id);
-        assert_eq!(cell_item.status, CellStatus::Joined);
     });
 
     // Uninstall app 1
@@ -254,13 +248,11 @@ async fn app_operations() {
             CellId::new(dna_files_2[0].dna_hash().clone(), app_2.agent_key.clone());
         let cell_item = cells.get(&expected_cell_id).unwrap();
         assert_eq!(*cell_item.cell.id(), expected_cell_id);
-        assert_eq!(cell_item.status, CellStatus::Joined);
         // Cell 2 of app 2
         let expected_cell_id =
             CellId::new(dna_files_2[1].dna_hash().clone(), app_2.agent_key.clone());
         let cell_item = cells.get(&expected_cell_id).unwrap();
         assert_eq!(*cell_item.cell.id(), expected_cell_id);
-        assert_eq!(cell_item.status, CellStatus::Joined);
     });
 
     // Uninstall app 2
