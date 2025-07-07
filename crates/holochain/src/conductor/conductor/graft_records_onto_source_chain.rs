@@ -158,7 +158,6 @@ impl Conductor {
             space.cache_db.clone(),
             self.keystore().clone(),
             cell_id.agent_pubkey().clone(),
-            Arc::new(ribosome.dna_def().as_content().clone()),
         )
         .await?;
 
