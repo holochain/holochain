@@ -732,7 +732,7 @@ mod dna_impls {
                         .into_iter()
                         .map(|id| {
                             state
-                                .transition_app_status(&id, AppStatusTransition::Start)
+                                .transition_app_status(&id, AppStatusTransition::Enable)
                                 .map(second)
                         })
                         .collect::<Result<Vec<_>, _>>()?;
@@ -1910,20 +1910,6 @@ mod app_status_impls {
             Ok(app)
         }
 
-        /// Start an app
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-        pub async fn start_app(
-            self: Arc<Self>,
-            app_id: InstalledAppId,
-        ) -> ConductorResult<InstalledApp> {
-            let (app, delta) = self
-                .transition_app_status(app_id.clone(), AppStatusTransition::Start)
-                .await?;
-            self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
-                .await?;
-            Ok(app)
-        }
-
         /// Register an app as disabled in the database
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
         pub(crate) async fn add_disabled_app_to_db(
@@ -2102,7 +2088,7 @@ mod app_status_impls {
                                 Paused(_) => {
                                     // If all required cells are now running, restart the app
                                     if app.required_cells().all(|id| cell_ids.contains(&id)) {
-                                        app.status.transition(Start)
+                                        app.status.transition(Enable)
                                     } else {
                                         AppStatusFx::NoChange
                                     }

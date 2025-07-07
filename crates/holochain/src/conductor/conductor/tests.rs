@@ -865,7 +865,7 @@ async fn test_app_status_states() {
 
     // PAUSED  --start->  RUNNING
 
-    conductor.start_app("app".to_string()).await.unwrap();
+    conductor.enable_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, AppInfoStatus::Running);
 
     // RUNNING  --disable->  DISABLED
@@ -874,11 +874,6 @@ async fn test_app_status_states() {
         .disable_app("app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
-    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
-
-    // DISABLED  --start->  DISABLED
-
-    conductor.start_app("app".to_string()).await.unwrap();
     assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
 
     // DISABLED  --pause->  DISABLED
@@ -961,10 +956,6 @@ async fn test_cell_and_app_status_reconciliation() {
         .disable_app(app_id.clone(), DisabledAppReason::User)
         .await
         .unwrap();
-    assert_eq!(check().await, (Disabled, 0));
-
-    // - Starting a disabled app does nothing
-    conductor.start_app(app_id.clone()).await.unwrap();
     assert_eq!(check().await, (Disabled, 0));
 
     // - ...but enabling one does
