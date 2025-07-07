@@ -321,25 +321,20 @@ impl RealRibosome {
             .map(|(zome_name, def)| {
                 let mut dependencies = Vec::new();
 
-                if integrity_zomes.len() == 1 {
-                    // If there's only one integrity zome we add it to this zome and are done.
-                    dependencies.push(ZomeIndex(0));
-                } else {
-                    // Integrity zomes need to have themselves as a dependency.
-                    if ribosome.dna_def().is_integrity_zome(zome_name) {
-                        // Get the ZomeIndex for this zome.
-                        let id = integrity_zomes.get(zome_name).copied().ok_or_else(|| {
-                            ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
-                        })?;
-                        dependencies.push(id);
-                    }
-                    for name in def.dependencies() {
-                        // Get the ZomeIndex for this dependency.
-                        let id = integrity_zomes.get(name).copied().ok_or_else(|| {
-                            ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
-                        })?;
-                        dependencies.push(id);
-                    }
+                // Integrity zomes need to have themselves as a dependency.
+                if ribosome.dna_def().is_integrity_zome(zome_name) {
+                    // Get the ZomeIndex for this zome.
+                    let id = integrity_zomes.get(zome_name).copied().ok_or_else(|| {
+                        ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
+                    })?;
+                    dependencies.push(id);
+                }
+                for name in def.dependencies() {
+                    // Get the ZomeIndex for this dependency.
+                    let id = integrity_zomes.get(name).copied().ok_or_else(|| {
+                        ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
+                    })?;
+                    dependencies.push(id);
                 }
 
                 Ok((zome_name.clone(), dependencies))
