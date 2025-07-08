@@ -29,8 +29,10 @@ pub mod sql_cell {
             include_str!("sql/cell/agent_activity/must_get_agent_activity.sql");
         pub const ACTION_HASH_TO_SEQ: &str =
             include_str!("sql/cell/agent_activity/action_hash_to_seq.sql");
-        pub const ACTION_TS_TO_SEQ: &str =
-            include_str!("sql/cell/agent_activity/action_ts_to_seq.sql");
+        pub const TS_TO_SEQ: &str =
+            include_str!("sql/cell/agent_activity/ts_to_seq.sql");
+        pub const SEQ_TO_TS: &str =
+            include_str!("sql/cell/agent_activity/seq_to_ts.sql");
     }
 
     pub mod schedule {

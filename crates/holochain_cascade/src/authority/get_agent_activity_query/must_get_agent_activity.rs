@@ -107,24 +107,37 @@ fn find_bounds(
         Ok(result)
     };
 
-    // Map a timestamp to its sequence.
-    let mut by_ts_statement = txn.prepare(ACTION_TS_TO_SEQ)?;
-    let get_seq_from_ts = |ts: Timestamp| {
-        if let Some(scratch) = scratch {
-            if let Some(action) = scratch.actions().find(|a| a.get_timestamp() == ts) {
-                return Ok(Some(action.action().action_seq()));
-            }
-        }
+    // Get the oldest action in a given time period.
+    let mut by_ts_statement = txn.prepare(TS_TO_SEQ)?;
+    let get_seq_from_ts = |from: Timestamp, to: Timestamp| {
         let result = by_ts_statement
-          .query_row(named_params! {":authored_timestamp": ts.as_micros(), ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
+          .query_row(named_params! {":from": from.as_micros(), ":to": to.as_micros(), ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
               row.get(0)
           })
           .optional()?;
         Ok(result)
     };
 
+    // Get timestamp from a sequence.
+    let mut from_seq_statement = txn.prepare(SEQ_TO_TS)?;
+    let get_ts_from_seq = |seq: u32| {
+        // Search in scratch first
+        if let Some(scratch) = scratch {
+            if let Some(action) = scratch.actions().find(|a| a.seq() == seq) {
+                return Ok(Some(action.action().timestamp()));
+            }
+        }
+        // Search in database
+        let result = from_seq_statement
+            .query_row(named_params! {":seq": seq, ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
+                row.get(0)
+            })
+            .optional()?;
+        Ok(result)
+    };
+
     // For all the hashes in the filter, get their sequences.
-    Sequences::find_sequences(filter, get_seq_from_hash, get_seq_from_ts)
+    Sequences::find_sequences(filter, get_seq_from_hash, get_seq_from_ts, get_ts_from_seq)
 }
 
 /// Get the agent activity for a given range of actions

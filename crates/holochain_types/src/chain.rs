@@ -362,19 +362,21 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
 
 impl Sequences {
     /// Find the action sequences for all hashes in the filter.
-    pub fn find_sequences<F, F2, E>(
+    pub fn find_sequences<F, F2, F3, E>(
         filter: ChainFilter,
-        mut get_seq_for_hash: F,
-        mut get_seq_for_ts: F2,
+        mut get_seq_from_hash: F,
+        mut get_seq_from_ts: F2,
+        mut get_ts_from_seq: F3,
     ) -> Result<Self, E>
     where
-        F: FnMut(&ActionHash) -> Result<Option<u32>, E>,
-        F2: FnMut(Timestamp) -> Result<Option<u32>, E>,
+         F: FnMut(&ActionHash) -> Result<Option<u32>, E>,
+        F2: FnMut(Timestamp, Timestamp) -> Result<Option<u32>, E>,
+        F3: FnMut(u32) -> Result<Option<Timestamp>, E>,
     {
         // Get the top of the chain action sequence.
         // This is the highest sequence number and also the
         // start of the iterator.
-        let chain_top = match get_seq_for_hash(&filter.chain_top)? {
+        let chain_top = match get_seq_from_hash(&filter.chain_top)? {
             Some(seq) => seq,
             None => return Ok(Self::ChainTopNotFound(filter.chain_top)),
         };
@@ -391,7 +393,7 @@ impl Sequences {
                 let max = until_hashes
                     .iter()
                     .filter_map(|hash| {
-                        match get_seq_for_hash(hash) {
+                        match get_seq_from_hash(hash) {
                             Ok(seq) => {
                                 // Ignore any until hashes that could not be found.
                                 let seq = seq?;
@@ -423,16 +425,16 @@ impl Sequences {
 
         // Check if there is an until timestamp condition in the filter
         // and get the distance from the position.
-        if let Some(ts) = filter.get_until_timestamp() {
+        if let Some(from) = filter.get_until_timestamp() {
             let mut ts_distance = u32::MAX;
             // A timestamp of zero will produce an empty range.
-            if ts.0 != 0 {
-                let seq = get_seq_for_ts(ts)?;
-                // Ignore any until timestamp that could not be found.
-                if let Some(s) = seq {
-                    // Ignore any until timestamp that are higher than the chain top.
-                    if s <= chain_top {
-                        ts_distance = chain_top - s;
+            if from.0 != 0 {
+                // get chain-top timestamp
+                let maybe_to = get_ts_from_seq(chain_top)?;
+                if let Some(to) = maybe_to {
+                    let maybe_seq = get_seq_from_ts(from, to)?;
+                    if let Some(seq) = maybe_seq {
+                        ts_distance = chain_top - seq;
                     }
                 }
             }
