@@ -265,7 +265,6 @@ async fn sys_validation_workflow_inner(
     tracing::debug!("Sys validating {} ops", num_ops_to_validate);
 
     let cascade = Arc::new(workspace.local_cascade());
-    let dna_def = DnaDefHashed::from_content_sync((*workspace.dna_def()).clone());
 
     retrieve_previous_actions_for_ops(
         current_validation_dependencies.clone(),
@@ -286,7 +285,7 @@ async fn sys_validation_workflow_inner(
         // In most cases this will be a fast synchronous call.
         let r = validate_op(
             hashed_op.as_content(),
-            &dna_def,
+            &workspace.dna_hash,
             current_validation_dependencies.clone(),
         )
         .await;
@@ -609,12 +608,12 @@ async fn retrieve_previous_actions_for_ops(
 /// Validate a single DhtOp, using the supplied Cascade to draw dependencies from
 pub(crate) async fn validate_op(
     op: &DhtOp,
-    dna_def: &DnaDefHashed,
+    dna_hash: &DnaHash,
     validation_dependencies: SysValDeps,
 ) -> WorkflowResult<Outcome> {
     let result = match op {
-        DhtOp::ChainOp(op) => validate_chain_op(op, dna_def, validation_dependencies).await,
-        DhtOp::WarrantOp(op) => validate_warrant_op(op, dna_def, validation_dependencies).await,
+        DhtOp::ChainOp(op) => validate_chain_op(op, dna_hash, validation_dependencies).await,
+        DhtOp::WarrantOp(op) => validate_warrant_op(op, validation_dependencies).await,
     };
     match result {
         Ok(_) => Ok(Outcome::Accepted),
@@ -667,7 +666,7 @@ fn make_action_set_for_session_data(
 
 async fn validate_chain_op(
     op: &ChainOp,
-    dna_def: &DnaDefHashed,
+    dna_hash: &DnaHash,
     validation_dependencies: SysValDeps,
 ) -> SysValidationResult<()> {
     check_entry_visibility(op)?;
@@ -727,7 +726,7 @@ async fn validate_chain_op(
             store_entry(action.into(), entry, validation_dependencies.clone()).await
         }
         ChainOp::RegisterAgentActivity(_, action) => {
-            register_agent_activity(action, validation_dependencies.clone(), dna_def)?;
+            register_agent_activity(action, validation_dependencies.clone(), dna_hash)?;
             store_record(action, validation_dependencies)
         }
         ChainOp::RegisterUpdatedContent(_, action, entry) => {
@@ -771,7 +770,6 @@ async fn validate_chain_op(
 
 async fn validate_warrant_op(
     op: &WarrantOp,
-    _dna_def: &DnaDefHashed,
     validation_dependencies: SysValDeps,
 ) -> SysValidationResult<()> {
     match &op.proof {
@@ -974,14 +972,14 @@ pub async fn counterfeit_check_warrant(warrant_op: &WarrantOp) -> SysValidationR
 fn register_agent_activity(
     action: &Action,
     validation_dependencies: SysValDeps,
-    dna_def: &DnaDefHashed,
+    dna_hash: &DnaHash,
 ) -> SysValidationResult<()> {
     // Get data ready to validate
     let prev_action_hash = action.prev_action();
 
     // Checks
     check_prev_action(action)?;
-    check_valid_if_dna(action, dna_def)?;
+    check_valid_if_dna(action, dna_hash)?;
     if let Some(prev_action_hash) = prev_action_hash {
         // Just make sure we have the dependency and if not then don't mark this action as valid yet
         let validation_dependencies = validation_dependencies.same_dht.lock();
@@ -1170,7 +1168,7 @@ pub struct SysValidationWorkspace {
     authored_db: DbWrite<DbKindAuthored>,
     dht_db: DbWrite<DbKindDht>,
     cache: DbWrite<DbKindCache>,
-    pub(crate) dna_def: Arc<DnaDef>,
+    dna_hash: DnaHash,
     sys_validation_retry_delay: Duration,
 }
 
@@ -1179,7 +1177,7 @@ impl SysValidationWorkspace {
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
-        dna_def: Arc<DnaDef>,
+        dna_hash: DnaHash,
         sys_validation_retry_delay: Duration,
     ) -> Self {
         Self {
@@ -1187,7 +1185,7 @@ impl SysValidationWorkspace {
             authored_db,
             dht_db,
             cache,
-            dna_def,
+            dna_hash,
             sys_validation_retry_delay,
         }
     }
@@ -1207,16 +1205,6 @@ impl SysValidationWorkspace {
 
     pub fn network_and_cache_cascade(&self, network: DynHolochainP2pDna) -> CascadeImpl {
         CascadeImpl::empty().with_network(network, self.cache.clone())
-    }
-
-    /// Get a reference to the sys validation workspace's dna def.
-    pub fn dna_def(&self) -> Arc<DnaDef> {
-        self.dna_def.clone()
-    }
-
-    /// Get a reference to the sys validation workspace's dna def.
-    pub fn dna_def_hashed(&self) -> DnaDefHashed {
-        DnaDefHashed::from_content_sync((*self.dna_def).clone())
     }
 }
 

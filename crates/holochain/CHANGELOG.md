@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Test app operations (install/enable/disable/uninstall) with regards to app state and cell state.
 - **BREAKING CHANGE**: Remove `start_app` from conductor. Use `enable_app` instead.
 - Remove unused field `dna_def` the `HostFnWorkspace` struct ([#5102](https://github.com/holochain/holochain/pull/5102))
+- Replace the `dna_def` field of the `SysValidationWorkspace` with a `dna_hash` field.
 
 ## 0.6.0-dev.11
 

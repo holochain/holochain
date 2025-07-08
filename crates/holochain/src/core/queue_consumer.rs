@@ -144,10 +144,6 @@ pub async fn spawn_queue_consumer_tasks(
         )
     });
 
-    let dna_def = conductor
-        .get_dna_def(&dna_hash)
-        .expect("Dna must be in store");
-
     // Sys validation
     // One per space.
     let tx_sys = queue_consumer_map.spawn_once_sys_validation(dna_hash.clone(), || {
@@ -156,7 +152,7 @@ pub async fn spawn_queue_consumer_tasks(
                 authored_db.clone(),
                 dht_db.clone(),
                 cache.clone(),
-                Arc::new(dna_def),
+                cell_id.dna_hash().clone(),
                 conductor
                     .get_config()
                     .conductor_tuning_params()
