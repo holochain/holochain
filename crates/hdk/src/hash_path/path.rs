@@ -67,7 +67,7 @@ impl HdkPathExt for TypedPath {
 
     fn children_details(&self) -> ExternResult<holochain_zome_types::link::LinkDetails> {
         Self::ensure(self)?;
-        get_link_details(
+        get_links_details(
             LinkQuery::new(
                 self.path_entry_hash()?,
                 LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),

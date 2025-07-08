@@ -31,7 +31,7 @@ async fn links_not_authority() {
     assert_eq!(r, td.links);
 
     let r = cascade
-        .get_link_details(td.link_key_tag.clone(), Default::default())
+        .get_links_details(td.link_key_tag.clone(), Default::default())
         .await
         .unwrap();
 
@@ -47,7 +47,7 @@ async fn links_not_authority() {
     assert!(r.is_empty());
 
     let r = cascade
-        .get_link_details(td.link_key_tag.clone(), Default::default())
+        .get_links_details(td.link_key_tag.clone(), Default::default())
         .await
         .unwrap();
 

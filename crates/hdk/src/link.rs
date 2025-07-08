@@ -33,7 +33,7 @@ pub use hdi::link::*;
 /// - only reference other entries of the same entry type (e.g. comments can _not_ update posts)
 ///
 /// See [ `get_details` ] and get for more information about CRUD
-/// See [ `get_links` ] and [ `get_link_details` ] for more information about filtering by tag
+/// See [ `get_links` ] and [ `get_links_details` ] for more information about filtering by tag
 ///
 /// Generally links and CRUDs _do not interact_ beyond the fact that links need hashes to
 /// reference for the base and target to already exist due to a prior create or update.
@@ -140,13 +140,13 @@ pub fn delete_link(address: ActionHash, get_options: GetOptions) -> ExternResult
 ///   - `[ 1, 2, 3 ]` returns `[ a ]`
 ///   - `[ 5 ]` returns `[ ]` (does _not_ return c because the filter is by "prefix", not "contains")
 ///
-/// This is mostly identical to [`get_link_details`] but returns only creates that have not been
-/// deleted, whereas `get_link_details` returns all the creates and all the deletes together.
+/// This is mostly identical to [`get_links_details`] but returns only creates that have not been
+/// deleted, whereas `get_links_details` returns all the creates and all the deletes together.
 /// Also note that, unlike when [`get`] is used to retrieve an entry, links that
 /// only differ by author and creation time are not deduplicated; hence, you may receive multiple
 /// links with the same base, tag, and target.
 ///
-/// See [`get_link_details`].
+/// See [`get_links_details`].
 pub fn get_links(query: LinkQuery, strategy: GetStrategy) -> ExternResult<Vec<Link>> {
     Ok(HDK
         .with(|h| {
@@ -183,17 +183,18 @@ pub fn get_links(query: LinkQuery, strategy: GetStrategy) -> ExternResult<Vec<Li
 /// c.f. [`get_links`] that returns only the creates that have not been deleted.
 ///
 /// See [`get_links`].
-pub fn get_link_details(query: LinkQuery, strategy: GetStrategy) -> ExternResult<LinkDetails> {
+pub fn get_links_details(query: LinkQuery, strategy: GetStrategy) -> ExternResult<LinkDetails> {
     Ok(HDK
         .with(|h| {
             h.borrow()
-                .get_link_details(vec![GetLinksInput::from_query(query, strategy)])
+                .get_links_details(vec![GetLinksInput::from_query(query, strategy)])
         })?
         .into_iter()
         .next()
         .unwrap())
 }
 
+/// Count the number of links that matches the filter criteria provided in the [`LinkQuery`].
 pub fn count_links(query: LinkQuery) -> ExternResult<usize> {
     HDK.with(|h| h.borrow().count_links(query))
 }

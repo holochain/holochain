@@ -45,8 +45,8 @@ use crate::core::ribosome::host_fn::ed_25519_x_salsa20_poly1305_encrypt::ed_2551
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
-use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
+use crate::core::ribosome::host_fn::get_links_details::get_links_details;
 use crate::core::ribosome::host_fn::hash::hash;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
 use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
@@ -584,7 +584,7 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__get_1", get)
             .with_host_function(&mut ns, "__hc__get_details_1", get_details)
             .with_host_function(&mut ns, "__hc__get_links_1", get_links)
-            .with_host_function(&mut ns, "__hc__get_link_details_1", get_link_details)
+            .with_host_function(&mut ns, "__hc__get_links_details_1", get_links_details)
             .with_host_function(&mut ns, "__hc__count_links_1", count_links)
             .with_host_function(&mut ns, "__hc__get_agent_activity_1", get_agent_activity)
             .with_host_function(&mut ns, "__hc__must_get_entry_1", must_get_entry)
@@ -1338,7 +1338,7 @@ pub mod wasm_test {
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
                 "__hc__get_details_1",
-                "__hc__get_link_details_1",
+                "__hc__get_links_details_1",
                 "__hc__get_links_1",
                 "__hc__get_validation_receipts_1",
                 "__hc__hash_1",

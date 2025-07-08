@@ -806,7 +806,7 @@ impl CascadeImpl {
 
     /// Return all CreateLink actions and DeleteLink actions ordered by time.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, key, options)))]
-    pub async fn get_link_details(
+    pub async fn get_links_details(
         &self,
         key: WireLinkKey,
         options: GetLinksOptions,

@@ -10,7 +10,7 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-pub fn get_link_details(
+pub fn get_links_details(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
@@ -43,7 +43,7 @@ pub fn get_link_details(
                             &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         )
-                        .get_link_details(
+                        .get_links_details(
                             key,
                             GetLinksOptions {
                                 get_options,
@@ -69,7 +69,7 @@ pub fn get_link_details(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
-                "get_link_details".into(),
+                "get_links_details".into(),
             )
             .to_string(),
         ))

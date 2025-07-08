@@ -10,6 +10,7 @@ use holo_hash::HasHash;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
 use holochain_integrity_types::{LinkTag, LinkTypeFilter};
 pub use holochain_serialized_bytes::prelude::*;
+use holochain_wasmer_common::WasmError;
 
 /// Defines several ways that queries can be restricted to a range.
 /// Notably hash bounded ranges disambiguate forks whereas sequence indexes do
@@ -380,6 +381,24 @@ impl LinkQuery {
             after: None,
             author: None,
         }
+    }
+
+    /// Create a new [`LinkQuery`] for a base and a type which tries to convert the type into a [`LinkTypeFilter`].
+    pub fn try_new<LinkTypeFilterExt>(
+        base: impl Into<AnyLinkableHash>,
+        link_type: LinkTypeFilterExt,
+    ) -> Result<Self, WasmError>
+    where
+        LinkTypeFilterExt: TryInto<LinkTypeFilter, Error = WasmError>,
+    {
+        Ok(LinkQuery {
+            base: base.into(),
+            link_type: link_type.try_into()?,
+            tag_prefix: None,
+            before: None,
+            after: None,
+            author: None,
+        })
     }
 
     /// Filter by tag prefix.

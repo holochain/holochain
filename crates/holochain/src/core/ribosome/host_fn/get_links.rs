@@ -309,7 +309,7 @@ pub mod slow_tests {
         assert_eq!(links_bidi, vec![forward_links.clone(), back_links.clone()]);
 
         let forward_link_details: LinkDetails =
-            conductor.call(&alice, "get_link_details", ()).await;
+            conductor.call(&alice, "get_links_details", ()).await;
         let back_link_details: LinkDetails =
             conductor.call(&alice, "get_back_link_details", ()).await;
         let link_details_bidi: Vec<LinkDetails> =
