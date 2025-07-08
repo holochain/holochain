@@ -47,7 +47,7 @@ pub enum LimitConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
     UntilHash(HashSet<H>),
     /// Combination of Take, UntilTimestamp and UntilHash.
     /// Whichever is the smaller set.
-    Multiple(u32, HashSet<H>, Timestamp),
+    Multiple(Option<u32>, HashSet<H>, Option<Timestamp>),
 }
 
 /// Create a deterministic hash to compare [LimitConditions].
@@ -122,14 +122,18 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     }
 
     /// Take up to `n` actions including the starting position.
-    /// This may return less then `n` actions.
+    /// This may return less than `n` actions.
     pub fn take(mut self, n: u32) -> Self {
         self.limit_conditions = match self.limit_conditions {
             LimitConditions::ToGenesis => LimitConditions::Take(n),
             LimitConditions::Take(old_n) => LimitConditions::Take(old_n.min(n)),
-            LimitConditions::UntilTimestamp(t) => LimitConditions::Multiple(n, HashSet::new(), t),
-            LimitConditions::UntilHash(u) => LimitConditions::Multiple(n, u, Timestamp(0)),
-            LimitConditions::Multiple(old_n, u, t) => LimitConditions::Multiple(old_n.min(n), u, t),
+            LimitConditions::UntilTimestamp(t) => {
+                LimitConditions::Multiple(Some(n), HashSet::new(), Some(t))
+            }
+            LimitConditions::UntilHash(u) => LimitConditions::Multiple(Some(n), u, None),
+            LimitConditions::Multiple(old_n, u, t) => {
+                LimitConditions::Multiple(Some(old_n.unwrap_or(u32::MAX).min(n)), u, t)
+            }
         };
         self
     }
@@ -145,12 +149,16 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     pub fn until_timestamp(mut self, timestamp: Timestamp) -> Self {
         self.limit_conditions = match self.limit_conditions {
             LimitConditions::ToGenesis => LimitConditions::UntilTimestamp(timestamp),
-            LimitConditions::Take(n) => LimitConditions::Multiple(n, HashSet::new(), timestamp),
+            LimitConditions::Take(n) => {
+                LimitConditions::Multiple(Some(n), HashSet::new(), Some(timestamp))
+            }
             LimitConditions::UntilTimestamp(old_ts) => {
                 LimitConditions::UntilTimestamp(timestamp.max(old_ts))
             }
-            LimitConditions::UntilHash(u) => LimitConditions::Multiple(u32::MAX, u, timestamp),
-            LimitConditions::Multiple(n, u, _) => LimitConditions::Multiple(n, u, timestamp),
+            LimitConditions::UntilHash(u) => LimitConditions::Multiple(None, u, Some(timestamp)),
+            LimitConditions::Multiple(n, u, old_ts) => {
+                LimitConditions::Multiple(n, u, Some(old_ts.unwrap_or(Timestamp(0)).max(timestamp)))
+            }
         };
         self
     }
@@ -166,10 +174,10 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
                 LimitConditions::UntilHash(Some(action_hash).into_iter().collect())
             }
             LimitConditions::Take(n) => {
-                LimitConditions::Multiple(n, Some(action_hash).into_iter().collect(), Timestamp(0))
+                LimitConditions::Multiple(Some(n), Some(action_hash).into_iter().collect(), None)
             }
             LimitConditions::UntilTimestamp(t) => {
-                LimitConditions::Multiple(u32::MAX, Some(action_hash).into_iter().collect(), t)
+                LimitConditions::Multiple(None, Some(action_hash).into_iter().collect(), Some(t))
             }
             LimitConditions::UntilHash(mut u) => {
                 u.insert(action_hash);
@@ -194,30 +202,18 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
 
     /// Get the take number if there is one.
     pub fn get_take(&self) -> Option<u32> {
-        match &self.limit_conditions {
-            LimitConditions::Take(n) => Some(*n),
-            LimitConditions::Multiple(n, _, _) => {
-                if *n != u32::MAX {
-                    Some(*n)
-                } else {
-                    None
-                }
-            }
+        match self.limit_conditions {
+            LimitConditions::Take(n) => Some(n),
+            LimitConditions::Multiple(n, _, _) => n,
             _ => None,
         }
     }
 
     /// Get the take number if there is one.
     pub fn get_until_timestamp(&self) -> Option<Timestamp> {
-        match &self.limit_conditions {
-            LimitConditions::UntilTimestamp(ts) => Some(*ts),
-            LimitConditions::Multiple(_, _, ts) => {
-                if ts.0 > 0 {
-                    Some(*ts)
-                } else {
-                    None
-                }
-            }
+        match self.limit_conditions {
+            LimitConditions::UntilTimestamp(ts) => Some(ts),
+            LimitConditions::Multiple(_, _, ts) => ts,
             _ => None,
         }
     }

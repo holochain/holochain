@@ -342,17 +342,21 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
             // Just keep going till genesis.
             LimitConditions::ToGenesis => (),
             // Both filters are active. Return on the first to be hit.
-            LimitConditions::Multiple(n, until_hashes, ts) => {
-                *n = n.checked_sub(1)?;
+            LimitConditions::Multiple(maybe_n, until_hashes, maybe_ts) => {
+                if let Some(n) = maybe_n {
+                    *n = n.checked_sub(1)?;
+                }
 
                 if until_hashes.contains(op.as_ref().get_hash()) {
                     self.end = true;
                 }
 
-                if op.as_ref().get_timestamp() < *ts {
-                    // Timestamp passed, don't return item.
-                    self.end = true;
-                    return None;
+                if let Some(ts) = maybe_ts {
+                    if op.as_ref().get_timestamp() < *ts {
+                        // Timestamp passed, don't return item.
+                        self.end = true;
+                        return None;
+                    }
                 }
             }
         }
