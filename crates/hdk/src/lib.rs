@@ -527,7 +527,7 @@ pub mod info;
 /// - Many links can point from/to the same hash
 /// - Links reference entry hashes not actions
 ///
-/// Links are retrived from the DHT by performing [ `link::get_links` ] or [ `link::get_link_details` ] against the _base_ of a link.
+/// Links are retrived from the DHT by performing [ `link::get_links` ] or [ `link::get_links_details` ] against the _base_ of a link.
 ///
 /// Links also support short (about 500 bytes) binary data to encode contextual data on a domain specific basis.
 ///
