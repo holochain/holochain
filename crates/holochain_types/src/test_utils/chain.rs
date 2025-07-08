@@ -75,7 +75,17 @@ impl TestChainItem {
         Self {
             seq,
             hash: TestChainHash(seq),
-            timestamp: Timestamp(seq.into()),
+            timestamp: Timestamp::from_micros((seq * 1000).into()),
+            prev: seq.checked_sub(1).map(TestChainHash),
+        }
+    }
+
+    /// Constructor for happy-path chains with no forking
+    pub fn with_ts(seq: u32, us: i64) -> Self {
+        Self {
+            seq,
+            hash: TestChainHash(seq),
+            timestamp: Timestamp::from_micros(us),
             prev: seq.checked_sub(1).map(TestChainHash),
         }
     }
@@ -164,10 +174,23 @@ pub fn agent_chain(ranges: &[(u8, Range<u32>)]) -> Vec<(AgentPubKey, Vec<TestCha
         .collect()
 }
 
+/// Create a doubled chain per agent
+pub fn agent_chain_doubled(ranges: &[(u8, Range<u32>)]) -> Vec<(AgentPubKey, Vec<TestChainItem>)> {
+    ranges
+        .iter()
+        .map(|(a, range)| (agent_hash(&[*a]), doubled_chain(range.clone())))
+        .collect()
+}
+
 /// Create a chain from a range where the first chain items
 /// previous hash == that items hash.
 pub fn chain(range: Range<u32>) -> Vec<TestChainItem> {
     range.map(TestChainItem::new).rev().collect()
+}
+
+/// Same as chain() but timestamp only increments every two items
+pub fn doubled_chain(range: Range<u32>) -> Vec<TestChainItem> {
+    range.map(|i|TestChainItem::with_ts(i, i as i64 / 2 * 1000)).rev().collect()
 }
 
 /// Create a set of chains with forks where the first range
@@ -186,7 +209,7 @@ pub fn forked_chain(ranges: &[Range<u8>]) -> Vec<TestChainItem> {
                     TestChainItem {
                         seq: n as u32,
                         hash: TestChainHash::forked(n, i as u8),
-                        timestamp: Timestamp(n.into()),
+                        timestamp: Timestamp(n as i64 * 1000),
                         prev,
                     }
                 } else {
@@ -196,7 +219,7 @@ pub fn forked_chain(ranges: &[Range<u8>]) -> Vec<TestChainItem> {
                     TestChainItem {
                         seq: n as u32,
                         hash: TestChainHash::forked(n, i as u8),
-                        timestamp: Timestamp(n.into()),
+                        timestamp: Timestamp(n as i64 * 1000),
                         prev,
                     }
                 }

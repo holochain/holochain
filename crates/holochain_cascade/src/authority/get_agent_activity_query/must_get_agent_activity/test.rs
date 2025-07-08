@@ -22,23 +22,43 @@ use test_case::test_case;
     => agent_chain(&[(0, 2..9)]) ; "Until 2")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2))
-    => agent_chain(&[(0, 2..9)]) ; "Until timestamp 2")]
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2000))
+    => agent_chain(&[(0, 2..9)]) ; "Until timestamp 2000")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(1999))
+    => agent_chain(&[(0, 2..9)]) ; "Until timestamp 1999")]
+#[test_case(
+    agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2001))
+    => agent_chain(&[(0, 3..9)]) ; "Until timestamp 2001")]
+#[test_case(
+    agent_chain_doubled(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2000))
+    => agent_chain(&[(0, 4..9)]) ; "Until timestamp 2000 doubled")]
+#[test_case(
+    agent_chain_doubled(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(1999))
+    => agent_chain(&[(0, 4..9)]) ; "Until timestamp 1999 doubled")]
+#[test_case(
+    agent_chain_doubled(&[(0, 0..10)]), agent_hash(&[0]),
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2001))
+    => agent_chain(&[(0, 6..9)]) ; "Until timestamp 2001 doubled")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
     ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[2])).until_hash(action_hash(&[4]))
     => agent_chain(&[(0, 4..9)]) ; "Until 2 Until 4")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2)).until_timestamp(Timestamp::from_micros(4))
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2000)).until_timestamp(Timestamp::from_micros(4000))
     => agent_chain(&[(0, 4..9)]) ; "Until timestamp 2 Until timestamp 4")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2)).until_hash(action_hash(&[4]))
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2000)).until_hash(action_hash(&[4]))
     => agent_chain(&[(0, 4..9)]) ; "Until timestamp 2 Until 4")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[2])).until_timestamp(Timestamp::from_micros(4))
+    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[2])).until_timestamp(Timestamp::from_micros(4000))
     => agent_chain(&[(0, 4..9)]) ; "Until 2 Until timestamp 4")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
@@ -46,7 +66,7 @@ use test_case::test_case;
     => agent_chain(&[(0, 6..9)]) ; "Until 2 Until 4 take 3")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2)).until_timestamp(Timestamp::from_micros(4)).take(3)
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(2000)).until_timestamp(Timestamp::from_micros(4000)).take(3)
     => agent_chain(&[(0, 6..9)]) ; "Until timestamp 2 Until timestamp 4 take 3")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
@@ -58,15 +78,15 @@ use test_case::test_case;
     => agent_chain(&[(0, 8..9)]) ; "Until 8 Until 4 take 3")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(8)).until_hash(action_hash(&[4])).take(3)
+    ChainFilter::new(action_hash(&[8])).until_timestamp(Timestamp::from_micros(8000)).until_hash(action_hash(&[4])).take(3)
     => agent_chain(&[(0, 8..9)]) ; "Until timestamp 8 Until 4 take 3")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[8])).until_timestamp(Timestamp::from_micros(4)).take(3)
+    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[8])).until_timestamp(Timestamp::from_micros(4000)).take(3)
     => agent_chain(&[(0, 8..9)]) ; "Until 8 Until timestamp 4 take 3")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
-    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[3])).until_timestamp(Timestamp::from_micros(4)).take(8)
+    ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[3])).until_timestamp(Timestamp::from_micros(4000)).take(8)
     => agent_chain(&[(0, 4..9)]) ; "Until 3 Until timestamp 4 take 8")]
 #[tokio::test(flavor = "multi_thread")]
 /// Extracts the smallest range from the chain filter
@@ -92,7 +112,7 @@ async fn returns_full_sequence_from_filter(
                      cached_entry: _,
                  }| TestChainItem {
                     seq: a.hashed.action_seq(),
-                    timestamp: Timestamp(a.hashed.action_seq().into()),
+                    timestamp: Timestamp(a.hashed.action_seq() as i64 * 1000),
                     hash: TestChainHash::test(a.as_hash()),
                     prev: a.hashed.prev_action().map(TestChainHash::test),
                 },
