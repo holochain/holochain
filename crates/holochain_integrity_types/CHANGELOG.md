@@ -7,8 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- **BREAKING**: Renamed enum `ChainFilters` to `StopConditions` and renamed some of its variants.
-- Adds `UntilTimestamp` variant to `ChainFilters`
+- **BREAKING**: Rename enum `ChainFilters` to `LimitConditions` and rename some of its variants.
+- Add `UntilTimestamp` variant to `LimitConditions`
  
 ## 0.6.0-dev.7
 

@@ -27,8 +27,8 @@ pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// The starting position of the filter.
     pub chain_top: H,
     /// The stop conditions used by this filter.
-    /// Defaults to [`StopConditions::ToGenesis`].
-    pub stop_conditions: StopConditions<H>,
+    /// Defaults to [`LimitConditions::ToGenesis`].
+    pub limit_conditions: LimitConditions<H>,
     /// Should the query return any entries that are
     /// cached at the agent activity to save network hops.
     pub include_cached_entries: bool,
@@ -36,7 +36,7 @@ pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
 
 #[derive(Serialize, Deserialize, Debug, Eq, Clone)]
 /// Specify when to stop walking down the chain.
-pub enum StopConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
+pub enum LimitConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// Allow all up to genesis.
     ToGenesis,
     /// Take this many items (inclusive of the starting position).
@@ -50,20 +50,20 @@ pub enum StopConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
     Multiple(u32, HashSet<H>, Timestamp),
 }
 
-/// Create a deterministic hash to compare StopConditions.
-impl<H: Eq + Ord + std::hash::Hash> core::hash::Hash for StopConditions<H> {
+/// Create a deterministic hash to compare [LimitConditions].
+impl<H: Eq + Ord + std::hash::Hash> core::hash::Hash for LimitConditions<H> {
     fn hash<HH: std::hash::Hasher>(&self, state: &mut HH) {
         core::mem::discriminant(self).hash(state);
         match self {
-            StopConditions::ToGenesis => (),
-            StopConditions::Take(t) => t.hash(state),
-            StopConditions::UntilTimestamp(ts) => ts.hash(state),
-            StopConditions::UntilHash(u) => {
+            LimitConditions::ToGenesis => (),
+            LimitConditions::Take(t) => t.hash(state),
+            LimitConditions::UntilTimestamp(ts) => ts.hash(state),
+            LimitConditions::UntilHash(u) => {
                 let mut u: Vec<_> = u.iter().collect();
                 u.sort_unstable();
                 u.hash(state);
             }
-            StopConditions::Multiple(n, u, t) => {
+            LimitConditions::Multiple(n, u, t) => {
                 let mut u: Vec<_> = u.iter().collect();
                 u.sort_unstable();
                 u.hash(state);
@@ -74,8 +74,8 @@ impl<H: Eq + Ord + std::hash::Hash> core::hash::Hash for StopConditions<H> {
     }
 }
 
-/// Implement a deterministic partial eq to compare StopConditions.
-impl<H: Eq + Ord + std::hash::Hash> core::cmp::PartialEq for StopConditions<H> {
+/// Implement a deterministic partial eq to compare [LimitConditions].
+impl<H: Eq + Ord + std::hash::Hash> core::cmp::PartialEq for LimitConditions<H> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Take(l0), Self::Take(r0)) => l0 == r0,
@@ -116,7 +116,7 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     pub fn new(chain_top: H) -> Self {
         Self {
             chain_top,
-            stop_conditions: Default::default(),
+            limit_conditions: Default::default(),
             include_cached_entries: false,
         }
     }
@@ -124,12 +124,12 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     /// Take up to `n` actions including the starting position.
     /// This may return less then `n` actions.
     pub fn take(mut self, n: u32) -> Self {
-        self.stop_conditions = match self.stop_conditions {
-            StopConditions::ToGenesis => StopConditions::Take(n),
-            StopConditions::Take(old_n) => StopConditions::Take(old_n.min(n)),
-            StopConditions::UntilTimestamp(t) => StopConditions::Multiple(n, HashSet::new(), t),
-            StopConditions::UntilHash(u) => StopConditions::Multiple(n, u, Timestamp(0)),
-            StopConditions::Multiple(old_n, u, t) => StopConditions::Multiple(old_n.min(n), u, t),
+        self.limit_conditions = match self.limit_conditions {
+            LimitConditions::ToGenesis => LimitConditions::Take(n),
+            LimitConditions::Take(old_n) => LimitConditions::Take(old_n.min(n)),
+            LimitConditions::UntilTimestamp(t) => LimitConditions::Multiple(n, HashSet::new(), t),
+            LimitConditions::UntilHash(u) => LimitConditions::Multiple(n, u, Timestamp(0)),
+            LimitConditions::Multiple(old_n, u, t) => LimitConditions::Multiple(old_n.min(n), u, t),
         };
         self
     }
@@ -143,14 +143,14 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
 
     /// Take all actions until this timestamp is passed.
     pub fn until_timestamp(mut self, timestamp: Timestamp) -> Self {
-        self.stop_conditions = match self.stop_conditions {
-            StopConditions::ToGenesis => StopConditions::UntilTimestamp(timestamp),
-            StopConditions::Take(n) => StopConditions::Multiple(n, HashSet::new(), timestamp),
-            StopConditions::UntilTimestamp(old_ts) => {
-                StopConditions::UntilTimestamp(timestamp.max(old_ts))
+        self.limit_conditions = match self.limit_conditions {
+            LimitConditions::ToGenesis => LimitConditions::UntilTimestamp(timestamp),
+            LimitConditions::Take(n) => LimitConditions::Multiple(n, HashSet::new(), timestamp),
+            LimitConditions::UntilTimestamp(old_ts) => {
+                LimitConditions::UntilTimestamp(timestamp.max(old_ts))
             }
-            StopConditions::UntilHash(u) => StopConditions::Multiple(u32::MAX, u, timestamp),
-            StopConditions::Multiple(n, u, _) => StopConditions::Multiple(n, u, timestamp),
+            LimitConditions::UntilHash(u) => LimitConditions::Multiple(u32::MAX, u, timestamp),
+            LimitConditions::Multiple(n, u, _) => LimitConditions::Multiple(n, u, timestamp),
         };
         self
     }
@@ -161,23 +161,23 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     /// It is invalid to specify an until hash that is on a different
     /// fork then the starting position.
     pub fn until_hash(mut self, action_hash: H) -> Self {
-        self.stop_conditions = match self.stop_conditions {
-            StopConditions::ToGenesis => {
-                StopConditions::UntilHash(Some(action_hash).into_iter().collect())
+        self.limit_conditions = match self.limit_conditions {
+            LimitConditions::ToGenesis => {
+                LimitConditions::UntilHash(Some(action_hash).into_iter().collect())
             }
-            StopConditions::Take(n) => {
-                StopConditions::Multiple(n, Some(action_hash).into_iter().collect(), Timestamp(0))
+            LimitConditions::Take(n) => {
+                LimitConditions::Multiple(n, Some(action_hash).into_iter().collect(), Timestamp(0))
             }
-            StopConditions::UntilTimestamp(t) => {
-                StopConditions::Multiple(u32::MAX, Some(action_hash).into_iter().collect(), t)
+            LimitConditions::UntilTimestamp(t) => {
+                LimitConditions::Multiple(u32::MAX, Some(action_hash).into_iter().collect(), t)
             }
-            StopConditions::UntilHash(mut u) => {
+            LimitConditions::UntilHash(mut u) => {
                 u.insert(action_hash);
-                StopConditions::UntilHash(u)
+                LimitConditions::UntilHash(u)
             }
-            StopConditions::Multiple(n, mut u, t) => {
+            LimitConditions::Multiple(n, mut u, t) => {
                 u.insert(action_hash);
-                StopConditions::Multiple(n, u, t)
+                LimitConditions::Multiple(n, u, t)
             }
         };
         self
@@ -185,18 +185,18 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
 
     /// Get the until hashes if there are any.
     pub fn get_until_hash(&self) -> Option<&HashSet<H>> {
-        match &self.stop_conditions {
-            StopConditions::UntilHash(u) => Some(u),
-            StopConditions::Multiple(_, u, _) => Some(u),
+        match &self.limit_conditions {
+            LimitConditions::UntilHash(u) => Some(u),
+            LimitConditions::Multiple(_, u, _) => Some(u),
             _ => None,
         }
     }
 
     /// Get the take number if there is one.
     pub fn get_take(&self) -> Option<u32> {
-        match &self.stop_conditions {
-            StopConditions::Take(n) => Some(*n),
-            StopConditions::Multiple(n, _, _) => {
+        match &self.limit_conditions {
+            LimitConditions::Take(n) => Some(*n),
+            LimitConditions::Multiple(n, _, _) => {
                 if *n != u32::MAX {
                     Some(*n)
                 } else {
@@ -209,9 +209,9 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
 
     /// Get the take number if there is one.
     pub fn get_until_timestamp(&self) -> Option<Timestamp> {
-        match &self.stop_conditions {
-            StopConditions::UntilTimestamp(ts) => Some(*ts),
-            StopConditions::Multiple(_, _, ts) => {
+        match &self.limit_conditions {
+            LimitConditions::UntilTimestamp(ts) => Some(*ts),
+            LimitConditions::Multiple(_, _, ts) => {
                 if ts.0 > 0 {
                     Some(*ts)
                 } else {
@@ -223,7 +223,7 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     }
 }
 
-impl<H: Eq + Ord + std::hash::Hash> Default for StopConditions<H> {
+impl<H: Eq + Ord + std::hash::Hash> Default for LimitConditions<H> {
     fn default() -> Self {
         Self::ToGenesis
     }
