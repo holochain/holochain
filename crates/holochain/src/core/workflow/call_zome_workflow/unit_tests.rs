@@ -103,7 +103,6 @@ impl TestCase {
     {
         let mut conductor = SweetConductor::from_standard_config().await;
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Crd]).await;
-        let dna_def = Arc::new(dna_file.dna_def().clone());
         let app = conductor.setup_app("", &[dna_file]).await.unwrap();
         let dna_hash = app.cells()[0].dna_hash().clone();
         let agent = app.agent().clone();
@@ -116,7 +115,6 @@ impl TestCase {
             conductor.get_cache_db(&cell_id).await.unwrap(),
             conductor.keystore(),
             agent.clone(),
-            dna_def,
         )
         .await
         .unwrap();

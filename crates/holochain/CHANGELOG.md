@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   enabled when the `NETAUDIT` tracing target is enabled at `WARN` level or lower.
 - Test app operations (install/enable/disable/uninstall) with regards to app state and cell state.
 - **BREAKING CHANGE**: Remove `start_app` from conductor. Use `enable_app` instead.
+- Remove unused field `dna_def` the `HostFnWorkspace` struct ([#5102](https://github.com/holochain/holochain/pull/5102))
 
 ## 0.6.0-dev.11
 
