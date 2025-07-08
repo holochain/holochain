@@ -370,11 +370,11 @@ impl ChainQueryFilter {
 }
 
 impl LinkQuery {
-    /// Create a new link query for a base and link type
-    pub fn new(base: impl Into<AnyLinkableHash>, link_type: LinkTypeFilter) -> Self {
+    /// Create a new [`LinkQuery`] for a base and link type
+    pub fn new(base: impl Into<AnyLinkableHash>, link_type: impl Into<LinkTypeFilter>) -> Self {
         LinkQuery {
             base: base.into(),
-            link_type,
+            link_type: link_type.into(),
             tag_prefix: None,
             before: None,
             after: None,
@@ -388,19 +388,19 @@ impl LinkQuery {
         self
     }
 
-    /// Filter for links created before `before`.
+    /// Filter for links created before `before` [`Timestamp`].
     pub fn before(mut self, before: Timestamp) -> Self {
         self.before = Some(before);
         self
     }
 
-    /// Filter for links create after `after`.
+    /// Filter for links create after `after` [`Timestamp`].
     pub fn after(mut self, after: Timestamp) -> Self {
         self.after = Some(after);
         self
     }
 
-    /// Filter for links created by this author.
+    /// Filter for links created by this author, identified by its [`AgentPubKey`].
     pub fn author(mut self, author: AgentPubKey) -> Self {
         self.author = Some(author);
         self

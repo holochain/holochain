@@ -83,7 +83,13 @@ impl Default for GetOptions {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+impl From<GetStrategy> for GetOptions {
+    fn from(strategy: GetStrategy) -> Self {
+        Self { strategy }
+    }
+}
+
+#[derive(PartialEq, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 /// Set if data should be fetched from the network or only from the local
 /// databases.
 pub enum GetStrategy {
@@ -92,6 +98,7 @@ pub enum GetStrategy {
     ///
     /// If the current agent is an authority for this hash, this call will not
     /// go to the network.
+    #[default]
     Network,
     /// Gets the action/entry and its metadata from local databases only.
     /// No network call is made.
@@ -244,5 +251,20 @@ pub fn entry_type_matches(entry_type: &EntryType, entry: &Entry) -> bool {
         (EntryType::CapClaim, Entry::CapClaim(_)) => true,
         (EntryType::CapGrant, Entry::CapGrant(_)) => true,
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_should_convert_get_strategy_to_get_options() {
+        let get_options = GetOptions::from(GetStrategy::Network);
+        assert_eq!(get_options.strategy, GetStrategy::Network);
+
+        let get_options = GetOptions::from(GetStrategy::Local);
+        assert_eq!(get_options.strategy, GetStrategy::Local);
     }
 }
