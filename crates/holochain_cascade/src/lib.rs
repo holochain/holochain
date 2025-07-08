@@ -764,7 +764,7 @@ impl CascadeImpl {
     }
 
     /// Gets links from the DHT or cache depending on its metadata.
-    // The default behavior is to skip deleted or replaced entries.
+    /// Deleted or replaced entries are skipped.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn dht_get_links(
         &self,
@@ -772,7 +772,7 @@ impl CascadeImpl {
         options: GetLinksOptions,
     ) -> CascadeResult<Vec<Link>> {
         // only fetch links from network if i am not an authority and
-        // GetStrategy is Latest
+        // GetStrategy is Network
         if let GetStrategy::Network = options.get_options.strategy {
             let authority = self.am_i_an_authority(key.base.clone()).await?;
             if !authority {
