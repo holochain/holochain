@@ -231,7 +231,7 @@ impl ConductorState {
                     );
                 }
             }
-            AppStatusTransition::Enable | AppStatusTransition::Start => {
+            AppStatusTransition::Enable => {
                 let dependencies: Vec<_> = self
                     .get_app(id)?
                     .roles()

@@ -279,18 +279,18 @@ impl RealRibosome {
                             let i: u8 = i
                                 .try_into()
                                 .map_err(|_| ZomeTypesError::EntryTypeIndexOverflow)?;
-                            EntryDefIndex(i)
+                            i
                         }
-                        None => EntryDefIndex(0),
+                        None => 0,
                     };
                 let num_link_types = match ribosome.get_const_fn(&zome, "__num_link_types").await? {
                     Some(i) => {
                         let i: u8 = i
                             .try_into()
                             .map_err(|_| ZomeTypesError::LinkTypeIndexOverflow)?;
-                        LinkType(i)
+                        i
                     }
-                    None => LinkType(0),
+                    None => 0,
                 };
                 RibosomeResult::Ok((num_entry_types, num_link_types))
             },

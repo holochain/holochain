@@ -186,7 +186,6 @@ mod tests {
             test_cache.to_db(),
             keystore,
             author.clone(),
-            Arc::new(dna_def),
         )
         .await
         .unwrap();

@@ -267,8 +267,5 @@ mod tests {
                 .get(vec![GetInput::new(hash, GetOptions::default())])
                 .expect("TODO after crate re-org"))
         });
-        // let dna = InlineDna::new(hashmap! {
-        //     "zome".into() => zome
-        // });
     }
 }

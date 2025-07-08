@@ -301,11 +301,6 @@ impl SweetConductor {
         self.raw_handle().disable_app(id, reason).await
     }
 
-    /// Convenience function that uses the internal handle to start an app
-    pub async fn start_app(&self, id: InstalledAppId) -> ConductorResult<InstalledApp> {
-        self.raw_handle().start_app(id).await
-    }
-
     /// Convenience function that uses the internal handle to pause an app
     pub async fn pause_app(
         &self,

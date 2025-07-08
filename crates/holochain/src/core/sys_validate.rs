@@ -184,10 +184,9 @@ pub fn check_prev_action(action: &Action) -> SysValidationResult<()> {
 }
 
 /// Check that Dna actions are only added to empty source chains
-pub fn check_valid_if_dna(action: &Action, dna_def: &DnaDefHashed) -> SysValidationResult<()> {
+pub fn check_valid_if_dna(action: &Action, dna_hash: &DnaHash) -> SysValidationResult<()> {
     match action {
         Action::Dna(a) => {
-            let dna_hash = dna_def.as_hash();
             if a.hash != *dna_hash {
                 Err(ValidationOutcome::WrongDna(a.hash.clone(), dna_hash.clone()).into())
             } else {
