@@ -85,7 +85,6 @@ async fn main_workflow() {
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
-        Arc::new(dna_file.dna_def().clone()),
     ));
 
     // check there are no ops to app validate
@@ -299,7 +298,6 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
-        Arc::new(dna_file.dna_def().clone()),
     ));
 
     // check there are no ops to app validate
@@ -417,7 +415,6 @@ async fn validate_ops_in_sequence_must_get_action() {
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
-        Arc::new(dna_file.dna_def().clone()),
     ));
 
     // check there are no ops to app validate
@@ -583,7 +580,6 @@ async fn handle_error_in_op_validation() {
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
-        Arc::new(dna_file.dna_def().clone()),
     ));
 
     // create register agent activity op that will return an error during validation
@@ -957,7 +953,6 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
         conductor.get_dht_db(&dna_hash).unwrap(),
         conductor.get_cache_db(&cell_id).await.unwrap(),
         conductor.keystore(),
-        Arc::new(dna_file.dna_def().clone()),
     ));
 
     // Check there are no ops to app validate as genesis entries should have already been validated

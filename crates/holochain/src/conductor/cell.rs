@@ -755,7 +755,6 @@ impl Cell {
         let invocation =
             ZomeCallInvocation::try_from_params(self.conductor_api.clone(), params).await?;
 
-        let dna_def = ribosome.dna_def().as_content().clone();
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
@@ -767,7 +766,6 @@ impl Cell {
                     self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
-                    Arc::new(dna_def),
                 )
                 .await?
             }
@@ -810,7 +808,6 @@ impl Cell {
 
         // get the dna
         let ribosome = self.get_ribosome()?;
-        let dna_def = ribosome.dna_def().clone();
 
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
@@ -819,7 +816,6 @@ impl Cell {
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
-            Arc::new(dna_def.into_content()),
         )
         .await?;
 
