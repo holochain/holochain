@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Replace the `dna_def` field of the `SysValidationWorkspace` with a `dna_hash` field.
 - Remove unnecessary uses of `LinkType` and `EntryDefIndex` types
 - **BREAKING CHANGE**: Remove `pause_app` and `Paused` state from conductor. Pausing an app was used when enabling an app partially failed and could be re-attempted. Now the app is only enabled if all cells successfully started up.
+- **BREAKING CHANGE**: Removed everything related to `started` and `stopped` apps. Instead `enabled` and `disabled` remain as the only two possible states an app can be in after it has been installed.
 
 ## 0.6.0-dev.11
 

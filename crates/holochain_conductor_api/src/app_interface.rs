@@ -547,15 +547,15 @@ impl AppInfo {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppInfoStatus {
+    Enabled,
     Disabled { reason: DisabledAppReason },
-    Running,
     AwaitingMemproofs,
 }
 
 impl From<AppStatus> for AppInfoStatus {
     fn from(i: AppStatus) -> Self {
         match i {
-            AppStatus::Running => AppInfoStatus::Running,
+            AppStatus::Enabled => AppInfoStatus::Enabled,
             AppStatus::Disabled(reason) => AppInfoStatus::Disabled { reason },
             AppStatus::AwaitingMemproofs => AppInfoStatus::AwaitingMemproofs,
         }
@@ -565,7 +565,7 @@ impl From<AppStatus> for AppInfoStatus {
 impl From<AppInfoStatus> for AppStatus {
     fn from(i: AppInfoStatus) -> Self {
         match i {
-            AppInfoStatus::Running => AppStatus::Running,
+            AppInfoStatus::Enabled => AppStatus::Enabled,
             AppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
             AppInfoStatus::AwaitingMemproofs => AppStatus::AwaitingMemproofs,
         }

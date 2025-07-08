@@ -274,7 +274,7 @@ pub(crate) fn spawn_task_outcome_handler(
                 TaskOutcome::StopApps(cell_id, error, context) => {
                     tracing::error!("About to automatically stop apps");
                     let app_ids = conductor
-                        .list_running_apps_for_dependent_cell_id(&cell_id)
+                        .list_enabled_apps_for_dependent_cell_id(&cell_id)
                         .await
                         .map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
@@ -325,7 +325,7 @@ pub(crate) fn spawn_task_outcome_handler(
                 TaskOutcome::StopAppsWithDna(dna_hash, error, context) => {
                     tracing::error!("About to automatically stop apps with dna {}", dna_hash);
                     let app_ids = conductor
-                        .list_running_apps_for_dependent_dna_hash(dna_hash.as_ref())
+                        .list_enabled_apps_for_dependent_dna_hash(dna_hash.as_ref())
                         .await
                         .map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {

@@ -78,7 +78,7 @@ async fn can_update_state() {
         .unwrap();
     let state = conductor.get_state().await.unwrap();
     assert_eq!(
-        state.stopped_apps().map(second).collect::<Vec<_>>()[0]
+        state.disabled_apps().map(second).collect::<Vec<_>>()[0]
             .all_cells()
             .collect::<Vec<_>>()
             .as_slice(),
@@ -208,7 +208,7 @@ async fn test_list_running_apps_for_dependent_cell_id() {
 
     let list_apps = |conductor: ConductorHandle, cell: SweetCell| async move {
         conductor
-            .list_running_apps_for_dependent_cell_id(cell.cell_id())
+            .list_enabled_apps_for_dependent_cell_id(cell.cell_id())
             .await
             .unwrap()
     };
@@ -300,7 +300,7 @@ async fn uninstall_app() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.running_apps().count(), state.stopped_apps().count())
+            (state.enabled_apps().count(), state.disabled_apps().count())
         },
         (2, 0)
     );
@@ -355,7 +355,7 @@ async fn uninstall_app() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.running_apps().count(), state.stopped_apps().count())
+            (state.enabled_apps().count(), state.disabled_apps().count())
         },
         (0, 0)
     );
@@ -394,7 +394,7 @@ async fn test_reconciliation_idempotency() {
         .unwrap();
 
     // - Ensure that the app is active
-    assert_eq_retry_10s!(conductor.list_running_apps().await.unwrap().len(), 1);
+    assert_eq_retry_10s!(conductor.list_enabled_apps().await.unwrap().len(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -483,7 +483,7 @@ async fn test_enable_disable_enable_app() {
     assert_eq!(inactive_apps.len(), 0);
     assert_eq!(active_apps.len(), 1);
     assert_eq!(active_apps[0].cell_info.len(), 2);
-    assert_matches!(active_apps[0].status, AppInfoStatus::Running);
+    assert_matches!(active_apps[0].status, AppInfoStatus::Enabled);
 
     let (_, cell) = app.into_tuple();
 
@@ -531,7 +531,7 @@ async fn test_enable_disable_enable_app() {
 
     // - Ensure that the app is active
 
-    assert_eq_retry_10s!(conductor.list_running_apps().await.unwrap().len(), 1);
+    assert_eq_retry_10s!(conductor.list_enabled_apps().await.unwrap().len(), 1);
     let inactive_apps = conductor
         .list_apps(Some(AppStatusFilter::Disabled))
         .await
@@ -776,7 +776,7 @@ async fn test_bad_entry_validation_after_genesis_returns_zome_call_error() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.running_apps().count(), state.stopped_apps().count())
+            (state.enabled_apps().count(), state.disabled_apps().count())
         },
         (1, 0)
     );
@@ -835,7 +835,7 @@ async fn test_apps_disable_on_panic_after_genesis() {
     assert_eq_retry_10s!(
         {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.running_apps().count(), state.stopped_apps().count())
+            (state.enabled_apps().count(), state.disabled_apps().count())
         },
         (0, 1)
     );
@@ -855,7 +855,7 @@ async fn test_app_status_states() {
 
     let get_status = || async { conductor.list_apps(None).await.unwrap()[0].status.clone() };
 
-    // RUNNING  --disable->  DISABLED
+    // ENABLED  --disable->  DISABLED
 
     conductor
         .disable_app("app".to_string(), DisabledAppReason::User)
@@ -866,7 +866,7 @@ async fn test_app_status_states() {
     // DISABLED  --enable->  ENABLED
 
     conductor.enable_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, AppInfoStatus::Running);
+    assert_matches!(get_status().await, AppInfoStatus::Enabled);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -903,11 +903,11 @@ async fn test_cell_and_app_status_reconciliation() {
         )
     };
 
-    assert_eq!(check().await, (Running, 3));
+    assert_eq!(check().await, (Enabled, 3));
 
     // - Simulate a cell being removed due to error
     conductor.remove_cells(cell1).await;
-    assert_eq!(check().await, (Running, 2));
+    assert_eq!(check().await, (Enabled, 2));
 
     // - App status won't change.
     let delta = conductor
@@ -925,7 +925,7 @@ async fn test_cell_and_app_status_reconciliation() {
 
     // - ...but enabling one does
     conductor.enable_app(app_id).await.unwrap();
-    assert_eq!(check().await, (Running, 3));
+    assert_eq!(check().await, (Enabled, 3));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -936,7 +936,7 @@ async fn test_app_status_filters() {
 
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    conductor.setup_app("running", &dnas).await.unwrap();
+    conductor.setup_app("enabled", &dnas).await.unwrap();
     conductor.setup_app("disabled", &dnas).await.unwrap();
 
     // put apps in the proper states for testing
@@ -1124,9 +1124,9 @@ async fn test_deferred_memproof_provisioning() {
 
     conductor.enable_app(app_id.clone()).await.unwrap();
 
-    //- Status is now Running and there is 1 cell assignment
+    //- Status is now Enabled and there is 1 cell assignment
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
-    assert_eq!(app_info.status, AppInfoStatus::Running);
+    assert_eq!(app_info.status, AppInfoStatus::Enabled);
 
     //- And now we can make a zome call successfully
     let _: String = conductor.call(&cell.zome("foo"), "foo", ()).await;

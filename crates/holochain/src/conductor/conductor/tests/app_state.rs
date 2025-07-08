@@ -83,10 +83,10 @@ async fn app_operations() {
     // Enable app 1 now
     conductor.enable_app(app_id_1.clone()).await.unwrap();
 
-    // Conductor state should reflect that the app is running.
+    // Conductor state should reflect that the app is enabled.
     let state = conductor.get_state().await.unwrap();
     assert_eq!(state.app_interfaces, HashMap::new());
-    expected_app_map.get_mut(&app_id_1).unwrap().status = AppStatus::Running;
+    expected_app_map.get_mut(&app_id_1).unwrap().status = AppStatus::Enabled;
     assert_eq!(*state.installed_apps(), expected_app_map);
 
     // Running cells should only contain the installed cell.
@@ -122,10 +122,10 @@ async fn app_operations() {
     // Enable app again
     conductor.enable_app(app_id_1.clone()).await.unwrap();
 
-    // Conductor state should reflect that the app is running.
+    // Conductor state should reflect that the app is enabled.
     let state = conductor.get_state().await.unwrap();
     assert_eq!(state.app_interfaces, HashMap::new());
-    expected_app_map.get_mut(&app_id_1).unwrap().status = AppStatus::Running;
+    expected_app_map.get_mut(&app_id_1).unwrap().status = AppStatus::Enabled;
     assert_eq!(*state.installed_apps(), expected_app_map);
 
     // Running cells should contain only the installed cell.
@@ -206,7 +206,7 @@ async fn app_operations() {
                 app_2.installed_at,
             )
             .unwrap(),
-            AppStatus::Running,
+            AppStatus::Enabled,
         ),
     );
     assert_eq!(*state.installed_apps(), expected_app_map);
