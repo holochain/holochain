@@ -16,13 +16,14 @@ mod test;
 /// Filter source chain items.
 /// Starting from some chain position given as an [`ActionHash`]
 /// the chain is walked backwards to genesis.
-/// The filter can stop early by specifying stop conditions:
+/// The filter can stop early by specifying limit conditions:
 /// A maximum number of items is reached, a given [`ActionHash`] is found, or
 /// a given timestamp has been passed.
-/// Multiple `[`ActionHash`] can be provided. The filter will stop at and take the first one found.
-/// When providing a Timestamp, the filter will stop at and take the last item that has a
-/// Timestamp younger than the provided one. In the edge case of multiple actions having the same
-/// Timestamp as the stop condition, only one of the actions will be included.
+/// Multiple [`ActionHash`] can be provided. The filter will stop at and take the first one found.
+/// When providing a Timestamp, the filter will stop at and take the oldest action that has a
+/// Timestamp newer than the provided one. In the edge case of multiple actions having the same
+/// Timestamp as the limit condition, the filter will stop at the action with the lowest sequence.
+/// Multiple limit conditions can be set. Whichever is the smaller set will be kept.
 pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// The starting position of the filter.
     pub chain_top: H,
@@ -39,14 +40,13 @@ pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
 pub enum LimitConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// Allow all up to genesis.
     ToGenesis,
-    /// Take this many items (inclusive of the starting position).
+    /// Take this many actions (inclusive of the starting position).
     Take(u32),
-    /// Continue until some timestamp is passed.
+    /// Take all actions since the given timestamp.
     UntilTimestamp(Timestamp),
     /// Continue until one of these hashes is found.
     UntilHash(HashSet<H>),
     /// Combination of Take, UntilTimestamp and UntilHash.
-    /// Whichever is the smaller set.
     Multiple(Option<u32>, HashSet<H>, Option<Timestamp>),
 }
 
@@ -100,7 +100,7 @@ impl<H: Eq + Ord + std::hash::Hash> core::cmp::PartialEq for LimitConditions<H> 
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-/// Input of the `must_get_agent_activity` call.
+/// Input to the `must_get_agent_activity` call.
 pub struct MustGetAgentActivityInput {
     /// The author of the chain that you are requesting
     /// activity from.
@@ -123,6 +123,7 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
 
     /// Take up to `n` actions including the starting position.
     /// This may return less than `n` actions.
+    /// If an `n` was already set, the smallest of the two is kept.
     pub fn take(mut self, n: u32) -> Self {
         self.limit_conditions = match self.limit_conditions {
             LimitConditions::ToGenesis => LimitConditions::Take(n),
@@ -145,7 +146,8 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
         self
     }
 
-    /// Take all actions until this timestamp is passed.
+    /// Take all actions since the given timestamp.
+    /// If a timestamp was already set, the biggest of the two is kept.
     pub fn until_timestamp(mut self, timestamp: Timestamp) -> Self {
         self.limit_conditions = match self.limit_conditions {
             LimitConditions::ToGenesis => LimitConditions::UntilTimestamp(timestamp),
