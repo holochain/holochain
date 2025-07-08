@@ -10,4 +10,4 @@ WHERE
   AND DhtOp.type = :activity
   AND Action.author = :author
 ORDER BY
-    seq ASC
+  seq ASC

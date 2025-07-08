@@ -27,7 +27,7 @@ mod test;
 pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// The starting position of the filter.
     pub chain_top: H,
-    /// The stop conditions used by this filter.
+    /// The limit conditions used by this filter.
     /// Defaults to [`LimitConditions::ToGenesis`].
     pub limit_conditions: LimitConditions<H>,
     /// Should the query return any entries that are
