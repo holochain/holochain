@@ -65,7 +65,6 @@ fn can_until_timestamp(len: u32, chain_top: u32, until_us: i64) -> Vec<TestChain
     build_chain(chain(0..len), filter)
 }
 
-
 #[test_case(1, 0, 0 => doubled_chain(0..1))]
 #[test_case(1, 0, 1000 => doubled_chain(0..0))]
 #[test_case(2, 1, 1000 => using pretty(doubled_chain(1..1)))]
@@ -78,7 +77,6 @@ fn can_until_timestamp_doubled(len: u32, chain_top: u32, until_us: i64) -> Vec<T
     let filter = TestFilter::new(hash(chain_top)).until_timestamp(Timestamp::from_micros(until_us));
     build_chain(doubled_chain(0..len), filter)
 }
-
 
 #[test_case(10, TestFilter::new(hash(9)).take(10).until_hash(hash(4)) => chain(4..10))]
 #[test_case(10, TestFilter::new(hash(9)).take(2).until_hash(hash(4)) => chain(8..10))]
@@ -162,10 +160,9 @@ fn test_filter_then_check(
     match Sequences::find_sequences::<_, _, _, ()>(
         filter,
         |a| Ok(f(a)),
-        |_ts, _ts2, | Ok(None),
-        |_seq | Ok(None),
-    )
-    {
+        |_ts, _ts2| Ok(None),
+        |_seq| Ok(None),
+    ) {
         Ok(Sequences::Found(s)) => s.filter_then_check(chain, vec![]),
         _ => unreachable!(),
     }
@@ -247,7 +244,7 @@ fn test_find_sequences(
     filter: ChainFilter,
     mut f: impl FnMut(&ActionHash) -> Option<u32>,
 ) -> Sequences {
-    match Sequences::find_sequences::<_, _, _,()>(
+    match Sequences::find_sequences::<_, _, _, ()>(
         filter,
         |a| Ok(f(a)),
         |_ts1, _ts2| Ok(None),

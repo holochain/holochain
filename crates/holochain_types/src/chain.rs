@@ -369,7 +369,7 @@ impl Sequences {
         mut get_ts_from_seq: F3,
     ) -> Result<Self, E>
     where
-         F: FnMut(&ActionHash) -> Result<Option<u32>, E>,
+        F: FnMut(&ActionHash) -> Result<Option<u32>, E>,
         F2: FnMut(Timestamp, Timestamp) -> Result<Option<u32>, E>,
         F3: FnMut(u32) -> Result<Option<Timestamp>, E>,
     {

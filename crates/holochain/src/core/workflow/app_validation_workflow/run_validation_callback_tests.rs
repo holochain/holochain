@@ -24,7 +24,7 @@ use holochain_types::{
 };
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::{
-    chain::{ChainFilter, MustGetAgentActivityInput, LimitConditions},
+    chain::{ChainFilter, LimitConditions, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
     entry::MustGetActionInput,
     fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator},

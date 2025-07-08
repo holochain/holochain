@@ -190,7 +190,10 @@ pub fn chain(range: Range<u32>) -> Vec<TestChainItem> {
 
 /// Same as chain() but timestamp only increments every two items
 pub fn doubled_chain(range: Range<u32>) -> Vec<TestChainItem> {
-    range.map(|i|TestChainItem::with_ts(i, i as i64 / 2 * 1000)).rev().collect()
+    range
+        .map(|i| TestChainItem::with_ts(i, i as i64 / 2 * 1000))
+        .rev()
+        .collect()
 }
 
 /// Create a set of chains with forks where the first range
