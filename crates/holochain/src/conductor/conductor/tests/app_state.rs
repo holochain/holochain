@@ -1,14 +1,45 @@
-use crate::sweettest::{SweetConductor, SweetDnaFile};
-use hdk::prelude::{CellId, DnaModifiersOpt, NetworkSeed, RoleName};
-use holochain_types::app::{
-    AppBundle, AppBundleSource, AppManifest, AppManifestCurrentBuilder, AppRoleAssignment,
-    AppRoleDnaManifest, AppRoleManifest, AppRolePrimary, AppStatus, CellProvisioning,
-    DisabledAppReason, InstallAppPayload, InstalledApp, InstalledAppCommon, InstalledAppId,
-    InstalledAppMap,
+use crate::{
+    conductor::{
+        conductor::{
+            tests::{
+                common_genesis_test_app, mk_dna, simple_create_entry_zome, simple_crud_zome,
+                unwrap_cell_info_clone, POST_COMMIT_CHANNEL_BOUND,
+            },
+            ConductorApiError,
+        },
+        error::ConductorError,
+        ribosome_store::RibosomeStore,
+        space::Spaces,
+        state::ConductorState,
+        Conductor,
+    },
+    sweettest::*,
+    test_utils::retry_fn_until_timeout,
 };
-use holochain_types::dna::{DnaBundle, DnaFile};
+use hdk::prelude::*;
+use holo_hash::ActionHash;
+use holochain_conductor_api::{conductor::ConductorConfig, AppInfoStatus, AppStatusFilter};
+use holochain_keystore::test_keystore;
+use holochain_state::prelude::test_db_dir;
+use holochain_types::{
+    app::{
+        AppBundle, AppBundleSource, AppManifest, AppManifestCurrentBuilder, AppRoleAssignment,
+        AppRoleDnaManifest, AppRoleManifest, AppRolePrimary, AppStatus, CellProvisioning,
+        DisabledAppReason, EnableCloneCellPayload, InstallAppPayload, InstalledApp,
+        InstalledAppCommon, InstalledAppId, InstalledAppMap, InstalledCell,
+    },
+    prelude::second,
+};
+use holochain_types::{
+    app::{CreateCloneCellPayload, DisableCloneCellPayload},
+    dna::{DnaBundle, DnaFile},
+};
 use holochain_wasm_test_utils::TestWasm;
-use std::collections::HashMap;
+use matches::assert_matches;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_update_state() {
@@ -41,9 +72,9 @@ async fn can_update_state() {
         outcome_tx,
     );
     let state = conductor.get_state().await.unwrap();
-    let mut expect_state = ConductorState::default();
-    expect_state.set_tag(state.tag().clone());
-    assert_eq!(state, expect_state);
+    let mut expected_state = ConductorState::default();
+    expected_state.set_tag(state.tag().clone());
+    assert_eq!(state, expected_state);
 
     let cell_id = fake_cell_id(1);
     let installed_cell = InstalledCell::new(cell_id.clone(), "role_name".to_string());
@@ -63,74 +94,6 @@ async fn can_update_state() {
             .collect::<Vec<_>>()
             .as_slice(),
         &[cell_id]
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn can_set_fake_state() {
-    let db_dir = test_db_dir();
-    let expected = ConductorState::default();
-    let conductor = ConductorBuilder::new()
-        .config(SweetConductorConfig::standard().into())
-        .fake_state(expected.clone())
-        .with_data_root_path(db_dir.path().to_path_buf().into())
-        .test(&[])
-        .await
-        .unwrap();
-    let actual = conductor.get_state_from_handle().await.unwrap();
-    assert_eq!(actual, expected);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "This kind of cell sharing is no longer possible.
-            Keeping the test here to highlight the intention,
-            though it will have to be removed or totally rewritten some day."]
-async fn test_list_running_apps_for_dependent_cell_id() {
-    holochain_trace::test_run();
-
-    let mk_dna = |name: &'static str| async move {
-        let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
-        SweetDnaFile::unique_from_inline_zomes((name, zome)).await
-    };
-
-    // Create three unique DNAs
-    let (dna1, _, _) = mk_dna("zome1").await;
-    let (dna2, _, _) = mk_dna("zome2").await;
-    let (dna3, _, _) = mk_dna("zome3").await;
-
-    // Install two apps on the Conductor:
-    // Both share a CellId in common, and also include a distinct CellId each.
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let app1 = conductor.setup_app("app1", [&dna1, &dna2]).await.unwrap();
-    let alice = app1.agent().clone();
-    let app2 = conductor
-        .setup_app_for_agent("app2", alice, [&dna1, &dna3])
-        .await
-        .unwrap();
-
-    let (cell1, cell2) = app1.into_tuple();
-    let (_, cell3) = app2.into_tuple();
-
-    let list_apps = |conductor: ConductorHandle, cell: SweetCell| async move {
-        conductor
-            .list_enabled_apps_for_dependent_cell_id(cell.cell_id())
-            .await
-            .unwrap()
-    };
-
-    // - Ensure that the first CellId is associated with both apps,
-    //   and the other two are only associated with one app each.
-    assert_eq!(
-        list_apps(conductor.clone(), cell1).await,
-        hashset!["app1".to_string(), "app2".to_string()]
-    );
-    assert_eq!(
-        list_apps(conductor.clone(), cell2).await,
-        hashset!["app1".to_string()]
-    );
-    assert_eq!(
-        list_apps(conductor.clone(), cell3).await,
-        hashset!["app2".to_string()]
     );
 }
 
@@ -179,13 +142,16 @@ async fn uninstall_app() {
         .is_some());
 
     // - Ensure that the apps are active
-    assert_eq_retry_10s!(
-        {
+    retry_fn_until_timeout(
+        || async {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.enabled_apps().count(), state.disabled_apps().count())
+            state.enabled_apps().count() == 2 && state.disabled_apps().count() == 0
         },
-        (2, 0)
-    );
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     let db1 = conductor
         .spaces
@@ -234,13 +200,16 @@ async fn uninstall_app() {
     std::fs::File::open(db2.path()).unwrap_err();
 
     // - Ensure that the apps are removed
-    assert_eq_retry_10s!(
-        {
+    retry_fn_until_timeout(
+        || async {
             let state = conductor.get_state_from_handle().await.unwrap();
-            (state.enabled_apps().count(), state.disabled_apps().count())
+            state.enabled_apps().count() == 0 && state.disabled_apps().count() == 0
         },
-        (0, 0)
-    );
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     // - A new app can't read any of the data from the previous two, because once the last instance
     //   of the cells was destroyed, all data was destroyed as well.
@@ -256,30 +225,7 @@ async fn uninstall_app() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_reconciliation_idempotency() {
-    holochain_trace::test_run();
-    let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
-    let mut conductor = SweetConductor::from_standard_config().await;
-    common_genesis_test_app(&mut conductor, ("custom", zome))
-        .await
-        .unwrap();
-
-    conductor
-        .raw_handle()
-        .reconcile_cell_status_with_app_status()
-        .await
-        .unwrap();
-    conductor
-        .raw_handle()
-        .reconcile_cell_status_with_app_status()
-        .await
-        .unwrap();
-
-    // - Ensure that the app is active
-    assert_eq_retry_10s!(conductor.list_enabled_apps().await.unwrap().len(), 1);
-}
-#[tokio::test(flavor = "multi_thread")]
-async fn test_enable_disable_enable_app() {
+async fn disabled_app_cannot_be_called() {
     holochain_trace::test_run();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -289,19 +235,6 @@ async fn test_enable_disable_enable_app() {
 
     let all_apps = conductor.list_apps(None).await.unwrap();
     assert_eq!(all_apps.len(), 1);
-
-    let inactive_apps = conductor
-        .list_apps(Some(AppStatusFilter::Disabled))
-        .await
-        .unwrap();
-    let active_apps = conductor
-        .list_apps(Some(AppStatusFilter::Enabled))
-        .await
-        .unwrap();
-    assert_eq!(inactive_apps.len(), 0);
-    assert_eq!(active_apps.len(), 1);
-    assert_eq!(active_apps[0].cell_info.len(), 2);
-    assert_matches!(active_apps[0].status, AppInfoStatus::Enabled);
 
     let (_, cell) = app.into_tuple();
 
@@ -314,24 +247,6 @@ async fn test_enable_disable_enable_app() {
         .disable_app("app".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
-
-    let inactive_apps = conductor
-        .list_apps(Some(AppStatusFilter::Disabled))
-        .await
-        .unwrap();
-    let active_apps = conductor
-        .list_apps(Some(AppStatusFilter::Enabled))
-        .await
-        .unwrap();
-    assert_eq!(active_apps.len(), 0);
-    assert_eq!(inactive_apps.len(), 1);
-    assert_eq!(inactive_apps[0].cell_info.len(), 2);
-    assert_matches!(
-        inactive_apps[0].status,
-        AppInfoStatus::Disabled {
-            reason: DisabledAppReason::User
-        }
-    );
 
     // - We can't make a zome call while disabled
     assert!(conductor
@@ -346,24 +261,10 @@ async fn test_enable_disable_enable_app() {
         .call_fallible::<_, Option<Record>>(&cell.zome("zome"), "get", hash.clone())
         .await
         .is_ok());
-
-    // - Ensure that the app is active
-
-    assert_eq_retry_10s!(conductor.list_enabled_apps().await.unwrap().len(), 1);
-    let inactive_apps = conductor
-        .list_apps(Some(AppStatusFilter::Disabled))
-        .await
-        .unwrap();
-    let active_apps = conductor
-        .list_apps(Some(AppStatusFilter::Enabled))
-        .await
-        .unwrap();
-    assert_eq!(active_apps.len(), 1);
-    assert_eq!(inactive_apps.len(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_enable_disable_enable_clone_cell() {
+async fn disabled_clone_cell_cannot_be_called() {
     holochain_trace::test_run();
     let zome = simple_create_entry_zome();
     let mut conductor = SweetConductor::from_standard_config().await;
@@ -419,23 +320,20 @@ async fn test_enable_disable_enable_clone_cell() {
     conductor.shutdown().await;
     conductor.startup().await;
 
-    {
-        // - cell should still be disabled after restart
-        let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
-        let cell = unwrap_cell_info_clone(app_info.cell_info.get(&role_name).unwrap()[1].clone());
-        assert!(!cell.enabled);
-    }
-    {
-        // - should *still* not be able to call a zome fn on a disabled clone cell after restart
-        let result: Result<Option<Record>, _> =
-            conductor.call_fallible(&zome, "get", hash.clone()).await;
-        assert!(matches!(
-            result,
-            Err(ConductorApiError::ConductorError(
-                ConductorError::CellDisabled(_)
-            ))
-        ));
-    }
+    // - cell should still be disabled after restart
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    let cell = unwrap_cell_info_clone(app_info.cell_info.get(&role_name).unwrap()[1].clone());
+    assert!(!cell.enabled);
+
+    // - should *still* not be able to call a zome fn on a disabled clone cell after restart
+    let result: Result<Option<Record>, _> =
+        conductor.call_fallible(&zome, "get", hash.clone()).await;
+    assert!(matches!(
+        result,
+        Err(ConductorApiError::ConductorError(
+            ConductorError::CellDisabled(_)
+        ))
+    ));
 
     conductor
         .raw_handle()
@@ -443,169 +341,20 @@ async fn test_enable_disable_enable_clone_cell() {
         .await
         .unwrap();
 
-    {
-        // - cell should still be enabled now
-        let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
-        let cell = unwrap_cell_info_clone(app_info.cell_info.get(&role_name).unwrap()[1].clone());
-        assert!(cell.enabled);
-    }
-    {
-        // - can call clone again
-        let _: Option<Record> = conductor
-            .call_fallible(&zome, "get", hash)
-            .await
-            .expect("can call zome fn now");
-    }
-}
+    // - cell should be enabled now
+    let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
+    let cell = unwrap_cell_info_clone(app_info.cell_info.get(&role_name).unwrap()[1].clone());
+    assert!(cell.enabled);
 
-// NB: currently the pre-genesis and post-genesis handling of panics is the same.
-//   If we implement [ B-04188 ], then this test will be made more possible.
-//   Otherwise, we have to devise a way to discover whether a panic happened
-//   during genesis or not.
-// NOTE: we need a test with a failure during a validation callback that happens
-//       *inline*. It's not enough to have a failing validate for
-//       instance, because that failure will be returned by the zome call.
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "need to figure out how to write this test, i.e. to make genesis panic"]
-async fn test_apps_disable_on_panic_after_genesis() {
-    holochain_trace::test_run();
-    let unit_entry_def = EntryDef::default_from_id("unit");
-    let bad_zome =
-        InlineZomeSet::new_unique_single("integrity", "custom", vec![unit_entry_def.clone()], 0)
-            // We need a different validation callback that doesn't happen inline
-            // so we can cause failure in it. But it must also be after genesis.
-            .function("integrity", "validate", |_api, op: Op| {
-                match op {
-                    Op::StoreEntry(StoreEntry { action, .. })
-                        if action.hashed.content.app_entry_def().is_some() =>
-                    {
-                        // Trigger a deserialization error
-                        let _: Entry = SerializedBytes::try_from(())?.try_into()?;
-                        Ok(ValidateResult::Valid)
-                    }
-                    _ => Ok(ValidateResult::Valid),
-                }
-            })
-            .function("custom", "create", move |api, ()| {
-                let entry = Entry::app(().try_into().unwrap()).unwrap();
-                let hash = api.create(CreateInput::new(
-                    InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
-                    EntryVisibility::Public,
-                    entry,
-                    ChainTopOrdering::default(),
-                ))?;
-                Ok(hash)
-            });
-
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let app = common_genesis_test_app(&mut conductor, bad_zome)
+    // - can call clone again
+    let _: Option<Record> = conductor
+        .call_fallible(&zome, "get", hash.clone())
         .await
-        .unwrap();
-
-    let (_, cell_bad) = app.into_tuple();
-
-    let _: ConductorApiResult<ActionHash> = conductor
-        .call_fallible(&cell_bad.zome("custom"), "create", ())
-        .await;
-
-    assert_eq_retry_10s!(
-        {
-            let state = conductor.get_state_from_handle().await.unwrap();
-            (state.enabled_apps().count(), state.disabled_apps().count())
-        },
-        (0, 1)
-    );
+        .expect("can call zome fn now");
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_app_status_states() {
-    holochain_trace::test_run();
-    let zome = simple_create_entry_zome();
-    let mut conductor = SweetConductor::from_standard_config().await;
-    common_genesis_test_app(&mut conductor, ("zome", zome))
-        .await
-        .unwrap();
-
-    let all_apps = conductor.list_apps(None).await.unwrap();
-    assert_eq!(all_apps.len(), 1);
-
-    let get_status = || async { conductor.list_apps(None).await.unwrap()[0].status.clone() };
-
-    // ENABLED  --disable->  DISABLED
-
-    conductor
-        .disable_app("app".to_string(), DisabledAppReason::User)
-        .await
-        .unwrap();
-    assert_matches!(get_status().await, AppInfoStatus::Disabled { .. });
-
-    // DISABLED  --enable->  ENABLED
-
-    conductor.enable_app("app".to_string()).await.unwrap();
-    assert_matches!(get_status().await, AppInfoStatus::Enabled);
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "we don't have the ability to share cells across apps yet, but will need a test for that once we do"]
-async fn test_app_status_states_multi_app() {
-    todo!("write a test similar to the previous one, testing various state transitions, including switching on and off individual Cells");
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_cell_and_app_status_reconciliation() {
-    holochain_trace::test_run();
-    use AppStatusFx::*;
-    use AppStatusKind::*;
-    let mk_zome = || ("zome", InlineIntegrityZome::new_unique(Vec::new(), 0));
-    let dnas = [
-        mk_dna(mk_zome()).await.0,
-        mk_dna(mk_zome()).await.0,
-        mk_dna(mk_zome()).await.0,
-    ];
-    let app_id = "app".to_string();
-    let config = SweetConductorConfig::standard();
-    let mut conductor = SweetConductor::from_config(config).await;
-    conductor.setup_app(&app_id, &dnas).await.unwrap();
-
-    let cell_ids: Vec<_> = conductor.running_cell_ids().into_iter().collect();
-    let cell1 = &cell_ids[0..1];
-
-    let check = || async {
-        (
-            AppStatusKind::from(AppStatus::from(
-                conductor.list_apps(None).await.unwrap()[0].status.clone(),
-            )),
-            conductor.running_cell_ids().len(),
-        )
-    };
-
-    assert_eq!(check().await, (Enabled, 3));
-
-    // - Simulate a cell being removed due to error
-    conductor.remove_cells(cell1).await;
-    assert_eq!(check().await, (Enabled, 2));
-
-    // - App status won't change.
-    let delta = conductor
-        .reconcile_app_status_with_cell_status(None)
-        .await
-        .unwrap();
-    assert_eq!(delta, NoChange);
-
-    // - Disabling the app causes all cells to be removed
-    conductor
-        .disable_app(app_id.clone(), DisabledAppReason::User)
-        .await
-        .unwrap();
-    assert_eq!(check().await, (Disabled, 0));
-
-    // - ...but enabling one does
-    conductor.enable_app(app_id).await.unwrap();
-    assert_eq!(check().await, (Enabled, 3));
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn test_app_status_filters() {
+async fn app_status_filters() {
     holochain_trace::test_run();
     let zome = InlineIntegrityZome::new_unique(Vec::new(), 0);
     let dnas = [mk_dna(("dna", zome)).await.0];
@@ -615,48 +364,56 @@ async fn test_app_status_filters() {
     conductor.setup_app("enabled", &dnas).await.unwrap();
     conductor.setup_app("disabled", &dnas).await.unwrap();
 
-    // put apps in the proper states for testing
+    let inactive_apps = conductor
+        .list_apps(Some(AppStatusFilter::Disabled))
+        .await
+        .unwrap();
+    let active_apps = conductor
+        .list_apps(Some(AppStatusFilter::Enabled))
+        .await
+        .unwrap();
+    assert_eq!(active_apps.len(), 2);
+    assert_eq!(inactive_apps.len(), 0);
 
+    // Disable one app
     conductor
         .disable_app("disabled".to_string(), DisabledAppReason::User)
         .await
         .unwrap();
 
-    macro_rules! list_apps {
-        ($filter: expr) => {
-            conductor.list_apps($filter).await.unwrap()
-        };
-    }
-
-    // Check the counts returned by each filter
-    use AppStatusFilter::*;
-
-    assert_eq!(list_apps!(None).len(), 2);
-    assert_eq!(
-        (
-            list_apps!(Some(Enabled)).len(),
-            list_apps!(Some(Disabled)).len(),
-        ),
-        (1, 1)
+    let inactive_apps = conductor
+        .list_apps(Some(AppStatusFilter::Disabled))
+        .await
+        .unwrap();
+    let active_apps = conductor
+        .list_apps(Some(AppStatusFilter::Enabled))
+        .await
+        .unwrap();
+    assert_eq!(active_apps.len(), 1);
+    assert_eq!(inactive_apps.len(), 1);
+    assert_matches!(
+        &inactive_apps[0].status,
+        AppInfoStatus::Disabled { reason } if *reason == DisabledAppReason::User
     );
 
     // check that counts are still accurate after a restart
-
     conductor.shutdown().await;
     conductor.startup().await;
 
-    assert_eq!(list_apps!(None).len(), 2);
-    assert_eq!(
-        (
-            list_apps!(Some(Enabled)).len(),
-            list_apps!(Some(Disabled)).len(),
-        ),
-        (1, 1)
-    );
+    let inactive_apps = conductor
+        .list_apps(Some(AppStatusFilter::Disabled))
+        .await
+        .unwrap();
+    let active_apps = conductor
+        .list_apps(Some(AppStatusFilter::Enabled))
+        .await
+        .unwrap();
+    assert_eq!(active_apps.len(), 1);
+    assert_eq!(inactive_apps.len(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn app_operations() {
+async fn app_status_and_cell_state() {
     let conductor = SweetConductor::from_standard_config().await;
 
     // Check conductor state is empty.
@@ -745,8 +502,9 @@ async fn app_operations() {
     });
 
     // Disable app
+    let expected_disabled_app_reason = DisabledAppReason::User;
     conductor
-        .disable_app(app_id_1.clone(), DisabledAppReason::User)
+        .disable_app(app_id_1.clone(), expected_disabled_app_reason.clone())
         .await
         .unwrap();
 
@@ -754,7 +512,7 @@ async fn app_operations() {
     let state = conductor.get_state().await.unwrap();
     assert_eq!(state.app_interfaces, HashMap::new());
     expected_app_map.get_mut(&app_id_1).unwrap().status =
-        AppStatus::Disabled(DisabledAppReason::User);
+        AppStatus::Disabled(expected_disabled_app_reason);
     assert_eq!(*state.installed_apps(), expected_app_map);
 
     // Running cells should again be empty.

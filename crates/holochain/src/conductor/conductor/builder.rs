@@ -373,13 +373,6 @@ impl ConductorBuilder {
     }
 
     #[cfg(any(test, feature = "test_utils"))]
-    /// Sets some fake conductor state for tests
-    pub fn fake_state(mut self, state: ConductorState) -> Self {
-        self.state = Some(state);
-        self
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub(crate) async fn update_fake_state(
         state: Option<ConductorState>,

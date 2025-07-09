@@ -1,11 +1,9 @@
 use super::Conductor;
-use super::ConductorState;
 use super::*;
 use crate::conductor::api::error::ConductorApiError;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::sweettest::*;
 use crate::test_utils::inline_zomes::simple_crud_zome;
-use crate::test_utils::retry_fn_until_timeout;
 use crate::{
     assert_eq_retry_10s, core::ribosome::guest_callback::genesis_self_check::GenesisSelfCheckResult,
 };
@@ -20,7 +18,6 @@ use holochain_types::inline_zome::InlineZomeSet;
 use holochain_types::test_utils::fake_cell_id;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::op::Op;
-use maplit::hashset;
 use matches::assert_matches;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
