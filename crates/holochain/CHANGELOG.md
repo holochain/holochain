@@ -12,8 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE**: Remove `CellStatus` which used to indicate whether a cell has joined the network or not. Going forward cells that couldn't join the network will not be kept in conductor state.
 - **BREAKING CHANGE**: Remove `generate_test_device_seed` from `ConductorBuilder`. This was a remnant from DPKI.
 - Add integration tests for the use of `path`'s and the links created by them. ([\#5114](https://github.com/holochain/holochain/pull/5114))
+- **BREAKING CHANGE** Removed an if/else clause in the `Ribosome::new()` impl that lead to inconsistent behavior depending on the number of zomes defined in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)). This means that **the dependencies field for zomes in the dna manifest is now always mandatory**. Previously, if there was only one single integrity zome in the whole dna, it was implied by the conductor that a coordinator zome would depend on that integrity zome. This is no longer the case.
 - Clearer error message if `ScopeLinkedType` or `ScopedEntryDefIndex` cannot be created due to zome dependencies not being specified in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)).
-- Removed an if/else clause in the `Ribosome::new()` impl that lead to inconsistent behavior depending on the number of zomes defined in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)).
 
 ## 0.6.0-dev.12
 
