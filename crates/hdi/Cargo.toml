@@ -1,6 +1,6 @@
 [package]
 name = "hdi"
-version = "0.7.0-dev.7"
+version = "0.7.0-dev.8"
 description = "The HDI"
 license = "CAL-1.0"
 repository = "https://github.com/holochain/holochain/tree/develop/crates/hdi"
