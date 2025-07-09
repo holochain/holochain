@@ -7,7 +7,7 @@ async fn app_bundle_fixture(modifiers: DnaModifiersOpt<YamlProperties>) -> (AppB
     let fake_wasms = vec![dna_wasm.clone().into_content()];
     let fake_zomes = vec![IntegrityZome::new(
         "hi".into(),
-        ZomeDef::Wasm(WasmZome::new(dna_wasm.as_hash().clone())).into(),
+        ZomeDef::Wasm(WasmZome::new(dna_wasm.as_hash().clone(), None)).into(),
     )];
     let dna_def_1 = DnaDef::unique_from_zomes(fake_zomes.clone(), vec![]);
 

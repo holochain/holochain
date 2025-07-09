@@ -323,10 +323,10 @@ impl From<ZomeDef> for CoordinatorZomeDef {
 
 impl WasmZome {
     /// Constructor
-    pub fn new(wasm_hash: holo_hash::WasmHash) -> Self {
+    pub fn new(wasm_hash: holo_hash::WasmHash, dependencies: Option<Vec<ZomeName>>) -> Self {
         Self {
             wasm_hash,
-            dependencies: Default::default(),
+            dependencies: dependencies.unwrap_or_default(),
         }
     }
 }
