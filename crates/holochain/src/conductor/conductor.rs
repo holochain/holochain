@@ -392,12 +392,9 @@ mod startup_shutdown_impls {
 
             info!("Conductor startup: app interfaces started.");
 
-            // We don't care what fx are returned here, since all cells need to
-            // be spun up
-            let _ = self.start_paused_apps().await?;
             let res = self.process_app_status_fx(AppStatusFx::SpinUp, None).await;
 
-            info!("Conductor startup: apps started.");
+            info!("Conductor startup: apps enabled.");
 
             res
         }
@@ -717,32 +714,6 @@ mod dna_impls {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
             }
-        }
-
-        /// Restart every paused app
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub(crate) async fn start_paused_apps(&self) -> ConductorResult<AppStatusFx> {
-            let (_, delta) = self
-                .update_state_prime(|mut state| {
-                    let ids = state.paused_apps().map(first).cloned().collect::<Vec<_>>();
-                    if !ids.is_empty() {
-                        tracing::info!("Restarting {} paused apps: {:#?}", ids.len(), ids);
-                    }
-                    let deltas: Vec<AppStatusFx> = ids
-                        .into_iter()
-                        .map(|id| {
-                            state
-                                .transition_app_status(&id, AppStatusTransition::Enable)
-                                .map(second)
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    let delta = deltas
-                        .into_iter()
-                        .fold(AppStatusFx::default(), AppStatusFx::combine);
-                    Ok((state, delta))
-                })
-                .await?;
-            Ok(delta)
         }
 
         pub(crate) async fn put_wasm(
@@ -1437,9 +1408,9 @@ mod app_impls {
         }
 
         /// List active AppIds
-        pub async fn list_running_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
+        pub async fn list_enabled_apps(&self) -> ConductorResult<Vec<InstalledAppId>> {
             let state = self.get_state().await?;
-            Ok(state.running_apps().map(|(id, _)| id).cloned().collect())
+            Ok(state.enabled_apps().map(|(id, _)| id).cloned().collect())
         }
 
         /// List Apps with their information,
@@ -1455,9 +1426,6 @@ mod app_impls {
             let apps_ids: Vec<&String> = match status_filter {
                 Some(Enabled) => conductor_state.enabled_apps().map(|(id, _)| id).collect(),
                 Some(Disabled) => conductor_state.disabled_apps().map(|(id, _)| id).collect(),
-                Some(Running) => conductor_state.running_apps().map(|(id, _)| id).collect(),
-                Some(Stopped) => conductor_state.stopped_apps().map(|(id, _)| id).collect(),
-                Some(Paused) => conductor_state.paused_apps().map(|(id, _)| id).collect(),
                 None => conductor_state.installed_apps().keys().collect(),
             };
 
@@ -1475,14 +1443,14 @@ mod app_impls {
 
         /// Get the IDs of all active installed Apps which use this Cell
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub async fn list_running_apps_for_dependent_cell_id(
+        pub async fn list_enabled_apps_for_dependent_cell_id(
             &self,
             cell_id: &CellId,
         ) -> ConductorResult<HashSet<InstalledAppId>> {
             Ok(self
                 .get_state()
                 .await?
-                .running_apps()
+                .enabled_apps()
                 .filter(|(_, v)| v.all_cells().any(|i| i == *cell_id))
                 .map(|(k, _)| k)
                 .cloned()
@@ -1499,13 +1467,13 @@ mod app_impls {
             Ok(self
                 .get_state()
                 .await?
-                .running_apps()
-                .find(|(_, running_app)| running_app.all_cells().any(|i| i == *cell_id))
-                .and_then(|(_, running_app)| {
-                    let app = running_app.clone().into_common();
+                .enabled_apps()
+                .find(|(_, enabled_app)| enabled_app.all_cells().any(|i| i == *cell_id))
+                .and_then(|(_, enabled_app)| {
+                    let app = enabled_app.clone().into_common();
                     app.role(role_name).ok().map(|role| match role {
                         AppRoleAssignment::Primary(primary) => {
-                            CellId::new(primary.dna_hash().clone(), running_app.agent_key().clone())
+                            CellId::new(primary.dna_hash().clone(), enabled_app.agent_key().clone())
                         }
                         AppRoleAssignment::Dependency(dependency) => dependency.cell_id.clone(),
                     })
@@ -1514,14 +1482,14 @@ mod app_impls {
 
         /// Get the IDs of all active installed Apps which use this Dna
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub async fn list_running_apps_for_dependent_dna_hash(
+        pub async fn list_enabled_apps_for_dependent_dna_hash(
             &self,
             dna_hash: &DnaHash,
         ) -> ConductorResult<HashSet<InstalledAppId>> {
             Ok(self
                 .get_state()
                 .await?
-                .running_apps()
+                .enabled_apps()
                 .filter(|(_, v)| v.all_cells().any(|i| i.dna_hash() == dna_hash))
                 .map(|(k, _)| k)
                 .cloned()
@@ -1571,7 +1539,7 @@ mod app_impls {
             .await?;
 
             self.clone()
-                .create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
+                .create_and_add_initialized_cells_for_enabled_apps(Some(installed_app_id))
                 .await?;
             let app_ids: HashSet<_> = [installed_app_id.to_owned()].into_iter().collect();
             let delta = self
@@ -1763,7 +1731,7 @@ mod clone_cell_impls {
             // run genesis on cloned cell
             let cells = vec![(clone_cell.cell_id.clone(), membrane_proof)];
             crate::conductor::conductor::genesis_cells(self.clone(), cells).await?;
-            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
+            self.create_and_add_initialized_cells_for_enabled_apps(Some(installed_app_id))
                 .await?;
             Ok(clone_cell)
         }
@@ -1828,7 +1796,7 @@ mod clone_cell_impls {
                 })
                 .await?;
 
-            self.create_and_add_initialized_cells_for_running_apps(Some(installed_app_id))
+            self.create_and_add_initialized_cells_for_enabled_apps(Some(installed_app_id))
                 .await?;
             Ok(enabled_cell)
         }
@@ -1866,8 +1834,8 @@ mod app_status_impls {
     impl Conductor {
         /// Adjust which cells are present in the Conductor (adding and removing as
         /// needed) to match the current reality of all app statuses.
-        /// - If a Cell is used by at least one Running app, then ensure it is added
-        /// - If a Cell is used by no running apps, then ensure it is removed.
+        /// - If a Cell is used by at least one Enabled app, then ensure it is added
+        /// - If a Cell is used by no Enabled apps, then ensure it is removed.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn reconcile_cell_status_with_app_status(
             self: Arc<Self>,
@@ -1875,7 +1843,7 @@ mod app_status_impls {
             self.remove_dangling_cells().await?;
 
             let results = self
-                .create_and_add_initialized_cells_for_running_apps(None)
+                .create_and_add_initialized_cells_for_enabled_apps(None)
                 .await?;
             Ok(results)
         }
@@ -1915,7 +1883,7 @@ mod app_status_impls {
         pub(crate) async fn add_disabled_app_to_db(
             &self,
             app: InstalledAppCommon,
-        ) -> ConductorResult<StoppedApp> {
+        ) -> ConductorResult<DisabledApp> {
             let (_, stopped_app) = self
                 .update_state_prime(move |mut state| {
                     let stopped_app = state.add_app(app)?;
@@ -1942,30 +1910,14 @@ mod app_status_impls {
                 .1)
         }
 
-        /// Pause an app
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-        #[cfg(any(test, feature = "test_utils"))]
-        pub async fn pause_app(
-            self: Arc<Self>,
-            app_id: InstalledAppId,
-            reason: PausedAppReason,
-        ) -> ConductorResult<InstalledApp> {
-            let (app, delta) = self
-                .transition_app_status(app_id.clone(), AppStatusTransition::Pause(reason))
-                .await?;
-            self.process_app_status_fx(delta, Some(vec![app_id.clone()].into_iter().collect()))
-                .await?;
-            Ok(app)
-        }
-
         /// Create any Cells which are missing for any running apps, then initialize
         /// and join them. (Joining could take a while.)
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub(crate) async fn create_and_add_initialized_cells_for_running_apps(
+        pub(crate) async fn create_and_add_initialized_cells_for_enabled_apps(
             self: Arc<Self>,
             app_id: Option<&InstalledAppId>,
         ) -> ConductorResult<CellStartupErrors> {
-            let results = self.clone().create_cells_for_running_apps(app_id).await?;
+            let results = self.clone().create_cells_for_enabled_apps(app_id).await?;
             let (new_cells, errors): (Vec<_>, Vec<_>) =
                 results.into_iter().partition(Result::is_ok);
 
@@ -2031,18 +1983,13 @@ mod app_status_impls {
 
         /// Adjust app statuses (via state transitions) to match the current
         /// reality of which Cells are present in the conductor.
-        /// - Do not change state for Disabled apps. For all others:
-        /// - If an app is Paused but all of its (required) Cells are on,
-        ///   then set it to Running
-        /// - If an app is Running but at least one of its (required) Cells are off,
-        ///   then set it to Paused
+        /// Do not change state for Disabled apps.
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub(crate) async fn reconcile_app_status_with_cell_status(
             &self,
             app_ids: Option<HashSet<InstalledAppId>>,
         ) -> ConductorResult<AppStatusFx> {
             use AppStatus::*;
-            use AppStatusTransition::*;
 
             // NOTE: this is checking all *live* cells, meaning all cells
             // which have fully joined the network. This could lead to a race condition
@@ -2055,7 +2002,6 @@ mod app_status_impls {
             // we might consider relaxing this check so that this race condition isn't
             // possible, and let ourselves be optimistic that all cells will join soon after
             // the app starts.
-            let cell_ids: HashSet<CellId> = self.running_cell_ids();
             let (_, delta) = self
                 .update_state_prime(move |mut state| {
                     #[allow(deprecated)]
@@ -2069,29 +2015,10 @@ mod app_status_impls {
                         .into_iter()
                         .map(|(_app_id, app)| {
                             match app.status().clone() {
-                                Running => {
-                                    // If not all required cells are running, pause the app
-                                    let missing: Vec<_> = app
-                                        .required_cells()
-                                        .filter(|id| !cell_ids.contains(id))
-                                        .collect();
-                                    if !missing.is_empty() {
-                                        let reason = PausedAppReason::Error(format!(
-                                            "Some cells are missing / not able to run: {:#?}",
-                                            missing
-                                        ));
-                                        app.status.transition(Pause(reason))
-                                    } else {
-                                        AppStatusFx::NoChange
-                                    }
-                                }
-                                Paused(_) => {
-                                    // If all required cells are now running, restart the app
-                                    if app.required_cells().all(|id| cell_ids.contains(&id)) {
-                                        app.status.transition(Enable)
-                                    } else {
-                                        AppStatusFx::NoChange
-                                    }
+                                Enabled => {
+                                    // If not all required cells are running, temporarily do nothing, until the next PR removes
+                                    // state machinery altogether.
+                                    AppStatusFx::NoChange
                                 }
                                 Disabled(_) => {
                                     // Disabled status should never automatically change.
@@ -2932,7 +2859,6 @@ impl Conductor {
     }
 
     /// Remove all Cells which are not referenced by any Enabled app.
-    /// (Cells belonging to Paused apps are not considered "dangling" and will not be removed).
     ///
     /// Additionally, if the cell is being removed because the last app referencing it was uninstalled,
     /// all data used by that cell (across Authored, DHT, and Cache databases) will also be removed.
@@ -2941,7 +2867,7 @@ impl Conductor {
         let state = self.get_state().await?;
 
         let keepers: HashSet<CellId> = state
-            .enabled_apps_and_services()
+            .enabled_apps()
             .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
             .collect();
 
@@ -3050,7 +2976,7 @@ impl Conductor {
 
     /// Attempt to create all necessary Cells which have not already been created
     /// and added to the conductor, namely the cells which are referenced by
-    /// Running apps. If there are no cells to create, this function does nothing.
+    /// Enabled apps. If there are no cells to create, this function does nothing.
     ///
     /// Accepts an optional app id to only create cells of that app instead of all apps.
     ///
@@ -3058,7 +2984,7 @@ impl Conductor {
     /// handled alongside the failures.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     #[allow(clippy::complexity)]
-    async fn create_cells_for_running_apps(
+    async fn create_cells_for_enabled_apps(
         self: Arc<Self>,
         app_id: Option<&InstalledAppId>,
     ) -> ConductorResult<Vec<Result<(Cell, InitialQueueTriggers), (CellId, CellError)>>> {
@@ -3068,7 +2994,7 @@ impl Conductor {
         let app_cells: HashSet<CellId> = match app_id {
             Some(app_id) => {
                 let app = state.get_app(app_id)?;
-                if app.status().is_running() {
+                if app.status().is_enabled() {
                     app.all_enabled_cells().collect()
                 } else {
                     HashSet::new()
@@ -3080,7 +3006,7 @@ impl Conductor {
                 state
                     .installed_apps()
                     .iter()
-                    .filter(|(_, app)| app.status().is_running())
+                    .filter(|(_, app)| app.status().is_enabled())
                     .flat_map(|(_id, app)| app.all_enabled_cells())
                     .collect()
             }

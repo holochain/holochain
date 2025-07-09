@@ -301,15 +301,6 @@ impl SweetConductor {
         self.raw_handle().disable_app(id, reason).await
     }
 
-    /// Convenience function that uses the internal handle to pause an app
-    pub async fn pause_app(
-        &self,
-        id: InstalledAppId,
-        reason: PausedAppReason,
-    ) -> ConductorResult<InstalledApp> {
-        self.raw_handle().pause_app(id, reason).await
-    }
-
     /// Install the dna first.
     /// This allows a big speed up when
     /// installing many apps with the same dna

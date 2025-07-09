@@ -103,20 +103,16 @@ impl ConductorState {
         &mut self.installed_apps
     }
 
-    /// Iterate over only the "enabled" apps and services
-    pub fn enabled_apps_and_services(
-        &self,
-    ) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
-        self.installed_apps
-            .iter()
-            .filter(|(_, app)| app.status().is_enabled())
-    }
-
     /// Iterate over only the "enabled" apps
-    pub fn enabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
-        self.installed_apps
-            .iter()
-            .filter(|(_, app)| app.status().is_enabled())
+    pub fn enabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, EnabledApp)> + '_ {
+        self.installed_apps.iter().filter_map(|(id, app)| {
+            if app.status().is_enabled() {
+                let enabled_app = EnabledApp::from(app.as_ref().clone());
+                Some((id, enabled_app))
+            } else {
+                None
+            }
+        })
     }
 
     /// Iterate over only the "disabled" apps
@@ -124,36 +120,6 @@ impl ConductorState {
         self.installed_apps
             .iter()
             .filter(|(_, app)| !app.status().is_enabled())
-    }
-
-    /// Iterate over only the "running" apps
-    pub fn running_apps(&self) -> impl Iterator<Item = (&InstalledAppId, RunningApp)> + '_ {
-        self.installed_apps.iter().filter_map(|(id, app)| {
-            if *app.status() == AppStatus::Running {
-                let running = RunningApp::from(app.as_ref().clone());
-                Some((id, running))
-            } else {
-                None
-            }
-        })
-    }
-
-    /// Iterate over only the paused apps
-    pub fn paused_apps(&self) -> impl Iterator<Item = (&InstalledAppId, StoppedApp)> + '_ {
-        self.installed_apps.iter().filter_map(|(id, app)| {
-            if app.status.is_paused() {
-                StoppedApp::from_app(app).map(|stopped| (id, stopped))
-            } else {
-                None
-            }
-        })
-    }
-
-    /// Iterate over only the "stopped" apps (paused OR disabled)
-    pub fn stopped_apps(&self) -> impl Iterator<Item = (&InstalledAppId, StoppedApp)> + '_ {
-        self.installed_apps
-            .iter()
-            .filter_map(|(id, app)| StoppedApp::from_app(app).map(|stopped| (id, stopped)))
     }
 
     /// Getter for a single app. Returns error if app missing.
@@ -179,11 +145,11 @@ impl ConductorState {
 
     /// Add an app in the Disabled state. Returns an error if an app is already
     /// present at the given ID.
-    pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<StoppedApp> {
+    pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<DisabledApp> {
         if self.installed_apps.contains_key(app.id()) {
             return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
         }
-        let stopped_app = StoppedApp::new_fresh(app);
+        let stopped_app = DisabledApp::new_fresh(app);
         self.installed_apps
             .insert(stopped_app.id().clone(), stopped_app.clone().into());
         Ok(stopped_app)
@@ -212,20 +178,20 @@ impl ConductorState {
         transition: AppStatusTransition,
     ) -> ConductorResult<(&InstalledApp, AppStatusFx)> {
         match transition {
-            AppStatusTransition::Disable(_) | AppStatusTransition::Pause(_) => {
+            AppStatusTransition::Disable(_) => {
                 let dependents: Vec<_> = self
                     .get_dependent_apps(id, true)?
                     .into_iter()
                     .filter(|id| {
                         self.installed_apps
                             .get(id)
-                            .map(|app| app.status().is_running())
+                            .map(|app| app.status().is_enabled())
                             .unwrap_or(false)
                     })
                     .collect();
                 if !dependents.is_empty() {
                     tracing::warn!(
-                        "Disabling/pausing app '{}' which has running protected dependent apps: {:?}",
+                        "Disabling app '{}' which has enabled protected dependent apps: {:?}",
                         id,
                         dependents
                     );
@@ -243,7 +209,7 @@ impl ConductorState {
                                 self.installed_apps
                                     .iter()
                                     .filter_map(|(id, app)| {
-                                        (!app.status().is_running()
+                                        (!app.status().is_enabled()
                                             && app.all_cells().any(|id| id == *cell_id))
                                         .then_some(id)
                                     })
@@ -256,7 +222,7 @@ impl ConductorState {
                     .collect();
                 if !dependencies.is_empty() {
                     return Err(ConductorError::AppStatusError(format!(
-                        "Enabling/starting App '{}' which has protected dependencies that are not running: {:?}",
+                        "Enabling app '{}' which has protected dependencies that are not enabled: {:?}",
                         id, dependencies
                     )));
                 }
@@ -339,7 +305,7 @@ impl ConductorState {
                             .iter()
                             .filter_map(|(id, app)| {
                                 (app.all_cells().any(|id| id == *cell_id)
-                                    && !app.status().is_running())
+                                    && !app.status().is_enabled())
                                 .then_some(id)
                             })
                             .collect()

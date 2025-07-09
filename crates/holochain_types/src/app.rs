@@ -341,10 +341,10 @@ impl InstalledApp {
 
     /// Constructor for freshly installed app
     #[cfg(feature = "test_utils")]
-    pub fn new_running(app: InstalledAppCommon) -> Self {
+    pub fn new_enabled(app: InstalledAppCommon) -> Self {
         Self {
             app,
-            status: AppStatus::Running,
+            status: AppStatus::Enabled,
         }
     }
 
@@ -380,12 +380,12 @@ pub type InstalledAppMap = IndexMap<InstalledAppId, InstalledApp>;
     shrinkwraprs::Shrinkwrap,
 )]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct RunningApp(InstalledAppCommon);
+pub struct EnabledApp(InstalledAppCommon);
 
-impl RunningApp {
+impl EnabledApp {
     /// Convert to a StoppedApp with the given reason
-    pub fn into_stopped(self, reason: StoppedAppReason) -> StoppedApp {
-        StoppedApp {
+    pub fn into_disabled(self, reason: DisabledAppReason) -> DisabledApp {
+        DisabledApp {
             app: self.0,
             reason,
         }
@@ -397,47 +397,33 @@ impl RunningApp {
     }
 }
 
-impl From<RunningApp> for InstalledApp {
-    fn from(app: RunningApp) -> Self {
+impl From<EnabledApp> for InstalledApp {
+    fn from(app: EnabledApp) -> Self {
         Self {
             app: app.into_common(),
-            status: AppStatus::Running,
+            status: AppStatus::Enabled,
         }
     }
 }
 
-/// An app which is either Paused or Disabled, i.e. not Running
+/// An app which is [AppStatus::Disabled], i.e. not running
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
 )]
 #[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct StoppedApp {
+pub struct DisabledApp {
     #[shrinkwrap(main_field)]
     app: InstalledAppCommon,
-    reason: StoppedAppReason,
+    reason: DisabledAppReason,
 }
 
-impl StoppedApp {
+impl DisabledApp {
     /// Constructor
     pub fn new_fresh(app: InstalledAppCommon) -> Self {
         Self {
             app,
-            reason: StoppedAppReason::Disabled(DisabledAppReason::NeverStarted),
+            reason: DisabledAppReason::NeverStarted,
         }
-    }
-
-    /// If the app is Stopped, convert into a StoppedApp.
-    /// Returns None if app is Running.
-    pub fn from_app(app: &InstalledApp) -> Option<Self> {
-        StoppedAppReason::from_status(app.status()).map(|reason| Self {
-            app: app.as_ref().clone(),
-            reason,
-        })
-    }
-
-    /// Convert to a RunningApp
-    pub fn into_active(self) -> RunningApp {
-        RunningApp(self.app)
     }
 
     /// Move inner type out
@@ -446,14 +432,14 @@ impl StoppedApp {
     }
 }
 
-impl From<StoppedApp> for InstalledAppCommon {
-    fn from(d: StoppedApp) -> Self {
+impl From<DisabledApp> for InstalledAppCommon {
+    fn from(d: DisabledApp) -> Self {
         d.app
     }
 }
 
-impl From<StoppedApp> for InstalledApp {
-    fn from(d: StoppedApp) -> Self {
+impl From<DisabledApp> for InstalledApp {
+    fn from(d: DisabledApp) -> Self {
         Self {
             app: d.app,
             status: d.reason.into(),
@@ -927,27 +913,14 @@ impl InstalledAppCommon {
 
 /// The status of an installed app.
 ///
-/// App Status is a combination of two pieces of independent state:
-/// - Enabled/Disabled, which is a designation set by the user via the conductor admin interface.
-/// - Running/Stopped, which is a fact about the reality of the app in the course of its operation.
-///
-/// The combinations of these basic states give rise to the unified App Status.
+/// Either Enabled or Disabled, set by the user via the conductor admin interface.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppStatus {
-    /// The app is enabled and running normally.
-    Running,
+    /// The app is enabled.
+    Enabled,
 
-    /// Enabled, but stopped due to some recoverable problem.
-    /// The app "hopes" to be Running again as soon as possible.
-    /// Holochain may restart the app automatically if it can. It may also be
-    /// restarted manually via the `StartApp` admin method.
-    /// Paused apps will be automatically set to Running when the conductor restarts.
-    Paused(PausedAppReason),
-
-    /// Disabled and stopped, either manually by the user, or automatically due
-    /// to an unrecoverable error. App must be Enabled before running again,
-    /// and will not restart automaticaly on conductor reboot.
+    /// The app is disabled.
     Disabled(DisabledAppReason),
 
     /// The app is installed, but genesis has not completed because Membrane Proofs
@@ -959,8 +932,7 @@ pub enum AppStatus {
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum AppStatusKind {
-    Running,
-    Paused,
+    Enabled,
     Disabled,
     AwaitingMemproofs,
 }
@@ -968,8 +940,7 @@ pub enum AppStatusKind {
 impl From<AppStatus> for AppStatusKind {
     fn from(status: AppStatus) -> Self {
         match status {
-            AppStatus::Running => Self::Running,
-            AppStatus::Paused(_) => Self::Paused,
+            AppStatus::Enabled => Self::Enabled,
             AppStatus::Disabled(_) => Self::Disabled,
             AppStatus::AwaitingMemproofs => Self::AwaitingMemproofs,
         }
@@ -979,8 +950,6 @@ impl From<AppStatus> for AppStatusKind {
 /// Represents a state transition operation from one state to another
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AppStatusTransition {
-    /// Attempt to pause a Running app
-    Pause(PausedAppReason),
     /// Gets an app running no matter what
     Enable,
     /// Disables an app, no matter what
@@ -991,18 +960,7 @@ impl AppStatus {
     /// Does this status correspond to an Enabled state?
     /// If false, this indicates a Disabled state.
     pub fn is_enabled(&self) -> bool {
-        matches!(self, Self::Running | Self::Paused(_))
-    }
-
-    /// Does this status correspond to a Running state?
-    /// If false, this indicates a Stopped state.
-    pub fn is_running(&self) -> bool {
-        matches!(self, Self::Running)
-    }
-
-    /// Does this status correspond to a Paused state?
-    pub fn is_paused(&self) -> bool {
-        matches!(self, Self::Paused(_))
+        matches!(self, Self::Enabled)
     }
 
     /// Transition a status from one state to another.
@@ -1012,16 +970,11 @@ impl AppStatus {
         use AppStatusFx::*;
         use AppStatusTransition::*;
         match (&self, transition) {
-            (Running, Pause(reason)) => Some((Paused(reason), SpinDown)),
-            (Running, Disable(reason)) => Some((Disabled(reason), SpinDown)),
-            (Running, Enable) => None,
+            (Enabled, Disable(reason)) => Some((Disabled(reason), SpinDown)),
+            (Enabled, Enable) => None,
 
-            (Paused(_), Enable) => Some((Running, SpinUp)),
-            (Paused(_), Disable(reason)) => Some((Disabled(reason), SpinDown)),
-            (Paused(_), Pause(_)) => None,
-
-            (Disabled(_), Enable) => Some((Running, SpinUp)),
-            (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) => None,
+            (Disabled(_), Enable) => Some((Enabled, SpinUp)),
+            (Disabled(_), Disable(_)) => None,
 
             (AwaitingMemproofs, Enable) => Some((
                 AwaitingMemproofs,
@@ -1082,61 +1035,6 @@ impl AppStatusFx {
     }
 }
 
-/// The various reasons for why an App is not in the Running state.
-#[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-    SerializedBytes,
-    derive_more::From,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum StoppedAppReason {
-    /// Same meaning as [`AppStatus::Paused`].
-    Paused(PausedAppReason),
-
-    /// Same meaning as [`AppStatus::Disabled`].
-    Disabled(DisabledAppReason),
-
-    /// Same meaning as [`AppStatus::AwaitingMemproofs`].
-    AwaitingMemproofs,
-}
-
-impl StoppedAppReason {
-    /// Convert a status into a StoppedAppReason.
-    /// If the status is Running, returns None.
-    pub fn from_status(status: &AppStatus) -> Option<Self> {
-        match status {
-            AppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
-            AppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
-            AppStatus::AwaitingMemproofs => Some(Self::AwaitingMemproofs),
-            AppStatus::Running => None,
-        }
-    }
-}
-
-impl From<StoppedAppReason> for AppStatus {
-    fn from(reason: StoppedAppReason) -> Self {
-        match reason {
-            StoppedAppReason::Paused(reason) => Self::Paused(reason),
-            StoppedAppReason::Disabled(reason) => Self::Disabled(reason),
-            StoppedAppReason::AwaitingMemproofs => Self::AwaitingMemproofs,
-        }
-    }
-}
-
-/// The reason for an app being in a Paused state.
-/// NB: there is no way to manually pause an app.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
-pub enum PausedAppReason {
-    /// The pause was due to a RECOVERABLE error
-    Error(String),
-}
-
 /// The reason for an app being in a Disabled state.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
@@ -1152,6 +1050,19 @@ pub enum DisabledAppReason {
     User,
     /// The disabling was due to an UNRECOVERABLE error
     Error(String),
+}
+
+impl From<DisabledAppReason> for AppStatus {
+    fn from(reason: DisabledAppReason) -> Self {
+        match reason {
+            DisabledAppReason::NeverStarted => Self::Disabled(reason),
+            DisabledAppReason::NotStartedAfterProvidingMemproofs => {
+                Self::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)
+            }
+            DisabledAppReason::Error(err) => Self::Disabled(DisabledAppReason::Error(err)),
+            DisabledAppReason::User => Self::Disabled(DisabledAppReason::User),
+        }
+    }
 }
 
 /// App "roles" correspond to cell entries in the AppManifest.
@@ -1284,7 +1195,7 @@ pub struct AppRoleDependency {
 
 #[cfg(test)]
 mod tests {
-    use super::RunningApp;
+    use super::EnabledApp;
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
@@ -1325,7 +1236,7 @@ mod tests {
             roles: vec![],
             allow_deferred_memproofs: false,
         });
-        let mut app: RunningApp = InstalledAppCommon::new(
+        let mut app: EnabledApp = InstalledAppCommon::new(
             "app",
             agent.clone(),
             vec![(role_name.clone(), role1)],
@@ -1451,25 +1362,16 @@ mod tests {
 
     #[test]
     fn app_status_serialization() {
-        let app_status: AppStatus = AppStatus::Running;
+        let app_status: AppStatus = AppStatus::Enabled;
         assert_eq!(
             serde_json::to_string(&app_status).unwrap(),
-            "{\"type\":\"running\"}"
+            "{\"type\":\"enabled\"}"
         );
 
         let app_status: AppStatus = AppStatus::Disabled(DisabledAppReason::NeverStarted);
         assert_eq!(
             serde_json::to_string(&app_status).unwrap(),
             "{\"type\":\"disabled\",\"value\":{\"type\":\"never_started\"}}"
-        );
-    }
-
-    #[test]
-    fn paused_app_reason_serialization() {
-        let reason = PausedAppReason::Error("s are here to learn from".into());
-        assert_eq!(
-            serde_json::to_string(&reason).unwrap(),
-            "{\"type\":\"error\",\"value\":\"s are here to learn from\"}"
         );
     }
 
