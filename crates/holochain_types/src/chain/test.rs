@@ -157,12 +157,7 @@ fn test_filter_then_check(
     mut f: impl FnMut(&ActionHash) -> Option<u32>,
 ) -> MustGetAgentActivityResponse {
     let chain = chain_to_ops(chain);
-    match Sequences::find_sequences::<_, _, _, ()>(
-        filter,
-        |a| Ok(f(a)),
-        |_ts, _ts2| Ok(None),
-        |_seq| Ok(None),
-    ) {
+    match Sequences::find_sequences::<_, _, ()>(filter, |a| Ok(f(a)), |_ts| Ok(None)) {
         Ok(Sequences::Found(s)) => s.filter_then_check(chain, vec![]),
         _ => unreachable!(),
     }
@@ -244,12 +239,7 @@ fn test_find_sequences(
     filter: ChainFilter,
     mut f: impl FnMut(&ActionHash) -> Option<u32>,
 ) -> Sequences {
-    match Sequences::find_sequences::<_, _, _, ()>(
-        filter,
-        |a| Ok(f(a)),
-        |_ts1, _ts2| Ok(None),
-        |_seq| Ok(None),
-    ) {
+    match Sequences::find_sequences::<_, _, ()>(filter, |a| Ok(f(a)), |_ts1| Ok(None)) {
         Ok(r) => r,
         Err(_) => unreachable!(),
     }

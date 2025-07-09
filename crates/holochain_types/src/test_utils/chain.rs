@@ -75,12 +75,12 @@ impl TestChainItem {
         Self {
             seq,
             hash: TestChainHash(seq),
-            timestamp: Timestamp::from_micros((seq * 1000).into()),
+            timestamp: Timestamp::from_micros(seq as i64 * 1000),
             prev: seq.checked_sub(1).map(TestChainHash),
         }
     }
 
-    /// Constructor for happy-path chains with no forking
+    /// Constructor for happy-path chains with no forking and explicit timestamp
     pub fn with_ts(seq: u32, us: i64) -> Self {
         Self {
             seq,
@@ -95,7 +95,7 @@ impl TestChainItem {
         Self {
             seq: seq.into(),
             hash: TestChainHash::forked(seq, new_fork),
-            timestamp: Timestamp(seq.into()),
+            timestamp: Timestamp::from_micros(seq as i64 * 1000),
             prev: seq
                 .checked_sub(1)
                 .map(|s| TestChainHash::forked(s, prev_fork)),
@@ -257,7 +257,8 @@ pub fn chain_item_to_action(i: &impl ChainItem) -> SignedActionHashed {
     let mut action = fixt!(SignedActionHashed);
     match (action_seq, prev_action) {
         (_, None) => {
-            let dna = fixt!(Dna);
+            let mut dna = fixt!(Dna);
+            dna.timestamp = Timestamp(0);
             action.hashed.content = Action::Dna(dna);
             action.hashed.hash = hash;
         }

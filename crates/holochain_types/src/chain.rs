@@ -366,16 +366,14 @@ impl<I: AsRef<A>, A: ChainItem> Iterator for ChainFilterIter<I, A> {
 
 impl Sequences {
     /// Find the action sequences for all hashes in the filter.
-    pub fn find_sequences<F, F2, F3, E>(
+    pub fn find_sequences<F, F2, E>(
         filter: ChainFilter,
         mut get_seq_from_hash: F,
         mut get_seq_from_ts: F2,
-        mut get_ts_from_seq: F3,
     ) -> Result<Self, E>
     where
         F: FnMut(&ActionHash) -> Result<Option<u32>, E>,
-        F2: FnMut(Timestamp, Timestamp) -> Result<Option<u32>, E>,
-        F3: FnMut(u32) -> Result<Option<Timestamp>, E>,
+        F2: FnMut(Timestamp) -> Result<Option<u32>, E>,
     {
         // Get the top of the chain action sequence.
         // This is the highest sequence number and also the
@@ -429,23 +427,14 @@ impl Sequences {
 
         // Check if there is an until timestamp condition in the filter
         // and get the distance from the position.
-        if let Some(from) = filter.get_until_timestamp() {
-            let mut ts_distance = u32::MAX;
-            // A timestamp of zero will produce an empty range.
-            if from.0 != 0 {
-                // get chain-top timestamp
-                let maybe_to = get_ts_from_seq(chain_top)?;
-                if let Some(to) = maybe_to {
-                    let maybe_seq = get_seq_from_ts(from, to)?;
-                    if let Some(seq) = maybe_seq {
-                        ts_distance = chain_top - seq;
-                    }
+        if let Some(until_ts) = filter.get_until_timestamp() {
+            if let Some(seq) = get_seq_from_ts(until_ts)? {
+                let ts_distance = chain_top - seq;
+                // Keep the shortest distance between untilHash and untilTimestamp.
+                if ts_distance <= distance {
+                    chain_bottom_type = ChainBottomType::UntilTimestamp;
+                    distance = ts_distance;
                 }
-            }
-            // Keep the shortest distance
-            if ts_distance <= distance {
-                chain_bottom_type = ChainBottomType::UntilTimestamp;
-                distance = ts_distance;
             }
         }
 
@@ -457,7 +446,7 @@ impl Sequences {
                 if take == 0 {
                     return Ok(Self::EmptyRange);
                 } else if take <= distance {
-                    // The take will be reached first.
+                    // The take limit will be reached first.
                     chain_bottom_type = ChainBottomType::Take;
                     // Add one to include the "position" in the number of
                     // "take". This matches the rust iterator "take".
