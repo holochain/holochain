@@ -1,6 +1,6 @@
 [package]
 name = "holochain_types"
-version = "0.5.4-rc.0"
+version = "0.5.4"
 description = "Holochain common types"
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -29,26 +29,26 @@ flate2 = "1.0.14"
 futures = "0.3"
 getrandom = { version = "0.2.7" }
 one_err = "0.0.8"
-holo_hash = { version = "^0.5.3", path = "../holo_hash", features = [
+holo_hash = { version = "^0.5.4", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_keystore = { version = "^0.5.4-rc.0", path = "../holochain_keystore" }
-holochain_nonce = { version = "^0.5.3", path = "../holochain_nonce" }
+holochain_keystore = { version = "^0.5.4", path = "../holochain_keystore" }
+holochain_nonce = { version = "^0.5.4", path = "../holochain_nonce" }
 holochain_serialized_bytes = "=0.0.56"
-holochain_sqlite = { path = "../holochain_sqlite", version = "^0.5.4-rc.0" }
-holochain_trace = { version = "^0.5.3", path = "../holochain_trace" }
-holochain_util = { version = "^0.5.3", path = "../holochain_util", features = [
+holochain_sqlite = { path = "../holochain_sqlite", version = "^0.5.4"}
+holochain_trace = { version = "^0.5.4", path = "../holochain_trace" }
+holochain_util = { version = "^0.5.4", path = "../holochain_util", features = [
   "backtrace",
 ] }
-holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.3", features = [
+holochain_zome_types = { path = "../holochain_zome_types", version = "^0.5.4", features = [
   "full",
 ] }
-holochain_timestamp = { version = "^0.5.3", path = "../timestamp" }
+holochain_timestamp = { version = "^0.5.4", path = "../timestamp" }
 kitsune2_api = "0.1.8"
 itertools = { version = "0.12" }
 mr_bundle = { path = "../mr_bundle", features = [
   "packing",
-], version = "^0.5.3" }
+], version = "^0.5.4"}
 must_future = "0.1.1"
 nanoid = "0.4"
 parking_lot = "0.12"
@@ -71,7 +71,7 @@ tracing = "0.1.26"
 indexmap = { version = "2.6.0", features = ["serde"] }
 schemars = "0.8.21"
 
-fixt = { path = "../fixt", version = "^0.5.3", optional = true }
+fixt = { path = "../fixt", version = "^0.5.4", optional = true }
 isotest = { version = "0", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }
