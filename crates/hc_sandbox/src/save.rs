@@ -100,27 +100,31 @@ pub fn load(mut hc_dir: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
 
 /// Print out the sandboxes contained in the `.hc` file.
 pub fn list(hc_dir: PathBuf, verbose: bool) -> anyhow::Result<()> {
-    let out = load(hc_dir)?.into_iter().enumerate().try_fold(
-        "\nSandboxes contained in `.hc`\n".to_string(),
-        |out, (i, path)| {
-            let r = match verbose {
-                false => format!("{}{}: {}\n", out, i, path.display()),
-                true => {
-                    let config = holochain_conductor_config::config::read_config(
-                        ConfigRootPath::from(path.clone()),
-                    )?;
-                    format!(
-                        "{}{}: {}\nConductor Config:\n{:?}\n",
-                        out,
-                        i,
-                        path.display(),
-                        config
-                    )
-                }
-            };
-            anyhow::Result::<_, anyhow::Error>::Ok(r)
-        },
-    )?;
+    let paths = load(hc_dir.clone())?;
+    let out = match paths.len() {
+        0 => format!("No sandboxes contained in `{}`", hc_dir.join(".hc").display()),
+        _ => paths.into_iter().enumerate().try_fold(
+            format!("Sandboxes contained in `{}`", hc_dir.join(".hc").display()),
+            |out, (i, path)| {
+                let r = match verbose {
+                    false => format!("{}{}: {}\n", out, i, path.display()),
+                    true => {
+                        let config = holochain_conductor_config::config::read_config(
+                            ConfigRootPath::from(path.clone()),
+                        )?;
+                        format!(
+                            "{}{}: {}\nConductor Config:\n{:?}\n",
+                            out,
+                            i,
+                            path.display(),
+                            config
+                        )
+                    }
+                };
+                anyhow::Result::<_, anyhow::Error>::Ok(r)
+            },
+        )?,
+    };
     msg!("{}", out);
     Ok(())
 }
