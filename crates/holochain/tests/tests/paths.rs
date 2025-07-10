@@ -407,3 +407,76 @@ async fn paths_are_case_sensitive() {
         .await;
     assert!(books.is_empty(),);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn paths_can_be_created_fully_or_with_path_sharding() {
+    holochain_trace::test_run();
+
+    let mut conductor_batch = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Paths]).await;
+
+    let apps = conductor_batch
+        .setup_app("paths_app", [&dna])
+        .await
+        .unwrap();
+
+    let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
+
+    conductor_batch[0]
+        .declare_full_storage_arcs(dna.dna_hash())
+        .await;
+    conductor_batch[1]
+        .declare_full_storage_arcs(dna.dna_hash())
+        .await;
+
+    // Wait for gossip to start
+    conductor_batch[0]
+        .require_initial_gossip_activity_for_cell(&alice_cell, 1, Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    // Alice adds a book entry.
+    let () = conductor_batch[0]
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "add_book_entry",
+            ("Shakespeare", "Romeo and Juliet"),
+        )
+        .await;
+
+    await_consistency(Duration::from_secs(60), [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
+
+    // Can find book using path-sharding.
+    let books: Vec<BookEntry> = conductor_batch[0]
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "Shakespeare",
+        )
+        .await;
+    assert_eq!(
+        books,
+        [BookEntry {
+            name: "Romeo and Juliet".to_string()
+        }]
+    );
+
+    // Can find book manually at a path.
+    let books: Vec<BookEntry> = conductor_batch[1]
+        .call(
+            &bob_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_at_path",
+            // This is the path created by path-sharding the author's name.
+            "S.h.a.k.e.s.p.e.a.r.e.Shakespeare",
+        )
+        .await;
+    assert_eq!(
+        books,
+        [BookEntry {
+            name: "Romeo and Juliet".to_string()
+        }]
+    );
+}

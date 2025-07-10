@@ -95,3 +95,23 @@ fn find_books_from_author(author: String) -> ExternResult<Vec<BookEntry>> {
 
     Ok(books)
 }
+
+#[hdk_extern]
+fn find_books_at_path(path_string: String) -> ExternResult<Vec<BookEntry>> {
+    let path = Path::from(path_string).typed(LinkTypes::AuthorPath)?;
+
+    let books = get_links(
+        LinkQuery::new(
+            path.path_entry_hash()?,
+            LinkTypes::AuthorBook.try_into_filter()?,
+        ),
+        GetStrategy::default(),
+    )?
+    .into_iter()
+    .filter_map(|link| link.target.into_entry_hash())
+    .filter_map(|entry_hash| must_get_entry(entry_hash).map(|entry| entry.content).ok())
+    .filter_map(|entry_content| BookEntry::try_from(entry_content).ok())
+    .collect();
+
+    Ok(books)
+}
