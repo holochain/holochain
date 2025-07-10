@@ -506,15 +506,13 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::EnableApp`].
     ///
-    /// It means the app was enabled successfully. If it was possible to
-    /// put the app in a running state, it will be running, otherwise it will
-    /// be paused.
+    /// If anything during the process of enabling the app fails,
+    /// the error is returned and the app remains disabled.
+    /// In case of failure to join the network of any of the app's
+    /// cells, it can be re-attempted to enable the app.
     ///
-    /// Contains the app info and list of errors for cells that could not be enabled.
-    AppEnabled {
-        app: AppInfo,
-        errors: Vec<(CellId, String)>,
-    },
+    /// Contains the app info of the enabled app.
+    AppEnabled(AppInfo),
 
     /// The successful response to an [`AdminRequest::DisableApp`].
     ///

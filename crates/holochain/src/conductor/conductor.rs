@@ -1833,14 +1833,14 @@ mod app_status_impls {
         pub async fn enable_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
-        ) -> ConductorResult<(InstalledApp, CellStartupErrors)> {
+        ) -> ConductorResult<InstalledApp> {
             let (app, delta) = self
                 .transition_app_status(app_id.clone(), AppStatusTransition::Enable)
                 .await?;
-            let errors = self
+            let _ = self
                 .process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
                 .await?;
-            Ok((app, errors))
+            Ok(app)
         }
 
         /// Disable an app
@@ -1864,13 +1864,13 @@ mod app_status_impls {
             &self,
             app: InstalledAppCommon,
         ) -> ConductorResult<DisabledApp> {
-            let (_, stopped_app) = self
+            let (_, disabled_app) = self
                 .update_state_prime(move |mut state| {
-                    let stopped_app = state.add_app(app)?;
-                    Ok((state, stopped_app))
+                    let disabled_app = state.add_app(app)?;
+                    Ok((state, disabled_app))
                 })
                 .await?;
-            Ok(stopped_app)
+            Ok(disabled_app)
         }
 
         /// Transition an app's status to a new state.
