@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use anyhow::bail;
-use holo_hash::DnaHashB64;
+use holo_hash::{AgentPubKeyB64, DnaHashB64};
 use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::AgentMetaInfo;
@@ -21,7 +21,7 @@ use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
 use holochain_types::app::AppManifest;
 use holochain_types::app::RoleSettingsMap;
 use holochain_types::app::RoleSettingsMapYaml;
-use holochain_types::prelude::DnaModifiersOpt;
+use holochain_types::prelude::{Deserialize, DnaModifiersOpt, Serialize};
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
@@ -31,7 +31,7 @@ use holochain_types::prelude::{DnaSource, NetworkSeed};
 use kitsune2_api::Url;
 use kitsune2_core::Ed25519Verifier;
 use std::convert::TryFrom;
-
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use crate::cmds::Existing;
 use crate::ports::get_admin_ports;
 use crate::run::run_async;
@@ -489,31 +489,24 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             add_agent_info(client, agent_infos).await?;
         }
         AdminRequestCli::ListAgents(args) => {
-            use std::fmt::Write;
+            let mut out = Vec::new();
             let agent_infos = request_agent_info(client, args).await?;
+            let cell_info = client.list_cell_ids().await?;
+            let agents = cell_info
+                .iter()
+                .map(|c| c.agent_pubkey().clone())
+                .map(|a| (a.clone(), a.to_k2_agent()))
+                .collect::<Vec<_>>();
+
+            let dnas = cell_info
+                .iter()
+                .map(|c| c.dna_hash().clone())
+                .map(|d| (d.clone(), d.to_k2_space()))
+                .collect::<Vec<_>>();
+
             for info in agent_infos {
-                let mut out = String::new();
-                let cell_info = client.list_cell_ids().await?;
-                let agents = cell_info
-                    .iter()
-                    .map(|c| c.agent_pubkey().clone())
-                    .map(|a| (a.clone(), a.to_k2_agent()))
-                    .collect::<Vec<_>>();
-
-                let dnas = cell_info
-                    .iter()
-                    .map(|c| c.dna_hash().clone())
-                    .map(|d| (d.clone(), d.to_k2_space()))
-                    .collect::<Vec<_>>();
-
                 let this_agent = agents.iter().find(|a| info.agent == a.1);
                 let this_dna = dnas.iter().find(|d| info.space == d.1).unwrap();
-                if let Some(this_agent) = this_agent {
-                    writeln!(out, "This agent {:?} is {:?}", this_agent.0, this_agent.1)?;
-                }
-                writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
-
-                use chrono::{DateTime, Duration, NaiveDateTime, Utc};
                 let duration = Duration::try_milliseconds(info.created_at.as_micros() / 1000)
                     .ok_or_else(|| anyhow!("Agent info timestamp out of range"))?;
                 let s = duration.num_seconds();
@@ -528,20 +521,18 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 // TODO FIXME
                 #[allow(deprecated)]
                 let exp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-                let now = Utc::now();
 
-                writeln!(out, "signed at {}", dt)?;
-                writeln!(
-                    out,
-                    "expires at {} in {}mins",
-                    exp,
-                    (exp - now).num_minutes()
-                )?;
-                writeln!(out, "space: {:?}", info.space)?;
-                writeln!(out, "agent: {:?}", info.agent)?;
-                writeln!(out, "URLs: {:?}", info.url)?;
-                msg!("{}\n", out);
+                out.push(AgentResponse {
+                    agent_pub_key: this_agent.map(|a| a.0.clone().into()),
+                    k2_agent: this_agent.map(|a| a.1.clone()),
+                    dna_hash: this_dna.0.clone().into(),
+                    k2_space: this_dna.1.clone(),
+                    signed_at: dt,
+                    expires_at: exp,
+                    url: info.url.clone(),
+                });
             }
+            println!("{}", serde_json::to_value(&out)?);
         }
         AdminRequestCli::AgentMetaInfo(args) => {
             let info = client.agent_meta_info(args.url, args.dna).await?;
@@ -555,6 +546,18 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         }
     }
     Ok(())
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct AgentResponse {
+    agent_pub_key: Option<AgentPubKeyB64>,
+    k2_agent: Option<kitsune2_api::AgentId>,
+    dna_hash: DnaHashB64,
+    k2_space: kitsune2_api::SpaceId,
+    signed_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+    url: Option<Url>,
+
 }
 
 /// Calls [`AdminWebsocket::register_dna`] and registers the DNA.
