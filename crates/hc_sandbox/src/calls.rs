@@ -413,7 +413,6 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(client, args).await?;
             println!("{}", serde_json::to_value(&app)?);
-            // println!("{}", serde_json::to_value(AppInfoJson::from(app))?);
         }
         AdminRequestCli::UninstallApp(args) => {
             client
@@ -443,8 +442,6 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         AdminRequestCli::ListApps(args) => {
             let apps = client.list_apps(args.status).await?;
             println!("{}", serde_json::to_value(&apps)?);
-            // let apps_json: Vec<AppInfoJson> = apps.iter().map(|a| AppInfoJson::from(a)).collect();
-            // println!("{}", serde_json::to_value(&apps_json)?);
         }
         AdminRequestCli::EnableApp(args) => {
             client.enable_app(args.app_id.clone()).await?;
