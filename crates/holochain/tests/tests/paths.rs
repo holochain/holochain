@@ -100,6 +100,138 @@ async fn agents_can_find_entries_at_paths() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn agents_can_find_multiple_entries_at_same_path() {
+    holochain_trace::test_run();
+
+    let mut conductor_batch = SweetConductorBatch::from_standard_config_rendezvous(2).await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Paths]).await;
+
+    let apps = conductor_batch
+        .setup_app("paths_app", [&dna])
+        .await
+        .unwrap();
+
+    let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
+
+    conductor_batch[0]
+        .declare_full_storage_arcs(dna.dna_hash())
+        .await;
+    conductor_batch[1]
+        .declare_full_storage_arcs(dna.dna_hash())
+        .await;
+
+    // Wait for gossip to start
+    conductor_batch[0]
+        .require_initial_gossip_activity_for_cell(&alice_cell, 1, Duration::from_secs(30))
+        .await
+        .unwrap();
+
+    // There should be no books created yet.
+    let books: Vec<BookEntry> = conductor_batch[0]
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "Stevenson",
+        )
+        .await;
+    assert!(books.is_empty());
+
+    let books: Vec<BookEntry> = conductor_batch[1]
+        .call(
+            &bob_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "Stevenson",
+        )
+        .await;
+    assert!(books.is_empty());
+
+    // Alice adds a book entry.
+    let () = conductor_batch[0]
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "add_book_entry",
+            ("Stevenson", "Treasure Island"),
+        )
+        .await;
+
+    // Bob adds a book entry.
+    let () = conductor_batch[1]
+        .call(
+            &bob_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "add_book_entry",
+            ("Stevenson", "Strange Case of Dr Jekyll and Mr Hyde"),
+        )
+        .await;
+
+    // Alice should at least see her own entry.
+    let books: Vec<BookEntry> = conductor_batch[0]
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "Stevenson",
+        )
+        .await;
+    assert!(books.contains(&BookEntry {
+        name: "Treasure Island".to_string()
+    }));
+
+    // Bob should at least see his own entry.
+    let books: Vec<BookEntry> = conductor_batch[1]
+        .call(
+            &bob_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "Stevenson",
+        )
+        .await;
+    assert!(books.contains(&BookEntry {
+        name: "Strange Case of Dr Jekyll and Mr Hyde".to_string()
+    }));
+
+    await_consistency(Duration::from_secs(60), [&alice_cell, &bob_cell])
+        .await
+        .unwrap();
+
+    // After consistency, both should see each other's entries.
+    let books: Vec<BookEntry> = conductor_batch[0]
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "Stevenson",
+        )
+        .await;
+    assert_eq!(
+        books,
+        [
+            BookEntry {
+                name: "Treasure Island".to_string()
+            },
+            BookEntry {
+                name: "Strange Case of Dr Jekyll and Mr Hyde".to_string()
+            }
+        ]
+    );
+    let books: Vec<BookEntry> = conductor_batch[1]
+        .call(
+            &bob_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "Stevenson",
+        )
+        .await;
+    assert_eq!(
+        books,
+        [
+            BookEntry {
+                name: "Treasure Island".to_string()
+            },
+            BookEntry {
+                name: "Strange Case of Dr Jekyll and Mr Hyde".to_string()
+            }
+        ]
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn paths_are_case_sensitive() {
     holochain_trace::test_run();
 
