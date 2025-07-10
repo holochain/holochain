@@ -89,9 +89,9 @@ impl From<GetStrategy> for GetOptions {
     }
 }
 
-#[derive(PartialEq, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 /// Set if data should be fetched from the network or only from the local
 /// databases.
+#[derive(PartialEq, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum GetStrategy {
     /// Fetch latest metadata from the network,
     /// and otherwise fall back to locally cached metadata.
