@@ -6,14 +6,7 @@ mod integrity;
 #[hdk_extern]
 fn add_book_entry(author_and_name: (String, String)) -> ExternResult<()> {
     // Use path-sharding to split author's name into single character paths.
-    let path_string = format!(
-        "1:{}#{}",
-        author_and_name.0.len(),
-        author_and_name
-            .0
-            .to_lowercase()
-            .replace(char::is_whitespace, "-"),
-    );
+    let path_string = format!("1:{}#{}", author_and_name.0.len(), author_and_name.0);
     let path = Path::from(path_string).typed(LinkTypes::AuthorPath)?;
 
     let book_tag: LinkTag = author_and_name.1.clone().into();
@@ -75,7 +68,7 @@ fn recursively_find_books(path: TypedPath) -> ExternResult<Vec<Link>> {
 
 #[hdk_extern]
 fn find_books_from_author(author: String) -> ExternResult<Vec<BookEntry>> {
-    let path_string = format!("1:{}#{}", author.len(), author.to_lowercase(),);
+    let path_string = format!("1:{}#{}", author.len(), author,);
     let path = Path::from(path_string).typed(LinkTypes::AuthorPath)?;
 
     // Path-sharding appends an extra leaf to the path so remove it.

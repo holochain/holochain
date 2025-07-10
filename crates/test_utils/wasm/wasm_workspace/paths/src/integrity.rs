@@ -41,17 +41,8 @@ fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     "Link's target_address '{target_address}' was not a valid entry hash",
                 )))
             } else if let Ok(tag_components) = Component::try_from(tag_bytes) {
-                if let Ok(tag_string) = String::try_from(&tag_components) {
-                    if tag_string
-                        .chars()
-                        .all(|c| c == '-' || c.is_ascii_lowercase())
-                    {
-                        Ok(ValidateCallbackResult::Valid)
-                    } else {
-                        Ok(ValidateCallbackResult::Invalid(format!(
-                    "Link's tag of '{tag_string:?}' contained more than lower-case ASCII letters and dashes",
-                )))
-                    }
+                if String::try_from(&tag_components).is_ok() {
+                    Ok(ValidateCallbackResult::Valid)
                 } else {
                     Ok(ValidateCallbackResult::Invalid(format!(
                         "The components of the link's tag '{tag_components:?}' were not valid strings",

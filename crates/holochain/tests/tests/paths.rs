@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use holochain::sweettest::{await_consistency, SweetConductorBatch, SweetDnaFile};
+use holochain::sweettest::{await_consistency, SweetConductor, SweetConductorBatch, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
 
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
@@ -97,4 +97,73 @@ async fn agents_can_find_entries_at_paths() {
             name: "Romeo and Juliet".to_string()
         }]
     );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn paths_are_case_sensitive() {
+    holochain_trace::test_run();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Paths]).await;
+
+    let app = conductor.setup_app("paths_app", [&dna]).await.unwrap();
+
+    let alice_cell = app.cells().first().unwrap();
+
+    conductor.declare_full_storage_arcs(dna.dna_hash()).await;
+
+    // There should be no books created yet.
+    let books: Vec<BookEntry> = conductor
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "Shakespeare",
+        )
+        .await;
+    assert!(books.is_empty());
+
+    // Alice adds a book entry.
+    let () = conductor
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "add_book_entry",
+            ("Shakespeare", "Romeo and Juliet"),
+        )
+        .await;
+
+    // Alice should find her entry when case is same as when entered.
+    let books: Vec<BookEntry> = conductor
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "Shakespeare",
+        )
+        .await;
+    assert_eq!(
+        books,
+        [BookEntry {
+            name: "Romeo and Juliet".to_string()
+        }]
+    );
+
+    // Alice should not find her entry when path is all lowercase.
+    let books: Vec<BookEntry> = conductor
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "shakespeare",
+        )
+        .await;
+    assert!(books.is_empty(),);
+
+    // Alice should not find her entry when path is all UPPERCASE.
+    let books: Vec<BookEntry> = conductor
+        .call(
+            &alice_cell.zome(TestWasm::Paths.coordinator_zome_name()),
+            "find_books_from_author",
+            "SHAKESPEARE",
+        )
+        .await;
+    assert!(books.is_empty(),);
 }
