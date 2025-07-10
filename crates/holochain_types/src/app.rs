@@ -950,9 +950,9 @@ impl From<AppStatus> for AppStatusKind {
 /// Represents a state transition operation from one state to another
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AppStatusTransition {
-    /// Gets an app running no matter what
+    /// Enables an app
     Enable,
-    /// Disables an app, no matter what
+    /// Disables an app
     Disable(DisabledAppReason),
 }
 
