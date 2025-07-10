@@ -313,7 +313,7 @@ pub mod slow_tests {
         let back_link_details: LinkDetails =
             conductor.call(&alice, "get_back_link_details", ()).await;
         let link_details_bidi: Vec<LinkDetails> =
-            conductor.call(&alice, "get_link_details_bidi", ()).await;
+            conductor.call(&alice, "get_links_details_bidi", ()).await;
 
         assert_eq!(
             link_details_bidi,

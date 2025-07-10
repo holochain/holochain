@@ -233,7 +233,7 @@ fn get_links_bidi(_: ()) -> ExternResult<Vec<Vec<Link>>> {
 }
 
 #[hdk_extern]
-fn get_link_details_bidi(_: ()) -> ExternResult<Vec<LinkDetails>> {
+fn get_links_details_bidi(_: ()) -> ExternResult<Vec<LinkDetails>> {
     HDK.with(|h| {
         h.borrow().get_links_details(vec![
             GetLinksInputBuilder::try_new(base()?, LinkTypes::SomeLinks)?.build(),
@@ -317,7 +317,7 @@ fn get_links_local_only(_: ()) -> ExternResult<Vec<Link>> {
 }
 
 #[hdk_extern]
-fn get_link_details_local_only(_: ()) -> ExternResult<LinkDetails> {
+fn get_links_details_local_only(_: ()) -> ExternResult<LinkDetails> {
     hdk::prelude::get_links_details(
         LinkQuery::try_new(base()?, LinkTypes::SomeLinks)?,
         GetStrategy::Local,
