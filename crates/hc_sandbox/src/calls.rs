@@ -407,50 +407,60 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             println!("{}", serde_json::to_value(&interface_infos)?);
         }
         AdminRequestCli::RegisterDna(args) => {
-            let dnas = register_dna(client, args).await?;
-            println!("{}", serde_json::to_value(&dnas)?);
+            let dna = register_dna(client, args).await?;
+            println!("{}", serde_json::to_value(dna.to_string())?);
         }
         AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(client, args).await?;
             println!("{}", serde_json::to_value(&app)?);
+            // println!("{}", serde_json::to_value(AppInfoJson::from(app))?);
         }
         AdminRequestCli::UninstallApp(args) => {
             client
                 .uninstall_app(args.app_id.clone(), args.force)
                 .await?;
-            println!("{}", serde_json::to_value(&args.app_id)?);
+            msg!("Uninstalled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::ListDnas => {
-            let dnas = client.list_dnas().await?;
+            let dnas: Vec<DnaHashB64> = client.list_dnas()
+                .await?
+                .into_iter()
+                .map(|d| d.into())
+                .collect();
             println!("{}", serde_json::to_value(&dnas)?);
         }
         AdminRequestCli::NewAgent => {
             let agent = client.generate_agent_pub_key().await?;
-            println!("{}", serde_json::to_value(&agent)?);
+            println!("{}", serde_json::to_value(agent.to_string())?);
         }
         AdminRequestCli::ListCells => {
-            let cells = client.list_cell_ids().await?;
+            let cells: Vec<String> = client.list_cell_ids()
+                .await?
+                .into_iter()
+                .map(|cell_id| format!("{}", cell_id)).collect();
             println!("{}", serde_json::to_value(&cells)?);
         }
         AdminRequestCli::ListApps(args) => {
             let apps = client.list_apps(args.status).await?;
             println!("{}", serde_json::to_value(&apps)?);
+            // let apps_json: Vec<AppInfoJson> = apps.iter().map(|a| AppInfoJson::from(a)).collect();
+            // println!("{}", serde_json::to_value(&apps_json)?);
         }
         AdminRequestCli::EnableApp(args) => {
             client.enable_app(args.app_id.clone()).await?;
-            msg!("Activated app: {:?}", args.app_id);
+            msg!("Enabled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::DisableApp(args) => {
             client.disable_app(args.app_id.clone()).await?;
-            msg!("Deactivated app: {:?}", args.app_id);
+            msg!("Disabled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::DumpState(args) => {
             let state = client.dump_state(args.into()).await?;
-            msg!("DUMP STATE \n{}", state);
+            println!("{}", state);
         }
         AdminRequestCli::DumpConductorState => {
             let state = client.dump_conductor_state().await?;
-            msg!("DUMP CONDUCTOR STATE \n{}", state);
+            println!("{}", state);
         }
         AdminRequestCli::DumpNetworkMetrics(args) => {
             let metrics = client
@@ -459,7 +469,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             // Print without other text so it can be piped
             println!(
                 "{}",
-                serde_json::to_string(
+                serde_json::to_value(
                     &metrics
                         .into_iter()
                         .map(|(k, v)| (k.to_string(), v))
@@ -470,14 +480,14 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         AdminRequestCli::DumpNetworkStats => {
             let stats = client.dump_network_stats().await?;
             // Print without other text so it can be piped
-            println!("{}", serde_json::to_string(&stats)?);
+            println!("{}", serde_json::to_value(&stats)?);
         }
         AdminRequestCli::ListCapabilityGrants(args) => {
             let info = client
                 .list_capability_grants(args.installed_app_id, args.include_revoked)
                 .await?;
             // Print without other text so it can be piped
-            println!("{:?}", info);
+            println!("{}", serde_json::to_value(info)?);
         }
         AdminRequestCli::AddAgents(args) => {
             let agent_infos_results =
@@ -538,11 +548,9 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             let info = client.agent_meta_info(args.url, args.dna).await?;
             let string_key_info = info
                 .into_iter()
-                .map(|(k, v)| (DnaHashB64::from(k).to_string(), v))
+                .map(|(k, v)| (k.to_string(), v))
                 .collect::<BTreeMap<String, BTreeMap<String, AgentMetaInfo>>>();
-
-            let info_json = serde_json::to_string_pretty(&string_key_info)?;
-            println!("{}", info_json);
+            println!("{}", serde_json::to_value(&string_key_info)?);
         }
     }
     Ok(())
@@ -557,7 +565,6 @@ struct AgentResponse {
     signed_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     url: Option<Url>,
-
 }
 
 /// Calls [`AdminWebsocket::register_dna`] and registers the DNA.
@@ -637,9 +644,6 @@ pub async fn install_app_bundle(
             }
         }
     }
-
-    msg!("App installed with id {:?}.", app_id);
-
     Ok(installed_app)
 }
 
