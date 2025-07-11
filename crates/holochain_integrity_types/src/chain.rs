@@ -147,6 +147,7 @@ impl<H: Eq + Ord + std::hash::Hash> ChainFilter<H> {
     }
 
     /// Take all actions since the given timestamp.
+    ///
     /// If a timestamp was already set, the biggest of the two is kept.
     pub fn until_timestamp(mut self, timestamp: Timestamp) -> Self {
         self.limit_conditions = match self.limit_conditions {
