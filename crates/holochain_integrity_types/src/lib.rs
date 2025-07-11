@@ -22,8 +22,6 @@ pub mod entry;
 #[allow(missing_docs)]
 pub mod entry_def;
 pub mod genesis;
-#[allow(missing_docs)]
-pub mod hash;
 pub mod info;
 #[allow(missing_docs)]
 pub mod link;

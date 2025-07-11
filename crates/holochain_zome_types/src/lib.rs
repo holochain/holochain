@@ -33,8 +33,6 @@ pub mod entry;
 pub mod entry_def;
 pub mod genesis;
 #[allow(missing_docs)]
-pub mod hash;
-#[allow(missing_docs)]
 pub mod info;
 #[allow(missing_docs)]
 pub mod init;

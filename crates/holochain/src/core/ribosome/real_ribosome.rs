@@ -47,7 +47,6 @@ use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::get_links_details::get_links_details;
-use crate::core::ribosome::host_fn::hash::hash;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
 use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
@@ -512,7 +511,6 @@ impl RealRibosome {
         host_fn_builder
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
             .with_host_function(&mut ns, "__hc__trace_1", trace)
-            .with_host_function(&mut ns, "__hc__hash_1", hash)
             .with_host_function(&mut ns, "__hc__version_1", version)
             .with_host_function(&mut ns, "__hc__verify_signature_1", verify_signature)
             .with_host_function(&mut ns, "__hc__sign_1", sign)
@@ -1336,7 +1334,6 @@ pub mod wasm_test {
                 "__hc__get_links_1",
                 "__hc__get_links_details_1",
                 "__hc__get_validation_receipts_1",
-                "__hc__hash_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
                 "__hc__must_get_entry_1",

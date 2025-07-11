@@ -194,7 +194,6 @@ mockall::mock! {
 
     impl HdiT for HdkT {
         fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
-        fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
         fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
         fn must_get_action(
             &self,
@@ -245,10 +244,6 @@ impl ErrHdk {
 /// Every call is an error for the ErrHdk.
 impl HdiT for ErrHdk {
     fn verify_signature(&self, _verify_signature: VerifySignature) -> ExternResult<bool> {
-        Self::err()
-    }
-
-    fn hash(&self, _hash_input: HashInput) -> ExternResult<HashOutput> {
         Self::err()
     }
 
@@ -499,9 +494,6 @@ use hdi::hdi::HostHdi;
 impl HdiT for HostHdk {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
         HostHdi::new().verify_signature(verify_signature)
-    }
-    fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput> {
-        HostHdi::new().hash(hash_input)
     }
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
         HostHdi::new().must_get_entry(must_get_entry_input)

@@ -22,7 +22,6 @@ thread_local!(pub static HDI: RefCell<Rc<dyn HdiT>> = RefCell::new(Rc::new(HostH
 pub trait HdiT: Send + Sync {
     // Ed25519
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
-    fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
     fn must_get_action(
         &self,
@@ -72,9 +71,6 @@ impl ErrHdi {
 impl HdiT for ErrHdi {
     fn verify_signature(&self, _: VerifySignature) -> ExternResult<bool> {
         Self::err("verify_signature")
-    }
-    fn hash(&self, _: HashInput) -> ExternResult<HashOutput> {
-        Self::err("hash")
     }
     fn must_get_entry(&self, _: MustGetEntryInput) -> ExternResult<EntryHashed> {
         Self::err("must_get_entry")
@@ -144,9 +140,6 @@ impl Default for HostHdi {
 impl HdiT for HostHdi {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
         host_call::<VerifySignature, bool>(__hc__verify_signature_1, verify_signature)
-    }
-    fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput> {
-        host_call::<HashInput, HashOutput>(__hc__hash_1, hash_input)
     }
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
         host_call::<MustGetEntryInput, EntryHashed>(__hc__must_get_entry_1, must_get_entry_input)

@@ -126,7 +126,6 @@ macro_rules! holochain_externs {
     () => {
         holochain_wasmer_guest::host_externs!(
             trace:1,
-            hash:1,
             unreachable:1,
             verify_signature:1,
             sign:1,
