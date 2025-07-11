@@ -28,12 +28,6 @@ pub struct ConductorBuilder {
     #[cfg(any(test, feature = "test_utils"))]
     pub state: Option<ConductorState>,
 
-    /// If specified here and a device seed is not already specified in the config,
-    /// a new seed will be generated in lair with a random unique tag, and the conductor config
-    /// will be updated to use this seed.
-    #[cfg(any(test, feature = "test_utils"))]
-    pub generate_test_device_seed: bool,
-
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
 

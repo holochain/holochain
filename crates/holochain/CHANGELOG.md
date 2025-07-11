@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: Remove `pause_app` and `Paused` state from conductor. Pausing an app was used when enabling an app partially failed and could be re-attempted. Now the app is only enabled if all cells successfully started up.
+- **BREAKING CHANGE**: Removed everything related to `started` and `stopped` apps. Instead `enabled` and `disabled` remain as the only two possible states an app can be in after it has been installed.
+- **BREAKING CHANGE**: Remove `CellStatus` which used to indicate whether a cell has joined the network or not. Going forward cells that couldn't join the network will not be kept in conductor state.
+- **BREAKING CHANGE**: Remove `generate_test_device_seed` from `ConductorBuilder`. This was a remnant from DPKI.
+
 ## 0.6.0-dev.12
 
 - It’s possible to configure an advanced setting for the network layer that shows tracing information about network connectivity and state changes. Rather than having to configure that in Holochain runtimes, it is now automatically enabled when the `NETAUDIT` tracing target is enabled at `WARN` level or lower.
@@ -15,9 +20,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Remove unused field `dna_def` the `HostFnWorkspace` struct ([\#5102](https://github.com/holochain/holochain/pull/5102))
 - Replace the `dna_def` field of the `SysValidationWorkspace` with a `dna_hash` field.
 - Remove unnecessary uses of `LinkType` and `EntryDefIndex` types
-- **BREAKING CHANGE**: Remove `pause_app` and `Paused` state from conductor. Pausing an app was used when enabling an app partially failed and could be re-attempted. Now the app is only enabled if all cells successfully started up.
-- **BREAKING CHANGE**: Removed everything related to `started` and `stopped` apps. Instead `enabled` and `disabled` remain as the only two possible states an app can be in after it has been installed.
-- **BREAKING CHANGE**: Remove `CellStatus` which used to indicate whether a cell has joined the network or not. Going forward cells that couldn't join the network will not be kept in conductor state.
 
 ## 0.6.0-dev.11
 
