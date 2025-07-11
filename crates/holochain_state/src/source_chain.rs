@@ -235,7 +235,7 @@ impl SourceChain {
     }
 
     #[async_recursion]
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, network)))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, chc)))]
     pub async fn flush(
         &self,
         storage_arcs: Vec<DhtArc>,
