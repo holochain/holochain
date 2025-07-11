@@ -1690,6 +1690,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_paths"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+ "holochain_serialized_bytes",
+ "serde",
+]
+
+[[package]]
 name = "test_wasm_post_commit_signal"
 version = "0.0.1"
 dependencies = [
