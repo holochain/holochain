@@ -19,7 +19,7 @@ mod test;
 /// The filter can stop early by specifying limit conditions:
 /// A maximum number of items is reached, a given [`ActionHash`] is found, or
 /// a given timestamp has been passed.
-/// Multiple [`ActionHash`] can be provided. The filter will stop at and take the first one found.
+/// Multiple [`ActionHash`]es can be provided. The filter will stop at and take the first one found.
 /// When providing a Timestamp, the filter will stop at and take the oldest action that has a
 /// Timestamp newer than the provided one. In the edge case of multiple actions having the same
 /// Timestamp as the limit condition, the filter will stop at the action with the lowest sequence.
