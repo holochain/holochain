@@ -28,7 +28,8 @@ fn add_book_entry(author_and_name: (String, String)) -> ExternResult<()> {
     let book_action_hash = create_entry(EntryTypes::BookEntry(BookEntry {
         name: author_and_name.1,
     }))?;
-    let book_action = must_get_action(book_action_hash)?;
+    let book_action =
+        get(book_action_hash, GetOptions::default())?.expect("failed to get entry we just created");
     let book_entry_hash = book_action
         .action()
         .entry_hash()
@@ -89,8 +90,8 @@ fn find_books_from_author(author: String) -> ExternResult<Vec<BookEntry>> {
     let books = book_links
         .into_iter()
         .filter_map(|link| link.target.into_entry_hash())
-        .filter_map(|entry_hash| must_get_entry(entry_hash).map(|entry| entry.content).ok())
-        .filter_map(|entry_content| BookEntry::try_from(entry_content).ok())
+        .filter_map(|entry_hash| get(entry_hash, GetOptions::default()).ok().flatten())
+        .filter_map(|record| BookEntry::try_from(record).ok())
         .collect();
 
     Ok(books)
@@ -109,8 +110,8 @@ fn find_books_at_path(path_string: String) -> ExternResult<Vec<BookEntry>> {
     )?
     .into_iter()
     .filter_map(|link| link.target.into_entry_hash())
-    .filter_map(|entry_hash| must_get_entry(entry_hash).map(|entry| entry.content).ok())
-    .filter_map(|entry_content| BookEntry::try_from(entry_content).ok())
+    .filter_map(|entry_hash| get(entry_hash, GetOptions::default()).ok().flatten())
+    .filter_map(|record| BookEntry::try_from(record).ok())
     .collect();
 
     Ok(books)
