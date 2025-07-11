@@ -1802,6 +1802,8 @@ mod clone_cell_impls {
 /// Methods related to management of app and cell status
 mod app_status_impls {
     use super::*;
+    use crate::conductor::cell::error::CellResult;
+    use holochain_chc::ChcImpl;
 
     impl Conductor {
         /// Adjust which cells are present in the Conductor (adding and removing as
@@ -1820,17 +1822,107 @@ mod app_status_impls {
             Ok(results)
         }
 
+        /// Instantiate a cell.
+        pub async fn create_cell(
+            self: Arc<Self>,
+            cell_id: &CellId,
+            chc: Option<ChcImpl>,
+        ) -> CellResult<(Cell, InitialQueueTriggers)> {
+            let holochain_p2p_cell = holochain_p2p::HolochainP2pDna::new(
+                self.holochain_p2p.clone(),
+                cell_id.dna_hash().clone(),
+                chc,
+            );
+            let space = self
+                .get_or_create_space(cell_id.dna_hash())
+                .map_err(|e| CellError::FailedToCreateDnaSpace(ConductorError::from(e).into()))?;
+            let signal_tx = self
+                .get_signal_tx(cell_id)
+                .await
+                .map_err(|err| CellError::ConductorError(Box::new(err)))?;
+            tracing::info!(?cell_id, "Creating a cell");
+            Cell::create(
+                cell_id.clone(),
+                self.clone(),
+                space,
+                holochain_p2p_cell,
+                signal_tx,
+            )
+            .await
+        }
+
         /// Enable an app
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn enable_app(
             self: Arc<Self>,
             app_id: InstalledAppId,
         ) -> ConductorResult<InstalledApp> {
-            let (app, delta) = self
-                .transition_app_status(app_id.clone(), AppStatusTransition::Enable)
-                .await?;
-            let _ = self
-                .process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
+            // Check if app can be enabled.
+            let state = self.clone().get_state().await?;
+            if state.get_app(&app_id)?.status == AppStatus::AwaitingMemproofs {
+                return Err(ConductorError::AppStatusError(
+                    "App is awaiting membrane proofs and cannot be enabled.".to_string(),
+                ));
+            }
+
+            // Determine the app's cells.
+            let cell_ids_in_app = state.get_app(&app_id)?.all_enabled_cells();
+            let cells_to_create = cell_ids_in_app.map(|cell_id| {
+                let handle = self.clone();
+                async move {
+                    handle
+                        .clone()
+                        .create_cell(&cell_id, handle.get_chc(&cell_id))
+                        .await
+                }
+            });
+            // Create cells
+            let cells = future::join_all(cells_to_create)
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()?;
+
+            // Add agents to local agent store in kitsune
+            future::join_all(cells.iter().enumerate().map(|(i, (cell, _))| {
+                async move {
+                    let cell_id = cell.id().clone();
+                    let agent_pubkey = cell_id.agent_pubkey().clone();
+                    let timeout_result = tokio::time::timeout(
+                        JOIN_NETWORK_WAITING_PERIOD,
+                        cell.holochain_p2p_dna().clone().join(
+                            agent_pubkey,
+                            None,
+                        ),
+                    )
+                        .await;
+                    match timeout_result {
+                        Ok(network_join_result) => {
+                            if let Err(e) = network_join_result {
+                                    tracing::error!(
+                                        "Network join failed for {cell_id}. This should never happen. Error: {e:?}"
+                                    );
+                            }
+                        }
+                        Err(_) => {
+                            tracing::warn!(
+                                "Network join took longer than {JOIN_NETWORK_WAITING_PERIOD:?} for {cell_id}. Cell startup proceeding anyway."
+                            );
+                        }
+                    }
+                }.instrument(tracing::info_span!("network join task", ?i))
+            }))
+                .await;
+
+            self.add_and_initialize_cells(cells);
+
+            // Set app status to enabled in state.
+            let (_, app) = self
+                .update_state_prime(move |mut state| {
+                    let app = state.get_app_mut(&app_id)?;
+                    app.status = AppStatus::Enabled;
+                    let app = app.clone();
+                    Ok((state, app))
+                })
                 .await?;
             Ok(app)
         }

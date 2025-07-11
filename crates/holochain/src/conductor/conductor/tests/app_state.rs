@@ -676,6 +676,18 @@ async fn app_status_and_cell_state() {
     });
 }
 
+// #[tokio::test(flavor = "multi_thread")]
+// async fn cannot_create_cell_without_genesis() {
+//     let conductor = SweetConductor::from_standard_config().await;
+//     let cell_id = ::fixt::fixt!(CellId);
+//     let signal_tx = tokio::sync::broadcast::channel::<Signal>(1).0;
+//     assert!(conductor
+//         .raw_handle()
+//         .create_cell(&cell_id, signal_tx, None)
+//         .await
+//         .is_err());
+// }
+
 struct App {
     bundle: AppBundle,
     dna_files: Vec<DnaFile>,
