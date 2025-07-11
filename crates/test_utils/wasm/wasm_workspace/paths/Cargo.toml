@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 hdk = { path = "../../../../hdk" }
 hdi = { path = "../../../../hdi" }
-holochain_serialized_bytes = "0.0.56"
+holochain_serialized_bytes = "*"
 serde = "1.0"
 
 [features]
