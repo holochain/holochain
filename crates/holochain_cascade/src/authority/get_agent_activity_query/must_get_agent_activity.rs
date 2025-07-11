@@ -110,12 +110,26 @@ fn find_bounds(
     // Get the oldest action in a given time period.
     let mut by_ts_statement = txn.prepare(TS_TO_SEQ)?;
     let get_seq_from_ts = |until: Timestamp| {
-        let result = by_ts_statement
+        // Search in DB
+        let db_result = by_ts_statement
           .query_row(named_params! {":until": until.as_micros(), ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
               row.get(0)
           })
           .optional()?;
-        Ok(result)
+        // Search in scratch
+        let scratch_result = scratch.and_then(|s| {
+            s.actions()
+                .filter_map(|a| {
+                    if a.get_timestamp() >= until {
+                        Some(a.seq())
+                    } else {
+                        None
+                    }
+                })
+                .min()
+        });
+        // Return lowest of the two
+        Ok([db_result, scratch_result].into_iter().flatten().min())
     };
 
     // For all the hashes in the filter, get their sequences.
