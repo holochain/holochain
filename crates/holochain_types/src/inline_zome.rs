@@ -44,11 +44,12 @@ impl From<InlineEntryTypes> for ZomeEntryTypesKey {
 }
 
 impl InlineZomeSet {
-    /// Create a set of integrity and coordinators zomes.
-    pub fn new<I, C>(integrity: I, coordinators: C) -> Self
+    /// Create a set of integrity and coordinator zomes
+    pub fn new<I, C, D>(integrity: I, coordinators: C, dependencies: D) -> Self
     where
         I: IntoIterator<Item = (&'static str, String, Vec<EntryDef>, u8)>,
         C: IntoIterator<Item = (&'static str, String)>,
+        D: IntoIterator<Item = (ZomeName, ZomeName)>,
     {
         let integrity_zomes: Vec<_> = integrity
             .into_iter()
@@ -65,15 +66,16 @@ impl InlineZomeSet {
                 .into_iter()
                 .map(|(zome_name, uuid)| (zome_name, InlineCoordinatorZome::new(uuid)))
                 .collect(),
-            ..Default::default()
+            dependencies: dependencies.into_iter().collect(),
         }
     }
 
     /// Create a unique set of integrity and coordinators zomes.
-    pub fn new_unique<I, C>(integrity: I, coordinators: C) -> Self
+    pub fn new_unique<I, C, D>(integrity: I, coordinators: C, dependencies: D) -> Self
     where
         I: IntoIterator<Item = (&'static str, Vec<EntryDef>, u8)>,
         C: IntoIterator<Item = &'static str>,
+        D: IntoIterator<Item = (ZomeName, ZomeName)>,
     {
         let integrity_zomes: Vec<_> = integrity
             .into_iter()
@@ -88,11 +90,12 @@ impl InlineZomeSet {
                 .into_iter()
                 .map(|zome_name| (zome_name, InlineCoordinatorZome::new_unique()))
                 .collect(),
-            ..Default::default()
+            dependencies: dependencies.into_iter().collect(),
         }
     }
 
     /// A helper function to create a single integrity and coordinator zome.
+    /// The integrity zome will be added to the coordinator's zome dependencies.
     pub fn new_single(
         integrity_zome_name: &'static str,
         coordinator_zome_name: &'static str,
@@ -109,10 +112,12 @@ impl InlineZomeSet {
                 num_link_types,
             )],
             [(coordinator_zome_name, coordinator_uuid.into())],
+            [(coordinator_zome_name.into(), integrity_zome_name.into())],
         )
     }
 
     /// A helper function to create a unique single integrity and coordinator zome.
+    /// The integrity zome will be added to the coordinator's zome dependencies.
     pub fn new_unique_single(
         integrity_zome_name: &'static str,
         coordinator_zome_name: &'static str,
@@ -122,6 +127,7 @@ impl InlineZomeSet {
         Self::new_unique(
             [(integrity_zome_name, entry_defs, num_link_types)],
             [coordinator_zome_name],
+            [(coordinator_zome_name.into(), integrity_zome_name.into())],
         )
     }
 
