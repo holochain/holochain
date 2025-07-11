@@ -172,14 +172,6 @@ pub enum PendingJoinReason {
     TimedOut,
 }
 
-/// A [`Cell`] tracked by a Conductor
-#[derive(Debug, Clone)]
-#[allow(deprecated)]
-#[allow(unused)]
-struct CellItem {
-    cell: Arc<Cell>,
-}
-
 #[allow(dead_code)]
 pub(crate) type StopBroadcaster = task_motel::StopBroadcaster;
 pub(crate) type StopReceiver = task_motel::StopListener;
@@ -187,7 +179,7 @@ pub(crate) type StopReceiver = task_motel::StopListener;
 /// A Conductor is a group of [Cell]s
 pub struct Conductor {
     /// The collection of available, running cells associated with this Conductor
-    running_cells: RwShare<IndexMap<CellId, CellItem>>,
+    running_cells: RwShare<IndexMap<CellId, Arc<Cell>>>,
 
     /// The config used to create this Conductor
     pub config: Arc<ConductorConfig>,
@@ -689,8 +681,8 @@ mod dna_impls {
                     .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
                     .collect()
             });
-            for (cell_id, item) in to_cleanup {
-                if let Err(err) = item.cell.cleanup().await {
+            for (cell_id, cell) in to_cleanup {
+                if let Err(err) = cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
             }
@@ -1577,7 +1569,7 @@ mod cell_impls {
         pub(crate) async fn cell_by_id(&self, cell_id: &CellId) -> ConductorResult<Arc<Cell>> {
             // Can only get a cell from the running_cells list
             if let Some(cell) = self.running_cells.share_ref(|c| c.get(cell_id).cloned()) {
-                Ok(cell.cell)
+                Ok(cell)
             } else {
                 // If not in running_cells list, check if the cell id is registered at all,
                 // to give a different error message for disabled vs missing.
@@ -2824,12 +2816,7 @@ impl Conductor {
             for cell in new_cells {
                 let cell_id = cell.id().clone();
                 tracing::debug!(?cell_id, "added cell");
-                cells.insert(
-                    cell_id,
-                    CellItem {
-                        cell: Arc::new(cell),
-                    },
-                );
+                cells.insert(cell_id, Arc::new(cell));
             }
         });
         for trigger in triggers {
@@ -2870,7 +2857,7 @@ impl Conductor {
             to_remove
                 .iter()
                 .filter_map(|cell_id| cells.remove(cell_id))
-                .map(|item| item.cell)
+                .map(|cell| cell)
                 .collect()
         });
 
