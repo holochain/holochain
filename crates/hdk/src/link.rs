@@ -122,8 +122,8 @@ pub fn delete_link(address: ActionHash, get_options: GetOptions) -> ExternResult
     })
 }
 
-/// Returns all links that reference a base hash, filtered by link type and other criteria.
-/// Use a [`GetLinksInputBuilder`] to create the [`GetLinksInput`] and optionally filter links further.
+/// Returns all links that reference a base hash, filtered by the provided [`LinkQuery`] to apply diffent filters
+/// and the [`GetStrategy`], which can be used to specify whether to look up the links locally or fetch them from the network.
 ///
 /// _Note this will only get links that are defined in dependent integrity zomes._
 ///
@@ -141,7 +141,7 @@ pub fn delete_link(address: ActionHash, get_options: GetOptions) -> ExternResult
 ///   - `[ 5 ]` returns `[ ]` (does _not_ return c because the filter is by "prefix", not "contains")
 ///
 /// This is mostly identical to [`get_links_details`] but returns only creates that have not been
-/// deleted, whereas `get_links_details` returns all the creates and all the deletes together.
+/// deleted, whereas [`get_links_details`] returns all the creates and all the deletes together.
 /// Also note that, unlike when [`get`] is used to retrieve an entry, links that
 /// only differ by author and creation time are not deduplicated; hence, you may receive multiple
 /// links with the same base, tag, and target.
@@ -158,7 +158,7 @@ pub fn get_links(query: LinkQuery, strategy: GetStrategy) -> ExternResult<Vec<Li
         .collect())
 }
 
-/// Get all link creates and deletes that reference a base hash, optionally filtered by type or tag.
+/// Get all link creates and deletes that match the filter criteria provided in the [`LinkQuery`].
 ///
 /// Type can be filtered by providing a variant of the link types, or a range of them. To get links of
 /// all types, the full range operator can be used: `get_links(base, .., None)`. Furthermore, vectors of
