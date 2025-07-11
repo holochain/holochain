@@ -48,5 +48,8 @@ pub fn create_post(post: Post) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn get_all_posts() -> ExternResult<Vec<Link>> {
     let path = Path::from("all_posts");
-    get_links(GetLinksInputBuilder::try_new(path.path_entry_hash()?, LinkTypes::AllPosts)?.build())
+    get_links(
+        LinkQuery::try_new(path.path_entry_hash()?, LinkTypes::AllPosts)?,
+        GetStrategy::default(),
+    )
 }

@@ -161,7 +161,7 @@ host_fn_api_impls! {
     // Get links by entry hash from the cascade.
     fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
 
-    fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
+    fn get_links_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
     fn count_links(zt::query::LinkQuery) -> usize;
 
