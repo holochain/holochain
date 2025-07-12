@@ -76,7 +76,7 @@ pub struct ConductorConfig {
     pub tracing_override: Option<String>,
 
     /// The path to the data root for this conductor;
-    /// This can be `None` while building up the config programatically but MUST
+    /// This can be `None` while building up the config programmatically but MUST
     /// be set by the time the config is used to build a conductor.
     /// The database and compiled wasm directories are derived from this path.
     pub data_root_path: Option<DataRootPath>,

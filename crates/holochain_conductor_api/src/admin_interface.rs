@@ -602,7 +602,7 @@ pub enum ExternalApiWireError {
     // to react to using code (i.e. not just print)
     /// Any internal error
     InternalError(String),
-    /// The input to the API failed to deseralize.
+    /// The input to the API failed to deserialize.
     Deserialization(String),
     /// The DNA path provided was invalid.
     DnaReadError(String),

@@ -25,7 +25,7 @@ struct BoolWrap(bool);
 /// Serialization wrapper for u32 (number)
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct U32Wrap(u32);
-/// Serialzation wrapper for Strings
+/// Serialization wrapper for Strings
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct StringWrap(String);
 

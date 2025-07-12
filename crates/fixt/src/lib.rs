@@ -18,7 +18,7 @@ pub use rng::rng;
 /// Item is the Foo type of FooFixturator, i.e. the type of thing we are generating examples of
 /// Curve represents some algorithm capable of generating fixtures
 /// the Item is PhantomData because it simply represents a type to output
-/// the Curve must be provided when the Fixturator is constructed to allow for paramaterized curves
+/// the Curve must be provided when the Fixturator is constructed to allow for parameterized curves
 /// this is most easily handled in most cases with the fixturator! and newtype_fixturator! macros
 ///
 /// The inner index is always a single usize.
