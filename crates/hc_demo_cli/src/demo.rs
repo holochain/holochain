@@ -161,7 +161,7 @@ async fn gen_dna_file(output: std::path::PathBuf) {
         code: i_wasm.into(),
     })
     .await;
-    let i_zome = IntegrityZomeDef::from(ZomeDef::Wasm(WasmZome::new(i_wasm.hash.clone())));
+    let i_zome = IntegrityZomeDef::from(ZomeDef::Wasm(WasmZome::new(i_wasm.hash.clone(), None)));
 
     let mut c_wasm = Vec::new();
     std::io::Read::read_to_end(
@@ -174,7 +174,10 @@ async fn gen_dna_file(output: std::path::PathBuf) {
         code: c_wasm.into(),
     })
     .await;
-    let c_zome = CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome::new(c_wasm.hash.clone())));
+    let c_zome = CoordinatorZomeDef::from(ZomeDef::Wasm(WasmZome::new(
+        c_wasm.hash.clone(),
+        Some(vec!["integrity".into()]),
+    )));
 
     let network_seed = rand_utf8::rand_utf8(&mut rand::rng(), 32);
 
