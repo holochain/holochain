@@ -1995,23 +1995,6 @@ mod app_status_impls {
             Ok(disabled_app)
         }
 
-        /// Transition an app's status to a new state.
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-        pub(crate) async fn transition_app_status(
-            &self,
-            app_id: InstalledAppId,
-            transition: AppStatusTransition,
-        ) -> ConductorResult<(InstalledApp, AppStatusFx)> {
-            Ok(self
-                .update_state_prime(move |mut state| {
-                    let (app, delta) = state.transition_app_status(&app_id, transition)?.clone();
-                    let app = app.clone();
-                    Ok((state, (app, delta)))
-                })
-                .await?
-                .1)
-        }
-
         /// Create any Cells which are missing for any running apps, then initialize
         /// and join them. (Joining could take a while.)
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
