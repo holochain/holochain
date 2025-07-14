@@ -1851,7 +1851,7 @@ mod app_status_impls {
             .await
         }
 
-        /// Enable an app
+        /// Enable an installed app
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn enable_app(
             self: Arc<Self>,
@@ -1859,14 +1859,19 @@ mod app_status_impls {
         ) -> ConductorResult<InstalledApp> {
             // Check if app can be enabled.
             let state = self.clone().get_state().await?;
-            if state.get_app(&app_id)?.status == AppStatus::AwaitingMemproofs {
+            let app = state.get_app(&app_id)?;
+            if app.status == AppStatus::AwaitingMemproofs {
                 return Err(ConductorError::AppStatusError(
                     "App is awaiting membrane proofs and cannot be enabled.".to_string(),
                 ));
             }
+            // If app is already enabled, short circuit here.
+            if app.status == AppStatus::Enabled {
+                return Ok(app.clone());
+            }
 
-            // Determine the app's cells.
-            let cell_ids_in_app = state.get_app(&app_id)?.all_enabled_cells();
+            // Determine cells to create
+            let cell_ids_in_app = app.all_enabled_cells();
             let cells_to_create = cell_ids_in_app.map(|cell_id| {
                 let handle = self.clone();
                 async move {
@@ -1913,9 +1918,10 @@ mod app_status_impls {
             }))
                 .await;
 
+            // Add cells to conductor
             self.add_and_initialize_cells(cells);
 
-            // Set app status to enabled in state.
+            // Set app status to enabled in conductor state.
             let (_, app) = self
                 .update_state_prime(move |mut state| {
                     let app = state.get_app_mut(&app_id)?;
@@ -1927,7 +1933,7 @@ mod app_status_impls {
             Ok(app)
         }
 
-        /// Disable an app
+        /// Disable an installed app
         #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
         pub async fn disable_app(
             self: Arc<Self>,

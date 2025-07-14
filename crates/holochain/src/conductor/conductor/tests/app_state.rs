@@ -413,6 +413,75 @@ async fn app_status_filters() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn enable_and_disable_app_are_idempotent() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentInfo])
+        .await
+        .0;
+    let app_id: InstalledAppId = "app_1".to_string();
+    let _ = conductor.setup_app(&app_id, &[dna_file]).await.unwrap();
+
+    // Enable app
+    conductor.enable_app(app_id.clone()).await.unwrap();
+
+    // Check app is enabled.
+    let app = conductor
+        .get_state()
+        .await
+        .unwrap()
+        .get_app(&app_id)
+        .unwrap()
+        .clone();
+    assert_eq!(app.status, AppStatus::Enabled);
+
+    // Enable app while already enabled
+    conductor.enable_app(app_id.clone()).await.unwrap();
+
+    // Check app is enabled.
+    let app = conductor
+        .get_state()
+        .await
+        .unwrap()
+        .get_app(&app_id)
+        .unwrap()
+        .clone();
+    assert_eq!(app.status, AppStatus::Enabled);
+
+    // Disable app
+    let disabled_app_reason = DisabledAppReason::User;
+    conductor
+        .disable_app(app_id.clone(), disabled_app_reason.clone())
+        .await
+        .unwrap();
+
+    // Check app is disabled.
+    let app = conductor
+        .get_state()
+        .await
+        .unwrap()
+        .get_app(&app_id)
+        .unwrap()
+        .clone();
+    assert_eq!(app.status, AppStatus::Disabled(disabled_app_reason.clone()));
+
+    // Disable app while already disabled
+    conductor
+        .disable_app(app_id.clone(), disabled_app_reason.clone())
+        .await
+        .unwrap();
+
+    // Check app is disabled.
+    let app = conductor
+        .get_state()
+        .await
+        .unwrap()
+        .get_app(&app_id)
+        .unwrap()
+        .clone();
+    assert_eq!(app.status, AppStatus::Disabled(disabled_app_reason));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn app_status_and_cell_state() {
     let conductor = SweetConductor::from_standard_config().await;
 
@@ -675,18 +744,6 @@ async fn app_status_and_cell_state() {
         assert!(cells.is_empty());
     });
 }
-
-// #[tokio::test(flavor = "multi_thread")]
-// async fn cannot_create_cell_without_genesis() {
-//     let conductor = SweetConductor::from_standard_config().await;
-//     let cell_id = ::fixt::fixt!(CellId);
-//     let signal_tx = tokio::sync::broadcast::channel::<Signal>(1).0;
-//     assert!(conductor
-//         .raw_handle()
-//         .create_cell(&cell_id, signal_tx, None)
-//         .await
-//         .is_err());
-// }
 
 struct App {
     bundle: AppBundle,

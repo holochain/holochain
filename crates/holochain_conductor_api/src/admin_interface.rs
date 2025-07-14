@@ -137,6 +137,9 @@ pub enum AdminRequest {
     /// installed app is not enabled automatically. Once the app is enabled,
     /// zomes can be immediately called and it will also be loaded and enabled automatically on any reboot of the conductor.
     ///
+    /// This call is idempotent. If the app is already enabled, the call will be a no-op
+    /// and just return the already enabled app info.
+    ///
     /// # Returns
     ///
     /// [`AdminResponse::AppEnabled`]
@@ -148,7 +151,10 @@ pub enum AdminRequest {
     /// Changes the specified app from an enabled to a disabled state in the conductor.
     ///
     /// When an app is disabled, zome calls can no longer be made, and the app will not be
-    /// loaded on a reboot of the conductor.
+    /// enabled on a reboot of the conductor.
+    ///
+    /// This call is idempotent. If the app is already disabled, the call will be a no-op
+    /// and just return the already disabled app info.
     ///
     /// # Returns
     ///
