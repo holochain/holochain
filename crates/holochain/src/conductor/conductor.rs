@@ -1940,10 +1940,42 @@ mod app_status_impls {
             app_id: InstalledAppId,
             reason: DisabledAppReason,
         ) -> ConductorResult<InstalledApp> {
-            let (app, delta) = self
-                .transition_app_status(app_id.clone(), AppStatusTransition::Disable(reason))
-                .await?;
-            self.process_app_status_fx(delta, Some(vec![app_id.to_owned()].into_iter().collect()))
+            let state = self.clone().get_state().await?;
+            let app = state.get_app(&app_id)?;
+
+            // If app is already disabled, short circuit here.
+            if matches!(app.status, AppStatus::Disabled(_)) {
+                return Ok(app.clone());
+            }
+
+            // Remove cells from state.
+            let mut cell_ids_to_cleanup = app.all_cells();
+            let mut cells_to_cleanup = Vec::new();
+            self.running_cells.share_mut(|cells| {
+                cells.retain(|cell_id, cell| {
+                    if cell_ids_to_cleanup.contains(cell_id) {
+                        false
+                    } else {
+                        cells_to_cleanup.push(cell.clone());
+                        true
+                    }
+                })
+            });
+
+            // Stop all long-running tasks for cells about to be dropped.
+            tracing::debug!(?cells_to_cleanup, "Cleaning up cells");
+            for cell in cells_to_cleanup {
+                cell.cleanup().await?;
+            }
+
+            // Set app status to disabled.
+            let (_, app) = self
+                .update_state_prime(move |mut state| {
+                    let app = state.get_app_mut(&app_id)?;
+                    app.status = AppStatus::Disabled(reason);
+                    let app = app.clone();
+                    Ok((state, app))
+                })
                 .await?;
             Ok(app)
         }
@@ -2955,7 +2987,6 @@ impl Conductor {
             to_remove
                 .iter()
                 .filter_map(|cell_id| cells.remove(cell_id))
-                .map(|cell| cell)
                 .collect()
         });
 
