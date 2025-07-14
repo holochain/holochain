@@ -342,7 +342,7 @@ mod startup_shutdown_impls {
             self: Arc<Self>,
             outcome_rx: OutcomeReceiver,
             admin_configs: Vec<AdminInterfaceConfig>,
-        ) -> ConductorResult<CellStartupErrors> {
+        ) -> ConductorResult<()> {
             self.load_dnas().await?;
 
             info!("Conductor startup: DNAs loaded.");
@@ -364,11 +364,11 @@ mod startup_shutdown_impls {
 
             info!("Conductor startup: app interfaces started.");
 
-            let res = self.process_app_status_fx(AppStatusFx::SpinUp, None).await;
+            let _ = self.process_app_status_fx(AppStatusFx::SpinUp, None).await;
 
             info!("Conductor startup: apps enabled.");
 
-            res
+            Ok(())
         }
     }
 }
