@@ -1225,11 +1225,6 @@ mod app_impls {
                 self.clone().register_dna(dna).await?;
             }
 
-            let cell_ids: Vec<_> = cells_to_create
-                .iter()
-                .map(|(cell_id, _)| cell_id.clone())
-                .collect();
-
             if flags.defer_memproofs {
                 let roles = ops.role_assignments;
                 let app = InstalledAppCommon::new(
@@ -1267,8 +1262,6 @@ mod app_impls {
                     // Return the result, which be may be an error if no_rollback was specified
                     genesis_result.map(|()| stopped_app.into())
                 } else if let Err(err) = genesis_result {
-                    // Rollback created cells on error
-                    self.remove_cells(&cell_ids).await;
                     Err(err)
                 } else {
                     unreachable!()
