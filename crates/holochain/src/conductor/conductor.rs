@@ -1552,15 +1552,6 @@ mod app_impls {
             })
             .await?;
 
-            self.clone()
-                .create_and_add_initialized_cells_for_enabled_apps(Some(installed_app_id))
-                .await?;
-            let app_ids: HashSet<_> = [installed_app_id.to_owned()].into_iter().collect();
-            let delta = self
-                .clone()
-                .reconcile_app_status_with_cell_status(Some(app_ids.clone()))
-                .await?;
-            self.process_app_status_fx(delta, Some(app_ids)).await?;
             Ok(())
         }
 
@@ -3177,52 +3168,6 @@ impl Conductor {
         // apps that had successfully created cells
         // and any apps that encounted errors
         Ok(futures::future::join_all(tasks).await)
-    }
-
-    /// Deal with the side effects of an app status state transition
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    async fn process_app_status_fx(
-        self: Arc<Self>,
-        delta: AppStatusFx,
-        app_ids: Option<HashSet<InstalledAppId>>,
-    ) -> ConductorResult<CellStartupErrors> {
-        use AppStatusFx::*;
-        let mut last = (delta, vec![]);
-        loop {
-            tracing::debug!(msg = "Processing app status delta", delta = ?last.0);
-            last = match last.0 {
-                NoChange => break,
-                SpinDown => {
-                    // Reconcile cell status so that dangling cells can leave the network and be removed
-                    let errors = self.clone().reconcile_cell_status_with_app_status().await?;
-
-                    // TODO: This should probably be emitted over the admin interface
-                    if !errors.is_empty() {
-                        error!(msg = "Errors when trying to stop app(s)", ?errors);
-                    }
-                    (NoChange, errors)
-                }
-                SpinUp | Both => {
-                    // Reconcile cell status so that missing/pending cells can become fully joined
-                    let errors = self.clone().reconcile_cell_status_with_app_status().await?;
-
-                    // Reconcile app status in case some cells failed to join, so the app can be paused
-                    let delta = self
-                        .clone()
-                        .reconcile_app_status_with_cell_status(app_ids.clone())
-                        .await?;
-
-                    // TODO: This should probably be emitted over the admin interface
-                    if !errors.is_empty() {
-                        error!(msg = "Errors when trying to start app(s)", ?errors);
-                    }
-                    (delta, errors)
-                }
-                Error(err) => return Err(ConductorError::AppStatusError(err)),
-            };
-        }
-
-        Ok(last.1)
     }
 
     /// Entirely remove an app from the database, returning the removed app.
