@@ -369,49 +369,8 @@ mod startup_shutdown_impls {
             let all_enabled_cell_ids = state
                 .enabled_apps()
                 .flat_map(|(_, app)| app.all_enabled_cells().collect::<Vec<_>>());
-            let cells_to_create = all_enabled_cell_ids.map(async |cell_id| {
-                let handle = self.clone();
-                let chc = handle.get_chc(&cell_id);
-                handle.clone().create_cell(&cell_id, chc).await
-            });
-            let cells = future::join_all(cells_to_create)
-                .await
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()?;
-
-            // Add agents to local agent store in kitsune
-            future::join_all(cells.iter().enumerate().map(|(i, (cell, _))| {
-                async move {
-                    let cell_id = cell.id().clone();
-                    let agent_pubkey = cell_id.agent_pubkey().clone();
-                    let timeout_result = tokio::time::timeout(
-                        JOIN_NETWORK_WAITING_PERIOD,
-                        cell.holochain_p2p_dna().clone().join(
-                            agent_pubkey,
-                            None,
-                        ),
-                    )
-                        .await;
-                    match timeout_result {
-                        Ok(network_join_result) => {
-                            if let Err(e) = network_join_result {
-                                    tracing::error!(
-                                        "Network join failed for {cell_id}. This should never happen. Error: {e:?}"
-                                    );
-                            }
-                        }
-                        Err(_) => {
-                            tracing::warn!(
-                                "Network join took longer than {JOIN_NETWORK_WAITING_PERIOD:?} for {cell_id}. Cell startup proceeding anyway."
-                            );
-                        }
-                    }
-                }.instrument(tracing::info_span!("network join task", ?i))
-            }))
-                .await;
-
-            // Add cells to conductor
-            self.add_and_initialize_cells(cells);
+            self.create_cells_and_add_to_state(all_enabled_cell_ids)
+                .await?;
 
             info!("Conductor startup: apps enabled.");
 
@@ -1855,8 +1814,65 @@ mod app_status_impls {
             Ok(results)
         }
 
+        /// Instantiate cells, join them to the network and add them to the conductor's state.
+        pub(crate) async fn create_cells_and_add_to_state(
+            self: Arc<Self>,
+            cell_ids: impl Iterator<Item = CellId>,
+        ) -> ConductorResult<()> {
+            let cells_to_create = cell_ids.map(|cell_id| {
+                let handle = self.clone();
+                async move {
+                    handle
+                        .clone()
+                        .create_cell(&cell_id, handle.get_chc(&cell_id))
+                        .await
+                }
+            });
+            // Create cells
+            let cells = future::join_all(cells_to_create)
+                .await
+                .into_iter()
+                .collect::<Result<Vec<_>, _>>()?;
+
+            // Add agents to local agent store in kitsune
+            future::join_all(cells.iter().enumerate().map(|(i, (cell, _))| {
+                async move {
+                    let cell_id = cell.id().clone();
+                    let agent_pubkey = cell_id.agent_pubkey().clone();
+                    let timeout_result = tokio::time::timeout(
+                        JOIN_NETWORK_WAITING_PERIOD,
+                        cell.holochain_p2p_dna().clone().join(
+                            agent_pubkey,
+                            None,
+                        ),
+                    )
+                        .await;
+                    match timeout_result {
+                        Ok(network_join_result) => {
+                            if let Err(e) = network_join_result {
+                                    tracing::error!(
+                                        "Network join failed for {cell_id}. This should never happen. Error: {e:?}"
+                                    );
+                            }
+                        }
+                        Err(_) => {
+                            tracing::warn!(
+                                "Network join took longer than {JOIN_NETWORK_WAITING_PERIOD:?} for {cell_id}. Cell startup proceeding anyway."
+                            );
+                        }
+                    }
+                }.instrument(tracing::info_span!("network join task", ?i))
+            }))
+                .await;
+
+            // Add cells to conductor
+            self.add_and_initialize_cells(cells);
+
+            Ok(())
+        }
+
         /// Instantiate a cell.
-        pub async fn create_cell(
+        async fn create_cell(
             self: Arc<Self>,
             cell_id: &CellId,
             chc: Option<ChcImpl>,
@@ -1905,54 +1921,9 @@ mod app_status_impls {
 
             // Determine cells to create
             let cell_ids_in_app = app.all_enabled_cells();
-            let cells_to_create = cell_ids_in_app.map(|cell_id| {
-                let handle = self.clone();
-                async move {
-                    handle
-                        .clone()
-                        .create_cell(&cell_id, handle.get_chc(&cell_id))
-                        .await
-                }
-            });
-            // Create cells
-            let cells = future::join_all(cells_to_create)
-                .await
-                .into_iter()
-                .collect::<Result<Vec<_>, _>>()?;
-
-            // Add agents to local agent store in kitsune
-            future::join_all(cells.iter().enumerate().map(|(i, (cell, _))| {
-                async move {
-                    let cell_id = cell.id().clone();
-                    let agent_pubkey = cell_id.agent_pubkey().clone();
-                    let timeout_result = tokio::time::timeout(
-                        JOIN_NETWORK_WAITING_PERIOD,
-                        cell.holochain_p2p_dna().clone().join(
-                            agent_pubkey,
-                            None,
-                        ),
-                    )
-                        .await;
-                    match timeout_result {
-                        Ok(network_join_result) => {
-                            if let Err(e) = network_join_result {
-                                    tracing::error!(
-                                        "Network join failed for {cell_id}. This should never happen. Error: {e:?}"
-                                    );
-                            }
-                        }
-                        Err(_) => {
-                            tracing::warn!(
-                                "Network join took longer than {JOIN_NETWORK_WAITING_PERIOD:?} for {cell_id}. Cell startup proceeding anyway."
-                            );
-                        }
-                    }
-                }.instrument(tracing::info_span!("network join task", ?i))
-            }))
-                .await;
-
-            // Add cells to conductor
-            self.add_and_initialize_cells(cells);
+            self.clone()
+                .create_cells_and_add_to_state(cell_ids_in_app)
+                .await?;
 
             // Set app status to enabled in conductor state.
             let (_, app) = self
@@ -2955,7 +2926,6 @@ impl Conductor {
     }
 
     /// Add fully constructed cells to the cell map in the Conductor
-    #[allow(deprecated)]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     fn add_and_initialize_cells(&self, cells: Vec<(Cell, InitialQueueTriggers)>) {
         let (new_cells, triggers): (Vec<_>, Vec<_>) = cells.into_iter().unzip();
