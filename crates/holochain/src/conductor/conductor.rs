@@ -1391,22 +1391,17 @@ mod app_impls {
             installed_app_id: &InstalledAppId,
             force: bool,
         ) -> ConductorResult<()> {
-            let deps = self
-                .get_state()
-                .await?
-                .get_dependent_apps(installed_app_id, true)?;
+            let state = self.get_state().await?;
+            let deps = state.get_dependent_apps(installed_app_id, true)?;
 
             // Only uninstall the app if there are no protected dependents,
             // or if force is used
             if force || deps.is_empty() {
-                let self_clone = self.clone();
                 let app = self.remove_app_from_db(installed_app_id).await?;
                 tracing::debug!(msg = "Removed app from db.", app = ?app);
 
-                // Remove cells which may now be dangling due to the removed app
-                self_clone
-                    .process_app_status_fx(AppStatusFx::SpinDown, None)
-                    .await?;
+                // Remove the cells of the app.
+                self.remove_dangling_cells().await?;
 
                 let installed_app_ids = self
                     .get_state()
@@ -1997,6 +1992,7 @@ mod app_status_impls {
 
             // Remove cells from state.
             let mut cell_ids_to_cleanup = app.all_cells();
+            // self.remove_cells(cell_ids_to_cleanup).await;
             let mut cells_to_cleanup = Vec::new();
             self.running_cells.share_mut(|cells| {
                 cells.retain(|cell_id, cell| {
