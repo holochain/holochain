@@ -687,11 +687,12 @@ mod dna_impls {
                     .filter_map(|cell_id| cells.remove(cell_id).map(|c| (cell_id, c)))
                     .collect()
             });
-            for (cell_id, cell) in to_cleanup {
+            future::join_all(to_cleanup.into_iter().map(|(cell_id, cell)| async move {
                 if let Err(err) = cell.cleanup().await {
                     tracing::error!("Error cleaning up Cell: {:?}\nCellId: {}", err, cell_id);
                 }
-            }
+            }))
+            .await;
         }
 
         pub(crate) async fn put_wasm(
