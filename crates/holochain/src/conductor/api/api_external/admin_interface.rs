@@ -297,10 +297,15 @@ impl AdminInterfaceApi {
             }
             GrantZomeCallCapability(payload) => {
                 self.conductor_handle
-                    .clone()
                     .grant_zome_call_capability(*payload)
                     .await?;
                 Ok(AdminResponse::ZomeCallCapabilityGranted)
+            }
+
+            RevokeZomeCallCapability { action_hash } => {
+                self.conductor_handle
+                    .revoke_zome_call_capability(action_hash, ChainTopOrdering::default())?;
+                Ok(AdminResponse::ZomeCallCapabilityRevoked)
             }
 
             ListCapabilityGrants {
@@ -319,10 +324,7 @@ impl AdminInterfaceApi {
             }
 
             DeleteCloneCell(payload) => {
-                self.conductor_handle
-                    .clone()
-                    .delete_clone_cell(&payload)
-                    .await?;
+                self.conductor_handle.delete_clone_cell(&payload).await?;
                 Ok(AdminResponse::CloneCellDeleted)
             }
             StorageInfo => Ok(AdminResponse::StorageInfo(

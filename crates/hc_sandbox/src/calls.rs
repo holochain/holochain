@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use anyhow::bail;
+use holo_hash::ActionHash;
 use holo_hash::DnaHashB64;
 use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
@@ -66,36 +67,51 @@ pub struct Call {
 #[allow(missing_docs)]
 #[derive(Debug, Subcommand, Clone)]
 pub enum AdminRequestCli {
+    /// Calls [`AdminWebsocket::add_admin_interfaces`].
     AddAdminWs(AddAdminWs),
+    /// Calls [`AdminWebsocket::attach_app_interface`].
     AddAppWs(AddAppWs),
+    /// Calls [`AdminWebsocket::register_dna`].
     RegisterDna(RegisterDna),
+    /// Calls [`AdminWebsocket::install_app`].
     InstallApp(InstallApp),
-    /// Calls AdminRequest::UninstallApp.
+    /// Calls [`AdminWebsocket::uninstall_app`].
     UninstallApp(UninstallApp),
-    /// Calls AdminRequest::ListAppInterfaces.
+    /// Calls [`AdminWebsocket::list_app_interfaces`].
     ListAppWs,
-    /// Calls AdminRequest::ListDnas.
+    /// Calls [`AdminWebsocket::list_dnas`].
     ListDnas,
-    /// Calls AdminRequest::GenerateAgentPubKey.
+    /// Calls [`AdminWebsocket::generate_agent_pub_key`].
     NewAgent,
-    /// Calls AdminRequest::ListCellIds.
+    /// Calls [`AdminWebsocket::list_cell_ids`].
     ListCells,
-    /// Calls AdminRequest::ListApps.
+    /// Calls [`AdminWebsocket::list_apps`].
     ListApps(ListApps),
+    /// Calls [`AdminWebsocket::enable_app`].
     EnableApp(EnableApp),
+    /// Calls [`AdminWebsocket::disable_app`].
     DisableApp(DisableApp),
+    /// Calls [`AdminWebsocket::dump_state`].
     DumpState(DumpState),
+    /// Calls [`AdminWebsocket::dump_conductor_state`].
     DumpConductorState,
+    /// Calls [`AdminWebsocket::dump_network_metrics`].
     DumpNetworkMetrics(DumpNetworkMetrics),
+    /// Calls [`AdminWebsocket::dump_network_stats`].
     DumpNetworkStats,
+    /// Calls [`AdminWebsocket::list_capability_grants`].
     ListCapabilityGrants(ListCapGrants),
-    /// Calls AdminRequest::AddAgentInfo.
+    /// Calls [`AdminWebsocket::revoke_zome_call_capability`].
+    RevokeZomeCallCapability(RevokeZomeCallCapability),
+    /// Calls [`AdminWebsocket::add_agent_info`].
     AddAgents(AgentInfos),
+    /// Calls [`AdminWebsocket::agent_info`].
     ListAgents(ListAgents),
+    /// Calls [`AdminWebsocket::agent_meta_info`].
     AgentMetaInfo(AgentMetaInfoArgs),
 }
 
-/// Calls AdminRequest::AddAdminInterfaces
+/// Calls [`AdminWebsocket::add_admin_interfaces`]
 /// and adds another admin interface.
 #[derive(Debug, Args, Clone)]
 pub struct AddAdminWs {
@@ -113,7 +129,7 @@ pub struct AddAdminWs {
     pub allowed_origins: AllowedOrigins,
 }
 
-/// Calls AdminRequest::AttachAppInterface
+/// Calls [`AdminWebsocket::attach_app_interface`]
 /// and adds another app interface.
 #[derive(Debug, Args, Clone)]
 pub struct AddAppWs {
@@ -138,7 +154,7 @@ pub struct AddAppWs {
     pub installed_app_id: Option<InstalledAppId>,
 }
 
-/// Calls AdminRequest::RegisterDna
+/// Calls [`AdminWebsocket::register_dna`]
 /// and registers a DNA. You can only use a path or a hash, not both.
 #[derive(Debug, Args, Clone)]
 pub struct RegisterDna {
@@ -156,7 +172,7 @@ pub struct RegisterDna {
     pub hash: Option<DnaHash>,
 }
 
-/// Calls AdminRequest::InstallApp
+/// Calls [`AdminWebsocket::install_app`]
 /// and installs a new app.
 ///
 /// Setting properties and membrane proofs is not
@@ -188,7 +204,7 @@ pub struct InstallApp {
     pub roles_settings: Option<PathBuf>,
 }
 
-/// Calls AdminRequest::UninstallApp
+/// Calls [`AdminWebsocket::uninstall_app`]
 /// and uninstalls the specified app.
 #[derive(Debug, Args, Clone)]
 pub struct UninstallApp {
@@ -205,7 +221,7 @@ pub struct UninstallApp {
     pub force: bool,
 }
 
-/// Calls AdminRequest::EnableApp
+/// Calls [`AdminWebsocket::enable_app`]
 /// and activates the installed app.
 #[derive(Debug, Args, Clone)]
 pub struct EnableApp {
@@ -213,7 +229,7 @@ pub struct EnableApp {
     pub app_id: String,
 }
 
-/// Calls AdminRequest::DisableApp
+/// Calls [`AdminWebsocket::disable_app`]
 /// and disables the installed app.
 #[derive(Debug, Args, Clone)]
 pub struct DisableApp {
@@ -221,7 +237,7 @@ pub struct DisableApp {
     pub app_id: String,
 }
 
-/// Calls AdminRequest::DumpState
+/// Calls [`AdminWebsocket::dump_state`]
 /// and dumps the current cell's state.
 // TODO: Add pretty print.
 // TODO: Default to dumping all cell state.
@@ -257,7 +273,14 @@ pub struct ListCapGrants {
     pub include_revoked: bool,
 }
 
-/// Calls AdminRequest::AddAgentInfo
+/// Arguments for revoking a zome call capability.
+#[derive(Debug, Args, Clone)]
+pub struct RevokeZomeCallCapability {
+    /// The [`ActionHash`] of the zome call capability to revoke.
+    pub action_hash: String,
+}
+
+/// Calls [`AdminWebsocket::add_agent_info`]
 /// and disables the installed app.
 #[derive(Debug, Args, Clone)]
 pub struct AgentInfos {
@@ -265,7 +288,7 @@ pub struct AgentInfos {
     pub agent_infos: String,
 }
 
-/// Calls AdminRequest::RequestAgentInfo
+/// Calls [`AdminWebsocket::agent_info`]
 /// and pretty prints the agent info on
 /// this conductor.
 #[derive(Debug, Args, Clone)]
@@ -275,7 +298,7 @@ pub struct ListAgents {
     pub dna: Option<Vec<DnaHash>>,
 }
 
-/// Calls AdminRequest::ListApps
+/// Calls [`AdminWebsocket::list_apps`]
 /// and pretty prints the list of apps
 /// installed in this conductor.
 #[derive(Debug, Args, Clone)]
@@ -285,7 +308,7 @@ pub struct ListApps {
     pub status: Option<AppStatusFilter>,
 }
 
-/// Calls AdminRequest::AgentMetaInfo
+/// Calls [`AdminWebsocket::agent_meta_info`]
 /// and prints the agent meta info related to the specified Url
 #[derive(Debug, Args, Clone)]
 pub struct AgentMetaInfoArgs {
@@ -471,6 +494,15 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             let stats = client.dump_network_stats().await?;
             // Print without other text so it can be piped
             println!("{}", serde_json::to_string(&stats)?);
+        }
+        AdminRequestCli::RevokeZomeCallCapability(args) => {
+            let action_hash = ActionHash::try_from(&args.action_hash)
+                .map_err(|e| anyhow!("Invalid action hash: {}", e))?;
+            client.revoke_zome_call_capability(action_hash).await?;
+            msg!(
+                "Revoked zome call capability for action hash: {}",
+                args.action_hash
+            );
         }
         AdminRequestCli::ListCapabilityGrants(args) => {
             let info = client

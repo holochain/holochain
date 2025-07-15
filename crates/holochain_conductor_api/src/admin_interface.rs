@@ -392,6 +392,15 @@ pub enum AdminRequest {
     /// [`AdminResponse::ZomeCallCapabilityGranted`]
     GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
 
+    /// Revoke a capability grant.
+    ///
+    /// You have to provide the [`ActionHash`] of the capability grant to revoke.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ZomeCallCapabilityRevoked`]
+    RevokeZomeCallCapability { action_hash: ActionHash },
+
     /// Request capability grant info for all cells in the app.
     ///
     /// # Returns
@@ -570,6 +579,9 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
     ZomeCallCapabilityGranted,
+
+    /// The successful response to an [`AdminRequest::RevokeZomeCallCapability`].
+    ZomeCallCapabilityRevoked,
 
     /// The successful response to an [`AdminRequest::ListCapabilityGrants`].
     CapabilityGrantsInfo(AppCapGrantInfo),

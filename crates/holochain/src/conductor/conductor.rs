@@ -2235,6 +2235,7 @@ mod scheduler_impls {
 /// Miscellaneous methods
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
+    use hdk::prelude::delete_cap_grant;
     use holochain_conductor_api::JsonDump;
     use holochain_zome_types::{action::builder, Entry};
     use kitsune2_api::{SpaceId, TransportStats};
@@ -2290,6 +2291,19 @@ mod misc_impls {
                 .await?;
 
             Ok(action_hash)
+        }
+
+        /// Revoke a zome call capability for a cell identified by the [`ActionHash`] of the grant and by its [`CellId`].
+        pub fn revoke_zome_call_capability(
+            &self,
+            action_hash: ActionHash,
+            chain_top_ordering: ChainTopOrdering,
+        ) -> ConductorApiResult<ActionHash> {
+            delete_cap_grant(DeleteInput {
+                deletes_action_hash: action_hash,
+                chain_top_ordering,
+            })
+            .map_err(ConductorApiError::other)
         }
 
         /// Get capability grant info for a set of App cells including revoked capabality grants

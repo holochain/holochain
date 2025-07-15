@@ -1,6 +1,6 @@
 use crate::error::{ConductorApiError, ConductorApiResult};
 use crate::util::AbortOnDropHandle;
-use holo_hash::DnaHash;
+use holo_hash::{ActionHash, DnaHash};
 use holochain_conductor_api::{
     AdminInterfaceConfig, AdminRequest, AdminResponse, AgentMetaInfo, AppAuthenticationToken,
     AppAuthenticationTokenIssued, AppInfo, AppInterfaceInfo, AppStatusFilter, FullStateDump,
@@ -405,6 +405,19 @@ impl AdminWebsocket {
 
         match response {
             AdminResponse::CapabilityGrantsInfo(info) => Ok(info),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
+    pub async fn revoke_zome_call_capability(
+        &self,
+        action_hash: ActionHash,
+    ) -> ConductorApiResult<()> {
+        let msg = AdminRequest::RevokeZomeCallCapability { action_hash };
+        let response = self.send(msg).await?;
+
+        match response {
+            AdminResponse::ZomeCallCapabilityRevoked => Ok(()),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }
