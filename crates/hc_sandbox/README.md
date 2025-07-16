@@ -262,7 +262,7 @@ cd ./crates/test_utils/wasm
 cargo build --release --features build
 cp wasm_workspace/target/wasm32-unknown-unknown/release/test_wasm_foo.wasm $HOLOCHAIN_DIR/crates/hc_sandbox/tests/fixtures/my-app/dna/zomes/test_wasm_foo.wasm
 cp wasm_workspace/target/wasm32-unknown-unknown/release/test_wasm_foo.wasm $HOLOCHAIN_DIR/crates/hc_sandbox/tests/fixtures/my-app-deferred/dna/zomes/test_wasm_foo.wasm
-# Go back and delete any old Wasm files
+# Go back and delete any old DNA/hApp files
 cd -
 find ./ -iname "*.dna" -delete
 find ./ -iname "*.happ" -delete
