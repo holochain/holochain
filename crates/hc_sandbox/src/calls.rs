@@ -64,7 +64,6 @@ pub struct Call {
 
 // Docs have different use for clap
 // so documenting everything doesn't make sense.
-#[allow(missing_docs)]
 #[derive(Debug, Subcommand, Clone)]
 pub enum AdminRequestCli {
     /// Calls [`AdminWebsocket::add_admin_interfaces`].

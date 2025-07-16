@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE** Removed an if/else clause in the `Ribosome::new()` impl that lead to inconsistent behavior depending on the number of zomes defined in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)). This means that **the dependencies field for zomes in the dna manifest is now always mandatory**. Previously, if there was only one single integrity zome in the whole dna, it was implied by the conductor that a coordinator zome would depend on that integrity zome. This is no longer the case.
 - Clearer error message if `ScopeLinkedType` or `ScopedEntryDefIndex` cannot be created due to zome dependencies not being specified in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)).
 - Added a new Admin API endpoint to revoke zome call capability `revoke_zome_call_capability`. [Issue 4596](https://github.com/holochain/holochain/issues/4596)
+- **BREAKING CHANGE**: the return type of `capability_grant_info` has been changed from `HashMap<CellId, Vec<CapGrantInfo>>` to `Vec<(CellId, Vec<CapGrantInfo>)>`. This is to make it work with JSON encoding, which does not support maps with non-string tuple keys. The new type is now also used in the Admin API response `CapabilityGrantsInfo`.
 
 ## 0.6.0-dev.12
 

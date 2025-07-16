@@ -334,8 +334,13 @@ async fn cap_grant_info_call() {
         .await
         .unwrap();
 
-    // println!("after delete: {:?}\n", cap_info);
-    let cap_cell_info = cap_info.0.get(cell_id).unwrap().get(1).unwrap();
+    let cap_cell_info = cap_info
+        .0
+        .iter()
+        .find_map(|(k, v)| if k == cell_id { Some(v) } else { None })
+        .unwrap()
+        .get(1)
+        .unwrap();
     assert_eq!(cap_cell_info.action_hash.clone(), grant_action_hash);
     assert!(cap_cell_info.revoked_at.is_some());
     assert!(cap_cell_info

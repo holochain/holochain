@@ -2293,7 +2293,7 @@ mod misc_impls {
             Ok(action_hash)
         }
 
-        /// Revoke a zome call capability for a cell identified by the [`ActionHash`] of the grant and by its [`CellId`].
+        /// Revoke a zome call capability for a cell identified by the [`ActionHash`] of the grant.
         pub fn revoke_zome_call_capability(
             &self,
             action_hash: ActionHash,
@@ -2312,7 +2312,7 @@ mod misc_impls {
             cell_set: &HashSet<CellId>,
             include_revoked: bool,
         ) -> ConductorApiResult<AppCapGrantInfo> {
-            let mut hash_map: HashMap<CellId, Vec<CapGrantInfo>> = HashMap::new();
+            let mut grant_info: Vec<(CellId, Vec<CapGrantInfo>)> = Vec::new();
             let grant_query = ChainQueryFilter::new()
                 .include_entries(true)
                 .entry_type(EntryType::CapGrant);
@@ -2385,9 +2385,9 @@ mod misc_impls {
                     };
                     cap_grants.push(zome_grant_info);
                 }
-                hash_map.insert(cell_id.clone(), cap_grants);
+                grant_info.push((cell_id.clone(), cap_grants));
             }
-            Ok(AppCapGrantInfo(hash_map))
+            Ok(AppCapGrantInfo(grant_info))
         }
 
         /// Create a JSON dump of the cell's state
