@@ -715,7 +715,7 @@ impl Agent {
             }));
         let response = admin_tx.request(request);
         let response = check_timeout(response, 3000).await.unwrap();
-        assert_matches!(response, AdminResponse::ZomeCallCapabilityGranted);
+        assert_matches!(response, AdminResponse::ZomeCallCapabilityGranted(_));
 
         Agent {
             admin_tx,

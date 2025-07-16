@@ -347,3 +347,99 @@ async fn cap_grant_info_call() {
         .created_at
         .lt(&cap_cell_info.revoked_at.unwrap()));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[cfg(feature = "test_utils")]
+async fn revoke_zome_call_capability_call() {
+    use std::collections::HashSet;
+
+    let zome = TestWasm::Create;
+    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let app = conductor.setup_app("app", [&dna]).await.unwrap();
+    let cell_id = app.cells()[0].cell_id();
+
+    // generate a cap access public key
+    let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
+
+    // compute a cap access secret
+    let cap_access_secret: CapSecret = [0; 64].into();
+
+    // set up functions to grant access to
+    let mut functions = BTreeSet::new();
+    let granted_function: GrantedFunction = ("create_entry".into(), "get_entry".into());
+    functions.insert(granted_function.clone());
+    let granted_functions = GrantedFunctions::Listed(functions);
+    // set up assignees which is only the agent key
+    let mut assignees = BTreeSet::new();
+    assignees.insert(cap_access_public_key.clone());
+
+    let cap_grant = ZomeCallCapGrant {
+        tag: "signing_key".into(),
+        functions: granted_functions,
+        access: CapAccess::Assigned {
+            secret: cap_access_secret,
+            assignees,
+        },
+    };
+
+    // create a new cap grant entry
+    let grant_action_hash = conductor
+        .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
+            cell_id: cell_id.clone(),
+            cap_grant: cap_grant.clone(),
+        })
+        .await
+        .unwrap();
+
+    // println!("grant_action_hash: {:?}\n", grant_action_hash);
+
+    let mut cell_set = HashSet::new();
+    cell_set.insert(cell_id.clone());
+
+    // get the cap grant info, not including revoked grants
+    let cap_info = conductor.capability_grant_info(&cell_set, false).await;
+    assert!(cap_info.is_ok());
+
+    // delete the cap grant entry
+    let _delete_action_hash = conductor
+        .revoke_zome_call_capability(cell_id.clone(), grant_action_hash.clone())
+        .await
+        .expect("Failed to revoke zome call capability");
+
+    // if we get WITHOUT REVOKED, we should not find the cap grant
+
+    let cap_info = conductor
+        .capability_grant_info(&cell_set, false)
+        .await
+        .expect("Failed to get capability grant info");
+    // should have the cap grant
+    let cap_cell_info = cap_info
+        .0
+        .iter()
+        .find_map(|(k, v)| if k == cell_id { Some(v) } else { None })
+        .unwrap()
+        .first();
+    assert!(
+        cap_cell_info.is_none(),
+        "Cap grant should not be found after revocation"
+    );
+
+    // get with REVOKED
+    let cap_info = conductor
+        .capability_grant_info(&cell_set, true)
+        .await
+        .expect("Failed to get capability grant info");
+    let cap_cell_info = cap_info
+        .0
+        .iter()
+        .find_map(|(k, v)| if k == cell_id { Some(v) } else { None })
+        .unwrap()
+        .get(1)
+        .unwrap();
+    assert_eq!(cap_cell_info.action_hash.clone(), grant_action_hash);
+    assert!(cap_cell_info.revoked_at.is_some());
+    assert!(cap_cell_info
+        .created_at
+        .lt(&cap_cell_info.revoked_at.unwrap()));
+}

@@ -295,16 +295,19 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::RecordsGrafted)
             }
-            GrantZomeCallCapability(payload) => {
-                self.conductor_handle
-                    .grant_zome_call_capability(*payload)
-                    .await?;
-                Ok(AdminResponse::ZomeCallCapabilityGranted)
-            }
+            GrantZomeCallCapability(payload) => self
+                .conductor_handle
+                .grant_zome_call_capability(*payload)
+                .await
+                .map(AdminResponse::ZomeCallCapabilityGranted),
 
-            RevokeZomeCallCapability { action_hash } => {
+            RevokeZomeCallCapability {
+                action_hash,
+                cell_id,
+            } => {
                 self.conductor_handle
-                    .revoke_zome_call_capability(action_hash, ChainTopOrdering::default())?;
+                    .revoke_zome_call_capability(cell_id, action_hash)
+                    .await?;
                 Ok(AdminResponse::ZomeCallCapabilityRevoked)
             }
 

@@ -2235,7 +2235,6 @@ mod scheduler_impls {
 /// Miscellaneous methods
 mod misc_impls {
     use super::{state_dump_helpers::peer_store_dump, *};
-    use hdk::prelude::delete_cap_grant;
     use holochain_conductor_api::JsonDump;
     use holochain_zome_types::{action::builder, Entry};
     use kitsune2_api::{SpaceId, TransportStats};
@@ -2279,7 +2278,6 @@ mod misc_impls {
                 )
                 .await?;
 
-            let cell = self.cell_by_id(&cell_id).await?;
             source_chain
                 .flush(
                     cell.holochain_p2p_dna()
@@ -2294,16 +2292,67 @@ mod misc_impls {
         }
 
         /// Revoke a zome call capability for a cell identified by the [`ActionHash`] of the grant.
-        pub fn revoke_zome_call_capability(
+        pub async fn revoke_zome_call_capability(
             &self,
+            cell_id: CellId,
             action_hash: ActionHash,
-            chain_top_ordering: ChainTopOrdering,
         ) -> ConductorApiResult<ActionHash> {
-            delete_cap_grant(DeleteInput {
-                deletes_action_hash: action_hash,
-                chain_top_ordering,
-            })
-            .map_err(ConductorApiError::other)
+            // Must init before committing a grant
+            let cell = self.cell_by_id(&cell_id).await?;
+            cell.check_or_run_zome_init().await?;
+
+            let source_chain = SourceChain::new(
+                self.get_or_create_authored_db(
+                    cell_id.dna_hash(),
+                    cell.id().agent_pubkey().clone(),
+                )?,
+                self.get_or_create_dht_db(cell_id.dna_hash())?,
+                self.keystore.clone(),
+                cell_id.agent_pubkey().clone(),
+            )
+            .await?;
+
+            // find entry by the action hash
+            let grant_query = ChainQueryFilter::new()
+                .include_entries(true)
+                .entry_type(EntryType::CapGrant);
+
+            let cap_grant_entry = source_chain
+                .query(grant_query.clone())
+                .await?
+                .into_iter()
+                .find_map(|record| {
+                    if record.action_hash() == &action_hash {
+                        match record.entry {
+                            RecordEntry::Present(entry) => Some(entry),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .ok_or_else(|| ConductorApiError::other("No cap grant found for action hash"))?;
+            let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
+
+            let action_builder = builder::Delete {
+                deletes_address: action_hash,
+                deletes_entry_address: entry_hash,
+            };
+            let action_hash = source_chain
+                .put_weightless(action_builder, None, ChainTopOrdering::default())
+                .await?;
+
+            source_chain
+                .flush(
+                    cell.holochain_p2p_dna()
+                        .target_arcs()
+                        .await
+                        .map_err(ConductorApiError::other)?,
+                    cell.holochain_p2p_dna().chc(),
+                )
+                .await?;
+
+            Ok(action_hash)
         }
 
         /// Get capability grant info for a set of App cells including revoked capabality grants

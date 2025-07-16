@@ -382,12 +382,12 @@ impl AdminWebsocket {
     pub async fn grant_zome_call_capability(
         &self,
         payload: GrantZomeCallCapabilityPayload,
-    ) -> ConductorApiResult<()> {
+    ) -> ConductorApiResult<ActionHash> {
         let msg = AdminRequest::GrantZomeCallCapability(Box::new(payload));
         let response = self.send(msg).await?;
 
         match response {
-            AdminResponse::ZomeCallCapabilityGranted => Ok(()),
+            AdminResponse::ZomeCallCapabilityGranted(action_hash) => Ok(action_hash),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }
@@ -411,9 +411,13 @@ impl AdminWebsocket {
 
     pub async fn revoke_zome_call_capability(
         &self,
+        cell_id: CellId,
         action_hash: ActionHash,
     ) -> ConductorApiResult<()> {
-        let msg = AdminRequest::RevokeZomeCallCapability { action_hash };
+        let msg = AdminRequest::RevokeZomeCallCapability {
+            action_hash,
+            cell_id,
+        };
         let response = self.send(msg).await?;
 
         match response {

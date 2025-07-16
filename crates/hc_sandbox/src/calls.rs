@@ -62,8 +62,7 @@ pub struct Call {
     pub call: AdminRequestCli,
 }
 
-// Docs have different use for clap
-// so documenting everything doesn't make sense.
+/// Calls to the admin API that can be made from the CLI.
 #[derive(Debug, Subcommand, Clone)]
 pub enum AdminRequestCli {
     /// Calls [`AdminWebsocket::add_admin_interfaces`].
@@ -277,6 +276,10 @@ pub struct ListCapGrants {
 pub struct RevokeZomeCallCapability {
     /// The [`ActionHash`] of the zome call capability to revoke.
     pub action_hash: String,
+    /// The [`DnaHash`] used to identify the cell the capability grant is for.
+    pub dna_hash: String,
+    /// The [`AgentPubKey`] used to identify the cell the capability grant is for.
+    pub agent_key: String,
 }
 
 /// Calls [`AdminWebsocket::add_agent_info`]
@@ -497,7 +500,15 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         AdminRequestCli::RevokeZomeCallCapability(args) => {
             let action_hash = ActionHash::try_from(&args.action_hash)
                 .map_err(|e| anyhow!("Invalid action hash: {}", e))?;
-            client.revoke_zome_call_capability(action_hash).await?;
+            let dna_hash = DnaHash::try_from(&args.dna_hash)
+                .map_err(|e| anyhow!("Invalid DNA hash: {}", e))?;
+            let agent_key = AgentPubKey::try_from(&args.agent_key)
+                .map_err(|e| anyhow!("Invalid agent key: {}", e))?;
+            let cell_id = CellId::new(dna_hash, agent_key);
+
+            client
+                .revoke_zome_call_capability(cell_id, action_hash)
+                .await?;
             msg!(
                 "Revoked zome call capability for action hash: {}",
                 args.action_hash

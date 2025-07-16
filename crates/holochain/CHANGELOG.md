@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Clearer error message if `ScopeLinkedType` or `ScopedEntryDefIndex` cannot be created due to zome dependencies not being specified in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)).
 - Added a new Admin API endpoint to revoke zome call capability `revoke_zome_call_capability`. [Issue 4596](https://github.com/holochain/holochain/issues/4596)
 - **BREAKING CHANGE**: the return type of `capability_grant_info` has been changed from `HashMap<CellId, Vec<CapGrantInfo>>` to `Vec<(CellId, Vec<CapGrantInfo>)>`. This is to make it work with JSON encoding, which does not support maps with non-string tuple keys. The new type is now also used in the Admin API response `CapabilityGrantsInfo`.
+- **BREAKING CHANGE**: the return type of `grant_zome_call_capability` has been changed from `()` to `ActionHash`. This has been done to make it easier to know the `ActionHash` of the grant in case you want to revoke it later.
 
 ## 0.6.0-dev.12
 
