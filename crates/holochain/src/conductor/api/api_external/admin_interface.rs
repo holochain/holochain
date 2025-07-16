@@ -189,30 +189,17 @@ impl AdminInterfaceApi {
             }
             EnableApp { installed_app_id } => {
                 // Enable app
-                let (app, errors) = self
+                let _ = self
                     .conductor_handle
                     .clone()
                     .enable_app(installed_app_id.clone())
                     .await?;
-
-                let app_cells: HashSet<_> = app.required_cells().collect();
-
                 let app_info = self
                     .conductor_handle
                     .get_app_info(&installed_app_id)
                     .await?
                     .ok_or(ConductorError::AppNotInstalled(installed_app_id))?;
-
-                let errors: Vec<_> = errors
-                    .into_iter()
-                    .filter(|(cell_id, _)| app_cells.contains(cell_id))
-                    .map(|(cell_id, error)| (cell_id, error.to_string()))
-                    .collect();
-
-                Ok(AdminResponse::AppEnabled {
-                    app: app_info,
-                    errors,
-                })
+                Ok(AdminResponse::AppEnabled(app_info))
             }
             DisableApp { installed_app_id } => {
                 // Disable app

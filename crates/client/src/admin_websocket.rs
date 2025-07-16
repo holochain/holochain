@@ -39,10 +39,7 @@ impl std::fmt::Debug for AdminWebsocket {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct EnableAppResponse {
-    pub app: AppInfo,
-    pub errors: Vec<(CellId, String)>,
-}
+pub struct EnableAppResponse(AppInfo);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthorizeSigningCredentialsPayload {
@@ -350,7 +347,7 @@ impl AdminWebsocket {
         let response = self.send(msg).await?;
 
         match response {
-            AdminResponse::AppEnabled { app, errors } => Ok(EnableAppResponse { app, errors }),
+            AdminResponse::AppEnabled(app) => Ok(EnableAppResponse(app)),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

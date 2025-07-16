@@ -413,6 +413,75 @@ async fn app_status_filters() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn enable_and_disable_app_are_idempotent() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::AgentInfo])
+        .await
+        .0;
+    let app_id: InstalledAppId = "app_1".to_string();
+    let _ = conductor.setup_app(&app_id, &[dna_file]).await.unwrap();
+
+    // Enable app
+    conductor.enable_app(app_id.clone()).await.unwrap();
+
+    // Check app is enabled.
+    let app = conductor
+        .get_state()
+        .await
+        .unwrap()
+        .get_app(&app_id)
+        .unwrap()
+        .clone();
+    assert_eq!(app.status, AppStatus::Enabled);
+
+    // Enable app while already enabled
+    conductor.enable_app(app_id.clone()).await.unwrap();
+
+    // Check app is enabled.
+    let app = conductor
+        .get_state()
+        .await
+        .unwrap()
+        .get_app(&app_id)
+        .unwrap()
+        .clone();
+    assert_eq!(app.status, AppStatus::Enabled);
+
+    // Disable app
+    let disabled_app_reason = DisabledAppReason::User;
+    conductor
+        .disable_app(app_id.clone(), disabled_app_reason.clone())
+        .await
+        .unwrap();
+
+    // Check app is disabled.
+    let app = conductor
+        .get_state()
+        .await
+        .unwrap()
+        .get_app(&app_id)
+        .unwrap()
+        .clone();
+    assert_eq!(app.status, AppStatus::Disabled(disabled_app_reason.clone()));
+
+    // Disable app while already disabled
+    conductor
+        .disable_app(app_id.clone(), disabled_app_reason.clone())
+        .await
+        .unwrap();
+
+    // Check app is disabled.
+    let app = conductor
+        .get_state()
+        .await
+        .unwrap()
+        .get_app(&app_id)
+        .unwrap()
+        .clone();
+    assert_eq!(app.status, AppStatus::Disabled(disabled_app_reason));
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn app_status_and_cell_state() {
     let conductor = SweetConductor::from_standard_config().await;
 
@@ -493,12 +562,12 @@ async fn app_status_and_cell_state() {
     // Running cells should only contain the installed cell.
     conductor.running_cells.share_ref(|cells| {
         assert_eq!(cells.len(), 1);
-        let (cell_id, cell_item) = cells.get_index(0).unwrap();
+        let (cell_id, cell) = cells.get_index(0).unwrap();
         assert_eq!(
             *cell_id,
             CellId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone())
         );
-        assert_eq!(cell_id, cell_item.cell.id());
+        assert_eq!(cell_id, cell.id());
     });
 
     // Disable app
@@ -532,12 +601,12 @@ async fn app_status_and_cell_state() {
     // Running cells should contain only the installed cell.
     conductor.running_cells.share_ref(|cells| {
         assert_eq!(cells.len(), 1);
-        let (cell_id, cell_item) = cells.get_index(0).unwrap();
+        let (cell_id, cell) = cells.get_index(0).unwrap();
         assert_eq!(
             *cell_id,
             CellId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone())
         );
-        assert_eq!(cell_id, cell_item.cell.id());
+        assert_eq!(cell_id, cell.id());
     });
 
     // Install another app with 2 DNAs
@@ -617,18 +686,18 @@ async fn app_status_and_cell_state() {
         // Cell of app 1
         let expected_cell_id =
             CellId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone());
-        let cell_item = cells.get(&expected_cell_id).unwrap();
-        assert_eq!(*cell_item.cell.id(), expected_cell_id);
+        let cell = cells.get(&expected_cell_id).unwrap();
+        assert_eq!(*cell.id(), expected_cell_id);
         // Cell 1 of app 2
         let expected_cell_id =
             CellId::new(dna_files_2[0].dna_hash().clone(), app_2.agent_key.clone());
-        let cell_item = cells.get(&expected_cell_id).unwrap();
-        assert_eq!(*cell_item.cell.id(), expected_cell_id);
+        let cell = cells.get(&expected_cell_id).unwrap();
+        assert_eq!(*cell.id(), expected_cell_id);
         // Cell 2 of app 2
         let expected_cell_id =
             CellId::new(dna_files_2[1].dna_hash().clone(), app_2.agent_key.clone());
-        let cell_item = cells.get(&expected_cell_id).unwrap();
-        assert_eq!(*cell_item.cell.id(), expected_cell_id);
+        let cell = cells.get(&expected_cell_id).unwrap();
+        assert_eq!(*cell.id(), expected_cell_id);
     });
 
     // Uninstall app 1
@@ -649,13 +718,13 @@ async fn app_status_and_cell_state() {
         // Cell 1 of app 2
         let expected_cell_id =
             CellId::new(dna_files_2[0].dna_hash().clone(), app_2.agent_key.clone());
-        let cell_item = cells.get(&expected_cell_id).unwrap();
-        assert_eq!(*cell_item.cell.id(), expected_cell_id);
+        let cell = cells.get(&expected_cell_id).unwrap();
+        assert_eq!(*cell.id(), expected_cell_id);
         // Cell 2 of app 2
         let expected_cell_id =
             CellId::new(dna_files_2[1].dna_hash().clone(), app_2.agent_key.clone());
-        let cell_item = cells.get(&expected_cell_id).unwrap();
-        assert_eq!(*cell_item.cell.id(), expected_cell_id);
+        let cell = cells.get(&expected_cell_id).unwrap();
+        assert_eq!(*cell.id(), expected_cell_id);
     });
 
     // Uninstall app 2

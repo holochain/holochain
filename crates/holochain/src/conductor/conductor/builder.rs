@@ -339,18 +339,10 @@ impl ConductorBuilder {
         });
 
         let configs = config.admin_interfaces.clone().unwrap_or_default();
-        let cell_startup_errors = conductor
+        conductor
             .clone()
             .initialize_conductor(outcome_receiver, configs)
             .await?;
-
-        // TODO: This should probably be emitted over the admin interface
-        if !cell_startup_errors.is_empty() {
-            error!(
-                msg = "Failed to create the following active apps",
-                ?cell_startup_errors
-            );
-        }
 
         if !no_print_setup {
             conductor.print_setup();

@@ -5,8 +5,8 @@ use super::*;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
-    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, CellError,
-    Conductor, ConductorBuilder,
+    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, Conductor,
+    ConductorBuilder,
 };
 use crate::retry_until_timeout;
 use ::fixt::prelude::StdRng;
@@ -285,10 +285,7 @@ impl SweetConductor {
     }
 
     /// Convenience function that uses the internal handle to enable an app
-    pub async fn enable_app(
-        &self,
-        id: InstalledAppId,
-    ) -> ConductorResult<(InstalledApp, Vec<(CellId, CellError)>)> {
+    pub async fn enable_app(&self, id: InstalledAppId) -> ConductorResult<InstalledApp> {
         self.raw_handle().enable_app(id).await
     }
 
