@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE** Fixed [Issue 4575](https://github.com/holochain/holochain/issues/4575):
   - Changed signature for `get_links` and `get_link_details` to take `LinkQuery` and a `GetStrategy` instead of `GetLinksInput` and `base`, `link_type`, `link_tag` and `get_options` respectively. This is to make the API more consistent with the rest of the HDK and to allow for more flexible queries.
   - Renamed `get_link_details` to `get_links_details`; since it actually returns a list of `LinkDetails` instead of a single `LinkDetails`.
+- **BREAKING CHANGE** [PR #5129](https://github.com/holochain/holochain/pull/5129): Removed `hash` function from host functions. Use the `hash_action` and `hash_entry` functions from `HDI` instead.
 
 ## 0.6.0-dev.9
 

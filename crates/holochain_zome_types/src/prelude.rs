@@ -15,7 +15,6 @@ pub use crate::dna_def::*;
 pub use crate::entry::*;
 pub use crate::entry_def::*;
 pub use crate::genesis::*;
-pub use crate::hash::*;
 pub use crate::info::*;
 pub use crate::init::*;
 pub use crate::judged::*;
