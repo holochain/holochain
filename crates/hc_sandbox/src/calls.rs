@@ -433,11 +433,15 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             println!("{}", serde_json::to_value(agent.to_string())?);
         }
         AdminRequestCli::ListCells => {
-            let cells: Vec<String> = client.list_cell_ids()
+            let cell_id_values: Vec<serde_json::Value> = client.list_cell_ids()
                 .await?
                 .into_iter()
-                .map(|cell_id| format!("{}", cell_id)).collect();
-            println!("{}", serde_json::to_value(&cells)?);
+                .map(|cell_id| serde_json::to_value(cell_id))
+                .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
+            let converted = cell_id_values.into_iter()
+                .map(|value| transform_cell_id(value))
+                .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
+            println!("{}", serde_json::to_value(&converted)?);
         }
         AdminRequestCli::ListApps(args) => {
             let apps = client.list_apps(args.status).await?;
