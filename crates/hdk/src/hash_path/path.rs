@@ -14,13 +14,15 @@ impl HdkPathExt for TypedPath {
     /// Only returns links between paths, not to other entries that might have their own links.
     fn children(&self) -> ExternResult<Vec<holochain_zome_types::link::Link>> {
         Self::ensure(self)?;
+
         let mut unwrapped = get_links(
-            GetLinksInputBuilder::try_new(
+            LinkQuery::new(
                 self.path_entry_hash()?,
                 LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-            )?
-            .build(),
+            ),
+            GetStrategy::default(),
         )?;
+
         // Only need one of each hash to build the tree.
         unwrapped.sort_unstable_by(|a, b| a.tag.cmp(&b.tag));
         unwrapped.dedup_by(|a, b| a.tag.eq(&b.tag));
@@ -65,11 +67,13 @@ impl HdkPathExt for TypedPath {
 
     fn children_details(&self) -> ExternResult<holochain_zome_types::link::LinkDetails> {
         Self::ensure(self)?;
-        get_link_details(
-            self.path_entry_hash()?,
-            LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
-            Some(holochain_zome_types::link::LinkTag::new([])),
-            GetOptions::default(),
+        get_links_details(
+            LinkQuery::new(
+                self.path_entry_hash()?,
+                LinkTypeFilter::single_type(self.link_type.zome_index, self.link_type.zome_type),
+            )
+            .tag_prefix(holochain_zome_types::link::LinkTag::new([])),
+            GetStrategy::default(),
         )
     }
 
@@ -103,15 +107,15 @@ impl HdkPathExt for TypedPath {
         } else if self.is_root() {
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
-                GetLinksInputBuilder::try_new(
+                LinkQuery::new(
                     root_hash()?,
                     LinkTypeFilter::single_type(
                         self.link_type.zome_index,
                         self.link_type.zome_type,
                     ),
-                )?
-                .tag_prefix(self.make_tag()?)
-                .build(),
+                )
+                .tag_prefix(self.make_tag()?),
+                GetStrategy::default(),
             )?
             .iter()
             .any(|Link { target, .. }| *target == this_paths_hash);
@@ -122,15 +126,15 @@ impl HdkPathExt for TypedPath {
                 .expect("Must have parent if not empty or root");
             let this_paths_hash: AnyLinkableHash = self.path_entry_hash()?.into();
             let exists = get_links(
-                GetLinksInputBuilder::try_new(
+                LinkQuery::new(
                     parent.path_entry_hash()?,
                     LinkTypeFilter::single_type(
                         self.link_type.zome_index,
                         self.link_type.zome_type,
                     ),
-                )?
-                .tag_prefix(self.make_tag()?)
-                .build(),
+                )
+                .tag_prefix(self.make_tag()?),
+                GetStrategy::default(),
             )?
             .iter()
             .any(|Link { target, .. }| *target == this_paths_hash);

@@ -8,6 +8,7 @@ use std::str::FromStr;
 /// Root for all paths.
 pub const ROOT: &[u8; 2] = &[0x00, 0x01];
 
+/// Gets the root hash from which all [`Path`]s originate.
 pub fn root_hash() -> ExternResult<AnyLinkableHash> {
     hash_entry(Entry::App(
         AppEntryBytes::try_from(SerializedBytes::from(UnsafeBytes::from(ROOT.to_vec())))

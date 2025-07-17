@@ -110,14 +110,7 @@ pub struct Cell {
 }
 
 impl Cell {
-    /// Constructor for a Cell, which ensure the Cell is fully initialized
-    /// before returning.
-    ///
-    /// If it hasn't happened already, a SourceChain will be created, and
-    /// genesis will be run. If these have already happened, those steps are
-    /// skipped.
-    ///
-    /// No Cell will be created if the SourceChain is not ready to be used.
+    /// Constructor for a Cell that has gone through genesis; fails otherwise.
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
@@ -718,11 +711,6 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    //
-    // TODO: when we had CellStatus to track whether a cell had joined the network or not,
-    // we would disallow zome calls for cells which had not joined. If we want that behavior,
-    // we can do that check at the time of the zome call, rather than at the time of trying
-    // to access the Cell itself, as it was previously done.
     pub async fn call_zome(
         &self,
         params: ZomeCallParams,
@@ -755,7 +743,6 @@ impl Cell {
         let invocation =
             ZomeCallInvocation::try_from_params(self.conductor_api.clone(), params).await?;
 
-        let dna_def = ribosome.dna_def().as_content().clone();
         // If there is no existing zome call then this is the root zome call
         let is_root_zome_call = workspace_lock.is_none();
         let workspace_lock = match workspace_lock {
@@ -767,7 +754,6 @@ impl Cell {
                     self.cache().clone(),
                     keystore.clone(),
                     self.id.agent_pubkey().clone(),
-                    Arc::new(dna_def),
                 )
                 .await?
             }
@@ -810,7 +796,6 @@ impl Cell {
 
         // get the dna
         let ribosome = self.get_ribosome()?;
-        let dna_def = ribosome.dna_def().clone();
 
         // Create the workspace
         let workspace = SourceChainWorkspace::init_as_root(
@@ -819,7 +804,6 @@ impl Cell {
             self.cache().clone(),
             keystore.clone(),
             id.agent_pubkey().clone(),
-            Arc::new(dna_def.into_content()),
         )
         .await?;
 

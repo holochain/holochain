@@ -9,9 +9,8 @@ fn init() -> ExternResult<InitCallbackResult> {
 
     // Look for links from our agent key, locally
     let links = get_links(
-        GetLinksInputBuilder::try_new(my_agent_info.agent_initial_pubkey.clone(), LinkTypes::Once)?
-            .get_options(GetStrategy::Local)
-            .build(),
+        LinkQuery::try_new(my_agent_info.agent_initial_pubkey.clone(), LinkTypes::Once)?,
+        GetStrategy::Local,
     )?;
 
     // If any of those links were authored by us, then init has already run and we're going to fail

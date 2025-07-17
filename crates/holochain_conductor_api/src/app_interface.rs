@@ -547,18 +547,16 @@ impl AppInfo {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppInfoStatus {
-    Paused { reason: PausedAppReason },
+    Enabled,
     Disabled { reason: DisabledAppReason },
-    Running,
     AwaitingMemproofs,
 }
 
 impl From<AppStatus> for AppInfoStatus {
     fn from(i: AppStatus) -> Self {
         match i {
-            AppStatus::Running => AppInfoStatus::Running,
+            AppStatus::Enabled => AppInfoStatus::Enabled,
             AppStatus::Disabled(reason) => AppInfoStatus::Disabled { reason },
-            AppStatus::Paused(reason) => AppInfoStatus::Paused { reason },
             AppStatus::AwaitingMemproofs => AppInfoStatus::AwaitingMemproofs,
         }
     }
@@ -567,9 +565,8 @@ impl From<AppStatus> for AppInfoStatus {
 impl From<AppInfoStatus> for AppStatus {
     fn from(i: AppInfoStatus) -> Self {
         match i {
-            AppInfoStatus::Running => AppStatus::Running,
+            AppInfoStatus::Enabled => AppStatus::Enabled,
             AppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
-            AppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
             AppInfoStatus::AwaitingMemproofs => AppStatus::AwaitingMemproofs,
         }
     }
@@ -585,7 +582,7 @@ pub struct AppAuthenticationRequest {
 #[cfg(test)]
 mod tests {
     use crate::{AppInfoStatus, AppRequest, AppResponse};
-    use holochain_types::app::{AppStatus, DisabledAppReason, PausedAppReason};
+    use holochain_types::app::{AppStatus, DisabledAppReason};
     use serde::Deserialize;
 
     #[test]
@@ -642,14 +639,6 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
             "{\"type\":\"disabled\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}"
-        );
-
-        let status: AppInfoStatus =
-            AppStatus::Paused(PausedAppReason::Error("because".into())).into();
-
-        assert_eq!(
-            serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"paused\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}",
         );
 
         let status: AppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();

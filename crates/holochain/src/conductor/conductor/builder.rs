@@ -28,12 +28,6 @@ pub struct ConductorBuilder {
     #[cfg(any(test, feature = "test_utils"))]
     pub state: Option<ConductorState>,
 
-    /// If specified here and a device seed is not already specified in the config,
-    /// a new seed will be generated in lair with a random unique tag, and the conductor config
-    /// will be updated to use this seed.
-    #[cfg(any(test, feature = "test_utils"))]
-    pub generate_test_device_seed: bool,
-
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
 
@@ -345,18 +339,10 @@ impl ConductorBuilder {
         });
 
         let configs = config.admin_interfaces.clone().unwrap_or_default();
-        let cell_startup_errors = conductor
+        conductor
             .clone()
             .initialize_conductor(outcome_receiver, configs)
             .await?;
-
-        // TODO: This should probably be emitted over the admin interface
-        if !cell_startup_errors.is_empty() {
-            error!(
-                msg = "Failed to create the following active apps",
-                ?cell_startup_errors
-            );
-        }
 
         if !no_print_setup {
             conductor.print_setup();
@@ -369,13 +355,6 @@ impl ConductorBuilder {
     /// are actually available for signing (especially for tryorama compat)
     pub fn with_keystore(mut self, keystore: MetaLairClient) -> Self {
         self.keystore = Some(keystore);
-        self
-    }
-
-    #[cfg(any(test, feature = "test_utils"))]
-    /// Sets some fake conductor state for tests
-    pub fn fake_state(mut self, state: ConductorState) -> Self {
-        self.state = Some(state);
         self
     }
 

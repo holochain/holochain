@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-dev.8
+
+- [Fixed issue 3606](https://github.com/holochain/holochain/issues/3606): Implemented `action_hash` for `Op`.
+
 ## 0.6.0-dev.7
 
 ## 0.6.0-dev.6

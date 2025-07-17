@@ -1,12 +1,11 @@
-use std::sync::Arc;
-
-use crate::sweettest::*;
+use crate::{sweettest::*, test_utils::retry_fn_until_timeout};
 use holochain_conductor_api::{AdminRequest, AdminResponse, AppRequest, AppResponse};
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use kitsune2_api::{AgentInfoSigned, DynLocalAgent};
 use kitsune2_core::{Ed25519LocalAgent, Ed25519Verifier};
 use kitsune2_test_utils::agent::AgentBuilder;
+use std::sync::Arc;
 
 // in these tests we set up a mix of apps and including clone cells so we can test
 // different varieties of combinations in the app_agent_info case, and we use the same setup in the admin_agent_info
@@ -26,9 +25,7 @@ async fn setup_tests() -> (
     let dna3 = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
     // Install two different apps on a conductor: app1 (dna1, dna2) and app2 (dna3)
-    let config = SweetConductorConfig::standard();
-    let mut conductor =
-        SweetConductor::from_config_rendezvous(config, SweetLocalRendezvous::new().await).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
 
     let app1_id: InstalledAppId = "app1".into();
     let app2_id: InstalledAppId = "app2".into();
@@ -40,7 +37,7 @@ async fn setup_tests() -> (
         .installed_app_id()
         .clone();
 
-    // Install app2 on conductors 1 and 2
+    // Install app2
     let installed_app2_id = conductor
         .setup_app(&app2_id, &[dna3.0.clone()])
         .await
@@ -48,7 +45,7 @@ async fn setup_tests() -> (
         .installed_app_id()
         .clone();
 
-    // Create a disabled clone cell for app1 on conductor[0]
+    // Create a disabled clone cell for app1
     let clone_cell = conductor
         .create_clone_cell(
             &installed_app1_id,
@@ -61,6 +58,38 @@ async fn setup_tests() -> (
         )
         .await
         .unwrap();
+
+    // Wait until all peers are added to the peer stores.
+    retry_fn_until_timeout(
+        || async {
+            futures::future::join_all(
+                [
+                    dna1.0.dna_hash(),
+                    dna2.0.dna_hash(),
+                    dna3.0.dna_hash(),
+                    clone_cell.cell_id.dna_hash(),
+                ]
+                .map(|dna_hash| async {
+                    conductor
+                        .holochain_p2p()
+                        .peer_store(dna_hash.clone())
+                        .await
+                        .unwrap()
+                        .get_all()
+                        .await
+                        .unwrap()
+                        .len()
+                }),
+            )
+            .await
+            .iter()
+            .all(|num_agents| *num_agents == 1)
+        },
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     (
         dna1.0.dna_hash().clone(),
@@ -100,11 +129,7 @@ async fn admin_agent_info() {
         _ => panic!("Expected AgentInfo response"),
     };
 
-    assert_eq!(
-        agent_infos.len(),
-        4,
-        "Should have agent_info for each dna on each conductor"
-    );
+    assert_eq!(agent_infos.len(), 4, "Should have agent_info for each dna");
 
     let mut seen_spaces = std::collections::HashSet::new();
     let mut seen_agents = std::collections::HashSet::new();

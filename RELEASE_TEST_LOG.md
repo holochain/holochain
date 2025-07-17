@@ -2,6 +2,31 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2025-07-09: v0.4.4-rc.0
+
+*Success*
+- A quick smoke test with 7 nodes.
+- The only changes in this release are to zome call atomicity and the `hc-sandbox` CLI tool. We checked that peer 
+  discovery is working, that signals can be sent and that entries created by all nodes are received by all other nodes.
+
+## 2025-07-09: v0.5.4-rc.0
+
+*Success*
+- Ran a test with dino-adventure.
+- Test with 7 nodes and observed:
+  - Peer discovery and initial sync was fast.
+  - Sending signals was 100% reliable.
+  - Entries created by all nodes were initially received quickly.
+  - After taking one node offline and then creating data, some people were able to see created data quickly and for
+    other it took some time. In the region of a couple of minutes. This is acceptable while we discover that a peer
+    is offline but it then appeared to remain slower after we should have stopped talking to the offline node.
+  - Bringing the offline node back online resulted in a nearly immediate sync for that node. When everyone created data
+    with the offline node back online, we continued to observe slightly slower sync times than we saw initially with
+    everyone online. For most people, data came through quickly. For a few people, it took a couple of minutes.
+
+This doesn't appear to be regression from the previous release, but might suggest that our connection handling once 
+peers start to come and go, still needs work.
+
 ## 2025-06-25: v0.5.3-rc.0
 
 *Success*

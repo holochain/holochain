@@ -315,6 +315,10 @@ async fn app_validation_ops() {
             ),
         ],
         [("zome1", "a".to_string()), ("zome2", "b".to_string())],
+        [
+            ("zome1".into(), "integrity_zome1".into()),
+            ("zome2".into(), "integrity_zome2".into()),
+        ],
     )
     .with_dependency("zome1", "integrity_zome1")
     .with_dependency("zome2", "integrity_zome2")
@@ -350,6 +354,10 @@ async fn app_validation_ops() {
             ),
         ],
         [("zome1", "a".to_string()), ("zome2", "b".to_string())],
+        [
+            ("zome1".into(), "integrity_zome1".into()),
+            ("zome2".into(), "integrity_zome2".into()),
+        ],
     )
     .with_dependency("zome1", "integrity_zome1")
     .with_dependency("zome2", "integrity_zome2")

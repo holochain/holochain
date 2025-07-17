@@ -5,8 +5,8 @@ use super::*;
 use crate::conductor::api::error::ConductorApiError;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
-    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, CellError,
-    Conductor, ConductorBuilder,
+    api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, Conductor,
+    ConductorBuilder,
 };
 use crate::retry_until_timeout;
 use ::fixt::prelude::StdRng;
@@ -285,10 +285,7 @@ impl SweetConductor {
     }
 
     /// Convenience function that uses the internal handle to enable an app
-    pub async fn enable_app(
-        &self,
-        id: InstalledAppId,
-    ) -> ConductorResult<(InstalledApp, Vec<(CellId, CellError)>)> {
+    pub async fn enable_app(&self, id: InstalledAppId) -> ConductorResult<InstalledApp> {
         self.raw_handle().enable_app(id).await
     }
 
@@ -299,20 +296,6 @@ impl SweetConductor {
         reason: DisabledAppReason,
     ) -> ConductorResult<InstalledApp> {
         self.raw_handle().disable_app(id, reason).await
-    }
-
-    /// Convenience function that uses the internal handle to start an app
-    pub async fn start_app(&self, id: InstalledAppId) -> ConductorResult<InstalledApp> {
-        self.raw_handle().start_app(id).await
-    }
-
-    /// Convenience function that uses the internal handle to pause an app
-    pub async fn pause_app(
-        &self,
-        id: InstalledAppId,
-        reason: PausedAppReason,
-    ) -> ConductorResult<InstalledApp> {
-        self.raw_handle().pause_app(id, reason).await
     }
 
     /// Install the dna first.

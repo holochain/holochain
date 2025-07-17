@@ -10,10 +10,6 @@ pub fn set_zome_types(entries: &[(u8, u8)], links: &[(u8, u8)]) {
             todo!()
         }
 
-        fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput> {
-            todo!()
-        }
-
         fn must_get_entry(
             &self,
             must_get_entry_input: MustGetEntryInput,

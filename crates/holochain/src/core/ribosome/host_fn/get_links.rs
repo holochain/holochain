@@ -309,11 +309,11 @@ pub mod slow_tests {
         assert_eq!(links_bidi, vec![forward_links.clone(), back_links.clone()]);
 
         let forward_link_details: LinkDetails =
-            conductor.call(&alice, "get_link_details", ()).await;
+            conductor.call(&alice, "get_links_details", ()).await;
         let back_link_details: LinkDetails =
             conductor.call(&alice, "get_back_link_details", ()).await;
         let link_details_bidi: Vec<LinkDetails> =
-            conductor.call(&alice, "get_link_details_bidi", ()).await;
+            conductor.call(&alice, "get_links_details_bidi", ()).await;
 
         assert_eq!(
             link_details_bidi,
@@ -380,12 +380,10 @@ pub mod slow_tests {
             .call(
                 &alice,
                 "get_links_with_query",
-                GetLinksInputBuilder::try_new(
+                LinkQuery::new(
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
-                )
-                .unwrap()
-                .build(),
+                ),
             )
             .await;
         assert_eq!(5, links.len());
@@ -394,13 +392,11 @@ pub mod slow_tests {
             .call(
                 &alice,
                 "get_links_with_query",
-                GetLinksInputBuilder::try_new(
+                LinkQuery::new(
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
                 )
-                .unwrap()
-                .tag_prefix(LinkTag::new("a"))
-                .build(),
+                .tag_prefix(LinkTag::new("a")),
             )
             .await;
         assert_eq!(
@@ -415,13 +411,11 @@ pub mod slow_tests {
             .call(
                 &alice,
                 "get_links_with_query",
-                GetLinksInputBuilder::try_new(
+                LinkQuery::new(
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
                 )
-                .unwrap()
-                .tag_prefix(LinkTag::new("a.b"))
-                .build(),
+                .tag_prefix(LinkTag::new("a.b")),
             )
             .await;
         assert_eq!(
@@ -436,13 +430,11 @@ pub mod slow_tests {
             .call(
                 &alice,
                 "get_links_with_query",
-                GetLinksInputBuilder::try_new(
+                LinkQuery::new(
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
                 )
-                .unwrap()
-                .tag_prefix(LinkTag::new("b"))
-                .build(),
+                .tag_prefix(LinkTag::new("b")),
             )
             .await;
         assert_eq!(
@@ -496,12 +488,10 @@ pub mod slow_tests {
             .call(
                 &alice,
                 "get_links_with_query",
-                GetLinksInputBuilder::try_new(
+                LinkQuery::new(
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
-                )
-                .unwrap()
-                .build(),
+                ),
             )
             .await;
         assert_eq!(4, links.len());
@@ -511,13 +501,11 @@ pub mod slow_tests {
             .call(
                 &alice,
                 "get_links_with_query",
-                GetLinksInputBuilder::try_new(
+                LinkQuery::new(
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
                 )
-                .unwrap()
-                .before(mid_time)
-                .build(),
+                .before(mid_time),
             )
             .await;
         assert_eq!(
@@ -533,13 +521,11 @@ pub mod slow_tests {
             .call(
                 &alice,
                 "get_links_with_query",
-                GetLinksInputBuilder::try_new(
+                LinkQuery::new(
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
                 )
-                .unwrap()
-                .after(mid_time)
-                .build(),
+                .after(mid_time),
             )
             .await;
         assert_eq!(
@@ -555,13 +541,8 @@ pub mod slow_tests {
             .call(
                 &alice,
                 "get_links_with_query",
-                GetLinksInputBuilder::try_new(
-                    base,
-                    LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
-                )
-                .unwrap()
-                .author(alice.cell_id().agent_pubkey().clone())
-                .build(),
+                LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))
+                    .author(alice.cell_id().agent_pubkey().clone()),
             )
             .await;
         assert_eq!(

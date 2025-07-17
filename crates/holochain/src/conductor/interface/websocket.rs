@@ -988,11 +988,11 @@ mod test {
         let state = conductor_handle.get_state_from_handle().await.unwrap();
         assert_eq!(initial_state, state);
 
-        // Check it is running, and get all cells
+        // Check it is enabled, and get all cells
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
             .inspect(|app| {
-                assert_eq!(*app.status(), AppStatus::Running);
+                assert_eq!(*app.status(), AppStatus::Enabled);
             })
             .unwrap()
             .all_cells()
@@ -1006,11 +1006,11 @@ mod test {
 
         assert_eq!(expected, cell_ids);
 
-        // Check that it is returned in get_app_info as running
+        // Check that it is returned in get_app_info as enabled
         let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
-            assert_matches!(info.status, AppInfoStatus::Running);
+            assert_matches!(info.status, AppInfoStatus::Enabled);
         }
 
         // Now deactivate app

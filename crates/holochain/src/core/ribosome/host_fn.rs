@@ -161,12 +161,9 @@ host_fn_api_impls! {
     // Get links by entry hash from the cascade.
     fn get_links (Vec<zt::link::GetLinksInput>) -> Vec<Vec<zt::link::Link>>;
 
-    fn get_link_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
+    fn get_links_details (Vec<zt::link::GetLinksInput>) -> Vec<zt::link::LinkDetails>;
 
     fn count_links(zt::query::LinkQuery) -> usize;
-
-    // Hash data on the host.
-    fn hash (zt::hash::HashInput) -> zt::hash::HashOutput;
 
     // Retreive a record from the DHT or short circuit.
     fn must_get_valid_record (zt::entry::MustGetValidRecordInput) -> Record;
