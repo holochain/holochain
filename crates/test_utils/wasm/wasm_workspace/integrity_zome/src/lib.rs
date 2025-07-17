@@ -63,10 +63,6 @@ fn call_verify_signature(verify_signature: VerifySignature) -> ExternResult<bool
     HDI.with(|i| i.borrow().verify_signature(verify_signature))
 }
 #[hdk_extern]
-fn call_hash(hash_input: HashInput) -> ExternResult<HashOutput> {
-    HDI.with(|i| i.borrow().hash(hash_input))
-}
-#[hdk_extern]
 fn call_must_get_entry(must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
     HDI.with(|i| i.borrow().must_get_entry(must_get_entry_input))
 }
@@ -136,11 +132,6 @@ pub mod test {
             .once()
             .returning(|_| Ok(true));
 
-        mock_hdi.expect_hash().once().returning({
-            let empty_agent_key = empty_agent_key.clone();
-            move |_| Ok(HashOutput::Entry(empty_agent_key.clone().into()))
-        });
-
         mock_hdi.expect_must_get_entry().once().returning({
             let empty_agent_key = empty_agent_key.clone();
             move |_| {
@@ -209,8 +200,6 @@ pub mod test {
             data: vec![],
         })
         .unwrap();
-
-        call_hash(HashInput::Entry(Entry::Agent(empty_agent_key.clone()))).unwrap();
 
         call_must_get_entry(MustGetEntryInput(empty_agent_key.clone().into())).unwrap();
 

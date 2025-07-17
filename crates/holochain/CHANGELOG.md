@@ -7,12 +7,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- It's possible to configure an advanced setting for the network layer that shows tracing information about network
-  connectivity and state changes. Rather than having to configure that in Holochain runtimes, it is now automatically
-  enabled when the `NETAUDIT` tracing target is enabled at `WARN` level or lower.
+- Refactor conductor methods `enable_app`, `disable_app`, `uninstall_app` and `initialize_conductor` to directly manage cells instead of using state machine code.
+- **BREAKING CHANGE**: `AdminRequest::EnableApp` fails when creating the app's cells fails and returns the first error that occurred. In case of success the enabled app info is returned.
+
+## 0.6.0-dev.13
+
+- **BREAKING CHANGE**: Remove `pause_app` and `Paused` state from conductor. Pausing an app was used when enabling an app partially failed and could be re-attempted. Now the app is only enabled if all cells successfully started up.
+- **BREAKING CHANGE**: Removed everything related to `started` and `stopped` apps. Instead `enabled` and `disabled` remain as the only two possible states an app can be in after it has been installed.
+- **BREAKING CHANGE**: Remove `CellStatus` which used to indicate whether a cell has joined the network or not. Going forward cells that couldn’t join the network will not be kept in conductor state.
+- **BREAKING CHANGE**: Remove `generate_test_device_seed` from `ConductorBuilder`. This was a remnant from DPKI.
+- Add integration tests for the use of `path`'s and the links created by them. ([\#5114](https://github.com/holochain/holochain/pull/5114))
+- **BREAKING CHANGE** Removed an if/else clause in the `Ribosome::new()` impl that lead to inconsistent behavior depending on the number of zomes defined in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)). This means that **the dependencies field for zomes in the dna manifest is now always mandatory**. Previously, if there was only one single integrity zome in the whole dna, it was implied by the conductor that a coordinator zome would depend on that integrity zome. This is no longer the case.
+- Clearer error message if `ScopeLinkedType` or `ScopedEntryDefIndex` cannot be created due to zome dependencies not being specified in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)).
+
+## 0.6.0-dev.12
+
+- It’s possible to configure an advanced setting for the network layer that shows tracing information about network connectivity and state changes. Rather than having to configure that in Holochain runtimes, it is now automatically enabled when the `NETAUDIT` tracing target is enabled at `WARN` level or lower.
 - Test app operations (install/enable/disable/uninstall) with regards to app state and cell state.
 - **BREAKING CHANGE**: Remove `start_app` from conductor. Use `enable_app` instead.
-- Remove unused field `dna_def` the `HostFnWorkspace` struct ([#5102](https://github.com/holochain/holochain/pull/5102))
+- Remove unused field `dna_def` the `HostFnWorkspace` struct ([\#5102](https://github.com/holochain/holochain/pull/5102))
 - Replace the `dna_def` field of the `SysValidationWorkspace` with a `dna_hash` field.
 - Remove unnecessary uses of `LinkType` and `EntryDefIndex` types
 
@@ -517,7 +530,7 @@ Now it serializes to
 - Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
 
 - Major refactor of the sys validation workflow to improve reliability and performance:
-
+  
   - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
   - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
   - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
@@ -754,7 +767,7 @@ Now it serializes to
 ## 0.0.154
 
 - Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
-
+  
   Reason: it causes a build failure of the *holochain*  crate on crates.io
 
 ## 0.0.153
@@ -920,7 +933,7 @@ network:
 - **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 
 - **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
-
+  
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
@@ -950,7 +963,7 @@ network:
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
-
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`

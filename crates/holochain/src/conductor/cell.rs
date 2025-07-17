@@ -110,14 +110,7 @@ pub struct Cell {
 }
 
 impl Cell {
-    /// Constructor for a Cell, which ensure the Cell is fully initialized
-    /// before returning.
-    ///
-    /// If it hasn't happened already, a SourceChain will be created, and
-    /// genesis will be run. If these have already happened, those steps are
-    /// skipped.
-    ///
-    /// No Cell will be created if the SourceChain is not ready to be used.
+    /// Constructor for a Cell that has gone through genesis; fails otherwise.
     pub async fn create(
         id: CellId,
         conductor_handle: ConductorHandle,
@@ -718,11 +711,6 @@ impl Cell {
     }
 
     /// Function called by the Conductor
-    //
-    // TODO: when we had CellStatus to track whether a cell had joined the network or not,
-    // we would disallow zome calls for cells which had not joined. If we want that behavior,
-    // we can do that check at the time of the zome call, rather than at the time of trying
-    // to access the Cell itself, as it was previously done.
     pub async fn call_zome(
         &self,
         params: ZomeCallParams,

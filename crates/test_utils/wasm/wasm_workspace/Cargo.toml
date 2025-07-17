@@ -16,6 +16,7 @@ members = [
   "debug",
   "dna_properties",
   "emit_signal",
+  "paths",
   "post_commit_signal",
   "entry_defs",
   "hash_entry",

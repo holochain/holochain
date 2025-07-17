@@ -198,10 +198,8 @@ where
     Entry: TryFrom<I, Error = E>,
     WasmError: From<E>,
 {
-    match HDI.with(|h| h.borrow().hash(HashInput::Entry(Entry::try_from(input)?)))? {
-        HashOutput::Entry(entry_hash) => Ok(entry_hash),
-        _ => unreachable!(),
-    }
+    let entry = Entry::try_from(input)?;
+    Ok(EntryHashed::from_content_sync(entry).into_hash())
 }
 
 /// Hash an [`Action`] into an [`ActionHash`].
@@ -217,54 +215,5 @@ where
 /// which already has associated methods to access the [`ActionHash`] of the inner [`Action`]. In
 /// normal usage it is unlikely to be required to separately hash a [`Action`] like this.
 pub fn hash_action(input: Action) -> ExternResult<ActionHash> {
-    match HDI.with(|h| h.borrow().hash(HashInput::Action(input)))? {
-        HashOutput::Action(action_hash) => Ok(action_hash),
-        _ => unreachable!(),
-    }
-}
-
-/// Hash arbitrary bytes using BLAKE2b.
-/// This is the same algorithm used by holochain for typed hashes.
-/// Notably the output hash length is configurable.
-pub fn hash_blake2b(input: Vec<u8>, output_len: u8) -> ExternResult<Vec<u8>> {
-    match HDI.with(|h| h.borrow().hash(HashInput::Blake2B(input, output_len)))? {
-        HashOutput::Blake2B(vec) => Ok(vec),
-        _ => unreachable!(),
-    }
-}
-
-// @todo - not implemented on the host
-pub fn hash_sha256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
-    match HDI.with(|h| h.borrow().hash(HashInput::Sha256(input)))? {
-        HashOutput::Sha256(hash) => Ok(hash.as_ref().to_vec()),
-        _ => unreachable!(),
-    }
-}
-
-// @todo - not implemented on the host
-pub fn hash_sha512(input: Vec<u8>) -> ExternResult<Vec<u8>> {
-    match HDI.with(|h| h.borrow().hash(HashInput::Sha512(input)))? {
-        HashOutput::Sha512(hash) => Ok(hash.as_ref().to_vec()),
-        _ => unreachable!(),
-    }
-}
-
-/// Hash arbitrary bytes using keccak256.
-/// This is the same algorithm used by ethereum and other EVM compatible blockchains.
-/// It is essentially the same as sha3 256 but with a minor difference in configuration
-/// that is enough to generate different hash outputs.
-pub fn hash_keccak256(input: Vec<u8>) -> ExternResult<Vec<u8>> {
-    match HDI.with(|h| h.borrow().hash(HashInput::Keccak256(input)))? {
-        HashOutput::Keccak256(hash) => Ok(hash.as_ref().to_vec()),
-        _ => unreachable!(),
-    }
-}
-
-/// Hash arbitrary bytes using SHA3 256.
-/// This is the official NIST standard for 256 bit SHA3 hashes.
-pub fn hash_sha3(input: Vec<u8>) -> ExternResult<Vec<u8>> {
-    match HDI.with(|h| h.borrow().hash(HashInput::Sha3256(input)))? {
-        HashOutput::Sha3256(hash) => Ok(hash.as_ref().to_vec()),
-        _ => unreachable!(),
-    }
+    Ok(ActionHashed::from_content_sync(input).into_hash())
 }

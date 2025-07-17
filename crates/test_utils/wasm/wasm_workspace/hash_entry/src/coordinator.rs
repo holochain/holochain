@@ -31,31 +31,3 @@ fn twenty_three_degrees_hash(_: ()) -> ExternResult<EntryHash> {
 fn hash_entry(entry: Entry) -> ExternResult<EntryHash> {
     hdk::prelude::hash_entry(entry)
 }
-
-#[cfg(all(test, feature = "mock"))]
-mod tests {
-    use ::fixt::prelude::*;
-    use hdk::prelude::*;
-
-    #[test]
-    fn hash_entry_smoke() {
-        let mut mock_hdk = hdk::prelude::MockHdkT::new();
-
-        let input_entry = fixt!(Entry);
-        let output_hash = fixt!(EntryHash);
-        let output_hash_closure = output_hash.clone();
-        mock_hdk
-            .expect_hash()
-            .with(hdk::prelude::mockall::predicate::eq(HashInput::Entry(
-                input_entry.clone(),
-            )))
-            .times(1)
-            .return_once(move |_| Ok(HashOutput::Entry(output_hash_closure)));
-
-        hdk::prelude::set_hdk(mock_hdk);
-
-        let result = super::hash_entry(input_entry);
-
-        assert_eq!(result, Ok(output_hash))
-    }
-}

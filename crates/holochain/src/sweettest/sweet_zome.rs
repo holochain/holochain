@@ -40,6 +40,7 @@ impl SweetInlineZomes {
             InlineZomeSet::new_unique(
                 [(Self::INTEGRITY, entry_defs, num_link_types)],
                 [Self::COORDINATOR],
+                [(Self::COORDINATOR.into(), Self::INTEGRITY.into())],
             )
             .with_dependency(Self::COORDINATOR, Self::INTEGRITY),
         )

@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** [PR #5129](https://github.com/holochain/holochain/pull/5129): Removed `hash` function from host functions. Use the `hash_action` and `hash_entry` functions from `HDI` instead.
+
+## 0.7.0-dev.9
+
+## 0.7.0-dev.8
+
 ## 0.7.0-dev.7
 
 ## 0.7.0-dev.6

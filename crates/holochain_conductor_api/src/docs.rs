@@ -15,16 +15,13 @@
 //! pub enum AppStatusFilter {
 //!     Enabled,
 //!     Disabled,
-//!     Running,
-//!     Stopped,
-//!     Paused,
 //! }
 //! ```
 //!
 //! would lead to the following associated TypeScript type
 //!
 //! ```ignore
-//! type AppStatusFilter = "enabled" | "disabled" | "running" | "stopped" | "paused";
+//! type AppStatusFilter = "enabled" | "disabled";
 //! ```
 //!
 //! 2. Enums that **include tuple-like and/or struct-like variants** are serialized using
