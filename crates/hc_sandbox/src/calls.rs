@@ -9,8 +9,13 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::cmds::Existing;
+use crate::ports::get_admin_ports;
+use crate::run::run_async;
 use anyhow::anyhow;
 use anyhow::bail;
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use clap::{Args, Parser, Subcommand};
 use holo_hash::{AgentPubKeyB64, DnaHashB64};
 use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
@@ -18,27 +23,22 @@ use holochain_conductor_api::AgentMetaInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
+use holochain_trace::Output;
 use holochain_types::app::AppManifest;
 use holochain_types::app::RoleSettingsMap;
 use holochain_types::app::RoleSettingsMapYaml;
-use holochain_types::prelude::{Deserialize, DnaModifiersOpt, Serialize};
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
+use holochain_types::prelude::{Deserialize, DnaModifiersOpt, Serialize};
 use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
+use holochain_types::websocket::AllowedOrigins;
+use kitsune2_api::AgentInfoSigned;
 use kitsune2_api::Url;
 use kitsune2_core::Ed25519Verifier;
 use std::convert::TryFrom;
-use chrono::{DateTime, Duration, NaiveDateTime, Utc};
-use crate::cmds::Existing;
-use crate::ports::get_admin_ports;
-use crate::run::run_async;
-use clap::{Args, Parser, Subcommand};
-use holochain_trace::Output;
-use holochain_types::websocket::AllowedOrigins;
-use kitsune2_api::AgentInfoSigned;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
@@ -393,14 +393,14 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                     },
                 }])
                 .await?;
-            println!("{}", serde_json::to_value(&port)?);
+            println!("{}", serde_json::to_value(port)?);
         }
         AdminRequestCli::AddAppWs(args) => {
             let port = args.port.unwrap_or(0);
             let port = client
                 .attach_app_interface(port, args.allowed_origins, args.installed_app_id)
                 .await?;
-            println!("{}", serde_json::to_value(&port)?);
+            println!("{}", serde_json::to_value(port)?);
         }
         AdminRequestCli::ListAppWs => {
             let interface_infos = client.list_app_interfaces().await?;
@@ -412,7 +412,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         }
         AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(client, args).await?;
-            println!("{}",  convert_app_info(app)?);
+            println!("{}", convert_app_info(app)?);
         }
         AdminRequestCli::UninstallApp(args) => {
             client
@@ -421,7 +421,8 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             msg!("Uninstalled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::ListDnas => {
-            let dnas: Vec<DnaHashB64> = client.list_dnas()
+            let dnas: Vec<DnaHashB64> = client
+                .list_dnas()
                 .await?
                 .into_iter()
                 .map(|d| d.into())
@@ -433,20 +434,23 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             println!("{}", serde_json::to_value(agent.to_string())?);
         }
         AdminRequestCli::ListCells => {
-            let cell_id_values: Vec<serde_json::Value> = client.list_cell_ids()
+            let cell_id_values: Vec<serde_json::Value> = client
+                .list_cell_ids()
                 .await?
                 .into_iter()
-                .map(|cell_id| serde_json::to_value(cell_id))
+                .map(serde_json::to_value)
                 .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
-            let converted = cell_id_values.into_iter()
-                .map(|value| transform_cell_id(value))
+            let converted = cell_id_values
+                .into_iter()
+                .map(transform_cell_id)
                 .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
             println!("{}", serde_json::to_value(&converted)?);
         }
         AdminRequestCli::ListApps(args) => {
             let apps = client.list_apps(args.status).await?;
-            let values = apps.into_iter()
-                .map(|app_info| convert_app_info(app_info))
+            let values = apps
+                .into_iter()
+                .map(convert_app_info)
                 .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
             println!("{}", serde_json::to_value(values)?);
         }
@@ -474,7 +478,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             println!(
                 "{}",
                 serde_json::to_value(
-                    &metrics
+                    metrics
                         .into_iter()
                         .map(|(k, v)| (k.to_string(), v))
                         .collect::<HashMap<_, _>>()
@@ -600,8 +604,8 @@ fn transform_cell_info_map(value: serde_json::Value) -> anyhow::Result<serde_jso
                     bail!("Value is not a CellInfo.");
                 };
                 if let Some(old_value) = cell_id_map.get("cell_id") {
-                     let new_value = transform_cell_id(old_value.to_owned())?;
-                     cell_id_map.insert("cell_id".to_string(), new_value);
+                    let new_value = transform_cell_id(old_value.to_owned())?;
+                    cell_id_map.insert("cell_id".to_string(), new_value);
                 }
             }
         }
@@ -645,7 +649,7 @@ fn value_to_base64(value: serde_json::Value) -> anyhow::Result<Vec<u8>> {
         let Some(n) = num.as_i64() else {
             anyhow::bail!("Value is not an integer.");
         };
-        if n < 0 || n > 255 {
+        if !(0..=255).contains(&n) {
             anyhow::bail!("Value is not an u8.");
         }
         bytes.push(n as u8);
