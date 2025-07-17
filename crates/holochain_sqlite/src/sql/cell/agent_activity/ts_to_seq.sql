@@ -9,5 +9,6 @@ WHERE
   AND Action.author = :author
 ORDER BY
   seq ASC
-LIMIT 1;
+LIMIT
+  1;
 
