@@ -21,7 +21,7 @@ mod test;
 /// a given timestamp has been passed.
 /// Multiple [`ActionHash`]es can be provided. The filter will stop at and take the first one found.
 /// When providing a Timestamp, the filter will stop at and take the oldest action that has a
-/// Timestamp newer than the provided one. In the edge case of multiple actions having the same
+/// Timestamp newer than the provided one. In the case of multiple actions having the same
 /// Timestamp as the limit condition, the filter will stop at the action with the lowest sequence.
 /// Multiple limit conditions can be set. Whichever is the smaller set will be kept.
 pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
