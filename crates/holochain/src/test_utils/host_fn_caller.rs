@@ -182,7 +182,6 @@ impl HostFnCaller {
             cache,
             keystore.clone(),
             cell_id.agent_pubkey().clone(),
-            Arc::new(ribosome.dna_def().as_content().clone()),
         )
         .await
         .unwrap();
@@ -445,7 +444,7 @@ impl HostFnCaller {
         output
     }
 
-    pub async fn get_link_details(
+    pub async fn get_links_details(
         &self,
         base: AnyLinkableHash,
         type_query: LinkTypeFilter,
@@ -458,7 +457,7 @@ impl HostFnCaller {
             .tag_prefix(tag)
             .build();
         let output = {
-            host_fn::get_link_details::get_link_details(ribosome, call_context, vec![input])
+            host_fn::get_links_details::get_links_details(ribosome, call_context, vec![input])
                 .unwrap()
                 .into_iter()
                 .next()

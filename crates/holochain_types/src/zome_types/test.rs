@@ -29,30 +29,20 @@ fn make_scope(entries: &[(u8, u8)], links: &[(u8, u8)]) -> ScopedZomeTypesSet {
 #[test_case(vec![(1,20)] => make_set(&[(0, 1)], &[(0, 20)]))]
 #[test_case(vec![(1,20), (0, 0)] => make_set(&[(0, 1), (1, 0)], &[(0, 20), (1, 0)]))]
 fn test_from_ordered_iterator(iter: Vec<(u8, u8)>) -> GlobalZomeTypes {
-    GlobalZomeTypes::from_ordered_iterator(
-        iter.into_iter()
-            .map(|(e, l)| (EntryDefIndex(e), LinkType(l))),
-    )
-    .unwrap()
+    GlobalZomeTypes::from_ordered_iterator(iter).unwrap()
 }
 
 #[test]
 fn test_from_ordered_iterator_err() {
     assert!(matches!(
-        GlobalZomeTypes::from_ordered_iterator((0..300).map(|_| (EntryDefIndex(1), LinkType(1))),)
-            .unwrap_err(),
+        GlobalZomeTypes::from_ordered_iterator((0..300).map(|_| (1, 1)),).unwrap_err(),
         ZomeTypesError::ZomeIndexOverflow
     ));
 }
 
 #[test]
 fn construction_is_deterministic() {
-    let zome_types = vec![
-        (EntryDefIndex(3), LinkType(2)),
-        (EntryDefIndex(0), LinkType(0)),
-        (EntryDefIndex(5), LinkType(1)),
-        (EntryDefIndex(12), LinkType(0)),
-    ];
+    let zome_types = vec![(3, 2), (0, 0), (5, 1), (12, 0)];
 
     assert_eq!(
         GlobalZomeTypes::from_ordered_iterator(zome_types.clone()).unwrap(),

@@ -7,6 +7,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Refactor conductor methods `enable_app`, `disable_app`, `uninstall_app` and `initialize_conductor` to directly manage cells instead of using state machine code.
+- **BREAKING CHANGE**: `AdminRequest::EnableApp` fails when creating the app's cells fails and returns the first error that occurred. In case of success the enabled app info is returned.
+
+## 0.6.0-dev.13
+
+- **BREAKING CHANGE**: Remove `pause_app` and `Paused` state from conductor. Pausing an app was used when enabling an app partially failed and could be re-attempted. Now the app is only enabled if all cells successfully started up.
+- **BREAKING CHANGE**: Removed everything related to `started` and `stopped` apps. Instead `enabled` and `disabled` remain as the only two possible states an app can be in after it has been installed.
+- **BREAKING CHANGE**: Remove `CellStatus` which used to indicate whether a cell has joined the network or not. Going forward cells that couldn’t join the network will not be kept in conductor state.
+- **BREAKING CHANGE**: Remove `generate_test_device_seed` from `ConductorBuilder`. This was a remnant from DPKI.
+- Add integration tests for the use of `path`'s and the links created by them. ([\#5114](https://github.com/holochain/holochain/pull/5114))
+- **BREAKING CHANGE** Removed an if/else clause in the `Ribosome::new()` impl that lead to inconsistent behavior depending on the number of zomes defined in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)). This means that **the dependencies field for zomes in the dna manifest is now always mandatory**. Previously, if there was only one single integrity zome in the whole dna, it was implied by the conductor that a coordinator zome would depend on that integrity zome. This is no longer the case.
+- Clearer error message if `ScopeLinkedType` or `ScopedEntryDefIndex` cannot be created due to zome dependencies not being specified in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)).
+
+## 0.6.0-dev.12
+
+- It’s possible to configure an advanced setting for the network layer that shows tracing information about network connectivity and state changes. Rather than having to configure that in Holochain runtimes, it is now automatically enabled when the `NETAUDIT` tracing target is enabled at `WARN` level or lower.
+- Test app operations (install/enable/disable/uninstall) with regards to app state and cell state.
+- **BREAKING CHANGE**: Remove `start_app` from conductor. Use `enable_app` instead.
+- Remove unused field `dna_def` the `HostFnWorkspace` struct ([\#5102](https://github.com/holochain/holochain/pull/5102))
+- Replace the `dna_def` field of the `SysValidationWorkspace` with a `dna_hash` field.
+- Remove unnecessary uses of `LinkType` and `EntryDefIndex` types
+
 ## 0.6.0-dev.11
 
 ## 0.6.0-dev.10

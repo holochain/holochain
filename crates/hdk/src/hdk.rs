@@ -49,7 +49,7 @@ pub trait HdkT: HdiT {
     fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<ActionHash>;
     fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<ActionHash>;
     fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>>;
-    fn get_link_details(
+    fn get_links_details(
         &self,
         get_links_input: Vec<GetLinksInput>,
     ) -> ExternResult<Vec<LinkDetails>>;
@@ -141,7 +141,7 @@ mockall::mock! {
         fn create_link(&self, create_link_input: CreateLinkInput) -> ExternResult<ActionHash>;
         fn delete_link(&self, delete_link_input: DeleteLinkInput) -> ExternResult<ActionHash>;
         fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>>;
-        fn get_link_details(
+        fn get_links_details(
             &self,
             get_links_input: Vec<GetLinksInput>,
         ) -> ExternResult<Vec<LinkDetails>>;
@@ -194,7 +194,6 @@ mockall::mock! {
 
     impl HdiT for HdkT {
         fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool>;
-        fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput>;
         fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed>;
         fn must_get_action(
             &self,
@@ -245,10 +244,6 @@ impl ErrHdk {
 /// Every call is an error for the ErrHdk.
 impl HdiT for ErrHdk {
     fn verify_signature(&self, _verify_signature: VerifySignature) -> ExternResult<bool> {
-        Self::err()
-    }
-
-    fn hash(&self, _hash_input: HashInput) -> ExternResult<HashOutput> {
         Self::err()
     }
 
@@ -367,7 +362,7 @@ impl HdkT for ErrHdk {
     fn get_links(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>> {
         Self::err()
     }
-    fn get_link_details(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<LinkDetails>> {
+    fn get_links_details(&self, _: Vec<GetLinksInput>) -> ExternResult<Vec<LinkDetails>> {
         Self::err()
     }
     fn count_links(&self, _: LinkQuery) -> ExternResult<usize> {
@@ -500,9 +495,6 @@ impl HdiT for HostHdk {
     fn verify_signature(&self, verify_signature: VerifySignature) -> ExternResult<bool> {
         HostHdi::new().verify_signature(verify_signature)
     }
-    fn hash(&self, hash_input: HashInput) -> ExternResult<HashOutput> {
-        HostHdi::new().hash(hash_input)
-    }
     fn must_get_entry(&self, must_get_entry_input: MustGetEntryInput) -> ExternResult<EntryHashed> {
         HostHdi::new().must_get_entry(must_get_entry_input)
     }
@@ -618,11 +610,14 @@ impl HdkT for HostHdk {
     fn get_links(&self, get_links_input: Vec<GetLinksInput>) -> ExternResult<Vec<Vec<Link>>> {
         host_call::<Vec<GetLinksInput>, Vec<Vec<Link>>>(__hc__get_links_1, get_links_input)
     }
-    fn get_link_details(
+    fn get_links_details(
         &self,
         get_links_input: Vec<GetLinksInput>,
     ) -> ExternResult<Vec<LinkDetails>> {
-        host_call::<Vec<GetLinksInput>, Vec<LinkDetails>>(__hc__get_link_details_1, get_links_input)
+        host_call::<Vec<GetLinksInput>, Vec<LinkDetails>>(
+            __hc__get_links_details_1,
+            get_links_input,
+        )
     }
     fn count_links(&self, query: LinkQuery) -> ExternResult<usize> {
         host_call::<LinkQuery, usize>(__hc__count_links_1, query)

@@ -83,7 +83,7 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 match zome_info()?.zome_types.entries.get(value) {
                     Some(t) => Ok(t),
                     _ => Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "{:?} does not map to any ZomeIndex and EntryDefIndex that is in scope for this zome.",
+                        "{:?} does not map to any ZomeIndex and EntryDefIndex that is in scope for this zome. Make sure you have all zome dependencies specified correctly in the dna manifest.",
                         value
                     )))),
                 }

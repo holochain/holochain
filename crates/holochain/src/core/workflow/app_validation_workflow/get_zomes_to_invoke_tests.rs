@@ -54,7 +54,6 @@ async fn register_agent_activity() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -113,7 +112,6 @@ async fn store_entry_create_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -168,7 +166,6 @@ async fn store_entry_create_non_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -229,7 +226,6 @@ async fn store_entry_update_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -286,7 +282,6 @@ async fn store_entry_update_non_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -342,7 +337,6 @@ async fn store_record_create_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -384,7 +378,6 @@ async fn store_record_create_non_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -439,7 +432,6 @@ async fn store_record_create_wrong_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -485,7 +477,6 @@ async fn store_record_create_link() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -548,7 +539,6 @@ async fn store_record_update_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -594,7 +584,6 @@ async fn store_record_update_non_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -672,7 +661,6 @@ async fn store_record_update_of_update_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -730,7 +718,6 @@ async fn store_record_delete_without_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -786,7 +773,6 @@ async fn store_record_delete_non_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -845,7 +831,6 @@ async fn store_record_delete_link() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -916,7 +901,6 @@ async fn register_update_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -963,7 +947,6 @@ async fn register_update_non_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -1022,7 +1005,6 @@ async fn register_delete_create_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -1088,7 +1070,6 @@ async fn register_delete_create_non_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -1158,7 +1139,6 @@ async fn register_delete_update_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -1224,7 +1204,6 @@ async fn register_delete_update_non_app_entry() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -1280,7 +1259,6 @@ async fn register_create_link() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();
@@ -1326,7 +1304,6 @@ async fn register_delete_link() {
         test_space.space.cache_db.clone(),
         fixt!(MetaLairClient),
         None,
-        Arc::new(dna_file.dna_def().clone()),
     )
     .await
     .unwrap();

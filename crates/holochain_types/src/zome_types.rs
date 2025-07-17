@@ -35,7 +35,7 @@ impl GlobalZomeTypes {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn from_ordered_iterator<I>(ordered_iterator: I) -> ZomeTypesResult<GlobalZomeTypes>
     where
-        I: IntoIterator<Item = (EntryDefIndex, LinkType)>,
+        I: IntoIterator<Item = (u8, u8)>,
     {
         let r = ordered_iterator.into_iter().enumerate().try_fold(
             Self::default(),
@@ -43,8 +43,8 @@ impl GlobalZomeTypes {
                 let zome_index: ZomeIndex = u8::try_from(zome_index)
                     .map_err(|_| ZomeTypesError::ZomeIndexOverflow)?
                     .into();
-                zome_types.entries.insert(zome_index, num_entry_types.0);
-                zome_types.links.insert(zome_index, num_link_types.0);
+                zome_types.entries.insert(zome_index, num_entry_types);
+                zome_types.links.insert(zome_index, num_link_types);
                 Ok(zome_types)
             },
         )?;

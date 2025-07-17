@@ -1,10 +1,10 @@
 //! # Dht Operations
 
 use crate::{
-    Action, ActionRef, ActionType, AppEntryDef, Create, CreateLink, Delete, DeleteLink, Entry,
-    EntryType, Record, SignedActionHashed, SignedHashed, Update,
+    Action, ActionHashedContainer, ActionRef, ActionType, AppEntryDef, Create, CreateLink, Delete,
+    DeleteLink, Entry, EntryType, Record, SignedActionHashed, SignedHashed, Update,
 };
-use holo_hash::{ActionHash, AgentPubKey, EntryHash, HashableContent};
+use holo_hash::{ActionHash, AgentPubKey, EntryHash, HasHash, HashableContent};
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
 
@@ -262,6 +262,7 @@ impl Op {
             }
         }
     }
+
     /// Get the [`ActionHash`] for the previous action from this op if there is one.
     pub fn prev_action(&self) -> Option<&ActionHash> {
         match self {
@@ -280,6 +281,7 @@ impl Op {
             }
         }
     }
+
     /// Get the [`ActionType`] of this op.
     pub fn action_type(&self) -> ActionType {
         match self {
@@ -309,6 +311,25 @@ impl Op {
                 action.hashed.entry_data()
             }
             Op::RegisterDelete(_) | Op::RegisterCreateLink(_) | Op::RegisterDeleteLink(_) => None,
+        }
+    }
+
+    /// Get the [`ActionHash`] for this [`Op`].
+    pub fn action_hash(&self) -> &ActionHash {
+        match self {
+            Op::StoreRecord(StoreRecord { record }) => record.action_hash(),
+            Op::StoreEntry(StoreEntry { action, .. }) => action.hashed.as_hash(),
+            Op::RegisterUpdate(RegisterUpdate { update, .. }) => update.hashed.as_hash(),
+            Op::RegisterDelete(RegisterDelete { delete, .. }) => delete.hashed.as_hash(),
+            Op::RegisterAgentActivity(RegisterAgentActivity { action, .. }) => {
+                action.hashed.action_hash()
+            }
+            Op::RegisterCreateLink(RegisterCreateLink { create_link }) => {
+                create_link.hashed.as_hash()
+            }
+            Op::RegisterDeleteLink(RegisterDeleteLink { delete_link, .. }) => {
+                delete_link.hashed.as_hash()
+            }
         }
     }
 }
@@ -492,4 +513,207 @@ pub enum UnitEnumEither<E: UnitEnum> {
     Enum(E),
     /// Just the unit enum
     Unit(E::Unit),
+}
+
+#[cfg(test)]
+mod tests {
+
+    use holo_hash::AnyLinkableHash;
+
+    use crate::{AppEntryBytes, EntryVisibility, Signature, SIGNATURE_BYTES};
+
+    use super::*;
+
+    #[test]
+    fn test_should_get_action_hash_for_store_record() {
+        let create = Create {
+            author: AgentPubKey::from_raw_36(vec![0; 36]),
+            timestamp: Timestamp::now(),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                10.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0; 36]),
+            weight: crate::EntryRateWeight::default(),
+        };
+
+        let action = Action::Create(create);
+        let hashed = SignedHashed::new_unchecked(action, Signature([0; SIGNATURE_BYTES]));
+
+        let record = Record::new(
+            SignedActionHashed::from(SignedHashed {
+                hashed: hashed.clone().into(),
+                signature: Signature([0; SIGNATURE_BYTES]),
+            }),
+            None,
+        );
+
+        let op = Op::StoreRecord(StoreRecord { record });
+        assert_eq!(op.action_hash(), hashed.as_hash());
+    }
+
+    #[test]
+    fn test_should_get_action_hash_for_store_entry() {
+        let create = Create {
+            author: AgentPubKey::from_raw_36(vec![0; 36]),
+            timestamp: Timestamp::now(),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                10.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0; 36]),
+            weight: crate::EntryRateWeight::default(),
+        };
+
+        let action = EntryCreationAction::Create(create);
+        let hashed = SignedHashed::new_unchecked(action, Signature([0; SIGNATURE_BYTES]));
+
+        let entry = Entry::App(AppEntryBytes(SerializedBytes::default()));
+
+        let op = Op::StoreEntry(StoreEntry {
+            action: hashed.clone(),
+            entry,
+        });
+        assert_eq!(op.action_hash(), hashed.as_hash());
+    }
+
+    #[test]
+    fn test_should_get_action_hash_for_register_update() {
+        let update = Update {
+            author: AgentPubKey::from_raw_36(vec![0; 36]),
+            timestamp: Timestamp::now(),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                10.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0; 36]),
+            weight: crate::EntryRateWeight::default(),
+            original_action_address: ActionHash::from_raw_36(vec![0; 36]),
+            original_entry_address: EntryHash::from_raw_36(vec![0; 36]),
+        };
+        let hashed = SignedHashed::new_unchecked(update, Signature([0; SIGNATURE_BYTES]));
+
+        let op = Op::RegisterUpdate(RegisterUpdate {
+            update: hashed.clone(),
+            new_entry: None,
+        });
+        assert_eq!(op.action_hash(), hashed.as_hash());
+    }
+
+    #[test]
+    fn test_should_get_action_hash_for_register_delete() {
+        let delete = Delete {
+            action_seq: 1,
+            author: AgentPubKey::from_raw_36(vec![0; 36]),
+            timestamp: Timestamp::now(),
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            weight: crate::RateWeight::default(),
+            deletes_address: ActionHash::from_raw_36(vec![0; 36]),
+            deletes_entry_address: EntryHash::from_raw_36(vec![0; 36]),
+        };
+        let hashed = SignedHashed::new_unchecked(delete, Signature([0; SIGNATURE_BYTES]));
+
+        let op = Op::RegisterDelete(RegisterDelete {
+            delete: hashed.clone(),
+        });
+        assert_eq!(op.action_hash(), hashed.as_hash());
+    }
+
+    #[test]
+    fn test_should_get_action_hash_for_register_agent_activity() {
+        let action = Action::Create(Create {
+            author: AgentPubKey::from_raw_36(vec![0; 36]),
+            timestamp: Timestamp::now(),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                10.into(),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0; 36]),
+            weight: crate::EntryRateWeight::default(),
+        });
+
+        let hashed = SignedHashed::new_unchecked(action, Signature([0; SIGNATURE_BYTES]));
+
+        let hashed = SignedActionHashed::from(SignedHashed {
+            hashed: hashed.clone().into(),
+            signature: Signature([0; SIGNATURE_BYTES]),
+        });
+
+        let op = Op::RegisterAgentActivity(RegisterAgentActivity {
+            action: hashed.clone(),
+            cached_entry: None,
+        });
+        assert_eq!(op.action_hash(), hashed.as_hash());
+    }
+
+    #[test]
+    fn test_should_get_action_hash_for_create_link() {
+        let mut link_hash = [0x84, 0x21, 0x24].to_vec();
+        link_hash.extend(vec![0; 36]);
+
+        let create_link = CreateLink {
+            zome_index: crate::ZomeIndex(0),
+            link_type: crate::LinkType(1),
+            base_address: AnyLinkableHash::from_raw_39(link_hash.clone()),
+            tag: crate::LinkTag(vec![0; 32]),
+            target_address: AnyLinkableHash::from_raw_39(link_hash),
+            timestamp: Timestamp::now(),
+            author: AgentPubKey::from_raw_36(vec![0; 36]),
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            weight: crate::RateWeight::default(),
+            action_seq: 1,
+        };
+        let hashed = SignedHashed::new_unchecked(create_link, Signature([0; SIGNATURE_BYTES]));
+
+        let op = Op::RegisterCreateLink(RegisterCreateLink {
+            create_link: hashed.clone(),
+        });
+        assert_eq!(op.action_hash(), hashed.as_hash());
+    }
+
+    #[test]
+    fn test_should_get_action_hash_for_register_delete_link() {
+        let mut link_hash = [0x84, 0x21, 0x24].to_vec();
+        link_hash.extend(vec![0; 36]);
+
+        let delete_link = DeleteLink {
+            author: AgentPubKey::from_raw_36(vec![0; 36]),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            link_add_address: ActionHash::from_raw_36(vec![0; 36]),
+            base_address: AnyLinkableHash::from_raw_39(link_hash.clone()),
+            timestamp: Timestamp::now(),
+        };
+
+        let hashed =
+            SignedHashed::new_unchecked(delete_link.clone(), Signature([0; SIGNATURE_BYTES]));
+        let op = Op::RegisterDeleteLink(RegisterDeleteLink {
+            delete_link: hashed.clone(),
+            create_link: CreateLink {
+                zome_index: crate::ZomeIndex(0),
+                link_type: crate::LinkType(1),
+                base_address: AnyLinkableHash::from_raw_39(link_hash.clone()),
+                tag: crate::LinkTag(vec![0; 32]),
+                target_address: AnyLinkableHash::from_raw_39(link_hash),
+                timestamp: Timestamp::now(),
+                author: AgentPubKey::from_raw_36(vec![0; 36]),
+                prev_action: ActionHash::from_raw_36(vec![0; 36]),
+                weight: crate::RateWeight::default(),
+                action_seq: 1,
+            },
+        });
+        assert_eq!(op.action_hash(), hashed.as_hash());
+    }
 }

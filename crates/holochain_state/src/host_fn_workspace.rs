@@ -14,7 +14,6 @@ pub struct HostFnWorkspace<
     authored: DbRead<DbKindAuthored>,
     dht: DbRead<DbKindDht>,
     cache: DbWrite<DbKindCache>,
-    dna_def: Arc<DnaDef>,
     /// Did the root call that started this call chain
     /// come from an init callback.
     /// This is needed so that we don't run init recursively inside
@@ -38,13 +37,6 @@ pub struct HostFnStores {
 
 pub type HostFnWorkspaceRead = HostFnWorkspace<DbRead<DbKindAuthored>, DbRead<DbKindDht>>;
 
-impl HostFnWorkspace {
-    /// Get a reference to the host fn workspace's dna def.
-    pub fn dna_def(&self) -> Arc<DnaDef> {
-        self.dna_def.clone()
-    }
-}
-
 impl SourceChainWorkspace {
     pub async fn new(
         authored: DbWrite<DbKindAuthored>,
@@ -52,11 +44,10 @@ impl SourceChainWorkspace {
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
-        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
         let source_chain =
             SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def, false)
+        Self::new_inner(authored, dht, cache, source_chain, false)
     }
 
     /// Create a source chain workspace where the root caller is the init callback.
@@ -66,11 +57,10 @@ impl SourceChainWorkspace {
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
-        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
         let source_chain =
             SourceChain::new(authored.clone(), dht.clone(), keystore, author).await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def, true)
+        Self::new_inner(authored, dht, cache, source_chain, true)
     }
 
     /// Create a source chain with a blank chain head.
@@ -83,11 +73,10 @@ impl SourceChainWorkspace {
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: AgentPubKey,
-        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
         let source_chain =
             SourceChain::raw_empty(authored.clone(), dht.clone(), keystore, author).await?;
-        Self::new_inner(authored, dht, cache, source_chain, dna_def, false)
+        Self::new_inner(authored, dht, cache, source_chain, false)
     }
 
     fn new_inner(
@@ -95,7 +84,6 @@ impl SourceChainWorkspace {
         dht: DbWrite<DbKindDht>,
         cache: DbWrite<DbKindCache>,
         source_chain: SourceChain,
-        dna_def: Arc<DnaDef>,
         init_is_root: bool,
     ) -> SourceChainResult<Self> {
         Ok(Self {
@@ -103,7 +91,6 @@ impl SourceChainWorkspace {
                 source_chain: Some(source_chain.clone()),
                 authored: authored.into(),
                 dht: dht.into(),
-                dna_def,
                 cache,
                 init_is_root,
             },
@@ -129,7 +116,6 @@ where
         cache: DbWrite<DbKindCache>,
         keystore: MetaLairClient,
         author: Option<AgentPubKey>,
-        dna_def: Arc<DnaDef>,
     ) -> SourceChainResult<Self> {
         let source_chain = match author {
             Some(author) => {
@@ -142,7 +128,6 @@ where
             authored: authored.into(),
             dht: dht.into(),
             cache,
-            dna_def,
             init_is_root: false,
         })
     }
@@ -188,7 +173,6 @@ impl From<HostFnWorkspace> for HostFnWorkspaceRead {
             authored: workspace.authored,
             dht: workspace.dht,
             cache: workspace.cache,
-            dna_def: workspace.dna_def,
             init_is_root: workspace.init_is_root,
         }
     }
@@ -207,7 +191,6 @@ impl From<SourceChainWorkspace> for HostFnWorkspaceRead {
             authored: workspace.inner.authored,
             dht: workspace.inner.dht,
             cache: workspace.inner.cache,
-            dna_def: workspace.inner.dna_def,
             init_is_root: workspace.inner.init_is_root,
         }
     }

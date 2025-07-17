@@ -14,6 +14,127 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250716.001240
+
+## [hcterm-0.6.0-dev.13](crates/hcterm/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_cli-0.6.0-dev.13](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_cli\_bundle-0.6.0-dev.13](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.13](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_client-0.8.0-dev.10](crates/holochain_client/CHANGELOG.md#0.8.0-dev.10)
+
+## [holochain-0.6.0-dev.13](crates/holochain/CHANGELOG.md#0.6.0-dev.13)
+
+- **BREAKING CHANGE**: Remove `pause_app` and `Paused` state from conductor. Pausing an app was used when enabling an app partially failed and could be re-attempted. Now the app is only enabled if all cells successfully started up.
+- **BREAKING CHANGE**: Removed everything related to `started` and `stopped` apps. Instead `enabled` and `disabled` remain as the only two possible states an app can be in after it has been installed.
+- **BREAKING CHANGE**: Remove `CellStatus` which used to indicate whether a cell has joined the network or not. Going forward cells that couldn’t join the network will not be kept in conductor state.
+- **BREAKING CHANGE**: Remove `generate_test_device_seed` from `ConductorBuilder`. This was a remnant from DPKI.
+- Add integration tests for the use of `path`’s and the links created by them. ([\#5114](https://github.com/holochain/holochain/pull/5114))
+- **BREAKING CHANGE** Removed an if/else clause in the `Ribosome::new()` impl that lead to inconsistent behavior depending on the number of zomes defined in the dna manifest ([\#5105](https://github.com/holochain/holochain/pull/5105)). This means that **the dependencies field for zomes in the dna manifest is now always mandatory**. Previously, if there was only one single integrity zome in the whole dna, it was implied by the conductor that a coordinator zome would depend on that integrity zome. This is no longer the case.
+- Clearer error message if `ScopeLinkedType` or `ScopedEntryDefIndex` cannot be created due to zome dependencies not being specified in the dna manifest ([\#5105](https://github.com/holochain/holochain/pull/5105)).
+
+## [holochain\_cascade-0.6.0-dev.13](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_conductor\_config-0.6.0-dev.13](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_test\_wasm\_common-0.6.0-dev.10](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.0-dev.10)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.13](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_websocket-0.6.0-dev.13](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.13)
+
+## [hdk-0.6.0-dev.10](crates/hdk/CHANGELOG.md#0.6.0-dev.10)
+
+- **BREAKING CHANGE** Fixed [Issue 4575](https://github.com/holochain/holochain/issues/4575):
+  - Changed signature for `get_links` and `get_link_details` to take `LinkQuery` and a `GetStrategy` instead of `GetLinksInput` and `base`, `link_type`, `link_tag` and `get_options` respectively. This is to make the API more consistent with the rest of the HDK and to allow for more flexible queries.
+  - Renamed `get_link_details` to `get_links_details`; since it actually returns a list of `LinkDetails` instead of a single `LinkDetails`.
+
+## [holochain\_conductor\_api-0.6.0-dev.13](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_p2p-0.6.0-dev.13](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.13)
+
+## [hdi-0.7.0-dev.9](crates/hdi/CHANGELOG.md#0.7.0-dev.9)
+
+## [holochain\_state-0.6.0-dev.13](crates/holochain_state/CHANGELOG.md#0.6.0-dev.13)
+
+### Fixed
+
+- Tracing macro on `source_chain::flush` function was skipping the `network` parameter that was removed, it now skips the new `chc` parameter that replaced the `network` parameter.
+
+## [hdk\_derive-0.6.0-dev.8](crates/hdk_derive/CHANGELOG.md#0.6.0-dev.8)
+
+## [holochain\_chc-0.3.0-dev.13](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.13)
+
+## [holochain\_state\_types-0.6.0-dev.8](crates/holochain_state_types/CHANGELOG.md#0.6.0-dev.8)
+
+## [holochain\_types-0.6.0-dev.13](crates/holochain_types/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_keystore-0.6.0-dev.10](crates/holochain_keystore/CHANGELOG.md#0.6.0-dev.10)
+
+## [holochain\_sqlite-0.6.0-dev.13](crates/holochain_sqlite/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_zome\_types-0.6.0-dev.10](crates/holochain_zome_types/CHANGELOG.md#0.6.0-dev.10)
+
+## [holochain\_integrity\_types-0.6.0-dev.8](crates/holochain_integrity_types/CHANGELOG.md#0.6.0-dev.8)
+
+- [Fixed issue 3606](https://github.com/holochain/holochain/issues/3606): Implemented `action_hash` for `Op`.
+
+## [holo\_hash-0.6.0-dev.8](crates/holo_hash/CHANGELOG.md#0.6.0-dev.8)
+
+# 20250709.001228
+
+## [hcterm-0.6.0-dev.12](crates/hcterm/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_cli-0.6.0-dev.12](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_cli\_bundle-0.6.0-dev.12](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.12](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_client-0.8.0-dev.9](crates/holochain_client/CHANGELOG.md#0.8.0-dev.9)
+
+## [holochain-0.6.0-dev.12](crates/holochain/CHANGELOG.md#0.6.0-dev.12)
+
+- It’s possible to configure an advanced setting for the network layer that shows tracing information about network connectivity and state changes. Rather than having to configure that in Holochain runtimes, it is now automatically enabled when the `NETAUDIT` tracing target is enabled at `WARN` level or lower.
+- Test app operations (install/enable/disable/uninstall) with regards to app state and cell state.
+- **BREAKING CHANGE**: Remove `start_app` from conductor. Use `enable_app` instead.
+- Remove unused field `dna_def` the `HostFnWorkspace` struct ([\#5102](https://github.com/holochain/holochain/pull/5102))
+- Replace the `dna_def` field of the `SysValidationWorkspace` with a `dna_hash` field.
+- Remove unnecessary uses of `LinkType` and `EntryDefIndex` types
+
+## [holochain\_cascade-0.6.0-dev.12](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_conductor\_config-0.6.0-dev.12](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_test\_wasm\_common-0.6.0-dev.9](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.12](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_websocket-0.6.0-dev.12](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.12)
+
+## [hdk-0.6.0-dev.9](crates/hdk/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_conductor\_api-0.6.0-dev.12](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_p2p-0.6.0-dev.12](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.12)
+
+## [hdi-0.7.0-dev.8](crates/hdi/CHANGELOG.md#0.7.0-dev.8)
+
+## [holochain\_state-0.6.0-dev.12](crates/holochain_state/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_chc-0.3.0-dev.12](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.12)
+
+## [holochain\_types-0.6.0-dev.12](crates/holochain_types/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_keystore-0.6.0-dev.9](crates/holochain_keystore/CHANGELOG.md#0.6.0-dev.9)
+
+## [holochain\_sqlite-0.6.0-dev.12](crates/holochain_sqlite/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_zome\_types-0.6.0-dev.9](crates/holochain_zome_types/CHANGELOG.md#0.6.0-dev.9)
+
 # 20250702.001217
 
 ## [hcterm-0.6.0-dev.11](crates/hcterm/CHANGELOG.md#0.6.0-dev.11)

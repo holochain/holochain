@@ -377,7 +377,6 @@ impl TestCase {
             test_space.space.cache_db.clone(),
             fixt!(MetaLairClient),
             None,
-            Arc::new(dna_file.dna_def().clone()),
         )
         .await
         .unwrap();

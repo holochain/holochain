@@ -20,7 +20,7 @@
 //! accomplish that:
 //!
 //! 1. Stop all other tasks related to the cell, so they don't continue in the background.
-//! 2. Pause or disable any apps which depend on the cell, because the app cannot
+//! 2. Disable any apps which depend on the cell, because the app cannot
 //!    function without the proper functioning of that cell.
 
 mod error;
@@ -220,10 +220,10 @@ pub enum TaskOutcome {
     MinorError(Box<ManagedTaskError>, String),
     /// Close the conductor down because this is an unrecoverable error.
     ShutdownConductor(Box<ManagedTaskError>, String),
-    /// Either pause or disable all apps which contain the problematic Cell,
+    /// Disable all apps which contain the problematic Cell,
     /// depending upon the specific error.
     StopApps(CellId, Box<ManagedTaskError>, String),
-    /// Either pause or disable all apps which contain the problematic Dna,
+    /// Disable all apps which contain the problematic DNA,
     /// depending upon the specific error.
     StopAppsWithDna(Arc<DnaHash>, Box<ManagedTaskError>, String),
 }
@@ -274,7 +274,7 @@ pub(crate) fn spawn_task_outcome_handler(
                 TaskOutcome::StopApps(cell_id, error, context) => {
                     tracing::error!("About to automatically stop apps");
                     let app_ids = conductor
-                        .list_running_apps_for_dependent_cell_id(&cell_id)
+                        .list_enabled_apps_for_dependent_cell_id(&cell_id)
                         .await
                         .map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {
@@ -325,7 +325,7 @@ pub(crate) fn spawn_task_outcome_handler(
                 TaskOutcome::StopAppsWithDna(dna_hash, error, context) => {
                     tracing::error!("About to automatically stop apps with dna {}", dna_hash);
                     let app_ids = conductor
-                        .list_running_apps_for_dependent_dna_hash(dna_hash.as_ref())
+                        .list_enabled_apps_for_dependent_dna_hash(dna_hash.as_ref())
                         .await
                         .map_err(TaskManagerError::internal)?;
                     if error.is_recoverable() {

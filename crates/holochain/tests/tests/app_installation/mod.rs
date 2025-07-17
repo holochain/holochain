@@ -356,5 +356,5 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
     //- Status is Running, i.e. membrane proof provisioning has not been deferred
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
 
-    assert_eq!(app_info.status, AppInfoStatus::Running);
+    assert_eq!(app_info.status, AppInfoStatus::Enabled);
 }

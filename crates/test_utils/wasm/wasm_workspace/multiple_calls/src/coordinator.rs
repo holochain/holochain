@@ -43,7 +43,10 @@ pub struct TwoInt(pub u32, pub u32);
 fn slow_fn(n: TwoInt) -> ExternResult<()> {
     for i in 0..n.1 {
         debug!("zome call: {} get call number: {}", n.0, i);
-        get_links(GetLinksInputBuilder::try_new(hash_entry(&Val(i))?, ..)?.build())?;
+        get_links(
+            LinkQuery::new(hash_entry(&Val(i))?, (..).try_into_filter()?),
+            GetStrategy::default(),
+        )?;
     }
     Ok(())
 }

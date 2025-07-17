@@ -57,12 +57,12 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
         fixt!(Entry),
     )
     .into();
-    let dna_def = dna.dna_def().clone().into_hashed();
+    let dna_hash = dna.dna_hash().clone();
 
     //- Check that the op is indeed invalid
     let outcome = crate::core::workflow::sys_validation_workflow::validate_op(
         &op,
-        &dna_def,
+        &dna_hash,
         Default::default(),
     )
     .await
@@ -147,10 +147,10 @@ async fn sys_validation_produces_forked_chain_warrant() {
         ChainOp::from_type(ChainOpType::StoreRecord, action.clone(), Some(entry)).unwrap();
 
     //- Check that the op is valid
-    let dna_def = dna.dna_def().clone().into_hashed();
+    let dna_hash = dna.dna_hash().clone();
     let outcome = crate::core::workflow::sys_validation_workflow::validate_op(
         &forked_op.clone().into(),
-        &dna_def,
+        &dna_hash,
         Default::default(),
     )
     .await

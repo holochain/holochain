@@ -268,7 +268,7 @@ async fn deferred_memproof_installation() {
         .await
         .unwrap()
         .expect("app info must exist");
-    assert_eq!(app_info.status, AppInfoStatus::Running);
+    assert_eq!(app_info.status, AppInfoStatus::Enabled);
 }
 
 #[tokio::test(flavor = "multi_thread")]

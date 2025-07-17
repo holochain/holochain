@@ -43,8 +43,8 @@ pub use crate::info::zome_info;
 pub use crate::link::count_links;
 pub use crate::link::create_link;
 pub use crate::link::delete_link;
-pub use crate::link::get_link_details;
 pub use crate::link::get_links;
+pub use crate::link::get_links_details;
 pub use crate::link::GetLinksInputBuilder;
 pub use crate::link::LinkTypeFilterExt;
 pub use crate::map_extern;
@@ -126,7 +126,6 @@ macro_rules! holochain_externs {
     () => {
         holochain_wasmer_guest::host_externs!(
             trace:1,
-            hash:1,
             unreachable:1,
             verify_signature:1,
             sign:1,
@@ -143,7 +142,7 @@ macro_rules! holochain_externs {
             get:1,
             get_details:1,
             get_links:1,
-            get_link_details:1,
+            get_links_details:1,
             count_links:1,
             get_agent_activity:1,
             must_get_entry:1,

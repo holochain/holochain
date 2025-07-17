@@ -10,6 +10,7 @@ use holo_hash::HasHash;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
 use holochain_integrity_types::{LinkTag, LinkTypeFilter};
 pub use holochain_serialized_bytes::prelude::*;
+use holochain_wasmer_common::WasmError;
 
 /// Defines several ways that queries can be restricted to a range.
 /// Notably hash bounded ranges disambiguate forks whereas sequence indexes do
@@ -370,16 +371,34 @@ impl ChainQueryFilter {
 }
 
 impl LinkQuery {
-    /// Create a new link query for a base and link type
-    pub fn new(base: impl Into<AnyLinkableHash>, link_type: LinkTypeFilter) -> Self {
+    /// Create a new [`LinkQuery`] for a base and link type
+    pub fn new(base: impl Into<AnyLinkableHash>, link_type: impl Into<LinkTypeFilter>) -> Self {
         LinkQuery {
             base: base.into(),
-            link_type,
+            link_type: link_type.into(),
             tag_prefix: None,
             before: None,
             after: None,
             author: None,
         }
+    }
+
+    /// Create a new [`LinkQuery`] for a base and a type which tries to convert the type into a [`LinkTypeFilter`].
+    pub fn try_new<LinkTypeFilterExt>(
+        base: impl Into<AnyLinkableHash>,
+        link_type: LinkTypeFilterExt,
+    ) -> Result<Self, WasmError>
+    where
+        LinkTypeFilterExt: TryInto<LinkTypeFilter, Error = WasmError>,
+    {
+        Ok(LinkQuery {
+            base: base.into(),
+            link_type: link_type.try_into()?,
+            tag_prefix: None,
+            before: None,
+            after: None,
+            author: None,
+        })
     }
 
     /// Filter by tag prefix.
@@ -388,19 +407,19 @@ impl LinkQuery {
         self
     }
 
-    /// Filter for links created before `before`.
+    /// Filter for links created before `before` [`Timestamp`].
     pub fn before(mut self, before: Timestamp) -> Self {
         self.before = Some(before);
         self
     }
 
-    /// Filter for links create after `after`.
+    /// Filter for links create after `after` [`Timestamp`].
     pub fn after(mut self, after: Timestamp) -> Self {
         self.after = Some(after);
         self
     }
 
-    /// Filter for links created by this author.
+    /// Filter for links created by this author, identified by its [`AgentPubKey`].
     pub fn author(mut self, author: AgentPubKey) -> Self {
         self.author = Some(author);
         self
