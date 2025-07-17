@@ -1792,22 +1792,6 @@ mod app_status_impls {
     use holochain_chc::ChcImpl;
 
     impl Conductor {
-        /// Adjust which cells are present in the Conductor (adding and removing as
-        /// needed) to match the current reality of all app statuses.
-        /// - If a Cell is used by at least one Enabled app, then ensure it is added
-        /// - If a Cell is used by no Enabled apps, then ensure it is removed.
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-        pub async fn reconcile_cell_status_with_app_status(
-            self: Arc<Self>,
-        ) -> ConductorResult<CellStartupErrors> {
-            self.remove_dangling_cells().await?;
-
-            let results = self
-                .create_and_add_initialized_cells_for_enabled_apps(None)
-                .await?;
-            Ok(results)
-        }
-
         /// Instantiate cells, join them to the network and add them to the conductor's state.
         pub(crate) async fn create_cells_and_add_to_state(
             self: Arc<Self>,
