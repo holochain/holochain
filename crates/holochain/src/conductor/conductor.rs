@@ -1977,59 +1977,6 @@ mod app_status_impls {
                 .await?;
             Ok(disabled_app)
         }
-
-        /// Adjust app statuses (via state transitions) to match the current
-        /// reality of which Cells are present in the conductor.
-        /// Do not change state for Disabled apps.
-        #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-        pub(crate) async fn reconcile_app_status_with_cell_status(
-            &self,
-            app_ids: Option<HashSet<InstalledAppId>>,
-        ) -> ConductorResult<AppStatusFx> {
-            use AppStatus::*;
-
-            // NOTE: this is checking all *live* cells, meaning all cells
-            // which have fully joined the network. This could lead to a race condition
-            // when an app is first starting up, it checks its cell status, and if
-            // all cells haven't joined the network yet, the app will get disabled again.
-            //
-            // How this *should* be handled is that join retrying should be more frequent,
-            // and should be sure to update app state on every newly joined cell, so that
-            // the app will be enabled as soon as all cells are fully live. For now though,
-            // we might consider relaxing this check so that this race condition isn't
-            // possible, and let ourselves be optimistic that all cells will join soon after
-            // the app starts.
-            let (_, delta) = self
-                .update_state_prime(move |mut state| {
-                    #[allow(deprecated)]
-                    let apps = state.installed_apps_mut().iter_mut().filter(|(id, _)| {
-                        app_ids
-                            .as_ref()
-                            .map(|ids| ids.contains(&**id))
-                            .unwrap_or(true)
-                    });
-                    let delta = apps
-                        .into_iter()
-                        .map(|(_app_id, app)| {
-                            match app.status().clone() {
-                                Enabled => {
-                                    // If not all required cells are running, temporarily do nothing, until the next PR removes
-                                    // state machinery altogether.
-                                    AppStatusFx::NoChange
-                                }
-                                Disabled(_) => {
-                                    // Disabled status should never automatically change.
-                                    AppStatusFx::NoChange
-                                }
-                                AwaitingMemproofs => AppStatusFx::NoChange,
-                            }
-                        })
-                        .fold(AppStatusFx::default(), AppStatusFx::combine);
-                    Ok((state, delta))
-                })
-                .await?;
-            Ok(delta)
-        }
     }
 }
 
