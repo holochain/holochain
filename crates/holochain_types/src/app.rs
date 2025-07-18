@@ -956,51 +956,6 @@ pub enum AppStatusTransition {
     Disable(DisabledAppReason),
 }
 
-/// A declaration of the side effects of a particular AppStatusTransition.
-///
-/// Two values of this type may also be combined into one,
-/// to capture the overall effect of a series of transitions.
-///
-/// The intent of this type is to make sure that any operation which causes an
-/// app state transition is followed up with a call to process_app_status_fx
-/// in order to reconcile the cell state with the new app state.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[must_use = "be sure to run this value through `process_app_status_fx` to handle any transition effects"]
-pub enum AppStatusFx {
-    /// The transition did not result in any change to CellState.
-    NoChange,
-    /// The transition may cause some Cells to be removed.
-    SpinDown,
-    /// The transition may cause some Cells to be added (fallibly).
-    SpinUp,
-    /// The transition may cause some Cells to be removed and some to be (fallibly) added.
-    Both,
-    /// The transition was invalid and should produce an error.
-    Error(String),
-}
-
-impl Default for AppStatusFx {
-    fn default() -> Self {
-        Self::NoChange
-    }
-}
-
-impl AppStatusFx {
-    /// Combine two effects into one. Think "monoidal append", if that helps.
-    pub fn combine(self, other: Self) -> Self {
-        use AppStatusFx::*;
-        match (self, other) {
-            (NoChange, a) | (a, NoChange) => a,
-            (SpinDown, SpinDown) => SpinDown,
-            (SpinUp, SpinUp) => SpinUp,
-            (Both, _) | (_, Both) => Both,
-            (SpinDown, SpinUp) | (SpinUp, SpinDown) => Both,
-            (Error(err1), Error(err2)) => Error(format!("{err1}. {err2}")),
-            (Error(err), _) | (_, Error(err)) => Error(err),
-        }
-    }
-}
-
 /// The reason for an app being in a Disabled state.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
