@@ -19,8 +19,8 @@ use kitsune2_test_utils::agent::AgentBuilder;
 use std::collections::HashSet;
 use std::future::Future;
 use std::net::ToSocketAddrs;
-use std::path::PathBuf;
-use std::process::{Output, Stdio};
+use std::path::{Path, PathBuf};
+use std::process::{ExitStatus, Output, Stdio};
 use std::str::from_utf8;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
@@ -168,24 +168,103 @@ async fn package_fixture_if_not_packaged() {
     println!("@@ Package Fixture Complete");
 }
 
-async fn clean_sandboxes() {
-    println!("@@ Clean");
-
+async fn clean_sandboxes(cur_dir: &Path) {
     let mut cmd = get_sandbox_command();
-
-    cmd.arg("clean");
-
+        cmd.arg("clean")
+        .current_dir(&cur_dir);
+    println!("@@ Clean");
     println!("@@ {cmd:?}");
-
-    cmd.status().await.unwrap();
-
+    let status = cmd.status().await.unwrap();
+    assert!(status.success());
     println!("@@ Clean Complete");
 }
+
+
+async fn list_sandboxes(cur_dir: &Path) -> Output {
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("list")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .current_dir(&cur_dir)
+        .kill_on_drop(true);
+
+    println!("@@ List");
+    println!("@@ {cmd:?}");
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let output = hc_admin.wait_with_output().await.unwrap();
+    assert!(output.status.success());
+    println!("@@ List Complete");
+    output
+}
+
+
+/// Simple list and clean test
+/// Run list, generate, list, clean, list
+#[tokio::test(flavor = "multi_thread")]
+async fn list_and_clean() {
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    println!("@@ Temp dir: {temp_dir:?}");
+
+    clean_sandboxes(temp_dir.path()).await;
+    package_fixture_if_not_packaged().await;
+    holochain_trace::test_run();
+
+    let output = list_sandboxes(temp_dir.path()).await;
+    println!("@@ {output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count1 = stdout.lines().count();
+
+    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
+
+
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+    println!("@@ {cmd:?}");
+    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let output = hc_admin.wait_with_output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+
+    let output = list_sandboxes(temp_dir.path()).await;
+    println!("@@ {output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count2 = stdout.lines().count();
+    assert_eq!(line_count1 + 1, line_count2);
+
+    clean_sandboxes(temp_dir.path()).await;
+    let output = list_sandboxes(temp_dir.path()).await;
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count3 = stdout.lines().count();
+    assert_eq!(line_count3, line_count1);
+}
+
 
 /// Generates a new sandbox with a single app deployed and tries to get app info
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_connect() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
@@ -225,7 +304,7 @@ async fn generate_sandbox_and_connect() {
 /// Generates a new sandbox with a single app deployed and tries to list DNA
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_list_dna() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
@@ -269,7 +348,7 @@ async fn generate_sandbox_and_call_list_dna() {
 /// set to true and tries to list DNA
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
@@ -314,7 +393,7 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
 /// upon calling `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_non_running_sandbox_and_call_list_dna() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
@@ -360,7 +439,7 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
 /// ListDna with the correct origin
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_list_dna_with_origin() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
@@ -451,7 +530,7 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
 /// Creates a new sandbox and tries to list apps via `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_and_call_list_apps() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
@@ -495,7 +574,7 @@ async fn create_sandbox_and_call_list_apps() {
 /// correctly
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_with_roles_settings_override() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
@@ -600,7 +679,7 @@ async fn generate_sandbox_with_roles_settings_override() {
 /// upon calling `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_add_and_list_agent() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     // Helper fn to parse process output for agent pub keys.
@@ -753,7 +832,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
 /// Tests retrieval of agent meta info via `hc sandbox call agent-meta-info`
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_agent_meta_info() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
@@ -913,7 +992,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn authorize_zome_call_credentials() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
     holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
@@ -975,7 +1054,7 @@ async fn authorize_zome_call_credentials() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_zome_function() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
@@ -1088,7 +1167,7 @@ async fn call_zome_function() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn zome_function_can_return_hash() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();

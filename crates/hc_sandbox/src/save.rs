@@ -79,18 +79,20 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
 
 /// Load sandbox paths from the `.hc` file.
 pub fn load(mut hc_dir: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
-    let mut paths = Vec::new();
     hc_dir.push(".hc");
-    if hc_dir.exists() {
-        let existing = std::fs::read_to_string(hc_dir)?;
-        for sandbox in existing.lines() {
-            let path = PathBuf::from(sandbox);
-            let config_file_path = ConfigFilePath::from(ConfigRootPath::from(path.clone()));
-            if config_file_path.as_ref().exists() {
-                paths.push(path);
-            } else {
-                tracing::error!("Failed to load path {} from existing .hc", path.display());
-            }
+    if !hc_dir.is_file() {
+        return Ok(Vec::new());
+    };
+    let mut paths = Vec::new();
+    let existing = std::fs::read_to_string(&hc_dir)
+        .with_context(|| format!("Failed to read file: {}", hc_dir.display()))?;
+    for sandbox in existing.lines() {
+        let path = PathBuf::from(sandbox);
+        let config_file_path = ConfigFilePath::from(ConfigRootPath::from(path.clone()));
+        if config_file_path.as_ref().exists() {
+            paths.push(path);
+        } else {
+            tracing::error!("Failed to load path {} from existing .hc", path.display());
         }
     }
     Ok(paths)
@@ -98,27 +100,31 @@ pub fn load(mut hc_dir: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
 
 /// Print out the sandboxes contained in the `.hc` file.
 pub fn list(hc_dir: PathBuf, verbose: bool) -> anyhow::Result<()> {
-    let out = load(hc_dir)?.into_iter().enumerate().try_fold(
-        "\nSandboxes contained in `.hc`\n".to_string(),
-        |out, (i, path)| {
-            let r = match verbose {
-                false => format!("{}{}: {}\n", out, i, path.display()),
-                true => {
-                    let config = holochain_conductor_config::config::read_config(
-                        ConfigRootPath::from(path.clone()),
-                    )?;
-                    format!(
-                        "{}{}: {}\nConductor Config:\n{:?}\n",
-                        out,
-                        i,
-                        path.display(),
-                        config
-                    )
-                }
-            };
-            anyhow::Result::<_, anyhow::Error>::Ok(r)
-        },
-    )?;
+    let paths = load(hc_dir.clone())?;
+    let out = match paths.len() {
+        0 => format!("No sandboxes contained in `{}`", hc_dir.join(".hc").display()),
+        _ => paths.into_iter().enumerate().try_fold(
+            format!("Sandboxes contained in `{}`", hc_dir.join(".hc").display()),
+            |out, (i, path)| {
+                let r = match verbose {
+                    false => format!("{}{}: {}\n", out, i, path.display()),
+                    true => {
+                        let config = holochain_conductor_config::config::read_config(
+                            ConfigRootPath::from(path.clone()),
+                        )?;
+                        format!(
+                            "{}{}: {}\nConductor Config:\n{:?}\n",
+                            out,
+                            i,
+                            path.display(),
+                            config
+                        )
+                    }
+                };
+                anyhow::Result::<_, anyhow::Error>::Ok(r)
+            },
+        )?,
+    };
     msg!("{}", out);
     Ok(())
 }
