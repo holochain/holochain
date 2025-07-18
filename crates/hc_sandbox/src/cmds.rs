@@ -93,19 +93,9 @@ pub enum NetworkType {
 
 #[derive(Debug, Parser, Clone)]
 pub struct Existing {
-    /// Paths to existing sandbox directories.
-    /// For example `hc sandbox run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
-    #[arg(short, long, value_delimiter = ',')]
-    pub existing_paths: Vec<PathBuf>,
-
     /// Run all the existing conductor sandboxes specified in `$(pwd)/.hc`.
     #[arg(short, long, conflicts_with_all = &["last", "indices"])]
     pub all: bool,
-
-    /// Run the last created conductor sandbox --
-    /// that is, the last line in `$(pwd)/.hc`.
-    #[arg(short, long, conflicts_with_all = &["all", "indices"])]
-    pub last: bool,
 
     /// Run a selection of existing conductor sandboxes
     /// from those specified in `$(pwd)/.hc`.
@@ -121,70 +111,55 @@ impl Existing {
     /// Returns at minimum all paths in self.existing_paths.
     pub fn load(&self) -> anyhow::Result<Vec<PathBuf>> {
         let saved_sandboxes = crate::save::load(std::env::current_dir()?)?;
-        let mut provided = self.existing_paths.clone();
         if self.all {
             // Add all sandboxes in .hc
-            provided.extend(saved_sandboxes);
-        } else if self.last {
-            // Get the last sandbox in .hc
-            if let Some(last) = saved_sandboxes.last() {
-                provided.push(last.clone());
-            }
-        } else if !self.indices.is_empty() {
+            return Ok(saved_sandboxes);
+        }
+        if !self.indices.is_empty() {
+            let mut selection = Vec::new();
             // Get the indices
             for i in self.indices.clone() {
                 let Some(selected) = saved_sandboxes.get(i) else {
                     msg!("Warning. No sandbox found at index {}.", i);
                     continue;
                 };
-                provided.push(selected.clone());
+                selection.push(selected.clone());
             }
-        } else if !provided.is_empty() {
-            // If there are existing paths provided then use those.
-        } else if saved_sandboxes.len() == 1 {
-            // If there is only one saved sandbox then use that.
-            provided.push(saved_sandboxes[0].clone());
-        } else if saved_sandboxes.len() > 1 {
-            // There are multiple saved sandboxes, the user must disambiguate
-            msg!(
-                "
-There are multiple sandboxes and hc doesn't know which of them to run.
-You can run:
-    - `--all` `-a` run all sandboxes.
-    - `--last` `-l` run the last created sandbox.
-    - `--existing-paths` `-e` run a list of existing paths to sandboxes.
-    - `1` run a sandbox by index from the list below.
-    - `0 2` run multiple sandboxes by indices from the list below.
-Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more information."
-            );
-            crate::save::list(std::env::current_dir()?, false)?;
-        } else {
-            // There are no sandboxes
-            msg!(
+            return Ok(selection);
+        }
+        // No options provided, pick one known sandbox
+        match saved_sandboxes.len() {
+            1 => Ok(vec![saved_sandboxes[0].clone()]), // If there is only one saved sandbox then use that.
+            0 => {
+                // There are no sandboxes
+                msg!(
                 "
 Before running or calling you need to generate a sandbox.
 You can use `hc sandbox generate` to do this.
 Run `hc sandbox generate --help` for more options."
             );
-            return Ok(vec![]);
-        }
-
-        if provided.is_empty() {
-            // There are no sandboxes
-            msg!(
+                Ok(vec![])
+            },
+            _ => {
+                // There are multiple saved sandboxes, the user must disambiguate
+                msg!(
                 "
-No sandbox found.
-You can use `hc sandbox generate` to generate a sandbox.
-Run `hc sandbox --help` for more options."
+There are multiple sandboxes and hc doesn't know which of them to run.
+You can run:
+    - `--all` `-a` run all sandboxes.
+    - `1` run a sandbox by index from the list below.
+    - `0 2` run multiple sandboxes by indices from the list below.
+Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more information."
             );
+                crate::save::list(std::env::current_dir()?, false)?;
+                Ok(vec![])
+            }
         }
-
-        Ok(provided)
     }
 
-    /// Returns true if no "existing" parameter has been set
+    /// Returns true if no "existing" option has been set
     pub fn is_empty(&self) -> bool {
-        self.existing_paths.is_empty() && self.indices.is_empty() && !self.all && !self.last
+        self.indices.is_empty() && !self.all
     }
 }
 

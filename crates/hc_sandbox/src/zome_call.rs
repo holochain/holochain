@@ -323,9 +323,7 @@ async fn admin_port_from_connect_args(
         Ok(admin_port)
     } else if let Some(index) = connect_args.index {
         let paths = Existing {
-            existing_paths: vec![],
             all: false,
-            last: false,
             indices: vec![index as usize],
         }
         .load()?;
