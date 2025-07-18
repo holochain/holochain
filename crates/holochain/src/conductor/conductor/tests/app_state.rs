@@ -18,7 +18,7 @@ use crate::{
 };
 use hdk::prelude::*;
 use holo_hash::ActionHash;
-use holochain_conductor_api::{conductor::ConductorConfig, AppInfoStatus, AppStatusFilter};
+use holochain_conductor_api::{conductor::ConductorConfig, AppStatusFilter};
 use holochain_keystore::test_keystore;
 use holochain_state::prelude::test_db_dir;
 use holochain_types::{
@@ -393,7 +393,7 @@ async fn app_status_filters() {
     assert_eq!(inactive_apps.len(), 1);
     assert_matches!(
         &inactive_apps[0].status,
-        AppInfoStatus::Disabled { reason } if *reason == DisabledAppReason::User
+        AppStatus::Disabled(reason) if *reason == DisabledAppReason::User
     );
 
     // check that counts are still accurate after a restart
