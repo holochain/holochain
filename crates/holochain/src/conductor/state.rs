@@ -362,7 +362,79 @@ impl AppInterfaceConfig {
     }
 }
 
-// TODO: Tons of consistency check tests were ripped out in the great legacy code cleanup
-// We should add these back in when we've landed the new Dna format
-// See https://github.com/holochain/holochain/blob/7750a0291e549be006529e4153b3b6cf0d686462/crates/holochain/src/conductor/state/tests.rs#L1
-// for all old tests
+#[cfg(test)]
+mod tests {
+    use super::ConductorState;
+    use ::fixt::fixt;
+    use hdk::prelude::CellId;
+    use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
+    use holochain_timestamp::Timestamp;
+    use holochain_types::app::{
+        AppManifestV0Builder, AppRoleAssignment, AppRolePrimary, AppStatus, DisabledAppReason,
+        InstalledApp, InstalledAppCommon,
+    };
+
+    #[test]
+    fn app_status() {
+        let mut state = ConductorState::default();
+        let agent = fixt!(AgentPubKey);
+        let dna_hash = fixt!(DnaHash);
+        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+        assert_eq!(state.enabled_apps().count(), 0);
+        assert_eq!(state.disabled_apps().count(), 0);
+        assert_eq!(state.installed_apps().len(), 0);
+        assert!(state.find_app_containing_cell(&cell_id).is_none());
+
+        // Add an app
+        let app_manifest = AppManifestV0Builder::default()
+            .name("name".to_string())
+            .description(None)
+            // cell lookup is purely based on the role assignments of the InstalledAppCommon
+            .roles(vec![])
+            .build()
+            .unwrap();
+        let app_id = "app_id";
+        let app = InstalledAppCommon::new(
+            app_id,
+            agent.clone(),
+            [(
+                "role_1".to_string(),
+                AppRoleAssignment::Primary(AppRolePrimary::new(dna_hash, true, 0)),
+            )],
+            app_manifest.into(),
+            Timestamp::now(),
+        )
+        .unwrap();
+        state.add_app(app.clone()).unwrap();
+        assert_eq!(state.enabled_apps().count(), 0);
+        assert_eq!(state.disabled_apps().count(), 1);
+        assert_eq!(state.installed_apps().len(), 1);
+        let installed_app = InstalledApp::new(
+            app.clone(),
+            AppStatus::Disabled(DisabledAppReason::NeverStarted),
+        );
+        assert_eq!(
+            state.installed_apps().first().unwrap(),
+            (&app_id.to_string(), &installed_app)
+        );
+        assert_eq!(
+            state.find_app_containing_cell(&cell_id).unwrap(),
+            &installed_app
+        );
+
+        // Set app state to enabled
+        state.get_app_mut(&app_id.to_string()).unwrap().status = AppStatus::Enabled;
+        assert_eq!(state.enabled_apps().count(), 1);
+        assert_eq!(state.disabled_apps().count(), 0);
+        assert_eq!(state.installed_apps().len(), 1);
+        let installed_app = InstalledApp::new(app.clone(), AppStatus::Enabled);
+        assert_eq!(
+            state.installed_apps().first().unwrap(),
+            (&app_id.to_string(), &installed_app)
+        );
+        assert_eq!(
+            state.find_app_containing_cell(&cell_id).unwrap(),
+            &installed_app
+        );
+    }
+}
