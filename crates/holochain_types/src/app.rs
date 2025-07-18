@@ -957,12 +957,6 @@ pub enum AppStatusTransition {
 }
 
 impl AppStatus {
-    /// Does this status correspond to an Enabled state?
-    /// If false, this indicates a Disabled state.
-    pub fn is_enabled(&self) -> bool {
-        matches!(self, Self::Enabled)
-    }
-
     /// Transition a status from one state to another.
     /// If None, the transition was not valid, and the status did not change.
     pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusFx {

@@ -106,7 +106,7 @@ impl ConductorState {
     /// Iterate over only the "enabled" apps
     pub fn enabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, EnabledApp)> + '_ {
         self.installed_apps.iter().filter_map(|(id, app)| {
-            if app.status().is_enabled() {
+            if app.status == AppStatus::Enabled {
                 let enabled_app = EnabledApp::from(app.as_ref().clone());
                 Some((id, enabled_app))
             } else {
@@ -119,7 +119,7 @@ impl ConductorState {
     pub fn disabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
         self.installed_apps
             .iter()
-            .filter(|(_, app)| !app.status().is_enabled())
+            .filter(|(_, app)| matches!(app.status, AppStatus::Disabled(_)))
     }
 
     /// Getter for a single app. Returns error if app missing.
@@ -185,7 +185,7 @@ impl ConductorState {
                     .filter(|id| {
                         self.installed_apps
                             .get(id)
-                            .map(|app| app.status().is_enabled())
+                            .map(|app| app.status == AppStatus::Enabled)
                             .unwrap_or(false)
                     })
                     .collect();
@@ -209,7 +209,7 @@ impl ConductorState {
                                 self.installed_apps
                                     .iter()
                                     .filter_map(|(id, app)| {
-                                        (!app.status().is_enabled()
+                                        (app.status != AppStatus::Enabled
                                             && app.all_cells().any(|id| id == *cell_id))
                                         .then_some(id)
                                     })
@@ -305,8 +305,8 @@ impl ConductorState {
                             .iter()
                             .filter_map(|(id, app)| {
                                 (app.all_cells().any(|id| id == *cell_id)
-                                    && !app.status().is_enabled())
-                                .then_some(id)
+                                    && app.status != AppStatus::Enabled)
+                                    .then_some(id)
                             })
                             .collect()
                     } else {
