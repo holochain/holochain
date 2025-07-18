@@ -295,12 +295,20 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::RecordsGrafted)
             }
-            GrantZomeCallCapability(payload) => {
+            GrantZomeCallCapability(payload) => self
+                .conductor_handle
+                .grant_zome_call_capability(*payload)
+                .await
+                .map(AdminResponse::ZomeCallCapabilityGranted),
+
+            RevokeZomeCallCapability {
+                action_hash,
+                cell_id,
+            } => {
                 self.conductor_handle
-                    .clone()
-                    .grant_zome_call_capability(*payload)
+                    .revoke_zome_call_capability(cell_id, action_hash)
                     .await?;
-                Ok(AdminResponse::ZomeCallCapabilityGranted)
+                Ok(AdminResponse::ZomeCallCapabilityRevoked)
             }
 
             ListCapabilityGrants {
@@ -319,10 +327,7 @@ impl AdminInterfaceApi {
             }
 
             DeleteCloneCell(payload) => {
-                self.conductor_handle
-                    .clone()
-                    .delete_clone_cell(&payload)
-                    .await?;
+                self.conductor_handle.delete_clone_cell(&payload).await?;
                 Ok(AdminResponse::CloneCellDeleted)
             }
             StorageInfo => Ok(AdminResponse::StorageInfo(
