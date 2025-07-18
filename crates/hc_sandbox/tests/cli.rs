@@ -604,7 +604,11 @@ async fn generate_sandbox_and_add_and_list_agent() {
     package_fixture_if_not_packaged().await;
 
     // Find all values with a given key
-    fn find_values_by_key(json: &serde_json::Value, target_key: &str, results: &mut Vec<serde_json::Value>) {
+    fn find_values_by_key(
+        json: &serde_json::Value,
+        target_key: &str,
+        results: &mut Vec<serde_json::Value>,
+    ) {
         match json {
             serde_json::Value::Object(map) => {
                 for (key, value) in map {
