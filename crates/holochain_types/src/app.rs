@@ -1086,7 +1086,6 @@ pub struct AppRoleDependency {
 
 #[cfg(test)]
 mod tests {
-    use super::EnabledApp;
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
@@ -1127,15 +1126,14 @@ mod tests {
             roles: vec![],
             allow_deferred_memproofs: false,
         });
-        let mut app: EnabledApp = InstalledAppCommon::new(
+        let mut app = InstalledAppCommon::new(
             "app",
             agent.clone(),
             vec![(role_name.clone(), role1)],
             manifest,
             Timestamp::now(),
         )
-        .unwrap()
-        .into();
+        .unwrap();
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];

@@ -104,15 +104,10 @@ impl ConductorState {
     }
 
     /// Iterate over only the "enabled" apps
-    pub fn enabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, EnabledApp)> + '_ {
-        self.installed_apps.iter().filter_map(|(id, app)| {
-            if app.status == AppStatus::Enabled {
-                let enabled_app = EnabledApp::from(app.as_ref().clone());
-                Some((id, enabled_app))
-            } else {
-                None
-            }
-        })
+    pub fn enabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
+        self.installed_apps
+            .iter()
+            .filter(|(_, app)| app.status == AppStatus::Enabled)
     }
 
     /// Iterate over only the "disabled" apps

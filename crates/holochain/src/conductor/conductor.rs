@@ -1437,8 +1437,7 @@ mod app_impls {
                 .enabled_apps()
                 .find(|(_, enabled_app)| enabled_app.all_cells().any(|i| i == *cell_id))
                 .and_then(|(_, enabled_app)| {
-                    let app = enabled_app.clone().into_common();
-                    app.role(role_name).ok().map(|role| match role {
+                    enabled_app.role(role_name).ok().map(|role| match role {
                         AppRoleAssignment::Primary(primary) => {
                             CellId::new(primary.dna_hash().clone(), enabled_app.agent_key().clone())
                         }
