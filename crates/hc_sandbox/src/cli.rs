@@ -8,6 +8,7 @@ use holochain_types::prelude::InstalledAppId;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::path::PathBuf;
+use crate::save::HcFile;
 
 const DEFAULT_APP_ID: &str = "test-app";
 
@@ -138,6 +139,8 @@ impl HcSandbox {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         holochain_util::pw::pw_set_piped(self.piped);
+        // Make sure we can use .hc
+        let mut hc_file = HcFile::try_load(std::env::current_dir()?)?;
         match self.subcommand {
             HcSandboxSubcommand::Generate {
                 app_id,
@@ -148,6 +151,7 @@ impl HcSandbox {
                 roles_settings,
             } => {
                 let paths = generate(
+                    &mut hc_file,
                     &self.holochain_path,
                     happ,
                     create,
@@ -177,14 +181,14 @@ impl HcSandbox {
                         }
                         result = run_n(&holochain_path, paths, ports, force_admin_ports, structured) => result,
                     };
-                    crate::save::release_ports(std::env::current_dir()?).await?;
+                    hc_file.release_ports().await?;
                     return result;
                 }
             }
             HcSandboxSubcommand::Run(Run { ports, existing }) => {
-                let paths = existing.load()?;
-                if paths.is_empty() {
-                    tracing::warn!("no paths available, exiting.");
+                let requested_paths = existing.load(&hc_file)?;
+                if requested_paths.is_empty() {
+                    tracing::warn!("no sandbox available, exiting.");
                     return Ok(());
                 }
                 let holochain_path = self.holochain_path.clone();
@@ -195,13 +199,14 @@ impl HcSandbox {
                         msg!("Received Ctrl-C, shutting down");
                         result.map_err(anyhow::Error::from)
                     }
-                    result = run_n(&holochain_path, paths.into_iter().map(ConfigRootPath::from).collect(), ports, force_admin_ports, self.structured) => result,
+                    result = run_n(&holochain_path, requested_paths.into_iter().map(ConfigRootPath::from).collect(), ports, force_admin_ports, self.structured) => result,
                 };
-                crate::save::release_ports(std::env::current_dir()?).await?;
+                hc_file.release_ports().await?;
                 return result;
             }
             HcSandboxSubcommand::Call(call) => {
                 crate::calls::call(
+                    &hc_file,
                     &self.holochain_path,
                     call,
                     self.force_admin_ports,
@@ -210,16 +215,16 @@ impl HcSandbox {
                 .await?
             }
             HcSandboxSubcommand::ZomeCallAuth(auth) => {
-                crate::zome_call::zome_call_auth(auth, self.force_admin_ports.first().cloned())
+                crate::zome_call::zome_call_auth(&hc_file, auth, self.force_admin_ports.first().cloned())
                     .await?
             }
             HcSandboxSubcommand::ZomeCall(call) => {
-                crate::zome_call::zome_call(call, self.force_admin_ports.first().cloned()).await?
+                crate::zome_call::zome_call(call, &hc_file, self.force_admin_ports.first().cloned()).await?
             }
             HcSandboxSubcommand::List { verbose } => {
-                crate::save::list(std::env::current_dir()?, verbose)?
+                hc_file.list(verbose)?
             }
-            HcSandboxSubcommand::Clean => crate::save::clean(std::env::current_dir()?, Vec::new())?,
+            HcSandboxSubcommand::Clean => hc_file.remove(Vec::new())?,
             HcSandboxSubcommand::Create(Create {
                 num_sandboxes,
                 network,
@@ -247,7 +252,7 @@ impl HcSandbox {
                     )?;
                     paths.push(path);
                 }
-                crate::save::save(std::env::current_dir()?, paths.clone())?;
+                hc_file.append(paths.clone())?;
                 msg!("Created {:?}", paths);
             }
         }
@@ -324,6 +329,7 @@ pub async fn run_n(
 
 /// Perform the `generate` subcommand
 pub async fn generate(
+    hc_file: &mut HcFile,
     holochain_path: &Path,
     happ: Option<PathBuf>,
     create: Create,
@@ -343,6 +349,6 @@ pub async fn generate(
         structured,
     )
     .await?;
-    crate::save::save(std::env::current_dir()?, paths.clone())?;
+    hc_file.append(paths.clone())?;
     Ok(paths)
 }

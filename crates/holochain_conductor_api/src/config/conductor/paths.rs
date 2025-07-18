@@ -13,7 +13,7 @@ pub const WASM_DIRECTORY: &str = "wasm";
 /// Name of the file that conductor config is written to.
 pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";
 
-/// Newtype to make sure we never accidentaly use or not use the config path.
+/// Newtype to make sure we never accidentally use or not use the config path.
 /// Intentionally has no default value.
 #[derive(
     shrinkwraprs::Shrinkwrap,

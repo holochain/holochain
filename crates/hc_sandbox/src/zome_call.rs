@@ -89,6 +89,7 @@ use holochain_types::websocket::AllowedOrigins;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
+use crate::save::HcFile;
 
 #[derive(Debug, Parser)]
 pub struct ConnectArgs {
@@ -146,10 +147,11 @@ pub struct ZomeCall {
 }
 
 pub async fn zome_call_auth(
+    hc_file: &HcFile,
     zome_call_auth: ZomeCallAuth,
     admin_port: Option<u16>,
 ) -> anyhow::Result<()> {
-    let admin_port = admin_port_from_connect_args(zome_call_auth.connect_args, admin_port).await?;
+    let admin_port = admin_port_from_connect_args(zome_call_auth.connect_args, hc_file, admin_port).await?;
 
     let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
     let app_client = get_app_client(&admin_client, zome_call_auth.app_id.clone(), None).await?;
@@ -201,8 +203,8 @@ pub async fn zome_call_auth(
     Ok(())
 }
 
-pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::Result<()> {
-    let admin_port = admin_port_from_connect_args(zome_call.connect_args, admin_port).await?;
+pub async fn zome_call(zome_call: ZomeCall, hc_file: &HcFile, admin_port: Option<u16>) -> anyhow::Result<()> {
+    let admin_port = admin_port_from_connect_args(zome_call.connect_args, hc_file, admin_port).await?;
 
     let admin_client = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
 
@@ -312,6 +314,7 @@ async fn generate_signing_credentials(
 
 async fn admin_port_from_connect_args(
     connect_args: ConnectArgs,
+    hc_file: &HcFile,
     admin_port: Option<u16>,
 ) -> anyhow::Result<u16> {
     // Use overridden admin port if provided, otherwise if the running argument was provided, use
@@ -326,17 +329,15 @@ async fn admin_port_from_connect_args(
             all: false,
             indices: vec![index as usize],
         }
-        .load()?;
+        .load(hc_file)?;
 
-        if let Some(admin_port) = get_admin_ports(paths).await?.first() {
+        if let Some(admin_port) = get_admin_ports(hc_file, paths).await?.first() {
             Ok(*admin_port)
         } else {
             anyhow::bail!("No admin port found")
         }
     } else {
-        let paths = crate::save::load(std::env::current_dir()?)?;
-
-        if let Some(admin_port) = get_admin_ports(paths).await?.first() {
+        if let Some(admin_port) = get_admin_ports(hc_file, hc_file.existing_valids()).await?.first() {
             Ok(*admin_port)
         } else {
             anyhow::bail!("No admin port found")

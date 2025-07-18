@@ -175,7 +175,7 @@ async fn clean_sandboxes(cur_dir: &Path) {
     println!("@@ Clean");
     println!("@@ {cmd:?}");
     let status = cmd.status().await.unwrap();
-    assert!(status.success());
+    assert_eq!(status, ExitStatus::default());
     println!("@@ Clean Complete");
 }
 
@@ -197,7 +197,7 @@ async fn list_sandboxes(cur_dir: &Path) -> Output {
 
     println!("@@ List");
     println!("@@ {cmd:?}");
-    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let hc_admin = input_piped_password(&mut cmd).await;
     let output = hc_admin.wait_with_output().await.unwrap();
     assert!(output.status.success());
     println!("@@ List Complete");
@@ -243,7 +243,7 @@ async fn list_and_clean() {
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
     println!("@@ {cmd:?}");
-    let mut hc_admin = input_piped_password(&mut cmd).await;
+    let hc_admin = input_piped_password(&mut cmd).await;
     let output = hc_admin.wait_with_output().await.unwrap();
     assert_eq!(output.status, ExitStatus::default());
 

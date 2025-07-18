@@ -13,13 +13,14 @@ use holochain_conductor_config::config::write_config;
 use holochain_conductor_config::ports::set_admin_port;
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
-use std::path::Path;
+use std::path::{Path};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::oneshot;
+use crate::save::HcFile;
 
 // MAYBE: Export these strings from their respective repos
 //        so that we can be sure to keep them in sync.
@@ -33,7 +34,7 @@ const HC_START_2: &str = "HOLOCHAIN_SANDBOX_END";
 /// on the `holochain_path`.
 /// Uses the sandbox provided by the `sandbox_path`.
 /// Adds an app interface specified in the `app_ports`.
-/// Can optionally force the admin port used. Otherwise
+/// Can optionally force the admin port used. Otherwise,
 /// the port in the config will be used if it's free or
 /// a random free port will be chosen.
 pub async fn run(
@@ -60,7 +61,8 @@ pub async fn run(
         launch_info.app_ports.push(port);
     }
 
-    crate::save::lock_live(std::env::current_dir()?, &sandbox_path, admin_port).await?;
+    let hc_file = HcFile::try_load(std::env::current_dir()?)?;
+    hc_file.lock_live(&sandbox_path, admin_port).await?;
     msg!("Connected successfully to a running holochain");
 
     msg!(

@@ -39,6 +39,7 @@ use clap::{Args, Parser, Subcommand};
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
 use kitsune2_api::AgentInfoSigned;
+use crate::save::HcFile;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
@@ -300,6 +301,7 @@ pub struct AgentMetaInfoArgs {
 
 #[doc(hidden)]
 pub async fn call(
+    hc_file: &HcFile,
     holochain_path: &Path,
     req: Call,
     force_admin_ports: Vec<u16>,
@@ -321,11 +323,11 @@ pub async fn call(
 
     let admin_clients = if running.is_empty() {
         let paths = if existing.is_empty() {
-            crate::save::load(std::env::current_dir()?)?
+            hc_file.existing_valids()
         } else {
-            existing.load()?
+            existing.load(&hc_file)?
         };
-        let ports = get_admin_ports(paths.clone()).await?;
+        let ports = get_admin_ports(hc_file, paths.clone()).await?;
         let mut clients = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match AdminWebsocket::connect(format!("localhost:{port}"), origin.clone()).await {

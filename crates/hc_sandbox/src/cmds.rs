@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use url2::Url2;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use crate::save::HcFile;
 
 // This creates a new Holochain sandbox
 // which is a
@@ -109,17 +111,16 @@ pub struct Existing {
 impl Existing {
     /// Determine all sandbox paths to use based on .hc and given options.
     /// Returns at minimum all paths in self.existing_paths.
-    pub fn load(&self) -> anyhow::Result<Vec<PathBuf>> {
-        let saved_sandboxes = crate::save::load(std::env::current_dir()?)?;
+    pub fn load(&self, hc_file: &HcFile) -> anyhow::Result<Vec<ConfigRootPath>> {
         if self.all {
-            // Add all sandboxes in .hc
-            return Ok(saved_sandboxes);
+            // Return all valid sandboxes in .hc
+            return Ok(hc_file.existing_valids());
         }
         if !self.indices.is_empty() {
             let mut selection = Vec::new();
             // Get the indices
             for i in self.indices.clone() {
-                let Some(selected) = saved_sandboxes.get(i) else {
+                let Some(Ok(selected)) = hc_file.existing_all.get(i) else {
                     msg!("Warning. No sandbox found at index {}.", i);
                     continue;
                 };
@@ -128,8 +129,8 @@ impl Existing {
             return Ok(selection);
         }
         // No options provided, pick one known sandbox
-        match saved_sandboxes.len() {
-            1 => Ok(vec![saved_sandboxes[0].clone()]), // If there is only one saved sandbox then use that.
+        match hc_file.existing_valids().len() {
+            1 => Ok(vec![hc_file.existing_valids()[0].clone()]), // If there is only one saved sandbox then use that.
             0 => {
                 // There are no sandboxes
                 msg!(
@@ -151,7 +152,7 @@ You can run:
     - `0 2` run multiple sandboxes by indices from the list below.
 Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more information."
             );
-                crate::save::list(std::env::current_dir()?, false)?;
+                hc_file.list(false)?;
                 Ok(vec![])
             }
         }
