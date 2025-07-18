@@ -247,7 +247,7 @@ pub mod test {
             )
             .await;
 
-        let filter = ChainFilter::new(c.clone()).until(a.clone());
+        let filter = ChainFilter::new(c.clone()).until_hash(a.clone());
 
         let r: Vec<RegisterAgentActivity> = conductor
             .call(

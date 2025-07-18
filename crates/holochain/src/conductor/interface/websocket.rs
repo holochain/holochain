@@ -701,24 +701,6 @@ mod test {
         (Arc::new(db_dir), conductor_handle)
     }
 
-    async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
-        conductor_handle
-            .clone()
-            .enable_app("test app".to_string())
-            .await
-            .unwrap();
-
-        let errors = conductor_handle
-            .clone()
-            .reconcile_cell_status_with_app_status()
-            .await
-            .unwrap();
-
-        assert!(errors.is_empty());
-
-        conductor_handle
-    }
-
     async fn call_zome<R: FnOnce(AppResponse) + 'static + Send>(
         conductor_handle: ConductorHandle,
         cell_id: CellId,
@@ -1124,7 +1106,12 @@ mod test {
 
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(agent_pubkey, vec![(dna, None)]).await;
-        let conductor_handle = activate(conductor_handle).await;
+
+        conductor_handle
+            .clone()
+            .enable_app("test app".to_string())
+            .await
+            .unwrap();
 
         // Allow agents time to join
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;

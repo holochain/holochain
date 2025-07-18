@@ -1166,7 +1166,7 @@ async fn test_must_get_agent_activity() {
                     AgentPubKey::from_raw_36(vec![2; 36]),
                     ChainFilter {
                         chain_top: ActionHash::from_raw_36(vec![3; 36]),
-                        filters: ChainFilters::ToGenesis,
+                        limit_conditions: LimitConditions::ToGenesis,
                         include_cached_entries: false,
                     },
                 )
@@ -1209,7 +1209,7 @@ async fn test_must_get_agent_activity_with_unresponsive_agents() {
                     AgentPubKey::from_raw_36(vec![2; 36]),
                     ChainFilter {
                         chain_top: ActionHash::from_raw_36(vec![3; 36]),
-                        filters: ChainFilters::ToGenesis,
+                        limit_conditions: LimitConditions::ToGenesis,
                         include_cached_entries: false,
                     },
                 )

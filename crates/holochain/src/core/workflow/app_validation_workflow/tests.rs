@@ -266,7 +266,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             if let Op::RegisterDelete(RegisterDelete { delete }) = op {
                 // chain filter goes from delete action until create action
                 let chain_filter = ChainFilter::new(delete.hashed.content.clone().to_hash())
-                    .until(delete.hashed.deletes_address.clone());
+                    .until_hash(delete.hashed.deletes_address.clone());
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
                     author: agent.clone(),
                     chain_filter: chain_filter.clone(),
