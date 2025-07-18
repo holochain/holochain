@@ -368,44 +368,6 @@ impl InstalledApp {
 /// A map from InstalledAppId -> InstalledApp
 pub type InstalledAppMap = IndexMap<InstalledAppId, InstalledApp>;
 
-/// An active app
-#[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-    derive_more::From,
-    shrinkwraprs::Shrinkwrap,
-)]
-#[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct EnabledApp(InstalledAppCommon);
-
-impl EnabledApp {
-    /// Convert to a StoppedApp with the given reason
-    pub fn into_disabled(self, reason: DisabledAppReason) -> DisabledApp {
-        DisabledApp {
-            app: self.0,
-            reason,
-        }
-    }
-
-    /// Move inner type out
-    pub fn into_common(self) -> InstalledAppCommon {
-        self.0
-    }
-}
-
-impl From<EnabledApp> for InstalledApp {
-    fn from(app: EnabledApp) -> Self {
-        Self {
-            app: app.into_common(),
-            status: AppStatus::Enabled,
-        }
-    }
-}
-
 /// An app which is [AppStatus::Disabled], i.e. not running
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
