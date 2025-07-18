@@ -214,10 +214,8 @@ impl AppInterfaceApi {
                     .ok_or(ConductorApiError::other("app not found".to_string()))?
                     .status;
                 match status {
-                    AppInfoStatus::Enabled
-                    | AppInfoStatus::Disabled {
-                        reason: DisabledAppReason::NotStartedAfterProvidingMemproofs,
-                    } => {
+                    AppStatus::Enabled
+                    | AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs) => {
                         self.conductor_handle
                             .clone()
                             .enable_app(installed_app_id.clone())

@@ -2824,7 +2824,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         struct AppInfo {
             installed_app_id: String,
             cell_info: HashMap<RoleName, Vec<CellInfo>>,
-            status: AppInfoStatus,
+            status: AppStatus,
         }
 
         enum CellInfo {

@@ -430,7 +430,7 @@ pub struct AppInfo {
     /// finally disabled clone cells.
     pub cell_info: IndexMap<RoleName, Vec<CellInfo>>,
     /// The app's current status, in an API-friendly format
-    pub status: AppInfoStatus,
+    pub status: AppStatus,
     /// The app's agent pub key.
     pub agent_pub_key: AgentPubKey,
     /// The original AppManifest used to install the app, which can also be used to
@@ -446,7 +446,7 @@ impl AppInfo {
         dna_definitions: &IndexMap<CellId, DnaDefHashed>,
     ) -> Self {
         let installed_app_id = app.id().clone();
-        let status = app.status().clone().into();
+        let status = app.status().clone();
         let agent_pub_key = app.agent_key().to_owned();
         let mut manifest = app.manifest().clone();
         let installed_at = *app.installed_at();

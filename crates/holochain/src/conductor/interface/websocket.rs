@@ -992,7 +992,7 @@ mod test {
         let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
-            assert_matches!(info.status, AppInfoStatus::Enabled);
+            assert_matches!(info.status, AppStatus::Enabled);
         }
 
         // Now deactivate app
@@ -1032,7 +1032,7 @@ mod test {
         let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
-            assert_matches!(info.status, AppInfoStatus::Disabled { .. });
+            assert_matches!(info.status, AppStatus::Disabled { .. });
         }
 
         // Enable the app one more time
