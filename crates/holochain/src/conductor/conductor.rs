@@ -1261,7 +1261,7 @@ mod app_impls {
                     let stopped_app = self.add_disabled_app_to_db(app).await?;
 
                     // Return the result, which be may be an error if no_rollback was specified
-                    genesis_result.map(|()| stopped_app.into())
+                    genesis_result.map(|()| stopped_app)
                 } else if let Err(err) = genesis_result {
                     Err(err)
                 } else {
@@ -1967,7 +1967,7 @@ mod app_status_impls {
         pub(crate) async fn add_disabled_app_to_db(
             &self,
             app: InstalledAppCommon,
-        ) -> ConductorResult<DisabledApp> {
+        ) -> ConductorResult<InstalledApp> {
             let (_, disabled_app) = self
                 .update_state_prime(move |mut state| {
                     let disabled_app = state.add_app(app)?;

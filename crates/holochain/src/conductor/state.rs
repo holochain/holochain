@@ -140,14 +140,13 @@ impl ConductorState {
 
     /// Add an app in the Disabled state. Returns an error if an app is already
     /// present at the given ID.
-    pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<DisabledApp> {
+    pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<InstalledApp> {
         if self.installed_apps.contains_key(app.id()) {
             return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
         }
-        let stopped_app = DisabledApp::new_fresh(app);
-        self.installed_apps
-            .insert(stopped_app.id().clone(), stopped_app.clone().into());
-        Ok(stopped_app)
+        let app = InstalledApp::new(app, AppStatus::Disabled(DisabledAppReason::NeverStarted));
+        self.installed_apps.insert(app.id().clone(), app.clone());
+        Ok(app)
     }
 
     /// Add an app in the AwaitingMemproofs state. Returns an error if an app is already
