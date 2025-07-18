@@ -2853,17 +2853,6 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             name: Option<String>,
         }
 
-        enum AppInfoStatus {
-            // The app is paused due to a recoverable error. There is no way to
-            // manually pause an app.
-            Paused { reason: PausedAppReason },
-            // The app is disabled, and may be restartable depending on the
-            // reason.
-            Disabled { reason: DisabledAppReason },
-            Running,
-            AwaitingMemproofs,
-        }
-
         enum PausedAppReason {
             Error(String);
         }

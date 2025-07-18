@@ -309,7 +309,7 @@ async fn installing_with_modifiers_for_non_existing_role_fails() {
 async fn providing_membrane_proof_overrides_deferred_provisioning() {
     //- Check that if providing a membrane proof in the role settings for an app with `allow_deferred_memproofs`
     //  set to `true` in the app manifest, membrane proofs are not deferred and the app has
-    //  AppStatus::Running after installation
+    //  AppStatus::Disabled after installation
     let conductor = SweetConductor::from_standard_config().await;
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Foo]).await;
     let app_id = "app-id".to_string();
@@ -351,7 +351,7 @@ async fn providing_membrane_proof_overrides_deferred_provisioning() {
 
     conductor.enable_app(app_id.clone()).await.unwrap();
 
-    //- Status is Running, i.e. membrane proof provisioning has not been deferred
+    //- Status is Enabled, i.e. membrane proof provisioning has not been deferred
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
 
     assert_eq!(app_info.status, AppStatus::Enabled);
