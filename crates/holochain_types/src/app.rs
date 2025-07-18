@@ -956,34 +956,6 @@ pub enum AppStatusTransition {
     Disable(DisabledAppReason),
 }
 
-impl AppStatus {
-    /// Transition a status from one state to another.
-    /// If None, the transition was not valid, and the status did not change.
-    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusFx {
-        use AppStatus::*;
-        use AppStatusFx::*;
-        use AppStatusTransition::*;
-        match (&self, transition) {
-            (Enabled, Disable(reason)) => Some((Disabled(reason), SpinDown)),
-            (Enabled, Enable) => None,
-
-            (Disabled(_), Enable) => Some((Enabled, SpinUp)),
-            (Disabled(_), Disable(_)) => None,
-
-            (AwaitingMemproofs, Enable) => Some((
-                AwaitingMemproofs,
-                Error("Cannot enable an app which is AwaitingMemproofs".to_string()),
-            )),
-            (AwaitingMemproofs, _) => None,
-        }
-        .map(|(new_status, delta)| {
-            *self = new_status;
-            delta
-        })
-        .unwrap_or(NoChange)
-    }
-}
-
 /// A declaration of the side effects of a particular AppStatusTransition.
 ///
 /// Two values of this type may also be combined into one,
