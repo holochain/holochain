@@ -2278,7 +2278,70 @@ mod misc_impls {
                 )
                 .await?;
 
+            source_chain
+                .flush(
+                    cell.holochain_p2p_dna()
+                        .target_arcs()
+                        .await
+                        .map_err(ConductorApiError::other)?,
+                    cell.holochain_p2p_dna().chc(),
+                )
+                .await?;
+
+            Ok(action_hash)
+        }
+
+        /// Revoke a zome call capability for a cell identified by the [`ActionHash`] of the grant.
+        pub async fn revoke_zome_call_capability(
+            &self,
+            cell_id: CellId,
+            action_hash: ActionHash,
+        ) -> ConductorApiResult<ActionHash> {
+            // Must init before committing a grant
             let cell = self.cell_by_id(&cell_id).await?;
+            cell.check_or_run_zome_init().await?;
+
+            let source_chain = SourceChain::new(
+                self.get_or_create_authored_db(
+                    cell_id.dna_hash(),
+                    cell.id().agent_pubkey().clone(),
+                )?,
+                self.get_or_create_dht_db(cell_id.dna_hash())?,
+                self.keystore.clone(),
+                cell_id.agent_pubkey().clone(),
+            )
+            .await?;
+
+            // find entry by the action hash
+            let grant_query = ChainQueryFilter::new()
+                .include_entries(true)
+                .entry_type(EntryType::CapGrant);
+
+            let cap_grant_entry = source_chain
+                .query(grant_query.clone())
+                .await?
+                .into_iter()
+                .find_map(|record| {
+                    if record.action_hash() == &action_hash {
+                        match record.entry {
+                            RecordEntry::Present(entry) => Some(entry),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .ok_or_else(|| ConductorApiError::other("No cap grant found for action hash"))?;
+            let entry_hash = EntryHash::with_data_sync(&cap_grant_entry);
+
+            let action_builder = builder::Delete {
+                deletes_address: action_hash,
+                deletes_entry_address: entry_hash,
+            };
+            let action_hash = source_chain
+                .put_weightless(action_builder, None, ChainTopOrdering::default())
+                .await?;
+
             source_chain
                 .flush(
                     cell.holochain_p2p_dna()
@@ -2298,7 +2361,7 @@ mod misc_impls {
             cell_set: &HashSet<CellId>,
             include_revoked: bool,
         ) -> ConductorApiResult<AppCapGrantInfo> {
-            let mut hash_map: HashMap<CellId, Vec<CapGrantInfo>> = HashMap::new();
+            let mut grant_info: Vec<(CellId, Vec<CapGrantInfo>)> = Vec::new();
             let grant_query = ChainQueryFilter::new()
                 .include_entries(true)
                 .entry_type(EntryType::CapGrant);
@@ -2371,9 +2434,9 @@ mod misc_impls {
                     };
                     cap_grants.push(zome_grant_info);
                 }
-                hash_map.insert(cell_id.clone(), cap_grants);
+                grant_info.push((cell_id.clone(), cap_grants));
             }
-            Ok(AppCapGrantInfo(hash_map))
+            Ok(AppCapGrantInfo(grant_info))
         }
 
         /// Create a JSON dump of the cell's state

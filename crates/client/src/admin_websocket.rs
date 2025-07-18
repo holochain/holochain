@@ -1,6 +1,6 @@
 use crate::error::{ConductorApiError, ConductorApiResult};
 use crate::util::AbortOnDropHandle;
-use holo_hash::DnaHash;
+use holo_hash::{ActionHash, DnaHash};
 use holochain_conductor_api::{
     AdminInterfaceConfig, AdminRequest, AdminResponse, AgentMetaInfo, AppAuthenticationToken,
     AppAuthenticationTokenIssued, AppInfo, AppInterfaceInfo, AppStatusFilter, FullStateDump,
@@ -382,12 +382,12 @@ impl AdminWebsocket {
     pub async fn grant_zome_call_capability(
         &self,
         payload: GrantZomeCallCapabilityPayload,
-    ) -> ConductorApiResult<()> {
+    ) -> ConductorApiResult<ActionHash> {
         let msg = AdminRequest::GrantZomeCallCapability(Box::new(payload));
         let response = self.send(msg).await?;
 
         match response {
-            AdminResponse::ZomeCallCapabilityGranted => Ok(()),
+            AdminResponse::ZomeCallCapabilityGranted(action_hash) => Ok(action_hash),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }
@@ -405,6 +405,23 @@ impl AdminWebsocket {
 
         match response {
             AdminResponse::CapabilityGrantsInfo(info) => Ok(info),
+            _ => unreachable!("Unexpected response {:?}", response),
+        }
+    }
+
+    pub async fn revoke_zome_call_capability(
+        &self,
+        cell_id: CellId,
+        action_hash: ActionHash,
+    ) -> ConductorApiResult<()> {
+        let msg = AdminRequest::RevokeZomeCallCapability {
+            action_hash,
+            cell_id,
+        };
+        let response = self.send(msg).await?;
+
+        match response {
+            AdminResponse::ZomeCallCapabilityRevoked => Ok(()),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }
