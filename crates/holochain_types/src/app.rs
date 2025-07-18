@@ -368,47 +368,6 @@ impl InstalledApp {
 /// A map from InstalledAppId -> InstalledApp
 pub type InstalledAppMap = IndexMap<InstalledAppId, InstalledApp>;
 
-/// An app which is [AppStatus::Disabled], i.e. not running
-#[derive(
-    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
-)]
-#[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct DisabledApp {
-    #[shrinkwrap(main_field)]
-    app: InstalledAppCommon,
-    reason: DisabledAppReason,
-}
-
-impl DisabledApp {
-    /// Constructor
-    pub fn new_fresh(app: InstalledAppCommon) -> Self {
-        Self {
-            app,
-            reason: DisabledAppReason::NeverStarted,
-        }
-    }
-
-    /// Move inner type out
-    pub fn into_common(self) -> InstalledAppCommon {
-        self.app
-    }
-}
-
-impl From<DisabledApp> for InstalledAppCommon {
-    fn from(d: DisabledApp) -> Self {
-        d.app
-    }
-}
-
-impl From<DisabledApp> for InstalledApp {
-    fn from(d: DisabledApp) -> Self {
-        Self {
-            app: d.app,
-            status: d.reason.into(),
-        }
-    }
-}
-
 /// The common data between apps of any status
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InstalledAppCommon {

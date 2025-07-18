@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Remove state machine functions from conductor, which have been replaced by functions that process the necessary steps directly.
 - **BREAKING CHANGE**: Use `AppStatus` in favor of `AppInfoStatus` in `AppResponse::AppInfo`.
 - Remove app status transition functions and `AppInfoStatus`.
+- **BREAKING CHANGE**: Remove types `EnabledApp` and `DisabledApp` in favor of `InstalledApp` to reduce app handling complexity.
 
 ## 0.6.0-dev.13
 
