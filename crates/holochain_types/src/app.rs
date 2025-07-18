@@ -919,41 +919,11 @@ impl InstalledAppCommon {
 pub enum AppStatus {
     /// The app is enabled.
     Enabled,
-
     /// The app is disabled.
     Disabled(DisabledAppReason),
-
     /// The app is installed, but genesis has not completed because Membrane Proofs
     /// have not been provided.
     AwaitingMemproofs,
-}
-
-/// The AppStatus without the reasons.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[allow(missing_docs)]
-pub enum AppStatusKind {
-    Enabled,
-    Disabled,
-    AwaitingMemproofs,
-}
-
-impl From<AppStatus> for AppStatusKind {
-    fn from(status: AppStatus) -> Self {
-        match status {
-            AppStatus::Enabled => Self::Enabled,
-            AppStatus::Disabled(_) => Self::Disabled,
-            AppStatus::AwaitingMemproofs => Self::AwaitingMemproofs,
-        }
-    }
-}
-
-/// Represents a state transition operation from one state to another
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AppStatusTransition {
-    /// Enables an app
-    Enable,
-    /// Disables an app
-    Disable(DisabledAppReason),
 }
 
 /// The reason for an app being in a Disabled state.
