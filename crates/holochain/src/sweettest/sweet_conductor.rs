@@ -422,9 +422,6 @@ impl SweetConductor {
             )
             .await?;
 
-        self.raw_handle()
-            .reconcile_cell_status_with_app_status()
-            .await?;
         let roles = dnas_with_roles
             .iter()
             .map(|dr| dr.role())
@@ -488,10 +485,6 @@ impl SweetConductor {
             )
             .await?;
         }
-
-        self.raw_handle()
-            .reconcile_cell_status_with_app_status()
-            .await?;
 
         let mut apps = Vec::new();
         for agent in agents {

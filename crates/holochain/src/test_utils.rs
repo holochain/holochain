@@ -131,13 +131,6 @@ pub async fn install_app(
         .enable_app(name.to_string())
         .await
         .unwrap();
-
-    let errors = conductor_handle
-        .reconcile_cell_status_with_app_status()
-        .await
-        .unwrap();
-
-    assert!(errors.is_empty(), "{:?}", errors);
 }
 
 /// Payload for installing cells
@@ -191,14 +184,6 @@ pub async fn install_app_in_conductor(
         .enable_app(installed_app_id)
         .await
         .unwrap();
-
-    let errors = conductor_handle
-        .clone()
-        .reconcile_cell_status_with_app_status()
-        .await
-        .unwrap();
-
-    assert!(errors.is_empty());
 
     agent
 }

@@ -242,7 +242,6 @@ pub(crate) fn spawn_task_outcome_handler(
     tokio::spawn(async move {
         while let Some((_group, result)) = outcomes.next().await {
             match result {
-                // TaskOutcome::Noop => (),
                 TaskOutcome::LogInfo(context) => {
                     debug!("Managed task completed: {}", context)
                 }
@@ -277,50 +276,24 @@ pub(crate) fn spawn_task_outcome_handler(
                         .list_enabled_apps_for_dependent_cell_id(&cell_id)
                         .await
                         .map_err(TaskManagerError::internal)?;
-                    if error.is_recoverable() {
-                        conductor.remove_cells(&[cell_id]).await;
-
-                        // The following message assumes that only the app_ids calculated will be paused, but other apps
-                        // may have been paused as well.
-                        tracing::error!(
-                            "PAUSING the following apps due to a recoverable error: {:?}\nError: {:?}\nContext: {}",
-                            app_ids,
-                            error,
-                            context
-                        );
-
-                        // MAYBE: it could be helpful to modify this function so that when providing Some(app_ids),
-                        //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
-                        //   can be set to the specific error message encountered here, rather than having to read it from
-                        //   the logs.
-                        let delta = conductor
-                            .reconcile_app_status_with_cell_status(None)
+                    // Disable every app which requires that cell.
+                    tracing::error!(
+                        "DISABLING the following apps due to an error: {:?}\nError: {:?}\nContext: {}",
+                        app_ids,
+                        error,
+                        context
+                    );
+                    for app_id in app_ids.iter() {
+                        conductor
+                            .clone()
+                            .disable_app(
+                                app_id.to_string(),
+                                DisabledAppReason::Error(error.to_string()),
+                            )
                             .await
                             .map_err(TaskManagerError::internal)?;
-                        tracing::debug!(delta = ?delta);
-
-                        tracing::error!("Apps paused.");
-                    } else {
-                        // Since the error is unrecoverable, we don't expect to be able to use this Cell anymore.
-                        // Therefore, we disable every app which requires that cell.
-                        tracing::error!(
-                            "DISABLING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
-                            app_ids,
-                            error,
-                            context
-                        );
-                        for app_id in app_ids.iter() {
-                            conductor
-                                .clone()
-                                .disable_app(
-                                    app_id.to_string(),
-                                    DisabledAppReason::Error(error.to_string()),
-                                )
-                                .await
-                                .map_err(TaskManagerError::internal)?;
-                        }
-                        tracing::error!("Apps disabled.");
                     }
+                    tracing::error!("Apps disabled.");
                 }
                 TaskOutcome::StopAppsWithDna(dna_hash, error, context) => {
                     tracing::error!("About to automatically stop apps with dna {}", dna_hash);
@@ -328,55 +301,24 @@ pub(crate) fn spawn_task_outcome_handler(
                         .list_enabled_apps_for_dependent_dna_hash(dna_hash.as_ref())
                         .await
                         .map_err(TaskManagerError::internal)?;
-                    if error.is_recoverable() {
-                        let cells_with_same_dna: Vec<_> = conductor
-                            .running_cell_ids()
-                            .into_iter()
-                            .filter(|id| id.dna_hash() == dna_hash.as_ref())
-                            .collect();
-                        conductor.remove_cells(&cells_with_same_dna).await;
-
-                        // The following message assumes that only the app_ids calculated will be paused, but other apps
-                        // may have been paused as well.
-                        tracing::error!(
-                            "PAUSING the following apps due to a recoverable error: {:?}\nError: {:?}\nContext: {}",
-                            app_ids,
-                            error,
-                            context
-                        );
-
-                        // MAYBE: it could be helpful to modify this function so that when providing Some(app_ids),
-                        //   you can also pass in a PausedAppReason override, so that the reason for the apps being paused
-                        //   can be set to the specific error message encountered here, rather than having to read it from
-                        //   the logs.
-                        let delta = conductor
-                            .reconcile_app_status_with_cell_status(None)
+                    // Disable every app which requires that cell.
+                    tracing::error!(
+                        "DISABLING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
+                        app_ids,
+                        error,
+                        context
+                    );
+                    for app_id in app_ids.iter() {
+                        conductor
+                            .clone()
+                            .disable_app(
+                                app_id.to_string(),
+                                DisabledAppReason::Error(error.to_string()),
+                            )
                             .await
                             .map_err(TaskManagerError::internal)?;
-                        tracing::debug!(delta = ?delta);
-
-                        tracing::error!("Apps paused.");
-                    } else {
-                        // Since the error is unrecoverable, we don't expect to be able to use this Cell anymore.
-                        // Therefore, we disable every app which requires that cell.
-                        tracing::error!(
-                            "DISABLING the following apps due to an unrecoverable error: {:?}\nError: {:?}\nContext: {}",
-                            app_ids,
-                            error,
-                            context
-                        );
-                        for app_id in app_ids.iter() {
-                            conductor
-                                .clone()
-                                .disable_app(
-                                    app_id.to_string(),
-                                    DisabledAppReason::Error(error.to_string()),
-                                )
-                                .await
-                                .map_err(TaskManagerError::internal)?;
-                        }
-                        tracing::error!("Apps disabled.");
                     }
+                    tracing::error!("Apps disabled.");
                 }
             };
         }
@@ -476,7 +418,6 @@ mod test {
         // the outcome channel sender lives on the TaskManager, so we need to drop it
         // so that the main_task will end
 
-        // tm.shutdown();
         drop(tm);
 
         main_task
