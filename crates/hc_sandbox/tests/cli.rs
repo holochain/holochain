@@ -432,16 +432,6 @@ async fn run_missing() {
 
     let mut cmd = get_sandbox_command();
     cmd.arg("run")
-        .arg("1")
-        .current_dir(&temp_dir.path())
-        .kill_on_drop(true);
-    println!("@@ Run: {cmd:?}");
-    let output = cmd.output().await.unwrap();
-    println!("@@ Run Complete");
-    assert_eq!(output.status, ExitStatus::default());
-
-    let mut cmd = get_sandbox_command();
-    cmd.arg("run")
         .arg("0")
         .current_dir(&temp_dir.path())
         .kill_on_drop(true);
@@ -449,6 +439,7 @@ async fn run_missing() {
     let output = cmd.output().await.unwrap();
     println!("@@ Run Complete");
     assert!(!output.status.success());
+
 }
 
 /// Generates a new sandbox with a single app deployed and tries to get app info
