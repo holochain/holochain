@@ -220,6 +220,32 @@ async fn clean_empty() {
     assert_eq!(line_count, 1);
 }
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
+/// Test "clean" on a bogus .hc file that we don't have permissions.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn clean_no_permission() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    println!("@@ Temp dir: {temp_dir:?}");
+
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, "/tmp/bogus").unwrap();
+    std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o000)).unwrap();
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("clean")
+        .current_dir(&temp_dir.path());
+    let output = cmd.output().await.unwrap();
+    assert!(!output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 0);
+}
+
+
 
 /// Test "clean" with a ".hc" file containing one bogus path.
 #[tokio::test(flavor = "multi_thread")]

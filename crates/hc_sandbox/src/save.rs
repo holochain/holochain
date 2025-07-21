@@ -160,7 +160,8 @@ impl HcFile {
         //let valid_remaining: Vec<ConfigRootPath> = remaining.into_iter().flatten().cloned().collect();
         // Erase all other .hc* files
         if remaining.is_empty() {
-            for entry in std::fs::read_dir(&self.dir)? {
+            for entry in std::fs::read_dir(&self.dir)
+                .with_context(|| format!("Failed to read directory: {}", self.dir.display()))? {
                 let entry = entry?;
                 if entry.file_type()?.is_file() {
                     if let Some(s) = entry.file_name().to_str() {
@@ -173,9 +174,8 @@ impl HcFile {
             }
             let hc_auth = self.dir.join(".hc_auth");
             if hc_auth.exists() {
-                std::fs::remove_file(&hc_auth).with_context(|| {
-                    format!("Failed to remove .hc_auth file at {}", self.dir.display())
-                })?;
+                std::fs::remove_file(&hc_auth)
+                    .with_context(|| format!("Failed to remove .hc_auth at {}", self.dir.display()))?;
             }
         }
         // Write new .hc file
@@ -251,7 +251,8 @@ impl HcFile {
         for (i, _) in self.existing_all.iter().enumerate() {
             let hc_live = self.dir.join(format!(".hc_live_{}", i));
             if hc_live.exists() {
-                let live = std::fs::read_to_string(hc_live)?;
+                let live = std::fs::read_to_string(hc_live.clone())
+                    .with_context(|| format!("Failed to read file at {}", hc_live.display()))?;
                 let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
                 ports.push(p)
             } else {
@@ -271,7 +272,8 @@ impl HcFile {
                 Some(i) => {
                     let hc_live = self.dir.join(format!(".hc_live_{}", i));
                     if hc_live.exists() {
-                        let live = std::fs::read_to_string(hc_live)?;
+                        let live = std::fs::read_to_string(hc_live.clone())
+                            .with_context(|| format!("Failed to read file at {}", hc_live.display()))?;
                         let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
                         ports.push(p)
                     } else {
@@ -290,7 +292,8 @@ impl HcFile {
         for file in files.iter() {
             let hc_live = self.dir.join(format!(".hc_live_{}", file));
             if hc_live.exists() {
-                std::fs::remove_file(hc_live)?;
+                std::fs::remove_file(hc_live.clone())
+                    .with_context(|| format!("Failed to remove file at {}", hc_live.display()))?;
             }
         }
         Ok(())
