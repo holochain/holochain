@@ -208,7 +208,6 @@ async fn list_sandboxes(cur_dir: &Path) -> Output {
 async fn clean_empty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
-    println!("@@ Temp dir: {temp_dir:?}");
 
     let mut cmd = get_sandbox_command();
     cmd.arg("clean")
@@ -229,7 +228,6 @@ use std::os::unix::fs::PermissionsExt;
 async fn clean_no_permission() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
-    println!("@@ Temp dir: {temp_dir:?}");
 
     let file_path = temp_dir.path().join(".hc");
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
@@ -252,7 +250,6 @@ async fn clean_no_permission() {
 async fn clean_one() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
-    println!("@@ Temp dir: {temp_dir:?}");
     let file_path = temp_dir.path().join(".hc");
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
 
@@ -271,7 +268,6 @@ async fn clean_one() {
 async fn remove_empty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
-    println!("@@ Temp dir: {temp_dir:?}");
 
     let mut cmd = get_sandbox_command();
     cmd.arg("remove")
@@ -289,7 +285,6 @@ async fn remove_empty() {
 async fn remove_one() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
-    println!("@@ Temp dir: {temp_dir:?}");
     let file_path = temp_dir.path().join(".hc");
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
 
@@ -309,7 +304,6 @@ async fn remove_one() {
 async fn remove_two() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
-    println!("@@ Temp dir: {temp_dir:?}");
     let file_path = temp_dir.path().join(".hc");
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
 
@@ -357,7 +351,6 @@ async fn remove_two() {
 async fn list_and_clean() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
-    println!("@@ Temp dir: {temp_dir:?}");
 
     clean_sandboxes(temp_dir.path()).await;
     package_fixture_if_not_packaged().await;

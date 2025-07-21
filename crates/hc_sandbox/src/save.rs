@@ -42,7 +42,10 @@ impl HcFile {
     /// Return only valid existing paths
     pub fn valid_paths(&self) -> Vec<ConfigRootPath> { self.existing_all.iter().flatten().cloned().collect() }
 
-    /// Return only valid existing paths
+    /// Return only invalid existing paths
+    pub fn invalid_paths(&self) -> Vec<ConfigRootPath> { self.existing_all.iter().filter_map(|result| result.clone().err()).collect() }
+
+    /// Return all paths
     pub fn all_paths(&self) -> Vec<ConfigRootPath> {
         self.existing_all.iter().map(|res| {
             match res {

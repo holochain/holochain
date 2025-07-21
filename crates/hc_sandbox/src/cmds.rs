@@ -110,9 +110,11 @@ pub struct Existing {
 
 impl Existing {
     /// Determine all sandbox paths to use based on .hc and given options.
-    /// Returns at minimum all paths in self.existing_paths.
     pub fn load(&self, hc_file: &HcFile) -> anyhow::Result<Vec<ConfigRootPath>> {
         if self.all {
+            // Warn for all invalid paths
+            hc_file.invalid_paths().iter()
+                .for_each(|inv| msg!("Warning. Sandbox not found at {}", inv.display()));
             // Return all valid sandboxes in .hc
             return Ok(hc_file.valid_paths());
         }
@@ -121,8 +123,8 @@ impl Existing {
             // Get the indices
             for i in self.indices.clone() {
                 let Some(Ok(selected)) = hc_file.existing_all.get(i) else {
-                    msg!("Warning. No sandbox found at index {}.", i);
-                    continue;
+                    msg!("Aborting. No sandbox found at index {}.", i);
+                    return Err(anyhow::anyhow!("Aborting. No sandbox found at index {}.", i));
                 };
                 selection.push(selected.clone());
             }
