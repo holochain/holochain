@@ -398,6 +398,59 @@ async fn list_and_clean() {
 }
 
 
+/// Test "run" with a missing index
+#[tokio::test(flavor = "multi_thread")]
+async fn run_missing() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, "/tmp/bogus").unwrap();
+
+    package_fixture_if_not_packaged().await;
+    holochain_trace::test_run();
+
+    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+    println!("@@ {cmd:?}");
+    let hc_admin = input_piped_password(&mut cmd).await;
+    let output = hc_admin.wait_with_output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("run")
+        .arg("1")
+        .current_dir(&temp_dir.path())
+        .kill_on_drop(true);
+    println!("@@ Run: {cmd:?}");
+    let output = cmd.output().await.unwrap();
+    println!("@@ Run Complete");
+    assert_eq!(output.status, ExitStatus::default());
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("run")
+        .arg("0")
+        .current_dir(&temp_dir.path())
+        .kill_on_drop(true);
+    println!("@@ Run: {cmd:?}");
+    let output = cmd.output().await.unwrap();
+    println!("@@ Run Complete");
+    assert!(!output.status.success());
+}
+
 /// Generates a new sandbox with a single app deployed and tries to get app info
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_connect() {

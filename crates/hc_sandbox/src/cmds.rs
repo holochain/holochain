@@ -123,7 +123,6 @@ impl Existing {
             // Get the indices
             for i in self.indices.clone() {
                 let Some(Ok(selected)) = hc_file.existing_all.get(i) else {
-                    msg!("Aborting. No sandbox found at index {}.", i);
                     return Err(anyhow::anyhow!("Aborting. No sandbox found at index {}.", i));
                 };
                 selection.push(selected.clone());
