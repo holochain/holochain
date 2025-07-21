@@ -24,6 +24,7 @@ use holochain_util::ffs;
 use holochain_zome_types::cell::CloneId;
 use holochain_zome_types::prelude::*;
 use indexmap::IndexMap;
+use itertools::Itertools;
 use std::{collections::HashMap, path::PathBuf};
 
 /// The unique identifier for an installed app in this conductor
@@ -396,14 +397,31 @@ impl InstalledAppCommon {
         manifest: AppManifest,
         installed_at: Timestamp,
     ) -> AppResult<Self> {
-        let role_assignments: IndexMap<_, _> = role_assignments.into_iter().collect();
-        // ensure no role name contains a clone id delimiter
+        // Ensure that role names are unique.
+        let role_assignments = role_assignments.into_iter().collect::<Vec<_>>();
+        let duplicate_role_names = role_assignments
+            .iter()
+            .map(|(role_name, _)| role_name.to_owned())
+            .counts()
+            .into_iter()
+            .filter_map(|(role_name, count)| if count > 1 { Some(role_name) } else { None })
+            .collect::<Vec<RoleName>>();
+        if !duplicate_role_names.is_empty() {
+            return Err(AppError::DuplicateRoleNames(
+                installed_app_id.to_string(),
+                duplicate_role_names,
+            ));
+        }
+
+        let role_assignments = role_assignments.into_iter().collect::<IndexMap<_, _>>();
+        // Ensure no role name contains a clone id delimiter.
         if let Some((illegal_role_name, _)) = role_assignments
             .iter()
             .find(|(role_name, _)| role_name.contains(CLONE_ID_DELIMITER))
         {
             return Err(AppError::IllegalRoleName(illegal_role_name.clone()));
         }
+
         Ok(InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             agent_key,
@@ -742,76 +760,6 @@ impl InstalledAppCommon {
     /// Accessor
     pub fn agent_key(&self) -> &AgentPubKey {
         &self.agent_key
-    }
-
-    /// Constructor for apps not using a manifest.
-    /// Allows for cloning up to 256 times and implies immediate provisioning.
-    #[cfg(feature = "test_utils")]
-    pub fn new_legacy<S: ToString, I: IntoIterator<Item = InstalledCell>>(
-        installed_app_id: S,
-        installed_cells: I,
-    ) -> AppResult<Self> {
-        use itertools::Itertools;
-
-        let installed_app_id = installed_app_id.to_string();
-        let installed_cells: Vec<_> = installed_cells.into_iter().collect();
-
-        // Get the agent key of the first cell
-        // NB: currently this has no significance.
-        let agent_key = installed_cells
-            .first()
-            .expect("Can't create app with 0 cells")
-            .cell_id
-            .agent_pubkey()
-            .to_owned();
-
-        // ensure all cells use the same agent key
-        if installed_cells
-            .iter()
-            .any(|c| *c.cell_id.agent_pubkey() != agent_key)
-        {
-            panic!(
-                "All cells in an app must use the same agent key. Cell data: {:#?}",
-                installed_cells
-            );
-        }
-
-        // ensure all cells use the same agent key
-        let duplicates: Vec<RoleName> = installed_cells
-            .iter()
-            .map(|c| c.role_name.to_owned())
-            .counts()
-            .into_iter()
-            .filter_map(|(role_name, count)| if count > 1 { Some(role_name) } else { None })
-            .collect();
-        if !duplicates.is_empty() {
-            return Err(AppError::DuplicateRoleNames(installed_app_id, duplicates));
-        }
-
-        let manifest = AppManifest::from_legacy(installed_cells.clone().into_iter());
-
-        let role_assignments = installed_cells
-            .into_iter()
-            .map(|InstalledCell { role_name, cell_id }| {
-                let role = AppRolePrimary {
-                    base_dna_hash: cell_id.dna_hash().clone(),
-                    is_provisioned: true,
-                    clones: HashMap::new(),
-                    clone_limit: 256,
-                    next_clone_index: 0,
-                    disabled_clones: HashMap::new(),
-                };
-                (role_name, role.into())
-            })
-            .collect();
-
-        Ok(Self {
-            installed_app_id,
-            agent_key,
-            role_assignments,
-            manifest,
-            installed_at: Timestamp::now(),
-        })
     }
 
     // pub fn dependencies(&self) -> Vec<

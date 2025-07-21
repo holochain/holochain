@@ -17,18 +17,18 @@ use crate::{
     test_utils::retry_fn_until_timeout,
 };
 use hdk::prelude::*;
-use holo_hash::ActionHash;
+use holo_hash::{
+    fixt::{AgentPubKeyFixturator, DnaHashFixturator},
+    ActionHash,
+};
 use holochain_conductor_api::{conductor::ConductorConfig, AppStatusFilter};
 use holochain_keystore::test_keystore;
 use holochain_state::prelude::test_db_dir;
-use holochain_types::{
-    app::{
-        AppBundle, AppBundleSource, AppManifest, AppManifestCurrentBuilder, AppRoleAssignment,
-        AppRoleDnaManifest, AppRoleManifest, AppRolePrimary, AppStatus, CellProvisioning,
-        DisabledAppReason, EnableCloneCellPayload, InstallAppPayload, InstalledApp,
-        InstalledAppCommon, InstalledAppId, InstalledAppMap, InstalledCell,
-    },
-    prelude::second,
+use holochain_types::app::{
+    AppBundle, AppBundleSource, AppManifest, AppManifestCurrentBuilder, AppManifestV0,
+    AppRoleAssignment, AppRoleDnaManifest, AppRoleManifest, AppRolePrimary, AppStatus,
+    CellProvisioning, DisabledAppReason, EnableCloneCellPayload, InstallAppPayload, InstalledApp,
+    InstalledAppCommon, InstalledAppId, InstalledAppMap,
 };
 use holochain_types::{
     app::{CreateCloneCellPayload, DisableCloneCellPayload},
@@ -76,9 +76,27 @@ async fn can_update_state() {
     expected_state.set_tag(state.tag().clone());
     assert_eq!(state, expected_state);
 
-    let cell_id = fake_cell_id(1);
-    let installed_cell = InstalledCell::new(cell_id.clone(), "role_name".to_string());
-    let app = InstalledAppCommon::new_legacy("fake app", vec![installed_cell]).unwrap();
+    let app_id = "app".to_string();
+    let app = InstalledAppCommon::new(
+        app_id.clone(),
+        ::fixt::fixt!(AgentPubKey),
+        vec![(
+            "role".to_string(),
+            AppRoleAssignment::Primary(AppRolePrimary::new(::fixt::fixt!(DnaHash), true, 0)),
+        )],
+        AppManifest::V0(AppManifestV0 {
+            allow_deferred_memproofs: false,
+            name: "".to_string(),
+            description: None,
+            roles: vec![],
+        }),
+        Timestamp::now(),
+    )
+    .unwrap();
+    let expected_app = InstalledApp::new(
+        app.clone(),
+        AppStatus::Disabled(DisabledAppReason::NeverStarted),
+    );
 
     conductor
         .update_state(|mut state| {
@@ -89,11 +107,8 @@ async fn can_update_state() {
         .unwrap();
     let state = conductor.get_state().await.unwrap();
     assert_eq!(
-        state.disabled_apps().map(second).collect::<Vec<_>>()[0]
-            .all_cells()
-            .collect::<Vec<_>>()
-            .as_slice(),
-        &[cell_id]
+        state.disabled_apps().collect::<Vec<_>>(),
+        vec![(&app_id, &expected_app)]
     );
 }
 
