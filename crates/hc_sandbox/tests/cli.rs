@@ -529,10 +529,12 @@ async fn generate_sandbox_and_call_list_dna() {
 /// set to true and tries to list DNA
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app-deferred/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -543,7 +545,8 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app-deferred/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -558,6 +561,7 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
         .arg("call")
         .arg(format!("--running={}", launch_info.admin_port))
         .arg("list-dnas")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -620,10 +624,12 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
 /// ListDna with the correct origin
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_list_dna_with_origin() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -633,7 +639,8 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -679,6 +686,7 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
         ))
         .arg("call")
         .arg("list-dnas")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -699,6 +707,7 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
         .arg("--origin")
         .arg("test-origin")
         .arg("list-dnas")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1023,12 +1032,13 @@ async fn generate_sandbox_and_add_and_list_agent() {
 /// Tests retrieval of agent meta info via `hc sandbox call agent-meta-info`
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_agent_meta_info() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
     holochain_trace::test_run();
-    let mut cmd = get_sandbox_command();
 
+    let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
             "--holochain-path={}",
@@ -1038,7 +1048,8 @@ async fn generate_sandbox_and_call_agent_meta_info() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -1108,6 +1119,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
         .arg("agent-meta-info")
         .arg("--url")
         .arg("wss://someurl:443")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -1151,6 +1163,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
         .arg("wss://someurl:443")
         .arg("--dna")
         .arg(dna_hashes_b64[0].clone())
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -1183,9 +1196,12 @@ async fn generate_sandbox_and_call_agent_meta_info() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn authorize_zome_call_credentials() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
+    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -1196,7 +1212,8 @@ async fn authorize_zome_call_credentials() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -1220,6 +1237,7 @@ async fn authorize_zome_call_credentials() {
         .arg(launch_info.admin_port.to_string())
         .arg("--piped")
         .arg("test-app")
+        .current_dir(temp_dir.path())
         .kill_on_drop(true)
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
@@ -1245,10 +1263,12 @@ async fn authorize_zome_call_credentials() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_zome_function() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -1259,7 +1279,8 @@ async fn call_zome_function() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -1296,6 +1317,7 @@ async fn call_zome_function() {
         .arg(launch_info.admin_port.to_string())
         .arg("--piped")
         .arg("test-app")
+        .current_dir(temp_dir.path())
         .kill_on_drop(true)
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
@@ -1326,6 +1348,7 @@ async fn call_zome_function() {
         .arg("zome1")
         .arg("foo")
         .arg("null")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
