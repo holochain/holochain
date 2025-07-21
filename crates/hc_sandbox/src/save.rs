@@ -42,9 +42,18 @@ impl HcFile {
     /// Return only valid existing paths
     pub fn existing_valids(&self) -> Vec<ConfigRootPath> { self.existing_all.iter().flatten().cloned().collect() }
 
-    /// Read the `.hc` file from disk and try to load each path.
+    /// Try to read the `.hc` file from disk,
+    /// try to load each sandbox path
+    /// and return a HcFile according to results.
     pub fn try_load(hc_dir: PathBuf) -> anyhow::Result<Self> {
         let hc_file = hc_dir.join(".hc");
+        dbg!(&hc_file);
+        if !hc_file.exists() {
+            return Ok(Self {
+                dir: hc_dir,
+                existing_all: Vec::new(),
+            });
+        }
         if !hc_file.is_file() {
             return Err(anyhow!("Failed to load hc file in {}", hc_dir.display()));
         };
@@ -101,24 +110,32 @@ impl HcFile {
     /// Remove paths by their index in the `.hc` file.
     /// If no indices are passed in then they will all be deleted.
     /// If no sandbox remains then all `.hc_*` files will be removed.
-    pub fn remove(mut self, indices_to_remove: Vec<usize>) -> anyhow::Result<()> {
-        // split the to_be_removed from the remaining
-        let index_set: std::collections::HashSet<usize> = indices_to_remove.iter().copied().collect();
+    pub fn remove(mut self, indices_to_remove: Vec<usize>) -> anyhow::Result<usize> {
+        let cur_size = self.existing_all.len();
         let mut to_remove = Vec::new();
         let mut remaining = Vec::new();
-        for (i, item) in self.existing_all.iter().enumerate() {
-            if index_set.contains(&i) {
-                to_remove.push(item);
-            } else {
-                remaining.push(item);
+        if indices_to_remove.is_empty() {
+            to_remove = self.existing_all.iter().collect();
+        } else {
+            // split the to_be_removed from the remaining
+            let index_set: std::collections::HashSet<usize> = indices_to_remove.iter().copied().collect();
+            for (i, item) in self.existing_all.iter().enumerate() {
+                if index_set.contains(&i) {
+                    to_remove.push(item);
+                } else {
+                    remaining.push(item);
+                }
             }
         }
         // Remove each requested sandbox dir
         for maybe_path in to_remove.into_iter() {
-            if let Ok(p) = maybe_path {
-                if let Err(e) = std::fs::remove_dir_all(p.as_ref()) {
-                    tracing::error!("Failed to remove {} because {:?}", p.display(), e);
-                }
+            match maybe_path {
+                Err(e) => msg!("Warning: Failed to delete sandbox at \"{}\".", e),
+                Ok(p) => {
+                    if let Err(e) = std::fs::remove_dir_all(p.as_ref()) {
+                        msg!("Warning: Failed to delete sandbox at \"{}\" because {:?}", p.display(), e);
+                    }
+                },
             }
         }
         // // Erase `.hc` file
@@ -153,7 +170,7 @@ impl HcFile {
         self = HcFile::new(self.dir, valid_remaining);
         self.save()?;
         //
-        Ok(())
+        Ok(cur_size - self.existing_all.len())
     }
 
 
@@ -268,20 +285,3 @@ fn get_file_locks() -> &'static tokio::sync::Mutex<Vec<usize>> {
 
     FILE_LOCKS.get_or_init(|| tokio::sync::Mutex::new(Vec::new()))
 }
-
-
-//
-// /// Append all sandbox paths to the `.hc` file in the `hc_dir` directory.
-// pub fn save(hc_dir: &PathBuf, paths: Vec<ConfigRootPath>) -> anyhow::Result<()> {
-//     std::fs::create_dir_all(hc_dir)
-//         .with_context(|| format!("Failed to create directory: {}", hc_dir.display()))?;
-//     let hc_file = hc_dir.join(".hc");
-//     let mut file = std::fs::OpenOptions::new()
-//         .append(true)
-//         .create(true)
-//         .open(hc_file)?;
-//     for path in paths {
-//         writeln!(file, "{}", path.display())?;
-//     }
-//     Ok(())
-// }

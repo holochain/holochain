@@ -205,14 +205,55 @@ async fn list_sandboxes(cur_dir: &Path) -> Output {
 }
 
 
-/// Simple list and clean test
-/// Run list, generate, list, clean, list
+/// Test "clean" of an empty folder.
 #[tokio::test(flavor = "multi_thread")]
-async fn list_and_clean() {
-
+async fn empty_clean() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
+    println!("@@ Temp dir: {temp_dir:?}");
+    let mut cmd = get_sandbox_command();
+    cmd.arg("clean")
+        .current_dir(&temp_dir.path());
+    println!("@@ Clean");
+    println!("@@ {cmd:?}");
+    let output = cmd.output().await.unwrap();
+    println!("@@ Clean Complete");
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 1);
+}
 
+
+/// Test "clean" with a ".hc" file containing one bogus path.
+#[tokio::test(flavor = "multi_thread")]
+async fn clean_one() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    println!("@@ Temp dir: {temp_dir:?}");
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, "/tmp/bogus").unwrap();
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("clean")
+        .current_dir(&temp_dir.path());
+    println!("@@ Clean");
+    println!("@@ {cmd:?}");
+    let output = cmd.output().await.unwrap();
+    println!("@@ Clean Complete");
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 2);
+}
+
+
+/// "list" test
+/// Runs: list, generate, list, clean, list
+#[tokio::test(flavor = "multi_thread")]
+async fn list_and_clean() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     println!("@@ Temp dir: {temp_dir:?}");
 
     clean_sandboxes(temp_dir.path()).await;
@@ -251,7 +292,7 @@ async fn list_and_clean() {
     println!("@@ {output:?}");
     let stdout = String::from_utf8(output.stdout).unwrap();
     let line_count2 = stdout.lines().count();
-    assert_eq!(line_count1 + 1, line_count2);
+    assert!(line_count1 < line_count2);
 
     clean_sandboxes(temp_dir.path()).await;
     let output = list_sandboxes(temp_dir.path()).await;

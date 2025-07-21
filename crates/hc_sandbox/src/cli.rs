@@ -224,7 +224,14 @@ impl HcSandbox {
             HcSandboxSubcommand::List { verbose } => {
                 hc_file.list(verbose)?
             }
-            HcSandboxSubcommand::Clean => hc_file.remove(Vec::new())?,
+            HcSandboxSubcommand::Clean => {
+                let removed_count = hc_file.remove(Vec::new())?;
+                match removed_count {
+                    0 => msg!("No sandbox path has been removed"),
+                    1 => msg!("1 sandbox path has been removed"),
+                    _ => msg!("{} sandbox paths have been removed", removed_count),
+                }
+            },
             HcSandboxSubcommand::Create(Create {
                 num_sandboxes,
                 network,
