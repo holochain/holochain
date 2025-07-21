@@ -608,7 +608,6 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
 /// Convert an [`AppInfo`] to JSON with extra base64 conversion of `agent_pub_key` and `cell_id` fields.
 fn app_info_to_json(app_info: AppInfo) -> anyhow::Result<serde_json::Value> {
     let value = serde_json::to_value(&app_info)?;
-    return Ok(value);
     let serde_json::Value::Object(mut app_info_map) = value else {
         bail!("Invalid appInfo conversion result");
     };
