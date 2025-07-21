@@ -13,7 +13,6 @@ use anyhow::anyhow;
 use anyhow::bail;
 use holo_hash::DnaHashB64;
 use holochain_client::AdminWebsocket;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::AgentMetaInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
@@ -325,7 +324,7 @@ pub async fn call(
         let paths = if existing.is_empty() {
             hc_file.valid_paths()
         } else {
-            existing.load(&hc_file)?
+            existing.load(hc_file)?
         };
         let ports = get_admin_ports(hc_file, paths.clone()).await?;
         let mut clients = Vec::with_capacity(ports.len());
@@ -339,7 +338,7 @@ pub async fn call(
                     // is being made
                     let (port, holochain, lair) = run_async(
                         holochain_path,
-                        ConfigRootPath::from(path),
+                        path,
                         None,
                         structured.clone(),
                     )

@@ -121,7 +121,7 @@ impl HcFile {
                 self.existing_all.push(Err(path));
             }
         }
-        return self.save();
+        self.save()
     }
 
     /// Remove paths by their index in the `.hc` file
@@ -210,7 +210,7 @@ impl HcFile {
             msg!("{}: {}\n", i, p.display());
             if verbose {
                 let config = holochain_conductor_config::config::read_config(
-                    ConfigRootPath::from(p.clone()),
+                   p.clone(),
                 )?;
                 msg!("Conductor Config:\n{:?}\n",config);
             }

@@ -211,7 +211,7 @@ impl HcSandbox {
                         msg!("Received Ctrl-C, shutting down");
                         result.map_err(anyhow::Error::from)
                     }
-                    result = run_n(&holochain_path, requested_paths.into_iter().map(ConfigRootPath::from).collect(), ports, force_admin_ports, self.structured) => result,
+                    result = run_n(&holochain_path, requested_paths, ports, force_admin_ports, self.structured) => result,
                 };
                 hc_file.release_ports().await?;
                 return result;
@@ -355,6 +355,7 @@ pub async fn run_n(
 }
 
 /// Perform the `generate` subcommand
+#[allow(clippy::too_many_arguments)]
 pub async fn generate(
     hc_file: &mut HcFile,
     holochain_path: &Path,
