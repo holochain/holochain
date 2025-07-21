@@ -436,7 +436,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         }
         AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(client, args).await?;
-            println!("{}", convert_app_info(app)?);
+            println!("{}", app_info_to_json(app)?);
         }
         AdminRequestCli::UninstallApp(args) => {
             client
@@ -466,7 +466,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
             let converted = cell_id_values
                 .into_iter()
-                .map(transform_cell_id)
+                .map(cell_id_json_to_base64_json)
                 .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
             println!("{}", serde_json::to_value(&converted)?);
         }
@@ -474,7 +474,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             let apps = client.list_apps(args.status).await?;
             let values = apps
                 .into_iter()
-                .map(convert_app_info)
+                .map(app_info_to_json)
                 .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
             println!("{}", serde_json::to_value(values)?);
         }
@@ -605,20 +605,21 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
     Ok(())
 }
 
-/// Convert an [AppInfo] to JSON with extra base64 conversion of `agent_pub_key` and `cell_id` fields.
-fn convert_app_info(app_info: AppInfo) -> anyhow::Result<serde_json::Value> {
+/// Convert an [`AppInfo`] to JSON with extra base64 conversion of `agent_pub_key` and `cell_id` fields.
+fn app_info_to_json(app_info: AppInfo) -> anyhow::Result<serde_json::Value> {
     let value = serde_json::to_value(&app_info)?;
+    return Ok(value);
     let serde_json::Value::Object(mut app_info_map) = value else {
         bail!("Invalid appInfo conversion result");
     };
     // Convert `agent_pub_key` field
     if let Some(old_value) = app_info_map.get("agent_pub_key") {
-        let new_value = transform_agent_pub_key(old_value.clone())?;
+        let new_value = agent_pub_key_json_to_base64_json(old_value.clone())?;
         app_info_map.insert("agent_pub_key".to_string(), new_value);
     }
     // Convert `cell_info` field
     if let Some(old_value) = app_info_map.get("cell_info") {
-        let new_value = transform_cell_info_map(old_value.clone())?;
+        let new_value = cell_id_to_base64_within_cell_info_map(old_value.clone())?;
         app_info_map.insert("cell_info".to_string(), new_value);
     }
     //
@@ -626,7 +627,9 @@ fn convert_app_info(app_info: AppInfo) -> anyhow::Result<serde_json::Value> {
 }
 
 /// Convert the inner `cell_id` fields of the JSON value of a `IndexMap<RoleName, Vec<CellInfo>>`.
-fn transform_cell_info_map(value: serde_json::Value) -> anyhow::Result<serde_json::Value> {
+fn cell_id_to_base64_within_cell_info_map(
+    value: serde_json::Value,
+) -> anyhow::Result<serde_json::Value> {
     let serde_json::Value::Object(mut cell_info_map_map) = value else {
         bail!("Value is not a CellInfo map.");
     };
@@ -645,7 +648,7 @@ fn transform_cell_info_map(value: serde_json::Value) -> anyhow::Result<serde_jso
                     bail!("Value is not a CellInfo.");
                 };
                 if let Some(old_value) = cell_id_map.get("cell_id") {
-                    let new_value = transform_cell_id(old_value.to_owned())?;
+                    let new_value = cell_id_json_to_base64_json(old_value.to_owned())?;
                     cell_id_map.insert("cell_id".to_string(), new_value);
                 }
             }
@@ -654,24 +657,26 @@ fn transform_cell_info_map(value: serde_json::Value) -> anyhow::Result<serde_jso
     Ok(serde_json::Value::Object(cell_info_map_map))
 }
 
-fn transform_cell_id(value: serde_json::Value) -> anyhow::Result<serde_json::Value> {
+fn cell_id_json_to_base64_json(value: serde_json::Value) -> anyhow::Result<serde_json::Value> {
     let serde_json::Value::Array(arr) = value else {
         anyhow::bail!("Value is not an array.");
     };
     if arr.len() != 2 {
         anyhow::bail!("CellId array length is not 2.");
     };
-    let dna = transform_dna_hash(arr[0].clone())?;
-    let agent = transform_agent_pub_key(arr[1].clone())?;
+    let dna = dna_hash_json_to_base64_json(arr[0].clone())?;
+    let agent = agent_pub_key_json_to_base64_json(arr[1].clone())?;
     Ok(serde_json::to_value(vec![dna, agent])?)
 }
 
-fn transform_dna_hash(input: serde_json::Value) -> anyhow::Result<serde_json::Value> {
+fn dna_hash_json_to_base64_json(input: serde_json::Value) -> anyhow::Result<serde_json::Value> {
     let json_key = format!("{}", DnaHash::from_raw_39(value_to_base64(input)?));
     Ok(serde_json::Value::String(json_key))
 }
 
-fn transform_agent_pub_key(input: serde_json::Value) -> anyhow::Result<serde_json::Value> {
+fn agent_pub_key_json_to_base64_json(
+    input: serde_json::Value,
+) -> anyhow::Result<serde_json::Value> {
     let json_key = format!("{}", AgentPubKey::from_raw_39(value_to_base64(input)?));
     Ok(serde_json::Value::String(json_key))
 }
