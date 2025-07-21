@@ -667,8 +667,9 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
 /// Creates a new sandbox and tries to list apps via `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_and_call_list_apps() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
-    package_fixture_if_not_packaged().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    //package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
@@ -680,6 +681,7 @@ async fn create_sandbox_and_call_list_apps() {
         .arg("--piped")
         .arg("create")
         .arg("--in-process-lair")
+        .current_dir(&temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -696,6 +698,7 @@ async fn create_sandbox_and_call_list_apps() {
         ))
         .arg("call")
         .arg("list-apps")
+        .current_dir(&temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -816,8 +819,10 @@ async fn generate_sandbox_with_roles_settings_override() {
 /// upon calling `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_add_and_list_agent() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
+    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
 
     // Helper fn to parse process output for agent pub keys.
     fn get_agent_keys_from_process_output(output: Output) -> Vec<String> {
@@ -840,9 +845,10 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
         .arg("--network-seed")
         .arg(format!("{}", UNIX_EPOCH.elapsed().unwrap().as_millis()))
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -869,6 +875,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg("--piped")
         .arg("call")
         .arg("list-agents")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -892,6 +899,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg(dna_hashes[0].to_string())
         .arg("--dna")
         .arg(dna_hashes[1].to_string())
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -917,6 +925,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg("list-agents")
         .arg("--dna")
         .arg(dna_hashes[0].to_string())
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -951,6 +960,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg("call")
         .arg("add-agents")
         .arg(agent_infos_to_add)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
