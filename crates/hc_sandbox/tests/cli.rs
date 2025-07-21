@@ -170,14 +170,12 @@ async fn package_fixture_if_not_packaged() {
 
 async fn clean_sandboxes(cur_dir: &Path) {
     let mut cmd = get_sandbox_command();
-        cmd.arg("clean")
-        .current_dir(&cur_dir);
+    cmd.arg("clean").current_dir(cur_dir);
     println!("@@ Clean: {cmd:?}");
     let status = cmd.status().await.unwrap();
     assert_eq!(status, ExitStatus::default());
     println!("@@ Clean Complete");
 }
-
 
 async fn list_sandboxes(cur_dir: &Path) -> Output {
     let mut cmd = get_sandbox_command();
@@ -191,7 +189,7 @@ async fn list_sandboxes(cur_dir: &Path) -> Output {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
-        .current_dir(&cur_dir)
+        .current_dir(cur_dir)
         .kill_on_drop(true);
 
     println!("@@ List: {cmd:?}");
@@ -202,7 +200,6 @@ async fn list_sandboxes(cur_dir: &Path) -> Output {
     output
 }
 
-
 /// Test "clean" of an empty folder.
 #[tokio::test(flavor = "multi_thread")]
 async fn clean_empty() {
@@ -210,8 +207,7 @@ async fn clean_empty() {
     std::fs::create_dir_all(&temp_dir).unwrap();
 
     let mut cmd = get_sandbox_command();
-    cmd.arg("clean")
-        .current_dir(&temp_dir.path());
+    cmd.arg("clean").current_dir(temp_dir.path());
     let output = cmd.output().await.unwrap();
     assert_eq!(output.status, ExitStatus::default());
     let stdout = String::from_utf8(output.stdout).unwrap();
@@ -234,16 +230,13 @@ async fn clean_no_permission() {
     std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o000)).unwrap();
 
     let mut cmd = get_sandbox_command();
-    cmd.arg("clean")
-        .current_dir(&temp_dir.path());
+    cmd.arg("clean").current_dir(temp_dir.path());
     let output = cmd.output().await.unwrap();
     assert!(!output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
     let line_count = stdout.lines().count();
     assert_eq!(line_count, 0);
 }
-
-
 
 /// Test "clean" with a ".hc" file containing one bogus path.
 #[tokio::test(flavor = "multi_thread")]
@@ -254,8 +247,7 @@ async fn clean_one() {
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
 
     let mut cmd = get_sandbox_command();
-    cmd.arg("clean")
-        .current_dir(&temp_dir.path());
+    cmd.arg("clean").current_dir(temp_dir.path());
     let output = cmd.output().await.unwrap();
     assert_eq!(output.status, ExitStatus::default());
     let stdout = String::from_utf8(output.stdout).unwrap();
@@ -270,9 +262,7 @@ async fn remove_empty() {
     std::fs::create_dir_all(&temp_dir).unwrap();
 
     let mut cmd = get_sandbox_command();
-    cmd.arg("remove")
-        .arg("0")
-        .current_dir(&temp_dir.path());
+    cmd.arg("remove").arg("0").current_dir(temp_dir.path());
     let output = cmd.output().await.unwrap();
     assert_eq!(output.status, ExitStatus::default());
     let stdout = String::from_utf8(output.stdout).unwrap();
@@ -289,9 +279,7 @@ async fn remove_one() {
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
 
     let mut cmd = get_sandbox_command();
-    cmd.arg("remove")
-        .arg("0")
-        .current_dir(&temp_dir.path());
+    cmd.arg("remove").arg("0").current_dir(temp_dir.path());
     let output = cmd.output().await.unwrap();
     assert_eq!(output.status, ExitStatus::default());
     let stdout = String::from_utf8(output.stdout).unwrap();
@@ -310,7 +298,9 @@ async fn remove_two() {
     package_fixture_if_not_packaged().await;
     holochain_trace::test_run();
 
-    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -332,9 +322,7 @@ async fn remove_two() {
     assert_eq!(output.status, ExitStatus::default());
 
     let mut cmd = get_sandbox_command();
-    cmd.arg("remove")
-        .arg("1")
-        .current_dir(&temp_dir.path());
+    cmd.arg("remove").arg("1").current_dir(temp_dir.path());
     println!("@@ Remove: {cmd:?}");
     let output = cmd.output().await.unwrap();
     println!("@@ Remove Complete");
@@ -343,7 +331,6 @@ async fn remove_two() {
     let line_count = stdout.lines().count();
     assert_eq!(line_count, 1);
 }
-
 
 /// "list" test
 /// Runs: list, generate, list, clean, list
@@ -361,8 +348,9 @@ async fn list_and_clean() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     let line_count1 = stdout.lines().count();
 
-    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -397,7 +385,6 @@ async fn list_and_clean() {
     assert_eq!(line_count3, line_count1);
 }
 
-
 /// Test "run" with a missing index
 #[tokio::test(flavor = "multi_thread")]
 async fn run_missing() {
@@ -409,7 +396,9 @@ async fn run_missing() {
     package_fixture_if_not_packaged().await;
     holochain_trace::test_run();
 
-    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -433,13 +422,12 @@ async fn run_missing() {
     let mut cmd = get_sandbox_command();
     cmd.arg("run")
         .arg("0")
-        .current_dir(&temp_dir.path())
+        .current_dir(temp_dir.path())
         .kill_on_drop(true);
     println!("@@ Run: {cmd:?}");
     let output = cmd.output().await.unwrap();
     println!("@@ Run Complete");
     assert!(!output.status.success());
-
 }
 
 /// Generates a new sandbox with a single app deployed and tries to get app info
@@ -532,7 +520,9 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app-deferred/");
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app-deferred/");
     holochain_trace::test_run();
 
     let mut cmd = get_sandbox_command();
@@ -627,7 +617,9 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
 
     let mut cmd = get_sandbox_command();
@@ -734,7 +726,7 @@ async fn create_sandbox_and_call_list_apps() {
         .arg("--piped")
         .arg("create")
         .arg("--in-process-lair")
-        .current_dir(&temp_dir.path())
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -751,7 +743,7 @@ async fn create_sandbox_and_call_list_apps() {
         ))
         .arg("call")
         .arg("list-apps")
-        .current_dir(&temp_dir.path())
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -875,7 +867,9 @@ async fn generate_sandbox_and_add_and_list_agent() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
 
     // Helper fn to parse process output for agent pub keys.
     fn get_agent_keys_from_process_output(output: Output) -> Vec<String> {
@@ -1035,7 +1029,9 @@ async fn generate_sandbox_and_call_agent_meta_info() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
 
     let mut cmd = get_sandbox_command();
@@ -1199,7 +1195,9 @@ async fn authorize_zome_call_credentials() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
 
     let mut cmd = get_sandbox_command();
@@ -1266,7 +1264,9 @@ async fn call_zome_function() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
 
     let mut cmd = get_sandbox_command();

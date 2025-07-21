@@ -1,10 +1,10 @@
 use holochain_conductor_api::conductor::NetworkConfig;
 use std::path::PathBuf;
 
-use clap::Parser;
-use url2::Url2;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use crate::save::HcFile;
+use clap::Parser;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use url2::Url2;
 
 // This creates a new Holochain sandbox
 // which is a
@@ -113,7 +113,9 @@ impl Existing {
     pub fn load(&self, hc_file: &HcFile) -> anyhow::Result<Vec<ConfigRootPath>> {
         if self.all {
             // Warn for all invalid paths
-            hc_file.invalid_paths().iter()
+            hc_file
+                .invalid_paths()
+                .iter()
                 .for_each(|inv| msg!("Warning. Sandbox not found at {}", inv.display()));
             // Return all valid sandboxes in .hc
             return Ok(hc_file.valid_paths());
@@ -123,7 +125,10 @@ impl Existing {
             // Get the indices
             for i in self.indices.clone() {
                 let Some(Ok(selected)) = hc_file.existing_all.get(i) else {
-                    return Err(anyhow::anyhow!("Aborting. No sandbox found at index {}.", i));
+                    return Err(anyhow::anyhow!(
+                        "Aborting. No sandbox found at index {}.",
+                        i
+                    ));
                 };
                 selection.push(selected.clone());
             }
@@ -135,24 +140,24 @@ impl Existing {
             0 => {
                 // There are no sandboxes
                 msg!(
-                "
+                    "
 Before running or calling you need to generate a sandbox.
 You can use `hc sandbox generate` to do this.
 Run `hc sandbox generate --help` for more options."
-            );
+                );
                 Ok(vec![])
-            },
+            }
             _ => {
                 // There are multiple saved sandboxes, the user must disambiguate
                 msg!(
-                "
+                    "
 There are multiple sandboxes and hc doesn't know which of them to run.
 You can run:
     - `--all` `-a` run all sandboxes.
     - `1` run a sandbox by index from the list below.
     - `0 2` run multiple sandboxes by indices from the list below.
 Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more information."
-            );
+                );
                 hc_file.list(false)?;
                 Ok(vec![])
             }

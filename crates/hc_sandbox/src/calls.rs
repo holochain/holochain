@@ -34,11 +34,11 @@ use std::convert::TryFrom;
 use crate::cmds::Existing;
 use crate::ports::get_admin_ports;
 use crate::run::run_async;
+use crate::save::HcFile;
 use clap::{Args, Parser, Subcommand};
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
 use kitsune2_api::AgentInfoSigned;
-use crate::save::HcFile;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
@@ -336,13 +336,8 @@ pub async fn call(
                     // Note that the holochain and lair processes need to be returned here
                     // in order to not get dropped but keep running until the admin call
                     // is being made
-                    let (port, holochain, lair) = run_async(
-                        holochain_path,
-                        path,
-                        None,
-                        structured.clone(),
-                    )
-                    .await?;
+                    let (port, holochain, lair) =
+                        run_async(holochain_path, path, None, structured.clone()).await?;
                     clients.push((
                         AdminWebsocket::connect(format!("localhost:{port}"), origin.clone())
                             .await?,

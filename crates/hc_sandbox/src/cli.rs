@@ -1,6 +1,7 @@
 //! Definitions of Parser options for use in the CLI
 
 use crate::cmds::*;
+use crate::save::HcFile;
 use clap::{ArgAction, Parser};
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_trace::Output;
@@ -8,7 +9,6 @@ use holochain_types::prelude::InstalledAppId;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::path::PathBuf;
-use crate::save::HcFile;
 
 const DEFAULT_APP_ID: &str = "test-app";
 
@@ -146,7 +146,6 @@ pub struct Run {
     existing: Existing,
 }
 
-
 impl HcSandbox {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
@@ -227,15 +226,18 @@ impl HcSandbox {
                 .await?
             }
             HcSandboxSubcommand::ZomeCallAuth(auth) => {
-                crate::zome_call::zome_call_auth(&hc_file, auth, self.force_admin_ports.first().cloned())
-                    .await?
+                crate::zome_call::zome_call_auth(
+                    &hc_file,
+                    auth,
+                    self.force_admin_ports.first().cloned(),
+                )
+                .await?
             }
             HcSandboxSubcommand::ZomeCall(call) => {
-                crate::zome_call::zome_call(call, &hc_file, self.force_admin_ports.first().cloned()).await?
+                crate::zome_call::zome_call(call, &hc_file, self.force_admin_ports.first().cloned())
+                    .await?
             }
-            HcSandboxSubcommand::List { verbose } => {
-                hc_file.list(verbose)?
-            }
+            HcSandboxSubcommand::List { verbose } => hc_file.list(verbose)?,
             HcSandboxSubcommand::Clean => {
                 let removed_count = hc_file.remove(Vec::new())?;
                 match removed_count {
@@ -243,8 +245,8 @@ impl HcSandbox {
                     1 => msg!("1 sandbox path has been removed"),
                     _ => msg!("{} sandbox paths have been removed", removed_count),
                 }
-            },
-            HcSandboxSubcommand::Remove {indices} => {
+            }
+            HcSandboxSubcommand::Remove { indices } => {
                 let removed_count = hc_file.remove(indices)?;
                 match removed_count {
                     0 => msg!("No sandbox path has been removed"),
