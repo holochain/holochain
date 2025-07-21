@@ -337,7 +337,7 @@ async fn admin_port_from_connect_args(
             anyhow::bail!("No admin port found")
         }
     } else {
-        if let Some(admin_port) = get_admin_ports(hc_file, hc_file.existing_valids()).await?.first() {
+        if let Some(admin_port) = get_admin_ports(hc_file, hc_file.valid_paths()).await?.first() {
             Ok(*admin_port)
         } else {
             anyhow::bail!("No admin port found")

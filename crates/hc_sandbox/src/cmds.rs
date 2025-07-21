@@ -114,7 +114,7 @@ impl Existing {
     pub fn load(&self, hc_file: &HcFile) -> anyhow::Result<Vec<ConfigRootPath>> {
         if self.all {
             // Return all valid sandboxes in .hc
-            return Ok(hc_file.existing_valids());
+            return Ok(hc_file.valid_paths());
         }
         if !self.indices.is_empty() {
             let mut selection = Vec::new();
@@ -129,8 +129,8 @@ impl Existing {
             return Ok(selection);
         }
         // No options provided, pick one known sandbox
-        match hc_file.existing_valids().len() {
-            1 => Ok(vec![hc_file.existing_valids()[0].clone()]), // If there is only one saved sandbox then use that.
+        match hc_file.valid_paths().len() {
+            1 => Ok(vec![hc_file.valid_paths()[0].clone()]), // If there is only one saved sandbox then use that.
             0 => {
                 // There are no sandboxes
                 msg!(

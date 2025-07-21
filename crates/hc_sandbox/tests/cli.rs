@@ -172,8 +172,7 @@ async fn clean_sandboxes(cur_dir: &Path) {
     let mut cmd = get_sandbox_command();
         cmd.arg("clean")
         .current_dir(&cur_dir);
-    println!("@@ Clean");
-    println!("@@ {cmd:?}");
+    println!("@@ Clean: {cmd:?}");
     let status = cmd.status().await.unwrap();
     assert_eq!(status, ExitStatus::default());
     println!("@@ Clean Complete");
@@ -195,8 +194,7 @@ async fn list_sandboxes(cur_dir: &Path) -> Output {
         .current_dir(&cur_dir)
         .kill_on_drop(true);
 
-    println!("@@ List");
-    println!("@@ {cmd:?}");
+    println!("@@ List: {cmd:?}");
     let hc_admin = input_piped_password(&mut cmd).await;
     let output = hc_admin.wait_with_output().await.unwrap();
     assert!(output.status.success());
@@ -207,17 +205,15 @@ async fn list_sandboxes(cur_dir: &Path) -> Output {
 
 /// Test "clean" of an empty folder.
 #[tokio::test(flavor = "multi_thread")]
-async fn empty_clean() {
+async fn clean_empty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
     println!("@@ Temp dir: {temp_dir:?}");
+
     let mut cmd = get_sandbox_command();
     cmd.arg("clean")
         .current_dir(&temp_dir.path());
-    println!("@@ Clean");
-    println!("@@ {cmd:?}");
     let output = cmd.output().await.unwrap();
-    println!("@@ Clean Complete");
     assert_eq!(output.status, ExitStatus::default());
     let stdout = String::from_utf8(output.stdout).unwrap();
     let line_count = stdout.lines().count();
@@ -237,14 +233,95 @@ async fn clean_one() {
     let mut cmd = get_sandbox_command();
     cmd.arg("clean")
         .current_dir(&temp_dir.path());
-    println!("@@ Clean");
-    println!("@@ {cmd:?}");
     let output = cmd.output().await.unwrap();
-    println!("@@ Clean Complete");
     assert_eq!(output.status, ExitStatus::default());
     let stdout = String::from_utf8(output.stdout).unwrap();
     let line_count = stdout.lines().count();
     assert_eq!(line_count, 2);
+}
+
+/// Test "remove" in empty folder
+#[tokio::test(flavor = "multi_thread")]
+async fn remove_empty() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    println!("@@ Temp dir: {temp_dir:?}");
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("remove")
+        .arg("0")
+        .current_dir(&temp_dir.path());
+    let output = cmd.output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 2);
+}
+
+/// Test "remove" with a ".hc" file containing one bogus path.
+#[tokio::test(flavor = "multi_thread")]
+async fn remove_one() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    println!("@@ Temp dir: {temp_dir:?}");
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, "/tmp/bogus").unwrap();
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("remove")
+        .arg("0")
+        .current_dir(&temp_dir.path());
+    let output = cmd.output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 2);
+}
+
+/// Test "remove" with a ".hc" file containing one bogus and one real path.
+#[tokio::test(flavor = "multi_thread")]
+async fn remove_two() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    println!("@@ Temp dir: {temp_dir:?}");
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, "/tmp/bogus").unwrap();
+
+    package_fixture_if_not_packaged().await;
+    holochain_trace::test_run();
+
+    let app_path = std::env::current_dir().unwrap().join("tests/fixtures/my-app/");
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+    println!("@@ {cmd:?}");
+    let hc_admin = input_piped_password(&mut cmd).await;
+    let output = hc_admin.wait_with_output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("remove")
+        .arg("1")
+        .current_dir(&temp_dir.path());
+    println!("@@ Remove: {cmd:?}");
+    let output = cmd.output().await.unwrap();
+    println!("@@ Remove Complete");
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 1);
 }
 
 

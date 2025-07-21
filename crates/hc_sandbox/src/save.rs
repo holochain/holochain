@@ -17,7 +17,7 @@ pub struct HcFile {
     /// Path to the `.hc` file.
     pub dir: PathBuf,
     /// Vec of results after trying to read each path in the `.hc` file.
-    pub existing_all: Vec<anyhow::Result<ConfigRootPath>>,
+    pub existing_all: Vec<Result<ConfigRootPath, ConfigRootPath>>,
 }
 
 impl HcFile {
@@ -29,7 +29,7 @@ impl HcFile {
             if path.exists() && path.is_dir() {
                 existing_all.push(Ok(path));
             } else {
-                existing_all.push(Err(anyhow!("{}", path.display())));
+                existing_all.push(Err(path));
             }
         }
         //
@@ -40,14 +40,25 @@ impl HcFile {
     }
     
     /// Return only valid existing paths
-    pub fn existing_valids(&self) -> Vec<ConfigRootPath> { self.existing_all.iter().flatten().cloned().collect() }
+    pub fn valid_paths(&self) -> Vec<ConfigRootPath> { self.existing_all.iter().flatten().cloned().collect() }
+
+    /// Return only valid existing paths
+    pub fn all_paths(&self) -> Vec<ConfigRootPath> {
+        self.existing_all.iter().map(|res| {
+            match res {
+                Ok(path) => path.clone(),
+                Err(path) => path.clone(),
+            }
+        }).collect()
+    }
+
 
     /// Try to read the `.hc` file from disk,
     /// try to load each sandbox path
     /// and return a HcFile according to results.
     pub fn try_load(hc_dir: PathBuf) -> anyhow::Result<Self> {
         let hc_file = hc_dir.join(".hc");
-        dbg!(&hc_file);
+        // If file does not exist, return empty struct
         if !hc_file.exists() {
             return Ok(Self {
                 dir: hc_dir,
@@ -65,13 +76,12 @@ impl HcFile {
         for sandbox in existing.lines() {
             let path = ConfigRootPath::from(PathBuf::from(sandbox));
             let config_file_path = ConfigFilePath::from(path.clone());
-            if config_file_path.as_ref().exists() && config_file_path.as_ref().is_dir() {
+            if config_file_path.as_ref().exists() && path.as_ref().is_dir() && config_file_path.as_ref().is_file() {
                 paths.push(Ok(path));
             } else {
-                paths.push(Err(anyhow!("{}", path.display())));
+                paths.push(Err(path));
             }
         }
-
 
         Ok(Self {
             dir: hc_dir,
@@ -79,7 +89,7 @@ impl HcFile {
         })
     }
 
-    /// Overwrite `.hc` file on disk with the valid content currently in this object
+    /// Overwrite `.hc` file on disk with all paths currently held by the object.
     pub fn save(&self) -> anyhow::Result<()> {
         std::fs::create_dir_all(&self.dir)
             .with_context(|| format!("Failed to create directory: {}", self.dir.display()))?;
@@ -89,9 +99,13 @@ impl HcFile {
             .truncate(true)
             .create(true)
             .open(hc_file)?;
-        for path in self.existing_valids().iter() {
-            writeln!(file, "{}", path.display())?;
+        for path in self.existing_all.iter() {
+            match path {
+                Ok(path) => writeln!(file, "{}", path.display())?,
+                Err(path) => writeln!(file, "{}", path.display())?,
+            }
         }
+
         Ok(())
     }
 
@@ -101,15 +115,16 @@ impl HcFile {
             if path.exists() && path.is_dir() {
                 self.existing_all.push(Ok(path));
             } else {
-                self.existing_all.push(Err(anyhow!("{}", path.display())));
+                self.existing_all.push(Err(path));
             }
         }
         return self.save();
     }
 
-    /// Remove paths by their index in the `.hc` file.
-    /// If no indices are passed in then they will all be deleted.
-    /// If no sandbox remains then all `.hc_*` files will be removed.
+    /// Remove paths by their index in the `.hc` file
+    /// and attempt to delete the sandbox folder.
+    /// If no indices are passed in then they will all be removed.
+    /// If no sandbox paths remain then all `.hc_*` files will be removed.
     pub fn remove(mut self, indices_to_remove: Vec<usize>) -> anyhow::Result<usize> {
         let cur_size = self.existing_all.len();
         let mut to_remove = Vec::new();
@@ -117,6 +132,10 @@ impl HcFile {
         if indices_to_remove.is_empty() {
             to_remove = self.existing_all.iter().collect();
         } else {
+            // Tell user if index is out of range
+            indices_to_remove.iter().for_each(|i| {if i >= &cur_size {
+                msg!("Warning: Provided index is out of range: {}", i)
+            } });
             // split the to_be_removed from the remaining
             let index_set: std::collections::HashSet<usize> = indices_to_remove.iter().copied().collect();
             for (i, item) in self.existing_all.iter().enumerate() {
@@ -130,24 +149,17 @@ impl HcFile {
         // Remove each requested sandbox dir
         for maybe_path in to_remove.into_iter() {
             match maybe_path {
-                Err(e) => msg!("Warning: Failed to delete sandbox at \"{}\".", e),
+                Err(p) => msg!("Warning: Failed to delete sandbox at \"{}\"", p.display()),
                 Ok(p) => {
                     if let Err(e) = std::fs::remove_dir_all(p.as_ref()) {
-                        msg!("Warning: Failed to delete sandbox at \"{}\" because {:?}", p.display(), e);
+                        msg!("Warning: Failed to delete sandbox at {} because {:?}", p.display(), e);
                     }
                 },
             }
         }
-        // // Erase `.hc` file
-        // let hc_file = self.dir.join(".hc");
-        // if hc_file.exists() {
-        //     std::fs::remove_file(&hc_file)
-        //         .with_context(|| format!("Failed to remove .hc file at {}", self.dir.display()))?;
-        // }
-        //
-        let valid_remaining: Vec<ConfigRootPath> = remaining.into_iter().flatten().cloned().collect();
-        // Erase all other files
-        if valid_remaining.is_empty() {
+        //let valid_remaining: Vec<ConfigRootPath> = remaining.into_iter().flatten().cloned().collect();
+        // Erase all other .hc* files
+        if remaining.is_empty() {
             for entry in std::fs::read_dir(&self.dir)? {
                 let entry = entry?;
                 if entry.file_type()?.is_file() {
@@ -167,9 +179,15 @@ impl HcFile {
             }
         }
         // Write new .hc file
-        self = HcFile::new(self.dir, valid_remaining);
+        let remaining_as_paths = remaining.iter().map(|res| {
+            match res {
+                Ok(path) => path.clone(),
+                Err(path) => path.clone(),
+            }
+        }).collect();
+        self = HcFile::new(self.dir, remaining_as_paths);
         self.save()?;
-        //
+        // Return number of removed paths
         Ok(cur_size - self.existing_all.len())
     }
 
@@ -183,7 +201,7 @@ impl HcFile {
         msg!("Sandboxes contained in `{}`", self.dir.join(".hc").display());
         for (i, path) in self.existing_all.iter().enumerate() {
             let Ok(p) = path else {
-                msg!("{}: {} -- UNAVAILABLE\n", i, path.as_ref().err().unwrap().to_string());
+                msg!("{}: {} -- UNAVAILABLE\n", i, path.as_ref().err().unwrap().display());
                 continue;
             };
             msg!("{}: {}\n", i, p.display());
@@ -201,7 +219,7 @@ impl HcFile {
     pub async fn lock_live(&self, path: &Path, port: u16) -> anyhow::Result<()> {
         std::fs::create_dir_all(&self.dir)
             .with_context(|| format!("Failed to create directory: {}", self.dir.display()))?;
-        let index = match self.existing_valids().into_iter().enumerate().find(|p| p.1.as_ref() == path) {
+        let index = match self.valid_paths().into_iter().enumerate().find(|p| p.1.as_ref() == path) {
             Some((i, _)) => i,
             None => return Ok(()),
         };

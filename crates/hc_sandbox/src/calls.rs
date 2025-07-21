@@ -323,7 +323,7 @@ pub async fn call(
 
     let admin_clients = if running.is_empty() {
         let paths = if existing.is_empty() {
-            hc_file.existing_valids()
+            hc_file.valid_paths()
         } else {
             existing.load(&hc_file)?
         };
