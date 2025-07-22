@@ -1258,10 +1258,10 @@ mod app_impls {
                     )?;
 
                     // Update the db
-                    let stopped_app = self.add_disabled_app_to_db(app).await?;
+                    let disabled_app = self.add_disabled_app_to_db(app).await?;
 
                     // Return the result, which be may be an error if no_rollback was specified
-                    genesis_result.map(|()| stopped_app)
+                    genesis_result.map(|()| disabled_app)
                 } else if let Err(err) = genesis_result {
                     Err(err)
                 } else {
