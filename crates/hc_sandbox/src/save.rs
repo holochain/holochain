@@ -3,11 +3,10 @@
 //! This module gives basic helpers to save / load your sandboxes
 //! to / from a `.hc` file.
 
-use std::io::Write;
+use std::io::{ErrorKind, Write};
+use std::io::Error;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
-
-use anyhow::{anyhow, Context};
 use holochain_conductor_api::conductor::paths::{ConfigFilePath, ConfigRootPath};
 
 /// Representation of a loaded `.hc` file
@@ -62,7 +61,7 @@ impl HcFile {
     /// Try to read the `.hc` file from disk,
     /// try to load each sandbox path
     /// and return a HcFile according to results.
-    pub fn try_load(hc_dir: PathBuf) -> anyhow::Result<Self> {
+    pub fn try_load(hc_dir: PathBuf) -> std::io::Result<Self> {
         let hc_file = hc_dir.join(".hc");
         // If file does not exist, return empty struct
         if !hc_file.exists() {
@@ -72,10 +71,13 @@ impl HcFile {
             });
         }
         if !hc_file.is_file() {
-            return Err(anyhow!("Failed to load hc file in {}", hc_dir.display()));
+            return Err(Error::new(ErrorKind::Other, format!("Failed to load hc file in {}", hc_dir.display())));
         };
         let existing = std::fs::read_to_string(&hc_file)
-            .with_context(|| format!("Failed to read file: {}", hc_file.display()))?;
+            .map_err(|err| Error::new(
+                err.kind(),
+                format!("Failed to read config file '{}': {}", hc_file.display(), err)
+            ))?;
 
         let mut paths = Vec::new();
         for sandbox in existing.lines() {
@@ -98,9 +100,12 @@ impl HcFile {
     }
 
     /// Overwrite `.hc` file on disk with all paths currently held by the object.
-    pub fn save(&self) -> anyhow::Result<()> {
+    pub fn save(&self) -> std::io::Result<()> {
         std::fs::create_dir_all(&self.dir)
-            .with_context(|| format!("Failed to create directory: {}", self.dir.display()))?;
+            .map_err(|err| Error::new(
+                err.kind(),
+                format!("Failed to create directory: '{}': {}", self.dir.display(), err)
+            ))?;
         let hc_file = self.dir.join(".hc");
         let mut file = std::fs::OpenOptions::new()
             .write(true)
@@ -118,7 +123,7 @@ impl HcFile {
     }
 
     /// Append paths to HcFile and save to disk
-    pub fn append(&mut self, paths: Vec<ConfigRootPath>) -> anyhow::Result<()> {
+    pub fn append(&mut self, paths: Vec<ConfigRootPath>) -> std::io::Result<()> {
         for path in paths.into_iter() {
             if path.exists() && path.is_dir() {
                 self.existing_all.push(Ok(path));
@@ -133,7 +138,7 @@ impl HcFile {
     /// and attempt to delete the sandbox folder.
     /// If no indices are passed in then they will all be removed.
     /// If no sandbox paths remain then all `.hc_*` files will be removed.
-    pub fn remove(mut self, indices_to_remove: Vec<usize>) -> anyhow::Result<usize> {
+    pub fn remove(mut self, indices_to_remove: Vec<usize>) -> std::io::Result<usize> {
         let cur_size = self.existing_all.len();
         let mut to_remove = Vec::new();
         let mut remaining = Vec::new();
@@ -172,27 +177,34 @@ impl HcFile {
                 }
             }
         }
-        //let valid_remaining: Vec<ConfigRootPath> = remaining.into_iter().flatten().cloned().collect();
         // Erase all other .hc* files
         if remaining.is_empty() {
             for entry in std::fs::read_dir(&self.dir)
-                .with_context(|| format!("Failed to read directory: {}", self.dir.display()))?
+                .map_err(|err| Error::new(
+                    err.kind(),
+                    format!("Failed to read directory: '{}': {}", self.dir.display(), err)
+                ))?
             {
                 let entry = entry?;
                 if entry.file_type()?.is_file() {
                     if let Some(s) = entry.file_name().to_str() {
                         if s.starts_with(".hc_live_") {
                             std::fs::remove_file(entry.path())
-                                .with_context(|| format!("Failed to remove live lock at {}", s))?;
+                                .map_err(|err| Error::new(
+                                    err.kind(),
+                                    format!("Failed to remove live lock at '{}': {}", s, err)
+                                ))?
                         }
                     }
                 }
             }
             let hc_auth = self.dir.join(".hc_auth");
             if hc_auth.exists() {
-                std::fs::remove_file(&hc_auth).with_context(|| {
-                    format!("Failed to remove .hc_auth at {}", self.dir.display())
-                })?;
+                std::fs::remove_file(&hc_auth)
+                    .map_err(|err| Error::new(
+                        err.kind(),
+                        format!("Failed to remove .hc_auth at '{}': {}", self.dir.display(), err)
+                    ))?;
             }
         }
         // Write new .hc file
@@ -210,7 +222,7 @@ impl HcFile {
     }
 
     /// Print out the sandboxes contained in the `.hc` file.
-    pub fn list(&self, verbose: bool) -> anyhow::Result<()> {
+    pub fn list(&self, verbose: bool) -> std::io::Result<()> {
         if self.existing_all.is_empty() {
             msg!(
                 "No sandboxes contained in `{}`",
@@ -233,7 +245,8 @@ impl HcFile {
             };
             msg!("{}: {}\n", i, p.display());
             if verbose {
-                let config = holochain_conductor_config::config::read_config(p.clone())?;
+                let config = holochain_conductor_config::config::read_config(p.clone())
+                    .map_err(|err| Error::new(ErrorKind::Other, format!("Failed to read config at '{}': {}", p.display(), err)))?;
                 msg!("Conductor Config:\n{:?}\n", config);
             }
         }
@@ -241,9 +254,12 @@ impl HcFile {
     }
 
     /// Lock this setup as running live and advertise the port.
-    pub async fn lock_live(&self, path: &Path, port: u16) -> anyhow::Result<()> {
+    pub async fn lock_live(&self, path: &Path, port: u16) -> std::io::Result<()> {
         std::fs::create_dir_all(&self.dir)
-            .with_context(|| format!("Failed to create directory: {}", self.dir.display()))?;
+            .map_err(|err| Error::new(
+                err.kind(),
+                format!("Failed to create directory: '{}': {}", self.dir.display(), err)
+            ))?;
         let index = match self
             .valid_paths()
             .into_iter()
@@ -276,13 +292,16 @@ impl HcFile {
     /// For each registered setup, if it has a lockfile, return the port of the running conductor,
     /// otherwise return None.
     /// The resulting Vec has the same number of elements as lines in the `.hc` file.
-    pub fn load_ports(&self) -> anyhow::Result<Vec<Option<u16>>> {
+    pub fn load_ports(&self) -> std::io::Result<Vec<Option<u16>>> {
         let mut ports = Vec::new();
         for (i, _) in self.existing_all.iter().enumerate() {
             let hc_live = self.dir.join(format!(".hc_live_{}", i));
             if hc_live.exists() {
                 let live = std::fs::read_to_string(hc_live.clone())
-                    .with_context(|| format!("Failed to read file at {}", hc_live.display()))?;
+                    .map_err(|err| Error::new(
+                        err.kind(),
+                        format!("Failed to read file at '{}': {}", hc_live.display(), err)
+                    ))?;
                 let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
                 ports.push(p)
             } else {
@@ -293,7 +312,7 @@ impl HcFile {
     }
 
     /// Same as load_ports but only returns ports for paths passed in.
-    pub fn find_ports(&self, paths: &[ConfigRootPath]) -> anyhow::Result<Vec<Option<u16>>> {
+    pub fn find_ports(&self, paths: &[ConfigRootPath]) -> std::io::Result<Vec<Option<u16>>> {
         let mut ports = Vec::new();
         let all_paths = self.existing_all.iter().flatten().collect::<Vec<_>>();
         for path in paths {
@@ -302,9 +321,11 @@ impl HcFile {
                 Some(i) => {
                     let hc_live = self.dir.join(format!(".hc_live_{}", i));
                     if hc_live.exists() {
-                        let live = std::fs::read_to_string(hc_live.clone()).with_context(|| {
-                            format!("Failed to read file at {}", hc_live.display())
-                        })?;
+                        let live = std::fs::read_to_string(hc_live.clone())
+                            .map_err(|err| Error::new(
+                                err.kind(),
+                                format!("Failed to read file at '{}': {}", hc_live.display(), err)
+                            ))?;
                         let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
                         ports.push(p)
                     } else {
@@ -318,13 +339,16 @@ impl HcFile {
     }
 
     /// Remove all lockfiles, releasing all locked ports.
-    pub async fn release_ports(&self) -> anyhow::Result<()> {
+    pub async fn release_ports(&self) -> std::io::Result<()> {
         let files = get_file_locks().lock().await;
         for file in files.iter() {
             let hc_live = self.dir.join(format!(".hc_live_{}", file));
             if hc_live.exists() {
                 std::fs::remove_file(hc_live.clone())
-                    .with_context(|| format!("Failed to remove file at {}", hc_live.display()))?;
+                    .map_err(|err| Error::new(
+                        err.kind(),
+                        format!("Failed to remove file at '{}': {}", hc_live.display(), err)
+                    ))?;
             }
         }
         Ok(())
