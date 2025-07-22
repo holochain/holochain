@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE**: Use `AppStatus` in favor of `AppInfoStatus` in `AppResponse::AppInfo`.
 - Remove app status transition functions and `AppInfoStatus`.
 - **BREAKING CHANGE**: Remove types `EnabledApp` and `DisabledApp` in favor of `InstalledApp` to reduce app handling complexity.
+- **BREAKING CHANGE**: Replace and remove legacy constructor for `InstalledAppCommon`.
 
 ## 0.6.0-dev.13
 
