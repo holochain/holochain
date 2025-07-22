@@ -433,10 +433,14 @@ async fn run_missing() {
 /// Generates a new sandbox with a single app deployed and tries to get app info
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_connect() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -447,7 +451,8 @@ async fn generate_sandbox_and_connect() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -574,10 +579,14 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
 /// upon calling `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_non_running_sandbox_and_call_list_dna() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -587,7 +596,8 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -605,6 +615,7 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
         ))
         .arg("call")
         .arg("list-dnas")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
