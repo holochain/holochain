@@ -368,85 +368,6 @@ impl InstalledApp {
 /// A map from InstalledAppId -> InstalledApp
 pub type InstalledAppMap = IndexMap<InstalledAppId, InstalledApp>;
 
-/// An active app
-#[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-    derive_more::From,
-    shrinkwraprs::Shrinkwrap,
-)]
-#[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct EnabledApp(InstalledAppCommon);
-
-impl EnabledApp {
-    /// Convert to a StoppedApp with the given reason
-    pub fn into_disabled(self, reason: DisabledAppReason) -> DisabledApp {
-        DisabledApp {
-            app: self.0,
-            reason,
-        }
-    }
-
-    /// Move inner type out
-    pub fn into_common(self) -> InstalledAppCommon {
-        self.0
-    }
-}
-
-impl From<EnabledApp> for InstalledApp {
-    fn from(app: EnabledApp) -> Self {
-        Self {
-            app: app.into_common(),
-            status: AppStatus::Enabled,
-        }
-    }
-}
-
-/// An app which is [AppStatus::Disabled], i.e. not running
-#[derive(
-    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
-)]
-#[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct DisabledApp {
-    #[shrinkwrap(main_field)]
-    app: InstalledAppCommon,
-    reason: DisabledAppReason,
-}
-
-impl DisabledApp {
-    /// Constructor
-    pub fn new_fresh(app: InstalledAppCommon) -> Self {
-        Self {
-            app,
-            reason: DisabledAppReason::NeverStarted,
-        }
-    }
-
-    /// Move inner type out
-    pub fn into_common(self) -> InstalledAppCommon {
-        self.app
-    }
-}
-
-impl From<DisabledApp> for InstalledAppCommon {
-    fn from(d: DisabledApp) -> Self {
-        d.app
-    }
-}
-
-impl From<DisabledApp> for InstalledApp {
-    fn from(d: DisabledApp) -> Self {
-        Self {
-            app: d.app,
-            status: d.reason.into(),
-        }
-    }
-}
-
 /// The common data between apps of any status
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InstalledAppCommon {
@@ -919,120 +840,11 @@ impl InstalledAppCommon {
 pub enum AppStatus {
     /// The app is enabled.
     Enabled,
-
     /// The app is disabled.
     Disabled(DisabledAppReason),
-
     /// The app is installed, but genesis has not completed because Membrane Proofs
     /// have not been provided.
     AwaitingMemproofs,
-}
-
-/// The AppStatus without the reasons.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[allow(missing_docs)]
-pub enum AppStatusKind {
-    Enabled,
-    Disabled,
-    AwaitingMemproofs,
-}
-
-impl From<AppStatus> for AppStatusKind {
-    fn from(status: AppStatus) -> Self {
-        match status {
-            AppStatus::Enabled => Self::Enabled,
-            AppStatus::Disabled(_) => Self::Disabled,
-            AppStatus::AwaitingMemproofs => Self::AwaitingMemproofs,
-        }
-    }
-}
-
-/// Represents a state transition operation from one state to another
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AppStatusTransition {
-    /// Enables an app
-    Enable,
-    /// Disables an app
-    Disable(DisabledAppReason),
-}
-
-impl AppStatus {
-    /// Does this status correspond to an Enabled state?
-    /// If false, this indicates a Disabled state.
-    pub fn is_enabled(&self) -> bool {
-        matches!(self, Self::Enabled)
-    }
-
-    /// Transition a status from one state to another.
-    /// If None, the transition was not valid, and the status did not change.
-    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusFx {
-        use AppStatus::*;
-        use AppStatusFx::*;
-        use AppStatusTransition::*;
-        match (&self, transition) {
-            (Enabled, Disable(reason)) => Some((Disabled(reason), SpinDown)),
-            (Enabled, Enable) => None,
-
-            (Disabled(_), Enable) => Some((Enabled, SpinUp)),
-            (Disabled(_), Disable(_)) => None,
-
-            (AwaitingMemproofs, Enable) => Some((
-                AwaitingMemproofs,
-                Error("Cannot enable an app which is AwaitingMemproofs".to_string()),
-            )),
-            (AwaitingMemproofs, _) => None,
-        }
-        .map(|(new_status, delta)| {
-            *self = new_status;
-            delta
-        })
-        .unwrap_or(NoChange)
-    }
-}
-
-/// A declaration of the side effects of a particular AppStatusTransition.
-///
-/// Two values of this type may also be combined into one,
-/// to capture the overall effect of a series of transitions.
-///
-/// The intent of this type is to make sure that any operation which causes an
-/// app state transition is followed up with a call to process_app_status_fx
-/// in order to reconcile the cell state with the new app state.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[must_use = "be sure to run this value through `process_app_status_fx` to handle any transition effects"]
-pub enum AppStatusFx {
-    /// The transition did not result in any change to CellState.
-    NoChange,
-    /// The transition may cause some Cells to be removed.
-    SpinDown,
-    /// The transition may cause some Cells to be added (fallibly).
-    SpinUp,
-    /// The transition may cause some Cells to be removed and some to be (fallibly) added.
-    Both,
-    /// The transition was invalid and should produce an error.
-    Error(String),
-}
-
-impl Default for AppStatusFx {
-    fn default() -> Self {
-        Self::NoChange
-    }
-}
-
-impl AppStatusFx {
-    /// Combine two effects into one. Think "monoidal append", if that helps.
-    pub fn combine(self, other: Self) -> Self {
-        use AppStatusFx::*;
-        match (self, other) {
-            (NoChange, a) | (a, NoChange) => a,
-            (SpinDown, SpinDown) => SpinDown,
-            (SpinUp, SpinUp) => SpinUp,
-            (Both, _) | (_, Both) => Both,
-            (SpinDown, SpinUp) | (SpinUp, SpinDown) => Both,
-            (Error(err1), Error(err2)) => Error(format!("{err1}. {err2}")),
-            (Error(err), _) | (_, Error(err)) => Error(err),
-        }
-    }
 }
 
 /// The reason for an app being in a Disabled state.
@@ -1195,7 +1007,6 @@ pub struct AppRoleDependency {
 
 #[cfg(test)]
 mod tests {
-    use super::EnabledApp;
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
@@ -1236,15 +1047,14 @@ mod tests {
             roles: vec![],
             allow_deferred_memproofs: false,
         });
-        let mut app: EnabledApp = InstalledAppCommon::new(
+        let mut app = InstalledAppCommon::new(
             "app",
             agent.clone(),
             vec![(role_name.clone(), role1)],
             manifest,
             Timestamp::now(),
         )
-        .unwrap()
-        .into();
+        .unwrap();
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];

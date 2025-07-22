@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Refactor conductor methods `enable_app`, `disable_app`, `uninstall_app` and `initialize_conductor` to directly manage cells instead of using state machine code.
 - **BREAKING CHANGE**: `AdminRequest::EnableApp` fails when creating the app's cells fails and returns the first error that occurred. In case of success the enabled app info is returned.
 - Remove state machine functions from conductor, which have been replaced by functions that process the necessary steps directly.
+- **BREAKING CHANGE**: Use `AppStatus` in favor of `AppInfoStatus` in `AppResponse::AppInfo`.
+- Remove app status transition functions and `AppInfoStatus`.
+- **BREAKING CHANGE**: Remove types `EnabledApp` and `DisabledApp` in favor of `InstalledApp` to reduce app handling complexity.
 
 ## 0.6.0-dev.13
 

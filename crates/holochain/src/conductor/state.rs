@@ -104,22 +104,17 @@ impl ConductorState {
     }
 
     /// Iterate over only the "enabled" apps
-    pub fn enabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, EnabledApp)> + '_ {
-        self.installed_apps.iter().filter_map(|(id, app)| {
-            if app.status().is_enabled() {
-                let enabled_app = EnabledApp::from(app.as_ref().clone());
-                Some((id, enabled_app))
-            } else {
-                None
-            }
-        })
+    pub fn enabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
+        self.installed_apps
+            .iter()
+            .filter(|(_, app)| app.status == AppStatus::Enabled)
     }
 
     /// Iterate over only the "disabled" apps
     pub fn disabled_apps(&self) -> impl Iterator<Item = (&InstalledAppId, &InstalledApp)> + '_ {
         self.installed_apps
             .iter()
-            .filter(|(_, app)| !app.status().is_enabled())
+            .filter(|(_, app)| matches!(app.status, AppStatus::Disabled(_)))
     }
 
     /// Getter for a single app. Returns error if app missing.
@@ -145,14 +140,13 @@ impl ConductorState {
 
     /// Add an app in the Disabled state. Returns an error if an app is already
     /// present at the given ID.
-    pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<DisabledApp> {
+    pub fn add_app(&mut self, app: InstalledAppCommon) -> ConductorResult<InstalledApp> {
         if self.installed_apps.contains_key(app.id()) {
             return Err(ConductorError::AppAlreadyInstalled(app.id().clone()));
         }
-        let stopped_app = DisabledApp::new_fresh(app);
-        self.installed_apps
-            .insert(stopped_app.id().clone(), stopped_app.clone().into());
-        Ok(stopped_app)
+        let app = InstalledApp::new(app, AppStatus::Disabled(DisabledAppReason::NeverStarted));
+        self.installed_apps.insert(app.id().clone(), app.clone());
+        Ok(app)
     }
 
     /// Add an app in the AwaitingMemproofs state. Returns an error if an app is already
@@ -167,73 +161,6 @@ impl ConductorState {
         let app = InstalledApp::new(app, AppStatus::AwaitingMemproofs);
         self.installed_apps.insert(app.id().clone(), app.clone());
         Ok(app)
-    }
-
-    /// Update the status of an installed app in-place.
-    /// Return a reference to the (possibly updated) app.
-    /// Additionally, if an update occurred, return the previous state. If no update occurred, return None.
-    pub fn transition_app_status(
-        &mut self,
-        id: &InstalledAppId,
-        transition: AppStatusTransition,
-    ) -> ConductorResult<(&InstalledApp, AppStatusFx)> {
-        match transition {
-            AppStatusTransition::Disable(_) => {
-                let dependents: Vec<_> = self
-                    .get_dependent_apps(id, true)?
-                    .into_iter()
-                    .filter(|id| {
-                        self.installed_apps
-                            .get(id)
-                            .map(|app| app.status().is_enabled())
-                            .unwrap_or(false)
-                    })
-                    .collect();
-                if !dependents.is_empty() {
-                    tracing::warn!(
-                        "Disabling app '{}' which has enabled protected dependent apps: {:?}",
-                        id,
-                        dependents
-                    );
-                }
-            }
-            AppStatusTransition::Enable => {
-                let dependencies: Vec<_> = self
-                    .get_app(id)?
-                    .roles()
-                    .values()
-                    .flat_map(|r| match r {
-                        AppRoleAssignment::Primary(_) => vec![],
-                        AppRoleAssignment::Dependency(AppRoleDependency { cell_id, protected }) => {
-                            if *protected {
-                                self.installed_apps
-                                    .iter()
-                                    .filter_map(|(id, app)| {
-                                        (!app.status().is_enabled()
-                                            && app.all_cells().any(|id| id == *cell_id))
-                                        .then_some(id)
-                                    })
-                                    .collect()
-                            } else {
-                                vec![]
-                            }
-                        }
-                    })
-                    .collect();
-                if !dependencies.is_empty() {
-                    return Err(ConductorError::AppStatusError(format!(
-                        "Enabling app '{}' which has protected dependencies that are not enabled: {:?}",
-                        id, dependencies
-                    )));
-                }
-            }
-        }
-        let app = self
-            .installed_apps
-            .get_mut(id)
-            .ok_or_else(|| ConductorError::AppNotInstalled(id.clone()))?;
-        let delta = app.status.transition(transition);
-        Ok((app, delta))
     }
 
     /// Returns the interface configuration with the given ID if present
@@ -305,8 +232,8 @@ impl ConductorState {
                             .iter()
                             .filter_map(|(id, app)| {
                                 (app.all_cells().any(|id| id == *cell_id)
-                                    && !app.status().is_enabled())
-                                .then_some(id)
+                                    && app.status != AppStatus::Enabled)
+                                    .then_some(id)
                             })
                             .collect()
                     } else {
@@ -362,7 +289,79 @@ impl AppInterfaceConfig {
     }
 }
 
-// TODO: Tons of consistency check tests were ripped out in the great legacy code cleanup
-// We should add these back in when we've landed the new Dna format
-// See https://github.com/holochain/holochain/blob/7750a0291e549be006529e4153b3b6cf0d686462/crates/holochain/src/conductor/state/tests.rs#L1
-// for all old tests
+#[cfg(test)]
+mod tests {
+    use super::ConductorState;
+    use ::fixt::fixt;
+    use hdk::prelude::CellId;
+    use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
+    use holochain_timestamp::Timestamp;
+    use holochain_types::app::{
+        AppManifestV0Builder, AppRoleAssignment, AppRolePrimary, AppStatus, DisabledAppReason,
+        InstalledApp, InstalledAppCommon,
+    };
+
+    #[test]
+    fn app_status() {
+        let mut state = ConductorState::default();
+        let agent = fixt!(AgentPubKey);
+        let dna_hash = fixt!(DnaHash);
+        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+        assert_eq!(state.enabled_apps().count(), 0);
+        assert_eq!(state.disabled_apps().count(), 0);
+        assert_eq!(state.installed_apps().len(), 0);
+        assert!(state.find_app_containing_cell(&cell_id).is_none());
+
+        // Add an app
+        let app_manifest = AppManifestV0Builder::default()
+            .name("name".to_string())
+            .description(None)
+            // cell lookup is purely based on the role assignments of the InstalledAppCommon
+            .roles(vec![])
+            .build()
+            .unwrap();
+        let app_id = "app_id";
+        let app = InstalledAppCommon::new(
+            app_id,
+            agent.clone(),
+            [(
+                "role_1".to_string(),
+                AppRoleAssignment::Primary(AppRolePrimary::new(dna_hash, true, 0)),
+            )],
+            app_manifest.into(),
+            Timestamp::now(),
+        )
+        .unwrap();
+        state.add_app(app.clone()).unwrap();
+        assert_eq!(state.enabled_apps().count(), 0);
+        assert_eq!(state.disabled_apps().count(), 1);
+        assert_eq!(state.installed_apps().len(), 1);
+        let installed_app = InstalledApp::new(
+            app.clone(),
+            AppStatus::Disabled(DisabledAppReason::NeverStarted),
+        );
+        assert_eq!(
+            state.installed_apps().first().unwrap(),
+            (&app_id.to_string(), &installed_app)
+        );
+        assert_eq!(
+            state.find_app_containing_cell(&cell_id).unwrap(),
+            &installed_app
+        );
+
+        // Set app state to enabled
+        state.get_app_mut(&app_id.to_string()).unwrap().status = AppStatus::Enabled;
+        assert_eq!(state.enabled_apps().count(), 1);
+        assert_eq!(state.disabled_apps().count(), 0);
+        assert_eq!(state.installed_apps().len(), 1);
+        let installed_app = InstalledApp::new(app.clone(), AppStatus::Enabled);
+        assert_eq!(
+            state.installed_apps().first().unwrap(),
+            (&app_id.to_string(), &installed_app)
+        );
+        assert_eq!(
+            state.find_app_containing_cell(&cell_id).unwrap(),
+            &installed_app
+        );
+    }
+}
