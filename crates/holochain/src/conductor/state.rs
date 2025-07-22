@@ -209,42 +209,6 @@ impl ConductorState {
             .map(|(id, _)| id.clone())
             .collect())
     }
-
-    /// Find all installed apps which have a cell that this app depends on
-    /// via `AppRoleAssignment::Dependency`.
-    ///
-    /// The `protected_only` field is a filter. If false, all dependency apps are returned.
-    /// If true, only protected dependencies are returned.
-    pub fn get_depdency_apps(
-        &self,
-        id: &InstalledAppId,
-        protected_only: bool,
-    ) -> ConductorResult<Vec<InstalledAppId>> {
-        let dependencies: Vec<_> = self
-            .get_app(id)?
-            .roles()
-            .values()
-            .flat_map(|r| match r {
-                AppRoleAssignment::Primary(_) => vec![],
-                AppRoleAssignment::Dependency(AppRoleDependency { cell_id, protected }) => {
-                    if !protected_only || *protected {
-                        self.installed_apps
-                            .iter()
-                            .filter_map(|(id, app)| {
-                                (app.all_cells().any(|id| id == *cell_id)
-                                    && app.status != AppStatus::Enabled)
-                                    .then_some(id)
-                            })
-                            .collect()
-                    } else {
-                        vec![]
-                    }
-                }
-            })
-            .cloned()
-            .collect();
-        Ok(dependencies)
-    }
 }
 
 /// Here, interfaces are user facing and make available zome functions to
