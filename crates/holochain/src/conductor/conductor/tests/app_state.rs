@@ -24,14 +24,14 @@ use holo_hash::{
 use holochain_conductor_api::{conductor::ConductorConfig, AppStatusFilter};
 use holochain_keystore::test_keystore;
 use holochain_state::prelude::test_db_dir;
-use holochain_types::app::{
-    AppBundle, AppBundleSource, AppManifest, AppManifestCurrentBuilder, AppManifestV0,
-    AppRoleAssignment, AppRoleDnaManifest, AppRoleManifest, AppRolePrimary, AppStatus,
-    CellProvisioning, DisabledAppReason, EnableCloneCellPayload, InstallAppPayload, InstalledApp,
-    InstalledAppCommon, InstalledAppId, InstalledAppMap,
-};
 use holochain_types::{
-    app::{CreateCloneCellPayload, DisableCloneCellPayload},
+    app::{
+        AppBundle, AppBundleSource, AppManifest, AppManifestCurrentBuilder, AppManifestV0,
+        AppRoleAssignment, AppRoleDnaManifest, AppRoleManifest, AppRolePrimary, AppStatus,
+        CellProvisioning, CreateCloneCellPayload, DeleteCloneCellPayload, DisableCloneCellPayload,
+        DisabledAppReason, EnableCloneCellPayload, InstallAppPayload, InstalledApp,
+        InstalledAppCommon, InstalledAppId, InstalledAppMap,
+    },
     dna::{DnaBundle, DnaFile},
 };
 use holochain_wasm_test_utils::TestWasm;
@@ -237,6 +237,109 @@ async fn uninstall_app() {
         .call::<_, Option<Record>>(&app3.cells()[0].zome("coordinator"), "read", hash2.clone())
         .await
         .is_none());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn delete_clone_cell_deletes_cell_databases() {
+    holochain_trace::test_run();
+    let (dna, _, _) = mk_dna(simple_crud_zome()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    let app_id = "app".to_string();
+    let role_name = "role".to_string();
+    let _ = conductor
+        .setup_app(&app_id, [&(role_name.clone(), dna)])
+        .await
+        .unwrap();
+    conductor.enable_app(app_id.clone()).await.unwrap();
+    let clone_cell_1 = conductor
+        .create_clone_cell(
+            &app_id,
+            CreateCloneCellPayload {
+                role_name: role_name.clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("1".to_string()),
+                membrane_proof: None,
+                name: None,
+            },
+        )
+        .await
+        .unwrap();
+    let clone_cell_2 = conductor
+        .create_clone_cell(
+            &app_id,
+            CreateCloneCellPayload {
+                role_name: role_name.clone(),
+                modifiers: DnaModifiersOpt::none().with_network_seed("2".to_string()),
+                membrane_proof: None,
+                name: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    let clone_cell_1_db = conductor
+        .spaces
+        .get_or_create_authored_db(
+            clone_cell_1.cell_id.dna_hash(),
+            clone_cell_1.cell_id.agent_pubkey().clone(),
+        )
+        .unwrap();
+    let clone_cell_2_db = conductor
+        .spaces
+        .get_or_create_authored_db(
+            clone_cell_2.cell_id.dna_hash(),
+            clone_cell_2.cell_id.agent_pubkey().clone(),
+        )
+        .unwrap();
+    // - Check that the clone cells' authored database files exist
+    std::fs::File::open(clone_cell_1_db.path()).unwrap();
+    std::fs::File::open(clone_cell_2_db.path()).unwrap();
+
+    // - Delete the first clone cell
+    conductor
+        .disable_clone_cell(
+            &app_id,
+            &DisableCloneCellPayload {
+                clone_cell_id: CloneCellId::CloneId(clone_cell_1.clone_id.clone()),
+            },
+        )
+        .await
+        .unwrap();
+    conductor
+        .delete_clone_cell(&DeleteCloneCellPayload {
+            app_id: app_id.clone(),
+            clone_cell_id: CloneCellId::CloneId(clone_cell_1.clone_id),
+        })
+        .await
+        .unwrap();
+
+    // - Check that the first clone cell's authored DB file is deleted
+    // and the second clone cell's authored DB is intact.
+    #[cfg(not(windows))]
+    std::fs::File::open(clone_cell_1_db.path()).unwrap_err();
+    std::fs::File::open(clone_cell_2_db.path()).unwrap();
+
+    // - Delete the second clone cell.
+    conductor
+        .disable_clone_cell(
+            &app_id,
+            &DisableCloneCellPayload {
+                clone_cell_id: CloneCellId::CloneId(clone_cell_2.clone_id.clone()),
+            },
+        )
+        .await
+        .unwrap();
+    conductor
+        .delete_clone_cell(&DeleteCloneCellPayload {
+            app_id,
+            clone_cell_id: CloneCellId::CloneId(clone_cell_2.clone_id),
+        })
+        .await
+        .unwrap();
+
+    // - Check that second clone cell's authored DB file is deleted too.
+    #[cfg(not(windows))]
+    std::fs::File::open(clone_cell_2_db.path()).unwrap_err();
 }
 
 #[tokio::test(flavor = "multi_thread")]
