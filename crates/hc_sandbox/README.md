@@ -108,6 +108,7 @@ hc sandbox generate network quic
 ```
 
 You can also generate sandboxes with the underlying dpki service disabled by passing in the `--no-dpki` flag.
+
 ```shell
 hc sandbox generate --no-dpki
 ```
@@ -153,36 +154,11 @@ hc sandbox create \
 Allows calling the [conductor admin API](https://docs.rs/holochain_conductor_api/latest/holochain_conductor_api/enum.AdminRequest.html) API on one or more _running_ sandboxes.
 Although the API functions receive input as MessagePack-serialized data,
 this command lets you conveniently pass them as command-line arguments instead.
-All relevant results are output as JSON.
+All responses that return structured data are output as JSON.
 For a list of all available admin API functions, run:
 
 ```shell
 hc sandbox call --help
-```
-
-```text
-[... options and flags ...]
-SUBCOMMANDS:
-    add-admin-ws           Calls AdminRequest::AddAdminInterfaces which adds another admin interface
-    add-agents             Calls AdminRequest::AddAgentInfo. _Unimplemented_
-    add-app-ws             Calls AdminRequest::AttachAppInterface which adds another app interface
-    disable-app            Calls AdminRequest::DisableApp which disables the installed app
-    dump-conductor-state   Calls AdminRequest::DumpConductorState which prints the conductor state
-    dump-network-metrics   Calls AdminRequest::DumpNetworkMetrics which prints the network metrics
-    dump-network-stats     Calls AdminRequest::DumpNetworkStats which prints the network stats
-    dump-state             Calls AdminRequest::DumpState which prints the state of a cell TODO: Default to dumping all cell state    
-    enable-app             Calls AdminRequest::EnableApp which activates the installed app
-    help                   Prints this message or the help of the given subcommand(s)
-    install-app            Calls AdminRequest::InstallApp which installs the app and prints it's app info
-    list-agents            Calls AdminRequest::RequestAgentInfo and prints the agent info on this conductor
-    list-app-ws            Calls AdminRequest::ListAppInterfaces which prints all the app interfaces
-    list-apps              Calls AdminRequest::ListApps which prints all apps' app info
-    list-capability-grants Calls AdminRequest::ListCapabilityGrants which prints all capability grants 
-    list-cells             Calls AdminRequest::ListCellIds which prints all cell ids
-    list-dnas              Calls AdminRequest::ListDnas which prints all DNAs
-    new-agent              Calls AdminRequest::GenerateAgentPubKey which generates a new agent pub key
-    register-dna           Calls AdminRequest::RegisterDna which registers a Dna. You can only use a path or a hash not both
-    uninstall-app          Calls AdminRequest::UninstallApp which uninstalls an app
 ```
 
 For information on the input parameters of a function, run:
@@ -234,7 +210,7 @@ To then call or run an individual sandbox (or subset):
 hc sandbox r -i=0,2
 ```
 
-You can remove all of the sandboxes with:
+You can remove all sandboxes with:
 
 ```shell
 hc sandbox clean

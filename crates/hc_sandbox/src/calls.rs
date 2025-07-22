@@ -417,14 +417,14 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                     },
                 }])
                 .await?;
-            println!("{}", serde_json::to_value(port)?);
+            msg!("Added admin port {}", port);
         }
         AdminRequestCli::AddAppWs(args) => {
             let port = args.port.unwrap_or(0);
             let port = client
                 .attach_app_interface(port, args.allowed_origins, args.installed_app_id)
                 .await?;
-            println!("{}", serde_json::to_value(port)?);
+            msg!("Added app port {}", port);
         }
         AdminRequestCli::ListAppWs => {
             let interface_infos = client.list_app_interfaces().await?;
@@ -432,7 +432,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         }
         AdminRequestCli::RegisterDna(args) => {
             let dna = register_dna(client, args).await?;
-            println!("{}", serde_json::to_value(dna.to_string())?);
+            msg!("Registered DNA: {}", dna);
         }
         AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(client, args).await?;
@@ -458,24 +458,20 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             println!("{}", serde_json::to_value(agent.to_string())?);
         }
         AdminRequestCli::ListCells => {
-            let cell_id_values: Vec<serde_json::Value> = client
+            let cell_id_jsons: Vec<serde_json::Value> = client
                 .list_cell_ids()
                 .await?
-                .into_iter()
-                .map(serde_json::to_value)
+                .iter()
+                .map(|id| cell_id_json_to_base64_json(serde_json::to_value(&id)?))
                 .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
-            let converted = cell_id_values
-                .into_iter()
-                .map(cell_id_json_to_base64_json)
-                .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
-            println!("{}", serde_json::to_value(&converted)?);
+            println!("{}", serde_json::to_value(&cell_id_jsons)?);
         }
         AdminRequestCli::ListApps(args) => {
             let apps = client.list_apps(args.status).await?;
             let values = apps
                 .into_iter()
                 .map(app_info_to_json)
-                .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
+                .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
             println!("{}", serde_json::to_value(values)?);
         }
         AdminRequestCli::EnableApp(args) => {
@@ -606,15 +602,21 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
 }
 
 /// Convert an [`AppInfo`] to JSON with extra base64 conversion of `agent_pub_key` and `cell_id` fields.
-fn app_info_to_json(app_info: AppInfo) -> anyhow::Result<serde_json::Value> {
+fn app_info_to_json(app_info: AppInfo) -> Result<serde_json::Value, serde_json::Error> {
     let value = serde_json::to_value(&app_info)?;
     let serde_json::Value::Object(mut app_info_map) = value else {
-        bail!("Invalid appInfo conversion result");
+        return Err(serde::de::Error::custom(
+            "Invalid appInfo conversion result",
+        ));
     };
     // Convert `agent_pub_key` field
     if let Some(old_value) = app_info_map.get("agent_pub_key") {
-        let new_value = agent_pub_key_json_to_base64_json(old_value.clone())?;
-        app_info_map.insert("agent_pub_key".to_string(), new_value);
+        let new_value =
+            AgentPubKey::from_raw_39(value_to_base64(old_value.to_owned())?).to_string();
+        app_info_map.insert(
+            "agent_pub_key".to_string(),
+            serde_json::Value::String(new_value),
+        );
     }
     // Convert `cell_info` field
     if let Some(old_value) = app_info_map.get("cell_info") {
@@ -628,23 +630,26 @@ fn app_info_to_json(app_info: AppInfo) -> anyhow::Result<serde_json::Value> {
 /// Convert the inner `cell_id` fields of the JSON value of a `IndexMap<RoleName, Vec<CellInfo>>`.
 fn cell_id_to_base64_within_cell_info_map(
     value: serde_json::Value,
-) -> anyhow::Result<serde_json::Value> {
+) -> Result<serde_json::Value, serde_json::Error> {
     let serde_json::Value::Object(mut cell_info_map_map) = value else {
-        bail!("Value is not a CellInfo map.");
+        return Err(serde::de::Error::custom("Value is not a CellInfo map."));
     };
     // For each role
     for (key, val) in cell_info_map_map.iter_mut() {
         let serde_json::Value::Array(arr) = val else {
-            anyhow::bail!(format!("Value for `{}` is not an array.", key));
+            return Err(serde::de::Error::custom(format!(
+                "Value for `{}` is not an array.",
+                key
+            )));
         };
         // For each cell
         for item in arr.iter_mut() {
             let serde_json::Value::Object(ref mut cell_info_map) = item else {
-                bail!("Value is not a CellInfo value.");
+                return Err(serde::de::Error::custom("Value is not a CellInfo value."));
             };
             if let Some(old_map) = cell_info_map.get_mut("value") {
                 let serde_json::Value::Object(ref mut cell_id_map) = old_map else {
-                    bail!("Value is not a CellInfo.");
+                    return Err(serde::de::Error::custom("Value is not a CellInfo."));
                 };
                 if let Some(old_value) = cell_id_map.get("cell_id") {
                     let new_value = cell_id_json_to_base64_json(old_value.to_owned())?;
@@ -656,46 +661,46 @@ fn cell_id_to_base64_within_cell_info_map(
     Ok(serde_json::Value::Object(cell_info_map_map))
 }
 
-fn cell_id_json_to_base64_json(value: serde_json::Value) -> anyhow::Result<serde_json::Value> {
+#[derive(Serialize, Debug)]
+struct CellIdJson {
+    pub dna_hash: String,
+    pub agent_pub_key: String,
+}
+
+fn cell_id_json_to_base64_json(
+    value: serde_json::Value,
+) -> Result<serde_json::Value, serde_json::Error> {
     let serde_json::Value::Array(arr) = value else {
-        anyhow::bail!("Value is not an array.");
+        return Err(serde::de::Error::custom("Value is not an array."));
     };
     if arr.len() != 2 {
-        anyhow::bail!("CellId array length is not 2.");
+        return Err(serde::de::Error::custom(
+            "Value of type array does not have a length of 2.",
+        ));
     };
-    let dna = dna_hash_json_to_base64_json(arr[0].clone())?;
-    let agent = agent_pub_key_json_to_base64_json(arr[1].clone())?;
-    Ok(serde_json::to_value(vec![dna, agent])?)
-}
-
-fn dna_hash_json_to_base64_json(input: serde_json::Value) -> anyhow::Result<serde_json::Value> {
-    let json_key = format!("{}", DnaHash::from_raw_39(value_to_base64(input)?));
-    Ok(serde_json::Value::String(json_key))
-}
-
-fn agent_pub_key_json_to_base64_json(
-    input: serde_json::Value,
-) -> anyhow::Result<serde_json::Value> {
-    let json_key = format!("{}", AgentPubKey::from_raw_39(value_to_base64(input)?));
-    Ok(serde_json::Value::String(json_key))
+    let cell_id_json = CellIdJson {
+        dna_hash: DnaHash::from_raw_39(value_to_base64(arr[0].clone())?).to_string(),
+        agent_pub_key: AgentPubKey::from_raw_39(value_to_base64(arr[1].clone())?).to_string(),
+    };
+    Ok(serde_json::to_value(cell_id_json)?)
 }
 
 /// Converts a JSON Value representing a vector of integers into a Vec<u8>
-fn value_to_base64(value: serde_json::Value) -> anyhow::Result<Vec<u8>> {
+fn value_to_base64(value: serde_json::Value) -> Result<Vec<u8>, serde_json::Error> {
     let serde_json::Value::Array(arr) = value else {
-        anyhow::bail!("Value is not an array.");
+        return Err(serde::de::Error::custom("Value is not an array."));
     };
     // Convert JSON array to Vec<u8>
     let mut bytes = Vec::new();
     for item in arr {
         let serde_json::Value::Number(num) = item else {
-            anyhow::bail!("Value is not a number.");
+            return Err(serde::de::Error::custom("Value is not a number."));
         };
         let Some(n) = num.as_i64() else {
-            anyhow::bail!("Value is not an integer.");
+            return Err(serde::de::Error::custom("Value is not an integer."));
         };
         if !(0..=255).contains(&n) {
-            anyhow::bail!("Value is not an u8.");
+            return Err(serde::de::Error::custom("Value is not an u8."));
         }
         bytes.push(n as u8);
     }
