@@ -360,3 +360,34 @@ fn get_file_locks() -> &'static tokio::sync::Mutex<Vec<usize>> {
 
     FILE_LOCKS.get_or_init(|| tokio::sync::Mutex::new(Vec::new()))
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    impl HcFile {
+        /// Constructor for testing only
+        pub fn test_new(dir: PathBuf, existing_all: Vec<Result<ConfigRootPath, ConfigRootPath>>) -> Self {
+            Self { dir, existing_all }
+        }
+    }
+
+    #[test]
+    fn hc_file() {
+        let vec = vec![
+            Ok(PathBuf::from(".ok1").into()),
+            Err(PathBuf::from(".err1").into()),
+            Ok(PathBuf::from(".ok2").into()),
+            Ok(PathBuf::from(".ok3").into()),
+            Err(PathBuf::from(".err2").into()),
+        ];
+        let hc_file = HcFile::test_new(PathBuf::from("nowhere"), vec);
+
+        assert_eq!(hc_file.all_paths().len(), 5);
+        assert_eq!(hc_file.valid_paths().len(), 3);
+        assert_eq!(hc_file.invalid_paths().len(), 2);
+        assert_eq!(hc_file.invalid_paths()[0], PathBuf::from(".err1").into());
+        assert_eq!(hc_file.valid_paths()[0], PathBuf::from(".ok1").into());
+    }
+}
