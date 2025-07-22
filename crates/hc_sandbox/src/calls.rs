@@ -436,7 +436,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         }
         AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(client, args).await?;
-            println!("{}", app_info_to_json(app)?);
+            println!("{}", app_info_to_base64_json(app)?);
         }
         AdminRequestCli::UninstallApp(args) => {
             client
@@ -462,7 +462,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .list_cell_ids()
                 .await?
                 .iter()
-                .map(|id| cell_id_json_to_base64_json(serde_json::to_value(&id)?))
+                .map(|id| cell_id_json_to_base64_json(serde_json::to_value(id)?))
                 .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
             println!("{}", serde_json::to_value(&cell_id_jsons)?);
         }
@@ -470,7 +470,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             let apps = client.list_apps(args.status).await?;
             let values = apps
                 .into_iter()
-                .map(app_info_to_json)
+                .map(app_info_to_base64_json)
                 .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
             println!("{}", serde_json::to_value(values)?);
         }
@@ -602,7 +602,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
 }
 
 /// Convert an [`AppInfo`] to JSON with extra base64 conversion of `agent_pub_key` and `cell_id` fields.
-fn app_info_to_json(app_info: AppInfo) -> Result<serde_json::Value, serde_json::Error> {
+fn app_info_to_base64_json(app_info: AppInfo) -> Result<serde_json::Value, serde_json::Error> {
     let value = serde_json::to_value(&app_info)?;
     let serde_json::Value::Object(mut app_info_map) = value else {
         return Err(serde::de::Error::custom(
@@ -661,7 +661,7 @@ fn cell_id_to_base64_within_cell_info_map(
     Ok(serde_json::Value::Object(cell_info_map_map))
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct CellIdJson {
     pub dna_hash: String,
     pub agent_pub_key: String,
@@ -682,7 +682,7 @@ fn cell_id_json_to_base64_json(
         dna_hash: DnaHash::from_raw_39(value_to_base64(arr[0].clone())?).to_string(),
         agent_pub_key: AgentPubKey::from_raw_39(value_to_base64(arr[1].clone())?).to_string(),
     };
-    Ok(serde_json::to_value(cell_id_json)?)
+    serde_json::to_value(cell_id_json)
 }
 
 /// Converts a JSON Value representing a vector of integers into a Vec<u8>
@@ -856,5 +856,152 @@ impl From<CellId> for DumpState {
 impl From<DumpState> for CellId {
     fn from(ds: DumpState) -> Self {
         CellId::new(ds.dna, ds.agent_key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holochain_client::{SerializedBytes, Timestamp};
+    use holochain_conductor_api::*;
+    use holochain_types::app::{AppManifestV0Builder, AppRoleManifest};
+    use holochain_types::fixt::CellIdFixturator;
+    use holochain_types::prelude::{DnaModifiers, RoleName};
+    use indexmap::IndexMap;
+
+    #[test]
+    fn valid_cell_id_json_to_base64_json() {
+        let cell_id = fixt!(CellId);
+        let cell_id_json = serde_json::to_value(&cell_id).unwrap();
+        let cell_id_base64_json = cell_id_json_to_base64_json(cell_id_json).unwrap();
+        let cell_id_struct: CellIdJson = serde_json::from_value(cell_id_base64_json).unwrap();
+        let _struct_json = serde_json::to_value(&cell_id_struct).unwrap();
+        assert_eq!(cell_id.dna_hash().to_string(), cell_id_struct.dna_hash);
+        assert_eq!(
+            cell_id.agent_pubkey().to_string(),
+            cell_id_struct.agent_pub_key
+        );
+    }
+
+    #[test]
+    fn invalid_cell_id_json_to_base64_json() {
+        let bad_cell_id = vec!["1", "2"];
+        let cell_id_json = serde_json::to_value(&bad_cell_id).unwrap();
+        let cell_id_base64_json = cell_id_json_to_base64_json(cell_id_json);
+        assert!(cell_id_base64_json.is_err());
+    }
+
+    #[test]
+    fn app_info_to_json() {
+        let cell_info = CellInfo::new_provisioned(
+            fixt!(CellId),
+            DnaModifiers {
+                network_seed: "sample-seed".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            "sample-info".to_string(),
+        );
+        let mut cell_info_map: IndexMap<RoleName, Vec<CellInfo>> = IndexMap::new();
+        cell_info_map.insert("sample-role".to_string(), vec![cell_info]);
+
+        let role_manifest = AppRoleManifest::sample("sample-dna".to_string());
+        let sample_app_manifest_v0 = AppManifestV0Builder::default()
+            .name("sample-app".to_string())
+            .description(Some("Some description".to_string()))
+            .roles(vec![role_manifest.clone()])
+            .build()
+            .unwrap();
+        let sample_app_manifest = AppManifest::V0(sample_app_manifest_v0.clone());
+
+        let app_info = AppInfo {
+            installed_app_id: "test-app".to_string(),
+            status: AppInfoStatus::Enabled,
+            agent_pub_key: fixt!(AgentPubKey),
+            installed_at: Timestamp(42),
+            manifest: sample_app_manifest,
+            cell_info: cell_info_map,
+        };
+        let app_info_json = app_info_to_base64_json(app_info.clone()).unwrap();
+        let app_info_2 = serde_json::from_value::<AppInfo>(app_info_json.clone());
+        assert!(app_info_2.is_err());
+
+        let serde_json::Value::Object(app_info_map) = app_info_json else {
+            panic!("Invalid appInfo conversion result");
+        };
+        let Some(agent_value) = app_info_map.get("agent_pub_key") else {
+            panic!("Invalid appInfo conversion result");
+        };
+        let agent_value_str = serde_json::from_value::<String>(agent_value.to_owned()).unwrap();
+        assert_eq!(app_info.agent_pub_key.to_string(), agent_value_str);
+    }
+
+    #[test]
+    fn invalid_cell_info_map_json() {
+        let bad_cell_id = vec!["1", "2"];
+        let cell_id_json = serde_json::to_value(&bad_cell_id).unwrap();
+        let cell_id_base64_json = cell_id_to_base64_within_cell_info_map(cell_id_json);
+        assert!(cell_id_base64_json.is_err());
+    }
+
+    #[test]
+    fn valid_cell_info_map_json() {
+        let cell_id_1 = fixt!(CellId);
+        let cell_info = CellInfo::new_provisioned(
+            cell_id_1.clone(),
+            DnaModifiers {
+                network_seed: "sample-seed".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            "sample-info".to_string(),
+        );
+        let mut cell_info_map: IndexMap<RoleName, Vec<CellInfo>> = IndexMap::new();
+        cell_info_map.insert("role1".to_string(), vec![cell_info.clone()]);
+        cell_info_map.insert(
+            "role2".to_string(),
+            vec![cell_info.clone(), cell_info.clone()],
+        );
+        let cell_info_map_json = serde_json::to_value(&cell_info_map).unwrap();
+        let conv = cell_id_to_base64_within_cell_info_map(cell_info_map_json.clone()).unwrap();
+        let cell_info_map_2 =
+            serde_json::from_value::<IndexMap<RoleName, Vec<CellInfo>>>(conv.clone());
+        assert!(cell_info_map_2.is_err());
+
+        let serde_json::Value::Object(cell_info_map_map) = conv else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let Some(cells_value) = cell_info_map_map.get("role2") else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let serde_json::Value::Array(cell_info_vec) = cells_value else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let serde_json::Value::Object(ref cell_info_2) = cell_info_vec[1] else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let Some(cell_info_obj) = cell_info_2.get("value") else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let serde_json::Value::Object(ref cell_info_value) = cell_info_obj else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let Some(cell_id_value) = cell_info_value.get("cell_id") else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let serde_json::Value::Object(ref cell_id_obj) = cell_id_value else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let Some(dna_value) = cell_id_obj.get("dna_hash") else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let dna_b64 = serde_json::from_value::<String>(dna_value.to_owned()).unwrap();
+        assert_eq!(cell_id_1.dna_hash().to_string(), dna_b64);
+
+        let Some(agent_value) = cell_id_obj.get("agent_pub_key") else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let agent_b64 = serde_json::from_value::<String>(agent_value.to_owned()).unwrap();
+        assert_eq!(cell_id_1.agent_pubkey().to_string(), agent_b64);
     }
 }
