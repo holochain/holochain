@@ -473,10 +473,14 @@ async fn generate_sandbox_and_connect() {
 /// Generates a new sandbox with a single app deployed and tries to list DNA
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_list_dna() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -487,7 +491,8 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -502,6 +507,7 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("call")
         .arg(format!("--running={}", launch_info.admin_port))
         .arg("list-dnas")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1254,7 +1260,7 @@ async fn authorize_zome_call_credentials() {
     let exit_code = child.wait().await.unwrap();
     assert!(exit_code.success());
 
-    assert!(PathBuf::from(".hc_auth").exists());
+    assert!(temp_dir.path().join(".hc_auth").exists());
 
     shutdown_sandbox(hc_admin).await;
 }
@@ -1381,10 +1387,14 @@ async fn call_zome_function() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn zome_function_can_return_hash() {
-    clean_sandboxes(&std::env::current_dir().unwrap()).await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -1395,7 +1405,8 @@ async fn zome_function_can_return_hash() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -1432,6 +1443,7 @@ async fn zome_function_can_return_hash() {
         .arg(launch_info.admin_port.to_string())
         .arg("--piped")
         .arg("test-app")
+        .current_dir(temp_dir.path())
         .kill_on_drop(true)
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
@@ -1462,6 +1474,7 @@ async fn zome_function_can_return_hash() {
         .arg("zome1")
         .arg("get_dna_hash")
         .arg("null")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
