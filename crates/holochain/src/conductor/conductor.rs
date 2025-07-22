@@ -1354,7 +1354,11 @@ mod app_impls {
                 tracing::debug!(msg = "Removed app from db.", app = ?app);
 
                 // Remove the cells of the app.
-                self.remove_dangling_cells().await?;
+                let cells_to_remove = app.all_cells().collect::<Vec<_>>();
+                self.delete_cell_databases(cells_to_remove.clone()).await?;
+
+                // Remove the cells from conductor state.
+                self.remove_cells(&cells_to_remove).await;
 
                 let installed_app_ids = self
                     .get_state()
@@ -1931,6 +1935,7 @@ mod app_status_impls {
 
             // Remove cells from state.
             let mut cell_ids_to_cleanup = app.all_cells();
+            //TODO
             // self.remove_cells(cell_ids_to_cleanup).await;
             let mut cells_to_cleanup = Vec::new();
             self.running_cells.share_mut(|cells| {
@@ -2957,6 +2962,78 @@ impl Conductor {
                         .boxed(),
                     self.spaces
                         .cache(dna_hash)
+                        .unwrap()
+                        .write_async(|txn| purge_data(txn))
+                        .boxed(),
+                    // TODO: also delete stale Wasms
+                ]
+                .into_iter(),
+            )
+            .await
+            .into_iter()
+            .collect::<Result<Vec<()>, _>>()?;
+        }
+
+        Ok(())
+    }
+
+    /// Delete cell databases.
+    ///
+    /// All data used by that cell (across Authored, DHT, and Cache databases) will also be deleted.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    async fn delete_cell_databases(&self, cell_ids: Vec<CellId>) -> ConductorResult<()> {
+        // Delete all data from authored databases which are longer installed
+        for cell_id in cell_ids.clone() {
+            let db = self
+                .spaces
+                .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
+            let mut path = db.path().clone();
+            if let Err(err) = ffs::remove_file(&path).await {
+                tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
+                db.write_async(|txn| purge_data(txn)).await?;
+            }
+            path.set_extension("");
+            let stem = path.to_string_lossy();
+            for ext in ["db-shm", "db-wal"] {
+                let path = PathBuf::from(format!("{stem}.{ext}"));
+                if let Err(err) = ffs::remove_file(&path).await {
+                    let err = err.remove_backtrace();
+                    tracing::warn!(?err, "Failed to remove DB file");
+                }
+            }
+        }
+
+        let all_dnas = self
+            .get_state()
+            .await?
+            .installed_apps()
+            .iter()
+            .flat_map(|(_, app)| app.all_cells().map(|cell_id| cell_id.dna_hash().clone()))
+            .collect::<Vec<_>>();
+        // Find any DNAs from cleaned up cells which don't have representation in any cells
+        // in any installed app, so that we can remove their data from the databases.
+        let dnas_to_purge: Vec<_> = cell_ids
+            .iter()
+            .map(|cell_id| cell_id.dna_hash())
+            .filter(|dna| !all_dnas.contains(dna))
+            .collect();
+
+        if !dnas_to_purge.is_empty() {
+            tracing::info!(?dnas_to_purge, "Purging DNAs");
+        }
+
+        // For any DNAs no longer represented in any installed app,
+        // purge data from those DNA-specific databases
+        for dna_hash in dnas_to_purge {
+            futures::future::join_all(
+                [
+                    self.spaces
+                        .dht_db(&dna_hash)
+                        .unwrap()
+                        .write_async(|txn| purge_data(txn))
+                        .boxed(),
+                    self.spaces
+                        .cache(&dna_hash)
                         .unwrap()
                         .write_async(|txn| purge_data(txn))
                         .boxed(),
