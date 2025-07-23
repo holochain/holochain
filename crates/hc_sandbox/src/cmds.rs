@@ -98,7 +98,6 @@ pub struct Existing {
     /// Run all the existing conductor sandboxes specified in `$(pwd)/.hc`.
     #[arg(short, long, conflicts_with_all = &["last", "indices"])]
     pub all: bool,
-
     /// Run a selection of existing conductor sandboxes
     /// from those specified in `$(pwd)/.hc`.
     /// Existing sandboxes and their indices are visible via `hc list`.
@@ -110,7 +109,7 @@ pub struct Existing {
 
 impl Existing {
     /// Determine all sandbox paths to use based on .hc and given options.
-    pub fn load(&self, hc_file: &HcFile) -> anyhow::Result<Vec<ConfigRootPath>> {
+    pub fn load(&self, hc_file: &HcFile) -> std::io::Result<Vec<ConfigRootPath>> {
         if self.all {
             // Warn for all invalid paths
             hc_file
@@ -125,10 +124,10 @@ impl Existing {
             // Get the indices
             for i in self.indices.clone() {
                 let Some(Ok(selected)) = hc_file.existing_all.get(i) else {
-                    return Err(anyhow::anyhow!(
+                    return Err(std::io::Error::new(std::io::ErrorKind::Other, format!(
                         "Aborting. No sandbox found at index {}.",
                         i
-                    ));
+                    )));
                 };
                 selection.push(selected.clone());
             }
@@ -247,4 +246,88 @@ impl Default for Create {
 // e.g., https://users.rust-lang.org/t/implementation-of-fnonce-is-not-general-enough/68294
 fn try_parse_url2(arg: &str) -> url2::Url2Result<Url2> {
     Url2::try_parse(arg)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn existing_is_empty() {
+        let ex = Existing    { all: false, indices: Vec::new() };
+        assert!(ex.is_empty());
+        let ex = Existing    { all: true, indices: Vec::new() };
+        assert!(!ex.is_empty());
+        let ex = Existing    { all: false, indices: vec![1] };
+        assert!(!ex.is_empty());
+        let ex = Existing    { all: true, indices: vec![1, 2, 3] };
+        assert!(!ex.is_empty());
+    }
+
+    #[test]
+    fn existing_load_normal() {
+        let hc_file = vec![
+            Ok(PathBuf::from(".ok1").into()),
+            Err(PathBuf::from(".err1").into()),
+            Ok(PathBuf::from(".ok2").into()),
+            Ok(PathBuf::from(".ok3").into()),
+            Err(PathBuf::from(".err2").into()),
+        ];
+        let hc_file = HcFile::test_new(PathBuf::from("nowhere"), hc_file);
+
+        let ex_none = Existing    { all: false, indices: Vec::new() };
+        let res = ex_none.load(&hc_file).unwrap();
+        assert_eq!(0, res.len());
+
+        let ex_all = Existing    { all: true, indices: Vec::new() };
+        let res = ex_all.load(&hc_file).unwrap();
+        assert_eq!(3, res.len());
+
+        let ex_one = Existing    { all: false, indices: vec![0] };
+        let res = ex_one.load(&hc_file).unwrap();
+        assert_eq!(1, res.len());
+
+        let ex_bad = Existing    { all: false, indices: vec![1] };
+        let res = ex_bad.load(&hc_file);
+        assert!(res.is_err());
+
+        let ex_many_bad = Existing    { all: false, indices: vec![1, 2, 3] };
+        let res = ex_many_bad.load(&hc_file);
+        assert!(res.is_err());
+
+        let ex_many_ok = Existing    { all: false, indices: vec![0, 3] };
+        let res = ex_many_ok.load(&hc_file).unwrap();
+        assert_eq!(2, res.len());
+
+        let ex = Existing    { all: true, indices: vec![1, 2, 3] };
+        let res = ex.load(&hc_file).unwrap();
+        assert_eq!(3, res.len());
+
+        let ex_oob = Existing    { all: false, indices: vec![0, 42] };
+        let res = ex_oob.load(&hc_file);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn existing_load_empty() {
+        let hc_file = vec![];
+        let hc_file = HcFile::test_new(PathBuf::from("nowhere"), hc_file);
+
+        let ex_none = Existing    { all: false, indices: Vec::new() };
+        let res = ex_none.load(&hc_file).unwrap();
+        assert_eq!(0, res.len());
+
+        let ex_all = Existing    { all: true, indices: Vec::new() };
+        let res = ex_all.load(&hc_file).unwrap();
+        assert_eq!(0, res.len());
+
+        let ex_one = Existing    { all: false, indices: vec![0] };
+        let res = ex_one.load(&hc_file);
+        assert!(res.is_err());
+
+        let ex_many_bad = Existing    { all: false, indices: vec![1, 2, 3] };
+        let res = ex_many_bad.load(&hc_file);
+        assert!(res.is_err());
+    }
 }
