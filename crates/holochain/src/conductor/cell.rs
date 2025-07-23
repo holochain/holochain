@@ -173,11 +173,6 @@ impl Cell {
     where
         Ribosome: RibosomeT + 'static,
     {
-        // get the dna
-        let dna_file = conductor_handle
-            .get_dna_file(cell_id.dna_hash())
-            .ok_or_else(|| DnaError::DnaMissing(cell_id.dna_hash().to_owned()))?;
-
         let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
 
         // run genesis
@@ -191,13 +186,7 @@ impl Cell {
             return Ok(());
         }
 
-        let args = GenesisWorkflowArgs::new(
-            dna_file,
-            cell_id.agent_pubkey().clone(),
-            membrane_proof,
-            ribosome,
-            chc,
-        );
+        let args = GenesisWorkflowArgs::new(cell_id.clone(), membrane_proof, ribosome, chc);
 
         genesis_workflow(workspace, conductor_api, args)
             .await

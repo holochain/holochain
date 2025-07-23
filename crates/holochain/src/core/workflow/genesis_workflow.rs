@@ -28,8 +28,7 @@ pub struct GenesisWorkflowArgs<Ribosome>
 where
     Ribosome: RibosomeT + 'static,
 {
-    dna_file: DnaFile,
-    agent_pubkey: AgentPubKey,
+    cell_id: CellId,
     membrane_proof: Option<MembraneProof>,
     ribosome: Ribosome,
     chc: Option<ChcImpl>,
@@ -57,18 +56,19 @@ where
     Ribosome: RibosomeT + 'static,
 {
     let GenesisWorkflowArgs {
-        dna_file,
-        agent_pubkey,
+        cell_id,
         membrane_proof,
         ribosome,
         chc,
     } = args;
 
-    if workspace.has_genesis(agent_pubkey.clone()).await? {
+    if workspace
+        .has_genesis(cell_id.agent_pubkey().clone())
+        .await?
+    {
         return Ok(());
     }
 
-    let dna_hash = ribosome.dna_def().to_hash();
     let DnaDef {
         name,
         modifiers: DnaModifiers { properties, .. },
@@ -78,7 +78,7 @@ where
     let dna_info = DnaInfoV1 {
         zome_names: integrity_zomes.iter().map(|(n, _)| n.clone()).collect(),
         name: name.clone(),
-        hash: dna_hash,
+        hash: cell_id.dna_hash().clone(),
         properties: properties.clone(),
     };
     let result = ribosome
@@ -92,13 +92,13 @@ where
                     payload: Arc::new(GenesisSelfCheckDataV1 {
                         dna_info,
                         membrane_proof: membrane_proof.clone(),
-                        agent_key: agent_pubkey.clone(),
+                        agent_key: cell_id.agent_pubkey().clone(),
                     }),
                 },
                 invocation_2: GenesisSelfCheckInvocationV2 {
                     payload: Arc::new(GenesisSelfCheckDataV2 {
                         membrane_proof: membrane_proof.clone(),
-                        agent_key: agent_pubkey.clone(),
+                        agent_key: cell_id.agent_pubkey().clone(),
                     }),
                 },
             },
@@ -114,8 +114,8 @@ where
         workspace.vault.clone(),
         workspace.dht_db.clone(),
         api.keystore().clone(),
-        dna_file.dna_hash().clone(),
-        agent_pubkey,
+        cell_id.dna_hash().clone(),
+        cell_id.agent_pubkey().clone(),
         membrane_proof,
         chc,
     )
@@ -198,8 +198,7 @@ mod tests {
             let dna_def = DnaDefHashed::from_content_sync(dna.dna_def().clone());
             ribosome.expect_dna_def().return_const(dna_def);
             let args = GenesisWorkflowArgs {
-                dna_file: dna.clone(),
-                agent_pubkey: author.clone(),
+                cell_id: CellId::new(dna.dna_hash().clone(), author.clone()),
                 membrane_proof: None,
                 ribosome,
                 chc: None,
