@@ -1947,26 +1947,8 @@ mod app_status_impls {
             }
 
             // Remove cells from state.
-            let mut cell_ids_to_cleanup = app.all_cells();
-            //TODO
-            // self.remove_cells(cell_ids_to_cleanup).await;
-            let mut cells_to_cleanup = Vec::new();
-            self.running_cells.share_mut(|cells| {
-                cells.retain(|cell_id, cell| {
-                    if cell_ids_to_cleanup.contains(cell_id) {
-                        false
-                    } else {
-                        cells_to_cleanup.push(cell.clone());
-                        true
-                    }
-                })
-            });
-
-            // Stop all long-running tasks for cells about to be dropped.
-            tracing::debug!(?cells_to_cleanup, "Cleaning up cells");
-            for cell in cells_to_cleanup {
-                cell.cleanup().await?;
-            }
+            let cell_ids_to_cleanup = app.all_cells().collect::<Vec<_>>();
+            self.remove_cells(&cell_ids_to_cleanup).await;
 
             // Set app status to disabled.
             let (_, app) = self
