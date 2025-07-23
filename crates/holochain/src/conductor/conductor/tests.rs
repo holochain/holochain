@@ -10,12 +10,10 @@ use crate::{
 use ::fixt::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
-use holochain_conductor_api::AppInfoStatus;
 use holochain_conductor_api::CellInfo;
 use holochain_keystore::crude_mock_keystore::*;
 use holochain_keystore::test_keystore;
-use holochain_types::inline_zome::InlineZomeSet;
-use holochain_types::test_utils::fake_cell_id;
+use holochain_types::{app::AppStatus, inline_zome::InlineZomeSet};
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::op::Op;
 use matches::assert_matches;
@@ -60,11 +58,23 @@ async fn app_ids_are_unique() {
         outcome_tx,
     );
 
-    let cell_id = fake_cell_id(1);
-
-    let installed_cell = InstalledCell::new(cell_id.clone(), "handle".to_string());
     let app_id = "app_id".to_string();
-    let app = InstalledAppCommon::new_legacy(app_id.clone(), vec![installed_cell]).unwrap();
+    let app = InstalledAppCommon::new(
+        app_id.clone(),
+        fixt!(AgentPubKey),
+        [(
+            "handle".to_string(),
+            AppRoleAssignment::Primary(AppRolePrimary::new(fixt!(DnaHash), true, 0)),
+        )],
+        AppManifest::V0(AppManifestV0 {
+            allow_deferred_memproofs: false,
+            description: None,
+            name: "".to_string(),
+            roles: vec![],
+        }),
+        Timestamp::now(),
+    )
+    .unwrap();
 
     conductor.add_disabled_app_to_db(app.clone()).await.unwrap();
 
@@ -76,14 +86,61 @@ async fn app_ids_are_unique() {
 
 /// App can't be installed if it contains duplicate RoleNames
 #[tokio::test(flavor = "multi_thread")]
-async fn role_names_are_unique() {
-    let agent = fixt!(AgentPubKey);
-    let cells = vec![
-        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "1".into()),
-        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "1".into()),
-        InstalledCell::new(CellId::new(fixt!(DnaHash), agent.clone()), "2".into()),
-    ];
-    let result = InstalledAppCommon::new_legacy("id", cells.into_iter());
+async fn role_names_must_be_unique() {
+    // Three unique role names succeed.
+    let result = InstalledAppCommon::new(
+        "id".to_string(),
+        fixt!(AgentPubKey),
+        [
+            (
+                "1".into(),
+                AppRoleAssignment::Primary(AppRolePrimary::new(fixt!(DnaHash), true, 0)),
+            ),
+            (
+                "2".into(),
+                AppRoleAssignment::Primary(AppRolePrimary::new(fixt!(DnaHash), true, 0)),
+            ),
+            (
+                "3".into(),
+                AppRoleAssignment::Primary(AppRolePrimary::new(fixt!(DnaHash), true, 0)),
+            ),
+        ],
+        AppManifest::V0(AppManifestV0 {
+            name: "".to_string(),
+            description: None,
+            roles: vec![],
+            allow_deferred_memproofs: false,
+        }),
+        Timestamp::now(),
+    );
+    matches::assert_matches!(result, Ok(_));
+
+    // Duplicate role names fail.
+    let result = InstalledAppCommon::new(
+        "id".to_string(),
+        fixt!(AgentPubKey),
+        [
+            (
+                "1".into(),
+                AppRoleAssignment::Primary(AppRolePrimary::new(fixt!(DnaHash), true, 0)),
+            ),
+            (
+                "1".into(),
+                AppRoleAssignment::Primary(AppRolePrimary::new(fixt!(DnaHash), true, 0)),
+            ),
+            (
+                "2".into(),
+                AppRoleAssignment::Primary(AppRolePrimary::new(fixt!(DnaHash), true, 0)),
+            ),
+        ],
+        AppManifest::V0(AppManifestV0 {
+            name: "".to_string(),
+            description: None,
+            roles: vec![],
+            allow_deferred_memproofs: false,
+        }),
+        Timestamp::now(),
+    );
     matches::assert_matches!(
         result,
         Err(AppError::DuplicateRoleNames(_, role_names)) if role_names == vec!["1".to_string()]
@@ -397,7 +454,7 @@ async fn test_deferred_memproof_provisioning() {
 
     //- Status is AwaitingMemproofs and there is 1 cell assignment
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
-    assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+    assert_eq!(app_info.status, AppStatus::AwaitingMemproofs);
     assert_eq!(app_info.cell_info.len(), 1);
 
     let cell = conductor.get_sweet_cell(cell_id.clone()).unwrap();
@@ -417,13 +474,13 @@ async fn test_deferred_memproof_provisioning() {
 
     //- Status is still AwaitingMemproofs after a restart
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
-    assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+    assert_eq!(app_info.status, AppStatus::AwaitingMemproofs);
 
     //- Status is still AwaitingMemproofs after enabling but before memproofs
     let r = conductor.enable_app(app_id.clone()).await;
     assert_matches!(r, Err(ConductorError::AppStatusError(_)));
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
-    assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+    assert_eq!(app_info.status, AppStatus::AwaitingMemproofs);
 
     //- Can not create a clone cell until memproofs have been provided
     let error = conductor
@@ -456,16 +513,14 @@ async fn test_deferred_memproof_provisioning() {
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
     assert_eq!(
         app_info.status,
-        AppInfoStatus::Disabled {
-            reason: DisabledAppReason::NotStartedAfterProvidingMemproofs
-        }
+        AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)
     );
 
     conductor.enable_app(app_id.clone()).await.unwrap();
 
     //- Status is now Enabled and there is 1 cell assignment
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
-    assert_eq!(app_info.status, AppInfoStatus::Enabled);
+    assert_eq!(app_info.status, AppStatus::Enabled);
 
     //- And now we can make a zome call successfully
     let _: String = conductor.call(&cell.zome("foo"), "foo", ()).await;

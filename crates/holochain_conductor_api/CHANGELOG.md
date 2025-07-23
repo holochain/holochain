@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.14
+
 - Added `AdminRequest::RevokeZomeCallCapability` and `AdminResponse::ZomeCallCapabilityRevoked` to implement an admin API endpoint to revoke capability grants. [Issue 4596](https://github.com/holochain/holochain/issues/4596)
 - **BREAKING CHANGE**: Changed the type of `AdminResponse::CapabilityGrantsInfo` to a `Vec<(CellId, Vec<CapGrantInfo>)>` instead of a `HashMap<CellId, Vec<CapGrantInfo>>`; this is to make it work with JSON encoding, which does not support maps with non-string tuple keys.
 - **BREAKING CHANGE**: the type of `AdminResponse::ZomeCallCapabilityGranted` has been changed from `()` to `ActionHash`. This has been done to make it easier to know the `ActionHash` of the grant in case you want to revoke it later.

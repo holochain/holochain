@@ -1258,10 +1258,10 @@ mod app_impls {
                     )?;
 
                     // Update the db
-                    let stopped_app = self.add_disabled_app_to_db(app).await?;
+                    let disabled_app = self.add_disabled_app_to_db(app).await?;
 
                     // Return the result, which be may be an error if no_rollback was specified
-                    genesis_result.map(|()| stopped_app.into())
+                    genesis_result.map(|()| disabled_app)
                 } else if let Err(err) = genesis_result {
                     Err(err)
                 } else {
@@ -1437,8 +1437,7 @@ mod app_impls {
                 .enabled_apps()
                 .find(|(_, enabled_app)| enabled_app.all_cells().any(|i| i == *cell_id))
                 .and_then(|(_, enabled_app)| {
-                    let app = enabled_app.clone().into_common();
-                    app.role(role_name).ok().map(|role| match role {
+                    enabled_app.role(role_name).ok().map(|role| match role {
                         AppRoleAssignment::Primary(primary) => {
                             CellId::new(primary.dna_hash().clone(), enabled_app.agent_key().clone())
                         }
@@ -1968,7 +1967,7 @@ mod app_status_impls {
         pub(crate) async fn add_disabled_app_to_db(
             &self,
             app: InstalledAppCommon,
-        ) -> ConductorResult<DisabledApp> {
+        ) -> ConductorResult<InstalledApp> {
             let (_, disabled_app) = self
                 .update_state_prime(move |mut state| {
                     let disabled_app = state.add_app(app)?;

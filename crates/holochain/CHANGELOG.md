@@ -7,9 +7,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-dev.14
+
 - Refactor conductor methods `enable_app`, `disable_app`, `uninstall_app` and `initialize_conductor` to directly manage cells instead of using state machine code.
-- **BREAKING CHANGE**: `AdminRequest::EnableApp` fails when creating the app's cells fails and returns the first error that occurred. In case of success the enabled app info is returned.
+- **BREAKING CHANGE**: `AdminRequest::EnableApp` fails when creating the app’s cells fails and returns the first error that occurred. In case of success the enabled app info is returned.
 - Remove state machine functions from conductor, which have been replaced by functions that process the necessary steps directly.
+- **BREAKING CHANGE**: Use `AppStatus` in favor of `AppInfoStatus` in `AppResponse::AppInfo`.
+- Remove app status transition functions and `AppInfoStatus`.
+- **BREAKING CHANGE**: Remove types `EnabledApp` and `DisabledApp` in favor of `InstalledApp` to reduce app handling complexity.
+- **BREAKING CHANGE**: Replace and remove legacy constructor for `InstalledAppCommon`.
+- Remove an unnecessary use of `DnaFile` in the genesis workflow ([#5150](https://github.com/holochain/holochain/pull/5150)).
 
 ## 0.6.0-dev.13
 
@@ -17,9 +24,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE**: Removed everything related to `started` and `stopped` apps. Instead `enabled` and `disabled` remain as the only two possible states an app can be in after it has been installed.
 - **BREAKING CHANGE**: Remove `CellStatus` which used to indicate whether a cell has joined the network or not. Going forward cells that couldn’t join the network will not be kept in conductor state.
 - **BREAKING CHANGE**: Remove `generate_test_device_seed` from `ConductorBuilder`. This was a remnant from DPKI.
-- Add integration tests for the use of `path`'s and the links created by them. ([\#5114](https://github.com/holochain/holochain/pull/5114))
-- **BREAKING CHANGE** Removed an if/else clause in the `Ribosome::new()` impl that lead to inconsistent behavior depending on the number of zomes defined in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)). This means that **the dependencies field for zomes in the dna manifest is now always mandatory**. Previously, if there was only one single integrity zome in the whole dna, it was implied by the conductor that a coordinator zome would depend on that integrity zome. This is no longer the case.
-- Clearer error message if `ScopeLinkedType` or `ScopedEntryDefIndex` cannot be created due to zome dependencies not being specified in the dna manifest ([#5105](https://github.com/holochain/holochain/pull/5105)).
+- Add integration tests for the use of `path`’s and the links created by them. ([\#5114](https://github.com/holochain/holochain/pull/5114))
+- **BREAKING CHANGE** Removed an if/else clause in the `Ribosome::new()` impl that lead to inconsistent behavior depending on the number of zomes defined in the dna manifest ([\#5105](https://github.com/holochain/holochain/pull/5105)). This means that **the dependencies field for zomes in the dna manifest is now always mandatory**. Previously, if there was only one single integrity zome in the whole dna, it was implied by the conductor that a coordinator zome would depend on that integrity zome. This is no longer the case.
+- Clearer error message if `ScopeLinkedType` or `ScopedEntryDefIndex` cannot be created due to zome dependencies not being specified in the dna manifest ([\#5105](https://github.com/holochain/holochain/pull/5105)).
 - Added a new Admin API endpoint to revoke zome call capability `revoke_zome_call_capability`. [Issue 4596](https://github.com/holochain/holochain/issues/4596)
 - **BREAKING CHANGE**: the return type of `capability_grant_info` has been changed from `HashMap<CellId, Vec<CapGrantInfo>>` to `Vec<(CellId, Vec<CapGrantInfo>)>`. This is to make it work with JSON encoding, which does not support maps with non-string tuple keys. The new type is now also used in the Admin API response `CapabilityGrantsInfo`.
 - **BREAKING CHANGE**: the return type of `grant_zome_call_capability` has been changed from `()` to `ActionHash`. This has been done to make it easier to know the `ActionHash` of the grant in case you want to revoke it later.
