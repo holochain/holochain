@@ -3,11 +3,10 @@
 //! This module gives basic helpers to save / load your sandboxes
 //! to / from a `.hc` file.
 
-use std::io::{ErrorKind, Write};
-use std::io::Error;
+use holochain_conductor_api::conductor::paths::{ConfigFilePath, ConfigRootPath};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
-use holochain_conductor_api::conductor::paths::{ConfigFilePath, ConfigRootPath};
 
 /// Representation of a loaded `.hc` file
 #[derive(Debug)]
@@ -71,13 +70,21 @@ impl HcFile {
             });
         }
         if !hc_file.is_file() {
-            return Err(Error::new(ErrorKind::Other, format!("Failed to load hc file in {}", hc_dir.display())));
+            return Err(std::io::Error::other(format!(
+                "Failed to load hc file in {}",
+                hc_dir.display()
+            )));
         };
-        let existing = std::fs::read_to_string(&hc_file)
-            .map_err(|err| Error::new(
+        let existing = std::fs::read_to_string(&hc_file).map_err(|err| {
+            std::io::Error::new(
                 err.kind(),
-                format!("Failed to read config file '{}': {}", hc_file.display(), err)
-            ))?;
+                format!(
+                    "Failed to read config file '{}': {}",
+                    hc_file.display(),
+                    err
+                ),
+            )
+        })?;
 
         let mut paths = Vec::new();
         for sandbox in existing.lines() {
@@ -101,11 +108,16 @@ impl HcFile {
 
     /// Overwrite `.hc` file on disk with all paths currently held by the object.
     pub fn save(&self) -> std::io::Result<()> {
-        std::fs::create_dir_all(&self.dir)
-            .map_err(|err| Error::new(
+        std::fs::create_dir_all(&self.dir).map_err(|err| {
+            std::io::Error::new(
                 err.kind(),
-                format!("Failed to create directory: '{}': {}", self.dir.display(), err)
-            ))?;
+                format!(
+                    "Failed to create directory: '{}': {}",
+                    self.dir.display(),
+                    err
+                ),
+            )
+        })?;
         let hc_file = self.dir.join(".hc");
         let mut file = std::fs::OpenOptions::new()
             .write(true)
@@ -179,32 +191,42 @@ impl HcFile {
         }
         // Erase all other .hc* files
         if remaining.is_empty() {
-            for entry in std::fs::read_dir(&self.dir)
-                .map_err(|err| Error::new(
+            for entry in std::fs::read_dir(&self.dir).map_err(|err| {
+                std::io::Error::new(
                     err.kind(),
-                    format!("Failed to read directory: '{}': {}", self.dir.display(), err)
-                ))?
-            {
+                    format!(
+                        "Failed to read directory: '{}': {}",
+                        self.dir.display(),
+                        err
+                    ),
+                )
+            })? {
                 let entry = entry?;
                 if entry.file_type()?.is_file() {
                     if let Some(s) = entry.file_name().to_str() {
                         if s.starts_with(".hc_live_") {
-                            std::fs::remove_file(entry.path())
-                                .map_err(|err| Error::new(
+                            std::fs::remove_file(entry.path()).map_err(|err| {
+                                std::io::Error::new(
                                     err.kind(),
-                                    format!("Failed to remove live lock at '{}': {}", s, err)
-                                ))?
+                                    format!("Failed to remove live lock at '{}': {}", s, err),
+                                )
+                            })?
                         }
                     }
                 }
             }
             let hc_auth = self.dir.join(".hc_auth");
             if hc_auth.exists() {
-                std::fs::remove_file(&hc_auth)
-                    .map_err(|err| Error::new(
+                std::fs::remove_file(&hc_auth).map_err(|err| {
+                    std::io::Error::new(
                         err.kind(),
-                        format!("Failed to remove .hc_auth at '{}': {}", self.dir.display(), err)
-                    ))?;
+                        format!(
+                            "Failed to remove .hc_auth at '{}': {}",
+                            self.dir.display(),
+                            err
+                        ),
+                    )
+                })?;
             }
         }
         // Write new .hc file
@@ -245,8 +267,14 @@ impl HcFile {
             };
             msg!("{}: {}\n", i, p.display());
             if verbose {
-                let config = holochain_conductor_config::config::read_config(p.clone())
-                    .map_err(|err| Error::new(ErrorKind::Other, format!("Failed to read config at '{}': {}", p.display(), err)))?;
+                let config =
+                    holochain_conductor_config::config::read_config(p.clone()).map_err(|err| {
+                        std::io::Error::other(format!(
+                            "Failed to read config at '{}': {}",
+                            p.display(),
+                            err
+                        ))
+                    })?;
                 msg!("Conductor Config:\n{:?}\n", config);
             }
         }
@@ -255,11 +283,16 @@ impl HcFile {
 
     /// Lock this setup as running live and advertise the port.
     pub async fn lock_live(&self, path: &Path, port: u16) -> std::io::Result<()> {
-        std::fs::create_dir_all(&self.dir)
-            .map_err(|err| Error::new(
+        std::fs::create_dir_all(&self.dir).map_err(|err| {
+            std::io::Error::new(
                 err.kind(),
-                format!("Failed to create directory: '{}': {}", self.dir.display(), err)
-            ))?;
+                format!(
+                    "Failed to create directory: '{}': {}",
+                    self.dir.display(),
+                    err
+                ),
+            )
+        })?;
         let index = match self
             .valid_paths()
             .into_iter()
@@ -282,7 +315,7 @@ impl HcFile {
             }
             Err(e) => match e.kind() {
                 std::io::ErrorKind::AlreadyExists => {}
-                _ => return Err(e.into()),
+                _ => return Err(e),
             },
         }
 
@@ -297,11 +330,12 @@ impl HcFile {
         for (i, _) in self.existing_all.iter().enumerate() {
             let hc_live = self.dir.join(format!(".hc_live_{}", i));
             if hc_live.exists() {
-                let live = std::fs::read_to_string(hc_live.clone())
-                    .map_err(|err| Error::new(
+                let live = std::fs::read_to_string(hc_live.clone()).map_err(|err| {
+                    std::io::Error::new(
                         err.kind(),
-                        format!("Failed to read file at '{}': {}", hc_live.display(), err)
-                    ))?;
+                        format!("Failed to read file at '{}': {}", hc_live.display(), err),
+                    )
+                })?;
                 let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
                 ports.push(p)
             } else {
@@ -321,11 +355,12 @@ impl HcFile {
                 Some(i) => {
                     let hc_live = self.dir.join(format!(".hc_live_{}", i));
                     if hc_live.exists() {
-                        let live = std::fs::read_to_string(hc_live.clone())
-                            .map_err(|err| Error::new(
+                        let live = std::fs::read_to_string(hc_live.clone()).map_err(|err| {
+                            std::io::Error::new(
                                 err.kind(),
-                                format!("Failed to read file at '{}': {}", hc_live.display(), err)
-                            ))?;
+                                format!("Failed to read file at '{}': {}", hc_live.display(), err),
+                            )
+                        })?;
                         let p = live.lines().next().and_then(|l| l.parse::<u16>().ok());
                         ports.push(p)
                     } else {
@@ -344,11 +379,12 @@ impl HcFile {
         for file in files.iter() {
             let hc_live = self.dir.join(format!(".hc_live_{}", file));
             if hc_live.exists() {
-                std::fs::remove_file(hc_live.clone())
-                    .map_err(|err| Error::new(
+                std::fs::remove_file(hc_live.clone()).map_err(|err| {
+                    std::io::Error::new(
                         err.kind(),
-                        format!("Failed to remove file at '{}': {}", hc_live.display(), err)
-                    ))?;
+                        format!("Failed to remove file at '{}': {}", hc_live.display(), err),
+                    )
+                })?;
             }
         }
         Ok(())
@@ -361,14 +397,16 @@ fn get_file_locks() -> &'static tokio::sync::Mutex<Vec<usize>> {
     FILE_LOCKS.get_or_init(|| tokio::sync::Mutex::new(Vec::new()))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     impl HcFile {
         /// Constructor for testing only
-        pub fn test_new(dir: PathBuf, existing_all: Vec<Result<ConfigRootPath, ConfigRootPath>>) -> Self {
+        pub fn test_new(
+            dir: PathBuf,
+            existing_all: Vec<Result<ConfigRootPath, ConfigRootPath>>,
+        ) -> Self {
             Self { dir, existing_all }
         }
     }
