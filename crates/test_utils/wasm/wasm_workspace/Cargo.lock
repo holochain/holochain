@@ -485,7 +485,7 @@ checksum = "5971ac85611da7067dbfcabef3c70ebb5606018acd9e2a3903a0da507521e0d5"
 
 [[package]]
 name = "hdi"
-version = "0.7.0-dev.9"
+version = "0.7.0-dev.10"
 dependencies = [
  "getrandom",
  "hdk_derive",
@@ -503,7 +503,7 @@ dependencies = [
 
 [[package]]
 name = "hdk"
-version = "0.6.0-dev.10"
+version = "0.6.0-dev.11"
 dependencies = [
  "getrandom",
  "hdi",
@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "hdk_derive"
-version = "0.6.0-dev.8"
+version = "0.6.0-dev.9"
 dependencies = [
  "darling 0.14.4",
  "heck 0.5.0",
@@ -569,7 +569,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_integrity_types"
-version = "0.6.0-dev.8"
+version = "0.6.0-dev.9"
 dependencies = [
  "derive_builder",
  "holo_hash",
@@ -638,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_test_wasm_common"
-version = "0.6.0-dev.10"
+version = "0.6.0-dev.11"
 dependencies = [
  "hdk",
  "holochain_serialized_bytes",
@@ -691,7 +691,7 @@ dependencies = [
 
 [[package]]
 name = "holochain_zome_types"
-version = "0.6.0-dev.10"
+version = "0.6.0-dev.11"
 dependencies = [
  "derive_builder",
  "derive_more",
