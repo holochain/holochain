@@ -865,9 +865,8 @@ mod tests {
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_client::{SerializedBytes, Timestamp};
-    use holochain_conductor_api::AppInfoStatus;
     use holochain_conductor_api::CellInfo;
-    use holochain_types::app::{AppManifestV0Builder, AppRoleManifest};
+    use holochain_types::app::{AppManifestV0Builder, AppRoleManifest, AppStatus};
     use holochain_types::fixt::CellIdFixturator;
     use holochain_types::prelude::{DnaModifiers, RoleName};
     use indexmap::IndexMap;
@@ -918,7 +917,7 @@ mod tests {
 
         let app_info = AppInfo {
             installed_app_id: "test-app".to_string(),
-            status: AppInfoStatus::Enabled,
+            status: AppStatus::Enabled,
             agent_pub_key: fixt!(AgentPubKey),
             installed_at: Timestamp(42),
             manifest: sample_app_manifest,
