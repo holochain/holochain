@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Replace `Conductor::remove_dangling_cells` method with methods that remove the cells specific to the app and delete their databases.
+
 ## 0.6.0-dev.14
 
 - Refactor conductor methods `enable_app`, `disable_app`, `uninstall_app` and `initialize_conductor` to directly manage cells instead of using state machine code.

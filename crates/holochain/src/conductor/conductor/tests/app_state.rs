@@ -118,21 +118,21 @@ async fn uninstall_app() {
     let (dna, _, _) = mk_dna(simple_crud_zome()).await;
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let app1 = conductor.setup_app("app1", [&dna]).await.unwrap();
+    let app_1 = conductor.setup_app("app1", [&dna]).await.unwrap();
 
-    let hash1: ActionHash = conductor
+    let hash_1: ActionHash = conductor
         .call(
-            &app1.cells()[0].zome("coordinator"),
+            &app_1.cells()[0].zome("coordinator"),
             "create_string",
             "1".to_string(),
         )
         .await;
 
-    let app2 = conductor.setup_app("app2", [&dna]).await.unwrap();
+    let app_2 = conductor.setup_app("app2", [&dna]).await.unwrap();
 
-    let hash2: ActionHash = conductor
+    let hash_2: ActionHash = conductor
         .call(
-            &app2.cells()[0].zome("coordinator"),
+            &app_2.cells()[0].zome("coordinator"),
             "create_string",
             "1".to_string(),
         )
@@ -148,11 +148,19 @@ async fn uninstall_app() {
     .unwrap();
 
     assert!(conductor
-        .call::<_, Option<Record>>(&app1.cells()[0].zome("coordinator"), "read", hash2.clone())
+        .call::<_, Option<Record>>(
+            &app_1.cells()[0].zome("coordinator"),
+            "read",
+            hash_2.clone()
+        )
         .await
         .is_some());
     assert!(conductor
-        .call::<_, Option<Record>>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone())
+        .call::<_, Option<Record>>(
+            &app_2.cells()[0].zome("coordinator"),
+            "read",
+            hash_1.clone()
+        )
         .await
         .is_some());
 
@@ -168,18 +176,23 @@ async fn uninstall_app() {
     .await
     .unwrap();
 
-    let db1 = conductor
+    let authored_db_1 = conductor
         .spaces
-        .get_or_create_authored_db(dna.dna_hash(), app1.cells()[0].agent_pubkey().clone())
+        .get_or_create_authored_db(dna.dna_hash(), app_1.agent().clone())
         .unwrap();
-    let db2 = conductor
+    let authored_db_2 = conductor
         .spaces
-        .get_or_create_authored_db(dna.dna_hash(), app2.cells()[0].agent_pubkey().clone())
+        .get_or_create_authored_db(dna.dna_hash(), app_2.agent().clone())
+        .unwrap();
+    let dht_db = conductor.get_dht_db(dna.dna_hash()).unwrap();
+    let cache_db = conductor
+        .get_cache_db(&CellId::new(dna.dna_hash().clone(), app_1.agent().clone()))
+        .await
         .unwrap();
 
     // - Check that both authored database files exist
-    std::fs::File::open(db1.path()).unwrap();
-    std::fs::File::open(db2.path()).unwrap();
+    std::fs::File::open(authored_db_1.path()).unwrap();
+    std::fs::File::open(authored_db_2.path()).unwrap();
 
     // - Uninstall the first app
     conductor
@@ -190,16 +203,27 @@ async fn uninstall_app() {
 
     // - Check that the first authored DB file is deleted since the cell was removed.
     #[cfg(not(windows))]
-    std::fs::File::open(db1.path()).unwrap_err();
-    std::fs::File::open(db2.path()).unwrap();
+    std::fs::File::open(authored_db_1.path()).unwrap_err();
+    std::fs::File::open(authored_db_2.path()).unwrap();
+    // - DHT and cache databases should still exist.
+    std::fs::File::open(dht_db.path()).unwrap();
+    std::fs::File::open(cache_db.path()).unwrap();
 
     // - Ensure that the remaining app can still access both hashes
     assert!(conductor
-        .call::<_, Option<Record>>(&app2.cells()[0].zome("coordinator"), "read", hash1.clone())
+        .call::<_, Option<Record>>(
+            &app_2.cells()[0].zome("coordinator"),
+            "read",
+            hash_1.clone()
+        )
         .await
         .is_some());
     assert!(conductor
-        .call::<_, Option<Record>>(&app2.cells()[0].zome("coordinator"), "read", hash2.clone())
+        .call::<_, Option<Record>>(
+            &app_2.cells()[0].zome("coordinator"),
+            "read",
+            hash_2.clone()
+        )
         .await
         .is_some());
 
@@ -210,15 +234,20 @@ async fn uninstall_app() {
         .await
         .unwrap();
 
-    // - Check that second authored DB file is deleted since the cell was removed.
     #[cfg(not(windows))]
-    std::fs::File::open(db2.path()).unwrap_err();
+    {
+        // - Check that second authored DB file is deleted since the cell was removed.
+        std::fs::File::open(authored_db_2.path()).unwrap_err();
+        // - Now the DHT and cache databases should be gone too.
+        std::fs::File::open(dht_db.path()).unwrap_err();
+        std::fs::File::open(cache_db.path()).unwrap_err();
+    }
 
     // - Ensure that the apps are removed
     retry_fn_until_timeout(
         || async {
             let state = conductor.get_state_from_handle().await.unwrap();
-            state.enabled_apps().count() == 0 && state.disabled_apps().count() == 0
+            state.installed_apps().is_empty()
         },
         None,
         None,
@@ -228,13 +257,13 @@ async fn uninstall_app() {
 
     // - A new app can't read any of the data from the previous two, because once the last instance
     //   of the cells was destroyed, all data was destroyed as well.
-    let app3 = conductor.setup_app("app2", [&dna]).await.unwrap();
+    let app3 = conductor.setup_app("app3", [&dna]).await.unwrap();
     assert!(conductor
-        .call::<_, Option<Record>>(&app3.cells()[0].zome("coordinator"), "read", hash1.clone())
+        .call::<_, Option<Record>>(&app3.cells()[0].zome("coordinator"), "read", hash_1.clone())
         .await
         .is_none());
     assert!(conductor
-        .call::<_, Option<Record>>(&app3.cells()[0].zome("coordinator"), "read", hash2.clone())
+        .call::<_, Option<Record>>(&app3.cells()[0].zome("coordinator"), "read", hash_2.clone())
         .await
         .is_none());
 }
