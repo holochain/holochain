@@ -2335,7 +2335,7 @@ mod misc_impls {
                 state: conductor_state,
             };
 
-            let out = serde_json::to_string_pretty(&dump)?;
+            let out = serde_json::to_string(&dump)?;
 
             Ok(out)
         }
