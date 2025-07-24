@@ -153,7 +153,7 @@ impl Existing {
             for i in self.indices.clone() {
                 let Some(Ok(selected)) = hc_file.existing_all.get(i) else {
                     return Err(std::io::Error::other(format!(
-                        "Aborting. No sandbox found at index {}.",
+                        "Aborting. Failed to find sandbox at index {}",
                         i
                     )));
                 };
