@@ -7,7 +7,7 @@ pub type RoleName = String;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CallTargetCell {
-    OtherCell(CellId),
+    OtherCell(DnaId),
     OtherRole(RoleName),
     Local,
 }

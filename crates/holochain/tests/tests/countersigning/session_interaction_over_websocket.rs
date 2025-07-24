@@ -9,7 +9,7 @@ use crate::tests::test_utils::{
 use ed25519_dalek::SigningKey;
 use hdk::prelude::{CapAccess, GrantZomeCallCapabilityPayload, GrantedFunctions, ZomeCallCapGrant};
 use hdk::prelude::{
-    CapSecret, CellId, FunctionName, PreflightRequest, PreflightRequestAcceptance, Role,
+    CapSecret, DnaId, FunctionName, PreflightRequest, PreflightRequestAcceptance, Role,
 };
 use holo_hash::{ActionHash, AgentPubKey};
 use holochain::prelude::{
@@ -107,8 +107,8 @@ async fn countersigning_session_interaction_calls() {
 
     println!(
         "Agents Alice {} and Bob {} set up and see each other.\n",
-        alice.cell_id.agent_pubkey(),
-        bob.cell_id.agent_pubkey()
+        alice.dna_id.agent_pubkey(),
+        bob.dna_id.agent_pubkey()
     );
 
     // Initialize Alice's source chain.
@@ -123,19 +123,19 @@ async fn countersigning_session_interaction_calls() {
         .unwrap();
 
     // Countersigning session state should not be in Alice's conductor memory yet.
-    assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
+    assert_matches!(get_session_state(&alice.dna_id, &alice_app_tx).await, None);
     // Countersigning session state should not be in Bob's conductor memory yet.
-    assert_matches!(get_session_state(&bob.cell_id, &bob_app_tx).await, None);
+    assert_matches!(get_session_state(&bob.dna_id, &bob_app_tx).await, None);
 
     // Abandoning a session of a non-existing cell should return an error.
     let response: AppResponse = request(
-        AppRequest::AbandonCountersigningSession(Box::new(bob.cell_id.clone())),
+        AppRequest::AbandonCountersigningSession(Box::new(bob.dna_id.clone())),
         &alice_app_tx,
     )
     .await;
     let expected_error = AppResponse::Error(
         ConductorApiError::ConductorError(ConductorError::CountersigningError(
-            CountersigningError::WorkspaceDoesNotExist(bob.cell_id.clone()),
+            CountersigningError::WorkspaceDoesNotExist(bob.dna_id.clone()),
         ))
         .into(),
     );
@@ -143,13 +143,13 @@ async fn countersigning_session_interaction_calls() {
 
     // Abandoning a non-existing session of an existing cell should return an error.
     let response: AppResponse = request(
-        AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
+        AppRequest::AbandonCountersigningSession(Box::new(alice.dna_id.clone())),
         &alice_app_tx,
     )
     .await;
     let expected_error = AppResponse::Error(
         ConductorApiError::ConductorError(ConductorError::CountersigningError(
-            CountersigningError::SessionNotFound(alice.cell_id.clone()),
+            CountersigningError::SessionNotFound(alice.dna_id.clone()),
         ))
         .into(),
     );
@@ -157,13 +157,13 @@ async fn countersigning_session_interaction_calls() {
 
     // Publishing a session of a non-existing cell should return an error.
     let response: AppResponse = request(
-        AppRequest::PublishCountersigningSession(Box::new(bob.cell_id.clone())),
+        AppRequest::PublishCountersigningSession(Box::new(bob.dna_id.clone())),
         &alice_app_tx,
     )
     .await;
     let expected_error = AppResponse::Error(
         ConductorApiError::ConductorError(ConductorError::CountersigningError(
-            CountersigningError::WorkspaceDoesNotExist(bob.cell_id.clone()),
+            CountersigningError::WorkspaceDoesNotExist(bob.dna_id.clone()),
         ))
         .into(),
     );
@@ -171,13 +171,13 @@ async fn countersigning_session_interaction_calls() {
 
     // Publishing a non-existing session of an existing cell should return an error.
     let response: AppResponse = request(
-        AppRequest::PublishCountersigningSession(Box::new(alice.cell_id.clone())),
+        AppRequest::PublishCountersigningSession(Box::new(alice.dna_id.clone())),
         &alice_app_tx,
     )
     .await;
     let expected_error = AppResponse::Error(
         ConductorApiError::ConductorError(ConductorError::CountersigningError(
-            CountersigningError::SessionNotFound(alice.cell_id.clone()),
+            CountersigningError::SessionNotFound(alice.dna_id.clone()),
         ))
         .into(),
     );
@@ -189,8 +189,8 @@ async fn countersigning_session_interaction_calls() {
             &alice_app_tx,
             "generate_countersigning_preflight_request_fast", // 10 sec timeout
             &[
-                (alice.cell_id.agent_pubkey().clone(), vec![Role(0)]),
-                (bob.cell_id.agent_pubkey().clone(), vec![]),
+                (alice.dna_id.agent_pubkey().clone(), vec![Role(0)]),
+                (bob.dna_id.agent_pubkey().clone(), vec![]),
             ],
         )
         .await;
@@ -222,23 +222,23 @@ async fn countersigning_session_interaction_calls() {
 
     // Countersigning session state should exist for both agents and be in "Accepted" state.
     assert_matches!(
-        get_session_state(&alice.cell_id, &alice_app_tx).await,
+        get_session_state(&alice.dna_id, &alice_app_tx).await,
         Some(CountersigningSessionState::Accepted(_))
     );
     assert_matches!(
-        get_session_state(&bob.cell_id, &bob_app_tx).await,
+        get_session_state(&bob.dna_id, &bob_app_tx).await,
         Some(CountersigningSessionState::Accepted(_))
     );
 
     // Abandoning a session in a resolvable state should not be possible and return an error.
     let response: AppResponse = request(
-        AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
+        AppRequest::AbandonCountersigningSession(Box::new(alice.dna_id.clone())),
         &alice_app_tx,
     )
     .await;
     let expected_error = AppResponse::Error(
         ConductorApiError::ConductorError(ConductorError::CountersigningError(
-            CountersigningError::SessionNotUnresolved(alice.cell_id.clone()),
+            CountersigningError::SessionNotUnresolved(alice.dna_id.clone()),
         ))
         .into(),
     );
@@ -246,13 +246,13 @@ async fn countersigning_session_interaction_calls() {
 
     // Publishing a session in a resolvable state should not be possible and return an error.
     let response: AppResponse = request(
-        AppRequest::PublishCountersigningSession(Box::new(alice.cell_id.clone())),
+        AppRequest::PublishCountersigningSession(Box::new(alice.dna_id.clone())),
         &alice_app_tx,
     )
     .await;
     let expected_error = AppResponse::Error(
         ConductorApiError::ConductorError(ConductorError::CountersigningError(
-            CountersigningError::SessionNotUnresolved(alice.cell_id.clone()),
+            CountersigningError::SessionNotUnresolved(alice.dna_id.clone()),
         ))
         .into(),
     );
@@ -260,7 +260,7 @@ async fn countersigning_session_interaction_calls() {
 
     // Session should be unaffected by the failing calls.
     assert_matches!(
-        get_session_state(&alice.cell_id, &alice_app_tx).await,
+        get_session_state(&alice.dna_id, &alice_app_tx).await,
         Some(CountersigningSessionState::Accepted(_))
     );
 
@@ -269,7 +269,7 @@ async fn countersigning_session_interaction_calls() {
     for _ in 0..5 {
         let response = call_zome_fn_fallible(
             &alice_app_tx,
-            alice.cell_id.clone(),
+            alice.dna_id.clone(),
             &alice.signing_keypair,
             alice.cap_secret,
             TestWasm::CounterSigning.coordinator_zome_name(),
@@ -308,7 +308,7 @@ async fn countersigning_session_interaction_calls() {
     // Alice's session should be in state unresolved with 1 attempted resolution.
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
-            let state = get_session_state(&alice.cell_id, &alice_app_tx).await;
+            let state = get_session_state(&alice.dna_id, &alice_app_tx).await;
             if let Some(CountersigningSessionState::Unknown {
                 resolution: summary,
                 ..
@@ -326,13 +326,13 @@ async fn countersigning_session_interaction_calls() {
 
     // Bob's session should still be in Accepted state.
     assert_matches!(
-        get_session_state(&bob.cell_id, &bob_app_tx).await,
+        get_session_state(&bob.dna_id, &bob_app_tx).await,
         Some(CountersigningSessionState::Accepted(_))
     );
 
     // Alice abandons the session.
     let response: AppResponse = request(
-        AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
+        AppRequest::AbandonCountersigningSession(Box::new(alice.dna_id.clone())),
         &alice_app_tx,
     )
     .await;
@@ -350,24 +350,24 @@ async fn countersigning_session_interaction_calls() {
     );
 
     // Alice's session should be gone from memory.
-    assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
+    assert_matches!(get_session_state(&alice.dna_id, &alice_app_tx).await, None);
 
     // Session should be abandoned and can not be abandoned again.
     let response: AppResponse = request(
-        AppRequest::AbandonCountersigningSession(Box::new(alice.cell_id.clone())),
+        AppRequest::AbandonCountersigningSession(Box::new(alice.dna_id.clone())),
         &alice_app_tx,
     )
     .await;
     let expected_error = AppResponse::Error(
         ConductorApiError::ConductorError(ConductorError::CountersigningError(
-            CountersigningError::SessionNotFound(alice.cell_id.clone()),
+            CountersigningError::SessionNotFound(alice.dna_id.clone()),
         ))
         .into(),
     );
     assert_eq!(format!("{:?}", response), format!("{:?}", expected_error));
     // Bob's session should still be in Accepted state.
     assert_matches!(
-        get_session_state(&bob.cell_id, &bob_app_tx).await,
+        get_session_state(&bob.dna_id, &bob_app_tx).await,
         Some(CountersigningSessionState::Accepted(_))
     );
 
@@ -384,7 +384,7 @@ async fn countersigning_session_interaction_calls() {
         bob_response.request.app_entry_hash
     );
     // Bob's session should be gone too.
-    assert_matches!(get_session_state(&bob.cell_id, &bob_app_tx).await, None);
+    assert_matches!(get_session_state(&bob.dna_id, &bob_app_tx).await, None);
 
     // Await DHT sync.
     tokio::time::timeout(Duration::from_secs(30), await_dht_sync(&[&alice, &bob]))
@@ -400,8 +400,8 @@ async fn countersigning_session_interaction_calls() {
             &alice_app_tx,
             "generate_countersigning_preflight_request", // 30 sec timeout
             &[
-                (alice.cell_id.agent_pubkey().clone(), vec![Role(0)]),
-                (bob.cell_id.agent_pubkey().clone(), vec![]),
+                (alice.dna_id.agent_pubkey().clone(), vec![Role(0)]),
+                (bob.dna_id.agent_pubkey().clone(), vec![]),
             ],
         )
         .await;
@@ -433,11 +433,11 @@ async fn countersigning_session_interaction_calls() {
 
     // Countersigning session state should exist for both agents and be in "Accepted" state.
     assert_matches!(
-        get_session_state(&alice.cell_id, &alice_app_tx).await,
+        get_session_state(&alice.dna_id, &alice_app_tx).await,
         Some(CountersigningSessionState::Accepted(_))
     );
     assert_matches!(
-        get_session_state(&bob.cell_id, &bob_app_tx).await,
+        get_session_state(&bob.dna_id, &bob_app_tx).await,
         Some(CountersigningSessionState::Accepted(_))
     );
 
@@ -445,7 +445,7 @@ async fn countersigning_session_interaction_calls() {
     for _ in 0..5 {
         let response = call_zome_fn_fallible(
             &bob_app_tx,
-            bob.cell_id.clone(),
+            bob.dna_id.clone(),
             &bob.signing_keypair,
             bob.cap_secret,
             TestWasm::CounterSigning.coordinator_zome_name(),
@@ -468,7 +468,7 @@ async fn countersigning_session_interaction_calls() {
     for _ in 0..5 {
         let response = call_zome_fn_fallible(
             &alice_app_tx,
-            alice.cell_id.clone(),
+            alice.dna_id.clone(),
             &alice.signing_keypair,
             alice.cap_secret,
             TestWasm::CounterSigning.coordinator_zome_name(),
@@ -521,10 +521,10 @@ async fn countersigning_session_interaction_calls() {
         }
     });
 
-    wait_for_full_arc_for_agent(bob.admin_tx.clone(), alice.cell_id.agent_pubkey().clone())
+    wait_for_full_arc_for_agent(bob.admin_tx.clone(), alice.dna_id.agent_pubkey().clone())
         .await
         .unwrap();
-    wait_for_full_arc_for_agent(alice.admin_tx.clone(), bob.cell_id.agent_pubkey().clone())
+    wait_for_full_arc_for_agent(alice.admin_tx.clone(), bob.dna_id.agent_pubkey().clone())
         .await
         .unwrap();
 
@@ -533,7 +533,7 @@ async fn countersigning_session_interaction_calls() {
     tokio::time::timeout(Duration::from_secs(60), async {
         loop {
             if matches!(
-                get_session_state(&alice.cell_id, &alice_app_tx).await,
+                get_session_state(&alice.dna_id, &alice_app_tx).await,
                 Some(CountersigningSessionState::Unknown { resolution, .. }) if resolution.attempts >= 1
             ) {
                 break;
@@ -546,7 +546,7 @@ async fn countersigning_session_interaction_calls() {
 
     // Alice forcefully publishes the session.
     let response: AppResponse = request(
-        AppRequest::PublishCountersigningSession(Box::new(alice.cell_id.clone())),
+        AppRequest::PublishCountersigningSession(Box::new(alice.dna_id.clone())),
         &alice_app_tx,
     )
     .await;
@@ -563,7 +563,7 @@ async fn countersigning_session_interaction_calls() {
         preflight_request.app_entry_hash
     );
     // Alice's session should be gone from memory.
-    assert_matches!(get_session_state(&alice.cell_id, &alice_app_tx).await, None);
+    assert_matches!(get_session_state(&alice.dna_id, &alice_app_tx).await, None);
 
     let resp = request::<_, AdminResponse>(
         AdminRequest::AgentInfo { dna_hashes: None },
@@ -594,7 +594,7 @@ async fn countersigning_session_interaction_calls() {
             .unwrap();
     assert_eq!(bob_session_entry_hash, preflight_request.app_entry_hash);
     // Bob's session should be gone from memory.
-    assert_matches!(get_session_state(&bob.cell_id, &bob_app_tx).await, None);
+    assert_matches!(get_session_state(&bob.dna_id, &bob_app_tx).await, None);
 
     tracing::info!("Sessions resolved successfully. Awaiting DHT sync...");
 
@@ -607,7 +607,7 @@ async fn countersigning_session_interaction_calls() {
 struct Agent {
     admin_tx: WebsocketSender,
     admin_port: u16,
-    cell_id: CellId,
+    dna_id: DnaId,
     signing_keypair: SigningKey,
     cap_secret: CapSecret,
     config_path: PathBuf,
@@ -674,10 +674,9 @@ impl Agent {
 
         // Install Dna.
         let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let cell_id =
-            register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000)
-                .await
-                .unwrap();
+        let dna_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000)
+            .await
+            .unwrap();
 
         // Activate cells.
         let request = AdminRequest::EnableApp {
@@ -703,7 +702,7 @@ impl Agent {
 
         let request =
             AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
-                cell_id: cell_id.clone(),
+                dna_id: dna_id.clone(),
                 cap_grant: ZomeCallCapGrant {
                     tag: "".into(),
                     access: CapAccess::Assigned {
@@ -720,7 +719,7 @@ impl Agent {
         Agent {
             admin_tx,
             admin_port,
-            cell_id,
+            dna_id,
             signing_keypair,
             cap_secret,
             config_path,
@@ -729,10 +728,10 @@ impl Agent {
         }
     }
 
-    fn shutdown(self) -> (PathBuf, CellId, SigningKey, CapSecret) {
+    fn shutdown(self) -> (PathBuf, DnaId, SigningKey, CapSecret) {
         let Agent {
             config_path,
-            cell_id,
+            dna_id,
             signing_keypair,
             cap_secret,
             admin_tx,
@@ -743,11 +742,11 @@ impl Agent {
         drop(_holochain);
         drop(admin_tx);
         drop(_admin_rx);
-        (config_path, cell_id, signing_keypair, cap_secret)
+        (config_path, dna_id, signing_keypair, cap_secret)
     }
 
-    async fn startup(config: (PathBuf, CellId, SigningKey, CapSecret)) -> Agent {
-        let (config_path, cell_id, signing_keypair, cap_secret) = config;
+    async fn startup(config: (PathBuf, DnaId, SigningKey, CapSecret)) -> Agent {
+        let (config_path, dna_id, signing_keypair, cap_secret) = config;
 
         let (_holochain, admin_port) = start_holochain_with_lair(config_path.clone(), true).await;
         let admin_port = admin_port.await.unwrap();
@@ -757,7 +756,7 @@ impl Agent {
         Agent {
             admin_tx,
             admin_port,
-            cell_id,
+            dna_id,
             signing_keypair,
             cap_secret,
             config_path,
@@ -791,7 +790,7 @@ impl Agent {
         let zome_name = TestWasm::CounterSigning.coordinator_zome_name();
         call_zome_fn(
             app_tx,
-            self.cell_id.clone(),
+            self.dna_id.clone(),
             &self.signing_keypair,
             self.cap_secret,
             zome_name,
@@ -834,7 +833,7 @@ async fn await_dht_sync(agents: &[&Agent]) {
         let requests = agents.iter().map(|agent| async {
             match request(
                 AdminRequest::DumpFullState {
-                    cell_id: Box::new(agent.cell_id.clone()),
+                    dna_id: Box::new(agent.dna_id.clone()),
                     dht_ops_cursor: None,
                 },
                 &agent.admin_tx,
@@ -896,11 +895,11 @@ where
 }
 
 async fn get_session_state(
-    cell_id: &CellId,
+    dna_id: &DnaId,
     app_tx: &WebsocketSender,
 ) -> Option<CountersigningSessionState> {
     match request(
-        AppRequest::GetCountersigningSessionState(Box::new(cell_id.clone())),
+        AppRequest::GetCountersigningSessionState(Box::new(dna_id.clone())),
         app_tx,
     )
     .await

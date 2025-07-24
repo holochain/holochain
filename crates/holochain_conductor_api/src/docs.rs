@@ -33,7 +33,7 @@
 //! #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 //! pub enum Signal {
 //!     App {
-//!         cell_id: CellId,
+//!         dna_id: DnaId,
 //!         zome_name: ZomeName,
 //!         signal: AppSignal,
 //!     },
@@ -48,7 +48,7 @@
 //!   | {
 //!       type: "app",
 //!       value: {
-//!         cell_id: CellId,
+//!         dna_id: DnaId,
 //!         zome_name: ZomeName,
 //!         signal: AppSignal
 //!       }

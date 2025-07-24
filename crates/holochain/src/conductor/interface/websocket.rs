@@ -581,15 +581,15 @@ mod test {
             AdminResponse::AppInstalled(app_info) => app_info,
             _ => panic!("didn't install app"),
         };
-        let cell_id = match &app_info
+        let dna_id = match &app_info
             .cell_info
             .get(&dna_file.dna_hash().to_string())
             .unwrap()[0]
         {
-            CellInfo::Provisioned(cell) => cell.cell_id.clone(),
+            CellInfo::Provisioned(cell) => cell.dna_id.clone(),
             _ => panic!("emit_signal cell not available"),
         };
-        let agent_key = cell_id.agent_pubkey().clone();
+        let agent_key = dna_id.agent_pubkey().clone();
 
         // Activate cells
         let request = AdminRequest::EnableApp {
@@ -633,7 +633,7 @@ mod test {
                 conductor_handle.keystore(),
                 ZomeCallParams {
                     provenance: agent_key.clone(),
-                    cell_id: cell_id.clone(),
+                    dna_id: dna_id.clone(),
                     zome_name: TestWasm::EmitSignal.coordinator_zome_name(),
                     fn_name: "commit_entry_and_emit_signal_post_commit".into(),
                     cap_secret: None,
@@ -703,7 +703,7 @@ mod test {
 
     async fn call_zome<R: FnOnce(AppResponse) + 'static + Send>(
         conductor_handle: ConductorHandle,
-        cell_id: CellId,
+        dna_id: DnaId,
         zome_name: ZomeName,
         function_name: String,
         respond: R,
@@ -711,7 +711,7 @@ mod test {
         // Now make sure we can call a zome once again
         let zome_call_params = ZomeCallParams {
             provenance: fixt!(AgentPubKey, Predictable, 0),
-            cell_id,
+            dna_id,
             zome_name,
             fn_name: function_name.into(),
             cap_secret: None,
@@ -781,11 +781,11 @@ mod test {
 
         let (_tmpdir, _, handle, agent_key) =
             setup_app_in_new_conductor("test app".to_string(), None, vec![(dna, None)]).await;
-        let cell_id = CellId::from((dna_hash.clone(), agent_key));
+        let dna_id = DnaId::from((dna_hash.clone(), agent_key));
 
         call_zome(
             handle.clone(),
-            cell_id.clone(),
+            dna_id.clone(),
             TestWasm::Foo.coordinator_zome_name(),
             "foo".into(),
             |response: AppResponse| {
@@ -819,12 +819,12 @@ mod test {
             .next()
             .unwrap();
 
-        let cell_id_1 = CellId::from((dna_1.dna_hash().clone(), fake_agent_pubkey_1()));
+        let dna_id_1 = DnaId::from((dna_1.dna_hash().clone(), fake_agent_pubkey_1()));
 
-        let cell_id_2 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_1()));
+        let dna_id_2 = DnaId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_1()));
 
         // Run the same DNA in cell 3 to check that grouping works correctly
-        let cell_id_3 = CellId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_2()));
+        let dna_id_3 = DnaId::from((dna_2.dna_hash().clone(), fake_agent_pubkey_2()));
 
         let db_dir = test_db_dir();
 
@@ -838,7 +838,7 @@ mod test {
         install_app_in_conductor(
             handle.clone(),
             "test app 1".to_string(),
-            Some(cell_id_1.agent_pubkey().clone()),
+            Some(dna_id_1.agent_pubkey().clone()),
             &[(dna_1, None)],
         )
         .await;
@@ -846,7 +846,7 @@ mod test {
         install_app_in_conductor(
             handle.clone(),
             "test app 2".to_string(),
-            Some(cell_id_2.agent_pubkey().clone()),
+            Some(dna_id_2.agent_pubkey().clone()),
             &[(dna_2.clone(), None)],
         )
         .await;
@@ -854,7 +854,7 @@ mod test {
         install_app_in_conductor(
             handle.clone(),
             "test app 3".to_string(),
-            Some(cell_id_3.agent_pubkey().clone()),
+            Some(dna_id_3.agent_pubkey().clone()),
             &[(dna_2, None)],
         )
         .await;
@@ -915,7 +915,7 @@ mod test {
         }
         let dna_hashes = dnas.iter().map(|d| d.dna_hash()).collect::<Vec<_>>();
         let dnas_with_proofs = dnas.iter().cloned().map(|d| (d, None)).collect::<Vec<_>>();
-        let cell_id_0 = CellId::new(
+        let dna_id_0 = DnaId::new(
             dnas_with_proofs
                 .first()
                 .cloned()
@@ -957,7 +957,7 @@ mod test {
 
         call_zome(
             conductor_handle.clone(),
-            cell_id_0.clone(),
+            dna_id_0.clone(),
             TestWasm::Link.coordinator_zome_name(),
             "get_links".into(),
             |response: AppResponse| {
@@ -971,7 +971,7 @@ mod test {
         assert_eq!(initial_state, state);
 
         // Check it is enabled, and get all cells
-        let cell_ids: HashSet<CellId> = state
+        let dna_ids: HashSet<DnaId> = state
             .get_app(&app_id)
             .inspect(|app| {
                 assert_eq!(*app.status(), AppStatus::Enabled);
@@ -983,10 +983,10 @@ mod test {
         // Collect the expected result
         let expected = dna_hashes
             .into_iter()
-            .map(|hash| CellId::from((hash.clone(), agent_key.clone())))
+            .map(|hash| DnaId::from((hash.clone(), agent_key.clone())))
             .collect::<HashSet<_>>();
 
-        assert_eq!(expected, cell_ids);
+        assert_eq!(expected, dna_ids);
 
         // Check that it is returned in get_app_info as enabled
         let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
@@ -1017,7 +1017,7 @@ mod test {
         let state = conductor_handle.get_state_from_handle().await.unwrap();
 
         // Check it's deactivated, and get all cells
-        let cell_ids: HashSet<CellId> = state
+        let dna_ids: HashSet<DnaId> = state
             .get_app(&app_id)
             .inspect(|app| {
                 assert_matches!(*app.status(), AppStatus::Disabled(_));
@@ -1026,7 +1026,7 @@ mod test {
             .all_cells()
             .collect();
 
-        assert_eq!(expected, cell_ids);
+        assert_eq!(expected, dna_ids);
 
         // Check that it is returned in get_app_info as deactivated
         let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
@@ -1062,7 +1062,7 @@ mod test {
 
         call_zome(
             conductor_handle.clone(),
-            cell_id_0.clone(),
+            dna_id_0.clone(),
             TestWasm::Link.coordinator_zome_name(),
             "get_links".into(),
             |response: AppResponse| {
@@ -1102,7 +1102,7 @@ mod test {
             vec![("zomey".into(), TestWasm::Foo.into())],
         );
         let agent_pubkey = fake_agent_pubkey_1();
-        let cell_id = CellId::from((dna.dna_hash().clone(), agent_pubkey.clone()));
+        let dna_id = DnaId::from((dna.dna_hash().clone(), agent_pubkey.clone()));
 
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(agent_pubkey, vec![(dna, None)]).await;
@@ -1117,11 +1117,11 @@ mod test {
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         // Get state
-        let expected = conductor_handle.dump_cell_state(&cell_id).await.unwrap();
+        let expected = conductor_handle.dump_cell_state(&dna_id).await.unwrap();
 
         let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::DumpState {
-            cell_id: Box::new(cell_id),
+            dna_id: Box::new(dna_id),
         };
         let respond = move |response: AdminResponse| {
             assert_matches!(response, AdminResponse::StateDumped(s) if s == expected);

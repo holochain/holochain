@@ -35,12 +35,12 @@ pub fn accept_countersigning_preflight_request<'a>(
                     return Ok(PreflightRequestAcceptance::UnacceptableFutureStart);
                 }
 
-                let cell_id = call_context.host_context.call_zome_handle().cell_id();
+                let dna_id = call_context.host_context.call_zome_handle().dna_id();
 
                 call_context
                     .host_context
                     .call_zome_handle()
-                    .accept_countersigning_session(cell_id.clone(), input.clone())
+                    .accept_countersigning_session(dna_id.clone(), input.clone())
                     .await
                     .map_err(|e| -> RuntimeError {
                         wasm_error!(WasmErrorInner::Host(e.to_string())).into()
@@ -449,7 +449,7 @@ pub mod wasm_test {
         let thing_fail_create_alice = conductor
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: alice.cell_id().clone(),
+                dna_id: alice.dna_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
@@ -469,7 +469,7 @@ pub mod wasm_test {
         let countersign_fail_create_alice = conductor
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: alice.cell_id().clone(),
+                dna_id: alice.dna_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_an_invalid_countersigned_thing".into(),
                 cap_secret: None,
@@ -564,7 +564,7 @@ pub mod wasm_test {
         let preflight_acceptance_fail = conductors[1]
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: alice.cell_id().clone(),
+                dna_id: alice.dna_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "accept_countersigning_preflight_request".into(),
                 cap_secret: None,
@@ -601,7 +601,7 @@ pub mod wasm_test {
         let thing_fail_create_alice = conductors[1]
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: alice.cell_id().clone(),
+                dna_id: alice.dna_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
@@ -618,7 +618,7 @@ pub mod wasm_test {
         let thing_fail_create_bob = conductors[1]
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: bob.cell_id().clone(),
+                dna_id: bob.dna_id().clone(),
                 zome_name: bob.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
@@ -645,7 +645,7 @@ pub mod wasm_test {
         let thing_fail_create_alice = conductors[1]
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: alice.cell_id().clone(),
+                dna_id: alice.dna_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
@@ -680,7 +680,7 @@ pub mod wasm_test {
         let thing_fail_create_bob = conductors[1]
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: bob.cell_id().clone(),
+                dna_id: bob.dna_id().clone(),
                 zome_name: bob.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
@@ -840,7 +840,7 @@ pub mod wasm_test {
         let preflight_acceptance_fail = conductor
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: alice.cell_id().clone(),
+                dna_id: alice.dna_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "accept_countersigning_preflight_request".into(),
                 cap_secret: None,
@@ -876,7 +876,7 @@ pub mod wasm_test {
         let thing_fail_create_alice = conductor
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: alice.cell_id().clone(),
+                dna_id: alice.dna_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
@@ -893,7 +893,7 @@ pub mod wasm_test {
         let thing_fail_create_bob = conductor
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: bob.cell_id().clone(),
+                dna_id: bob.dna_id().clone(),
                 zome_name: bob.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
@@ -920,7 +920,7 @@ pub mod wasm_test {
         let thing_fail_create_alice = conductor
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: alice.cell_id().clone(),
+                dna_id: alice.dna_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
@@ -955,7 +955,7 @@ pub mod wasm_test {
         let thing_fail_create_bob = conductor
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: bob.cell_id().clone(),
+                dna_id: bob.dna_id().clone(),
                 zome_name: bob.name().clone(),
                 fn_name: "create_a_thing".into(),
                 cap_secret: None,
@@ -1241,8 +1241,8 @@ pub mod wasm_test {
         let alice = alice_cell.zome(TestWasm::CounterSigning);
         let bob = bob_cell.zome(TestWasm::CounterSigning);
 
-        let alice_pubkey = alice_cell.cell_id().agent_pubkey();
-        let bob_pubkey = bob_cell.cell_id().agent_pubkey();
+        let alice_pubkey = alice_cell.dna_id().agent_pubkey();
+        let bob_pubkey = bob_cell.dna_id().agent_pubkey();
 
         // Alice and bob can see carol but not each other.
         // We will simply teleport the countersigning requests and responses.

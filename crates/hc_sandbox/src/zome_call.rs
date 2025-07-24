@@ -76,7 +76,7 @@ use crate::ports::get_admin_ports;
 use anyhow::Context;
 use clap::Parser;
 use holochain_client::{
-    AdminWebsocket, AppWebsocket, CellId, ClientAgentSigner, DynAgentSigner, SigningCredentials,
+    AdminWebsocket, AppWebsocket, ClientAgentSigner, DnaId, DynAgentSigner, SigningCredentials,
     ZomeCallTarget,
 };
 use holochain_conductor_api::{CellInfo, IssueAppAuthenticationTokenPayload};
@@ -159,12 +159,12 @@ pub async fn zome_call_auth(
         _ => anyhow::bail!("No app info found for app id {}", zome_call_auth.app_id),
     };
 
-    let cell_ids = info
+    let dna_ids = info
         .cell_info
         .values()
         .flatten()
         .filter_map(|info| match info {
-            CellInfo::Provisioned(info) => Some(info.cell_id.clone()),
+            CellInfo::Provisioned(info) => Some(info.dna_id.clone()),
             _ => None,
         })
         .collect::<HashSet<_>>();
@@ -181,10 +181,10 @@ pub async fn zome_call_auth(
 
     let signing_agent_key = AgentPubKey::from_raw_32(key.verifying_key().as_bytes().to_vec());
 
-    for cell_id in cell_ids {
+    for dna_id in dna_ids {
         admin_client
             .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
-                cell_id: cell_id.clone(),
+                dna_id: dna_id.clone(),
                 cap_grant: ZomeCallCapGrant::new(
                     "sandbox".to_string(),
                     CapAccess::Assigned {
@@ -195,7 +195,7 @@ pub async fn zome_call_auth(
                 ),
             })
             .await?;
-        msg!("Authorized zome calls for cell: {:?}", cell_id);
+        msg!("Authorized zome calls for cell: {:?}", dna_id);
     }
 
     Ok(())
@@ -214,21 +214,21 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
         _ => anyhow::bail!("No app info found for app id {}", zome_call.app_id.clone()),
     };
 
-    let cell_ids = info
+    let dna_ids = info
         .cell_info
         .values()
         .flatten()
         .filter_map(|info| match info {
             CellInfo::Provisioned(info)
-                if info.cell_id.dna_hash() == zome_call.dna_hash.as_ref() =>
+                if info.dna_id.dna_hash() == zome_call.dna_hash.as_ref() =>
             {
-                Some(info.cell_id.clone())
+                Some(info.dna_id.clone())
             }
             _ => None,
         })
         .collect::<Vec<_>>();
 
-    if cell_ids.is_empty() {
+    if dna_ids.is_empty() {
         anyhow::bail!(
             "No cell found for DNA hash [{:?}] in app {:?}",
             zome_call.dna_hash,
@@ -244,12 +244,12 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
 
     let (auth, key) = generate_signing_credentials(passphrase).await?;
 
-    let credentials: Vec<(CellId, SigningCredentials)> = cell_ids
+    let credentials: Vec<(DnaId, SigningCredentials)> = dna_ids
         .clone()
         .into_iter()
-        .map(|cell_id| {
+        .map(|dna_id| {
             (
-                cell_id,
+                dna_id,
                 SigningCredentials {
                     signing_agent_key: AgentPubKey::from_raw_32(
                         key.verifying_key().as_bytes().to_vec(),
@@ -266,7 +266,7 @@ pub async fn zome_call(zome_call: ZomeCall, admin_port: Option<u16>) -> anyhow::
 
     let response = app_client
         .call_zome(
-            ZomeCallTarget::CellId(cell_ids.first().unwrap().clone()),
+            ZomeCallTarget::DnaId(dna_ids.first().unwrap().clone()),
             ZomeName::from(zome_call.zome_name),
             FunctionName(zome_call.function),
             ExternIO::encode(serde_json::from_slice::<serde_json::Value>(
@@ -349,7 +349,7 @@ async fn admin_port_from_connect_args(
 async fn get_app_client(
     admin_client: &AdminWebsocket,
     installed_app_id: InstalledAppId,
-    credentials: Option<Vec<(CellId, SigningCredentials)>>,
+    credentials: Option<Vec<(DnaId, SigningCredentials)>>,
 ) -> anyhow::Result<AppWebsocket> {
     let app_interfaces = admin_client.list_app_interfaces().await?;
 
@@ -394,8 +394,8 @@ async fn get_app_client(
     match credentials {
         None => (),
         Some(c) => {
-            for (cell_id, creds) in c {
-                signer.add_credentials(cell_id, creds);
+            for (dna_id, creds) in c {
+                signer.add_credentials(dna_id, creds);
             }
         }
     }

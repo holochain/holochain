@@ -248,15 +248,15 @@ async fn many_concurrent_zome_calls_dont_gunk_up_the_works() {
         let calls = future::join_all(std::iter::zip(cells, clients.iter_mut()).map(
             |(cell, client)| async move {
                 let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
-                let cell_id = cell.cell_id().clone();
+                let dna_id = cell.dna_id().clone();
                 let call = ZomeCallParamsSigned::try_from_params(
                     conductor.raw_handle().keystore(),
                     ZomeCallParams {
-                        cell_id: cell_id.clone(),
+                        dna_id: dna_id.clone(),
                         zome_name: TestWasm::MultipleCalls.into(),
                         fn_name: "create_entry_multiple".into(),
                         cap_secret: None,
-                        provenance: cell_id.agent_pubkey().clone(),
+                        provenance: dna_id.agent_pubkey().clone(),
                         payload: ExternIO::encode(n).unwrap(),
                         nonce,
                         expires_at,

@@ -79,7 +79,7 @@ impl CountersigningWorkspace {
 
     pub fn mark_countersigning_session_for_force_abandon(
         &self,
-        cell_id: &CellId,
+        dna_id: &DnaId,
     ) -> Result<(), CountersigningError> {
         self.inner
             .share_mut(|inner, _| {
@@ -94,13 +94,13 @@ impl CountersigningWorkspace {
                             *force_abandon = true;
                             Ok(())
                         } else {
-                            Err(CountersigningError::SessionNotUnresolved(cell_id.clone()))
+                            Err(CountersigningError::SessionNotUnresolved(dna_id.clone()))
                         }
                     } else {
-                        Err(CountersigningError::SessionNotUnresolved(cell_id.clone()))
+                        Err(CountersigningError::SessionNotUnresolved(dna_id.clone()))
                     }
                 } else {
-                    Err(CountersigningError::SessionNotFound(cell_id.clone()))
+                    Err(CountersigningError::SessionNotFound(dna_id.clone()))
                 })
             })
             .unwrap()
@@ -108,7 +108,7 @@ impl CountersigningWorkspace {
 
     pub fn mark_countersigning_session_for_force_publish(
         &self,
-        cell_id: &CellId,
+        dna_id: &DnaId,
     ) -> Result<(), CountersigningError> {
         self.inner
             .share_mut(|inner, _| {
@@ -123,13 +123,13 @@ impl CountersigningWorkspace {
                             *force_publish = true;
                             Ok(())
                         } else {
-                            Err(CountersigningError::SessionNotUnresolved(cell_id.clone()))
+                            Err(CountersigningError::SessionNotUnresolved(dna_id.clone()))
                         }
                     } else {
-                        Err(CountersigningError::SessionNotUnresolved(cell_id.clone()))
+                        Err(CountersigningError::SessionNotUnresolved(dna_id.clone()))
                     }
                 } else {
-                    Err(CountersigningError::SessionNotFound(cell_id.clone()))
+                    Err(CountersigningError::SessionNotFound(dna_id.clone()))
                 })
             })
             .unwrap()
@@ -158,7 +158,7 @@ pub(crate) async fn countersigning_workflow(
     workspace: Arc<CountersigningWorkspace>,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    cell_id: CellId,
+    dna_id: DnaId,
     signal_tx: Sender<Signal>,
     self_trigger: TriggerSender,
     integration_trigger: TriggerSender,
@@ -185,23 +185,18 @@ pub(crate) async fn countersigning_workflow(
         .unwrap();
 
     // Ensure the workspace state knows about anything in the database on startup.
-    refresh::refresh_workspace_state(
-        &space,
-        workspace.clone(),
-        cell_id.clone(),
-        signal_tx.clone(),
-    )
-    .await;
+    refresh::refresh_workspace_state(&space, workspace.clone(), dna_id.clone(), signal_tx.clone())
+        .await;
 
     // Abandon any sessions that have timed out.
-    apply_timeout(&space, workspace.clone(), &cell_id, signal_tx.clone()).await?;
+    apply_timeout(&space, workspace.clone(), &dna_id, signal_tx.clone()).await?;
 
     // If the session is in an unknown state, try to recover it.
     try_recover_failed_session(
         &space,
         workspace.clone(),
         network.clone(),
-        &cell_id,
+        &dna_id,
         &signal_tx,
     )
     .await?;
@@ -228,7 +223,7 @@ pub(crate) async fn countersigning_workflow(
                 space.clone(),
                 network.clone(),
                 keystore.clone(),
-                cell_id.agent_pubkey().clone(),
+                dna_id.agent_pubkey().clone(),
                 signature_bundle.clone(),
                 integration_trigger.clone(),
                 publish_trigger.clone(),
@@ -240,12 +235,12 @@ pub(crate) async fn countersigning_workflow(
                     break;
                 }
                 Ok(None) => {
-                    tracing::warn!("Rejected signature bundle for countersigning session for agent: {:?}: {:?}", cell_id.agent_pubkey(), signature_bundle);
+                    tracing::warn!("Rejected signature bundle for countersigning session for agent: {:?}: {:?}", dna_id.agent_pubkey(), signature_bundle);
                 }
                 Err(e) => {
                     tracing::error!(
                         "Error completing countersigning session for agent: {:?}: {:?}",
-                        cell_id.agent_pubkey(),
+                        dna_id.agent_pubkey(),
                         e
                     );
                 }
@@ -274,7 +269,7 @@ pub(crate) async fn countersigning_workflow(
                             }
                         }
                         _ => {
-                            tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it: {:?}", cell_id.agent_pubkey(), session);
+                            tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it: {:?}", dna_id.agent_pubkey(), session);
                         }
                     }
                 }
@@ -311,7 +306,7 @@ pub(crate) async fn countersigning_workflow(
             if force_abandon {
                 force_abandon_session(
                     space.clone(),
-                    cell_id.agent_pubkey(),
+                    dna_id.agent_pubkey(),
                     &preflight_request,
                     workspace.clone(),
                     &signal_tx,
@@ -324,7 +319,7 @@ pub(crate) async fn countersigning_workflow(
                     keystore.clone(),
                     integration_trigger.clone(),
                     publish_trigger.clone(),
-                    cell_id.clone(),
+                    dna_id.clone(),
                     preflight_request.clone(),
                 )
                 .await?;
@@ -340,7 +335,7 @@ pub(crate) async fn countersigning_workflow(
             .inner
             .share_mut(|inner, _| {
                 let countersigned_entry_hash = inner.session.as_ref().map(|session| session.session_app_entry_hash().clone());
-                tracing::trace!("Countersigning session completed successfully, removing from the workspace for agent: {:?}", cell_id.agent_pubkey());
+                tracing::trace!("Countersigning session completed successfully, removing from the workspace for agent: {:?}", dna_id.agent_pubkey());
                 inner.session = None;
                 Ok(countersigned_entry_hash)
             })
@@ -391,7 +386,7 @@ async fn try_recover_failed_session(
     space: &Space,
     workspace: Arc<CountersigningWorkspace>,
     network: DynHolochainP2pDna,
-    cell_id: &CellId,
+    dna_id: &DnaId,
     signal_tx: &Sender<Signal>,
 ) -> WorkflowResult<()> {
     let maybe_session_in_unknown_state = workspace
@@ -412,12 +407,12 @@ async fn try_recover_failed_session(
     if let Some(preflight_request) = maybe_session_in_unknown_state {
         tracing::info!(
             "Countersigning session for agent {:?} is in an unknown state, attempting to resolve",
-            cell_id.agent_pubkey()
+            dna_id.agent_pubkey()
         );
         match incomplete::inner_countersigning_session_incomplete(
             space.clone(),
             network.clone(),
-            cell_id.agent_pubkey().clone(),
+            dna_id.agent_pubkey().clone(),
             preflight_request.clone(),
         )
         .await
@@ -426,7 +421,7 @@ async fn try_recover_failed_session(
                 // No need to do anything here. Signatures were found which may be able to complete
                 // the session but the session isn't actually complete yet. We need to let the
                 // workflow re-run and try those signatures.
-                update_last_attempted(workspace.clone(), true, outcomes, cell_id);
+                update_last_attempted(workspace.clone(), true, outcomes, dna_id);
             }
             Ok((SessionCompletionDecision::Abandoned, _)) => {
                 // The session state has been resolved, so we can remove it from the workspace.
@@ -435,7 +430,7 @@ async fn try_recover_failed_session(
                     .share_mut(|inner, _| {
                         tracing::trace!(
                             "Decision made for incomplete session, removing from workspace: {:?}",
-                            cell_id.agent_pubkey()
+                            dna_id.agent_pubkey()
                         );
 
                         inner.session = None;
@@ -452,11 +447,11 @@ async fn try_recover_failed_session(
             Ok((SessionCompletionDecision::Indeterminate, outcomes)) => {
                 tracing::info!(
                     "No automated decision could be reached for the current countersigning session: {:?}",
-                    cell_id.agent_pubkey()
+                    dna_id.agent_pubkey()
                 );
 
                 // Record the attempt
-                update_last_attempted(workspace.clone(), true, outcomes, cell_id);
+                update_last_attempted(workspace.clone(), true, outcomes, dna_id);
 
                 let resolution = get_resolution(workspace.clone());
                 if let Some(SessionResolutionSummary { attempts, .. }) = resolution {
@@ -466,11 +461,11 @@ async fn try_recover_failed_session(
                     if workspace.countersigning_resolution_retry_limit.is_none()
                         || (limit > 0 && attempts >= limit)
                     {
-                        tracing::info!("Reached the limit ({}) of attempts ({}) to resolve countersigning session for agent: {:?}", limit, attempts, cell_id.agent_pubkey());
+                        tracing::info!("Reached the limit ({}) of attempts ({}) to resolve countersigning session for agent: {:?}", limit, attempts, dna_id.agent_pubkey());
 
                         force_abandon_session(
                             space.clone(),
-                            cell_id.agent_pubkey(),
+                            dna_id.agent_pubkey(),
                             &preflight_request,
                             workspace.clone(),
                             signal_tx,
@@ -482,16 +477,16 @@ async fn try_recover_failed_session(
             Ok((SessionCompletionDecision::Failed, outcomes)) => {
                 tracing::info!(
                     "Failed to resolve countersigning session for agent: {:?}",
-                    cell_id.agent_pubkey()
+                    dna_id.agent_pubkey()
                 );
 
                 // Record the attempt time, but not the attempt count.
-                update_last_attempted(workspace.clone(), false, outcomes, cell_id);
+                update_last_attempted(workspace.clone(), false, outcomes, dna_id);
             }
             Err(e) => {
                 tracing::error!(
                     "Error resolving countersigning session for agent: {:?}: {:?}",
-                    cell_id.agent_pubkey(),
+                    dna_id.agent_pubkey(),
                     e
                 );
             }
@@ -526,7 +521,7 @@ fn update_last_attempted(
     workspace: Arc<CountersigningWorkspace>,
     add_to_attempts: bool,
     outcomes: Vec<SessionResolutionOutcome>,
-    cell_id: &CellId,
+    dna_id: &DnaId,
 ) {
     workspace.inner.share_mut(|inner, _| {
         if let Some(session) = &mut inner.session {
@@ -539,7 +534,7 @@ fn update_last_attempted(
                         resolution.last_attempt_at = Some(Timestamp::now());
                         resolution.outcomes = outcomes;
                     } else {
-                        tracing::warn!("Countersigning session for agent {:?} is missing a resolution but we are trying to resolve it", cell_id.agent_pubkey());
+                        tracing::warn!("Countersigning session for agent {:?} is missing a resolution but we are trying to resolve it", dna_id.agent_pubkey());
                     }
                 }
                 CountersigningSessionState::Unknown { resolution, .. } => {
@@ -550,11 +545,11 @@ fn update_last_attempted(
                     resolution.outcomes = outcomes;
                 }
                 state => {
-                    tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it: {:?}", cell_id.agent_pubkey(), state);
+                    tracing::error!("Countersigning session for agent {:?} was not in the expected state while trying to resolve it: {:?}", dna_id.agent_pubkey(), state);
                 }
             }
         } else {
-            tracing::error!("Countersigning session for agent {:?} was removed from the workspace while trying to resolve it", cell_id.agent_pubkey());
+            tracing::error!("Countersigning session for agent {:?} was removed from the workspace while trying to resolve it", dna_id.agent_pubkey());
         }
 
         Ok(())
@@ -583,7 +578,7 @@ fn get_resolution(workspace: Arc<CountersigningWorkspace>) -> Option<SessionReso
 async fn apply_timeout(
     space: &Space,
     workspace: Arc<CountersigningWorkspace>,
-    cell_id: &CellId,
+    dna_id: &DnaId,
     signal_tx: Sender<Signal>,
 ) -> WorkflowResult<()> {
     let preflight_request = workspace
@@ -600,7 +595,7 @@ async fn apply_timeout(
         return Ok(());
     }
 
-    let authored = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
+    let authored = space.get_or_create_authored_db(dna_id.agent_pubkey().clone())?;
 
     let current_session = authored.read_async(current_countersigning_session).await?;
 
@@ -676,12 +671,12 @@ async fn apply_timeout(
     if let Some(preflight_request) = timed_out {
         tracing::info!(
             "Countersigning session for agent {:?} has timed out, abandoning session",
-            cell_id.agent_pubkey()
+            dna_id.agent_pubkey()
         );
 
         if let Err(e) = force_abandon_session(
             space.clone(),
-            cell_id.agent_pubkey(),
+            dna_id.agent_pubkey(),
             &preflight_request,
             workspace.clone(),
             &signal_tx,
@@ -690,7 +685,7 @@ async fn apply_timeout(
         {
             tracing::error!(
                 "Error abandoning countersigning session for agent: {:?}: {:?}",
-                cell_id.agent_pubkey(),
+                dna_id.agent_pubkey(),
                 e
             );
         }

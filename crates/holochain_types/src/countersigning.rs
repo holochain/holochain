@@ -3,7 +3,7 @@
 use holo_hash::{AgentPubKey, EntryHash};
 use holochain_timestamp::Timestamp;
 use holochain_zome_types::{
-    cell::CellId,
+    cell::DnaId,
     prelude::PreflightRequest,
     record::{SignedAction, SignedActionHashed},
 };
@@ -194,12 +194,12 @@ pub enum SessionCompletionDecision {
 #[derive(Debug, Error)]
 pub enum CountersigningError {
     /// Countersigning workspace does not exist for cell.
-    #[error("Countersigning workspace does not exist for cell id {0:?}. Probably an invalid cell id was provided.")]
-    WorkspaceDoesNotExist(CellId),
+    #[error("Countersigning workspace does not exist for dna id {0:?}. Probably an invalid dna id was provided.")]
+    WorkspaceDoesNotExist(DnaId),
     /// No countersigning session found for the cell.
-    #[error("No countersigning session found for cell id {0:?}")]
-    SessionNotFound(CellId),
+    #[error("No countersigning session found for dna id {0:?}")]
+    SessionNotFound(DnaId),
     /// Countersigning session must be in an unresolved state to be abandoned or published.
-    #[error("Countersigning session for cell id {0:?} is not unresolved. Only unresolved sessions can be abandoned or published.")]
-    SessionNotUnresolved(CellId),
+    #[error("Countersigning session for dna id {0:?} is not unresolved. Only unresolved sessions can be abandoned or published.")]
+    SessionNotUnresolved(DnaId),
 }

@@ -19,14 +19,14 @@ async fn test_cell_handle_publish() {
 
     let agent_key = keystore.new_sign_keypair_random().await.unwrap();
     let dna_file = fake_valid_dna_file("test_cell_handle_publish");
-    let cell_id = CellId::new(dna_file.dna_hash().clone(), agent_key);
-    let dna = cell_id.dna_hash().clone();
-    let agent = cell_id.agent_pubkey().clone();
+    let dna_id = DnaId::new(dna_file.dna_hash().clone(), agent_key);
+    let dna = dna_id.dna_hash().clone();
+    let agent = dna_id.agent_pubkey().clone();
 
     let spaces = TestSpaces::new([dna.clone()]).await;
     let db = spaces.test_spaces[&dna]
         .space
-        .get_or_create_authored_db(cell_id.agent_pubkey().clone())
+        .get_or_create_authored_db(dna_id.agent_pubkey().clone())
         .unwrap();
     let dht_db = spaces.test_spaces[&dna].space.dht_db.clone();
 
@@ -51,7 +51,7 @@ async fn test_cell_handle_publish() {
         .unwrap();
 
     super::Cell::genesis(
-        cell_id.clone(),
+        dna_id.clone(),
         handle.clone(),
         db.clone(),
         dht_db.clone(),
@@ -63,7 +63,7 @@ async fn test_cell_handle_publish() {
     .unwrap();
 
     let (_cell, _) = super::Cell::create(
-        cell_id,
+        dna_id,
         handle.clone(),
         spaces.test_spaces[&dna].space.clone(),
         holochain_p2p_cell,

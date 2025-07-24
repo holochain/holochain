@@ -420,8 +420,8 @@ impl ZomeCallInvocation {
         if host_access
             .call_zome_handle
             .is_blocked(
-                BlockTargetId::Cell(CellId::new(
-                    (*self.cell_id.dna_hash()).clone(),
+                BlockTargetId::Cell(DnaId::new(
+                    (*self.dna_id.dna_hash()).clone(),
                     self.provenance.clone(),
                 )),
                 Timestamp::now(),
@@ -476,7 +476,7 @@ mockall::mock! {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ZomeCallInvocation {
     /// The Id of the `Cell` in which this Zome-call would be invoked
-    pub cell_id: CellId,
+    pub dna_id: DnaId,
     /// The Zome containing the function that would be invoked
     pub zome: Zome,
     /// The capability request authorization.
@@ -520,7 +520,7 @@ impl ZomeCallInvocation {
     ) -> RibosomeResult<Self> {
         let ZomeCallParams {
             cap_secret,
-            cell_id,
+            dna_id,
             expires_at,
             fn_name,
             nonce,
@@ -529,10 +529,10 @@ impl ZomeCallInvocation {
             zome_name,
         } = params;
         let zome = conductor_api
-            .get_zome(cell_id.dna_hash(), &zome_name)
+            .get_zome(dna_id.dna_hash(), &zome_name)
             .map_err(|conductor_api_error| RibosomeError::from(Box::new(conductor_api_error)))?;
         Ok(Self {
-            cell_id,
+            dna_id,
             zome,
             cap_secret,
             fn_name,
@@ -547,7 +547,7 @@ impl ZomeCallInvocation {
 impl From<ZomeCallInvocation> for ZomeCallParams {
     fn from(inv: ZomeCallInvocation) -> Self {
         let ZomeCallInvocation {
-            cell_id,
+            dna_id,
             zome,
             fn_name,
             cap_secret,
@@ -557,7 +557,7 @@ impl From<ZomeCallInvocation> for ZomeCallParams {
             expires_at,
         } = inv;
         Self {
-            cell_id,
+            dna_id,
             provenance,
             zome_name: zome.zome_name().clone(),
             fn_name,
@@ -765,7 +765,7 @@ pub mod wasm_test {
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
         let alice_zome_call_params = ZomeCallParams {
             provenance: alice_pubkey.clone(),
-            cell_id: alice.cell_id().clone(),
+            dna_id: alice.dna_id().clone(),
             zome_name: TestWasm::Capability.coordinator_zome_name(),
             fn_name: "needs_cap_claim".into(),
             cap_secret: None,
@@ -841,7 +841,7 @@ pub mod wasm_test {
             let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
 
             let alice_host_fn_caller = HostFnCaller::create_for_zome(
-                alice_cell.cell_id(),
+                alice_cell.dna_id(),
                 &conductor.raw_handle(),
                 &dna_file,
                 0,
@@ -849,7 +849,7 @@ pub mod wasm_test {
             .await;
 
             let bob_host_fn_caller = HostFnCaller::create_for_zome(
-                bob_cell.cell_id(),
+                bob_cell.dna_id(),
                 &conductor.raw_handle(),
                 &dna_file,
                 0,

@@ -95,7 +95,7 @@ impl PartialEq for Cell {
 /// on the Cell when a Conductor API method is called (either a
 /// [`CellConductorApi`](super::api::CellConductorApi) or an [`AppInterfaceApi`](super::api::AppInterfaceApi))
 pub struct Cell {
-    id: CellId,
+    id: DnaId,
     conductor_api: CellConductorHandle,
     // NOTE: this got snuck in here, the original purpose was that the Cell would have limited access to
     // the full Conductor via `CellConductorHandle`. As it stands, it's redundant to have both, but it
@@ -112,7 +112,7 @@ pub struct Cell {
 impl Cell {
     /// Constructor for a Cell that has gone through genesis; fails otherwise.
     pub async fn create(
-        id: CellId,
+        id: DnaId,
         conductor_handle: ConductorHandle,
         space: Space,
         holochain_p2p_cell: HolochainP2pDna,
@@ -162,7 +162,7 @@ impl Cell {
     /// with the SourceChain
     #[allow(clippy::too_many_arguments)]
     pub async fn genesis<Ribosome>(
-        cell_id: CellId,
+        dna_id: DnaId,
         conductor_handle: ConductorHandle,
         authored_db: DbWrite<DbKindAuthored>,
         dht_db: DbWrite<DbKindDht>,
@@ -173,20 +173,17 @@ impl Cell {
     where
         Ribosome: RibosomeT + 'static,
     {
-        let conductor_api = CellConductorApi::new(conductor_handle.clone(), cell_id.clone());
+        let conductor_api = CellConductorApi::new(conductor_handle.clone(), dna_id.clone());
 
         // run genesis
         let workspace = GenesisWorkspace::new(authored_db, dht_db);
 
         // exit early if genesis has already run
-        if workspace
-            .has_genesis(cell_id.agent_pubkey().clone())
-            .await?
-        {
+        if workspace.has_genesis(dna_id.agent_pubkey().clone()).await? {
             return Ok(());
         }
 
-        let args = GenesisWorkflowArgs::new(cell_id.clone(), membrane_proof, ribosome, chc);
+        let args = GenesisWorkflowArgs::new(dna_id.clone(), membrane_proof, ribosome, chc);
 
         genesis_workflow(workspace, conductor_api, args)
             .await
@@ -195,7 +192,7 @@ impl Cell {
 
         if let Some(trigger) = conductor_handle
             .get_queue_consumer_workflows()
-            .integration_trigger(Arc::new(cell_id.dna_hash().clone()))
+            .integration_trigger(Arc::new(dna_id.dna_hash().clone()))
         {
             trigger.trigger(&"genesis");
         }
@@ -212,7 +209,7 @@ impl Cell {
     }
 
     /// Accessor
-    pub fn id(&self) -> &CellId {
+    pub fn id(&self) -> &DnaId {
         &self.id
     }
 
@@ -282,7 +279,7 @@ impl Cell {
                     };
                     let zome_call_params = ZomeCallParams {
                         provenance,
-                        cell_id: self.id.clone(),
+                        dna_id: self.id.clone(),
                         zome_name: scheduled_fn.zome_name().clone(),
                         fn_name: scheduled_fn.fn_name().clone(),
                         cap_secret: None,
@@ -748,7 +745,7 @@ impl Cell {
             }
         };
         let args = CallZomeWorkflowArgs {
-            cell_id: self.id.clone(),
+            dna_id: self.id.clone(),
             ribosome,
             invocation,
             signal_tx: self.signal_tx.clone(),
@@ -807,7 +804,7 @@ impl Cell {
             ribosome,
             conductor_handle,
             signal_tx: self.signal_tx.clone(),
-            cell_id: self.id.clone(),
+            dna_id: self.id.clone(),
             integrate_dht_ops_trigger: self.queue_triggers.integrate_dht_ops.clone(),
         };
         let init_result = initialize_zomes_workflow(
@@ -827,7 +824,7 @@ impl Cell {
     }
 
     /// Clean up long-running managed tasks.
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(cell_id = ?self.id())))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(dna_id = ?self.id())))]
     pub async fn cleanup(&self) -> CellResult<()> {
         use holochain_p2p::HolochainP2pDnaT;
         let shutdown = self

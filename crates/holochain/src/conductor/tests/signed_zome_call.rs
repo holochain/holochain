@@ -16,8 +16,8 @@ async fn signed_zome_call() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
-    let cell_id = app.cells()[0].cell_id();
-    let agent_pub_key = cell_id.agent_pubkey().clone();
+    let dna_id = app.cells()[0].dna_id();
+    let agent_pub_key = dna_id.agent_pubkey().clone();
 
     // generate a cap access public key
     let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
@@ -46,7 +46,7 @@ async fn signed_zome_call() {
     // request authorization of signing key for agent's own cell should succeed
     let grant_action_hash = conductor
         .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             cap_grant: cap_grant.clone(),
         })
         .await
@@ -54,9 +54,9 @@ async fn signed_zome_call() {
 
     // create a source chain read to query for the cap grant
     let authored_db = conductor
-        .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
+        .get_or_create_authored_db(dna_id.dna_hash(), dna_id.agent_pubkey().clone())
         .unwrap();
-    let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
+    let dht_db = conductor.get_dht_db(dna_id.dna_hash()).unwrap();
 
     let chain = SourceChainRead::new(
         authored_db.into(),
@@ -109,7 +109,7 @@ async fn signed_zome_call() {
     let response = conductor
         .call_zome(ZomeCallParams {
             provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             zome_name: zome.coordinator_zome_name(),
             fn_name: "get_entry".into(),
             cap_secret: None,
@@ -127,7 +127,7 @@ async fn signed_zome_call() {
     let response = conductor
         .call_zome(ZomeCallParams {
             provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             zome_name: zome.coordinator_zome_name(),
             fn_name: "get_entry".into(),
             cap_secret: Some(cap_access_secret),
@@ -148,7 +148,7 @@ async fn signed_zome_call_wildcard() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
-    let cell_id = app.cells()[0].cell_id();
+    let dna_id = app.cells()[0].dna_id();
     let agent_pub_key = app.agent().clone();
 
     // generate a cap access public key
@@ -176,7 +176,7 @@ async fn signed_zome_call_wildcard() {
     // request authorization of signing key for agent's own cell should succeed
     conductor
         .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             cap_grant: cap_grant.clone(),
         })
         .await
@@ -184,9 +184,9 @@ async fn signed_zome_call_wildcard() {
 
     // create a source chain read to query for the cap grant
     let authored_db = conductor
-        .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
+        .get_or_create_authored_db(dna_id.dna_hash(), dna_id.agent_pubkey().clone())
         .unwrap();
-    let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
+    let dht_db = conductor.get_dht_db(dna_id.dna_hash()).unwrap();
 
     let source_chain_read = SourceChainRead::new(
         authored_db.into(),
@@ -219,7 +219,7 @@ async fn signed_zome_call_wildcard() {
     let response = conductor
         .call_zome(ZomeCallParams {
             provenance: cap_access_public_key.clone(), // N.B.: using agent key would bypass capgrant lookup
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             zome_name: zome.coordinator_zome_name(),
             fn_name: "get_entry".into(),
             cap_secret: Some(cap_access_secret),
@@ -243,8 +243,8 @@ async fn cap_grant_info_call() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
-    let cell_id = app.cells()[0].cell_id();
-    let agent_pub_key = cell_id.agent_pubkey().clone();
+    let dna_id = app.cells()[0].dna_id();
+    let agent_pub_key = dna_id.agent_pubkey().clone();
 
     // generate a cap access public key
     let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
@@ -273,7 +273,7 @@ async fn cap_grant_info_call() {
     // create a new cap grant entry
     let grant_action_hash = conductor
         .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             cap_grant: cap_grant.clone(),
         })
         .await
@@ -282,7 +282,7 @@ async fn cap_grant_info_call() {
     // println!("grant_action_hash: {:?}\n", grant_action_hash);
 
     let mut cell_set = HashSet::new();
-    cell_set.insert(cell_id.clone());
+    cell_set.insert(dna_id.clone());
 
     // get the grant info, not including revoked grants
     let cap_info = conductor.capability_grant_info(&cell_set, false).await;
@@ -290,7 +290,7 @@ async fn cap_grant_info_call() {
     // println!("{:?}\n", cap_info);
 
     // host call delete of cap grant
-    let host_caller = HostFnCaller::create(cell_id, &conductor.raw_handle(), &dna).await;
+    let host_caller = HostFnCaller::create(dna_id, &conductor.raw_handle(), &dna).await;
     let _deletehash = host_caller
         .delete_entry(DeleteInput {
             deletes_action_hash: grant_action_hash.clone(),
@@ -301,9 +301,9 @@ async fn cap_grant_info_call() {
 
     // create a source chain read to query for the deleted cap grant
     let authored_db = conductor
-        .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
+        .get_or_create_authored_db(dna_id.dna_hash(), dna_id.agent_pubkey().clone())
         .unwrap();
-    let dht_db = conductor.get_dht_db(cell_id.dna_hash()).unwrap();
+    let dht_db = conductor.get_dht_db(dna_id.dna_hash()).unwrap();
 
     let chain = SourceChainRead::new(
         authored_db.into(),
@@ -337,7 +337,7 @@ async fn cap_grant_info_call() {
     let cap_cell_info = cap_info
         .0
         .iter()
-        .find_map(|(k, v)| if k == cell_id { Some(v) } else { None })
+        .find_map(|(k, v)| if k == dna_id { Some(v) } else { None })
         .unwrap()
         .get(1)
         .unwrap();
@@ -357,7 +357,7 @@ async fn revoke_zome_call_capability_call() {
     let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![zome]).await;
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
-    let cell_id = app.cells()[0].cell_id();
+    let dna_id = app.cells()[0].dna_id();
 
     // generate a cap access public key
     let cap_access_public_key = fixt!(AgentPubKey, ::fixt::Predictable, 1);
@@ -386,7 +386,7 @@ async fn revoke_zome_call_capability_call() {
     // create a new cap grant entry
     let grant_action_hash = conductor
         .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             cap_grant: cap_grant.clone(),
         })
         .await
@@ -395,7 +395,7 @@ async fn revoke_zome_call_capability_call() {
     // println!("grant_action_hash: {:?}\n", grant_action_hash);
 
     let mut cell_set = HashSet::new();
-    cell_set.insert(cell_id.clone());
+    cell_set.insert(dna_id.clone());
 
     // get the cap grant info, not including revoked grants
     let cap_info = conductor.capability_grant_info(&cell_set, false).await;
@@ -403,7 +403,7 @@ async fn revoke_zome_call_capability_call() {
 
     // delete the cap grant entry
     let _delete_action_hash = conductor
-        .revoke_zome_call_capability(cell_id.clone(), grant_action_hash.clone())
+        .revoke_zome_call_capability(dna_id.clone(), grant_action_hash.clone())
         .await
         .expect("Failed to revoke zome call capability");
 
@@ -417,7 +417,7 @@ async fn revoke_zome_call_capability_call() {
     let cap_cell_info = cap_info
         .0
         .iter()
-        .find_map(|(k, v)| if k == cell_id { Some(v) } else { None })
+        .find_map(|(k, v)| if k == dna_id { Some(v) } else { None })
         .unwrap()
         .first();
     assert!(
@@ -433,7 +433,7 @@ async fn revoke_zome_call_capability_call() {
     let cap_cell_info = cap_info
         .0
         .iter()
-        .find_map(|(k, v)| if k == cell_id { Some(v) } else { None })
+        .find_map(|(k, v)| if k == dna_id { Some(v) } else { None })
         .unwrap()
         .get(1)
         .unwrap();

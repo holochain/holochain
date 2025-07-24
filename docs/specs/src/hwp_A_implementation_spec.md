@@ -970,7 +970,7 @@ Zomes are intended to be units of composition for application developers. Thus z
     enum CallTargetCell {
         // Call a function in another cell by its unique conductor-local ID, a
         // tuple of DNA hash and agent public key.
-        OtherCell(CellId),
+        OtherCell(DnaId),
         // Call a function in another cell by the role name specified in the app
         // manifest. This role name may be qualified to a specific clone of the
         // DNA that fills the role by appending a dot and the clone's index.
@@ -979,7 +979,7 @@ Zomes are intended to be units of composition for application developers. Thus z
         Local,
     }
 
-    struct CellId(DnaHash, AgentPubKey);
+    struct DnaId(DnaHash, AgentPubKey);
     ```
 
 #### Clone Management
@@ -991,7 +991,7 @@ The HDK SHOULD implement the ability for cells to modify the running App by addi
     ```rust
     struct CreateCloneCellInput {
         // The ID of the cell to clone.
-        cell_id: CellId,
+        dna_id: DnaId,
 
         // Modifiers to set for the new cell. At least one of the modifiers must
         // be set to obtain a distinct hash for the clone cell's DNA.
@@ -1019,7 +1019,7 @@ The HDK SHOULD implement the ability for cells to modify the running App by addi
 
     ```rust
     struct ClonedCell {
-        cell_id: CellId,
+        dna_id: DnaId,
         // A conductor-local clone identifier.
         clone_id: CloneId,
         // The hash of the DNA that this cell was instantiated from.
@@ -1037,14 +1037,14 @@ The HDK SHOULD implement the ability for cells to modify the running App by addi
 
     ```rust
     struct DisableCloneCellInput {
-        clone_cell_id: CloneCellId,
+        clone_dna_id: CloneDnaId,
     }
 
-    enum CloneCellId {
+    enum CloneDnaId {
         // Clone ID consisting of role name and clone index.
         CloneId(CloneId),
-        // Cell id consisting of DNA hash and agent key.
-        CellId(CellId),
+        // Dna IDconsisting of DNA hash and agent key.
+        DnaId(DnaId),
     }
 
     // A conductor-local unique identifier for a clone, consisting of the role
@@ -1056,7 +1056,7 @@ The HDK SHOULD implement the ability for cells to modify the running App by addi
 
     ```rust
     struct EnableCloneCellInput {
-        clone_cell_id: CloneCellId,
+        clone_dna_id: CloneDnaId,
     }
     ```
 
@@ -1064,7 +1064,7 @@ The HDK SHOULD implement the ability for cells to modify the running App by addi
 
     ```rust
     struct DeleteCloneCellInput {
-        clone_cell_id: CloneCellId,
+        clone_dna_id: CloneDnaId,
     }
     ```
 
@@ -1094,7 +1094,7 @@ Agents MUST be able to communicate directly with other agents. They do so simply
     ```rust
     enum ZomeCallResponse {
         Ok(ExternIO),
-        Unauthorized(ZomeCallAuthorization, CellId, ZomeName, FunctionName, AgentHash),
+        Unauthorized(ZomeCallAuthorization, DnaId, ZomeName, FunctionName, AgentHash),
         NetworkError(String),
         CountersigningSession(String),
     }
@@ -1707,7 +1707,7 @@ The following messages types MUST be implemented. In our implementation, they ar
         ```rust
         struct ZomeCallUnsigned {
             provenance: AgentPubKey,
-            cell_id: CellId,
+            dna_id: DnaId,
             zome_name: ZomeName,
             fn_name: FunctionName,
             cap_secret: Option<CapSecret>,
@@ -2838,7 +2838,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         }
 
         struct ProvisionedCell {
-            cell_id: CellId,
+            dna_id: DnaId,
             dna_modifiers: DnaModifiers,
             name: String,
         }
@@ -2879,7 +2879,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
 * `GenerateAgentPubKey -> AgentPubKeyGenerated(AgentPubKey)` : Generate a new Ed25519 key pair.
     * **Notes**: This call MUST cause a new key pair to be added to the key store and return the public part of that key to the caller. This public key is intended to be used later when installing an App, as a Cell represents the agency of an agent within the space created by a DNA, and that agency comes from the power to sign data with a private key.
 
-* `ListCellIds -> CellIdsListed<Vec<CellId>>`: List all the cell IDs in the conductor.
+* `ListDnaIds -> DnaIdsListed<Vec<DnaId>>`: List all the dna IDs in the conductor.
 
 * `ListApps { status_filter: Option<AppStatusFilter> } -> AppsListed(Vec<AppInfo>)`: List the apps and their information that are installed in the conductor.
     * **Notes**: If `status_filter` is `Some(_)`, it MUST return only the apps with the specified status.
@@ -2903,7 +2903,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         }
         ```
 
-* `EnableApp { installed_app_id: InstalledAppId } -> AppEnabled { app: AppInfo, errors: Vec<(CellId, String)> }`: Change the specified app from a disabled to an enabled state in the conductor.
+* `EnableApp { installed_app_id: InstalledAppId } -> AppEnabled { app: AppInfo, errors: Vec<(DnaId, String)> }`: Change the specified app from a disabled to an enabled state in the conductor.
     * **Notes**: Once an app is enabled, zome functions of all the Cells associated with the App that have a `Create` or `CreateIfNotExists` provisioning strategy MUST immediately be callable. Previously enabled Applications MUST also be loaded and enabled automatically on any reboot of the conductor.
     * **Return value**: If the attempt to enable the app was successful, `AdminResponse::Error(ExternalApiWireError::ActivateApp(s))` MUST be returned, where `s` is an error message to be used for troubleshooting purposes.
 
@@ -2933,11 +2933,11 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         ```
 * **Debugging and introspection dumps**: The following functions are for dumping data about the state of the Conductor. Implementations MAY implement these functions; there is no standard for what they return, other than that they SHOULD be self-describing JSON blobs of useful information that can be parsed by diagnostic tools.
 
-    * `DumpState { cell_id: CellId } -> StateDumped(String)`: Dump the state of the cell specified by the argument `cell_id`, including its chain.
+    * `DumpState { dna_id: DnaId } -> StateDumped(String)`: Dump the state of the cell specified by the argument `dna_id`, including its chain.
 
     * `DumpConductorState -> ConductorStateDumped(String)`: Dump the configured state of the Conductor, including the in-memory representation and the persisted state, as JSON. State to include MAY include status of Applications and Cells, networking configuration, and app interfaces.
 
-    * `DumpFullState { cell_id: CellId, dht_ops_cursor: Option<u64> } -> FullStateDumped(FullStateDump)`: Dump the full state of the specified Cell, including its chain, the list of known peers, and the contents of the DHT shard for which it has claimed authority.
+    * `DumpFullState { dna_id: DnaId, dht_ops_cursor: Option<u64> } -> FullStateDumped(FullStateDump)`: Dump the full state of the specified Cell, including its chain, the list of known peers, and the contents of the DHT shard for which it has claimed authority.
         * **Notes**: The full state including the DHT shard can be quite large.
         * **Arguments**: The database cursor of the last-seen DHT operation row can be supplied in the `dht_ops_cursor` field to dump only unseen state. If specified, the call MUST NOT return DHT operation data from this row and earlier.
         * **Return value**: Unlike other dump functions, this one has some explicit structure defined by Rust types, taking the form:
@@ -3012,12 +3012,12 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
     * **Notes**: Implementations MAY implement this function. It is useful for testing across networks. It is also intended for use cases in which it is important for peer info to be transmitted out-of-band.
     * **Arguments**: If supplied, the `dna_hash` argument MUST constrain the results to the peers of the specified DNA.
 
-* `GraftRecords { cell_id: CellId, validate: bool, records: Vec<Record> } -> RecordsGrafted`: "Graft" `Record`s onto the source chain of the specified `CellId`.
+* `GraftRecords { dna_id: DnaId, validate: bool, records: Vec<Record> } -> RecordsGrafted`: "Graft" `Record`s onto the source chain of the specified `DnaId`.
     * **Notes**: Implementations MAY implement this function. This admin call is provided for the purposes of restoring chains from backup. All records must be authored and signed by the same agent; if they are not, the call MUST fail. Caution must be exercised to avoid creating source chain forks, which will occur if the chains in the Conductor store and the new records supplied in this call diverge and have had their `RegisterAgentActivity` operations already published.
     * **Arguments**:
         * If `validate` is `true`, then the records MUST be validated before insertion. If `validate` is `false`, then records MUST be inserted as-is.
         * Records provided are expected to form a valid chain segment (ascending sequence numbers and valid `prev_action` references). If the first record contains a `prev_action` which matches an existing record, then the new records MUST be "grafted" onto the existing chain at that point, and any other records following that point which do not match the new records MUST be discarded. See the note above about the risk of source chain forks when using this call.
-        * If the DNA whose hash is referenced in the `cell_id` argument is not already installed on this conductor, the call MUST fail.
+        * If the DNA whose hash is referenced in the `dna_id` argument is not already installed on this conductor, the call MUST fail.
 
 * `GrantZomeCallCapability(GrantZomeCallCapabilityPayload) -> ZomeCallCapabilityGranted`: Attempt to store a capability grant on the source chain of the specified cell, so that a client may make zome calls to that cell.
     * **Notes**: Callers SHOULD construct a grant that uses the strongest security compatible with the use case; if a client is able to construct and store an Ed25519 key pair and use it to sign zome call payloads, a grant using `CapAccess::Assigned` with the client's public key SHOULD be favored.
@@ -3026,7 +3026,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         ```rust
         struct GrantZomeCallCapabilityPayload {
             // Cell for which to authorize the capability.
-            cell_id: CellId,
+            dna_id: DnaId,
             // Specifies the capability, consisting of zomes and functions to
             // allow signing for as well as access level, secret and assignees.
             cap_grant: ZomeCallCapGrant,
@@ -3040,7 +3040,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         ```rust
         struct DeleteCloneCellPayload {
             app_id: InstalledAppId,
-            clone_cell_id: CloneCellID,
+            clone_dna_id: CloneDnaId,
         }
         ```
 
@@ -3150,7 +3150,7 @@ enum ExternalApiWireError {
         ```rust
         struct ZomeCall {
             // The ID of the cell containing the zome to be called.
-            cell_id: CellId,
+            dna_id: DnaId,
             // The zome containing the function to be called.
             zome_name: ZomeName,
             // The name of the zome function to call.
@@ -3199,7 +3199,7 @@ enum ExternalApiWireError {
 
         ```rust
         struct ClonedCell {
-            cell_id: CellId,
+            dna_id: DnaId,
             // A conductor-local clone identifier.
             clone_id: CloneId,
             original_dna_hash: DnaHash,
@@ -3218,7 +3218,7 @@ enum ExternalApiWireError {
 
         ```rust
         struct DisableCloneCellPayload {
-            clone_cell_id: CloneCellId,
+            clone_dna_id: CloneDnaId,
         }
         ```
 
@@ -3228,7 +3228,7 @@ enum ExternalApiWireError {
 
         ```rust
         struct EnableCloneCellPayload {
-            clone_cell_id: CloneCellId,
+            clone_dna_id: CloneDnaId,
         }
         ```
 

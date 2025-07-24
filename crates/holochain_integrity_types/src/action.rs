@@ -561,8 +561,8 @@ pub struct DeleteLink {
     pub link_add_address: ActionHash,
 }
 
-/// Description of how to find the previous or next CellId in a migration.
-/// In a migration, of the two components of the CellId (dna and agent),
+/// Description of how to find the previous or next DnaId in a migration.
+/// In a migration, of the two components of the DnaId (dna and agent),
 /// always one stays fixed while the other one changes.
 /// This enum represents the component that changed.
 ///

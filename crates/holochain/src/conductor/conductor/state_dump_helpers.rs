@@ -2,24 +2,24 @@ use super::Conductor;
 use crate::conductor::api::error::{ConductorApiError, ConductorApiResult};
 use chrono::{DateTime, Utc};
 use holochain_conductor_api::{AgentInfoDump, P2pAgentsDump};
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 use kitsune2_api::AgentInfoSigned;
 use std::sync::Arc;
 
 pub async fn peer_store_dump(
     conductor: &Conductor,
-    cell_id: &CellId,
+    dna_id: &DnaId,
 ) -> ConductorApiResult<P2pAgentsDump> {
-    let dna_hash = cell_id.dna_hash().clone();
+    let dna_hash = dna_id.dna_hash().clone();
     let peer_store = conductor
         .holochain_p2p
         .peer_store(dna_hash.clone())
         .await
         .map_err(|err| ConductorApiError::CellError(err.into()))?;
     let all_peers = peer_store.get_all().await?;
-    let agent_id = cell_id.agent_pubkey().to_k2_agent();
+    let agent_id = dna_id.agent_pubkey().to_k2_agent();
     let this_agent_info = peer_store.get(agent_id.clone()).await?;
-    let agent_pub_key = cell_id.agent_pubkey().clone();
+    let agent_pub_key = dna_id.agent_pubkey().clone();
     let space_id = dna_hash.to_k2_space();
     Ok(P2pAgentsDump {
         peers: all_peers.into_iter().map(agent_info_dump).collect(),

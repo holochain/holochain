@@ -9,7 +9,7 @@ use holochain_cascade::error::CascadeError;
 use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 
 use std::path::PathBuf;
 use thiserror::Error;
@@ -28,9 +28,9 @@ pub enum CellError {
     #[error(transparent)]
     ActionError(#[from] ActionError),
     #[error("This cell has not had a successful genesis and cannot be created")]
-    CellWithoutGenesis(CellId),
+    CellWithoutGenesis(DnaId),
     #[error("The cell with id {0} is disabled.")]
-    CellDisabled(CellId),
+    CellDisabled(DnaId),
     #[error("Authentication failure. Bad signature {0:?} by provenance {1}.")]
     ZomeCallAuthenticationFailed(Signature, AgentPubKey),
     #[error(

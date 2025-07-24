@@ -17,7 +17,7 @@ fixturator!(
 );
 
 fixturator!(
-    CellId;
+    DnaId;
     constructor fn new(DnaHash, AgentPubKey);
 );
 

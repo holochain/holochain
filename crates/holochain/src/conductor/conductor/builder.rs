@@ -278,9 +278,9 @@ impl ConductorBuilder {
                     let PostCommitArgs {
                         host_access,
                         invocation,
-                        cell_id,
+                        dna_id,
                     } = post_commit_args;
-                    match conductor_handle.clone().get_ribosome(cell_id.dna_hash()) {
+                    match conductor_handle.clone().get_ribosome(dna_id.dna_hash()) {
                         Ok(ribosome) => {
                             if let Err(e) = ribosome.run_post_commit(host_access, invocation).await
                             {
@@ -297,11 +297,11 @@ impl ConductorBuilder {
                         &[
                             opentelemetry_api::KeyValue::new(
                                 "dna_hash",
-                                format!("{:?}", cell_id.dna_hash()),
+                                format!("{:?}", dna_id.dna_hash()),
                             ),
                             opentelemetry_api::KeyValue::new(
                                 "agent",
-                                format!("{:?}", cell_id.agent_pubkey()),
+                                format!("{:?}", dna_id.agent_pubkey()),
                             ),
                         ],
                     );

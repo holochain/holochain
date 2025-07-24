@@ -27,13 +27,13 @@ pub fn delete_clone_cell(
 
             let conductor_handle = host_context.call_zome_handle();
             let (installed_app_id, _) =
-                check_clone_access(conductor_handle.cell_id(), conductor_handle)?;
+                check_clone_access(conductor_handle.dna_id(), conductor_handle)?;
 
             tokio_helper::block_forever_on(async move {
                 conductor_handle
                     .delete_clone_cell(DeleteCloneCellPayload {
                         app_id: installed_app_id,
-                        clone_cell_id: input.clone_cell_id,
+                        clone_dna_id: input.clone_dna_id,
                     })
                     .await
             })

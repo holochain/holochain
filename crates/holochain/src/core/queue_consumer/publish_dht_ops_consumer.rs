@@ -10,7 +10,7 @@ use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
     tracing::instrument(skip(env, conductor, network))
 )]
 pub fn spawn_publish_dht_ops_consumer(
-    cell_id: CellId,
+    dna_id: DnaId,
     env: DbWrite<DbKindAuthored>,
     conductor: ConductorHandle,
     network: DynHolochainP2pDna,
@@ -38,14 +38,14 @@ pub fn spawn_publish_dht_ops_consumer(
     let sender = tx.clone();
     super::queue_consumer_cell_bound(
         "publish_dht_ops_consumer",
-        cell_id.clone(),
+        dna_id.clone(),
         conductor.task_manager(),
         (tx.clone(), rx),
         move || {
             let conductor = conductor.clone();
             let tx = tx.clone();
             let env = env.clone();
-            let agent = cell_id.agent_pubkey().clone();
+            let agent = dna_id.agent_pubkey().clone();
             let network = network.clone();
             let min_publish_interval = conductor
                 .get_config()

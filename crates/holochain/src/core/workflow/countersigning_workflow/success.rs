@@ -2,7 +2,7 @@ use crate::conductor::space::Space;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::workflow::countersigning_workflow::CountersigningSessionState;
 use holo_hash::{AgentPubKey, DnaHash};
-use holochain_zome_types::prelude::{CellId, SignedAction};
+use holochain_zome_types::prelude::{DnaId, SignedAction};
 
 /// An incoming countersigning session success.
 #[cfg_attr(
@@ -15,13 +15,13 @@ pub(crate) async fn countersigning_success(
     signature_bundle: Vec<SignedAction>,
     countersigning_trigger: TriggerSender,
 ) {
-    let cell_id = CellId::new(
+    let dna_id = DnaId::new(
         DnaHash::from_raw_36(space.dna_hash.get_raw_36().to_vec()),
         author.clone(),
     );
     let workspace = {
         let guard = space.countersigning_workspaces.lock();
-        guard.get(&cell_id).cloned()
+        guard.get(&dna_id).cloned()
     };
 
     if workspace.is_none() {

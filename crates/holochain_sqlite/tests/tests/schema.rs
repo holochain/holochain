@@ -4,13 +4,13 @@ use holochain_sqlite::db::{
 };
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::{DbKindPeerMetaStore, DbKindWasm};
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 use std::sync::Arc;
 use walkdir::WalkDir;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn check_schema_migrations_execute() {
-    let authored = DbWrite::test_in_mem(DbKindAuthored(Arc::new(CellId::new(
+    let authored = DbWrite::test_in_mem(DbKindAuthored(Arc::new(DnaId::new(
         DnaHash::from_raw_36(vec![1; 36]),
         AgentPubKey::from_raw_36(vec![0; 36]),
     ))))

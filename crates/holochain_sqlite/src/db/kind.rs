@@ -1,5 +1,5 @@
 use holo_hash::DnaHash;
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -8,7 +8,7 @@ use std::sync::Arc;
 pub enum DbKind {
     /// Specifies the environment used for authoring data by all cells on the same [`DnaHash`].
     #[display("{:?}-{:?}", "_0.dna_hash()", "_0.agent_pubkey()")]
-    Authored(Arc<CellId>),
+    Authored(Arc<DnaId>),
     /// Specifies the environment used for dht data by all cells on the same [`DnaHash`].
     #[display("{:?}", "_0")]
     Dht(Arc<DnaHash>),
@@ -48,7 +48,7 @@ pub trait DbKindOp {}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used for authoring data by all cells on the same [`DnaHash`].
-pub struct DbKindAuthored(pub Arc<CellId>);
+pub struct DbKindAuthored(pub Arc<DnaId>);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used for dht data by all cells on the same [`DnaHash`].

@@ -78,7 +78,7 @@ async fn ser_regression_test() {
 
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     let mut zome_call_params = ZomeCallParams {
-        cell_id: alice.cell_id().clone(),
+        dna_id: alice.dna_id().clone(),
         zome_name: TestWasm::SerRegression.into(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: "create_channel".into(),
@@ -125,7 +125,7 @@ async fn ser_regression_test() {
     };
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     let mut zome_call_params = ZomeCallParams {
-        cell_id: alice.cell_id().clone(),
+        dna_id: alice.dna_id().clone(),
         zome_name: TestWasm::SerRegression.into(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: "create_message".into(),

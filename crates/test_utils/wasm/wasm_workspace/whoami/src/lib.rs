@@ -60,9 +60,9 @@ fn whoarethey(agent_pubkey: AgentPubKey) -> ExternResult<AgentInfo> {
 // in theory the output is the same as the input
 // it's just that the output comes _from the opinion of the remote agent_
 #[hdk_extern]
-fn who_are_they_local(cell_id: CellId) -> ExternResult<AgentInfo> {
+fn who_are_they_local(dna_id: DnaId) -> ExternResult<AgentInfo> {
     let zome_call_response: ZomeCallResponse = call(
-        CallTargetCell::OtherCell(cell_id),
+        CallTargetCell::OtherCell(dna_id),
         zome_info()?.name,
         "whoami".to_string().into(),
         None,
@@ -117,12 +117,12 @@ fn who_are_they_role_secret((role_name, secret): (RoleName, CapSecret)) -> Exter
 }
 
 /// Call the create entry zome from this zome.
-/// The cell id must point to a cell which includes
+/// The dna id must point to a cell which includes
 /// the "create_entry" zome.
 #[hdk_extern]
-fn call_create_entry(cell_id: CellId) -> ExternResult<ActionHash> {
+fn call_create_entry(dna_id: DnaId) -> ExternResult<ActionHash> {
     let zome_call_response: ZomeCallResponse = call(
-        CallTargetCell::OtherCell(cell_id),
+        CallTargetCell::OtherCell(dna_id),
         Zomes::CreateEntry,
         "create_entry".to_string().into(),
         None,

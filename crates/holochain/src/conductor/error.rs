@@ -8,7 +8,7 @@ use holochain_conductor_api::conductor::ConductorConfigError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_wasmer_host::prelude::WasmErrorInner;
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 use thiserror::Error;
 
 /// Custom result type for conductor errors with [`ConductorError`] as the error type.
@@ -35,17 +35,17 @@ pub enum ConductorError {
     #[error(transparent)]
     DatabaseError(#[from] DatabaseError),
 
-    #[error("Cell already exists. CellId: {0:?}")]
-    CellAlreadyExists(CellId),
+    #[error("Cell already exists. DnaId: {0:?}")]
+    CellAlreadyExists(DnaId),
 
     #[error("Cell is not initialized.")]
     CellNotInitialized,
 
-    #[error("Cell was referenced, but is currently disabled. CellId: {0:?}")]
-    CellDisabled(CellId),
+    #[error("Cell was referenced, but is currently disabled. DnaId: {0:?}")]
+    CellDisabled(DnaId),
 
-    #[error("Cell was referenced, but is missing from the conductor. CellId: {0:?}")]
-    CellMissing(CellId),
+    #[error("Cell was referenced, but is missing from the conductor. DnaId: {0:?}")]
+    CellMissing(DnaId),
 
     #[error("Error while cloning cell: {0}")]
     CloneCellError(String),
@@ -88,7 +88,7 @@ pub enum ConductorError {
     InterfaceError(#[from] Box<InterfaceError>),
 
     #[error("Failed to run genesis on the following cells in the app: {errors:?}")]
-    GenesisFailed { errors: Vec<(CellId, CellError)> },
+    GenesisFailed { errors: Vec<(DnaId, CellError)> },
 
     #[error(transparent)]
     SerializedBytesError(#[from] holochain_serialized_bytes::SerializedBytesError),

@@ -1,6 +1,6 @@
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::app::InstalledAppId;
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -24,10 +24,10 @@ pub struct SignalSubscription {
 pub enum SignalFilterSet {
     /// Only allow signals from the specified Cells with the specified filters,
     /// block everything else
-    Include(HashMap<CellId, SignalFilter>),
+    Include(HashMap<DnaId, SignalFilter>),
     /// Only block signals from the specified Cells with the specified filters
     /// allow everything else
-    Exclude(HashMap<CellId, SignalFilter>),
+    Exclude(HashMap<DnaId, SignalFilter>),
 }
 
 impl Default for SignalFilterSet {

@@ -68,7 +68,7 @@ mod tests {
     #[tokio::test]
     async fn source_chain_lock() {
         let agent_pub_key = AgentPubKey::from_raw_36(vec![0; 36]);
-        let db = DbWrite::test_in_mem(DbKindAuthored(Arc::new(CellId::new(
+        let db = DbWrite::test_in_mem(DbKindAuthored(Arc::new(DnaId::new(
             DnaHash::from_raw_36(vec![1; 36]),
             agent_pub_key.clone(),
         ))))
@@ -133,7 +133,7 @@ mod tests {
     #[tokio::test]
     async fn cannot_hold_multiple_locks() {
         let agent_pub_key = AgentPubKey::from_raw_36(vec![0; 36]);
-        let db = DbWrite::test_in_mem(DbKindAuthored(Arc::new(CellId::new(
+        let db = DbWrite::test_in_mem(DbKindAuthored(Arc::new(DnaId::new(
             DnaHash::from_raw_36(vec![1; 36]),
             agent_pub_key.clone(),
         ))))

@@ -75,7 +75,7 @@ async fn do_not_block_or_send_to_self() {
     dna.expect_send_validation_receipts().never(); // Verify no receipts sent
     let dna = Arc::new(dna);
 
-    let validator = CellId::new(dna_hash.clone(), author);
+    let validator = DnaId::new(dna_hash.clone(), author);
 
     let work_complete = validation_receipt_workflow(
         Arc::new(dna_hash),
@@ -114,7 +114,7 @@ async fn block_invalid_op_author() {
     let dna = Arc::new(dna);
 
     let dna_hash = fixt!(DnaHash);
-    let validator = CellId::new(
+    let validator = DnaId::new(
         dna_hash.clone(),
         keystore.new_sign_keypair_random().await.unwrap(),
     );
@@ -144,9 +144,9 @@ async fn block_invalid_op_author() {
         let read_blocks = blocks.read();
         assert_eq!(1, read_blocks.len());
         match read_blocks.first().unwrap().target() {
-            BlockTarget::Cell(cell_id, reason) => {
+            BlockTarget::Cell(dna_id, reason) => {
                 assert_eq!(CellBlockReason::InvalidOp(op_hash.clone()), *reason);
-                assert_eq!(author, *cell_id.agent_pubkey());
+                assert_eq!(author, *dna_id.agent_pubkey());
             }
             _ => unreachable!("Only expect a cell block"),
         }
@@ -176,7 +176,7 @@ async fn continues_if_receipt_cannot_be_signed() {
 
     let dna_hash = fixt!(DnaHash);
 
-    let invalid_validator = CellId::new(
+    let invalid_validator = DnaId::new(
         dna_hash.clone(),
         fixt!(AgentPubKey), // Not valid because it won't be found in Lair
     );
@@ -216,7 +216,7 @@ async fn send_validation_receipt() {
 
     let dna_hash = fixt!(DnaHash);
 
-    let validator = CellId::new(
+    let validator = DnaId::new(
         dna_hash.clone(),
         keystore.new_sign_keypair_random().await.unwrap(),
     );
@@ -271,7 +271,7 @@ async fn errors_for_some_ops_does_not_prevent_the_workflow_proceeding() {
 
     let dna_hash = fixt!(DnaHash);
 
-    let validator = CellId::new(
+    let validator = DnaId::new(
         dna_hash.clone(),
         keystore.new_sign_keypair_random().await.unwrap(),
     );

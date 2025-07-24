@@ -245,7 +245,7 @@ mod slow_tests {
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::prelude::CreateCloneCellPayload;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::clone::CloneCellId;
+    use holochain_zome_types::clone::CloneDnaId;
     use holochain_zome_types::prelude::*;
     use std::sync::Arc;
     use std::time::Duration;
@@ -415,7 +415,7 @@ mod slow_tests {
             .unwrap();
 
         let enable_or_disable_payload = DisableCloneCellPayload {
-            clone_cell_id: CloneCellId::CloneId(cloned.clone_id.clone()),
+            clone_dna_id: CloneDnaId::CloneId(cloned.clone_id.clone()),
         };
         conductor
             .disable_clone_cell(app.installed_app_id(), &enable_or_disable_payload)
@@ -423,7 +423,7 @@ mod slow_tests {
             .unwrap();
 
         let zome: SweetZome = SweetZome::new(
-            cloned.cell_id.clone(),
+            cloned.dna_id.clone(),
             TestWasm::Create.coordinator_zome_name(),
         );
 

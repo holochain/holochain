@@ -125,7 +125,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         .1[0]
         .clone()
     {
-        CellInfo::Provisioned(c) => c.cell_id.dna_hash().clone(),
+        CellInfo::Provisioned(c) => c.dna_id.dna_hash().clone(),
         _ => panic!("wrong cell type."),
     };
 
@@ -143,7 +143,7 @@ async fn can_install_app_with_custom_modifiers_overridden_correctly() {
         .1[0]
         .clone()
     {
-        CellInfo::Provisioned(c) => c.cell_id.dna_hash().clone(),
+        CellInfo::Provisioned(c) => c.dna_id.dna_hash().clone(),
         _ => panic!("wrong cell type."),
     };
 

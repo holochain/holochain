@@ -78,7 +78,7 @@ mod tests;
 /// a race condition by trying to run a workflow too soon after cell creation.
 #[allow(clippy::too_many_arguments)]
 pub async fn spawn_queue_consumer_tasks(
-    cell_id: CellId,
+    dna_id: DnaId,
     network: DynHolochainP2pDna,
     space: &Space,
     conductor: ConductorHandle,
@@ -90,13 +90,13 @@ pub async fn spawn_queue_consumer_tasks(
     } = space;
 
     let keystore = conductor.keystore().clone();
-    let dna_hash = Arc::new(cell_id.dna_hash().clone());
+    let dna_hash = Arc::new(dna_id.dna_hash().clone());
     let queue_consumer_map = conductor.get_queue_consumer_workflows();
-    let authored_db = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
+    let authored_db = space.get_or_create_authored_db(dna_id.agent_pubkey().clone())?;
 
     // Publish
     let tx_publish = spawn_publish_dht_ops_consumer(
-        cell_id.clone(),
+        dna_id.clone(),
         authored_db.clone(),
         conductor.clone(),
         network.clone(),
@@ -152,7 +152,7 @@ pub async fn spawn_queue_consumer_tasks(
                 authored_db.clone(),
                 dht_db.clone(),
                 cache.clone(),
-                cell_id.dna_hash().clone(),
+                dna_id.dna_hash().clone(),
                 conductor
                     .get_config()
                     .conductor_tuning_params()
@@ -170,7 +170,7 @@ pub async fn spawn_queue_consumer_tasks(
     let workspace = {
         let mut guard = space.countersigning_workspaces.lock();
         guard
-            .entry(cell_id.clone())
+            .entry(dna_id.clone())
             .or_insert_with(|| {
                 Arc::new(CountersigningWorkspace::new(
                     conductor
@@ -188,7 +188,7 @@ pub async fn spawn_queue_consumer_tasks(
     let tx_countersigning = spawn_countersigning_consumer(
         space.clone(),
         workspace,
-        cell_id,
+        dna_id,
         conductor.clone(),
         tx_integration.clone(),
         tx_publish.clone(),
@@ -759,15 +759,15 @@ fn queue_consumer_cell_bound<
     Fut: 'static + Send + Future<Output = WorkflowResult<WorkComplete>>,
 >(
     name: &str,
-    cell_id: CellId,
+    dna_id: DnaId,
     tm: TaskManagerClient,
     (tx, rx): (TriggerSender, TriggerReceiver),
     fut: impl 'static + Send + FnMut() -> Fut,
 ) {
     let workflow_name = name.to_string();
-    let dna_hash = cell_id.dna_hash().clone();
-    let agent = cell_id.agent_pubkey().clone();
-    tm.add_cell_task_critical(name, cell_id, {
+    let dna_hash = dna_id.dna_hash().clone();
+    let agent = dna_id.agent_pubkey().clone();
+    tm.add_cell_task_critical(name, dna_id, {
         move |stop| {
             queue_consumer_main_task_impl(
                 workflow_name,

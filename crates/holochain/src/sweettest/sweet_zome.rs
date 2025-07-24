@@ -6,14 +6,14 @@ use serde::de::DeserializeOwned;
 /// Think of it as a partially applied SweetCell, with the ZomeName baked in.
 #[derive(Clone, Debug, derive_more::Constructor)]
 pub struct SweetZome {
-    cell_id: CellId,
+    dna_id: DnaId,
     name: ZomeName,
 }
 
 impl SweetZome {
     /// Accessor
-    pub fn cell_id(&self) -> &CellId {
-        &self.cell_id
+    pub fn dna_id(&self) -> &DnaId {
+        &self.dna_id
     }
 
     /// Accessor

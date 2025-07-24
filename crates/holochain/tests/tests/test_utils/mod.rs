@@ -101,7 +101,7 @@ pub async fn start_holochain_with_lair(
 
 pub async fn grant_zome_call_capability(
     admin_tx: &mut WebsocketSender,
-    cell_id: &CellId,
+    dna_id: &DnaId,
     zome_name: ZomeName,
     fn_name: FunctionName,
     signing_key: AgentPubKey,
@@ -116,7 +116,7 @@ pub async fn grant_zome_call_capability(
     let cap_secret = fixt!(CapSecret);
 
     let request = AdminRequest::GrantZomeCallCapability(Box::new(GrantZomeCallCapabilityPayload {
-        cell_id: cell_id.clone(),
+        dna_id: dna_id.clone(),
         cap_grant: ZomeCallCapGrant {
             tag: "".into(),
             access: CapAccess::Assigned {
@@ -134,7 +134,7 @@ pub async fn grant_zome_call_capability(
 
 pub async fn call_zome_fn_fallible<I>(
     app_tx: &WebsocketSender,
-    cell_id: CellId,
+    dna_id: DnaId,
     signing_keypair: &SigningKey,
     cap_secret: CapSecret,
     zome_name: ZomeName,
@@ -148,7 +148,7 @@ where
     let signing_key = AgentPubKey::from_raw_32(signing_keypair.verifying_key().as_bytes().to_vec());
     let zome_call_params = ZomeCallParams {
         cap_secret: Some(cap_secret),
-        cell_id: cell_id.clone(),
+        dna_id: dna_id.clone(),
         zome_name: zome_name.clone(),
         fn_name: fn_name.clone(),
         provenance: signing_key,
@@ -168,7 +168,7 @@ where
 
 pub async fn call_zome_fn<I>(
     app_tx: &WebsocketSender,
-    cell_id: CellId,
+    dna_id: DnaId,
     signing_keypair: &SigningKey,
     cap_secret: CapSecret,
     zome_name: ZomeName,
@@ -180,7 +180,7 @@ where
 {
     let call_response = call_zome_fn_fallible(
         app_tx,
-        cell_id,
+        dna_id,
         signing_keypair,
         cap_secret,
         zome_name,
@@ -250,7 +250,7 @@ pub async fn register_and_install_dna(
     properties: Option<YamlProperties>,
     role_name: RoleName,
     timeout: u64,
-) -> WebsocketResult<CellId> {
+) -> WebsocketResult<DnaId> {
     register_and_install_dna_named(
         client,
         dna_path,
@@ -271,7 +271,7 @@ pub async fn register_and_install_dna_named(
     role_name: RoleName,
     name: String,
     timeout: u64,
-) -> WebsocketResult<CellId> {
+) -> WebsocketResult<DnaId> {
     let mods = DnaModifiersOpt {
         properties,
         ..Default::default()
@@ -326,7 +326,7 @@ pub async fn register_and_install_dna_named(
     let response = client.request(request);
     let response = check_timeout_named("InstallApp", response, timeout).await?;
     if let AdminResponse::AppInstalled(app) = response {
-        Ok(CellId::new(dna_hash, app.agent_pub_key))
+        Ok(DnaId::new(dna_hash, app.agent_pub_key))
     } else {
         panic!("InstallApp failed: {:?}", response);
     }
@@ -420,11 +420,11 @@ async fn check_timeout_named<T>(
 
 pub async fn dump_full_state(
     client: &mut WebsocketSender,
-    cell_id: CellId,
+    dna_id: DnaId,
     dht_ops_cursor: Option<u64>,
 ) -> WebsocketResult<FullStateDump> {
     let request = AdminRequest::DumpFullState {
-        cell_id: Box::new(cell_id),
+        dna_id: Box::new(dna_id),
         dht_ops_cursor,
     };
     let response = client.request(request);

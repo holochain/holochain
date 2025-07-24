@@ -97,7 +97,7 @@ pub async fn send_post_commit(
     signal_tx: broadcast::Sender<Signal>,
     call_zome_handle: Option<CellConductorReadHandle>,
 ) -> Result<(), tokio::sync::mpsc::error::SendError<()>> {
-    let cell_id = workspace.source_chain().cell_id();
+    let dna_id = workspace.source_chain().dna_id();
 
     for zome in zomes {
         conductor_handle
@@ -112,7 +112,7 @@ pub async fn send_post_commit(
                     call_zome_handle: call_zome_handle.clone(),
                 },
                 invocation: PostCommitInvocation::new(zome, actions.clone()),
-                cell_id: cell_id.clone(),
+                dna_id: dna_id.clone(),
             });
     }
     Ok(())
@@ -122,7 +122,7 @@ pub async fn send_post_commit(
 pub struct PostCommitArgs {
     pub host_access: PostCommitHostAccess,
     pub invocation: PostCommitInvocation,
-    pub cell_id: Arc<CellId>,
+    pub dna_id: Arc<DnaId>,
 }
 
 #[cfg(test)]

@@ -83,7 +83,7 @@ how_many: 42
     // Install Dna
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
 
-    let installed_cell_id = register_and_install_dna(
+    let installed_dna_id = register_and_install_dna(
         &mut client,
         fake_dna_path,
         Some(properties.clone()),
@@ -93,7 +93,7 @@ how_many: 42
     .await
     .unwrap();
 
-    let installed_dna_hash = installed_cell_id.dna_hash().clone();
+    let installed_dna_hash = installed_dna_id.dna_hash().clone();
 
     assert_ne!(installed_dna_hash, original_dna_hash);
 
@@ -113,7 +113,7 @@ async fn zome_call_authentication() {
     // actually runs the holochain binary
 
     let TestCase {
-        cell_id,
+        dna_id,
         _admin_rx,
         app_tx,
         app_rx,
@@ -130,8 +130,8 @@ async fn zome_call_authentication() {
     // Authentication of zome call should fail with invalid signature.
     let (nonce, expires_at) = holochain_nonce::fresh_nonce(Timestamp::now()).unwrap();
     let mut zome_call_params = ZomeCallParams {
-        provenance: cell_id.agent_pubkey().clone(),
-        cell_id: cell_id.clone(),
+        provenance: dna_id.agent_pubkey().clone(),
+        dna_id: dna_id.clone(),
         zome_name: zome_name.clone(),
         fn_name: fn_name.clone(),
         cap_secret: None,
@@ -170,7 +170,7 @@ async fn zome_call_authentication() {
     tracing::info!("Calling zome");
     call_zome_fn(
         &app_tx,
-        cell_id.clone(),
+        dna_id.clone(),
         &signing_keypair,
         cap_secret,
         zome_name.clone(),
@@ -188,7 +188,7 @@ async fn zome_call_with_conductor_restart() {
     // actually runs the holochain binary
 
     let TestCase {
-        cell_id,
+        dna_id,
         admin_tx,
         _admin_rx,
         admin_port,
@@ -208,7 +208,7 @@ async fn zome_call_with_conductor_restart() {
     tracing::info!("Calling zome");
     call_zome_fn(
         &app_tx,
-        cell_id.clone(),
+        dna_id.clone(),
         &signing_keypair,
         cap_secret,
         zome_name.clone(),
@@ -261,7 +261,7 @@ async fn zome_call_with_conductor_restart() {
     tracing::info!("Calling zome again");
     call_zome_fn(
         &app_tx,
-        cell_id.clone(),
+        dna_id.clone(),
         &signing_keypair,
         cap_secret,
         zome_name.clone(),
@@ -378,7 +378,7 @@ async fn emit_signals() {
     let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
 
     // Install Dna
-    let cell_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 20_000)
+    let dna_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 20_000)
         .await
         .unwrap();
 
@@ -403,7 +403,7 @@ async fn emit_signals() {
     let fn_name = FunctionName("emit".into());
     let cap_secret = grant_zome_call_capability(
         &mut admin_tx,
-        &cell_id,
+        &dna_id,
         zome_name.clone(),
         fn_name.clone(),
         signing_key,
@@ -453,7 +453,7 @@ async fn emit_signals() {
 
     call_zome_fn(
         &app_tx_1,
-        cell_id.clone(),
+        dna_id.clone(),
         &signing_keypair,
         cap_secret,
         zome_name.clone(),
@@ -469,7 +469,7 @@ async fn emit_signals() {
 
     assert_eq!(
         Signal::App {
-            cell_id,
+            dna_id,
             zome_name,
             signal: AppSignal::new(ExternIO::encode(()).unwrap()),
         },
@@ -742,7 +742,7 @@ async fn concurrent_install_dna() {
             );
             let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
 
-            let _cell_id = register_and_install_dna_named(
+            let _dna_id = register_and_install_dna_named(
                 &mut client,
                 fake_dna_path.clone(),
                 None,
@@ -753,8 +753,8 @@ async fn concurrent_install_dna() {
             .await;
 
             // println!(
-            //     "[{}] installed app with cell id {} and name {}",
-            //     i, _cell_id, name
+            //     "[{}] installed app with dna id {} and name {}",
+            //     i, _dna_id, name
             // );
         })
     }))
@@ -817,11 +817,11 @@ async fn full_state_dump_cursor_works() {
 
     let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
 
-    let cell_id = app.into_cells()[0].cell_id().clone();
+    let dna_id = app.into_cells()[0].dna_id().clone();
 
     let (mut client, _rx) = conductor.admin_ws_client::<AppResponse>().await;
 
-    let full_state = dump_full_state(&mut client, cell_id.clone(), None)
+    let full_state = dump_full_state(&mut client, dna_id.clone(), None)
         .await
         .unwrap();
 
@@ -836,7 +836,7 @@ async fn full_state_dump_cursor_works() {
     // We are assuming we have at least one DhtOp in the Cell
     let full_state = dump_full_state(
         &mut client,
-        cell_id,
+        dna_id,
         Some(full_state.integration_dump.dht_ops_cursor - 1),
     )
     .await
@@ -926,11 +926,11 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     let _rx4 = WsPollRecv::new::<AdminResponse>(rx);
 
     let response: AdminResponse = ipv4_admin_sender
-        .request(AdminRequest::ListCellIds)
+        .request(AdminRequest::ListDnaIds)
         .await
         .unwrap();
     match response {
-        AdminResponse::CellIdsListed(_) => (),
+        AdminResponse::DnaIdsListed(_) => (),
         _ => panic!("unexpected response"),
     }
 
@@ -943,11 +943,11 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
     let _rx6 = WsPollRecv::new::<AdminResponse>(rx);
 
     let response: AdminResponse = ipv6_admin_sender
-        .request(AdminRequest::ListCellIds)
+        .request(AdminRequest::ListDnaIds)
         .await
         .unwrap();
     match response {
-        AdminResponse::CellIdsListed(_) => (),
+        AdminResponse::DnaIdsListed(_) => (),
         _ => panic!("unexpected response"),
     }
 
@@ -1135,7 +1135,7 @@ async fn filter_messages_that_do_not_deserialize() {
 }
 
 struct TestCase {
-    cell_id: CellId,
+    dna_id: DnaId,
     admin_tx: WebsocketSender,
     _admin_rx: WsPollRecv,
     app_tx: WebsocketSender,
@@ -1174,11 +1174,10 @@ impl TestCase {
 
         // Install Dna
         let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna.clone()).await.unwrap();
-        let cell_id =
-            register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000)
-                .await
-                .unwrap();
-        let installed_dna_hash = cell_id.dna_hash().clone();
+        let dna_id = register_and_install_dna(&mut admin_tx, fake_dna_path, None, "".into(), 10000)
+            .await
+            .unwrap();
+        let installed_dna_hash = dna_id.dna_hash().clone();
 
         // List Dnas
         let request = AdminRequest::ListDnas;
@@ -1213,7 +1212,7 @@ impl TestCase {
         // Grant zome call capability for agent
         let cap_secret = grant_zome_call_capability(
             &mut admin_tx,
-            &cell_id,
+            &dna_id,
             zome_name.clone(),
             fn_name.clone(),
             signing_key,
@@ -1222,7 +1221,7 @@ impl TestCase {
         .unwrap();
 
         TestCase {
-            cell_id,
+            dna_id,
             admin_tx,
             _admin_rx,
             admin_port,

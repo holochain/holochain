@@ -24,7 +24,7 @@ where
     pub ribosome: Ribosome,
     pub conductor_handle: ConductorHandle,
     pub signal_tx: broadcast::Sender<Signal>,
-    pub cell_id: CellId,
+    pub dna_id: DnaId,
     pub integrate_dht_ops_trigger: TriggerSender,
 }
 
@@ -96,11 +96,11 @@ where
         ribosome,
         conductor_handle,
         signal_tx,
-        cell_id,
+        dna_id,
         ..
     } = args;
     let call_zome_handle =
-        CellConductorApi::new(conductor_handle.clone(), cell_id.clone()).into_call_zome_handle();
+        CellConductorApi::new(conductor_handle.clone(), dna_id.clone()).into_call_zome_handle();
 
     // Call the init callback
     let result = {
@@ -215,7 +215,7 @@ mod tests {
             ribosome,
             conductor_handle,
             signal_tx: broadcast::channel(1).0,
-            cell_id: CellId::new(dna_hash.clone(), author.clone()),
+            dna_id: DnaId::new(dna_hash.clone(), author.clone()),
             integrate_dht_ops_trigger: integrate_dht_ops_trigger.0.clone(),
         };
         let keystore = fixt!(MetaLairClient);

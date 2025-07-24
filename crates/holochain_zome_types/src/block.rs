@@ -175,7 +175,7 @@ type IpV4 = std::net::Ipv4Addr;
 #[derive(Clone, Debug)]
 pub enum BlockTarget {
     /// Some cell did bad at the happ level.
-    Cell(CellId, CellBlockReason),
+    Cell(DnaId, CellBlockReason),
     NodeDna(kitsune_p2p_block::NodeId, DnaHash, NodeSpaceBlockReason),
     /// Some node is playing silly buggers.
     Node(kitsune_p2p_block::NodeId, NodeBlockReason),
@@ -199,7 +199,7 @@ impl From<kitsune_p2p_block::BlockTarget> for BlockTarget {
 
 #[derive(Debug, serde::Serialize, Clone)]
 pub enum BlockTargetId {
-    Cell(CellId),
+    Cell(DnaId),
     NodeDna(kitsune_p2p_block::NodeId, DnaHash),
     Node(kitsune_p2p_block::NodeId),
     Ip(IpV4),

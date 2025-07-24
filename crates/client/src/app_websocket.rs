@@ -15,7 +15,7 @@ use holochain_types::prelude::{CloneId, Signal};
 use holochain_websocket::{ConnectRequest, WebsocketConfig};
 use holochain_zome_types::{
     clone::ClonedCell,
-    prelude::{CellId, ExternIO, FunctionName, RoleName, Timestamp, ZomeCallParams, ZomeName},
+    prelude::{DnaId, ExternIO, FunctionName, RoleName, Timestamp, ZomeCallParams, ZomeName},
 };
 use kitsune2_api::Url;
 use std::collections::BTreeMap;
@@ -203,14 +203,14 @@ impl AppWebsocket {
         self.inner
             .on_signal(move |signal| match signal.clone() {
                 Signal::App {
-                    cell_id,
+                    dna_id,
                     zome_name: _,
                     signal: _,
                 } => {
                     if app_info.cell_info.values().any(|cells| {
                         cells.iter().any(|cell_info| match cell_info {
-                            CellInfo::Provisioned(cell) => cell.cell_id.eq(&cell_id),
-                            CellInfo::Cloned(cell) => cell.cell_id.eq(&cell_id),
+                            CellInfo::Provisioned(cell) => cell.dna_id.eq(&dna_id),
+                            CellInfo::Cloned(cell) => cell.dna_id.eq(&dna_id),
                             _ => false,
                         })
                     }) {
@@ -243,21 +243,21 @@ impl AppWebsocket {
         fn_name: FunctionName,
         payload: ExternIO,
     ) -> ConductorApiResult<ExternIO> {
-        let cell_id = match target {
-            ZomeCallTarget::CellId(cell_id) => cell_id,
-            ZomeCallTarget::RoleName(role_name) => self.get_cell_id_from_role_name(&role_name)?,
-            ZomeCallTarget::CloneId(clone_id) => self.get_cell_id_from_role_name(&clone_id.0)?,
+        let dna_id = match target {
+            ZomeCallTarget::DnaId(dna_id) => dna_id,
+            ZomeCallTarget::RoleName(role_name) => self.get_dna_id_from_role_name(&role_name)?,
+            ZomeCallTarget::CloneId(clone_id) => self.get_dna_id_from_role_name(&clone_id.0)?,
         };
 
         let (nonce, expires_at) =
             fresh_nonce(Timestamp::now()).map_err(ConductorApiError::FreshNonceError)?;
 
         let params = ZomeCallParams {
-            provenance: self.signer.get_provenance(&cell_id).ok_or(
+            provenance: self.signer.get_provenance(&dna_id).ok_or(
                 ConductorApiError::SignZomeCallError("Provenance not found".to_string()),
             )?,
-            cap_secret: self.signer.get_cap_secret(&cell_id),
-            cell_id: cell_id.clone(),
+            cap_secret: self.signer.get_cap_secret(&dna_id),
+            dna_id: dna_id.clone(),
             zome_name,
             fn_name,
             payload,
@@ -360,7 +360,7 @@ impl AppWebsocket {
         Ok(())
     }
 
-    fn get_cell_id_from_role_name(&self, role_name: &RoleName) -> ConductorApiResult<CellId> {
+    fn get_dna_id_from_role_name(&self, role_name: &RoleName) -> ConductorApiResult<DnaId> {
         if is_clone_id(role_name) {
             let base_role_name = get_base_role_name_from_clone_id(role_name);
 
@@ -381,7 +381,7 @@ impl AppWebsocket {
                 });
 
             let clone_cell = maybe_clone_cell.ok_or(ConductorApiError::CellNotFound)?;
-            Ok(clone_cell.cell_id)
+            Ok(clone_cell.dna_id)
         } else {
             let Some(role_cells) = self.app_info.cell_info.get(role_name) else {
                 return Err(ConductorApiError::CellNotFound);
@@ -394,7 +394,7 @@ impl AppWebsocket {
                 });
 
             let provisioned_cell = maybe_provisioned.ok_or(ConductorApiError::CellNotFound)?;
-            Ok(provisioned_cell.cell_id)
+            Ok(provisioned_cell.dna_id)
         }
     }
 
@@ -466,22 +466,22 @@ impl AppWebsocket {
 }
 
 pub enum ZomeCallTarget {
-    CellId(CellId),
+    DnaId(DnaId),
     /// Call a cell by its role name.
     ///
     /// Note that when using clone cells, if you create them after creating the [AppWebsocket], you will need to call [AppWebsocket::refresh_app_info]
-    /// for the right CellId to be found to make the call.
+    /// for the right DnaId to be found to make the call.
     RoleName(RoleName),
     /// Call a cell by its clone id.
     ///
     /// Note that when using clone cells, if you create them after creating the [AppWebsocket], you will need to call [AppWebsocket::refresh_app_info]
-    /// for the right CellId to be found to make the call.
+    /// for the right DnaId to be found to make the call.
     CloneId(CloneId),
 }
 
-impl From<CellId> for ZomeCallTarget {
-    fn from(cell_id: CellId) -> Self {
-        ZomeCallTarget::CellId(cell_id)
+impl From<DnaId> for ZomeCallTarget {
+    fn from(dna_id: DnaId) -> Self {
+        ZomeCallTarget::DnaId(dna_id)
     }
 }
 

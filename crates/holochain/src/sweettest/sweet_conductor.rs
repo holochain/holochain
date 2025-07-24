@@ -365,16 +365,16 @@ impl SweetConductor {
         let mut sweet_cells = Vec::new();
 
         for role in roles {
-            if let Some(CellInfo::Provisioned(ProvisionedCell { cell_id, .. })) =
+            if let Some(CellInfo::Provisioned(ProvisionedCell { dna_id, .. })) =
                 info.cell_info[role].first()
             {
-                assert_eq!(cell_id.agent_pubkey(), &agent, "Agent mismatch for cell");
+                assert_eq!(dna_id.agent_pubkey(), &agent, "Agent mismatch for cell");
 
                 // Initialize per-space databases
-                let _space = self.spaces.get_or_create_space(cell_id.dna_hash())?;
+                let _space = self.spaces.get_or_create_space(dna_id.dna_hash())?;
 
                 // Create and add the SweetCell
-                sweet_cells.push(self.get_sweet_cell(cell_id.clone())?);
+                sweet_cells.push(self.get_sweet_cell(dna_id.clone())?);
             }
         }
 
@@ -382,14 +382,14 @@ impl SweetConductor {
     }
 
     /// Construct a SweetCell for a cell which has already been created
-    pub fn get_sweet_cell(&self, cell_id: CellId) -> ConductorApiResult<SweetCell> {
+    pub fn get_sweet_cell(&self, dna_id: DnaId) -> ConductorApiResult<SweetCell> {
         let cell_authored_db = self
             .raw_handle()
-            .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
-        let cell_dht_db = self.raw_handle().get_dht_db(cell_id.dna_hash())?;
+            .get_or_create_authored_db(dna_id.dna_hash(), dna_id.agent_pubkey().clone())?;
+        let cell_dht_db = self.raw_handle().get_dht_db(dna_id.dna_hash())?;
         let conductor_config = self.config.clone();
         Ok(SweetCell {
-            cell_id,
+            dna_id,
             cell_authored_db,
             cell_dht_db,
             conductor_config,
@@ -530,7 +530,7 @@ impl SweetConductor {
             .raw_handle()
             .create_clone_cell(installed_app_id, payload)
             .await?;
-        let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
+        let dna_file = self.get_dna_file(clone.dna_id.dna_hash()).unwrap();
         self.dnas.push(dna_file);
         Ok(clone)
     }
@@ -721,11 +721,11 @@ impl SweetConductor {
         loop {
             let (number_of_peers, completed_rounds) = handle
                 .dump_network_metrics(Kitsune2NetworkMetricsRequest {
-                    dna_hash: Some(cell.cell_id().dna_hash().clone()),
+                    dna_hash: Some(cell.dna_id().dna_hash().clone()),
                     ..Default::default()
                 })
                 .await?
-                .get(cell.cell_id.dna_hash())
+                .get(cell.dna_id.dna_hash())
                 .map_or((0, 0), |info| {
                     (
                         // The number of peers we're holding metadata for
@@ -742,7 +742,7 @@ impl SweetConductor {
                 tracing::info!(
                     "Took {}s for cell {} to complete {} gossip rounds",
                     wait_start.elapsed().as_secs(),
-                    cell.cell_id(),
+                    cell.dna_id(),
                     completed_rounds
                 );
                 return Ok(());
@@ -753,7 +753,7 @@ impl SweetConductor {
             if wait_start.elapsed() > timeout {
                 anyhow::bail!(
                     "Timed out waiting for gossip to start for cell {}",
-                    cell.cell_id()
+                    cell.dna_id()
                 );
             }
         }
@@ -778,14 +778,14 @@ impl SweetConductor {
 
     /// Retries getting a list of peers from the conductor until all the given peers are in the response.
     ///
-    /// You can optionally filter by `cell_id`. That is used in the `get_agent_infos` call to the conductor, so you
+    /// You can optionally filter by `dna_id`. That is used in the `get_agent_infos` call to the conductor, so you
     /// can see how that works in the conductor docs.
     ///
     /// If the max_wait is reached then this function will return a "Timeout" error.
     pub async fn wait_for_peer_visible<P: IntoIterator<Item = AgentPubKey>>(
         &self,
         peers: P,
-        cell_id: Option<CellId>,
+        dna_id: Option<DnaId>,
         max_wait: Duration,
     ) -> ConductorApiResult<()> {
         let handle = self.raw_handle();
@@ -795,11 +795,7 @@ impl SweetConductor {
         tokio::time::timeout(max_wait, async move {
             loop {
                 let infos = handle
-                    .get_agent_infos(
-                        cell_id
-                            .clone()
-                            .map(|cell_id| vec![cell_id.dna_hash().clone()]),
-                    )
+                    .get_agent_infos(dna_id.clone().map(|dna_id| vec![dna_id.dna_hash().clone()]))
                     .await?
                     .into_iter()
                     .map(|p| AgentPubKey::from_k2_agent(&p.agent))

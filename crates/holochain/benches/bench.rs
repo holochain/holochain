@@ -33,9 +33,9 @@ static REAL_RIBOSOME: Lazy<Mutex<holochain::core::ribosome::real_ribosome::RealR
         )
     });
 
-static CELL_ID: Lazy<Mutex<holochain_zome_types::cell::CellId>> = Lazy::new(|| {
+static DNA_ID: Lazy<Mutex<holochain_zome_types::cell::DnaId>> = Lazy::new(|| {
     Mutex::new(
-        holochain_types::fixt::CellIdFixturator::new(Unpredictable)
+        holochain_types::fixt::DnaIdFixturator::new(Unpredictable)
             .next()
             .unwrap(),
     )
@@ -74,7 +74,7 @@ pub fn wasm_call_n(c: &mut Criterion) {
             b.iter(|| {
                 let zome: Zome = TestZomes::from(TestWasm::Bench).coordinator.erase_type();
                 let i = ZomeCallInvocation {
-                    cell_id: CELL_ID.lock().unwrap().clone(),
+                    dna_id: DNA_ID.lock().unwrap().clone(),
                     zome: zome.clone(),
                     cap_secret: Some(*CAP.lock().unwrap()),
                     fn_name: "echo_bytes".into(),

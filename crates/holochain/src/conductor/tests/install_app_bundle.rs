@@ -178,7 +178,7 @@ async fn reject_duplicate_app_for_same_agent() {
         .unwrap();
     let alice = app.agent_key().clone();
 
-    let cell_id = CellId::new(dna.dna_hash().to_owned(), app.agent_key().clone());
+    let dna_id = DnaId::new(dna.dna_hash().to_owned(), app.agent_key().clone());
 
     let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
     let bundle = AppBundle::new(manifest.clone().into(), resources).unwrap();
@@ -196,7 +196,7 @@ async fn reject_duplicate_app_for_same_agent() {
         .await;
     assert_matches!(
         duplicate_install_with_app_disabled.unwrap_err(),
-        ConductorError::CellAlreadyExists(id) if id == cell_id
+        ConductorError::CellAlreadyExists(id) if id == dna_id
     );
 
     // enable app
@@ -218,7 +218,7 @@ async fn reject_duplicate_app_for_same_agent() {
         .await;
     assert_matches!(
         duplicate_install_with_app_enabled.unwrap_err(),
-        ConductorError::CellAlreadyExists(id) if id == cell_id
+        ConductorError::CellAlreadyExists(id) if id == dna_id
     );
 
     let resources = vec![(path, DnaBundle::from_dna_file(dna.clone()).unwrap())];
@@ -373,12 +373,12 @@ async fn cells_by_dna_lineage() {
         .await
         .unwrap();
 
-    fn app_cells(app: &SweetApp, indices: &[usize]) -> (String, BTreeSet<CellId>) {
+    fn app_cells(app: &SweetApp, indices: &[usize]) -> (String, BTreeSet<DnaId>) {
         (
             app.installed_app_id().clone(),
             indices
                 .iter()
-                .map(|i| app.cells()[*i].cell_id().clone())
+                .map(|i| app.cells()[*i].dna_id().clone())
                 .collect(),
         )
     }
@@ -543,7 +543,7 @@ async fn use_existing_integration() {
         ));
     }
     {
-        // Fail to install the dependent app because the existing CellId is not specified
+        // Fail to install the dependent app because the existing DnaId is not specified
         let err = conductor
             .clone()
             .install_app_bundle(InstallAppPayload {
@@ -563,14 +563,14 @@ async fn use_existing_integration() {
         ));
     }
 
-    let cell_id = app_1
+    let dna_id = app_1
         .all_cells()
-        .collect::<Vec<CellId>>()
+        .collect::<Vec<DnaId>>()
         .first()
         .unwrap()
         .to_owned();
 
-    let role_settings = ("extant".into(), RoleSettings::UseExisting { cell_id });
+    let role_settings = ("extant".into(), RoleSettings::UseExisting { dna_id });
 
     let app_2 = conductor
         .clone()
@@ -585,9 +585,9 @@ async fn use_existing_integration() {
         .await
         .unwrap();
 
-    let cell_id_1 = app_1.all_cells().next().unwrap().clone();
-    let cell_id_2 = app_2.all_cells().next().unwrap().clone();
-    let zome2 = SweetZome::new(cell_id_2.clone(), "whoami".into());
+    let dna_id_1 = app_1.all_cells().next().unwrap().clone();
+    let dna_id_2 = app_2.all_cells().next().unwrap().clone();
+    let zome2 = SweetZome::new(dna_id_2.clone(), "whoami".into());
 
     conductor.enable_app("app_1".into()).await.unwrap();
     conductor.enable_app("app_2".into()).await.unwrap();
@@ -605,7 +605,7 @@ async fn use_existing_integration() {
         let secret = CapSecret::from([1; 64]);
         conductor
             .grant_zome_call_capability(GrantZomeCallCapabilityPayload {
-                cell_id: cell_id_1.clone(),
+                dna_id: dna_id_1.clone(),
                 cap_grant: ZomeCallCapGrant {
                     tag: "tag".into(),
                     // access: CapAccess::Unrestricted,
@@ -619,7 +619,7 @@ async fn use_existing_integration() {
         // - Call the existing dependency cell via the dependent cell
         let r: AgentInfo = conductor
             .call_from_fallible(
-                cell_id_2.agent_pubkey(),
+                dna_id_2.agent_pubkey(),
                 None,
                 &zome2,
                 "who_are_they_role_secret",
@@ -627,7 +627,7 @@ async fn use_existing_integration() {
             )
             .await
             .unwrap();
-        assert_eq!(r.agent_initial_pubkey, *cell_id_1.agent_pubkey());
+        assert_eq!(r.agent_initial_pubkey, *dna_id_1.agent_pubkey());
     }
 
     // Ideally, we shouldn't be able to disable app_1 because it's depended on by enabled app_2.

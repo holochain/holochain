@@ -53,7 +53,7 @@ impl TaskManagerClient {
         let tm = task_motel::TaskManager::new_instrumented(span, tx, |g| match g {
             TaskGroup::Conductor => None,
             TaskGroup::Dna(_) => Some(TaskGroup::Conductor),
-            TaskGroup::Cell(cell_id) => Some(TaskGroup::Dna(Arc::new(cell_id.dna_hash().clone()))),
+            TaskGroup::Cell(dna_id) => Some(TaskGroup::Dna(Arc::new(dna_id.dna_hash().clone()))),
         });
         Self {
             tm: Arc::new(Mutex::new(Some(tm))),
@@ -72,9 +72,9 @@ impl TaskManagerClient {
 
     /// Stop all tasks associated with a Cell and await their completion.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    pub fn stop_cell_tasks(&self, cell_id: CellId) -> ShutdownHandle {
+    pub fn stop_cell_tasks(&self, dna_id: DnaId) -> ShutdownHandle {
         if let Some(tm) = self.tm.lock().as_mut() {
-            tokio::spawn(tm.stop_group(&TaskGroup::Cell(cell_id)).in_current_span())
+            tokio::spawn(tm.stop_group(&TaskGroup::Cell(dna_id)).in_current_span())
         } else {
             tracing::warn!("Tried to shutdown cell's tasks while they're already shutting down");
             tokio::spawn(async move {})
@@ -133,20 +133,20 @@ impl TaskManagerClient {
     pub fn add_cell_task_ignored<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
-        cell_id: CellId,
+        dna_id: DnaId,
         f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
-        self.add_cell_task(name, TaskKind::Ignore, cell_id, f)
+        self.add_cell_task(name, TaskKind::Ignore, dna_id, f)
     }
 
     /// Add a Cell-level task which will cause that to be disabled if the task fails
     pub fn add_cell_task_critical<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
         &self,
         name: &str,
-        cell_id: CellId,
+        dna_id: DnaId,
         f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
-        self.add_cell_task(name, TaskKind::CellCritical(cell_id.clone()), cell_id, f)
+        self.add_cell_task(name, TaskKind::CellCritical(dna_id.clone()), dna_id, f)
     }
 
     fn add_conductor_task<Fut: Future<Output = ManagedTaskResult> + Send + 'static>(
@@ -176,12 +176,12 @@ impl TaskManagerClient {
         &self,
         name: &str,
         task_kind: TaskKind,
-        cell_id: CellId,
+        dna_id: DnaId,
         f: impl FnOnce(StopListener) -> Fut + Send + 'static,
     ) {
         let name = name.to_string();
         let f = move |stop| f(stop).map(move |t| produce_task_outcome(&task_kind, t, name));
-        self.add_task(TaskGroup::Cell(cell_id), f)
+        self.add_task(TaskGroup::Cell(dna_id), f)
     }
 
     fn add_task<Fut: Future<Output = TaskOutcome> + Send + 'static>(
@@ -206,7 +206,7 @@ pub enum TaskKind {
     Unrecoverable,
     /// If the task returns an error, "freeze" the cell which caused the error,
     /// but continue running the rest of the conductor and other managed tasks.
-    CellCritical(CellId),
+    CellCritical(DnaId),
     /// If the task returns an error, "freeze" all cells with this dna hash,
     /// but continue running the rest of the conductor and other managed tasks.
     DnaCritical(Arc<DnaHash>),
@@ -222,7 +222,7 @@ pub enum TaskOutcome {
     ShutdownConductor(Box<ManagedTaskError>, String),
     /// Disable all apps which contain the problematic Cell,
     /// depending upon the specific error.
-    StopApps(CellId, Box<ManagedTaskError>, String),
+    StopApps(DnaId, Box<ManagedTaskError>, String),
     /// Disable all apps which contain the problematic DNA,
     /// depending upon the specific error.
     StopAppsWithDna(Arc<DnaHash>, Box<ManagedTaskError>, String),
@@ -270,10 +270,10 @@ pub(crate) fn spawn_task_outcome_handler(
                     );
                     return Err(TaskManagerError::Unrecoverable(Box::new(error)));
                 }
-                TaskOutcome::StopApps(cell_id, error, context) => {
+                TaskOutcome::StopApps(dna_id, error, context) => {
                     tracing::error!("About to automatically stop apps");
                     let app_ids = conductor
-                        .list_enabled_apps_for_dependent_cell_id(&cell_id)
+                        .list_enabled_apps_for_dependent_dna_id(&dna_id)
                         .await
                         .map_err(TaskManagerError::internal)?;
                     // Disable every app which requires that cell.
@@ -338,9 +338,9 @@ fn produce_task_outcome(kind: &TaskKind, result: ManagedTaskResult, name: String
             Ok(_) => LogInfo(format!("task completed: {}", name)),
             Err(err) => ShutdownConductor(Box::new(err), name),
         },
-        TaskKind::CellCritical(cell_id) => match result {
+        TaskKind::CellCritical(dna_id) => match result {
             Ok(_) => LogInfo(format!("task completed: {}", name)),
-            Err(err) => StopApps(cell_id.to_owned(), Box::new(err), name),
+            Err(err) => StopApps(dna_id.to_owned(), Box::new(err), name),
         },
         TaskKind::DnaCritical(dna_hash) => match result {
             Ok(_) => LogInfo(format!("task completed: {}", name)),
@@ -377,7 +377,7 @@ pub enum TaskGroup {
     /// Tasks which are associated with a particular DNA space
     Dna(Arc<DnaHash>),
     /// Tasks which are associated with a particular running Cell
-    Cell(CellId),
+    Cell(DnaId),
 }
 
 /// Channel sender for task outcomes

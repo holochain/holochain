@@ -9,7 +9,7 @@ use crate::{
     test_utils::new_zome_call_params,
 };
 use ::fixt::fixt;
-use hdk::prelude::CellId;
+use hdk::prelude::DnaId;
 use holo_hash::fixt::ActionHashFixturator;
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::{actor::MockHcP2p, DynHolochainP2pDna, HolochainP2pDna};
@@ -106,13 +106,13 @@ impl TestCase {
         let app = conductor.setup_app("", &[dna_file]).await.unwrap();
         let dna_hash = app.cells()[0].dna_hash().clone();
         let agent = app.agent().clone();
-        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+        let dna_id = DnaId::new(dna_hash.clone(), agent.clone());
         let workspace = SourceChainWorkspace::new(
             conductor
                 .get_or_create_authored_db(&dna_hash, agent.clone())
                 .unwrap(),
             conductor.get_dht_db(&dna_hash).unwrap(),
-            conductor.get_cache_db(&cell_id).await.unwrap(),
+            conductor.get_cache_db(&dna_id).await.unwrap(),
             conductor.keystore(),
             agent.clone(),
         )
@@ -120,21 +120,21 @@ impl TestCase {
         .unwrap();
         // Get action that does not exist.
         let zome_call_params = new_zome_call_params(
-            &cell_id,
+            &dna_id,
             zome_call_fn_name,
             zome_call_payload,
             TestWasm::Crd.coordinator_zome_name(),
         )
         .unwrap();
         let invocation = ZomeCallInvocation::try_from_params(
-            Arc::new(CellConductorApi::new(conductor.clone(), cell_id.clone())),
+            Arc::new(CellConductorApi::new(conductor.clone(), dna_id.clone())),
             zome_call_params,
         )
         .await
         .unwrap();
         let (signal_tx, _signal_rx) = tokio::sync::broadcast::channel(1);
         let args = CallZomeWorkflowArgs {
-            cell_id,
+            dna_id,
             ribosome: conductor.get_ribosome(&dna_hash).unwrap(),
             invocation,
             signal_tx: signal_tx.clone(),

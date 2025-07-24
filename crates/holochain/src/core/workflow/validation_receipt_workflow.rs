@@ -31,19 +31,19 @@ pub async fn validation_receipt_workflow<B>(
     vault: DbWrite<DbKindDht>,
     network: DynHolochainP2pDna,
     keystore: MetaLairClient,
-    running_cell_ids: HashSet<CellId>,
+    running_dna_ids: HashSet<DnaId>,
     apply_block: B,
 ) -> WorkflowResult<WorkComplete>
 where
     B: Fn(Block) -> BoxFuture<'static, DatabaseResult<()>> + Clone,
 {
-    if running_cell_ids.is_empty() {
+    if running_dna_ids.is_empty() {
         return Ok(WorkComplete::Complete);
     }
 
     // This is making an assumption about the behaviour of validation: Once validation has run on this conductor
     // then all the cells running the same DNA agree on the result.
-    let validators = running_cell_ids
+    let validators = running_dna_ids
         .into_iter()
         .filter_map(|id| {
             let (d, a) = id.into_dna_and_agent();
@@ -133,7 +133,7 @@ where
                 // and if something goes wrong we know the integration will retry.
                 if let Err(e) = apply_block(Block::new(
                     BlockTarget::Cell(
-                        CellId::new((*dna_hash).clone(), op_author.clone()),
+                        DnaId::new((*dna_hash).clone(), op_author.clone()),
                         CellBlockReason::InvalidOp(receipt.dht_op_hash.clone()),
                     ),
                     match InclusiveTimestampInterval::try_new(Timestamp::MIN, Timestamp::MAX) {

@@ -1259,7 +1259,7 @@ pub mod wasm_test {
         let apps = conductor.setup_apps("app-", 2, &[dna_file]).await.unwrap();
 
         let ((alice,), (_bob,)) = apps.into_tuples();
-        let alice_pubkey = alice.cell_id().agent_pubkey().clone();
+        let alice_pubkey = alice.dna_id().agent_pubkey().clone();
         let alice = alice.zome(TestWasm::HdkExtern);
 
         let foo_result: String = conductor.call(&alice, "foo", ()).await;
@@ -1276,7 +1276,7 @@ pub mod wasm_test {
         let infallible_result = conductor
             .raw_handle()
             .call_zome(ZomeCallParams {
-                cell_id: alice.cell_id().clone(),
+                dna_id: alice.dna_id().clone(),
                 zome_name: alice.name().clone(),
                 fn_name: "infallible".into(),
                 cap_secret: None,

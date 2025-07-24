@@ -25,7 +25,7 @@ fn init() -> ExternResult<InitCallbackResult> {
 
     let my_agent_info = agent_info()?;
     let response = call(
-        CallTargetCell::OtherCell(CellId::new(
+        CallTargetCell::OtherCell(DnaId::new(
             properties.prev_dna_hash,
             my_agent_info.agent_initial_pubkey,
         )),

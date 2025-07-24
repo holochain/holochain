@@ -7,7 +7,7 @@ use holochain_client::{
     ConductorApiError, InstallAppPayload,
 };
 use holochain_types::prelude::{
-    AppBundleSource, CloneCellId, CloneId, CreateCloneCellPayload, DnaModifiersOpt, InstalledAppId,
+    AppBundleSource, CloneDnaId, CloneId, CreateCloneCellPayload, DnaModifiersOpt, InstalledAppId,
 };
 use holochain_types::websocket::AllowedOrigins;
 use holochain_zome_types::{dependencies::holochain_integrity_types::ExternIO, prelude::RoleName};
@@ -70,20 +70,20 @@ async fn clone_cell_management() {
             })
             .await
             .unwrap();
-        assert_eq!(*clone_cell.cell_id.agent_pubkey(), app_info.agent_pub_key);
+        assert_eq!(*clone_cell.dna_id.agent_pubkey(), app_info.agent_pub_key);
         assert_eq!(clone_cell.clone_id, CloneId::new(&role_name, 0));
         clone_cell
     };
-    let cell_id = clone_cell.cell_id.clone();
+    let dna_id = clone_cell.dna_id.clone();
 
     let credentials = admin_ws
         .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             functions: None,
         })
         .await
         .unwrap();
-    signer.add_credentials(cell_id.clone(), credentials);
+    signer.add_credentials(dna_id.clone(), credentials);
 
     const TEST_ZOME_NAME: &str = "foo";
     const TEST_FN_NAME: &str = "foo";
@@ -91,7 +91,7 @@ async fn clone_cell_management() {
     // call clone cell should succeed
     let response = app_ws
         .call_zome(
-            cell_id.clone().into(),
+            dna_id.clone().into(),
             TEST_ZOME_NAME.into(),
             TEST_FN_NAME.into(),
             ExternIO::encode(()).unwrap(),
@@ -103,7 +103,7 @@ async fn clone_cell_management() {
     // disable clone cell
     app_ws
         .disable_clone_cell(DisableCloneCellPayload {
-            clone_cell_id: CloneCellId::CloneId(clone_cell.clone().clone_id),
+            clone_dna_id: CloneDnaId::CloneId(clone_cell.clone().clone_id),
         })
         .await
         .unwrap();
@@ -111,7 +111,7 @@ async fn clone_cell_management() {
     // call disabled clone cell should fail
     let response = app_ws
         .call_zome(
-            cell_id.clone().into(),
+            dna_id.clone().into(),
             TEST_ZOME_NAME.into(),
             TEST_FN_NAME.into(),
             ExternIO::encode(()).unwrap(),
@@ -122,7 +122,7 @@ async fn clone_cell_management() {
     // enable clone cell
     let enabled_cell = app_ws
         .enable_clone_cell(EnableCloneCellPayload {
-            clone_cell_id: CloneCellId::CloneId(clone_cell.clone().clone_id),
+            clone_dna_id: CloneDnaId::CloneId(clone_cell.clone().clone_id),
         })
         .await
         .unwrap();
@@ -131,7 +131,7 @@ async fn clone_cell_management() {
     // call enabled clone cell should succeed
     let response = app_ws
         .call_zome(
-            cell_id.clone().into(),
+            dna_id.clone().into(),
             TEST_ZOME_NAME.into(),
             TEST_FN_NAME.into(),
             ExternIO::encode(()).unwrap(),
@@ -143,7 +143,7 @@ async fn clone_cell_management() {
     // disable clone cell again
     app_ws
         .disable_clone_cell(DisableCloneCellPayload {
-            clone_cell_id: CloneCellId::CloneId(clone_cell.clone().clone_id),
+            clone_dna_id: CloneDnaId::CloneId(clone_cell.clone().clone_id),
         })
         .await
         .unwrap();
@@ -152,20 +152,20 @@ async fn clone_cell_management() {
     admin_ws
         .delete_clone_cell(DeleteCloneCellPayload {
             app_id: app_id.clone(),
-            clone_cell_id: CloneCellId::DnaHash(clone_cell.cell_id.dna_hash().clone()),
+            clone_dna_id: CloneDnaId::DnaHash(clone_cell.dna_id.dna_hash().clone()),
         })
         .await
         .unwrap();
     // restore deleted clone cell should fail
     let enable_clone_cell_response = app_ws
         .enable_clone_cell(EnableCloneCellPayload {
-            clone_cell_id: CloneCellId::CloneId(clone_cell.clone_id),
+            clone_dna_id: CloneDnaId::CloneId(clone_cell.clone_id),
         })
         .await;
     assert!(enable_clone_cell_response.is_err());
 }
 
-// Check that app info can be refreshed to allow zome calls to a clone cell identified by its clone cell id
+// Check that app info can be refreshed to allow zome calls to a clone cell identified by its clone dna id
 #[tokio::test(flavor = "multi_thread")]
 pub async fn app_info_refresh() {
     let conductor = SweetConductor::from_standard_config().await;
@@ -228,12 +228,12 @@ pub async fn app_info_refresh() {
     // Authorise signing credentials for the cloned cell
     let credentials = admin_ws
         .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-            cell_id: cloned_cell.cell_id.clone(),
+            dna_id: cloned_cell.dna_id.clone(),
             functions: None,
         })
         .await
         .unwrap();
-    signer.add_credentials(cloned_cell.cell_id.clone(), credentials);
+    signer.add_credentials(cloned_cell.dna_id.clone(), credentials);
 
     // Call the zome function on the clone cell, expecting a failure
     let err = app_agent_ws

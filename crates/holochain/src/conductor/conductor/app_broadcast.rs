@@ -81,7 +81,7 @@ impl Default for AppBroadcast {
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use hdk::prelude::CellIdFixturator;
+    use hdk::prelude::DnaIdFixturator;
     use hdk::prelude::ZomeNameFixturator;
     use holochain_zome_types::signal::AppSignal;
 
@@ -98,7 +98,7 @@ mod tests {
 
         // Send and receive the signal
         let signal = Signal::App {
-            cell_id: fixt!(CellId),
+            dna_id: fixt!(DnaId),
             zome_name: fixt!(ZomeName),
             signal: AppSignal::new(ExternIO::from(vec![])),
         };
@@ -121,7 +121,7 @@ mod tests {
 
         // Send and receive the signal
         let signal = Signal::App {
-            cell_id: fixt!(CellId),
+            dna_id: fixt!(DnaId),
             zome_name: fixt!(ZomeName),
             signal: AppSignal::new(ExternIO::from(vec![])),
         };
@@ -145,7 +145,7 @@ mod tests {
         let mut rx_2 = app_broadcast.subscribe(installed_app_id.clone());
 
         let signal_1 = Signal::App {
-            cell_id: fixt!(CellId),
+            dna_id: fixt!(DnaId),
             zome_name: fixt!(ZomeName),
             signal: AppSignal::new(ExternIO::from(vec![])),
         };
@@ -157,7 +157,7 @@ mod tests {
         assert_eq!(signal_1, signal_1_rcv_2);
 
         let signal_2 = Signal::App {
-            cell_id: fixt!(CellId),
+            dna_id: fixt!(DnaId),
             zome_name: fixt!(ZomeName),
             signal: AppSignal::new(ExternIO::from(vec![])),
         };

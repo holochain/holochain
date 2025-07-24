@@ -294,7 +294,7 @@ async fn signals_are_not_sent_until_after_auth() {
         .easy_call_zome(
             app.agent(),
             None,
-            app.cells().first().unwrap().cell_id().clone(),
+            app.cells().first().unwrap().dna_id().clone(),
             TestWasm::EmitSignal.coordinator_zome_name(),
             "emit",
             (),
@@ -347,7 +347,7 @@ async fn signals_are_not_sent_until_after_auth() {
         .easy_call_zome(
             app.agent(),
             None,
-            app.cells().first().unwrap().cell_id().clone(),
+            app.cells().first().unwrap().dna_id().clone(),
             TestWasm::EmitSignal.coordinator_zome_name(),
             "emit",
             (),
@@ -457,7 +457,7 @@ async fn signals_are_restricted_by_app() {
         .easy_call_zome(
             app_1.agent(),
             None,
-            app_1.cells().first().unwrap().cell_id().clone(),
+            app_1.cells().first().unwrap().dna_id().clone(),
             TestWasm::EmitSignal.coordinator_zome_name(),
             "emit",
             (),

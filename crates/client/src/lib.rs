@@ -20,7 +20,7 @@ pub use holochain_types::{
 };
 pub use holochain_websocket::{ConnectRequest, WebsocketConfig};
 pub use holochain_zome_types::prelude::{
-    CellId, ClonedCell, ExternIO, GrantedFunctions, SerializedBytes, Timestamp,
+    ClonedCell, DnaId, ExternIO, GrantedFunctions, SerializedBytes, Timestamp,
 };
 pub use kitsune2_api::Url;
 pub use signing::client_signing::{ClientAgentSigner, SigningCredentials};

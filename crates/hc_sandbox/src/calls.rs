@@ -26,8 +26,8 @@ use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
-use holochain_types::prelude::{CellId, InstallAppPayload};
 use holochain_types::prelude::{DnaHash, InstalledAppId};
+use holochain_types::prelude::{DnaId, InstallAppPayload};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
 use kitsune2_api::Url;
 use kitsune2_core::Ed25519Verifier;
@@ -81,7 +81,7 @@ pub enum AdminRequestCli {
     ListDnas,
     /// Calls [`AdminWebsocket::generate_agent_pub_key`].
     NewAgent,
-    /// Calls [`AdminWebsocket::list_cell_ids`].
+    /// Calls [`AdminWebsocket::list_dna_ids`].
     ListCells,
     /// Calls [`AdminWebsocket::list_apps`].
     ListApps(ListApps),
@@ -241,11 +241,11 @@ pub struct DisableApp {
 // TODO: Default to dumping all cell state.
 #[derive(Debug, Args, Clone)]
 pub struct DumpState {
-    /// The DNA hash half of the cell ID to dump.
+    /// The DNA hash half of the dna id to dump.
     #[arg(value_parser = parse_dna_hash)]
     pub dna: DnaHash,
 
-    /// The agent half of the cell ID to dump.
+    /// The agent half of the dna id to dump.
     #[arg(value_parser = parse_agent_key)]
     pub agent_key: AgentPubKey,
 }
@@ -305,7 +305,7 @@ pub struct ListAgents {
 /// installed in this conductor.
 #[derive(Debug, Args, Clone)]
 pub struct ListApps {
-    /// Optionally request agent info for a particular cell ID.
+    /// Optionally request agent info for a particular dna id.
     #[arg(short, long, value_parser = parse_status_filter)]
     pub status: Option<AppStatusFilter>,
 }
@@ -454,8 +454,8 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             msg!("Added agent {}", agent);
         }
         AdminRequestCli::ListCells => {
-            let cells = client.list_cell_ids().await?;
-            msg!("Cell IDs: {:?}", cells);
+            let cells = client.list_dna_ids().await?;
+            msg!("Dna IDs: {:?}", cells);
         }
         AdminRequestCli::ListApps(args) => {
             let apps = client.list_apps(args.status).await?;
@@ -504,10 +504,10 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .map_err(|e| anyhow!("Invalid DNA hash: {}", e))?;
             let agent_key = AgentPubKey::try_from(&args.agent_key)
                 .map_err(|e| anyhow!("Invalid agent key: {}", e))?;
-            let cell_id = CellId::new(dna_hash, agent_key);
+            let dna_id = DnaId::new(dna_hash, agent_key);
 
             client
-                .revoke_zome_call_capability(cell_id, action_hash)
+                .revoke_zome_call_capability(dna_id, action_hash)
                 .await?;
             msg!(
                 "Revoked zome call capability for action hash: {}",
@@ -535,7 +535,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             let agent_infos = request_agent_info(client, args).await?;
             for info in agent_infos {
                 let mut out = String::new();
-                let cell_info = client.list_cell_ids().await?;
+                let cell_info = client.list_dna_ids().await?;
                 let agents = cell_info
                     .iter()
                     .map(|c| c.agent_pubkey().clone())
@@ -730,15 +730,15 @@ fn parse_status_filter(arg: &str) -> anyhow::Result<AppStatusFilter> {
     }
 }
 
-impl From<CellId> for DumpState {
-    fn from(cell_id: CellId) -> Self {
-        let (dna, agent_key) = cell_id.into_dna_and_agent();
+impl From<DnaId> for DumpState {
+    fn from(dna_id: DnaId) -> Self {
+        let (dna, agent_key) = dna_id.into_dna_and_agent();
         Self { dna, agent_key }
     }
 }
 
-impl From<DumpState> for CellId {
+impl From<DumpState> for DnaId {
     fn from(ds: DumpState) -> Self {
-        CellId::new(ds.dna, ds.agent_key)
+        DnaId::new(ds.dna, ds.agent_key)
     }
 }

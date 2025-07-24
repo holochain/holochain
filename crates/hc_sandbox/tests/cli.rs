@@ -787,22 +787,22 @@ async fn generate_sandbox_and_call_agent_meta_info() {
 
     let dna_hashes = match app_info {
         AppResponse::AppInfo(Some(info)) => {
-            let cell_ids: Vec<Vec<CellInfo>> = info
+            let dna_ids: Vec<Vec<CellInfo>> = info
                 .cell_info
                 .into_iter()
                 .map(|(_, cell_infos)| cell_infos)
                 .collect();
-            println!("cell_ids: {:?}", cell_ids);
-            let dna_hash_1 = match cell_ids[0].first().unwrap() {
-                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
+            println!("dna_ids: {:?}", dna_ids);
+            let dna_hash_1 = match dna_ids[0].first().unwrap() {
+                CellInfo::Provisioned(cell) => cell.dna_id.dna_hash().clone(),
                 _ => panic!("Cell not provisioned"),
             };
-            let dna_hash_2 = match cell_ids[1].first().unwrap() {
-                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
+            let dna_hash_2 = match dna_ids[1].first().unwrap() {
+                CellInfo::Provisioned(cell) => cell.dna_id.dna_hash().clone(),
                 _ => panic!("Cell not provisioned"),
             };
-            let dna_hash_3 = match cell_ids[2].first().unwrap() {
-                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
+            let dna_hash_3 = match dna_ids[2].first().unwrap() {
+                CellInfo::Provisioned(cell) => cell.dna_id.dna_hash().clone(),
                 _ => panic!("Cell not provisioned"),
             };
             // The fixture happ contains 3 times the same dna of which 2 have the same dna hash
@@ -1011,7 +1011,7 @@ async fn call_zome_function() {
     let dna_hash = match app_info {
         AppResponse::AppInfo(Some(info)) => {
             match info.cell_info.first().unwrap().1.first().unwrap() {
-                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
+                CellInfo::Provisioned(cell) => cell.dna_id.dna_hash().clone(),
                 _ => panic!("Cell not provisioned"),
             }
         }
@@ -1124,7 +1124,7 @@ async fn zome_function_can_return_hash() {
     let dna_hash = match app_info {
         AppResponse::AppInfo(Some(info)) => {
             match info.cell_info.first().unwrap().1.first().unwrap() {
-                CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
+                CellInfo::Provisioned(cell) => cell.dna_id.dna_hash().clone(),
                 _ => panic!("Cell not provisioned"),
             }
         }

@@ -8,8 +8,8 @@ impl Conductor {
         dna_hash: &DnaHash,
         agent: &AgentPubKey,
     ) -> HolochainP2pResult<Arc<Cell>> {
-        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
-        self.cell_by_id(&cell_id)
+        let dna_id = DnaId::new(dna_hash.clone(), agent.clone());
+        self.cell_by_id(&dna_id)
             .await
             .map_err(HolochainP2pError::other)
     }

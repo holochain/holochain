@@ -295,12 +295,12 @@ pub(super) async fn force_publish_countersigning_session(
     keystore: MetaLairClient,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
-    cell_id: CellId,
+    dna_id: DnaId,
     preflight_request: PreflightRequest,
 ) -> WorkflowResult<bool> {
     // Query database for current countersigning session.
     let reader_closure = {
-        let author = cell_id.agent_pubkey().clone();
+        let author = dna_id.agent_pubkey().clone();
         let preflight_request = preflight_request.clone();
         move |txn: &Txn<DbKindAuthored>| {
             // This chain lock isn't necessarily for the current session, we can't check that until later.
@@ -325,7 +325,7 @@ pub(super) async fn force_publish_countersigning_session(
             SourceChainResult::Ok(None)
         }
     };
-    let authored_db = space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?;
+    let authored_db = space.get_or_create_authored_db(dna_id.agent_pubkey().clone())?;
     let session_record = match authored_db.read_async(reader_closure).await? {
         Some(cs) => cs,
         None => {
@@ -342,7 +342,7 @@ pub(super) async fn force_publish_countersigning_session(
         network,
         keystore,
         session_record,
-        cell_id.agent_pubkey(),
+        dna_id.agent_pubkey(),
         this_cells_action_hash,
         integration_trigger,
         publish_trigger,
