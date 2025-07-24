@@ -430,7 +430,7 @@ pub struct AppInfo {
     /// finally disabled clone cells.
     pub cell_info: IndexMap<RoleName, Vec<CellInfo>>,
     /// The app's current status, in an API-friendly format
-    pub status: AppInfoStatus,
+    pub status: AppStatus,
     /// The app's agent pub key.
     pub agent_pub_key: AgentPubKey,
     /// The original AppManifest used to install the app, which can also be used to
@@ -446,7 +446,7 @@ impl AppInfo {
         dna_definitions: &IndexMap<CellId, DnaDefHashed>,
     ) -> Self {
         let installed_app_id = app.id().clone();
-        let status = app.status().clone().into();
+        let status = app.status().clone();
         let agent_pub_key = app.agent_key().to_owned();
         let mut manifest = app.manifest().clone();
         let installed_at = *app.installed_at();
@@ -543,38 +543,6 @@ impl AppInfo {
     }
 }
 
-/// A flat, slightly more API-friendly representation of [`AppInfo`]
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
-pub enum AppInfoStatus {
-    Paused { reason: PausedAppReason },
-    Disabled { reason: DisabledAppReason },
-    Running,
-    AwaitingMemproofs,
-}
-
-impl From<AppStatus> for AppInfoStatus {
-    fn from(i: AppStatus) -> Self {
-        match i {
-            AppStatus::Running => AppInfoStatus::Running,
-            AppStatus::Disabled(reason) => AppInfoStatus::Disabled { reason },
-            AppStatus::Paused(reason) => AppInfoStatus::Paused { reason },
-            AppStatus::AwaitingMemproofs => AppInfoStatus::AwaitingMemproofs,
-        }
-    }
-}
-
-impl From<AppInfoStatus> for AppStatus {
-    fn from(i: AppInfoStatus) -> Self {
-        match i {
-            AppInfoStatus::Running => AppStatus::Running,
-            AppInfoStatus::Disabled { reason } => AppStatus::Disabled(reason),
-            AppInfoStatus::Paused { reason } => AppStatus::Paused(reason),
-            AppInfoStatus::AwaitingMemproofs => AppStatus::AwaitingMemproofs,
-        }
-    }
-}
-
 /// The request payload sent on a Holochain app websocket to authenticate the connection.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AppAuthenticationRequest {
@@ -584,8 +552,8 @@ pub struct AppAuthenticationRequest {
 
 #[cfg(test)]
 mod tests {
-    use crate::{AppInfoStatus, AppRequest, AppResponse};
-    use holochain_types::app::{AppStatus, DisabledAppReason, PausedAppReason};
+    use crate::{AppRequest, AppResponse};
+    use holochain_types::app::{AppStatus, DisabledAppReason};
     use serde::Deserialize;
 
     #[test]
@@ -636,27 +604,18 @@ mod tests {
     fn status_serialization() {
         use serde_json;
 
-        let status: AppInfoStatus =
-            AppStatus::Disabled(DisabledAppReason::Error("because".into())).into();
+        let status = AppStatus::Disabled(DisabledAppReason::Error("because".into()));
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"disabled\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}"
+            "{\"type\":\"disabled\",\"value\":{\"type\":\"error\",\"value\":\"because\"}}"
         );
 
-        let status: AppInfoStatus =
-            AppStatus::Paused(PausedAppReason::Error("because".into())).into();
+        let status = AppStatus::Disabled(DisabledAppReason::User);
 
         assert_eq!(
             serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"paused\",\"value\":{\"reason\":{\"type\":\"error\",\"value\":\"because\"}}}",
-        );
-
-        let status: AppInfoStatus = AppStatus::Disabled(DisabledAppReason::User).into();
-
-        assert_eq!(
-            serde_json::to_string(&status).unwrap(),
-            "{\"type\":\"disabled\",\"value\":{\"reason\":{\"type\":\"user\"}}}",
+            "{\"type\":\"disabled\",\"value\":{\"type\":\"user\"}}",
         );
     }
 }

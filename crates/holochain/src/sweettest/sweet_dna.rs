@@ -204,7 +204,7 @@ impl SweetDnaFile {
 
     /// Create a unique DnaFile with no validation and no zome functions
     pub async fn unique_empty() -> DnaFile {
-        Self::unique_from_inline_zomes(InlineZomeSet::new([], []))
+        Self::unique_from_inline_zomes(InlineZomeSet::new([], [], []))
             .await
             .0
     }

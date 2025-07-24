@@ -8,9 +8,9 @@ use holochain_client::{
     AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, ClientAgentSigner,
     InstallAppPayload, InstalledAppId,
 };
-use holochain_conductor_api::{AppInfoStatus, CellInfo, IssueAppAuthenticationTokenPayload};
+use holochain_conductor_api::{CellInfo, IssueAppAuthenticationTokenPayload};
 use holochain_types::{
-    app::{AppBundle, AppManifestV0, DisabledAppReason},
+    app::{AppBundle, AppManifestV0, AppStatus, DisabledAppReason},
     websocket::AllowedOrigins,
 };
 use holochain_websocket::ConnectRequest;
@@ -241,7 +241,7 @@ async fn deferred_memproof_installation() {
         .await
         .unwrap()
         .expect("app info must exist");
-    assert_eq!(app_info.status, AppInfoStatus::AwaitingMemproofs);
+    assert_eq!(app_info.status, AppStatus::AwaitingMemproofs);
 
     app_ws.enable_app().await.unwrap_err();
 
@@ -254,9 +254,7 @@ async fn deferred_memproof_installation() {
         .expect("app info must exist");
     assert_eq!(
         app_info.status,
-        AppInfoStatus::Disabled {
-            reason: DisabledAppReason::NotStartedAfterProvidingMemproofs
-        },
+        AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs),
         "app status should be NotStartedAfterProvidingMemproofs"
     );
 
@@ -268,7 +266,7 @@ async fn deferred_memproof_installation() {
         .await
         .unwrap()
         .expect("app info must exist");
-    assert_eq!(app_info.status, AppInfoStatus::Running);
+    assert_eq!(app_info.status, AppStatus::Enabled);
 }
 
 #[tokio::test(flavor = "multi_thread")]

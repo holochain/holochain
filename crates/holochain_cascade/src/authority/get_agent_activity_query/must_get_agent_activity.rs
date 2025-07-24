@@ -83,23 +83,23 @@ pub fn filter_then_check(
     }
 }
 
-/// Find the filters sequence bounds.
+/// Find the filter's sequence bounds.
 fn find_bounds(
     txn: &Transaction,
     scratch: Option<&Scratch>,
     author: &AgentPubKey,
     filter: ChainFilter,
 ) -> StateQueryResult<Sequences> {
-    let mut statement = txn.prepare(ACTION_HASH_TO_SEQ)?;
+    let mut by_hash_statement = txn.prepare(ACTION_HASH_TO_SEQ)?;
 
     // Map an action hash to its sequence.
-    let get_seq = move |hash: &ActionHash| {
+    let get_seq_from_hash = |hash: &ActionHash| {
         if let Some(scratch) = scratch {
             if let Some(action) = scratch.actions().find(|a| a.action_address() == hash) {
                 return Ok(Some(action.action().action_seq()));
             }
         }
-        let result = statement
+        let result = by_hash_statement
                 .query_row(named_params! {":hash": hash, ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
                     row.get(0)
                 })
@@ -107,8 +107,33 @@ fn find_bounds(
         Ok(result)
     };
 
+    // Get the oldest action in a given time period.
+    let mut by_ts_statement = txn.prepare(TS_TO_SEQ)?;
+    let get_seq_from_ts = |until: Timestamp| {
+        // Search in DB
+        let db_result = by_ts_statement
+          .query_row(named_params! {":until": until.as_micros(), ":author": author, ":activity": ChainOpType::RegisterAgentActivity}, |row| {
+              row.get(0)
+          })
+          .optional()?;
+        // Search in scratch
+        let scratch_result = scratch.and_then(|s| {
+            s.actions()
+                .filter_map(|a| {
+                    if a.get_timestamp() >= until {
+                        Some(a.seq())
+                    } else {
+                        None
+                    }
+                })
+                .min()
+        });
+        // Return lowest of the two
+        Ok([db_result, scratch_result].into_iter().flatten().min())
+    };
+
     // For all the hashes in the filter, get their sequences.
-    Sequences::find_sequences(filter, get_seq)
+    Sequences::find_sequences(filter, get_seq_from_hash, get_seq_from_ts)
 }
 
 /// Get the agent activity for a given range of actions

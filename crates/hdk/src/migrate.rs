@@ -5,7 +5,7 @@ use holo_hash::ActionHash;
 
 /// Close your current source chain to indicate that you are planning to migrate to a new DNA.
 ///
-/// This must be the last entry you try to make in your source chain. Holochain's sytem validation
+/// This must be the last entry you try to make in your source chain. Holochain's system validation
 /// will reject any actions that come after this one.
 pub fn close_chain(new_target: Option<MigrationTarget>) -> ExternResult<ActionHash> {
     HDK.with(|h| h.borrow().close_chain(CloseChainInput { new_target }))

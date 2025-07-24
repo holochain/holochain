@@ -63,6 +63,8 @@ pub struct TestChainItem {
     pub seq: u32,
     /// The hash
     pub hash: TestChainHash,
+    /// The timestamp
+    pub timestamp: Timestamp,
     /// The previous hash, unless this is the first item
     pub prev: Option<TestChainHash>,
 }
@@ -73,6 +75,17 @@ impl TestChainItem {
         Self {
             seq,
             hash: TestChainHash(seq),
+            timestamp: Timestamp::from_micros(seq as i64 * 1000),
+            prev: seq.checked_sub(1).map(TestChainHash),
+        }
+    }
+
+    /// Constructor for happy-path chains with no forking and explicit timestamp
+    pub fn with_ts(seq: u32, us: i64) -> Self {
+        Self {
+            seq,
+            hash: TestChainHash(seq),
+            timestamp: Timestamp::from_micros(us),
             prev: seq.checked_sub(1).map(TestChainHash),
         }
     }
@@ -82,6 +95,7 @@ impl TestChainItem {
         Self {
             seq: seq.into(),
             hash: TestChainHash::forked(seq, new_fork),
+            timestamp: Timestamp::from_micros(seq as i64 * 1000),
             prev: seq
                 .checked_sub(1)
                 .map(|s| TestChainHash::forked(s, prev_fork)),
@@ -98,6 +112,10 @@ impl ChainItem for TestChainItem {
 
     fn get_hash(&self) -> &Self::Hash {
         &self.hash
+    }
+
+    fn get_timestamp(&self) -> Timestamp {
+        self.timestamp
     }
 
     fn prev_hash(&self) -> Option<&Self::Hash> {
@@ -156,10 +174,26 @@ pub fn agent_chain(ranges: &[(u8, Range<u32>)]) -> Vec<(AgentPubKey, Vec<TestCha
         .collect()
 }
 
+/// Create a doubled chain per agent
+pub fn agent_chain_doubled(ranges: &[(u8, Range<u32>)]) -> Vec<(AgentPubKey, Vec<TestChainItem>)> {
+    ranges
+        .iter()
+        .map(|(a, range)| (agent_hash(&[*a]), doubled_chain(range.clone())))
+        .collect()
+}
+
 /// Create a chain from a range where the first chain items
 /// previous hash == that items hash.
 pub fn chain(range: Range<u32>) -> Vec<TestChainItem> {
     range.map(TestChainItem::new).rev().collect()
+}
+
+/// Same as chain() but timestamp only increments every two items
+pub fn doubled_chain(range: Range<u32>) -> Vec<TestChainItem> {
+    range
+        .map(|i| TestChainItem::with_ts(i, i as i64 / 2 * 1000))
+        .rev()
+        .collect()
 }
 
 /// Create a set of chains with forks where the first range
@@ -178,6 +212,7 @@ pub fn forked_chain(ranges: &[Range<u8>]) -> Vec<TestChainItem> {
                     TestChainItem {
                         seq: n as u32,
                         hash: TestChainHash::forked(n, i as u8),
+                        timestamp: Timestamp(n as i64 * 1000),
                         prev,
                     }
                 } else {
@@ -187,6 +222,7 @@ pub fn forked_chain(ranges: &[Range<u8>]) -> Vec<TestChainItem> {
                     TestChainItem {
                         seq: n as u32,
                         hash: TestChainHash::forked(n, i as u8),
+                        timestamp: Timestamp(n as i64 * 1000),
                         prev,
                     }
                 }
@@ -221,7 +257,8 @@ pub fn chain_item_to_action(i: &impl ChainItem) -> SignedActionHashed {
     let mut action = fixt!(SignedActionHashed);
     match (action_seq, prev_action) {
         (_, None) => {
-            let dna = fixt!(Dna);
+            let mut dna = fixt!(Dna);
+            dna.timestamp = Timestamp(0);
             action.hashed.content = Action::Dna(dna);
             action.hashed.hash = hash;
         }
@@ -229,6 +266,7 @@ pub fn chain_item_to_action(i: &impl ChainItem) -> SignedActionHashed {
             let mut create = fixt!(Create);
             create.action_seq = action_seq;
             create.prev_action = prev_action;
+            create.timestamp = i.get_timestamp();
             action.hashed.content = Action::Create(create);
             action.hashed.hash = hash;
         }

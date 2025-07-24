@@ -41,7 +41,7 @@ use crate::prelude::*;
 // Medalla testnet due to a single roughtime server from cloudflare being 24 hours off.
 // Note also that roughtime, or any other "secure timestamping" option requires the agent to be
 // online at the time of generating times, which runs counter to the requirement that holochain
-// support "agent centric, offline first" behaviour, but may be acceptable or even a neccessary
+// support "agent centric, offline first" behaviour, but may be acceptable or even a necessary
 // evil for specific application logic.
 // The other challenge with roughtime is list management to track the list of valid servers over
 // time, which might rely on agents providing snapshots of links to public keys (i.e. representing
@@ -67,7 +67,7 @@ pub fn sys_time() -> ExternResult<Timestamp> {
 /// Adds a function from the current zome to the scheduler.
 ///
 /// Any schedulable function from the current zome can be added to the scheduler
-/// by calling this function. Schedulable functions are infallable and MUST return
+/// by calling this function. Schedulable functions are infallible and MUST return
 /// their next trigger time. Trigger times are expressed as either "ephemeral"
 /// which means they will run as "best effort" after some duration, or "persisted"
 /// which uses crontab like syntax to trigger the scheduled function many times.

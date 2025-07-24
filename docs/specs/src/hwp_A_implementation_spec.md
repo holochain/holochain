@@ -2824,7 +2824,7 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
         struct AppInfo {
             installed_app_id: String,
             cell_info: HashMap<RoleName, Vec<CellInfo>>,
-            status: AppInfoStatus,
+            status: AppStatus,
         }
 
         enum CellInfo {
@@ -2851,17 +2851,6 @@ For error conditions, the `AppResponse::Error(e)` variant MUST be used, where `e
             // An optional name to override the cell's bundle name when
             // instantiating.
             name: Option<String>,
-        }
-
-        enum AppInfoStatus {
-            // The app is paused due to a recoverable error. There is no way to
-            // manually pause an app.
-            Paused { reason: PausedAppReason },
-            // The app is disabled, and may be restartable depending on the
-            // reason.
-            Disabled { reason: DisabledAppReason },
-            Running,
-            AwaitingMemproofs,
         }
 
         enum PausedAppReason {

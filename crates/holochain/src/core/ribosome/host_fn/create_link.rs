@@ -69,4 +69,4 @@ pub fn create_link<'a>(
     }
 }
 
-// we rely on the tests for get_links and get_link_details
+// we rely on the tests for get_links and get_links_details

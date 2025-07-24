@@ -118,6 +118,21 @@ pub struct GetLinksInput {
     pub author: Option<AgentPubKey>,
 }
 
+impl GetLinksInput {
+    /// Get a new [`GetLinksInput`] from query parameters [`LinkQuery`] and [`GetOptions`].
+    pub fn from_query(query: LinkQuery, get_options: impl Into<GetOptions>) -> Self {
+        Self {
+            base_address: query.base,
+            link_type: query.link_type,
+            get_options: get_options.into(),
+            tag_prefix: query.tag_prefix,
+            author: query.author,
+            after: query.after,
+            before: query.before,
+        }
+    }
+}
+
 type CreateLinkWithDeleteLinks = Vec<(SignedActionHashed, Vec<SignedActionHashed>)>;
 #[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// CreateLinks with and DeleteLinks on them

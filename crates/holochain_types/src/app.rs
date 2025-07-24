@@ -24,6 +24,7 @@ use holochain_util::ffs;
 use holochain_zome_types::cell::CloneId;
 use holochain_zome_types::prelude::*;
 use indexmap::IndexMap;
+use itertools::Itertools;
 use std::{collections::HashMap, path::PathBuf};
 
 /// The unique identifier for an installed app in this conductor
@@ -113,26 +114,8 @@ pub struct InstallAppPayload {
     pub source: AppBundleSource,
 
     /// The agent to use when creating Cells for this App.
-    /// If None, a new agent key will be generated in the right circumstances (read on).
     ///
-    /// It's always OK to provide a pregenerated agent key here, but there is at least one
-    /// major benefit to letting Holochain generate keys for you (other than
-    /// the sheer convenience of not having to generate your own):
-    ///
-    /// If you are using a device seed in your conductor config, the agent key will be derived
-    /// from that seed using a sensible scheme based on the total number of app installations
-    /// in this conductor, which means you can fairly easily regenerate all of your auto-generated
-    /// agent keys if you lose access to the device with your conductor data
-    /// (as long as you retain exclusive access to the device seed of course).
-    ///
-    /// Holochain will only generate an agent key for you if a device seed tag
-    /// is set and pointing to a seed present in lair. If this config is not set, installation
-    /// will fail if no agent key is provided. This safety mechanism can however be overridden
-    /// by setting the `allow_throwaway_random_agent_key` flag on this payload, which will cause
-    /// Holochain to generate a totally random (non-recoverable) agent key.
-    ///
-    /// If you are not using a device seed, or if your app has special requirements for agent keys,
-    /// you can always provide your own here, no matter what setting you're using.
+    /// If None, a new agent key will be generated.
     #[serde(default)]
     pub agent_key: Option<AgentPubKey>,
 
@@ -359,10 +342,10 @@ impl InstalledApp {
 
     /// Constructor for freshly installed app
     #[cfg(feature = "test_utils")]
-    pub fn new_running(app: InstalledAppCommon) -> Self {
+    pub fn new_enabled(app: InstalledAppCommon) -> Self {
         Self {
             app,
-            status: AppStatus::Running,
+            status: AppStatus::Enabled,
         }
     }
 
@@ -385,99 +368,6 @@ impl InstalledApp {
 
 /// A map from InstalledAppId -> InstalledApp
 pub type InstalledAppMap = IndexMap<InstalledAppId, InstalledApp>;
-
-/// An active app
-#[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-    derive_more::From,
-    shrinkwraprs::Shrinkwrap,
-)]
-#[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct RunningApp(InstalledAppCommon);
-
-impl RunningApp {
-    /// Convert to a StoppedApp with the given reason
-    pub fn into_stopped(self, reason: StoppedAppReason) -> StoppedApp {
-        StoppedApp {
-            app: self.0,
-            reason,
-        }
-    }
-
-    /// Move inner type out
-    pub fn into_common(self) -> InstalledAppCommon {
-        self.0
-    }
-}
-
-impl From<RunningApp> for InstalledApp {
-    fn from(app: RunningApp) -> Self {
-        Self {
-            app: app.into_common(),
-            status: AppStatus::Running,
-        }
-    }
-}
-
-/// An app which is either Paused or Disabled, i.e. not Running
-#[derive(
-    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
-)]
-#[shrinkwrap(mutable, unsafe_ignore_visibility)]
-pub struct StoppedApp {
-    #[shrinkwrap(main_field)]
-    app: InstalledAppCommon,
-    reason: StoppedAppReason,
-}
-
-impl StoppedApp {
-    /// Constructor
-    pub fn new_fresh(app: InstalledAppCommon) -> Self {
-        Self {
-            app,
-            reason: StoppedAppReason::Disabled(DisabledAppReason::NeverStarted),
-        }
-    }
-
-    /// If the app is Stopped, convert into a StoppedApp.
-    /// Returns None if app is Running.
-    pub fn from_app(app: &InstalledApp) -> Option<Self> {
-        StoppedAppReason::from_status(app.status()).map(|reason| Self {
-            app: app.as_ref().clone(),
-            reason,
-        })
-    }
-
-    /// Convert to a RunningApp
-    pub fn into_active(self) -> RunningApp {
-        RunningApp(self.app)
-    }
-
-    /// Move inner type out
-    pub fn into_common(self) -> InstalledAppCommon {
-        self.app
-    }
-}
-
-impl From<StoppedApp> for InstalledAppCommon {
-    fn from(d: StoppedApp) -> Self {
-        d.app
-    }
-}
-
-impl From<StoppedApp> for InstalledApp {
-    fn from(d: StoppedApp) -> Self {
-        Self {
-            app: d.app,
-            status: d.reason.into(),
-        }
-    }
-}
 
 /// The common data between apps of any status
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -507,14 +397,31 @@ impl InstalledAppCommon {
         manifest: AppManifest,
         installed_at: Timestamp,
     ) -> AppResult<Self> {
-        let role_assignments: IndexMap<_, _> = role_assignments.into_iter().collect();
-        // ensure no role name contains a clone id delimiter
+        // Ensure that role names are unique.
+        let role_assignments = role_assignments.into_iter().collect::<Vec<_>>();
+        let duplicate_role_names = role_assignments
+            .iter()
+            .map(|(role_name, _)| role_name.to_owned())
+            .counts()
+            .into_iter()
+            .filter_map(|(role_name, count)| if count > 1 { Some(role_name) } else { None })
+            .collect::<Vec<RoleName>>();
+        if !duplicate_role_names.is_empty() {
+            return Err(AppError::DuplicateRoleNames(
+                installed_app_id.to_string(),
+                duplicate_role_names,
+            ));
+        }
+
+        let role_assignments = role_assignments.into_iter().collect::<IndexMap<_, _>>();
+        // Ensure no role name contains a clone id delimiter.
         if let Some((illegal_role_name, _)) = role_assignments
             .iter()
             .find(|(role_name, _)| role_name.contains(CLONE_ID_DELIMITER))
         {
             return Err(AppError::IllegalRoleName(illegal_role_name.clone()));
         }
+
         Ok(InstalledAppCommon {
             installed_app_id: installed_app_id.to_string(),
             agent_key,
@@ -614,10 +521,6 @@ impl InstalledAppCommon {
     }
 
     /// Iterator of all cells, both provisioned and cloned.
-    // NOTE: as our app state model becomes more nuanced, we need to give careful attention to
-    // the definition of this function, since this represents all cells in use by the conductor.
-    // Any cell which exists and is not returned by this function is fair game for purging
-    // during app installation. See [`Conductor::remove_dangling_cells`].
     pub fn all_cells(&self) -> impl Iterator<Item = CellId> + '_ {
         self.provisioned_cells()
             .map(|(_, c)| c)
@@ -855,76 +758,6 @@ impl InstalledAppCommon {
         &self.agent_key
     }
 
-    /// Constructor for apps not using a manifest.
-    /// Allows for cloning up to 256 times and implies immediate provisioning.
-    #[cfg(feature = "test_utils")]
-    pub fn new_legacy<S: ToString, I: IntoIterator<Item = InstalledCell>>(
-        installed_app_id: S,
-        installed_cells: I,
-    ) -> AppResult<Self> {
-        use itertools::Itertools;
-
-        let installed_app_id = installed_app_id.to_string();
-        let installed_cells: Vec<_> = installed_cells.into_iter().collect();
-
-        // Get the agent key of the first cell
-        // NB: currently this has no significance.
-        let agent_key = installed_cells
-            .first()
-            .expect("Can't create app with 0 cells")
-            .cell_id
-            .agent_pubkey()
-            .to_owned();
-
-        // ensure all cells use the same agent key
-        if installed_cells
-            .iter()
-            .any(|c| *c.cell_id.agent_pubkey() != agent_key)
-        {
-            panic!(
-                "All cells in an app must use the same agent key. Cell data: {:#?}",
-                installed_cells
-            );
-        }
-
-        // ensure all cells use the same agent key
-        let duplicates: Vec<RoleName> = installed_cells
-            .iter()
-            .map(|c| c.role_name.to_owned())
-            .counts()
-            .into_iter()
-            .filter_map(|(role_name, count)| if count > 1 { Some(role_name) } else { None })
-            .collect();
-        if !duplicates.is_empty() {
-            return Err(AppError::DuplicateRoleNames(installed_app_id, duplicates));
-        }
-
-        let manifest = AppManifest::from_legacy(installed_cells.clone().into_iter());
-
-        let role_assignments = installed_cells
-            .into_iter()
-            .map(|InstalledCell { role_name, cell_id }| {
-                let role = AppRolePrimary {
-                    base_dna_hash: cell_id.dna_hash().clone(),
-                    is_provisioned: true,
-                    clones: HashMap::new(),
-                    clone_limit: 256,
-                    next_clone_index: 0,
-                    disabled_clones: HashMap::new(),
-                };
-                (role_name, role.into())
-            })
-            .collect();
-
-        Ok(Self {
-            installed_app_id,
-            agent_key,
-            role_assignments,
-            manifest,
-            installed_at: Timestamp::now(),
-        })
-    }
-
     // pub fn dependencies(&self) -> Vec<
 
     /// Return the manifest if available
@@ -945,217 +778,17 @@ impl InstalledAppCommon {
 
 /// The status of an installed app.
 ///
-/// App Status is a combination of two pieces of independent state:
-/// - Enabled/Disabled, which is a designation set by the user via the conductor admin interface.
-/// - Running/Stopped, which is a fact about the reality of the app in the course of its operation.
-///
-/// The combinations of these basic states give rise to the unified App Status.
+/// Either Enabled or Disabled, set by the user via the conductor admin interface.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum AppStatus {
-    /// The app is enabled and running normally.
-    Running,
-
-    /// Enabled, but stopped due to some recoverable problem.
-    /// The app "hopes" to be Running again as soon as possible.
-    /// Holochain may restart the app automatically if it can. It may also be
-    /// restarted manually via the `StartApp` admin method.
-    /// Paused apps will be automatically set to Running when the conductor restarts.
-    Paused(PausedAppReason),
-
-    /// Disabled and stopped, either manually by the user, or automatically due
-    /// to an unrecoverable error. App must be Enabled before running again,
-    /// and will not restart automaticaly on conductor reboot.
+    /// The app is enabled.
+    Enabled,
+    /// The app is disabled.
     Disabled(DisabledAppReason),
-
     /// The app is installed, but genesis has not completed because Membrane Proofs
     /// have not been provided.
     AwaitingMemproofs,
-}
-
-/// The AppStatus without the reasons.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[allow(missing_docs)]
-pub enum AppStatusKind {
-    Running,
-    Paused,
-    Disabled,
-    AwaitingMemproofs,
-}
-
-impl From<AppStatus> for AppStatusKind {
-    fn from(status: AppStatus) -> Self {
-        match status {
-            AppStatus::Running => Self::Running,
-            AppStatus::Paused(_) => Self::Paused,
-            AppStatus::Disabled(_) => Self::Disabled,
-            AppStatus::AwaitingMemproofs => Self::AwaitingMemproofs,
-        }
-    }
-}
-
-/// Represents a state transition operation from one state to another
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AppStatusTransition {
-    /// Attempt to unpause a Paused app
-    Start,
-    /// Attempt to pause a Running app
-    Pause(PausedAppReason),
-    /// Gets an app running no matter what
-    Enable,
-    /// Disables an app, no matter what
-    Disable(DisabledAppReason),
-}
-
-impl AppStatus {
-    /// Does this status correspond to an Enabled state?
-    /// If false, this indicates a Disabled state.
-    pub fn is_enabled(&self) -> bool {
-        matches!(self, Self::Running | Self::Paused(_))
-    }
-
-    /// Does this status correspond to a Running state?
-    /// If false, this indicates a Stopped state.
-    pub fn is_running(&self) -> bool {
-        matches!(self, Self::Running)
-    }
-
-    /// Does this status correspond to a Paused state?
-    pub fn is_paused(&self) -> bool {
-        matches!(self, Self::Paused(_))
-    }
-
-    /// Transition a status from one state to another.
-    /// If None, the transition was not valid, and the status did not change.
-    pub fn transition(&mut self, transition: AppStatusTransition) -> AppStatusFx {
-        use AppStatus::*;
-        use AppStatusFx::*;
-        use AppStatusTransition::*;
-        match (&self, transition) {
-            (Running, Pause(reason)) => Some((Paused(reason), SpinDown)),
-            (Running, Disable(reason)) => Some((Disabled(reason), SpinDown)),
-            (Running, Start) | (Running, Enable) => None,
-
-            (Paused(_), Start) => Some((Running, SpinUp)),
-            (Paused(_), Enable) => Some((Running, SpinUp)),
-            (Paused(_), Disable(reason)) => Some((Disabled(reason), SpinDown)),
-            (Paused(_), Pause(_)) => None,
-
-            (Disabled(_), Enable) => Some((Running, SpinUp)),
-            (Disabled(_), Pause(_)) | (Disabled(_), Disable(_)) | (Disabled(_), Start) => None,
-
-            (AwaitingMemproofs, Enable | Start) => Some((
-                AwaitingMemproofs,
-                Error("Cannot enable an app which is AwaitingMemproofs".to_string()),
-            )),
-            (AwaitingMemproofs, _) => None,
-        }
-        .map(|(new_status, delta)| {
-            *self = new_status;
-            delta
-        })
-        .unwrap_or(NoChange)
-    }
-}
-
-/// A declaration of the side effects of a particular AppStatusTransition.
-///
-/// Two values of this type may also be combined into one,
-/// to capture the overall effect of a series of transitions.
-///
-/// The intent of this type is to make sure that any operation which causes an
-/// app state transition is followed up with a call to process_app_status_fx
-/// in order to reconcile the cell state with the new app state.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[must_use = "be sure to run this value through `process_app_status_fx` to handle any transition effects"]
-pub enum AppStatusFx {
-    /// The transition did not result in any change to CellState.
-    NoChange,
-    /// The transition may cause some Cells to be removed.
-    SpinDown,
-    /// The transition may cause some Cells to be added (fallibly).
-    SpinUp,
-    /// The transition may cause some Cells to be removed and some to be (fallibly) added.
-    Both,
-    /// The transition was invalid and should produce an error.
-    Error(String),
-}
-
-impl Default for AppStatusFx {
-    fn default() -> Self {
-        Self::NoChange
-    }
-}
-
-impl AppStatusFx {
-    /// Combine two effects into one. Think "monoidal append", if that helps.
-    pub fn combine(self, other: Self) -> Self {
-        use AppStatusFx::*;
-        match (self, other) {
-            (NoChange, a) | (a, NoChange) => a,
-            (SpinDown, SpinDown) => SpinDown,
-            (SpinUp, SpinUp) => SpinUp,
-            (Both, _) | (_, Both) => Both,
-            (SpinDown, SpinUp) | (SpinUp, SpinDown) => Both,
-            (Error(err1), Error(err2)) => Error(format!("{err1}. {err2}")),
-            (Error(err), _) | (_, Error(err)) => Error(err),
-        }
-    }
-}
-
-/// The various reasons for why an App is not in the Running state.
-#[derive(
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-    SerializedBytes,
-    derive_more::From,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum StoppedAppReason {
-    /// Same meaning as [`AppStatus::Paused`].
-    Paused(PausedAppReason),
-
-    /// Same meaning as [`AppStatus::Disabled`].
-    Disabled(DisabledAppReason),
-
-    /// Same meaning as [`AppStatus::AwaitingMemproofs`].
-    AwaitingMemproofs,
-}
-
-impl StoppedAppReason {
-    /// Convert a status into a StoppedAppReason.
-    /// If the status is Running, returns None.
-    pub fn from_status(status: &AppStatus) -> Option<Self> {
-        match status {
-            AppStatus::Paused(reason) => Some(Self::Paused(reason.clone())),
-            AppStatus::Disabled(reason) => Some(Self::Disabled(reason.clone())),
-            AppStatus::AwaitingMemproofs => Some(Self::AwaitingMemproofs),
-            AppStatus::Running => None,
-        }
-    }
-}
-
-impl From<StoppedAppReason> for AppStatus {
-    fn from(reason: StoppedAppReason) -> Self {
-        match reason {
-            StoppedAppReason::Paused(reason) => Self::Paused(reason),
-            StoppedAppReason::Disabled(reason) => Self::Disabled(reason),
-            StoppedAppReason::AwaitingMemproofs => Self::AwaitingMemproofs,
-        }
-    }
-}
-
-/// The reason for an app being in a Paused state.
-/// NB: there is no way to manually pause an app.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(tag = "type", content = "value", rename_all = "snake_case")]
-pub enum PausedAppReason {
-    /// The pause was due to a RECOVERABLE error
-    Error(String),
 }
 
 /// The reason for an app being in a Disabled state.
@@ -1171,10 +804,21 @@ pub enum DisabledAppReason {
     NotStartedAfterProvidingMemproofs,
     /// The disabling was done manually by the user (via admin interface)
     User,
-    /// Disabling app in order to revoke its agent key and render all chains read-only.
-    DeletingAgentKey,
     /// The disabling was due to an UNRECOVERABLE error
     Error(String),
+}
+
+impl From<DisabledAppReason> for AppStatus {
+    fn from(reason: DisabledAppReason) -> Self {
+        match reason {
+            DisabledAppReason::NeverStarted => Self::Disabled(reason),
+            DisabledAppReason::NotStartedAfterProvidingMemproofs => {
+                Self::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs)
+            }
+            DisabledAppReason::Error(err) => Self::Disabled(DisabledAppReason::Error(err)),
+            DisabledAppReason::User => Self::Disabled(DisabledAppReason::User),
+        }
+    }
 }
 
 /// App "roles" correspond to cell entries in the AppManifest.
@@ -1307,7 +951,6 @@ pub struct AppRoleDependency {
 
 #[cfg(test)]
 mod tests {
-    use super::RunningApp;
     use crate::prelude::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::*;
@@ -1348,15 +991,14 @@ mod tests {
             roles: vec![],
             allow_deferred_memproofs: false,
         });
-        let mut app: RunningApp = InstalledAppCommon::new(
+        let mut app = InstalledAppCommon::new(
             "app",
             agent.clone(),
             vec![(role_name.clone(), role1)],
             manifest,
             Timestamp::now(),
         )
-        .unwrap()
-        .into();
+        .unwrap();
 
         // Can add clones up to the limit
         let clones: Vec<_> = vec![new_clone(), new_clone(), new_clone()];
@@ -1474,25 +1116,16 @@ mod tests {
 
     #[test]
     fn app_status_serialization() {
-        let app_status: AppStatus = AppStatus::Running;
+        let app_status: AppStatus = AppStatus::Enabled;
         assert_eq!(
             serde_json::to_string(&app_status).unwrap(),
-            "{\"type\":\"running\"}"
+            "{\"type\":\"enabled\"}"
         );
 
         let app_status: AppStatus = AppStatus::Disabled(DisabledAppReason::NeverStarted);
         assert_eq!(
             serde_json::to_string(&app_status).unwrap(),
             "{\"type\":\"disabled\",\"value\":{\"type\":\"never_started\"}}"
-        );
-    }
-
-    #[test]
-    fn paused_app_reason_serialization() {
-        let reason = PausedAppReason::Error("s are here to learn from".into());
-        assert_eq!(
-            serde_json::to_string(&reason).unwrap(),
-            "{\"type\":\"error\",\"value\":\"s are here to learn from\"}"
         );
     }
 

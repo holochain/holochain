@@ -24,7 +24,7 @@ use holochain_types::{
 };
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::{
-    chain::{ChainFilter, ChainFilters, MustGetAgentActivityInput},
+    chain::{ChainFilter, LimitConditions, MustGetAgentActivityInput},
     dependencies::holochain_integrity_types::{UnresolvedDependencies, ValidateCallbackResult},
     entry::MustGetActionInput,
     fixt::{CreateFixturator, DeleteFixturator, SignatureFixturator},
@@ -229,7 +229,7 @@ async fn validation_callback_awaiting_deps_agent_activity() {
                 filter_hashes.insert(delete.hashed.deletes_address.clone().clone());
                 let chain_filter = ChainFilter {
                     chain_top: delete.as_hash().clone(),
-                    filters: ChainFilters::Until(filter_hashes),
+                    limit_conditions: LimitConditions::UntilHash(filter_hashes),
                     include_cached_entries: false,
                 };
                 let result = api.must_get_agent_activity(MustGetAgentActivityInput {
@@ -377,7 +377,6 @@ impl TestCase {
             test_space.space.cache_db.clone(),
             fixt!(MetaLairClient),
             None,
-            Arc::new(dna_file.dna_def().clone()),
         )
         .await
         .unwrap();

@@ -137,6 +137,9 @@ pub enum AdminRequest {
     /// installed app is not enabled automatically. Once the app is enabled,
     /// zomes can be immediately called and it will also be loaded and enabled automatically on any reboot of the conductor.
     ///
+    /// This call is idempotent. If the app is already enabled, the call will be a no-op
+    /// and just return the already enabled app info.
+    ///
     /// # Returns
     ///
     /// [`AdminResponse::AppEnabled`]
@@ -148,7 +151,10 @@ pub enum AdminRequest {
     /// Changes the specified app from an enabled to a disabled state in the conductor.
     ///
     /// When an app is disabled, zome calls can no longer be made, and the app will not be
-    /// loaded on a reboot of the conductor.
+    /// enabled on a reboot of the conductor.
+    ///
+    /// This call is idempotent. If the app is already disabled, the call will be a no-op
+    /// and just return the already disabled app info.
     ///
     /// # Returns
     ///
@@ -386,6 +392,19 @@ pub enum AdminRequest {
     /// [`AdminResponse::ZomeCallCapabilityGranted`]
     GrantZomeCallCapability(Box<GrantZomeCallCapabilityPayload>),
 
+    /// Revoke a capability grant.
+    ///
+    /// You have to provide the [`ActionHash`] of the capability grant to revoke and the [`CellId`] of the cell
+    /// the capability grant is for.
+    ///
+    /// # Returns
+    ///
+    /// [`AdminResponse::ZomeCallCapabilityRevoked`]
+    RevokeZomeCallCapability {
+        action_hash: ActionHash,
+        cell_id: CellId,
+    },
+
     /// Request capability grant info for all cells in the app.
     ///
     /// # Returns
@@ -506,15 +525,13 @@ pub enum AdminResponse {
 
     /// The successful response to an [`AdminRequest::EnableApp`].
     ///
-    /// It means the app was enabled successfully. If it was possible to
-    /// put the app in a running state, it will be running, otherwise it will
-    /// be paused.
+    /// If anything during the process of enabling the app fails,
+    /// the error is returned and the app remains disabled.
+    /// In case of failure to join the network of any of the app's
+    /// cells, it can be re-attempted to enable the app.
     ///
-    /// Contains the app info and list of errors for cells that could not be enabled.
-    AppEnabled {
-        app: AppInfo,
-        errors: Vec<(CellId, String)>,
-    },
+    /// Contains the app info of the enabled app.
+    AppEnabled(AppInfo),
 
     /// The successful response to an [`AdminRequest::DisableApp`].
     ///
@@ -565,7 +582,12 @@ pub enum AdminResponse {
     RecordsGrafted,
 
     /// The successful response to an [`AdminRequest::GrantZomeCallCapability`].
-    ZomeCallCapabilityGranted,
+    ///
+    /// Returns the [`ActionHash`] of the capability grant.
+    ZomeCallCapabilityGranted(ActionHash),
+
+    /// The successful response to an [`AdminRequest::RevokeZomeCallCapability`].
+    ZomeCallCapabilityRevoked,
 
     /// The successful response to an [`AdminRequest::ListCapabilityGrants`].
     CapabilityGrantsInfo(AppCapGrantInfo),
@@ -633,21 +655,12 @@ impl ExternalApiWireError {
 #[serde(rename_all = "snake_case")]
 /// Filter for [`AdminRequest::ListApps`].
 ///
-/// App Status is a combination of two pieces of independent state:
-/// - Enabled/Disabled, which is a designation set by the user via the conductor interface.
-/// - Running/Stopped, which is a fact about the reality of the app in the course of its operation.
+/// Apps can be either enabled or disabled, set by the user via the conductor interface.
 pub enum AppStatusFilter {
-    /// Filter on apps which are Enabled, which can include both Running and Paused apps.
+    /// Filter on apps which are Enabled.
     Enabled,
-    /// Filter only on apps which are Disabled.
+    /// Filter on apps which are Disabled.
     Disabled,
-    /// Filter on apps which are currently Running (meaning they are also Enabled).
-    Running,
-    /// Filter on apps which are Stopped, i.e. not Running.
-    /// This includes apps in the Disabled status, as well as the Paused status.
-    Stopped,
-    /// Filter only on Paused apps.
-    Paused,
 }
 
 /// Informational response for listing app interfaces.

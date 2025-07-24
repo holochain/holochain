@@ -701,24 +701,6 @@ mod test {
         (Arc::new(db_dir), conductor_handle)
     }
 
-    async fn activate(conductor_handle: ConductorHandle) -> ConductorHandle {
-        conductor_handle
-            .clone()
-            .enable_app("test app".to_string())
-            .await
-            .unwrap();
-
-        let errors = conductor_handle
-            .clone()
-            .reconcile_cell_status_with_app_status()
-            .await
-            .unwrap();
-
-        assert!(errors.is_empty());
-
-        conductor_handle
-    }
-
     async fn call_zome<R: FnOnce(AppResponse) + 'static + Send>(
         conductor_handle: ConductorHandle,
         cell_id: CellId,
@@ -988,11 +970,11 @@ mod test {
         let state = conductor_handle.get_state_from_handle().await.unwrap();
         assert_eq!(initial_state, state);
 
-        // Check it is running, and get all cells
+        // Check it is enabled, and get all cells
         let cell_ids: HashSet<CellId> = state
             .get_app(&app_id)
             .inspect(|app| {
-                assert_eq!(*app.status(), AppStatus::Running);
+                assert_eq!(*app.status(), AppStatus::Enabled);
             })
             .unwrap()
             .all_cells()
@@ -1006,11 +988,11 @@ mod test {
 
         assert_eq!(expected, cell_ids);
 
-        // Check that it is returned in get_app_info as running
+        // Check that it is returned in get_app_info as enabled
         let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
-            assert_matches!(info.status, AppInfoStatus::Running);
+            assert_matches!(info.status, AppStatus::Enabled);
         }
 
         // Now deactivate app
@@ -1050,7 +1032,7 @@ mod test {
         let maybe_info = conductor_handle.get_app_info(&app_id).await.unwrap();
         if let Some(info) = maybe_info {
             assert_eq!(info.installed_app_id, app_id);
-            assert_matches!(info.status, AppInfoStatus::Disabled { .. });
+            assert_matches!(info.status, AppStatus::Disabled { .. });
         }
 
         // Enable the app one more time
@@ -1124,7 +1106,12 @@ mod test {
 
         let (_tmpdir, conductor_handle) =
             setup_admin_fake_cells(agent_pubkey, vec![(dna, None)]).await;
-        let conductor_handle = activate(conductor_handle).await;
+
+        conductor_handle
+            .clone()
+            .enable_app("test app".to_string())
+            .await
+            .unwrap();
 
         // Allow agents time to join
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;

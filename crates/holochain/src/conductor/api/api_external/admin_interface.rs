@@ -189,30 +189,17 @@ impl AdminInterfaceApi {
             }
             EnableApp { installed_app_id } => {
                 // Enable app
-                let (app, errors) = self
+                let _ = self
                     .conductor_handle
                     .clone()
                     .enable_app(installed_app_id.clone())
                     .await?;
-
-                let app_cells: HashSet<_> = app.required_cells().collect();
-
                 let app_info = self
                     .conductor_handle
                     .get_app_info(&installed_app_id)
                     .await?
                     .ok_or(ConductorError::AppNotInstalled(installed_app_id))?;
-
-                let errors: Vec<_> = errors
-                    .into_iter()
-                    .filter(|(cell_id, _)| app_cells.contains(cell_id))
-                    .map(|(cell_id, error)| (cell_id, error.to_string()))
-                    .collect();
-
-                Ok(AdminResponse::AppEnabled {
-                    app: app_info,
-                    errors,
-                })
+                Ok(AdminResponse::AppEnabled(app_info))
             }
             DisableApp { installed_app_id } => {
                 // Disable app
@@ -308,12 +295,20 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::RecordsGrafted)
             }
-            GrantZomeCallCapability(payload) => {
+            GrantZomeCallCapability(payload) => self
+                .conductor_handle
+                .grant_zome_call_capability(*payload)
+                .await
+                .map(AdminResponse::ZomeCallCapabilityGranted),
+
+            RevokeZomeCallCapability {
+                action_hash,
+                cell_id,
+            } => {
                 self.conductor_handle
-                    .clone()
-                    .grant_zome_call_capability(*payload)
+                    .revoke_zome_call_capability(cell_id, action_hash)
                     .await?;
-                Ok(AdminResponse::ZomeCallCapabilityGranted)
+                Ok(AdminResponse::ZomeCallCapabilityRevoked)
             }
 
             ListCapabilityGrants {
@@ -332,10 +327,7 @@ impl AdminInterfaceApi {
             }
 
             DeleteCloneCell(payload) => {
-                self.conductor_handle
-                    .clone()
-                    .delete_clone_cell(&payload)
-                    .await?;
+                self.conductor_handle.delete_clone_cell(&payload).await?;
                 Ok(AdminResponse::CloneCellDeleted)
             }
             StorageInfo => Ok(AdminResponse::StorageInfo(

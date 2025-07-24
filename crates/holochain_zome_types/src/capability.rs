@@ -24,8 +24,6 @@
 //! information needed to refer to the capability as well as the secret needed
 //! to send to the Grantor.
 
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 use crate::prelude::*;
@@ -45,9 +43,12 @@ pub struct GrantZomeCallCapabilityPayload {
     pub cap_grant: ZomeCallCapGrant,
 }
 
-/// A mapping of cell IDs to their capability grant information.
+/// A list which map a cell ID to their capability grant information.
+///
+/// NOTE: while a map would have been more appropriate, we use a vector here
+/// because it is problematic with msgpack encoding.
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct AppCapGrantInfo(pub HashMap<CellId, Vec<CapGrantInfo>>);
+pub struct AppCapGrantInfo(pub Vec<(CellId, Vec<CapGrantInfo>)>);
 
 /// Information about a capability grant.
 #[derive(Debug, Deserialize, Serialize, Clone)]

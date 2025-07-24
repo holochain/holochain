@@ -10,7 +10,7 @@ use holochain_wasmer_host::prelude::*;
 use std::sync::Arc;
 use wasmer::RuntimeError;
 
-pub fn get_link_details(
+pub fn get_links_details(
     _ribosome: Arc<impl RibosomeT>,
     call_context: Arc<CallContext>,
     inputs: Vec<GetLinksInput>,
@@ -43,7 +43,7 @@ pub fn get_link_details(
                             &call_context.host_context.workspace(),
                             call_context.host_context.network().to_owned(),
                         )
-                        .get_link_details(
+                        .get_links_details(
                             key,
                             GetLinksOptions {
                                 get_options,
@@ -69,7 +69,7 @@ pub fn get_link_details(
             RibosomeError::HostFnPermissions(
                 call_context.zome.zome_name().clone(),
                 call_context.function_name().clone(),
-                "get_link_details".into(),
+                "get_links_details".into(),
             )
             .to_string(),
         ))
@@ -158,7 +158,7 @@ pub mod slow_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn get_link_details_local_only() {
+    async fn get_links_details_local_only() {
         holochain_trace::test_run();
         // agents should not pass around data
         let config = SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
@@ -180,7 +180,7 @@ pub mod slow_tests {
         // bob gets link details locally only
         let zome_bob = apps[1].cells()[0].zome(TestWasm::Link.coordinator_zome_name());
         let local_link_details: LinkDetails = conductors[1]
-            .call(&zome_bob, "get_link_details_local_only", ())
+            .call(&zome_bob, "get_links_details_local_only", ())
             .await;
         // link details should be empty
         assert_eq!(local_link_details.into_inner().len(), 0);

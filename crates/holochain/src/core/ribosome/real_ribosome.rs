@@ -45,9 +45,8 @@ use crate::core::ribosome::host_fn::ed_25519_x_salsa20_poly1305_encrypt::ed_2551
 use crate::core::ribosome::host_fn::emit_signal::emit_signal;
 use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
-use crate::core::ribosome::host_fn::get_link_details::get_link_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
-use crate::core::ribosome::host_fn::hash::hash;
+use crate::core::ribosome::host_fn::get_links_details::get_links_details;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
 use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
@@ -279,18 +278,18 @@ impl RealRibosome {
                             let i: u8 = i
                                 .try_into()
                                 .map_err(|_| ZomeTypesError::EntryTypeIndexOverflow)?;
-                            EntryDefIndex(i)
+                            i
                         }
-                        None => EntryDefIndex(0),
+                        None => 0,
                     };
                 let num_link_types = match ribosome.get_const_fn(&zome, "__num_link_types").await? {
                     Some(i) => {
                         let i: u8 = i
                             .try_into()
                             .map_err(|_| ZomeTypesError::LinkTypeIndexOverflow)?;
-                        LinkType(i)
+                        i
                     }
-                    None => LinkType(0),
+                    None => 0,
                 };
                 RibosomeResult::Ok((num_entry_types, num_link_types))
             },
@@ -321,25 +320,20 @@ impl RealRibosome {
             .map(|(zome_name, def)| {
                 let mut dependencies = Vec::new();
 
-                if integrity_zomes.len() == 1 {
-                    // If there's only one integrity zome we add it to this zome and are done.
-                    dependencies.push(ZomeIndex(0));
-                } else {
-                    // Integrity zomes need to have themselves as a dependency.
-                    if ribosome.dna_def().is_integrity_zome(zome_name) {
-                        // Get the ZomeIndex for this zome.
-                        let id = integrity_zomes.get(zome_name).copied().ok_or_else(|| {
-                            ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
-                        })?;
-                        dependencies.push(id);
-                    }
-                    for name in def.dependencies() {
-                        // Get the ZomeIndex for this dependency.
-                        let id = integrity_zomes.get(name).copied().ok_or_else(|| {
-                            ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
-                        })?;
-                        dependencies.push(id);
-                    }
+                // Integrity zomes need to have themselves as a dependency.
+                if ribosome.dna_def().is_integrity_zome(zome_name) {
+                    // Get the ZomeIndex for this zome.
+                    let id = integrity_zomes.get(zome_name).copied().ok_or_else(|| {
+                        ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
+                    })?;
+                    dependencies.push(id);
+                }
+                for name in def.dependencies() {
+                    // Get the ZomeIndex for this dependency.
+                    let id = integrity_zomes.get(name).copied().ok_or_else(|| {
+                        ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
+                    })?;
+                    dependencies.push(id);
                 }
 
                 Ok((zome_name.clone(), dependencies))
@@ -517,7 +511,6 @@ impl RealRibosome {
         host_fn_builder
             .with_host_function(&mut ns, "__hc__agent_info_1", agent_info)
             .with_host_function(&mut ns, "__hc__trace_1", trace)
-            .with_host_function(&mut ns, "__hc__hash_1", hash)
             .with_host_function(&mut ns, "__hc__version_1", version)
             .with_host_function(&mut ns, "__hc__verify_signature_1", verify_signature)
             .with_host_function(&mut ns, "__hc__sign_1", sign)
@@ -584,7 +577,7 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__get_1", get)
             .with_host_function(&mut ns, "__hc__get_details_1", get_details)
             .with_host_function(&mut ns, "__hc__get_links_1", get_links)
-            .with_host_function(&mut ns, "__hc__get_link_details_1", get_link_details)
+            .with_host_function(&mut ns, "__hc__get_links_details_1", get_links_details)
             .with_host_function(&mut ns, "__hc__count_links_1", count_links)
             .with_host_function(&mut ns, "__hc__get_agent_activity_1", get_agent_activity)
             .with_host_function(&mut ns, "__hc__must_get_entry_1", must_get_entry)
@@ -1338,10 +1331,9 @@ pub mod wasm_test {
                 "__hc__get_1",
                 "__hc__get_agent_activity_1",
                 "__hc__get_details_1",
-                "__hc__get_link_details_1",
                 "__hc__get_links_1",
+                "__hc__get_links_details_1",
                 "__hc__get_validation_receipts_1",
-                "__hc__hash_1",
                 "__hc__must_get_action_1",
                 "__hc__must_get_agent_activity_1",
                 "__hc__must_get_entry_1",

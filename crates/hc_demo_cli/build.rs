@@ -39,7 +39,10 @@ fn build(cargo_cmd: &std::ffi::OsStr, tgt: &str) {
     cmd.env_remove("CARGO_ENCODED_RUSTFLAGS");
     cmd.env("CARGO_TARGET_DIR", target_dir.clone());
     cmd.env("HC_DEMO_CLI_INCEPTION", "1");
-    cmd.env("RUSTFLAGS", "-C opt-level=z");
+    cmd.env(
+        "RUSTFLAGS",
+        "-C opt-level=z --cfg getrandom_backend=\"custom\"",
+    );
     cmd.arg("build");
     cmd.arg("--release");
     cmd.arg("--lib");
