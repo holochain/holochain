@@ -108,11 +108,30 @@ pub struct Existing {
 }
 
 impl Existing {
-
-    pub fn none() -> Self { Existing { all: false, indices: vec![] } }
-    pub fn all() -> Self { Existing { all: true, indices: vec![] } }
-    pub fn one(index: usize) -> Self { Existing { all: false, indices: vec![index] } }
-    pub fn many(indices: Vec<usize>) -> Self { Existing { all: false, indices } }
+    pub fn none() -> Self {
+        Existing {
+            all: false,
+            indices: vec![],
+        }
+    }
+    pub fn all() -> Self {
+        Existing {
+            all: true,
+            indices: vec![],
+        }
+    }
+    pub fn one(index: usize) -> Self {
+        Existing {
+            all: false,
+            indices: vec![index],
+        }
+    }
+    pub fn many(indices: Vec<usize>) -> Self {
+        Existing {
+            all: false,
+            indices,
+        }
+    }
 
     /// Determine all sandbox paths to use from an `.hc` file based on this struct's state.
     pub fn load(&self, hc_file: &HcFile) -> std::io::Result<Vec<ConfigRootPath>> {
@@ -122,7 +141,9 @@ impl Existing {
                 .invalid_paths()
                 .iter()
                 .enumerate()
-                .for_each(|(i, inv)| msg!("Warning. Sandbox not found at {}: {}", i, inv.display()));
+                .for_each(|(i, inv)| {
+                    msg!("Warning. Sandbox not found at {}: {}", i, inv.display())
+                });
             // Return all valid sandboxes in .hc
             return Ok(hc_file.valid_paths());
         }
@@ -309,7 +330,7 @@ mod tests {
         let res = Existing::all().load(&hc_file).unwrap();
         assert_eq!(0, res.len());
 
-        let res =  Existing::one(0).load(&hc_file);
+        let res = Existing::one(0).load(&hc_file);
         assert!(res.is_err());
 
         let res = Existing::many(vec![1, 2, 3]).load(&hc_file);

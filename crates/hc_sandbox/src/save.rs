@@ -3,13 +3,13 @@
 //! This module gives basic helpers to save / load your sandboxes
 //! to / from a `.hc` file.
 
+use crate::cmds::Existing;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
+use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
+use holochain_conductor_config::config::read_config;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
-use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
-use holochain_conductor_config::config::read_config;
-use crate::cmds::Existing;
 
 /// Representation of a loaded `.hc` file
 #[derive(Debug)]
@@ -149,7 +149,6 @@ impl HcFile {
         self.save()
     }
 
-
     /// Remove paths by their index in the `.hc` file
     /// and attempt to delete the sandbox folder.
     /// If no indices are passed in then they will all be removed.
@@ -181,7 +180,11 @@ impl HcFile {
         // Remove each requested sandbox dir
         for (i, maybe_path) in to_remove.into_iter().enumerate() {
             match maybe_path {
-                Err(p) => msg!("Warning: Failed to delete sandbox at {}: {}", i, p.display()),
+                Err(p) => msg!(
+                    "Warning: Failed to delete sandbox at {}: {}",
+                    i,
+                    p.display()
+                ),
                 Ok(p) => {
                     if let Err(e) = std::fs::remove_dir_all(p.as_ref()) {
                         msg!(
@@ -256,10 +259,7 @@ impl HcFile {
             );
             return Ok(());
         }
-        msg!(
-            "Sandboxes contained in {}",
-            self.dir.join(".hc").display()
-        );
+        msg!("Sandboxes contained in {}", self.dir.join(".hc").display());
         for (i, path) in self.existing_all.iter().enumerate() {
             let Ok(p) = path else {
                 msg!(
@@ -395,12 +395,8 @@ impl HcFile {
         Ok(())
     }
 
-
     /// List the admin ports for each sandbox.
-    pub async fn get_admin_ports(
-        &self,
-        paths: Vec<ConfigRootPath>,
-    ) -> anyhow::Result<Vec<u16>> {
+    pub async fn get_admin_ports(&self, paths: Vec<ConfigRootPath>) -> anyhow::Result<Vec<u16>> {
         let live_ports = self.find_ports(&paths[..])?;
         let mut ports = Vec::new();
         for (p, port) in paths.into_iter().zip(live_ports) {
@@ -411,8 +407,8 @@ impl HcFile {
             if let Some(config) = read_config(p)? {
                 if let Some(ai) = config.admin_interfaces {
                     if let Some(AdminInterfaceConfig {
-                                    driver: InterfaceDriver::Websocket { port, .. },
-                                }) = ai.first()
+                        driver: InterfaceDriver::Websocket { port, .. },
+                    }) = ai.first()
                     {
                         ports.push(*port)
                     }
@@ -421,7 +417,6 @@ impl HcFile {
         }
         Ok(ports)
     }
-
 }
 
 fn get_file_locks() -> &'static tokio::sync::Mutex<Vec<usize>> {
@@ -434,7 +429,6 @@ fn get_file_locks() -> &'static tokio::sync::Mutex<Vec<usize>> {
 fn is_sandbox_path_valid(path: &ConfigRootPath) -> bool {
     path.exists() && path.is_dir()
 }
-
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -461,11 +455,11 @@ pub(crate) mod tests {
                     let path = temp_dir.path().join(folder);
                     writeln!(file, "{}", path.display()).unwrap();
                     std::fs::create_dir_all(&path).unwrap();
-                },
+                }
                 Err(folder) => {
                     let path = temp_dir.path().join(folder);
                     writeln!(file, "{}", path.display()).unwrap();
-                },
+                }
             }
         }
         HcFile::load(PathBuf::from(temp_dir.path())).unwrap()

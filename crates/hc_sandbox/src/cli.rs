@@ -9,7 +9,6 @@ use holochain_types::prelude::InstalledAppId;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::path::PathBuf;
-use crate::cmds;
 
 const DEFAULT_APP_ID: &str = "test-app";
 
