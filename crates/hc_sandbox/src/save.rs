@@ -263,13 +263,13 @@ impl HcFile {
         for (i, path) in self.existing_all.iter().enumerate() {
             let Ok(p) = path else {
                 msg!(
-                    "{}: {} -- UNAVAILABLE\n",
+                    "{}: {} -- UNAVAILABLE",
                     i,
                     path.as_ref().err().unwrap().display()
                 );
                 continue;
             };
-            msg!("{}: {}\n", i, p.display());
+            msg!("{}: {}", i, p.display());
             if verbose {
                 let config =
                     holochain_conductor_config::config::read_config(p.clone()).map_err(|err| {
