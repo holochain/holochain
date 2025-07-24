@@ -159,16 +159,16 @@
 //!   - Any zome failure fails initialization for the DNA, any zome retry (missing dependencies) causes the DNA to retry.
 //!   - Failure overrides retry.
 //!   - See [`create_cap_grant`](crate::capability::create_cap_grant) for an explanation of how to set up capabilities in `init`.
-//! - `fn recv_remote_signal(signal: SerializedBytes) -> ExternResult<()>`:
-//!   - Allows the guest to receive remote signals sent from other agents via the [`send_remote_signal`](crate::p2p::send_remote_signal) host function.
-//!   - Only receives signals from a coordinator zome of the same name in the remote agent's cell.
-//!   - The single input parameter of this callback can be an arbitrary type with a `serde::Deserialize + std::fmt::Debug` implementation, rather than `SerializedBytes`. If you choose to do this, the call will fail if the type cannot be deserialized from the serialized bytes.
 //! - `fn migrate_agent_{{ open|close }} -> ExternResult<MigrateAgentCallbackResult>`:
 //!   - Allows the guest to pass/fail a migration attempt to/from another DNA.
 //!   - Open runs when an agent is starting a new source chain from an old one.
 //!   - Close runs when an agent is deprecating an old source chain in favour of a new one.
 //!   - All zomes in a DNA migrate at the same time.
 //!   - Any failure fails the migration.
+//! - `fn recv_remote_signal(signal: SerializedBytes) -> ExternResult<()>`:
+//!   - Allows the guest to receive remote signals sent from other agents via the [`send_remote_signal`](crate::p2p::send_remote_signal) host function.
+//!   - Only receives signals from a coordinator zome of the same name in the remote agent's cell.
+//!   - The single input parameter of this callback can be an arbitrary type with a `serde::Deserialize + std::fmt::Debug` implementation, rather than `SerializedBytes`. If you choose to do this, the call will fail if the type cannot be deserialized from the serialized bytes.
 //! - `fn post_commit(actions: Vec<SignedActionHashed>)`:
 //!   - Executes after the WASM call that originated the commits so not bound by the original atomic transaction.
 //!   - Input is all the action hashes that were committed.
