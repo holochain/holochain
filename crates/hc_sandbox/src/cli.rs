@@ -9,6 +9,7 @@ use holochain_types::prelude::InstalledAppId;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::path::PathBuf;
+use crate::cmds;
 
 const DEFAULT_APP_ID: &str = "test-app";
 
@@ -151,7 +152,7 @@ impl HcSandbox {
     pub async fn run(self) -> anyhow::Result<()> {
         holochain_util::pw::pw_set_piped(self.piped);
         // Make sure we can use .hc
-        let mut hc_file = HcFile::try_load(std::env::current_dir()?)?;
+        let mut hc_file = HcFile::load(std::env::current_dir()?)?;
         match self.subcommand {
             HcSandboxSubcommand::Generate {
                 app_id,
@@ -239,7 +240,7 @@ impl HcSandbox {
             }
             HcSandboxSubcommand::List { verbose } => hc_file.list(verbose)?,
             HcSandboxSubcommand::Clean => {
-                let removed_count = hc_file.remove(Vec::new())?;
+                let removed_count = hc_file.remove(Existing::all())?;
                 match removed_count {
                     0 => msg!("No sandbox path has been removed"),
                     1 => msg!("1 sandbox path has been removed"),
@@ -247,7 +248,7 @@ impl HcSandbox {
                 }
             }
             HcSandboxSubcommand::Remove { indices } => {
-                let removed_count = hc_file.remove(indices)?;
+                let removed_count = hc_file.remove(Existing::many(indices))?;
                 match removed_count {
                     0 => msg!("No sandbox path has been removed"),
                     1 => msg!("1 sandbox path has been removed"),

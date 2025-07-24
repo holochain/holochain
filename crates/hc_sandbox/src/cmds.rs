@@ -108,14 +108,21 @@ pub struct Existing {
 }
 
 impl Existing {
-    /// Determine all sandbox paths to use based on .hc and given options.
+
+    pub fn none() -> Self { Existing { all: false, indices: vec![] } }
+    pub fn all() -> Self { Existing { all: true, indices: vec![] } }
+    pub fn one(index: usize) -> Self { Existing { all: false, indices: vec![index] } }
+    pub fn many(indices: Vec<usize>) -> Self { Existing { all: false, indices } }
+
+    /// Determine all sandbox paths to use from an `.hc` file based on this struct's state.
     pub fn load(&self, hc_file: &HcFile) -> std::io::Result<Vec<ConfigRootPath>> {
         if self.all {
             // Warn for all invalid paths
             hc_file
                 .invalid_paths()
                 .iter()
-                .for_each(|inv| msg!("Warning. Sandbox not found at {}", inv.display()));
+                .enumerate()
+                .for_each(|(i, inv)| msg!("Warning. Sandbox not found at {}: {}", i, inv.display()));
             // Return all valid sandboxes in .hc
             return Ok(hc_file.valid_paths());
         }
@@ -254,127 +261,58 @@ mod tests {
 
     #[test]
     fn existing_is_empty() {
-        let ex = Existing {
-            all: false,
-            indices: Vec::new(),
-        };
-        assert!(ex.is_empty());
-        let ex = Existing {
-            all: true,
-            indices: Vec::new(),
-        };
-        assert!(!ex.is_empty());
-        let ex = Existing {
-            all: false,
-            indices: vec![1],
-        };
-        assert!(!ex.is_empty());
-        let ex = Existing {
-            all: true,
-            indices: vec![1, 2, 3],
-        };
-        assert!(!ex.is_empty());
+        assert!(Existing::none().is_empty());
+        assert!(!Existing::all().is_empty());
+        assert!(!Existing::one(1).is_empty());
+        assert!(!Existing::many(vec![1, 2, 3]).is_empty());
     }
 
     #[test]
     fn existing_load_normal() {
-        let hc_file = vec![
-            Ok(PathBuf::from(".ok1").into()),
-            Err(PathBuf::from(".err1").into()),
-            Ok(PathBuf::from(".ok2").into()),
-            Ok(PathBuf::from(".ok3").into()),
-            Err(PathBuf::from(".err2").into()),
-        ];
-        let hc_file = HcFile::test_new(PathBuf::from("nowhere"), hc_file);
+        let hc_file = crate::save::tests::create_test_folder(vec![
+            Ok(".ok1"),
+            Err(".err1"),
+            Ok(".ok2"),
+            Ok(".ok3"),
+            Err(".err2"),
+        ]);
 
-        let ex_none = Existing {
-            all: false,
-            indices: Vec::new(),
-        };
-        let res = ex_none.load(&hc_file).unwrap();
+        let res = Existing::none().load(&hc_file).unwrap();
         assert_eq!(0, res.len());
 
-        let ex_all = Existing {
-            all: true,
-            indices: Vec::new(),
-        };
-        let res = ex_all.load(&hc_file).unwrap();
+        let res = Existing::all().load(&hc_file).unwrap();
         assert_eq!(3, res.len());
 
-        let ex_one = Existing {
-            all: false,
-            indices: vec![0],
-        };
-        let res = ex_one.load(&hc_file).unwrap();
+        let res = Existing::one(0).load(&hc_file).unwrap();
         assert_eq!(1, res.len());
 
-        let ex_bad = Existing {
-            all: false,
-            indices: vec![1],
-        };
-        let res = ex_bad.load(&hc_file);
+        let res = Existing::one(1).load(&hc_file);
         assert!(res.is_err());
 
-        let ex_many_bad = Existing {
-            all: false,
-            indices: vec![1, 2, 3],
-        };
-        let res = ex_many_bad.load(&hc_file);
+        let res = Existing::many(vec![1, 2, 3]).load(&hc_file);
         assert!(res.is_err());
 
-        let ex_many_ok = Existing {
-            all: false,
-            indices: vec![0, 3],
-        };
-        let res = ex_many_ok.load(&hc_file).unwrap();
+        let res = Existing::many(vec![0, 3]).load(&hc_file).unwrap();
         assert_eq!(2, res.len());
 
-        let ex = Existing {
-            all: true,
-            indices: vec![1, 2, 3],
-        };
-        let res = ex.load(&hc_file).unwrap();
-        assert_eq!(3, res.len());
-
-        let ex_oob = Existing {
-            all: false,
-            indices: vec![0, 42],
-        };
-        let res = ex_oob.load(&hc_file);
+        let res = Existing::many(vec![0, 42]).load(&hc_file);
         assert!(res.is_err());
     }
 
     #[test]
     fn existing_load_empty() {
-        let hc_file = vec![];
-        let hc_file = HcFile::test_new(PathBuf::from("nowhere"), hc_file);
+        let hc_file = crate::save::tests::create_test_folder(Vec::new());
 
-        let ex_none = Existing {
-            all: false,
-            indices: Vec::new(),
-        };
-        let res = ex_none.load(&hc_file).unwrap();
+        let res = Existing::none().load(&hc_file).unwrap();
         assert_eq!(0, res.len());
 
-        let ex_all = Existing {
-            all: true,
-            indices: Vec::new(),
-        };
-        let res = ex_all.load(&hc_file).unwrap();
+        let res = Existing::all().load(&hc_file).unwrap();
         assert_eq!(0, res.len());
 
-        let ex_one = Existing {
-            all: false,
-            indices: vec![0],
-        };
-        let res = ex_one.load(&hc_file);
+        let res =  Existing::one(0).load(&hc_file);
         assert!(res.is_err());
 
-        let ex_many_bad = Existing {
-            all: false,
-            indices: vec![1, 2, 3],
-        };
-        let res = ex_many_bad.load(&hc_file);
+        let res = Existing::many(vec![1, 2, 3]).load(&hc_file);
         assert!(res.is_err());
     }
 }

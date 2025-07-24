@@ -72,7 +72,6 @@
 //! do not need the conductor passphrase.
 
 use crate::cmds::Existing;
-use crate::ports::get_admin_ports;
 use crate::save::HcFile;
 use anyhow::Context;
 use clap::Parser;
@@ -331,18 +330,14 @@ async fn admin_port_from_connect_args(
     } else if let Some(admin_port) = connect_args.running {
         Ok(admin_port)
     } else if let Some(index) = connect_args.index {
-        let paths = Existing {
-            all: false,
-            indices: vec![index as usize],
-        }
-        .load(hc_file)?;
+        let paths = Existing::one(index as usize).load(hc_file)?;
 
-        if let Some(admin_port) = get_admin_ports(hc_file, paths).await?.first() {
+        if let Some(admin_port) = hc_file.get_admin_ports(paths).await?.first() {
             Ok(*admin_port)
         } else {
             anyhow::bail!("No admin port found")
         }
-    } else if let Some(admin_port) = get_admin_ports(hc_file, hc_file.valid_paths())
+    } else if let Some(admin_port) = hc_file.get_admin_ports(hc_file.valid_paths())
         .await?
         .first()
     {

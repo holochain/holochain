@@ -238,7 +238,7 @@ async fn clean_no_permission() {
     assert_eq!(line_count, 0);
 }
 
-/// Test "clean" with a ".hc" file containing one bogus path.
+/// Test "clean" with a ".hc" file containing one path that doesn't exist.
 #[tokio::test(flavor = "multi_thread")]
 async fn clean_one() {
     let temp_dir = tempfile::TempDir::new().unwrap();

@@ -61,7 +61,7 @@ pub async fn run(
         launch_info.app_ports.push(port);
     }
 
-    let hc_file = HcFile::try_load(std::env::current_dir()?)?;
+    let hc_file = HcFile::load(std::env::current_dir()?)?;
     hc_file.lock_live(&sandbox_path, admin_port).await?;
     msg!("Connected successfully to a running holochain");
 

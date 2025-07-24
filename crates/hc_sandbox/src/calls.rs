@@ -32,7 +32,6 @@ use kitsune2_core::Ed25519Verifier;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
-use crate::ports::get_admin_ports;
 use crate::run::run_async;
 use crate::save::HcFile;
 use clap::{Args, Parser, Subcommand};
@@ -326,7 +325,7 @@ pub async fn call(
         } else {
             existing.load(hc_file)?
         };
-        let ports = get_admin_ports(hc_file, paths.clone()).await?;
+        let ports = hc_file.get_admin_ports(paths.clone()).await?;
         let mut clients = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match AdminWebsocket::connect(format!("localhost:{port}"), origin.clone()).await {
