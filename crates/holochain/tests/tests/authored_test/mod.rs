@@ -44,7 +44,7 @@ async fn authored_test() {
     let entry_hash = record.unwrap().action().entry_hash().cloned().unwrap();
 
     // publish these commits
-    let triggers = handle.get_cell_triggers(alice.cell_id()).await.unwrap();
+    let triggers = handle.get_cell_triggers(alice.dna_id()).await.unwrap();
     triggers.integrate_dht_ops.trigger(&"authored_test");
 
     // Alice commits the entry
@@ -52,7 +52,7 @@ async fn authored_test() {
         .authored_db()
         .read_async({
             let basis: AnyDhtHash = entry_hash.clone().into();
-            let alice_pk = alice.cell_id().agent_pubkey().clone();
+            let alice_pk = alice.dna_id().agent_pubkey().clone();
 
             move |txn| -> DatabaseResult<()> {
                 let has_authored_entry: bool = txn.query_row(
@@ -91,7 +91,7 @@ async fn authored_test() {
         .authored_db()
         .read_async({
             let basis: AnyDhtHash = entry_hash.clone().into();
-            let bob_pk = bob.cell_id().agent_pubkey().clone();
+            let bob_pk = bob.dna_id().agent_pubkey().clone();
 
             move |txn| -> DatabaseResult<()> {
                 let has_authored_entry: bool = txn.query_row(
@@ -139,14 +139,14 @@ async fn authored_test() {
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(bob.cell_id()).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob.dna_id()).await.unwrap();
     triggers.publish_dht_ops.trigger(&"");
 
     bob
         .authored_db()
         .read_async({
             let basis: AnyDhtHash = entry_hash.clone().into();
-            let bob_pk = bob.cell_id().agent_pubkey().clone();
+            let bob_pk = bob.dna_id().agent_pubkey().clone();
 
             move |txn| -> DatabaseResult<()> {
                 let has_authored_entry: bool = txn.query_row(

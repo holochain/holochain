@@ -34,7 +34,7 @@ impl SweetConductorHandle {
         I: serde::Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        self.call_from_fallible(zome.cell_id().agent_pubkey(), None, zome, fn_name, payload)
+        self.call_from_fallible(zome.dna_id().agent_pubkey(), None, zome, fn_name, payload)
             .await
     }
     /// Make a zome call to a Cell, as if some other Cell were the caller. More general case.
@@ -73,7 +73,7 @@ impl SweetConductorHandle {
             .easy_call_zome(
                 provenance,
                 cap_secret,
-                zome.cell_id().clone(),
+                zome.dna_id().clone(),
                 zome.name().clone(),
                 fn_name,
                 payload,

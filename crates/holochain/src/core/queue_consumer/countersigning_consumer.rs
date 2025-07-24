@@ -11,7 +11,7 @@ use tracing::*;
 pub(crate) fn spawn_countersigning_consumer(
     space: Space,
     workspace: Arc<CountersigningWorkspace>,
-    cell_id: CellId,
+    dna_id: DnaId,
     conductor: ConductorHandle,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
@@ -21,7 +21,7 @@ pub(crate) fn spawn_countersigning_consumer(
     let self_trigger = tx.clone();
     queue_consumer_cell_bound(
         "countersigning_consumer",
-        cell_id.clone(),
+        dna_id.clone(),
         conductor.task_manager(),
         (tx.clone(), rx),
         #[cfg(not(feature = "unstable-countersigning"))]
@@ -31,7 +31,7 @@ pub(crate) fn spawn_countersigning_consumer(
             countersigning_workflow_fn(
                 space.clone(),
                 workspace.clone(),
-                cell_id.clone(),
+                dna_id.clone(),
                 conductor.clone(),
                 self_trigger.clone(),
                 integration_trigger.clone(),
@@ -47,19 +47,19 @@ pub(crate) fn spawn_countersigning_consumer(
 async fn countersigning_workflow_fn(
     space: Space,
     workspace: Arc<CountersigningWorkspace>,
-    cell_id: CellId,
+    dna_id: DnaId,
     conductor: ConductorHandle,
     self_trigger: TriggerSender,
     integration_trigger: TriggerSender,
     publish_trigger: TriggerSender,
 ) -> WorkflowResult<WorkComplete> {
     let signal_tx = conductor
-        .get_signal_tx(&cell_id)
+        .get_signal_tx(&dna_id)
         .await
         .map_err(WorkflowError::other)?;
 
     let cell = conductor
-        .cell_by_id(&cell_id)
+        .cell_by_id(&dna_id)
         .await
         .map_err(WorkflowError::other)?;
     let cell_network = cell.holochain_p2p_dna();
@@ -71,7 +71,7 @@ async fn countersigning_workflow_fn(
         workspace,
         Arc::new(cell_network.clone()),
         keystore,
-        cell_id.clone(),
+        dna_id.clone(),
         signal_tx,
         self_trigger.clone(),
         integration_trigger.clone(),

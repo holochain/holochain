@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use ed25519_dalek::Signer;
 use holo_hash::AgentPubKey;
 use holochain_zome_types::{
-    capability::CapSecret, cell::CellId, dependencies::holochain_integrity_types::Signature,
+    capability::CapSecret, cell::DnaId, dependencies::holochain_integrity_types::Signature,
 };
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
@@ -25,7 +25,7 @@ impl std::fmt::Debug for SigningCredentials {
 
 #[derive(Debug, Clone, Default)]
 pub struct ClientAgentSigner {
-    credentials: Arc<RwLock<HashMap<CellId, SigningCredentials>>>,
+    credentials: Arc<RwLock<HashMap<DnaId, SigningCredentials>>>,
 }
 
 impl ClientAgentSigner {
@@ -35,8 +35,8 @@ impl ClientAgentSigner {
         }
     }
 
-    pub fn add_credentials(&self, cell_id: CellId, credentials: SigningCredentials) {
-        self.credentials.write().insert(cell_id, credentials);
+    pub fn add_credentials(&self, dna_id: DnaId, credentials: SigningCredentials) {
+        self.credentials.write().insert(dna_id, credentials);
     }
 }
 
@@ -44,27 +44,27 @@ impl ClientAgentSigner {
 impl AgentSigner for ClientAgentSigner {
     async fn sign(
         &self,
-        cell_id: &CellId,
+        dna_id: &DnaId,
         _provenance: AgentPubKey,
         data_to_sign: Arc<[u8]>,
     ) -> Result<Signature, anyhow::Error> {
         let credentials_lock = self.credentials.read();
         let credentials = credentials_lock
-            .get(cell_id)
-            .ok_or_else(|| anyhow::anyhow!("No credentials found for cell: {:?}", cell_id))?;
+            .get(dna_id)
+            .ok_or_else(|| anyhow::anyhow!("No credentials found for cell: {:?}", dna_id))?;
         let signature = credentials.keypair.try_sign(&data_to_sign)?;
         Ok(Signature(signature.to_bytes()))
     }
 
-    fn get_provenance(&self, cell_id: &CellId) -> Option<AgentPubKey> {
+    fn get_provenance(&self, dna_id: &DnaId) -> Option<AgentPubKey> {
         self.credentials
             .read()
-            .get(cell_id)
+            .get(dna_id)
             .map(|c| c.signing_agent_key.clone())
     }
 
-    fn get_cap_secret(&self, cell_id: &CellId) -> Option<CapSecret> {
-        self.credentials.read().get(cell_id).map(|c| c.cap_secret)
+    fn get_cap_secret(&self, dna_id: &DnaId) -> Option<CapSecret> {
+        self.credentials.read().get(dna_id).map(|c| c.cap_secret)
     }
 }
 

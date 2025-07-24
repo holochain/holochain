@@ -18,7 +18,7 @@ pub fn emit_signal(
             non_determinism: Permission::Allow,
             ..
         } => {
-            let cell_id = CellId::new(
+            let dna_id = DnaId::new(
                 ribosome.dna_def().as_hash().clone(),
                 call_context
                     .host_context
@@ -30,7 +30,7 @@ pub fn emit_signal(
                     .clone(),
             );
             let signal = Signal::App {
-                cell_id,
+                dna_id,
                 zome_name: call_context.zome.zome_name().clone(),
                 signal: input,
             };

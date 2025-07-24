@@ -2,7 +2,7 @@ use crate::conductor::api::CellConductorReadHandle;
 use holochain_types::app::{InstalledApp, InstalledAppId};
 use holochain_util::tokio_helper;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner, WasmHostError};
-use holochain_zome_types::{call::RoleName, cell::CellId};
+use holochain_zome_types::{call::RoleName, cell::DnaId};
 use wasmer::RuntimeError;
 
 /// Check whether the current cell belongs to the app we're trying to perform a clone operation on.
@@ -11,14 +11,14 @@ use wasmer::RuntimeError;
 /// This function takes the target cell to be cloned as an argument, and fetches the current cell from the call context
 /// so that the check cannot accidentally be called on the wrong cell, permitting access to the wrong app.
 pub fn check_clone_access(
-    target_cell_id: &CellId,
+    target_dna_id: &DnaId,
     conductor_handle: &CellConductorReadHandle,
 ) -> Result<(InstalledAppId, RoleName), RuntimeError> {
-    let current_cell_id = conductor_handle.cell_id();
+    let current_dna_id = conductor_handle.dna_id();
 
     let installed_app: InstalledApp = tokio_helper::block_forever_on(async move {
         conductor_handle
-            .find_app_containing_cell(current_cell_id)
+            .find_app_containing_cell(current_dna_id)
             .await
     })
     .map_err(|conductor_error| -> RuntimeError {
@@ -37,8 +37,7 @@ pub fn check_clone_access(
     let matched_app_role = installed_app
         .primary_roles()
         .find(|(_, role)| {
-            target_cell_id.agent_pubkey() == agent_key
-                && target_cell_id.dna_hash() == role.dna_hash()
+            target_dna_id.agent_pubkey() == agent_key && target_dna_id.dna_hash() == role.dna_hash()
         })
         .map(|(role_name, _)| role_name);
 

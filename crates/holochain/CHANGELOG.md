@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE**: Remove types `EnabledApp` and `DisabledApp` in favor of `InstalledApp` to reduce app handling complexity.
 - **BREAKING CHANGE**: Replace and remove legacy constructor for `InstalledAppCommon`.
 - Remove an unnecessary use of `DnaFile` in the genesis workflow ([#5150](https://github.com/holochain/holochain/pull/5150)).
+- **BREAKING CHANGE**: Rename `CellId` to `DnaId` since the combination of `(DnaHash, AgentPubkey)` uniquely identifies an instantiated *dna* as the set of *integrity* zomes + modifiers. While the notion of a "cell" will be refering to an *instantiated dna + coordinator zomes* going forward.
 
 ## 0.6.0-dev.13
 

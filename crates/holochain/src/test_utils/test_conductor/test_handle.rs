@@ -40,21 +40,21 @@ impl TestConductorHandle {
 
         for agent in agents {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            let cell_ids: Vec<TestCell> = dna_files
+            let dna_ids: Vec<TestCell> = dna_files
                 .iter()
-                .map(|f| CellId::new(f.dna_hash().clone(), agent.clone()))
-                .map(|cell_id| TestCell {
-                    cell_id,
+                .map(|f| DnaId::new(f.dna_hash().clone(), agent.clone()))
+                .map(|dna_id| TestCell {
+                    dna_id,
                     handle: self.clone(),
                 })
                 .collect();
-            let cells = cell_ids
+            let cells = dna_ids
                 .iter()
                 .map(|cell| {
                     (
                         InstalledCell::new(
-                            cell.cell_id().clone(),
-                            format!("{}", cell.cell_id().dna_hash()),
+                            cell.dna_id().clone(),
+                            format!("{}", cell.dna_id().dna_hash()),
                         ),
                         None,
                     )
@@ -65,7 +65,7 @@ impl TestConductorHandle {
                 .install_app(installed_app_id.clone(), cells)
                 .await
                 .expect("Could not install app");
-            info.push((installed_app_id, cell_ids));
+            info.push((installed_app_id, dna_ids));
         }
 
         for (installed_app_id, _) in info.iter() {
@@ -139,7 +139,7 @@ impl TestConductorHandle {
     /// `call_zome_ok`, but with arguments provided individually
     pub async fn call_zome_ok_flat<I, O, Z, F>(
         &self,
-        cell_id: &CellId,
+        dna_id: &DnaId,
         zome_name: Z,
         fn_name: F,
         cap_secret: Option<CapSecret>,
@@ -153,9 +153,9 @@ impl TestConductorHandle {
         O: DeserializeOwned + std::fmt::Debug,
     {
         let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
-        let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
+        let provenance = provenance.unwrap_or_else(|| dna_id.agent_pubkey().clone());
         let call = ZomeCall {
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             zome_name: zome_name.into(),
             fn_name: fn_name.into(),
             cap_secret,
@@ -179,7 +179,7 @@ where
     FunctionName: From<F>,
 {
     /// The Id of the `Cell` in which this Zome-call would be invoked
-    pub cell_id: &'a CellId,
+    pub dna_id: &'a DnaId,
     /// The Zome containing the function that would be invoked
     pub zome: &'a Zome,
     /// The capability request authorization.
@@ -191,7 +191,7 @@ where
     pub fn_name: F,
     /// The data to be serialized and passed as an argument to the Zome call
     pub payload: P,
-    /// If None, the AgentPubKey from the CellId is used (a common case)
+    /// If None, the AgentPubKey from the DnaId is used (a common case)
     pub provenance: Option<AgentPubKey>,
 }
 
@@ -202,7 +202,7 @@ where
 {
     fn from(tzci: TestZomeCall<'a, P, F>) -> Self {
         let TestZomeCall {
-            cell_id,
+            dna_id,
             zome,
             fn_name,
             cap_secret,
@@ -210,9 +210,9 @@ where
             payload,
         } = tzci;
         let payload = ExternIO::encode(payload).expect("Couldn't serialize payload");
-        let provenance = provenance.unwrap_or_else(|| cell_id.agent_pubkey().clone());
+        let provenance = provenance.unwrap_or_else(|| dna_id.agent_pubkey().clone());
         ZomeCallInvocation {
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             zome: zome.clone(),
             fn_name: fn_name.into(),
             cap_secret,

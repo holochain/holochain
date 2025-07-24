@@ -8,16 +8,16 @@ pub enum AppError {
     CloneLimitExceeded(u32, Box<AppRolePrimary>),
 
     #[error("Tried to create a cell with an existing id '{0}'")]
-    DuplicateCellId(CellId),
+    DuplicateDnaId(DnaId),
 
-    #[error("Tried to create a clone cell with existing clone cell id '{0}'")]
+    #[error("Tried to create a clone cell with existing clone dna id '{0}'")]
     DuplicateCloneIds(CloneId),
 
     #[error("Could not find clone cell with id '{0}'")]
-    CloneCellNotFound(CloneCellId),
+    CloneCellNotFound(CloneDnaId),
 
     #[error("Tried to delete a clone cell which was not already disabled: '{0}'")]
-    CloneCellMustBeDisabledBeforeDeleting(CloneCellId),
+    CloneCellMustBeDisabledBeforeDeleting(CloneDnaId),
 
     #[error("Illegal character '{CLONE_ID_DELIMITER}' used in role name: {0}")]
     IllegalRoleName(RoleName),

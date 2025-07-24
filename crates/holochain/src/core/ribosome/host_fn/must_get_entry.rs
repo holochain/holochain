@@ -143,7 +143,7 @@ pub mod test {
 
         let dht_db = conductor
             .raw_handle()
-            .get_dht_db(alice.cell_id().dna_hash())
+            .get_dht_db(alice.dna_id().dna_hash())
             .unwrap();
 
         // When we first get the record it will return because we haven't yet

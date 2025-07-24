@@ -64,7 +64,7 @@ async fn app_info_returns_all_cells_with_info() {
         .disable_clone_cell(
             &app_id,
             &DisableCloneCellPayload {
-                clone_cell_id: CloneCellId::DnaHash(clone_cell_2.cell_id.dna_hash().clone()),
+                clone_dna_id: CloneDnaId::DnaHash(clone_cell_2.dna_id.dna_hash().clone()),
             },
         )
         .await
@@ -92,15 +92,15 @@ async fn app_info_returns_all_cells_with_info() {
     // cell 2 in cell info is clone cell
     matches!(cell_info_for_role_2[1], CellInfo::Cloned(_));
 
-    // clone cell ids match
+    // clone dna ids match
     assert!(if let CellInfo::Cloned(cell) = &cell_info_for_role_1[1] {
-        cell.cell_id == clone_cell_1.cell_id.clone()
+        cell.dna_id == clone_cell_1.dna_id.clone()
     } else {
         false
     });
 
     assert!(if let CellInfo::Cloned(cell) = &cell_info_for_role_2[1] {
-        cell.cell_id == clone_cell_2.cell_id.clone()
+        cell.dna_id == clone_cell_2.dna_id.clone()
     } else {
         false
     });
@@ -124,7 +124,7 @@ async fn app_info_returns_all_cells_with_info() {
         .enable_clone_cell(
             &app_id,
             &EnableCloneCellPayload {
-                clone_cell_id: CloneCellId::DnaHash(clone_cell_2.cell_id.dna_hash().clone()),
+                clone_dna_id: CloneDnaId::DnaHash(clone_cell_2.dna_id.dna_hash().clone()),
             },
         )
         .await

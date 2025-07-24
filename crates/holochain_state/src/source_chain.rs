@@ -461,7 +461,7 @@ impl SourceChain {
         self.author_db()
             .read_async({
                 let agent_key = self.agent_pubkey().clone();
-                let cell_id = self.cell_id().as_ref().clone();
+                let dna_id = self.dna_id().as_ref().clone();
                 move |txn| {
                     txn.query_row(
                         SELECT_VALID_AGENT_PUB_KEY,
@@ -480,7 +480,7 @@ impl SourceChain {
                     )
                     .map_err(|err| match err {
                         rusqlite::Error::BlobSizeError | rusqlite::Error::QueryReturnedNoRows => {
-                            SourceChainError::InvalidAgentKey(agent_key, cell_id)
+                            SourceChainError::InvalidAgentKey(agent_key, dna_id)
                         }
                         _ => {
                             tracing::error!(?err, "Error looking up valid agent pub key");
@@ -594,7 +594,7 @@ where
         self.author.clone()
     }
 
-    pub fn cell_id(&self) -> Arc<CellId> {
+    pub fn dna_id(&self) -> Arc<DnaId> {
         self.vault.kind().0.clone()
     }
 
@@ -1554,7 +1554,7 @@ mod tests {
         // Valid agent pub key has been deleted. Repeating the operation should fail now as no valid
         // pub key can be found.
         let result = chain.delete_valid_agent_pub_key().await.unwrap_err();
-        assert_matches!(result, SourceChainError::InvalidAgentKey(invalid_key, cell_id) if invalid_key == *chain.author && cell_id == *chain.cell_id());
+        assert_matches!(result, SourceChainError::InvalidAgentKey(invalid_key, dna_id) if invalid_key == *chain.author && dna_id == *chain.dna_id());
     }
 
     #[tokio::test(flavor = "multi_thread")]

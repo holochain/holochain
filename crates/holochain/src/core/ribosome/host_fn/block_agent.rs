@@ -19,11 +19,11 @@ pub fn block_agent(
             .call_zome_handle()
             .block(Block::new(
                 BlockTarget::Cell(
-                    CellId::new(
+                    DnaId::new(
                         call_context
                             .host_context()
                             .call_zome_handle()
-                            .cell_id()
+                            .dna_id()
                             .dna_hash()
                             .clone(),
                         input.target,
@@ -127,7 +127,7 @@ mod test {
         let alice = alice_cell.zome(TestWasm::Create);
         let bob = bob_cell.zome(TestWasm::Create);
 
-        let bob_pubkey = bob_cell.cell_id().agent_pubkey();
+        let bob_pubkey = bob_cell.dna_id().agent_pubkey();
 
         conductors.reveal_peer_info(0, 1).await;
         conductors.reveal_peer_info(1, 0).await;

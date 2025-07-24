@@ -1243,7 +1243,7 @@ pub async fn make_warrant_op(
 /// particular cell.
 pub fn get_representative_agent(conductor: &Conductor, dna_hash: &DnaHash) -> Option<AgentPubKey> {
     conductor
-        .running_cell_ids()
+        .running_dna_ids()
         .into_iter()
         .find(|id| id.dna_hash() == dna_hash)
         .map(|id| id.agent_pubkey().clone())

@@ -35,7 +35,7 @@ async fn grafting() {
         .call(
             &zome,
             "read_entry",
-            EntryHash::from(alice.cell_id().agent_pubkey().clone()),
+            EntryHash::from(alice.dna_id().agent_pubkey().clone()),
         )
         .await;
 
@@ -102,7 +102,7 @@ async fn grafting() {
     let record = Record::new(sah, Some(entry.clone()));
     let result = conductor
         .clone()
-        .graft_records_onto_source_chain(alice.cell_id().clone(), false, vec![record])
+        .graft_records_onto_source_chain(alice.dna_id().clone(), false, vec![record])
         .await;
     // This gets rejected.
     assert!(matches!(
@@ -119,7 +119,7 @@ async fn grafting() {
     let hash = record.action_address().clone();
     conductor
         .clone()
-        .graft_records_onto_source_chain(alice.cell_id().clone(), false, vec![record])
+        .graft_records_onto_source_chain(alice.dna_id().clone(), false, vec![record])
         .await
         .expect("Should pass with valid agent");
 
@@ -137,7 +137,7 @@ async fn grafting() {
     let hash = record.action_address().clone();
     let result = conductor
         .clone()
-        .graft_records_onto_source_chain(alice.cell_id().clone(), false, vec![record.clone()])
+        .graft_records_onto_source_chain(alice.dna_id().clone(), false, vec![record.clone()])
         .await;
 
     // Validation is off so forking is possible.
@@ -152,7 +152,7 @@ async fn grafting() {
     // Graft records.
     let result = conductor
         .clone()
-        .graft_records_onto_source_chain(alice.cell_id().clone(), false, vec![record.clone()])
+        .graft_records_onto_source_chain(alice.dna_id().clone(), false, vec![record.clone()])
         .await;
 
     // An invalid chain is still possible because validation is off.
@@ -166,7 +166,7 @@ async fn grafting() {
     // Restore the original records
     let result = conductor
         .clone()
-        .graft_records_onto_source_chain(alice.cell_id().clone(), false, original_records.clone())
+        .graft_records_onto_source_chain(alice.dna_id().clone(), false, original_records.clone())
         .await;
 
     assert!(result.is_ok());
@@ -185,7 +185,7 @@ async fn grafting() {
     // Insert an invalid action with validation on.
     let result = conductor
         .clone()
-        .graft_records_onto_source_chain(alice.cell_id().clone(), true, vec![record.clone()])
+        .graft_records_onto_source_chain(alice.dna_id().clone(), true, vec![record.clone()])
         .await;
 
     // Fork is detected
@@ -195,7 +195,7 @@ async fn grafting() {
     // (there has been no change at this point, but it helps for clarity to reset the chain anyway)
     conductor
         .clone()
-        .graft_records_onto_source_chain(alice.cell_id().clone(), true, original_records.clone())
+        .graft_records_onto_source_chain(alice.dna_id().clone(), true, original_records.clone())
         // Restoring the original records is ok because they
         // will pass validation.
         .await
@@ -220,7 +220,7 @@ async fn grafting() {
     .await;
 
     let _records = conductor
-        .get_chc(alice.cell_id())
+        .get_chc(alice.dna_id())
         .unwrap()
         .clone()
         .get_record_data(None)
@@ -236,7 +236,7 @@ async fn grafting() {
     // Insert the chain from the original conductor.
     conductor
         .clone()
-        .graft_records_onto_source_chain(alice.cell_id().clone(), true, original_records.clone())
+        .graft_records_onto_source_chain(alice.dna_id().clone(), true, original_records.clone())
         .await
         .expect("Can cold start");
 

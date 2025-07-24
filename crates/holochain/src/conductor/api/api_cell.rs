@@ -26,7 +26,7 @@ use tokio::sync::mpsc::OwnedPermit;
 #[derive(Clone)]
 pub struct CellConductorApi {
     conductor_handle: ConductorHandle,
-    cell_id: CellId,
+    dna_id: DnaId,
 }
 
 /// Alias
@@ -37,20 +37,20 @@ pub type CellConductorHandle = Arc<dyn CellConductorApiT + Send + 'static>;
 pub type CellConductorReadHandle = Arc<dyn CellConductorReadHandleT + Send + 'static>;
 
 impl CellConductorApi {
-    /// Instantiate from a Conductor reference and a CellId to identify which Cell
+    /// Instantiate from a Conductor reference and a DnaId to identify which Cell
     /// this API instance is associated with
-    pub fn new(conductor_handle: ConductorHandle, cell_id: CellId) -> Self {
+    pub fn new(conductor_handle: ConductorHandle, dna_id: DnaId) -> Self {
         Self {
             conductor_handle,
-            cell_id,
+            dna_id,
         }
     }
 }
 
 #[async_trait]
 impl CellConductorApiT for CellConductorApi {
-    fn cell_id(&self) -> &CellId {
-        &self.cell_id
+    fn dna_id(&self) -> &DnaId {
+        &self.dna_id
     }
 
     fn keystore(&self) -> &MetaLairClient {
@@ -63,14 +63,12 @@ impl CellConductorApiT for CellConductorApi {
 
     fn get_this_dna(&self) -> ConductorApiResult<DnaFile> {
         self.conductor_handle
-            .get_dna_file(self.cell_id.dna_hash())
-            .ok_or_else(|| ConductorApiError::DnaMissing(self.cell_id.dna_hash().clone()))
+            .get_dna_file(self.dna_id.dna_hash())
+            .ok_or_else(|| ConductorApiError::DnaMissing(self.dna_id.dna_hash().clone()))
     }
 
     fn get_this_ribosome(&self) -> ConductorApiResult<RealRibosome> {
-        Ok(self
-            .conductor_handle
-            .get_ribosome(self.cell_id.dna_hash())?)
+        Ok(self.conductor_handle.get_ribosome(self.dna_id.dna_hash())?)
     }
 
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
@@ -98,8 +96,8 @@ impl CellConductorApiT for CellConductorApi {
 #[async_trait]
 #[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait CellConductorApiT: Send + Sync {
-    /// Get this cell id
-    fn cell_id(&self) -> &CellId;
+    /// Get this dna id
+    fn dna_id(&self) -> &DnaId;
 
     /// Request access to this conductor's keystore
     fn keystore(&self) -> &MetaLairClient;
@@ -131,8 +129,8 @@ pub trait CellConductorApiT: Send + Sync {
 /// A minimal set of functionality needed from the conductor by
 /// host functions.
 pub trait CellConductorReadHandleT: Send + Sync {
-    /// Get this cell id
-    fn cell_id(&self) -> &CellId;
+    /// Get this dna id
+    fn dna_id(&self) -> &DnaId;
 
     /// Invoke a zome function on a Cell
     async fn call_zome(&self, params: ZomeCallParams) -> ConductorApiResult<ZomeCallResult>;
@@ -158,13 +156,13 @@ pub trait CellConductorReadHandleT: Send + Sync {
         expires: Timestamp,
     ) -> ConductorApiResult<WitnessNonceResult>;
 
-    /// Find the first cell ID across all apps the given cell id is in that
+    /// Find the first dna id across all apps the given dna id is in that
     /// is assigned to the given role.
     async fn find_cell_with_role_alongside_cell(
         &self,
-        cell_id: &CellId,
+        dna_id: &DnaId,
         role_name: &RoleName,
-    ) -> ConductorResult<Option<CellId>>;
+    ) -> ConductorResult<Option<DnaId>>;
 
     /// Expose block functionality to zomes.
     async fn block(&self, input: Block) -> DatabaseResult<()>;
@@ -176,10 +174,10 @@ pub trait CellConductorReadHandleT: Send + Sync {
     async fn is_blocked(&self, input: BlockTargetId, timestamp: Timestamp)
         -> ConductorResult<bool>;
 
-    /// Find an installed app by one of its [CellId]s.
+    /// Find an installed app by one of its [DnaId]s.
     async fn find_app_containing_cell(
         &self,
-        cell_id: &CellId,
+        dna_id: &DnaId,
     ) -> ConductorResult<Option<InstalledApp>>;
 
     /// Expose create_clone_cell functionality to zomes.
@@ -210,15 +208,15 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Accept a countersigning session.
     async fn accept_countersigning_session(
         &self,
-        cell_id: CellId,
+        dna_id: DnaId,
         request: PreflightRequest,
     ) -> ConductorResult<PreflightRequestAcceptance>;
 }
 
 #[async_trait]
 impl CellConductorReadHandleT for CellConductorApi {
-    fn cell_id(&self) -> &CellId {
-        &self.cell_id
+    fn dna_id(&self) -> &DnaId {
+        &self.dna_id
     }
 
     async fn call_zome(&self, params: ZomeCallParams) -> ConductorApiResult<ZomeCallResult> {
@@ -230,7 +228,7 @@ impl CellConductorReadHandleT for CellConductorApi {
         params: ZomeCallParams,
         workspace_lock: SourceChainWorkspace,
     ) -> ConductorApiResult<ZomeCallResult> {
-        if self.cell_id == params.cell_id {
+        if self.dna_id == params.dna_id {
             self.conductor_handle
                 .call_zome_with_workspace(params, workspace_lock)
                 .await
@@ -261,11 +259,11 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn find_cell_with_role_alongside_cell(
         &self,
-        cell_id: &CellId,
+        dna_id: &DnaId,
         role_name: &RoleName,
-    ) -> ConductorResult<Option<CellId>> {
+    ) -> ConductorResult<Option<DnaId>> {
         self.conductor_handle
-            .find_cell_with_role_alongside_cell(cell_id, role_name)
+            .find_cell_with_role_alongside_cell(dna_id, role_name)
             .await
     }
 
@@ -287,11 +285,9 @@ impl CellConductorReadHandleT for CellConductorApi {
 
     async fn find_app_containing_cell(
         &self,
-        cell_id: &CellId,
+        dna_id: &DnaId,
     ) -> ConductorResult<Option<InstalledApp>> {
-        self.conductor_handle
-            .find_app_containing_cell(cell_id)
-            .await
+        self.conductor_handle.find_app_containing_cell(dna_id).await
     }
 
     async fn create_clone_cell(
@@ -337,11 +333,11 @@ impl CellConductorReadHandleT for CellConductorApi {
     #[cfg(feature = "unstable-countersigning")]
     async fn accept_countersigning_session(
         &self,
-        cell_id: CellId,
+        dna_id: DnaId,
         request: PreflightRequest,
     ) -> ConductorResult<PreflightRequestAcceptance> {
         self.conductor_handle
-            .accept_countersigning_session(cell_id, request)
+            .accept_countersigning_session(dna_id, request)
             .await
     }
 }

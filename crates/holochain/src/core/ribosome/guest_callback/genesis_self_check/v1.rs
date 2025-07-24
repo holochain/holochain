@@ -120,7 +120,7 @@ pub(crate) mod slow_tests {
             .call(
                 &cells[0].zome(TestIntegrityWasm::IntegrityZome),
                 "call_must_get_entry",
-                EntryHash::from(cells[0].cell_id().agent_pubkey().clone()),
+                EntryHash::from(cells[0].dna_id().agent_pubkey().clone()),
             )
             .await;
     }

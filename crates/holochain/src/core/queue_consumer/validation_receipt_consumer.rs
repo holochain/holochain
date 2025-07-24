@@ -29,7 +29,7 @@ pub fn spawn_validation_receipt_consumer(
                 env.clone(),
                 network.clone(),
                 keystore.clone(),
-                conductor.running_cell_ids(),
+                conductor.running_dna_ids(),
                 {
                     let conductor = conductor.clone();
                     move |block| {

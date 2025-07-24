@@ -50,12 +50,12 @@ pub struct Post(pub String);
 #[serde(transparent)]
 pub struct Msg(pub String);
 
-/// A CellId plus ZomeName: the full "path" to a zome in the conductor
+/// A DnaId plus ZomeName: the full "path" to a zome in the conductor
 #[derive(Clone, Debug, derive_more::From, derive_more::Into)]
-pub struct ZomePath(CellId, ZomeName);
+pub struct ZomePath(DnaId, ZomeName);
 
 impl ZomePath {
-    pub fn cell_id(&self) -> &CellId {
+    pub fn dna_id(&self) -> &DnaId {
         &self.0
     }
 
@@ -98,34 +98,34 @@ impl HostFnCaller {
     /// Create HostFnCaller for the first zome.
     // #[deprecated = "use create_for_zome"]
     pub async fn create(
-        cell_id: &CellId,
+        dna_id: &DnaId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
     ) -> HostFnCaller {
-        Self::create_for_zome(cell_id, handle, dna_file, 0).await
+        Self::create_for_zome(dna_id, handle, dna_file, 0).await
     }
 
     /// Create HostFnCaller for a specific zome if there are multiple.
     pub async fn create_for_zome(
-        cell_id: &CellId,
+        dna_id: &DnaId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
         zome_index: usize,
     ) -> HostFnCaller {
         let authored_db = handle
-            .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
+            .get_or_create_authored_db(dna_id.dna_hash(), dna_id.agent_pubkey().clone())
             .unwrap();
-        let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
-        let cache = handle.get_cache_db(cell_id).await.unwrap();
+        let dht_db = handle.get_dht_db(dna_id.dna_hash()).unwrap();
+        let cache = handle.get_cache_db(dna_id).await.unwrap();
         let keystore = handle.keystore().clone();
         let network = holochain_p2p::HolochainP2pDna::new(
             handle.holochain_p2p().clone(),
-            cell_id.dna_hash().clone(),
+            dna_id.dna_hash().clone(),
             None,
         );
 
         let zome_path = (
-            cell_id.clone(),
+            dna_id.clone(),
             dna_file
                 .dna()
                 .integrity_zomes
@@ -136,9 +136,9 @@ impl HostFnCaller {
         )
             .into();
         let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
-        let signal_tx = handle.get_signal_tx(cell_id).await.unwrap();
+        let signal_tx = handle.get_signal_tx(dna_id).await.unwrap();
         let call_zome_handle =
-            CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
+            CellConductorApi::new(handle.clone(), dna_id.clone()).into_call_zome_handle();
         HostFnCaller {
             authored_db,
             dht_db,
@@ -160,7 +160,7 @@ impl HostFnCaller {
         self.dht_db.clone()
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self), fields(cell_id = %self.zome_path.cell_id())))]
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self), fields(dna_id = %self.zome_path.dna_id())))]
     pub async fn unpack(&self) -> (Arc<RealRibosome>, Arc<CallContext>, SourceChainWorkspace) {
         let HostFnCaller {
             authored_db,
@@ -174,14 +174,14 @@ impl HostFnCaller {
             call_zome_handle,
         } = self.clone();
 
-        let (cell_id, zome_name) = zome_path.into();
+        let (dna_id, zome_name) = zome_path.into();
 
         let workspace = SourceChainWorkspace::new(
             authored_db,
             dht_db,
             cache,
             keystore.clone(),
-            cell_id.agent_pubkey().clone(),
+            dna_id.agent_pubkey().clone(),
         )
         .await
         .unwrap();
@@ -199,7 +199,7 @@ impl HostFnCaller {
             FunctionName::new("not_sure_what_should_be_here"),
             host_access.into(),
             // Auth as the author.
-            InvocationAuth::Cap(cell_id.agent_pubkey().clone(), None),
+            InvocationAuth::Cap(dna_id.agent_pubkey().clone(), None),
         ));
         (ribosome, call_context, workspace)
     }

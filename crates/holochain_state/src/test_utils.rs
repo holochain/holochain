@@ -7,7 +7,7 @@ use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::Statement;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
-use holochain_zome_types::test_utils::fake_cell_id;
+use holochain_zome_types::test_utils::fake_dna_id;
 use shrinkwraprs::Shrinkwrap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -23,7 +23,7 @@ pub fn test_authored_db() -> TestDb<DbKindAuthored> {
 
 /// Create a test authored database with a DNA hash and agent key based on the input `id`.
 pub fn test_authored_db_with_id(id: u8) -> TestDb<DbKindAuthored> {
-    test_db(DbKindAuthored(Arc::new(CellId::new(
+    test_db(DbKindAuthored(Arc::new(DnaId::new(
         fake_dna_hash(id),
         fake_agent_pub_key(id),
     ))))
@@ -48,7 +48,7 @@ pub fn test_cache_db() -> TestDb<DbKindCache> {
 }
 
 pub fn test_cache_db_with_id(id: u8) -> TestDb<DbKindCache> {
-    test_db(DbKindCache(Arc::new(fake_cell_id(id).dna_hash().clone())))
+    test_db(DbKindCache(Arc::new(fake_dna_id(id).dna_hash().clone())))
 }
 
 pub fn test_cache_db_with_dna_hash(hash: DnaHash) -> TestDb<DbKindCache> {
@@ -148,7 +148,7 @@ impl<Kind: DbKindT> TestDb<Kind> {
     pub fn dna_hash(&self) -> Option<Arc<DnaHash>> {
         match self.db.kind().kind() {
             DbKind::Cache(hash) | DbKind::Dht(hash) => Some(hash),
-            DbKind::Authored(cell_id) => Some(Arc::new(cell_id.dna_hash().clone())),
+            DbKind::Authored(dna_id) => Some(Arc::new(dna_id.dna_hash().clone())),
             _ => None,
         }
     }

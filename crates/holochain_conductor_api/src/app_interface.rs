@@ -84,10 +84,10 @@ pub enum AppRequest {
     ///
     /// # Errors
     ///
-    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
+    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid dna id was
     /// passed in to the call.
     #[cfg(feature = "unstable-countersigning")]
-    GetCountersigningSessionState(Box<CellId>),
+    GetCountersigningSessionState(Box<DnaId>),
 
     /// Abandon an unresolved countersigning session.
     ///
@@ -115,16 +115,16 @@ pub enum AppRequest {
     ///
     /// # Errors
     ///
-    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
+    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid dna id was
     /// passed in to the call.
     ///
     /// [`CountersigningError::SessionNotFound`] when no ongoing session could be found for the provided
-    /// cell id.
+    /// dna id.
     ///
     /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
     /// automatically has not been made.
     #[cfg(feature = "unstable-countersigning")]
-    AbandonCountersigningSession(Box<CellId>),
+    AbandonCountersigningSession(Box<DnaId>),
 
     /// Publish an unresolved countersigning session.
     ///
@@ -152,16 +152,16 @@ pub enum AppRequest {
     ///
     /// # Errors
     ///
-    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid cell id was
+    /// [`CountersigningError::WorkspaceDoesNotExist`] likely indicates that an invalid dna id was
     /// passed in to the call.
     ///
     /// [`CountersigningError::SessionNotFound`] when no ongoing session could be found for the provided
-    /// cell id.
+    /// dna id.
     ///
     /// [`CountersigningError::SessionNotUnresolved`] when an attempt to resolve the session
     /// automatically has not been made.
     #[cfg(feature = "unstable-countersigning")]
-    PublishCountersigningSession(Box<CellId>),
+    PublishCountersigningSession(Box<DnaId>),
 
     /// Clone a DNA (in the biological sense), thus creating a new `Cell`.
     ///
@@ -176,7 +176,7 @@ pub enum AppRequest {
 
     /// Disable a clone cell.
     ///
-    /// Providing a [`CloneId`] or [`CellId`], disable an existing clone cell.
+    /// Providing a [`CloneId`] or [`DnaId`], disable an existing clone cell.
     /// When the clone cell exists, it is disabled and can not be called any
     /// longer. If it doesn't exist, the call is a no-op.
     ///
@@ -370,16 +370,16 @@ pub enum CellInfo {
 }
 
 impl CellInfo {
-    pub fn new_provisioned(cell_id: CellId, dna_modifiers: DnaModifiers, name: String) -> Self {
+    pub fn new_provisioned(dna_id: DnaId, dna_modifiers: DnaModifiers, name: String) -> Self {
         Self::Provisioned(ProvisionedCell {
-            cell_id,
+            dna_id,
             dna_modifiers,
             name,
         })
     }
 
     pub fn new_cloned(
-        cell_id: CellId,
+        dna_id: DnaId,
         clone_id: CloneId,
         original_dna_hash: DnaHash,
         dna_modifiers: DnaModifiers,
@@ -387,7 +387,7 @@ impl CellInfo {
         enabled: bool,
     ) -> Self {
         Self::Cloned(ClonedCell {
-            cell_id,
+            dna_id,
             clone_id,
             original_dna_hash,
             dna_modifiers,
@@ -413,7 +413,7 @@ pub struct StemCell {
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ProvisionedCell {
     /// The cell's identifying data
-    pub cell_id: CellId,
+    pub dna_id: DnaId,
     /// The DNA modifiers that were used to instantiate the cell
     pub dna_modifiers: DnaModifiers,
     /// The name the cell was instantiated with
@@ -443,7 +443,7 @@ pub struct AppInfo {
 impl AppInfo {
     pub fn from_installed_app(
         app: &InstalledApp,
-        dna_definitions: &IndexMap<CellId, DnaDefHashed>,
+        dna_definitions: &IndexMap<DnaId, DnaDefHashed>,
     ) -> Self {
         let installed_app_id = app.id().clone();
         let status = app.status().clone();
@@ -458,12 +458,12 @@ impl AppInfo {
 
             // push the base cell to the vector of cell infos
             if let Some(provisioned_dna_hash) = role_assignment.provisioned_dna_hash() {
-                let provisioned_cell_id =
-                    CellId::new(provisioned_dna_hash.clone(), agent_pub_key.clone());
-                if let Some(dna_def) = dna_definitions.get(&provisioned_cell_id) {
+                let provisioned_dna_id =
+                    DnaId::new(provisioned_dna_hash.clone(), agent_pub_key.clone());
+                if let Some(dna_def) = dna_definitions.get(&provisioned_dna_id) {
                     // TODO: populate `enabled` with cell state once it is implemented for a base cell
                     let cell_info = CellInfo::new_provisioned(
-                        provisioned_cell_id.clone(),
+                        provisioned_dna_id.clone(),
                         dna_def.modifiers.to_owned(),
                         dna_def.name.to_owned(),
                     );
@@ -480,10 +480,7 @@ impl AppInfo {
                         }
                     }
                 } else {
-                    tracing::error!(
-                        "no DNA definition found for cell id {}",
-                        provisioned_cell_id
-                    );
+                    tracing::error!("no DNA definition found for dna id {}", provisioned_dna_id);
                 }
             } else {
                 // no provisioned cell, thus there must be a deferred cell
@@ -493,10 +490,10 @@ impl AppInfo {
 
             // push enabled clone cells to the vector of cell infos
             if let Some(clone_cells) = app.clone_cells_for_role_name(role_name) {
-                clone_cells.for_each(|(clone_id, cell_id)| {
-                    if let Some(dna_def) = dna_definitions.get(&cell_id) {
+                clone_cells.for_each(|(clone_id, dna_id)| {
+                    if let Some(dna_def) = dna_definitions.get(&dna_id) {
                         let cell_info = CellInfo::new_cloned(
-                            cell_id,
+                            dna_id,
                             clone_id.to_owned(),
                             dna_def.hash.to_owned(),
                             dna_def.modifiers.to_owned(),
@@ -505,17 +502,17 @@ impl AppInfo {
                         );
                         cell_info_for_role.push(cell_info);
                     } else {
-                        tracing::error!("no DNA definition found for cell id {}", cell_id);
+                        tracing::error!("no DNA definition found for dna id {}", dna_id);
                     }
                 });
             }
 
             // push disabled clone cells to the vector of cell infos
             if let Some(clone_cells) = app.disabled_clone_cells_for_role_name(role_name) {
-                clone_cells.for_each(|(clone_id, cell_id)| {
-                    if let Some(dna_def) = dna_definitions.get(&cell_id) {
+                clone_cells.for_each(|(clone_id, dna_id)| {
+                    if let Some(dna_def) = dna_definitions.get(&dna_id) {
                         let cell_info = CellInfo::new_cloned(
-                            cell_id,
+                            dna_id,
                             clone_id.to_owned(),
                             dna_def.hash.to_owned(),
                             dna_def.modifiers.to_owned(),
@@ -524,7 +521,7 @@ impl AppInfo {
                         );
                         cell_info_for_role.push(cell_info);
                     } else {
-                        tracing::error!("no DNA definition found for cell id {}", cell_id);
+                        tracing::error!("no DNA definition found for dna id {}", dna_id);
                     }
                 });
             }

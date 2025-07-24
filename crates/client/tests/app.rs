@@ -74,8 +74,8 @@ async fn handle_signal() {
     let installed_app = app_ws.app_info().await.unwrap().unwrap();
 
     let cells = installed_app.cell_info.into_values().next().unwrap();
-    let cell_id = match cells[0].clone() {
-        CellInfo::Provisioned(c) => c.cell_id,
+    let dna_id = match cells[0].clone() {
+        CellInfo::Provisioned(c) => c.dna_id,
         _ => panic!("Invalid cell type"),
     };
 
@@ -86,12 +86,12 @@ async fn handle_signal() {
 
     let credentials = admin_ws
         .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             functions: None,
         })
         .await
         .unwrap();
-    signer.add_credentials(cell_id.clone(), credentials);
+    signer.add_credentials(dna_id.clone(), credentials);
 
     let barrier = Arc::new(Barrier::new(2));
     let barrier_clone = barrier.clone();
@@ -109,7 +109,7 @@ async fn handle_signal() {
 
     app_ws
         .call_zome(
-            cell_id.into(),
+            dna_id.into(),
             TEST_ZOME_NAME.into(),
             TEST_FN_NAME.into(),
             ExternIO::encode(()).unwrap(),
@@ -612,7 +612,7 @@ async fn agent_meta_info() {
         .clone();
 
     let dna_hash = match app_info.cell_info.first().unwrap().1.first().unwrap() {
-        CellInfo::Provisioned(c) => c.cell_id.dna_hash().clone(),
+        CellInfo::Provisioned(c) => c.dna_id.dna_hash().clone(),
         _ => panic!("Wrong CellInfo type."),
     };
 

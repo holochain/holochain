@@ -281,8 +281,8 @@ impl ZomeCallResponse {
 pub struct ZomeCallParams {
     /// Provenance to sign.
     pub provenance: AgentPubKey,
-    /// Cell ID to sign.
-    pub cell_id: CellId,
+    /// Dna IDto sign.
+    pub dna_id: DnaId,
     /// Zome name to sign.
     pub zome_name: ZomeName,
     /// Function name to sign.

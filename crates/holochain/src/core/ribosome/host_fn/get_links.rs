@@ -291,7 +291,7 @@ pub mod slow_tests {
         assert_eq!(forward_link_0.target, hash_path_b);
         assert_eq!(
             forward_link_0.author,
-            alice.cell_id().agent_pubkey().clone()
+            alice.dna_id().agent_pubkey().clone()
         );
         assert_eq!(forward_link_0.tag, LinkTag::from(()));
         assert_eq!(forward_link_0.link_type, LinkType(0));
@@ -301,7 +301,7 @@ pub mod slow_tests {
         let back_link_0 = back_links.first().unwrap();
         assert_eq!(back_link_0.base, hash_path_b);
         assert_eq!(back_link_0.target, hash_path_a);
-        assert_eq!(back_link_0.author, alice.cell_id().agent_pubkey().clone());
+        assert_eq!(back_link_0.author, alice.dna_id().agent_pubkey().clone());
         assert_eq!(back_link_0.tag, LinkTag::from(()));
         assert_eq!(back_link_0.link_type, LinkType(0));
         assert_eq!(back_link_0.zome_index, ZomeIndex(0));
@@ -542,7 +542,7 @@ pub mod slow_tests {
                 &alice,
                 "get_links_with_query",
                 LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))
-                    .author(alice.cell_id().agent_pubkey().clone()),
+                    .author(alice.dna_id().agent_pubkey().clone()),
             )
             .await;
         assert_eq!(

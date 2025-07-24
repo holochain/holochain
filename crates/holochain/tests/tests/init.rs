@@ -59,12 +59,12 @@ async fn call_init_across_cells_passes() {
             Ok(())
         });
     let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
-    let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
+    let dna_id_1 = DnaId::new(dna_1.dna_hash().clone(), agent.clone());
 
     let zome_2 = SweetInlineZomes::new(vec![], 0).function("cross_cell_call", move |api, _: ()| {
         // Just calls into the other zome.
         api.call(vec![Call {
-            target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
+            target: CallTarget::ConductorCell(CallTargetCell::OtherCell(dna_id_1.clone())),
             zome_name: SweetInlineZomes::COORDINATOR.into(),
             fn_name: "touch".into(),
             cap_secret: None,
@@ -121,12 +121,12 @@ async fn call_init_from_init_across_cells() {
             Ok(())
         });
     let (dna1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome1).await;
-    let cellid1 = CellId::new(dna1.dna_hash().clone(), agent.clone());
+    let dna_id_1 = DnaId::new(dna1.dna_hash().clone(), agent.clone());
 
     let zome2 = SweetInlineZomes::new(vec![], 0)
         .function("init", move |api, _: ()| {
             api.call(vec![Call {
-                target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cellid1.clone())),
+                target: CallTarget::ConductorCell(CallTargetCell::OtherCell(dna_id_1.clone())),
                 zome_name: SweetInlineZomes::COORDINATOR.into(),
                 fn_name: "touch".into(),
                 cap_secret: None,
@@ -198,12 +198,12 @@ async fn call_init_with_invalid_return_type_across_cells() {
             Ok(())
         });
     let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
-    let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
+    let dna_id_1 = DnaId::new(dna_1.dna_hash().clone(), agent.clone());
 
     let zome_2 = SweetInlineZomes::new(vec![], 0).function("cross_cell_call", move |api, _: ()| {
         // Just call the other zome.
         api.call(vec![Call {
-            target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
+            target: CallTarget::ConductorCell(CallTargetCell::OtherCell(dna_id_1.clone())),
             zome_name: SweetInlineZomes::COORDINATOR.into(),
             fn_name: "touch".into(),
             cap_secret: None,
@@ -247,12 +247,12 @@ async fn call_init_with_invalid_return_type_from_init_across_cells() {
             Ok(())
         });
     let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
-    let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
+    let dna_id_1 = DnaId::new(dna_1.dna_hash().clone(), agent.clone());
 
     let zome_2 = SweetInlineZomes::new(vec![], 0)
         .function("init", move |api, _: ()| {
             api.call(vec![Call {
-                target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
+                target: CallTarget::ConductorCell(CallTargetCell::OtherCell(dna_id_1.clone())),
                 zome_name: SweetInlineZomes::COORDINATOR.into(),
                 fn_name: "touch".into(),
                 cap_secret: None,
@@ -340,12 +340,12 @@ async fn call_init_with_invalid_parameters_across_cells() {
             Ok(())
         });
     let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
-    let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
+    let dna_id_1 = DnaId::new(dna_1.dna_hash().clone(), agent.clone());
 
     let zome_2 = SweetInlineZomes::new(vec![], 0).function("cross_cell_call", move |api, _: ()| {
         // Simple Zome to just call the other zome.
         api.call(vec![Call {
-            target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
+            target: CallTarget::ConductorCell(CallTargetCell::OtherCell(dna_id_1.clone())),
             zome_name: SweetInlineZomes::COORDINATOR.into(),
             fn_name: "touch".into(),
             cap_secret: None,
@@ -389,12 +389,12 @@ async fn call_init_with_invalid_parameters_from_init_across_cells() {
             Ok(())
         });
     let (dna_1, _, _) = SweetDnaFile::unique_from_inline_zomes(zome_1).await;
-    let cell_id_1 = CellId::new(dna_1.dna_hash().clone(), agent.clone());
+    let dna_id_1 = DnaId::new(dna_1.dna_hash().clone(), agent.clone());
 
     let zome_2 = SweetInlineZomes::new(vec![], 0)
         .function("init", move |api, _: ()| {
             api.call(vec![Call {
-                target: CallTarget::ConductorCell(CallTargetCell::OtherCell(cell_id_1.clone())),
+                target: CallTarget::ConductorCell(CallTargetCell::OtherCell(dna_id_1.clone())),
                 zome_name: SweetInlineZomes::COORDINATOR.into(),
                 fn_name: "touch".into(),
                 cap_secret: None,

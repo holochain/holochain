@@ -243,9 +243,9 @@ async fn name_has_no_effect_on_dna_hash() {
     let app_id2 = apps[1].installed_app_id().clone();
     let app_id3 = apps[2].installed_app_id().clone();
     let ((cell1,), (cell2,), (cell3,)) = apps.into_tuples();
-    let role_name1 = cell1.cell_id().dna_hash().to_string();
-    let role_name2 = cell2.cell_id().dna_hash().to_string();
-    let role_name3 = cell3.cell_id().dna_hash().to_string();
+    let role_name1 = cell1.dna_id().dna_hash().to_string();
+    let role_name2 = cell2.dna_id().dna_hash().to_string();
+    let role_name3 = cell3.dna_id().dna_hash().to_string();
 
     let clone1 = conductor
         .create_clone_cell(
@@ -286,8 +286,8 @@ async fn name_has_no_effect_on_dna_hash() {
         .await
         .unwrap();
 
-    assert_eq!(clone1.cell_id.dna_hash(), clone2.cell_id.dna_hash());
-    assert_eq!(clone2.cell_id.dna_hash(), clone3.cell_id.dna_hash());
+    assert_eq!(clone1.dna_id.dna_hash(), clone2.dna_id.dna_hash());
+    assert_eq!(clone2.dna_id.dna_hash(), clone3.dna_id.dna_hash());
 }
 
 fn unwrap_cell_info_clone(cell_info: CellInfo) -> holochain_zome_types::clone::ClonedCell {
@@ -450,14 +450,14 @@ async fn test_deferred_memproof_provisioning() {
         .unwrap();
     assert_eq!(app.role_assignments().len(), 1);
 
-    let cell_id = app.all_cells().next().unwrap().clone();
+    let dna_id = app.all_cells().next().unwrap().clone();
 
     //- Status is AwaitingMemproofs and there is 1 cell assignment
     let app_info = conductor.get_app_info(&app_id).await.unwrap().unwrap();
     assert_eq!(app_info.status, AppStatus::AwaitingMemproofs);
     assert_eq!(app_info.cell_info.len(), 1);
 
-    let cell = conductor.get_sweet_cell(cell_id.clone()).unwrap();
+    let cell = conductor.get_sweet_cell(dna_id.clone()).unwrap();
 
     //- Can't make zome calls, error returned is CellDisabled
     //  (which isn't ideal, but gets the message across well enough)
@@ -583,7 +583,7 @@ async fn test_list_apps_sorted_consistently() {
     let (dna1, _, _) = SweetDnaFile::unique_from_inline_zomes(("zome1", zome)).await;
 
     // Install two apps on the Conductor:
-    // Both share a CellId in common, and also include a distinct CellId each.
+    // Both share a DnaId in common, and also include a distinct DnaId each.
     let mut conductor = SweetConductor::from_standard_config().await;
     let _ = conductor.setup_app("app1", [&dna1]).await.unwrap();
     let _ = conductor.setup_app("app2", [&dna1]).await.unwrap();

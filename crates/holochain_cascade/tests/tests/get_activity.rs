@@ -645,7 +645,7 @@ async fn test_must_get_agent_activity_inner(
         cache,
     );
     let authored = commit_chain(
-        DbKindAuthored(Arc::new(CellId::new(
+        DbKindAuthored(Arc::new(DnaId::new(
             DnaHash::from_raw_36(vec![0; 36]),
             AgentPubKey::from_raw_36(vec![0; 36]),
         ))),

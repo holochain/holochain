@@ -33,7 +33,7 @@ async fn send_signal_after_conductor_restart() {
         .await
         .unwrap();
     let alice = app.agent();
-    let alice_cell_id = app.cells()[0].cell_id().to_owned();
+    let alice_dna_id = app.cells()[0].dna_id().to_owned();
 
     // add app interface
     let app_interface_port_1 = (*conductor)
@@ -69,7 +69,7 @@ async fn send_signal_after_conductor_restart() {
         .easy_call_zome(
             alice,
             None,
-            alice_cell_id.clone(),
+            alice_dna_id.clone(),
             TestWasm::EmitSignal.coordinator_zome_name(),
             "emit",
             (),
@@ -80,12 +80,12 @@ async fn send_signal_after_conductor_restart() {
     let received_signal_1 = app_ws_rx_1.recv::<AppResponse>().await.unwrap();
     if let holochain_websocket::ReceiveMessage::Signal(v) = received_signal_1 {
         if let Ok(Signal::App {
-            cell_id,
+            dna_id,
             zome_name,
             signal,
         }) = Signal::try_from_vec(v)
         {
-            assert_eq!(cell_id, alice_cell_id);
+            assert_eq!(dna_id, alice_dna_id);
             assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
             let signal = signal.into_inner();
             println!("SIGNAL: {signal:?}");
@@ -106,7 +106,7 @@ async fn send_signal_after_conductor_restart() {
         .easy_call_zome(
             alice,
             None,
-            alice_cell_id.clone(),
+            alice_dna_id.clone(),
             TestWasm::EmitSignal.coordinator_zome_name(),
             "emit",
             (),
@@ -151,7 +151,7 @@ async fn send_signal_after_conductor_restart() {
         .easy_call_zome(
             alice,
             None,
-            alice_cell_id.clone(),
+            alice_dna_id.clone(),
             TestWasm::EmitSignal.coordinator_zome_name(),
             "emit",
             (),
@@ -163,12 +163,12 @@ async fn send_signal_after_conductor_restart() {
     let received_signal_2 = app_ws_rx_1.recv::<AppResponse>().await.unwrap();
     if let holochain_websocket::ReceiveMessage::Signal(v) = received_signal_2 {
         if let Ok(Signal::App {
-            cell_id,
+            dna_id,
             zome_name,
             signal,
         }) = Signal::try_from_vec(v)
         {
-            assert_eq!(cell_id, alice_cell_id);
+            assert_eq!(dna_id, alice_dna_id);
             assert_eq!(zome_name, TestWasm::EmitSignal.coordinator_zome_name());
             signal.into_inner().decode::<()>().unwrap();
         } else {

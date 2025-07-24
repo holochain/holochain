@@ -213,8 +213,8 @@ async fn test_block_invalid_receipt() {
         .call(&alice_cell.zome(coordinator_name), create_function_name, ())
         .await;
 
-    let alice_block_target = BlockTargetId::Cell(alice_cell.cell_id().to_owned());
-    let bob_block_target = BlockTargetId::Cell(bob_cell.cell_id().to_owned());
+    let alice_block_target = BlockTargetId::Cell(alice_cell.dna_id().to_owned());
+    let bob_block_target = BlockTargetId::Cell(bob_cell.dna_id().to_owned());
 
     for now in [Timestamp::now(), Timestamp::MIN, Timestamp::MAX] {
         assert!(!alice_conductor

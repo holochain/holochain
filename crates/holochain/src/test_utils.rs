@@ -386,9 +386,9 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         txn.prepare(
             "
             SELECT
-            DhtOp.type, 
-            Action.author as author, 
-            Action.blob as action_blob, 
+            DhtOp.type,
+            Action.author as author,
+            Action.blob as action_blob,
             Entry.blob as entry_blob
             FROM DhtOp
             JOIN
@@ -432,7 +432,7 @@ pub async fn display_agent_infos(conductor: &ConductorHandle) {
 /// Helper to create a signed zome invocation for tests
 pub async fn new_zome_call<P, Z: Into<ZomeName>>(
     keystore: &MetaLairClient,
-    cell_id: &CellId,
+    dna_id: &DnaId,
     func: &str,
     payload: P,
     zome: Z,
@@ -440,7 +440,7 @@ pub async fn new_zome_call<P, Z: Into<ZomeName>>(
 where
     P: serde::Serialize + std::fmt::Debug,
 {
-    let zome_call_params = new_zome_call_params(cell_id, func, payload, zome)?;
+    let zome_call_params = new_zome_call_params(dna_id, func, payload, zome)?;
     Ok(
         ZomeCallParamsSigned::try_from_params(keystore, zome_call_params)
             .await
@@ -450,7 +450,7 @@ where
 
 /// Helper to create an unsigned zome invocation for tests
 pub fn new_zome_call_params<P, Z>(
-    cell_id: &CellId,
+    dna_id: &DnaId,
     func: &str,
     payload: P,
     zome: Z,
@@ -461,12 +461,12 @@ where
 {
     let (nonce, expires_at) = fresh_nonce(Timestamp::now()).unwrap();
     Ok(ZomeCallParams {
-        cell_id: cell_id.clone(),
+        dna_id: dna_id.clone(),
         zome_name: zome.into(),
         cap_secret: Some(CapSecretFixturator::new(Unpredictable).next().unwrap()),
         fn_name: func.into(),
         payload: ExternIO::encode(payload)?,
-        provenance: cell_id.agent_pubkey().clone(),
+        provenance: dna_id.agent_pubkey().clone(),
         nonce,
         expires_at,
     })
@@ -474,7 +474,7 @@ where
 
 /// Helper to create a zome invocation for tests
 pub async fn new_invocation<P, Z>(
-    cell_id: &CellId,
+    dna_id: &DnaId,
     func: &str,
     payload: P,
     zome: Z,
@@ -484,7 +484,7 @@ where
     Z: Into<Zome> + Clone,
 {
     let ZomeCallParams {
-        cell_id,
+        dna_id,
         cap_secret,
         fn_name,
         payload,
@@ -492,9 +492,9 @@ where
         nonce,
         expires_at,
         ..
-    } = new_zome_call_params(cell_id, func, payload, zome.clone().into())?;
+    } = new_zome_call_params(dna_id, func, payload, zome.clone().into())?;
     Ok(ZomeCallInvocation {
-        cell_id,
+        dna_id,
         zome: zome.into(),
         cap_secret,
         fn_name,

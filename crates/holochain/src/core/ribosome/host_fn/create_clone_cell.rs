@@ -27,7 +27,7 @@ pub fn create_clone_cell(
 
             let conductor_handle = host_context.call_zome_handle();
             let (installed_app_id, role_name) =
-                check_clone_access(&input.cell_id, conductor_handle)?;
+                check_clone_access(&input.dna_id, conductor_handle)?;
 
             tokio_helper::block_forever_on(async move {
                 conductor_handle

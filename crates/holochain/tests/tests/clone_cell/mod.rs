@@ -14,11 +14,11 @@ async fn create_clone_cell() {
     let (cell,) = app.clone().into_tuple();
 
     let zome = SweetZome::new(
-        cell.cell_id().clone(),
+        cell.dna_id().clone(),
         TestWasm::Clone.coordinator_zome_name(),
     );
     let request = CreateCloneCellInput {
-        cell_id: cell.cell_id().clone(),
+        dna_id: cell.dna_id().clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("clone 1".to_string()),
         membrane_proof: None,
         name: Some("Clone 1".to_string()),
@@ -55,11 +55,11 @@ async fn disable_enable_and_delete_clone_cell() {
     let (cell,) = app.clone().into_tuple();
 
     let zome = SweetZome::new(
-        cell.cell_id().clone(),
+        cell.dna_id().clone(),
         TestWasm::Clone.coordinator_zome_name(),
     );
     let request = CreateCloneCellInput {
-        cell_id: cell.cell_id().clone(),
+        dna_id: cell.dna_id().clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("clone 1".to_string()),
         membrane_proof: None,
         name: Some("Clone 1".to_string()),
@@ -67,17 +67,17 @@ async fn disable_enable_and_delete_clone_cell() {
     let cloned_cell: ClonedCell = conductor.call(&zome, "create_clone", request).await;
 
     let request = DisableCloneCellInput {
-        clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
+        clone_dna_id: CloneDnaId::CloneId(cloned_cell.clone_id.clone()),
     };
     let _: () = conductor.call(&zome, "disable_clone", request).await;
 
     // Try and call the disabled clone cell, should fail
     let clone_zome = SweetZome::new(
-        cloned_cell.cell_id.clone(),
+        cloned_cell.dna_id.clone(),
         TestWasm::Clone.coordinator_zome_name(),
     );
     let request = CreateCloneCellInput {
-        cell_id: cell.cell_id().clone(),
+        dna_id: cell.dna_id().clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("clone 2".to_string()),
         membrane_proof: None,
         name: Some("Clone 2".to_string()),
@@ -89,13 +89,13 @@ async fn disable_enable_and_delete_clone_cell() {
 
     // Re-enable the clone cell
     let request = EnableCloneCellInput {
-        clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
+        clone_dna_id: CloneDnaId::CloneId(cloned_cell.clone_id.clone()),
     };
     let _: ClonedCell = conductor.call(&zome, "enable_clone", request).await;
 
     // Try again to create a second clone cell, should succeed
     let request = CreateCloneCellInput {
-        cell_id: cell.cell_id().clone(),
+        dna_id: cell.dna_id().clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("clone 2".to_string()),
         membrane_proof: None,
         name: Some("Clone 2".to_string()),
@@ -106,12 +106,12 @@ async fn disable_enable_and_delete_clone_cell() {
 
     // Now disable and delete the clone
     let request = DisableCloneCellInput {
-        clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
+        clone_dna_id: CloneDnaId::CloneId(cloned_cell.clone_id.clone()),
     };
     let _: () = conductor.call(&zome, "disable_clone", request).await;
 
     let request = DeleteCloneCellInput {
-        clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
+        clone_dna_id: CloneDnaId::CloneId(cloned_cell.clone_id.clone()),
     };
     let _: () = conductor.call(&zome, "delete_clone", request).await;
 
@@ -146,11 +146,11 @@ async fn prevents_cross_app_clone_operations() {
     let (cell,) = app.clone().into_tuple();
 
     let zome = SweetZome::new(
-        cell.cell_id().clone(),
+        cell.dna_id().clone(),
         TestWasm::Clone.coordinator_zome_name(),
     );
     let request = CreateCloneCellInput {
-        cell_id: cell.cell_id().clone(),
+        dna_id: cell.dna_id().clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("clone 1".to_string()),
         membrane_proof: None,
         name: Some("Clone 1".to_string()),
@@ -169,12 +169,12 @@ async fn prevents_cross_app_clone_operations() {
 
     // Should fail to create a clone cell against the other app
     let other_zome = SweetZome::new(
-        other_cell.cell_id().clone(),
+        other_cell.dna_id().clone(),
         TestWasm::Clone.coordinator_zome_name(),
     );
     let other_request = CreateCloneCellInput {
         // Targeting the cell from the original app
-        cell_id: cell.cell_id().clone(),
+        dna_id: cell.dna_id().clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("other clone 1".to_string()),
         membrane_proof: None,
         name: Some("Other clone 1".to_string()),
@@ -186,7 +186,7 @@ async fn prevents_cross_app_clone_operations() {
 
     // Should fail to disable the clone cell from the other app
     let other_request = DisableCloneCellInput {
-        clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
+        clone_dna_id: CloneDnaId::CloneId(cloned_cell.clone_id.clone()),
     };
     conductor
         .call_fallible::<_, ()>(&other_zome, "disable_clone", other_request)
@@ -195,13 +195,13 @@ async fn prevents_cross_app_clone_operations() {
 
     // Actually disable the clone cell from the original app
     let request = DisableCloneCellInput {
-        clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
+        clone_dna_id: CloneDnaId::CloneId(cloned_cell.clone_id.clone()),
     };
     let _: () = conductor.call(&zome, "disable_clone", request).await;
 
     // Try to enable the clone cell from the other app, should fail
     let other_request = EnableCloneCellInput {
-        clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
+        clone_dna_id: CloneDnaId::CloneId(cloned_cell.clone_id.clone()),
     };
     conductor
         .call_fallible::<_, ClonedCell>(&other_zome, "enable_clone", other_request)
@@ -210,7 +210,7 @@ async fn prevents_cross_app_clone_operations() {
 
     // Try to delete the clone cell from the other app, should fail
     let other_request = DeleteCloneCellInput {
-        clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
+        clone_dna_id: CloneDnaId::CloneId(cloned_cell.clone_id.clone()),
     };
     conductor
         .call_fallible::<_, ()>(&other_zome, "delete_clone", other_request)
@@ -219,7 +219,7 @@ async fn prevents_cross_app_clone_operations() {
 
     // Enable the cell again
     let request = EnableCloneCellInput {
-        clone_cell_id: CloneCellId::CloneId(cloned_cell.clone_id.clone()),
+        clone_dna_id: CloneDnaId::CloneId(cloned_cell.clone_id.clone()),
     };
     let _: ClonedCell = conductor.call(&zome, "enable_clone", request).await;
 
@@ -255,11 +255,11 @@ async fn create_clone_cell_from_a_clone() {
     let (cell,) = app.clone().into_tuple();
 
     let zome = SweetZome::new(
-        cell.cell_id().clone(),
+        cell.dna_id().clone(),
         TestWasm::Clone.coordinator_zome_name(),
     );
     let request = CreateCloneCellInput {
-        cell_id: cell.cell_id().clone(),
+        dna_id: cell.dna_id().clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("clone 1".to_string()),
         membrane_proof: None,
         name: Some("Clone 1".to_string()),
@@ -267,12 +267,12 @@ async fn create_clone_cell_from_a_clone() {
     let cloned_cell: ClonedCell = conductor.call(&zome, "create_clone", request).await;
 
     let clone_zome = SweetZome::new(
-        cloned_cell.cell_id.clone(),
+        cloned_cell.dna_id.clone(),
         TestWasm::Clone.coordinator_zome_name(),
     );
     let request = CreateCloneCellInput {
         // Clone the original cell
-        cell_id: cell.cell_id().clone(),
+        dna_id: cell.dna_id().clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("clone 2".to_string()),
         membrane_proof: None,
         name: Some("Clone 2".to_string()),
@@ -315,12 +315,12 @@ async fn create_clone_of_another_cell_in_same_app() {
     let (cell_1, cell_2) = app.clone().into_tuple();
 
     let zome = SweetZome::new(
-        cell_1.cell_id().clone(),
+        cell_1.dna_id().clone(),
         TestWasm::Clone.coordinator_zome_name(),
     );
     let request = CreateCloneCellInput {
         // Try to clone cell 2 from cell 1
-        cell_id: cell_2.cell_id().clone(),
+        dna_id: cell_2.dna_id().clone(),
         modifiers: DnaModifiersOpt::none().with_network_seed("clone 1".to_string()),
         membrane_proof: None,
         name: Some("Clone 1".to_string()),

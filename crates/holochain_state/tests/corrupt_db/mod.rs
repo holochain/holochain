@@ -34,7 +34,7 @@ async fn corrupt_cache_creates_new_db() {
 async fn corrupt_source_chain_panics() {
     holochain_trace::test_run();
 
-    let kind = DbKindAuthored(Arc::new(fixt!(CellId)));
+    let kind = DbKindAuthored(Arc::new(fixt!(DnaId)));
 
     // - Create a corrupt cell db.
     let testdir = create_corrupt_db(kind.clone());

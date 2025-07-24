@@ -620,7 +620,7 @@ async fn complete_session_with_chc_enabled() {
         .await;
     conductors.exchange_peer_info().await;
 
-    let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
+    let alice_chc = conductors[0].get_chc(alice.dna_id()).unwrap();
 
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
@@ -742,7 +742,7 @@ async fn session_rollback_with_chc_enabled() {
         .await;
     conductors.exchange_peer_info().await;
 
-    let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
+    let alice_chc = conductors[0].get_chc(alice.dna_id()).unwrap();
 
     // Subscribe early in the test to avoid missing signals later
     let alice_signal_rx = conductors[0].subscribe_to_app_signals("app".into());
@@ -883,8 +883,8 @@ async fn multiple_agents_on_same_conductor_with_chc_enabled() {
         .await;
     conductors.exchange_peer_info().await;
 
-    let alice_chc = conductors[0].get_chc(alice.cell_id()).unwrap();
-    let carol_chc = conductors[0].get_chc(carol.cell_id()).unwrap();
+    let alice_chc = conductors[0].get_chc(alice.dna_id()).unwrap();
+    let carol_chc = conductors[0].get_chc(carol.dna_id()).unwrap();
 
     // Need an initialised source chain for countersigning, so commit anything
     let alice_zome = alice.zome(TestWasm::CounterSigning);
@@ -1424,7 +1424,7 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
         loop {
             let state = conductors[0]
             .raw_handle()
-            .get_countersigning_session_state(alice.cell_id())
+            .get_countersigning_session_state(alice.dna_id())
             .await
             .unwrap();
             if matches!(
@@ -1444,7 +1444,7 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
 
     // Alice abandons the session.
     conductors[0]
-        .abandon_countersigning_session(alice.cell_id())
+        .abandon_countersigning_session(alice.dna_id())
         .await
         .unwrap();
 
@@ -1458,7 +1458,7 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
     // Alice's session should be gone from memory.
     let alice_state = conductors[0]
         .raw_handle()
-        .get_countersigning_session_state(alice.cell_id())
+        .get_countersigning_session_state(alice.dna_id())
         .await
         .unwrap();
     assert_matches!(alice_state, None);
@@ -1473,7 +1473,7 @@ async fn alice_can_force_abandon_session_when_automatic_resolution_has_failed_af
     // Bob's session should be gone from memory.
     let bob_state = conductors[1]
         .raw_handle()
-        .get_countersigning_session_state(bob.cell_id())
+        .get_countersigning_session_state(bob.dna_id())
         .await
         .unwrap();
     assert_matches!(bob_state, None);
@@ -1636,7 +1636,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
         loop {
             let state = conductors[0]
             .raw_handle()
-            .get_countersigning_session_state(alice.cell_id())
+            .get_countersigning_session_state(alice.dna_id())
             .await
             .unwrap();
             if matches!(
@@ -1656,7 +1656,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
 
     // Alice publishes the session.
     conductors[0]
-        .publish_countersigning_session(alice.cell_id())
+        .publish_countersigning_session(alice.dna_id())
         .await
         .unwrap();
 
@@ -1670,7 +1670,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
     // Alice's session should be gone from memory.
     let alice_state = conductors[0]
         .raw_handle()
-        .get_countersigning_session_state(alice.cell_id())
+        .get_countersigning_session_state(alice.dna_id())
         .await
         .unwrap();
     assert_matches!(alice_state, None);
@@ -1685,7 +1685,7 @@ async fn alice_can_force_publish_session_when_automatic_resolution_has_failed_af
     // Bob's session should be gone from memory.
     let bob_state = conductors[1]
         .raw_handle()
-        .get_countersigning_session_state(bob.cell_id())
+        .get_countersigning_session_state(bob.dna_id())
         .await
         .unwrap();
     assert_matches!(bob_state, None);

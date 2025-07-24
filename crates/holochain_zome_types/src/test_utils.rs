@@ -50,7 +50,7 @@ pub fn fake_cap_secret() -> CapSecret {
     [0; CAP_SECRET_BYTES].into()
 }
 
-/// A fixture example CellId for unit testing.
-pub fn fake_cell_id(name: u8) -> CellId {
+/// A fixture example DnaId for unit testing.
+pub fn fake_dna_id(name: u8) -> DnaId {
     (fake_dna_hash(name), fake_agent_pubkey_1()).into()
 }

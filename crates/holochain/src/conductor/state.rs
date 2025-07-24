@@ -168,11 +168,11 @@ impl ConductorState {
         self.app_interfaces.get(id).cloned()
     }
 
-    /// Find the app which contains the given cell by its [CellId].
-    pub fn find_app_containing_cell(&self, cell_id: &CellId) -> Option<&InstalledApp> {
+    /// Find the app which contains the given cell by its [DnaId].
+    pub fn find_app_containing_cell(&self, dna_id: &DnaId) -> Option<&InstalledApp> {
         self.installed_apps
             .values()
-            .find(|app| app.all_cells().any(|id| id == *cell_id))
+            .find(|app| app.all_cells().any(|id| id == *dna_id))
     }
 
     /// Get network compability params
@@ -194,7 +194,7 @@ impl ConductorState {
         protected_only: bool,
     ) -> ConductorResult<Vec<InstalledAppId>> {
         let app = self.get_app(id)?;
-        let cell_ids: HashSet<_> = app.all_cells().collect();
+        let dna_ids: HashSet<_> = app.all_cells().collect();
         Ok(self
             .installed_apps
             .iter()
@@ -202,7 +202,7 @@ impl ConductorState {
                 app.role_assignments.values().any(|r| match r {
                     AppRoleAssignment::Primary(_) => false,
                     AppRoleAssignment::Dependency(d) => {
-                        cell_ids.contains(&d.cell_id) && (!protected_only || d.protected)
+                        dna_ids.contains(&d.dna_id) && (!protected_only || d.protected)
                     }
                 })
             })
@@ -226,12 +226,12 @@ impl ConductorState {
             .values()
             .flat_map(|r| match r {
                 AppRoleAssignment::Primary(_) => vec![],
-                AppRoleAssignment::Dependency(AppRoleDependency { cell_id, protected }) => {
+                AppRoleAssignment::Dependency(AppRoleDependency { dna_id, protected }) => {
                     if !protected_only || *protected {
                         self.installed_apps
                             .iter()
                             .filter_map(|(id, app)| {
-                                (app.all_cells().any(|id| id == *cell_id)
+                                (app.all_cells().any(|id| id == *dna_id)
                                     && app.status != AppStatus::Enabled)
                                     .then_some(id)
                             })
@@ -293,7 +293,7 @@ impl AppInterfaceConfig {
 mod tests {
     use super::ConductorState;
     use ::fixt::fixt;
-    use hdk::prelude::CellId;
+    use hdk::prelude::DnaId;
     use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
     use holochain_timestamp::Timestamp;
     use holochain_types::app::{
@@ -306,11 +306,11 @@ mod tests {
         let mut state = ConductorState::default();
         let agent = fixt!(AgentPubKey);
         let dna_hash = fixt!(DnaHash);
-        let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+        let dna_id = DnaId::new(dna_hash.clone(), agent.clone());
         assert_eq!(state.enabled_apps().count(), 0);
         assert_eq!(state.disabled_apps().count(), 0);
         assert_eq!(state.installed_apps().len(), 0);
-        assert!(state.find_app_containing_cell(&cell_id).is_none());
+        assert!(state.find_app_containing_cell(&dna_id).is_none());
 
         // Add an app
         let app_manifest = AppManifestV0Builder::default()
@@ -345,7 +345,7 @@ mod tests {
             (&app_id.to_string(), &installed_app)
         );
         assert_eq!(
-            state.find_app_containing_cell(&cell_id).unwrap(),
+            state.find_app_containing_cell(&dna_id).unwrap(),
             &installed_app
         );
 
@@ -360,7 +360,7 @@ mod tests {
             (&app_id.to_string(), &installed_app)
         );
         assert_eq!(
-            state.find_app_containing_cell(&cell_id).unwrap(),
+            state.find_app_containing_cell(&dna_id).unwrap(),
             &installed_app
         );
     }

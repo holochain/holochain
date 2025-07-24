@@ -9,7 +9,7 @@ use holochain_chc::ChcError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_state::source_chain::SourceChainError;
 use holochain_types::prelude::*;
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 use mr_bundle::error::MrBundleError;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
@@ -24,13 +24,13 @@ pub enum ConductorApiError {
 
     /// Cell was referenced, but is missing from the conductor.
     #[error(
-        "A Cell attempted to use an CellConductorApi it was not given.\nAPI CellId: {api_cell_id:?}\nInvocation CellId: {call_cell_id:?}"
+        "A Cell attempted to use an CellConductorApi it was not given.\nAPI DnaId: {api_dna_id:?}\nInvocation DnaId: {call_dna_id:?}"
     )]
     ZomeCallCellMismatch {
-        /// The CellId which is referenced by the CellConductorApi
-        api_cell_id: CellId,
-        /// The CellId which is referenced by the ZomeCallInvocation
-        call_cell_id: CellId,
+        /// The DnaId which is referenced by the CellConductorApi
+        api_dna_id: DnaId,
+        /// The DnaId which is referenced by the ZomeCallInvocation
+        call_dna_id: DnaId,
     },
 
     /// Conductor threw an error during API call.

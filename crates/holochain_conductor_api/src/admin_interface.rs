@@ -3,7 +3,7 @@ use crate::{AppInfo, FullStateDump, StorageInfo};
 use holo_hash::*;
 use holochain_types::prelude::*;
 use holochain_types::websocket::AllowedOrigins;
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 use kitsune2_api::Url;
 use std::collections::{BTreeMap, HashMap};
 
@@ -114,8 +114,8 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::CellIdsListed`]
-    ListCellIds,
+    /// [`AdminResponse::DnaIdsListed`]
+    ListDnaIds,
 
     /// List the apps and their information that are installed in the conductor.
     ///
@@ -219,15 +219,15 @@ pub enum AdminRequest {
     /// [`AppRequest`]: super::AppRequest
     ListAppInterfaces,
 
-    /// Dump the state of the cell specified by argument `cell_id`,
+    /// Dump the state of the cell specified by argument `dna_id`,
     /// including its chain, as a string containing JSON.
     ///
     /// # Returns
     ///
     /// [`AdminResponse::StateDumped`]
     DumpState {
-        /// The cell ID for which to dump state
-        cell_id: Box<CellId>,
+        /// The dna id for which to dump state
+        dna_id: Box<DnaId>,
     },
 
     /// Dump the state of the conductor, including the in-memory representation
@@ -238,7 +238,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::ConductorStateDumped`]
     DumpConductorState,
 
-    /// Dump the full state of the Cell specified by argument `cell_id`,
+    /// Dump the full state of the Cell specified by argument `dna_id`,
     /// including its chain and DHT shard, as a string containing JSON.
     ///
     /// **Warning**: this API call is subject to change, and will not be available to hApps.
@@ -254,8 +254,8 @@ pub enum AdminRequest {
     ///
     /// [`AdminResponse::FullStateDumped`]
     DumpFullState {
-        /// The cell ID for which to dump the state
-        cell_id: Box<CellId>,
+        /// The dna id for which to dump the state
+        dna_id: Box<DnaId>,
         /// The last seen DhtOp RowId, returned in the full dump state.
         /// Only DhtOps with RowId greater than the cursor will be returned.
         dht_ops_cursor: Option<u64>,
@@ -334,7 +334,7 @@ pub enum AdminRequest {
         dna_hashes: Option<Vec<DnaHash>>,
     },
 
-    /// "Graft" [`Record`]s onto the source chain of the specified [`CellId`].
+    /// "Graft" [`Record`]s onto the source chain of the specified [`DnaId`].
     ///
     /// The records must form a valid chain segment (ascending sequence numbers,
     /// and valid `prev_action` references). If the first record contains a `prev_action`
@@ -374,7 +374,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::RecordsGrafted`]
     GraftRecords {
         /// The cell that the records are being inserted into.
-        cell_id: CellId,
+        dna_id: DnaId,
         /// If this is `true`, then the records will be validated before insertion.
         /// This is much slower but is useful for verifying the chain is valid.
         ///
@@ -394,7 +394,7 @@ pub enum AdminRequest {
 
     /// Revoke a capability grant.
     ///
-    /// You have to provide the [`ActionHash`] of the capability grant to revoke and the [`CellId`] of the cell
+    /// You have to provide the [`ActionHash`] of the capability grant to revoke and the [`DnaId`] of the cell
     /// the capability grant is for.
     ///
     /// # Returns
@@ -402,7 +402,7 @@ pub enum AdminRequest {
     /// [`AdminResponse::ZomeCallCapabilityRevoked`]
     RevokeZomeCallCapability {
         action_hash: ActionHash,
-        cell_id: CellId,
+        dna_id: DnaId,
     },
 
     /// Request capability grant info for all cells in the app.
@@ -502,10 +502,10 @@ pub enum AdminResponse {
     /// Contains a list of the hashes of all installed DNAs.
     DnasListed(Vec<DnaHash>),
 
-    /// The successful response to an [`AdminRequest::ListCellIds`].
+    /// The successful response to an [`AdminRequest::ListDnaIds`].
     ///
-    /// Contains a list of all the cell IDs in the conductor.
-    CellIdsListed(Vec<CellId>),
+    /// Contains a list of all the dna IDs in the conductor.
+    DnaIdsListed(Vec<DnaId>),
 
     /// The successful response to an [`AdminRequest::ListApps`].
     ///
@@ -611,7 +611,7 @@ pub enum AdminResponse {
 
 #[cfg(feature = "unstable-migration")]
 pub type CompatibleCells =
-    std::collections::BTreeSet<(InstalledAppId, std::collections::BTreeSet<CellId>)>;
+    std::collections::BTreeSet<(InstalledAppId, std::collections::BTreeSet<DnaId>)>;
 
 /// Error type that goes over the websocket wire.
 /// This intends to be application developer facing

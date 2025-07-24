@@ -10,16 +10,16 @@ use holochain_types::db::DbWrite;
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, Debug)]
 pub struct SweetCell {
-    pub(super) cell_id: CellId,
+    pub(super) dna_id: DnaId,
     pub(super) cell_authored_db: DbWrite<DbKindAuthored>,
     pub(super) cell_dht_db: DbWrite<DbKindDht>,
     pub(super) conductor_config: Arc<ConductorConfig>,
 }
 
 impl SweetCell {
-    /// Accessor for CellId
-    pub fn cell_id(&self) -> &CellId {
-        &self.cell_id
+    /// Accessor for DnaId
+    pub fn dna_id(&self) -> &DnaId {
+        &self.dna_id
     }
 
     /// Get the authored environment for this cell
@@ -34,17 +34,17 @@ impl SweetCell {
 
     /// Accessor for AgentPubKey
     pub fn agent_pubkey(&self) -> &AgentPubKey {
-        self.cell_id.agent_pubkey()
+        self.dna_id.agent_pubkey()
     }
 
     /// Accessor for DnaHash
     pub fn dna_hash(&self) -> &DnaHash {
-        self.cell_id.dna_hash()
+        self.dna_id.dna_hash()
     }
 
     /// Get a SweetZome with the given name
     pub fn zome<Z: Into<ZomeName>>(&self, zome_name: Z) -> SweetZome {
-        SweetZome::new(self.cell_id.clone(), zome_name.into())
+        SweetZome::new(self.dna_id.clone(), zome_name.into())
     }
 
     /// Accessor for ConductorConfig

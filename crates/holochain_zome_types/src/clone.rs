@@ -1,6 +1,6 @@
 //! Cells can be cloned to create new cells with the different properties.
 
-use crate::cell::{CellId, CloneId};
+use crate::cell::{CloneId, DnaId};
 use derive_more::Display;
 use holo_hash::DnaHash;
 use holochain_integrity_types::DnaModifiers;
@@ -9,7 +9,7 @@ use holochain_integrity_types::DnaModifiers;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCloneCellInput {
     /// The id of the cell to clone.
-    pub cell_id: CellId,
+    pub dna_id: DnaId,
     /// Modifiers to set for the new cell.
     /// At least one of the modifiers must be set to obtain a distinct hash for
     /// the clone cell's DNA.
@@ -25,7 +25,7 @@ pub struct CreateCloneCellInput {
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ClonedCell {
     /// The cell's identifying data
-    pub cell_id: CellId,
+    pub dna_id: DnaId,
     /// A conductor-local clone identifier
     pub clone_id: CloneId,
     /// The hash of the DNA that this cell was instantiated from
@@ -41,7 +41,7 @@ pub struct ClonedCell {
 /// Ways of specifying a clone cell in the context of an app.
 #[derive(Clone, Debug, Display, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
-pub enum CloneCellId {
+pub enum CloneDnaId {
     /// Clone id consisting of role name and clone index.
     CloneId(CloneId),
     /// The DNA hash of the clone to use within an app.
@@ -51,8 +51,8 @@ pub enum CloneCellId {
 /// Arguments to specify the clone cell to be disabled.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DisableCloneCellInput {
-    /// The clone id or cell id of the clone cell
-    pub clone_cell_id: CloneCellId,
+    /// The clone id or dna id of the clone cell
+    pub clone_dna_id: CloneDnaId,
 }
 
 /// Arguments to specify the clone cell to be enabled.

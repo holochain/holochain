@@ -142,7 +142,7 @@ mod tests {
                     base.clone(),
                     LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]),
                 )
-                .author(alice.cell_id().agent_pubkey().clone()),
+                .author(alice.dna_id().agent_pubkey().clone()),
             )
             .await;
         assert_eq!(1, count);
@@ -153,7 +153,7 @@ mod tests {
                 &bob,
                 "get_count",
                 LinkQuery::new(base, LinkTypeFilter::Dependencies(vec![ZomeIndex(0)]))
-                    .author(bob.cell_id().agent_pubkey().clone()),
+                    .author(bob.dna_id().agent_pubkey().clone()),
             )
             .await;
         assert_eq!(1, count);

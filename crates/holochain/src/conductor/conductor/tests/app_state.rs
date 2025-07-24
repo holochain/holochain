@@ -290,7 +290,7 @@ async fn disabled_clone_cell_cannot_be_called() {
 
     let (clone, role_name) = {
         let (_, cell) = app.into_tuple();
-        let role_name = cell.cell_id().dna_hash().to_string();
+        let role_name = cell.dna_id().dna_hash().to_string();
 
         let clone = conductor
             .create_clone_cell(
@@ -307,15 +307,15 @@ async fn disabled_clone_cell_cannot_be_called() {
 
         (clone, role_name)
     };
-    let zome = SweetZome::new(clone.cell_id.clone(), "zome".into());
+    let zome = SweetZome::new(clone.dna_id.clone(), "zome".into());
     let hash: ActionHash = conductor.call(&zome, "create", ()).await;
 
-    let clone_cell_id = CloneCellId::CloneId(clone.clone_id);
+    let clone_dna_id = CloneDnaId::CloneId(clone.clone_id);
     conductor
         .disable_clone_cell(
             &app_id,
             &DisableCloneCellPayload {
-                clone_cell_id: clone_cell_id.clone(),
+                clone_dna_id: clone_dna_id.clone(),
             },
         )
         .await
@@ -352,7 +352,7 @@ async fn disabled_clone_cell_cannot_be_called() {
 
     conductor
         .raw_handle()
-        .enable_clone_cell(&app_id, &EnableCloneCellPayload { clone_cell_id })
+        .enable_clone_cell(&app_id, &EnableCloneCellPayload { clone_dna_id })
         .await
         .unwrap();
 
@@ -577,12 +577,12 @@ async fn app_status_and_cell_state() {
     // Running cells should only contain the installed cell.
     conductor.running_cells.share_ref(|cells| {
         assert_eq!(cells.len(), 1);
-        let (cell_id, cell) = cells.get_index(0).unwrap();
+        let (dna_id, cell) = cells.get_index(0).unwrap();
         assert_eq!(
-            *cell_id,
-            CellId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone())
+            *dna_id,
+            DnaId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone())
         );
-        assert_eq!(cell_id, cell.id());
+        assert_eq!(dna_id, cell.id());
     });
 
     // Disable app
@@ -616,12 +616,12 @@ async fn app_status_and_cell_state() {
     // Running cells should contain only the installed cell.
     conductor.running_cells.share_ref(|cells| {
         assert_eq!(cells.len(), 1);
-        let (cell_id, cell) = cells.get_index(0).unwrap();
+        let (dna_id, cell) = cells.get_index(0).unwrap();
         assert_eq!(
-            *cell_id,
-            CellId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone())
+            *dna_id,
+            DnaId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone())
         );
-        assert_eq!(cell_id, cell.id());
+        assert_eq!(dna_id, cell.id());
     });
 
     // Install another app with 2 DNAs
@@ -699,20 +699,20 @@ async fn app_status_and_cell_state() {
     conductor.running_cells.share_ref(|cells| {
         assert_eq!(cells.len(), 3);
         // Cell of app 1
-        let expected_cell_id =
-            CellId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone());
-        let cell = cells.get(&expected_cell_id).unwrap();
-        assert_eq!(*cell.id(), expected_cell_id);
+        let expected_dna_id =
+            DnaId::new(dna_files_1[0].dna_hash().clone(), app_1.agent_key.clone());
+        let cell = cells.get(&expected_dna_id).unwrap();
+        assert_eq!(*cell.id(), expected_dna_id);
         // Cell 1 of app 2
-        let expected_cell_id =
-            CellId::new(dna_files_2[0].dna_hash().clone(), app_2.agent_key.clone());
-        let cell = cells.get(&expected_cell_id).unwrap();
-        assert_eq!(*cell.id(), expected_cell_id);
+        let expected_dna_id =
+            DnaId::new(dna_files_2[0].dna_hash().clone(), app_2.agent_key.clone());
+        let cell = cells.get(&expected_dna_id).unwrap();
+        assert_eq!(*cell.id(), expected_dna_id);
         // Cell 2 of app 2
-        let expected_cell_id =
-            CellId::new(dna_files_2[1].dna_hash().clone(), app_2.agent_key.clone());
-        let cell = cells.get(&expected_cell_id).unwrap();
-        assert_eq!(*cell.id(), expected_cell_id);
+        let expected_dna_id =
+            DnaId::new(dna_files_2[1].dna_hash().clone(), app_2.agent_key.clone());
+        let cell = cells.get(&expected_dna_id).unwrap();
+        assert_eq!(*cell.id(), expected_dna_id);
     });
 
     // Uninstall app 1
@@ -731,15 +731,15 @@ async fn app_status_and_cell_state() {
     // Running cells should only contain only the cells of app 2.
     conductor.running_cells.share_ref(|cells| {
         // Cell 1 of app 2
-        let expected_cell_id =
-            CellId::new(dna_files_2[0].dna_hash().clone(), app_2.agent_key.clone());
-        let cell = cells.get(&expected_cell_id).unwrap();
-        assert_eq!(*cell.id(), expected_cell_id);
+        let expected_dna_id =
+            DnaId::new(dna_files_2[0].dna_hash().clone(), app_2.agent_key.clone());
+        let cell = cells.get(&expected_dna_id).unwrap();
+        assert_eq!(*cell.id(), expected_dna_id);
         // Cell 2 of app 2
-        let expected_cell_id =
-            CellId::new(dna_files_2[1].dna_hash().clone(), app_2.agent_key.clone());
-        let cell = cells.get(&expected_cell_id).unwrap();
-        assert_eq!(*cell.id(), expected_cell_id);
+        let expected_dna_id =
+            DnaId::new(dna_files_2[1].dna_hash().clone(), app_2.agent_key.clone());
+        let cell = cells.get(&expected_dna_id).unwrap();
+        assert_eq!(*cell.id(), expected_dna_id);
     });
 
     // Uninstall app 2

@@ -39,7 +39,7 @@ use holochain_types::dht_op::{ChainOp, DhtOp, DhtOpHashed};
 use holochain_types::prelude::SystemSignal;
 use holochain_types::prelude::{ChainItems, SignedActionHashedExt};
 use holochain_types::signal::Signal;
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 use holochain_zome_types::countersigning::PreflightResponse;
 use holochain_zome_types::prelude::CreateBase;
 use holochain_zome_types::query::{ChainHead, ChainStatus};
@@ -1817,7 +1817,7 @@ impl TestHarness {
         .await
         .unwrap();
 
-        let cell_id = CellId::new(dna_hash.clone(), author.clone());
+        let dna_id = DnaId::new(dna_hash.clone(), author.clone());
         let workspace = Arc::new(CountersigningWorkspace::new(
             Duration::from_secs(1),
             retry_limit,
@@ -1826,7 +1826,7 @@ impl TestHarness {
             .space
             .countersigning_workspaces
             .lock()
-            .insert(cell_id.clone(), workspace.clone());
+            .insert(dna_id.clone(), workspace.clone());
 
         Self {
             dna_hash,
@@ -1892,7 +1892,7 @@ impl TestHarness {
             self.workspace.clone(),
             self.network.clone(),
             self.keystore.clone(),
-            CellId::new(self.dna_hash.clone(), self.author.clone()),
+            DnaId::new(self.dna_hash.clone(), self.author.clone()),
             self.signal_tx.clone(),
             self.countersigning_tx.clone(),
             self.integration_tx.clone(),

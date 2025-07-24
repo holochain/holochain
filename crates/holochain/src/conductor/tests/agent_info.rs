@@ -67,7 +67,7 @@ async fn setup_tests() -> (
                     dna1.0.dna_hash(),
                     dna2.0.dna_hash(),
                     dna3.0.dna_hash(),
-                    clone_cell.cell_id.dna_hash(),
+                    clone_cell.dna_id.dna_hash(),
                 ]
                 .map(|dna_hash| async {
                     conductor
@@ -148,7 +148,7 @@ async fn admin_agent_info() {
     assert!(seen_spaces.contains(&dna1_hash.to_k2_space()));
     assert!(seen_spaces.contains(&dna2_hash.to_k2_space()));
     assert!(seen_spaces.contains(&dna3_hash.to_k2_space()));
-    assert!(seen_spaces.contains(&clone_cell.cell_id.dna_hash().to_k2_space()));
+    assert!(seen_spaces.contains(&clone_cell.dna_id.dna_hash().to_k2_space()));
 
     assert_eq!(
         seen_agents.len(),
@@ -156,7 +156,7 @@ async fn admin_agent_info() {
         "The agent_infos should cover the two agents (one for each app)"
     );
 
-    let clone_cell_dna = clone_cell.cell_id.dna_hash();
+    let clone_cell_dna = clone_cell.dna_id.dna_hash();
 
     // Test getting agent info for the clone cell
     let response = admin_sender
@@ -226,7 +226,7 @@ async fn app_agent_info() {
         assert!(
             decoded.space == dna1_hash.to_k2_space()
                 || decoded.space == dna2_hash.to_k2_space()
-                || decoded.space == clone_cell.cell_id.dna_hash().to_k2_space(),
+                || decoded.space == clone_cell.dna_id.dna_hash().to_k2_space(),
             "Agent info space should be one of app1's DNAs or the clone cell's DNA"
         );
     }

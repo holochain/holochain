@@ -10,27 +10,27 @@ impl Conductor {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub async fn graft_records_onto_source_chain(
         self: Arc<Self>,
-        cell_id: CellId,
+        dna_id: DnaId,
         validate: bool,
         records: Vec<Record>,
     ) -> ConductorApiResult<()> {
         // Require that the cell is installed.
-        if let err @ Err(ConductorError::CellMissing(_)) = self.cell_by_id(&cell_id).await {
+        if let err @ Err(ConductorError::CellMissing(_)) = self.cell_by_id(&dna_id).await {
             let _ = err?;
         }
 
         // Get or create the space for this cell.
-        let space = self.get_or_create_space(cell_id.dna_hash())?;
+        let space = self.get_or_create_space(dna_id.dna_hash())?;
 
         let chc = None;
         let network = holochain_p2p::HolochainP2pDna::new(
             self.holochain_p2p().clone(),
-            cell_id.dna_hash().clone(),
+            dna_id.dna_hash().clone(),
             chc,
         );
 
         let source_chain: SourceChain = space
-            .source_chain(self.keystore().clone(), cell_id.agent_pubkey().clone())
+            .source_chain(self.keystore().clone(), dna_id.agent_pubkey().clone())
             .await?;
 
         let existing = source_chain
@@ -45,7 +45,7 @@ impl Conductor {
 
         if validate {
             self.clone()
-                .validate_records(&cell_id, &chain_top, graft.incoming())
+                .validate_records(&dna_id, &chain_top, graft.incoming())
                 .await?;
         }
 
@@ -57,7 +57,7 @@ impl Conductor {
                 let ops = produce_op_lites_from_records(vec![&el])?;
                 // Check have the same author as cell.
                 let (sah, entry) = el.into_inner();
-                if sah.action().author() != cell_id.agent_pubkey() {
+                if sah.action().author() != dna_id.agent_pubkey() {
                     return Err(StateMutationError::AuthorsMustMatch);
                 }
                 Ok((sah, ops, entry.into_option()))
@@ -66,9 +66,9 @@ impl Conductor {
 
         // Commit the records to the source chain.
         let ops_to_integrate = space
-            .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
+            .get_or_create_authored_db(dna_id.agent_pubkey().clone())?
             .write_async({
-                let cell_id = cell_id.clone();
+                let dna_id = dna_id.clone();
                 move |txn| {
                     if let Some((_, seq)) = chain_top {
                         // Remove records above the grafting position.
@@ -83,7 +83,7 @@ impl Conductor {
                         txn.execute(
                             holochain_sqlite::sql::sql_cell::DELETE_ACTIONS_AFTER_SEQ,
                             rusqlite::named_params! {
-                                ":author": cell_id.agent_pubkey(),
+                                ":author": dna_id.agent_pubkey(),
                                 ":seq": seq
                             },
                         )
@@ -113,7 +113,7 @@ impl Conductor {
 
         // Check which ops need to be integrated.
         // Only integrated if a cell is installed.
-        if self.running_cell_ids().contains(&cell_id) {
+        if self.running_dna_ids().contains(&dna_id) {
             holochain_state::integrate::authored_ops_to_dht_db(
                 network
                     .target_arcs()
@@ -121,14 +121,14 @@ impl Conductor {
                     .map_err(ConductorApiError::other)?,
                 ops_to_integrate,
                 space
-                    .get_or_create_authored_db(cell_id.agent_pubkey().clone())?
+                    .get_or_create_authored_db(dna_id.agent_pubkey().clone())?
                     .into(),
                 space.dht_db.clone(),
             )
             .await?;
 
             // Any ops that were moved to the dht_db but had dependencies will need to be integrated.
-            self.cell_by_id(&cell_id)
+            self.cell_by_id(&dna_id)
                 .await?
                 .notify_authored_ops_moved_to_limbo();
         }
@@ -137,27 +137,27 @@ impl Conductor {
 
     async fn validate_records(
         self: Arc<Self>,
-        cell_id: &CellId,
+        dna_id: &DnaId,
         chain_top: &Option<(ActionHash, u32)>,
         records: &[Record],
     ) -> ConductorApiResult<()> {
-        let space = self.get_or_create_space(cell_id.dna_hash())?;
-        let ribosome = self.get_ribosome(cell_id.dna_hash())?;
+        let space = self.get_or_create_space(dna_id.dna_hash())?;
+        let ribosome = self.get_ribosome(dna_id.dna_hash())?;
         let chc = None;
         let network = holochain_p2p::HolochainP2pDna::new(
             self.holochain_p2p().clone(),
-            cell_id.dna_hash().clone(),
+            dna_id.dna_hash().clone(),
             chc,
         );
 
         // Create a raw source chain to validate against because
         // genesis may not have been run yet.
         let workspace = SourceChainWorkspace::raw_empty(
-            space.get_or_create_authored_db(cell_id.agent_pubkey().clone())?,
+            space.get_or_create_authored_db(dna_id.agent_pubkey().clone())?,
             space.dht_db.clone(),
             space.cache_db.clone(),
             self.keystore().clone(),
-            cell_id.agent_pubkey().clone(),
+            dna_id.agent_pubkey().clone(),
         )
         .await?;
 

@@ -175,13 +175,13 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AgentPubKeyGenerated(agent_pub_key))
             }
-            ListCellIds => {
-                let cell_ids = self
+            ListDnaIds => {
+                let dna_ids = self
                     .conductor_handle
-                    .running_cell_ids()
+                    .running_dna_ids()
                     .into_iter()
                     .collect();
-                Ok(AdminResponse::CellIdsListed(cell_ids))
+                Ok(AdminResponse::DnaIdsListed(dna_ids))
             }
             ListApps { status_filter } => {
                 let apps = self.conductor_handle.list_apps(status_filter).await?;
@@ -230,8 +230,8 @@ impl AdminInterfaceApi {
                 let interfaces = self.conductor_handle.list_app_interfaces().await?;
                 Ok(AdminResponse::AppInterfacesListed(interfaces))
             }
-            DumpState { cell_id } => {
-                let state = self.conductor_handle.dump_cell_state(&cell_id).await?;
+            DumpState { dna_id } => {
+                let state = self.conductor_handle.dump_cell_state(&dna_id).await?;
                 Ok(AdminResponse::StateDumped(state))
             }
             DumpConductorState => {
@@ -239,12 +239,12 @@ impl AdminInterfaceApi {
                 Ok(AdminResponse::ConductorStateDumped(state))
             }
             DumpFullState {
-                cell_id,
+                dna_id,
                 dht_ops_cursor,
             } => {
                 let state = self
                     .conductor_handle
-                    .dump_full_cell_state(&cell_id, dht_ops_cursor)
+                    .dump_full_cell_state(&dna_id, dht_ops_cursor)
                     .await?;
                 Ok(AdminResponse::FullStateDumped(state))
             }
@@ -285,13 +285,13 @@ impl AdminInterfaceApi {
                 Ok(AdminResponse::AgentMetaInfo(r))
             }
             GraftRecords {
-                cell_id,
+                dna_id,
                 validate,
                 records,
             } => {
                 self.conductor_handle
                     .clone()
-                    .graft_records_onto_source_chain(cell_id, validate, records)
+                    .graft_records_onto_source_chain(dna_id, validate, records)
                     .await?;
                 Ok(AdminResponse::RecordsGrafted)
             }
@@ -303,10 +303,10 @@ impl AdminInterfaceApi {
 
             RevokeZomeCallCapability {
                 action_hash,
-                cell_id,
+                dna_id,
             } => {
                 self.conductor_handle
-                    .revoke_zome_call_capability(cell_id, action_hash)
+                    .revoke_zome_call_capability(dna_id, action_hash)
                     .await?;
                 Ok(AdminResponse::ZomeCallCapabilityRevoked)
             }
@@ -317,7 +317,7 @@ impl AdminInterfaceApi {
             } => {
                 let state = self.conductor_handle.clone().get_state().await?;
                 let app = state.get_app(&installed_app_id)?;
-                let app_cells: HashSet<CellId> = app.required_cells().collect();
+                let app_cells: HashSet<DnaId> = app.required_cells().collect();
                 let cap_info = self
                     .conductor_handle
                     .clone()
@@ -545,11 +545,11 @@ mod test {
 
     // let agent_key2 = fake_agent_pubkey_2();
     // let path_payload = InstallAppDnaPayload::hash_only(dna_hash.clone(), "".to_string());
-    // let cell_id2 = CellId::new(dna_hash.clone(), agent_key2.clone());
+    // let dna_id2 = DnaId::new(dna_hash.clone(), agent_key2.clone());
     // let expected_installed_app = InstalledApp::new_fresh(
     //     InstalledAppCommon::new_legacy(
     //         "test-by-path".to_string(),
-    //         vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+    //         vec![InstalledCell::new(dna_id2.clone(), "".to_string())],
     //     )
     //     .unwrap(),
     // );
@@ -574,7 +574,7 @@ mod test {
     // let expected_enabled_app = InstalledApp::new_running(
     //     InstalledAppCommon::new_legacy(
     //         "test-by-path".to_string(),
-    //         vec![InstalledCell::new(cell_id2.clone(), "".to_string())],
+    //         vec![InstalledCell::new(dna_id2.clone(), "".to_string())],
     //     )
     //     .unwrap(),
     // );
@@ -589,10 +589,10 @@ mod test {
     // );
 
     // let res = admin_api
-    //     .handle_admin_request(AdminRequest::ListCellIds)
+    //     .handle_admin_request(AdminRequest::ListDnaIds)
     //     .await;
 
-    // assert_matches!(res, AdminResponse::CellIdsListed(v) if v == vec![cell_id2]);
+    // assert_matches!(res, AdminResponse::DnaIdsListed(v) if v == vec![dna_id2]);
 
     // now try to install the happ using the hash
     // let _install_response = admin_api

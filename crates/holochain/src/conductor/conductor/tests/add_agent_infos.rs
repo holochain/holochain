@@ -16,16 +16,16 @@ async fn add_agent_infos_to_peer_store() {
 
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
 
-    let cell_id = app.cells()[0].cell_id().clone();
+    let dna_id = app.cells()[0].dna_id().clone();
     let cell_peer_store = conductor
         .holochain_p2p
-        .peer_store(cell_id.dna_hash().clone())
+        .peer_store(dna_id.dna_hash().clone())
         .await
         .unwrap();
     // Await agent to be added to peer store.
     retry_until_timeout!({
         if cell_peer_store
-            .get(cell_id.agent_pubkey().to_k2_agent())
+            .get(dna_id.agent_pubkey().to_k2_agent())
             .await
             .unwrap()
             .is_some()
@@ -39,15 +39,15 @@ async fn add_agent_infos_to_peer_store() {
     let agent_infos = conductor.get_agent_infos(None).await.unwrap();
     assert_eq!(agent_infos, expected_agent_infos);
 
-    // If cell id is passed into call, only the cell's agent info should be returned.
-    let cell_id = app.cells()[0].cell_id().clone();
+    // If dna id is passed into call, only the cell's agent info should be returned.
+    let dna_id = app.cells()[0].dna_id().clone();
     let expected_agent_info = cell_peer_store
-        .get(cell_id.agent_pubkey().to_k2_agent())
+        .get(dna_id.agent_pubkey().to_k2_agent())
         .await
         .unwrap()
         .unwrap();
     let agent_infos = conductor
-        .get_agent_infos(Some(vec![cell_id.dna_hash().clone()]))
+        .get_agent_infos(Some(vec![dna_id.dna_hash().clone()]))
         .await
         .unwrap();
     assert_eq!(agent_infos, vec![expected_agent_info.clone()]);

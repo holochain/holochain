@@ -37,7 +37,7 @@ pub struct CallZomeWorkflowArgs<RibosomeT> {
     pub signal_tx: broadcast::Sender<Signal>,
     pub conductor_handle: ConductorHandle,
     pub is_root_zome_call: bool,
-    pub cell_id: CellId,
+    pub dna_id: DnaId,
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -67,7 +67,7 @@ where
     let should_write = args.is_root_zome_call;
     let conductor_handle = args.conductor_handle.clone();
     let signal_tx = args.signal_tx.clone();
-    let cell_id = args.cell_id.clone();
+    let dna_id = args.dna_id.clone();
     let result = call_zome_workflow_inner(
         workspace.clone(),
         network.clone(),
@@ -110,7 +110,7 @@ where
                     // Only send post commit if this is a coordinator zome.
                     if let Some(coordinator_zome) = coordinator_zome {
                         let call_zome_handle =
-                            CellConductorApi::new(conductor_handle.clone(), cell_id)
+                            CellConductorApi::new(conductor_handle.clone(), dna_id)
                                 .into_call_zome_handle();
 
                         send_post_commit(
@@ -150,12 +150,12 @@ where
         invocation,
         signal_tx,
         conductor_handle,
-        cell_id,
+        dna_id,
         ..
     } = args;
 
     let call_zome_handle =
-        CellConductorApi::new(conductor_handle.clone(), cell_id).into_call_zome_handle();
+        CellConductorApi::new(conductor_handle.clone(), dna_id).into_call_zome_handle();
 
     tracing::trace!("Before zome call");
     let host_access = ZomeCallHostAccess::new(

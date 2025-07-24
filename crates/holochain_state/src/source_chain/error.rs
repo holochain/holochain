@@ -20,7 +20,7 @@ pub enum SourceChainError {
     ChainEmpty,
 
     #[error("Agent key {0} invalid in cell {1}")]
-    InvalidAgentKey(AgentPubKey, CellId),
+    InvalidAgentKey(AgentPubKey, DnaId),
 
     #[error(
         "Attempted to commit a bundle to the source chain, but the source chain head has moved since the bundle began. Bundle head: {2:?}, Current head: {3:?}"

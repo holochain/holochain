@@ -78,8 +78,8 @@ async fn signed_zome_call() {
     .unwrap();
 
     let cells = installed_app.cell_info.into_values().next().unwrap();
-    let cell_id = match cells[0].clone() {
-        CellInfo::Provisioned(c) => c.cell_id,
+    let dna_id = match cells[0].clone() {
+        CellInfo::Provisioned(c) => c.dna_id,
         _ => panic!("Invalid cell type"),
     };
 
@@ -90,16 +90,16 @@ async fn signed_zome_call() {
 
     let credentials = admin_ws
         .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             functions: None,
         })
         .await
         .unwrap();
-    signer.add_credentials(cell_id.clone(), credentials);
+    signer.add_credentials(dna_id.clone(), credentials);
 
     let response = app_ws
         .call_zome(
-            cell_id.into(),
+            dna_id.into(),
             TEST_ZOME_NAME.into(),
             TEST_FN_NAME.into(),
             ExternIO::encode(()).unwrap(),
@@ -253,7 +253,7 @@ async fn agent_meta_info() {
         .clone();
 
     let dna_hash = match app_info.cell_info.first().unwrap().1.first().unwrap() {
-        CellInfo::Provisioned(c) => c.cell_id.dna_hash().clone(),
+        CellInfo::Provisioned(c) => c.dna_id.dna_hash().clone(),
         _ => panic!("Wrong CellInfo type."),
     };
 
@@ -270,7 +270,7 @@ async fn agent_meta_info() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn list_cell_ids() {
+async fn list_dna_ids() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
     let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
@@ -290,17 +290,17 @@ async fn list_cell_ids() {
         .await
         .unwrap();
     admin_ws.enable_app(app_id).await.unwrap();
-    let cell_id =
-        if let CellInfo::Provisioned(cell) = &app_info.cell_info.get(ROLE_NAME).unwrap()[0] {
-            cell.cell_id.clone()
-        } else {
-            panic!("expected provisioned cell");
-        };
+    let dna_id = if let CellInfo::Provisioned(cell) = &app_info.cell_info.get(ROLE_NAME).unwrap()[0]
+    {
+        cell.dna_id.clone()
+    } else {
+        panic!("expected provisioned cell");
+    };
 
-    let cell_ids = admin_ws.list_cell_ids().await.unwrap();
-    // Check if list includes cell id.
-    assert_eq!(cell_ids.len(), 1);
-    assert!(cell_ids.contains(&cell_id));
+    let dna_ids = admin_ws.list_dna_ids().await.unwrap();
+    // Check if list includes dna id.
+    assert_eq!(dna_ids.len(), 1);
+    assert!(dna_ids.contains(&dna_id));
 }
 
 #[tokio::test(flavor = "multi_thread")]

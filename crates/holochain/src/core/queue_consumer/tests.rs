@@ -224,7 +224,7 @@ async fn test_concurrency() {
 
 #[tokio::test(flavor = "current_thread", start_paused = true)]
 async fn publish_loop() {
-    let kind = DbKindAuthored(Arc::new(fixt!(CellId)));
+    let kind = DbKindAuthored(Arc::new(fixt!(DnaId)));
     let tmpdir = tempfile::Builder::new()
         .prefix("holochain-test-environments")
         .tempdir()

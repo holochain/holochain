@@ -147,8 +147,8 @@ async fn zero_arc_can_link_to_uncached_base() {
     // Now we want to update agent infos where Alice has declared full arc.
     conductors.exchange_peer_info().await;
 
-    let alice_pk = alice.cell_id().agent_pubkey().clone();
-    let carol_pk = carol_empty_arc.cell_id().agent_pubkey().clone();
+    let alice_pk = alice.dna_id().agent_pubkey().clone();
+    let carol_pk = carol_empty_arc.dna_id().agent_pubkey().clone();
 
     println!("@!@!@ alice_pk: {alice_pk:?}");
     println!("@!@!@ carol_pk: {carol_pk:?}");

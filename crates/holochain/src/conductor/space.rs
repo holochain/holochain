@@ -78,7 +78,7 @@ pub struct Space {
 
     /// Countersigning workspace for session state.
     pub countersigning_workspaces:
-        Arc<parking_lot::Mutex<HashMap<CellId, Arc<CountersigningWorkspace>>>>,
+        Arc<parking_lot::Mutex<HashMap<DnaId, Arc<CountersigningWorkspace>>>>,
 
     /// Witnessing workspace that is shared across this cell.
     pub witnessing_workspace: WitnessingWorkspace,
@@ -211,7 +211,7 @@ impl Spaces {
         node_id: &str,
         dnas: Vec<DnaHash>,
         holochain_p2p: DynHcP2p,
-    ) -> ConductorResult<Vec<CellId>> {
+    ) -> ConductorResult<Vec<DnaId>> {
         let mut agents = Vec::new();
         for dna in dnas {
             let dna_agents = holochain_p2p
@@ -235,7 +235,7 @@ impl Spaces {
                     .unwrap_or_default();
 
                 if is_matching_node_id {
-                    Some(CellId::new(
+                    Some(DnaId::new(
                         DnaHash::from_k2_space(&agent.space),
                         AgentPubKey::from_k2_agent(&agent.agent),
                     ))
@@ -253,8 +253,8 @@ impl Spaces {
         timestamp: Timestamp,
         holochain_p2p: DynHcP2p,
     ) -> ConductorResult<bool> {
-        let cell_ids = match &target_id {
-            BlockTargetId::Cell(cell_id) => vec![cell_id.to_owned()],
+        let dna_ids = match &target_id {
+            BlockTargetId::Cell(dna_id) => vec![dna_id.to_owned()],
             BlockTargetId::NodeDna(node_id, dna_hash) => {
                 self.node_agents_in_spaces(node_id, vec![dna_hash.clone()], holochain_p2p)
                     .await?
@@ -278,7 +278,7 @@ impl Spaces {
         // which cells are blocked, so avoid the race condition by returning false
         // TODO: actually fix the preflight, because this could be a loophole for someone
         //       to evade a block in some circumstances
-        if cell_ids.is_empty() {
+        if dna_ids.is_empty() {
             return Ok(false);
         }
 
@@ -289,16 +289,16 @@ impl Spaces {
                     holochain_state::block::query_is_blocked(txn, target_id, timestamp)?
             // If there are zero unblocked cells then return true.
             || {
-                let mut all_blocked_cell_ids = true;
-                for cell_id in cell_ids {
+                let mut all_blocked_dna_ids = true;
+                for dna_id in dna_ids {
                     if !holochain_state::block::query_is_blocked(
                         txn,
-                        BlockTargetId::Cell(cell_id), timestamp)? {
-                            all_blocked_cell_ids = false;
+                        BlockTargetId::Cell(dna_id), timestamp)? {
+                            all_blocked_dna_ids = false;
                             break;
                         }
                 }
-                all_blocked_cell_ids
+                all_blocked_dna_ids
             },
                 )
             })
@@ -605,7 +605,7 @@ impl Space {
                 let db = tokio::task::block_in_place(|| {
                     DbWrite::open_with_pool_config(
                         self.root_db_dir.as_ref(),
-                        DbKindAuthored(Arc::new(CellId::new((*self.dna_hash).clone(), author))),
+                        DbKindAuthored(Arc::new(DnaId::new((*self.dna_hash).clone(), author))),
                         PoolConfig {
                             synchronous_level: DbSyncLevel::Normal,
                             key: self.db_key.clone(),

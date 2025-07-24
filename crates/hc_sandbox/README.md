@@ -174,7 +174,7 @@ SUBCOMMANDS:
     list-agents      Calls AdminRequest::RequestAgentInfo and pretty prints the agent info on this conductor
     list-app-ws      Calls AdminRequest::ListAppInterfaces
     list-apps        Calls AdminRequest::ListApps
-    list-cells       Calls AdminRequest::ListCellIds
+    list-cells       Calls AdminRequest::ListDnaIds
     list-dnas        Calls AdminRequest::ListDnas
     new-agent        Calls AdminRequest::GenerateAgentPubKey
     register-dna     Calls AdminRequest::RegisterDna and registers a Dna. You can only use a path or a hash not both

@@ -76,14 +76,14 @@ async fn main_workflow() {
 
     let mut conductor = SweetConductor::from_config(SweetConductorConfig::standard()).await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
-    let cell_id = app.cells()[0].cell_id().clone();
+    let dna_id = app.cells()[0].dna_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
-            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
+            .get_or_create_authored_db(&dna_hash, dna_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
+        conductor.get_cache_db(&dna_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -289,14 +289,14 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
-    let cell_id = app.cells()[0].cell_id().clone();
+    let dna_id = app.cells()[0].dna_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
-            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
+            .get_or_create_authored_db(&dna_hash, dna_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
+        conductor.get_cache_db(&dna_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -406,14 +406,14 @@ async fn validate_ops_in_sequence_must_get_action() {
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
-    let cell_id = app.cells()[0].cell_id().clone();
+    let dna_id = app.cells()[0].dna_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
-            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
+            .get_or_create_authored_db(&dna_hash, dna_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
+        conductor.get_cache_db(&dna_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -571,14 +571,14 @@ async fn handle_error_in_op_validation() {
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
-    let cell_id = app.cells()[0].cell_id().clone();
+    let dna_id = app.cells()[0].dna_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
-            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
+            .get_or_create_authored_db(&dna_hash, dna_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
+        conductor.get_cache_db(&dna_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -677,21 +677,21 @@ async fn app_validation_workflow_test() {
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
-    let alice_cell_id = alice.cell_id().clone();
-    let bob_cell_id = bob.cell_id().clone();
+    let alice_dna_id = alice.dna_id().clone();
+    let bob_dna_id = bob.dna_id().clone();
 
     conductors.exchange_peer_info().await;
 
     let expected_count = run_test(
-        alice_cell_id.clone(),
-        bob_cell_id.clone(),
+        alice_dna_id.clone(),
+        bob_dna_id.clone(),
         &conductors,
         &dna_file,
     )
     .await;
     run_test_entry_def_id(
-        alice_cell_id,
-        bob_cell_id,
+        alice_dna_id,
+        bob_dna_id,
         &conductors,
         &dna_file,
         expected_count,
@@ -948,14 +948,14 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
-    let cell_id = app.cells()[0].cell_id().clone();
+    let dna_id = app.cells()[0].dna_id().clone();
 
     let app_validation_workspace = Arc::new(AppValidationWorkspace::new(
         conductor
-            .get_or_create_authored_db(&dna_hash, cell_id.agent_pubkey().clone())
+            .get_or_create_authored_db(&dna_hash, dna_id.agent_pubkey().clone())
             .unwrap(),
         conductor.get_dht_db(&dna_hash).unwrap(),
-        conductor.get_cache_db(&cell_id).await.unwrap(),
+        conductor.get_cache_db(&dna_id).await.unwrap(),
         conductor.keystore(),
     ));
 
@@ -1340,8 +1340,8 @@ fn show_limbo(txn: &Transaction) -> Vec<DhtOpLite> {
 }
 
 async fn run_test(
-    alice_cell_id: CellId,
-    bob_cell_id: CellId,
+    alice_dna_id: DnaId,
+    bob_dna_id: DnaId,
     conductors: &SweetConductorBatch,
     dna_file: &DnaFile,
 ) -> usize {
@@ -1352,7 +1352,7 @@ async fn run_test(
     let delay_per_attempt = Duration::from_millis(100);
 
     let zome_call_params =
-        new_zome_call_params(&bob_cell_id, "always_validates", (), TestWasm::Validate).unwrap();
+        new_zome_call_params(&bob_dna_id, "always_validates", (), TestWasm::Validate).unwrap();
     conductors[1]
         .call_zome(zome_call_params)
         .await
@@ -1363,12 +1363,12 @@ async fn run_test(
     // Plus another 16 for genesis + init
     // Plus 2 for Cap Grant
     let expected_count = 3 + 16 + 2;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_dna_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
         .await
         .unwrap();
 
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_dna_id.dna_hash()).unwrap();
 
     alice_db
         .read_async(move |txn| -> DatabaseResult<()> {
@@ -1386,14 +1386,14 @@ async fn run_test(
     );
 
     let (invalid_action_hash, invalid_entry_hash) =
-        commit_invalid(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
+        commit_invalid(&bob_dna_id, &conductors[1].raw_handle(), dna_file).await;
     let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
     // Integration should have 3 ops in it
     // StoreEntry should be invalid.
     // RegisterAgentActivity will be valid.
     let expected_count = 3 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_dna_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
         .await
         .unwrap();
@@ -1426,7 +1426,7 @@ async fn run_test(
     );
 
     let zome_call_params =
-        new_zome_call_params(&bob_cell_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
+        new_zome_call_params(&bob_dna_id, "add_valid_link", (), TestWasm::ValidateLink).unwrap();
     conductors[1]
         .call_zome(zome_call_params)
         .await
@@ -1435,7 +1435,7 @@ async fn run_test(
 
     // Integration should have 6 ops in it
     let expected_count = 6 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_dna_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
         .await
         .unwrap();
@@ -1468,7 +1468,7 @@ async fn run_test(
     );
 
     let invocation = new_invocation(
-        &bob_cell_id,
+        &bob_dna_id,
         "add_invalid_link",
         (),
         TestWasm::ValidateLink.coordinator_zome(),
@@ -1476,7 +1476,7 @@ async fn run_test(
     .await
     .unwrap();
     let invalid_link_hash: ActionHash = call_zome_directly(
-        &bob_cell_id,
+        &bob_dna_id,
         &conductors[1].raw_handle(),
         dna_file,
         invocation,
@@ -1487,7 +1487,7 @@ async fn run_test(
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_dna_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
         .await
         .unwrap();
@@ -1522,7 +1522,7 @@ async fn run_test(
     );
 
     let invocation = new_invocation(
-        &bob_cell_id,
+        &bob_dna_id,
         "remove_valid_link",
         (),
         TestWasm::ValidateLink.coordinator_zome(),
@@ -1530,7 +1530,7 @@ async fn run_test(
     .await
     .unwrap();
     call_zome_directly(
-        &bob_cell_id,
+        &bob_dna_id,
         &conductors[1].raw_handle(),
         dna_file,
         invocation,
@@ -1539,7 +1539,7 @@ async fn run_test(
 
     // Integration should have 9 ops in it
     let expected_count = 9 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_dna_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
         .await
         .unwrap();
@@ -1574,7 +1574,7 @@ async fn run_test(
     );
 
     let invocation = new_invocation(
-        &bob_cell_id,
+        &bob_dna_id,
         "remove_invalid_link",
         (),
         TestWasm::ValidateLink.coordinator_zome(),
@@ -1582,7 +1582,7 @@ async fn run_test(
     .await
     .unwrap();
     let invalid_remove_hash: ActionHash = call_zome_directly(
-        &bob_cell_id,
+        &bob_dna_id,
         &conductors[1].raw_handle(),
         dna_file,
         invocation,
@@ -1593,7 +1593,7 @@ async fn run_test(
 
     // Integration should have 12 ops in it
     let expected_count = 12 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_dna_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
         .await
         .unwrap();
@@ -1635,8 +1635,8 @@ async fn run_test(
 /// 3. Reject only Post with "Banana" as the String to show it doesn't
 ///    affect other entries.
 async fn run_test_entry_def_id(
-    alice_cell_id: CellId,
-    bob_cell_id: CellId,
+    alice_dna_id: DnaId,
+    bob_dna_id: DnaId,
     conductors: &SweetConductorBatch,
     dna_file: &DnaFile,
     expected_count: usize,
@@ -1648,13 +1648,13 @@ async fn run_test_entry_def_id(
     let delay_per_attempt = Duration::from_millis(100);
 
     let (invalid_action_hash, invalid_entry_hash) =
-        commit_invalid_post(&bob_cell_id, &conductors[1].raw_handle(), dna_file).await;
+        commit_invalid_post(&bob_dna_id, &conductors[1].raw_handle(), dna_file).await;
     let invalid_entry_hash: AnyDhtHash = invalid_entry_hash.into();
 
     // Integration should have 3 ops in it
     // StoreEntry and StoreRecord should be invalid.
     let expected_count = 3 + expected_count;
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_dna_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
         .await
         .unwrap();
@@ -1685,13 +1685,13 @@ async fn run_test_entry_def_id(
 // Need to "hack holochain" because otherwise the invalid
 // commit is caught by the call zome workflow
 async fn commit_invalid(
-    bob_cell_id: &CellId,
+    bob_dna_id: &DnaId,
     handle: &ConductorHandle,
     dna_file: &DnaFile,
 ) -> (ActionHash, EntryHash) {
     let entry = ThisWasmEntry::NeverValidates;
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
-    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_dna_id, handle, dna_file).await;
     let zome_index = call_data.get_entry_type(TestWasm::Validate, 0).zome_index;
     // 4
     let invalid_action_hash = call_data
@@ -1703,7 +1703,7 @@ async fn commit_invalid(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_dna_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"commit_invalid");
     (invalid_action_hash, entry_hash)
 }
@@ -1711,7 +1711,7 @@ async fn commit_invalid(
 // Need to "hack holochain" because otherwise the invalid
 // commit is caught by the call zome workflow
 async fn commit_invalid_post(
-    bob_cell_id: &CellId,
+    bob_dna_id: &DnaId,
     handle: &ConductorHandle,
     dna_file: &DnaFile,
 ) -> (ActionHash, EntryHash) {
@@ -1719,7 +1719,7 @@ async fn commit_invalid_post(
     let entry = Post("Banana".into());
     let entry_hash = EntryHash::with_data_sync(&Entry::try_from(entry.clone()).unwrap());
     // Create call data for the 3rd zome Create
-    let call_data = HostFnCaller::create_for_zome(bob_cell_id, handle, dna_file, 2).await;
+    let call_data = HostFnCaller::create_for_zome(bob_dna_id, handle, dna_file, 2).await;
     let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
         .zome_index;
@@ -1733,23 +1733,23 @@ async fn commit_invalid_post(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_dna_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"commit_invalid_post");
     (invalid_action_hash, entry_hash)
 }
 
 async fn call_zome_directly(
-    bob_cell_id: &CellId,
+    bob_dna_id: &DnaId,
     handle: &ConductorHandle,
     dna_file: &DnaFile,
     invocation: ZomeCallInvocation,
 ) -> ExternIO {
-    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_dna_id, handle, dna_file).await;
     // 4
     let output = call_data.call_zome_direct(invocation).await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_dna_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"call_zome_directly");
     output
 }

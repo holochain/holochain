@@ -300,9 +300,9 @@ async fn private_entries_dont_leak() {
     .await;
 
     check_for_private_entries(alice.dht_db().clone()).await;
-    check_for_private_entries(conductors[0].get_cache_db(alice.cell_id()).await.unwrap()).await;
+    check_for_private_entries(conductors[0].get_cache_db(alice.dna_id()).await.unwrap()).await;
     check_for_private_entries(bobbo.dht_db().clone()).await;
-    check_for_private_entries(conductors[1].get_cache_db(bobbo.cell_id()).await.unwrap()).await;
+    check_for_private_entries(conductors[1].get_cache_db(bobbo.dna_id()).await.unwrap()).await;
 }
 
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
@@ -339,7 +339,7 @@ async fn check_all_gets_for_private_entry(
             .map(|d| d.map(|d| unwrap_to!(d => Details::Record).clone().record)),
     );
     let records = records.into_iter().flatten().collect();
-    check_records_for_private_entry(zome.cell_id().agent_pubkey().clone(), records);
+    check_records_for_private_entry(zome.dna_id().agent_pubkey().clone(), records);
     let entries: Vec<Option<Details>> = conductor
         .call(zome, "get_details", AnyDhtHash::from(entry_hash.clone()))
         .await;
@@ -351,7 +351,7 @@ async fn check_all_gets_for_private_entry(
         let details = unwrap_to!(entry=> Details::Entry).clone();
         let actions = details.actions;
         for action in actions {
-            assert_eq!(action.action().author(), zome.cell_id().agent_pubkey());
+            assert_eq!(action.action().author(), zome.dna_id().agent_pubkey());
         }
     }
 }

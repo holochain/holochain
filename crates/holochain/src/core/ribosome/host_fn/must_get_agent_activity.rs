@@ -202,7 +202,7 @@ pub mod test {
             .call(
                 &alice,
                 "commit_require_agents_chain",
-                (bob.cell_id().agent_pubkey().clone(), filter.clone()),
+                (bob.dna_id().agent_pubkey().clone(), filter.clone()),
             )
             .await;
 
@@ -212,7 +212,7 @@ pub mod test {
             .call_fallible(
                 &alice,
                 "commit_require_agents_chain",
-                (alice.cell_id().agent_pubkey().clone(), filter),
+                (alice.dna_id().agent_pubkey().clone(), filter),
             )
             .await;
 
@@ -222,7 +222,7 @@ pub mod test {
             .call(
                 &alice,
                 "commit_require_agents_chain_recursive",
-                (bob.cell_id().agent_pubkey().clone(), c.clone()),
+                (bob.dna_id().agent_pubkey().clone(), c.clone()),
             )
             .await;
 
@@ -243,7 +243,7 @@ pub mod test {
             .call(
                 &alice,
                 "commit_require_agents_chain_recursive",
-                (bob.cell_id().agent_pubkey().clone(), d.clone()),
+                (bob.dna_id().agent_pubkey().clone(), d.clone()),
             )
             .await;
 
@@ -253,7 +253,7 @@ pub mod test {
             .call(
                 &alice,
                 "call_must_get_agent_activity",
-                (bob.cell_id().agent_pubkey().clone(), filter.clone()),
+                (bob.dna_id().agent_pubkey().clone(), filter.clone()),
             )
             .await;
 

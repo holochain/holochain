@@ -6,7 +6,7 @@ use crate::core::workflow::{WorkflowError, WorkflowResult};
 use crate::prelude::{PreflightRequest, PreflightRequestAcceptance, PreflightResponse, Signature};
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_keystore::MetaLairClient;
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 
 /// Accept a countersigning session.
 ///
@@ -19,13 +19,13 @@ pub async fn accept_countersigning_request(
     request: PreflightRequest,
     countersigning_trigger: TriggerSender,
 ) -> WorkflowResult<PreflightRequestAcceptance> {
-    let cell_id = CellId::new(
+    let dna_id = DnaId::new(
         DnaHash::from_raw_36(space.dna_hash.get_raw_36().to_vec()),
         author.clone(),
     );
     let workspace = {
         let guard = space.countersigning_workspaces.lock();
-        guard.get(&cell_id).cloned()
+        guard.get(&dna_id).cloned()
     };
 
     if workspace.is_none() {

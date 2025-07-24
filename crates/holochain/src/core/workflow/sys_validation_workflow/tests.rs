@@ -27,12 +27,12 @@ async fn sys_validation_workflow_test() {
     let mut conductors = SweetConductorBatch::from_config(2, config).await;
     let apps = conductors.setup_app("test_app", [&dna_file]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
-    let alice_cell_id = alice.cell_id().clone();
-    let bob_cell_id = bob.cell_id().clone();
+    let alice_dna_id = alice.dna_id().clone();
+    let bob_dna_id = bob.dna_id().clone();
 
     conductors.exchange_peer_info().await;
 
-    run_test(alice_cell_id, bob_cell_id, conductors, dna_file).await;
+    run_test(alice_dna_id, bob_dna_id, conductors, dna_file).await;
 }
 
 #[cfg(feature = "unstable-warrants")]
@@ -78,7 +78,7 @@ async fn sys_validation_produces_invalid_chain_op_warrant() {
 
     //- Trigger sys validation
     conductor
-        .get_cell_triggers(alice.cells()[0].cell_id())
+        .get_cell_triggers(alice.cells()[0].dna_id())
         .await
         .unwrap()
         .sys_validation
@@ -179,7 +179,7 @@ async fn sys_validation_produces_forked_chain_warrant() {
         {
             //- Trigger sys validation
             conductors[1]
-                .get_cell_triggers(bob.cell_id())
+                .get_cell_triggers(bob.dna_id())
                 .await
                 .unwrap()
                 .sys_validation
@@ -206,8 +206,8 @@ async fn sys_validation_produces_forked_chain_warrant() {
 }
 
 async fn run_test(
-    alice_cell_id: CellId,
-    bob_cell_id: CellId,
+    alice_dna_id: DnaId,
+    bob_dna_id: DnaId,
     conductors: SweetConductorBatch,
     dna_file: DnaFile,
 ) {
@@ -217,14 +217,14 @@ async fn run_test(
     let num_attempts = 100;
     let delay_per_attempt = Duration::from_millis(100);
 
-    bob_links_in_a_legit_way(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
+    bob_links_in_a_legit_way(&bob_dna_id, &conductors[1].raw_handle(), &dna_file).await;
 
     // Integration should have 9 ops in it.
     // Plus another 14 for genesis.
     // Init is not run because we aren't calling the zome.
     let expected_count = 9 + 14;
 
-    let alice_dht_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    let alice_dht_db = conductors[0].get_dht_db(alice_dna_id.dna_hash()).unwrap();
     wait_for_integration(
         &alice_dht_db,
         expected_count,
@@ -265,7 +265,7 @@ async fn run_test(
     }).await.unwrap();
 
     let (bad_update_action, bad_update_entry_hash, link_add_hash) =
-        bob_makes_a_large_link(&bob_cell_id, &conductors[1].raw_handle(), &dna_file).await;
+        bob_makes_a_large_link(&bob_dna_id, &conductors[1].raw_handle(), &dna_file).await;
 
     // Integration should have 14 chain ops in it + 1 warrant op (if unstable-warrants enabled) + the running tally
     #[cfg(feature = "unstable-warrants")]
@@ -273,7 +273,7 @@ async fn run_test(
     #[cfg(not(feature = "unstable-warrants"))]
     let expected_count = 14 + expected_count;
 
-    let alice_db = conductors[0].get_dht_db(alice_cell_id.dna_hash()).unwrap();
+    let alice_db = conductors[0].get_dht_db(alice_dna_id.dna_hash()).unwrap();
     wait_for_integration(&alice_db, expected_count, num_attempts, delay_per_attempt)
         .await
         .unwrap();
@@ -341,7 +341,7 @@ async fn run_test(
 }
 
 async fn bob_links_in_a_legit_way(
-    bob_cell_id: &CellId,
+    bob_dna_id: &DnaId,
     handle: &ConductorHandle,
     dna_file: &DnaFile,
 ) -> ActionHash {
@@ -350,7 +350,7 @@ async fn bob_links_in_a_legit_way(
     let base_entry_hash = Entry::try_from(base.clone()).unwrap().to_hash();
     let target_entry_hash = Entry::try_from(target.clone()).unwrap().to_hash();
     let link_tag = LinkTag::from(vec![0; 256]);
-    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_dna_id, handle, dna_file).await;
     let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
         .zome_index;
@@ -385,7 +385,7 @@ async fn bob_links_in_a_legit_way(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_dna_id).await.unwrap();
     triggers
         .publish_dht_ops
         .trigger(&"bob_links_in_a_legit_way");
@@ -396,7 +396,7 @@ async fn bob_links_in_a_legit_way(
 }
 
 async fn bob_makes_a_large_link(
-    bob_cell_id: &CellId,
+    bob_dna_id: &DnaId,
     handle: &ConductorHandle,
     dna_file: &DnaFile,
 ) -> (ActionHash, EntryHash, ActionHash) {
@@ -410,7 +410,7 @@ async fn bob_makes_a_large_link(
     let bytes = (0..MAX_TAG_SIZE + 1).map(|_| 0u8).collect::<Vec<_>>();
     let link_tag = LinkTag(bytes);
 
-    let call_data = HostFnCaller::create(bob_cell_id, handle, dna_file).await;
+    let call_data = HostFnCaller::create(bob_dna_id, handle, dna_file).await;
     let zome_index = call_data
         .get_entry_type(TestWasm::Create, POST_INDEX)
         .zome_index;
@@ -455,7 +455,7 @@ async fn bob_makes_a_large_link(
         .await;
 
     // Produce and publish these commits
-    let triggers = handle.get_cell_triggers(bob_cell_id).await.unwrap();
+    let triggers = handle.get_cell_triggers(bob_dna_id).await.unwrap();
     triggers.publish_dht_ops.trigger(&"bob_makes_a_large_link");
     triggers
         .integrate_dht_ops

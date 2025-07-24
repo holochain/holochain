@@ -6,7 +6,7 @@ use holo_hash::AgentPubKey;
 use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_zome_types::{
     capability::CapSecret,
-    cell::CellId,
+    cell::DnaId,
     dependencies::holochain_integrity_types::Signature,
     zome_io::{ExternIO, ZomeCallParams},
 };
@@ -23,15 +23,15 @@ pub trait AgentSigner {
     /// Sign the given data with the public key found in the agent id of the provenance.
     async fn sign(
         &self,
-        cell_id: &CellId,
+        dna_id: &DnaId,
         provenance: AgentPubKey,
         data_to_sign: Arc<[u8]>,
     ) -> Result<Signature>;
 
-    fn get_provenance(&self, cell_id: &CellId) -> Option<AgentPubKey>;
+    fn get_provenance(&self, dna_id: &DnaId) -> Option<AgentPubKey>;
 
-    /// Get the capability secret for the given `cell_id` if it exists.
-    fn get_cap_secret(&self, cell_id: &CellId) -> Option<CapSecret>;
+    /// Get the capability secret for the given `dna_id` if it exists.
+    fn get_cap_secret(&self, dna_id: &DnaId) -> Option<CapSecret>;
 }
 
 /// Signs an unsigned zome call using the provided signing implementation
@@ -42,7 +42,7 @@ pub(crate) async fn sign_zome_call(
     let pub_key = params.provenance.clone();
     let (bytes, bytes_hash) = params.serialize_and_hash()?;
     let signature = signer
-        .sign(&params.cell_id, pub_key, bytes_hash.into())
+        .sign(&params.dna_id, pub_key, bytes_hash.into())
         .await?;
 
     Ok(ZomeCallParamsSigned {

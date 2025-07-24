@@ -10,7 +10,7 @@ use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
     dna::AgentPubKey,
     prelude::{
-        AppCapGrantInfo, CellId, DeleteCloneCellPayload, InstallAppPayload, RegisterDnaPayload,
+        AppCapGrantInfo, DeleteCloneCellPayload, DnaId, InstallAppPayload, RegisterDnaPayload,
         UpdateCoordinatorsPayload,
     },
 };
@@ -43,7 +43,7 @@ pub struct EnableAppResponse(AppInfo);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AuthorizeSigningCredentialsPayload {
-    pub cell_id: CellId,
+    pub dna_id: DnaId,
     pub functions: Option<GrantedFunctions>,
 }
 
@@ -362,10 +362,10 @@ impl AdminWebsocket {
         }
     }
 
-    pub async fn list_cell_ids(&self) -> ConductorApiResult<Vec<CellId>> {
-        let response = self.send(AdminRequest::ListCellIds).await?;
+    pub async fn list_dna_ids(&self) -> ConductorApiResult<Vec<DnaId>> {
+        let response = self.send(AdminRequest::ListDnaIds).await?;
         match response {
-            AdminResponse::CellIdsListed(cell_ids) => Ok(cell_ids),
+            AdminResponse::DnaIdsListed(dna_ids) => Ok(dna_ids),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }
@@ -411,12 +411,12 @@ impl AdminWebsocket {
 
     pub async fn revoke_zome_call_capability(
         &self,
-        cell_id: CellId,
+        dna_id: DnaId,
         action_hash: ActionHash,
     ) -> ConductorApiResult<()> {
         let msg = AdminRequest::RevokeZomeCallCapability {
             action_hash,
-            cell_id,
+            dna_id,
         };
         let response = self.send(msg).await?;
 
@@ -456,9 +456,9 @@ impl AdminWebsocket {
         }
     }
 
-    pub async fn dump_state(&self, cell_id: CellId) -> ConductorApiResult<String> {
+    pub async fn dump_state(&self, dna_id: DnaId) -> ConductorApiResult<String> {
         let msg = AdminRequest::DumpState {
-            cell_id: Box::new(cell_id),
+            dna_id: Box::new(dna_id),
         };
         let response = self.send(msg).await?;
         match response {
@@ -478,11 +478,11 @@ impl AdminWebsocket {
 
     pub async fn dump_full_state(
         &self,
-        cell_id: CellId,
+        dna_id: DnaId,
         dht_ops_cursor: Option<u64>,
     ) -> ConductorApiResult<FullStateDump> {
         let msg = AdminRequest::DumpFullState {
-            cell_id: Box::new(cell_id),
+            dna_id: Box::new(dna_id),
             dht_ops_cursor,
         };
         let response = self.send(msg).await?;
@@ -524,12 +524,12 @@ impl AdminWebsocket {
 
     pub async fn graft_records(
         &self,
-        cell_id: CellId,
+        dna_id: DnaId,
         validate: bool,
         records: Vec<Record>,
     ) -> ConductorApiResult<()> {
         let msg = AdminRequest::GraftRecords {
-            cell_id,
+            dna_id,
             validate,
             records,
         };
@@ -596,7 +596,7 @@ impl AdminWebsocket {
         csprng.fill_bytes(&mut cap_secret);
 
         self.grant_zome_call_capability(GrantZomeCallCapabilityPayload {
-            cell_id: request.cell_id,
+            dna_id: request.dna_id,
             cap_grant: ZomeCallCapGrant {
                 tag: "zome-call-signing-key".to_string(),
                 access: holochain_zome_types::capability::CapAccess::Assigned {

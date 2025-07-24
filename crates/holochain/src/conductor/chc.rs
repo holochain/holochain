@@ -9,7 +9,7 @@ use url::Url;
 pub use holochain_chc::*;
 
 /// Storage for the local CHC implementations
-pub static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<CellId, ChcImpl>>> =
+pub static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<DnaId, ChcImpl>>> =
     Lazy::new(|| parking_lot::Mutex::new(HashMap::new()));
 
 /// The URL which indicates that the fake local CHC service should be used,
@@ -19,12 +19,12 @@ pub const CHC_LOCAL_MAGIC_URL: &str = "local:";
 /// Build the appropriate CHC implementation.
 ///
 /// In particular, if the url is the magic string "local:", then a [`ChcLocal`]
-/// implementation will be used. Otherwise, if the url is set, and the CellId
+/// implementation will be used. Otherwise, if the url is set, and the DnaId
 /// is "CHC-enabled", then a [`ChcRemote`] will be produced.
 pub fn build_chc(
     base_url: Option<&Url>,
     keystore: MetaLairClient,
-    cell_id: &CellId,
+    dna_id: &DnaId,
 ) -> Option<ChcImpl> {
     // TODO: check if the agent key is Holo-hosted, otherwise return none
     let is_holo_agent = true;
@@ -32,26 +32,22 @@ pub fn build_chc(
         base_url.map(|url| {
             #[cfg(feature = "chc")]
             {
-                fn chc_local(keystore: MetaLairClient, cell_id: CellId) -> ChcImpl {
-                    let agent = cell_id.agent_pubkey().clone();
+                fn chc_local(keystore: MetaLairClient, dna_id: DnaId) -> ChcImpl {
+                    let agent = dna_id.agent_pubkey().clone();
                     let mut m = CHC_LOCAL_MAP.lock();
-                    m.entry(cell_id)
+                    m.entry(dna_id)
                         .or_insert_with(|| Arc::new(chc_local::ChcLocal::new(keystore, agent)))
                         .clone()
                 }
 
-                fn chc_remote(
-                    base_url: Url,
-                    keystore: MetaLairClient,
-                    cell_id: &CellId,
-                ) -> ChcImpl {
-                    Arc::new(chc_http::ChcHttp::new(base_url, keystore, cell_id))
+                fn chc_remote(base_url: Url, keystore: MetaLairClient, dna_id: &DnaId) -> ChcImpl {
+                    Arc::new(chc_http::ChcHttp::new(base_url, keystore, dna_id))
                 }
 
                 if url.as_str() == CHC_LOCAL_MAGIC_URL {
-                    chc_local(keystore, cell_id.clone())
+                    chc_local(keystore, dna_id.clone())
                 } else {
-                    chc_remote(url.clone(), keystore, cell_id)
+                    chc_remote(url.clone(), keystore, dna_id)
                 }
             }
 
@@ -141,11 +137,11 @@ mod tests {
             .unwrap()
             .into_tuple();
 
-        let cell_id = cell.cell_id();
-        let agent = cell_id.agent_pubkey().clone();
+        let dna_id = cell.dna_id();
+        let agent = dna_id.agent_pubkey().clone();
 
         let top_hash = {
-            let mut dump = conductor.dump_full_cell_state(cell_id, None).await.unwrap();
+            let mut dump = conductor.dump_full_cell_state(dna_id, None).await.unwrap();
             assert_eq!(dump.source_chain_dump.records.len(), 3);
             dump.source_chain_dump.records.pop().unwrap().action_address
         };
@@ -165,7 +161,7 @@ mod tests {
 
         {
             // add some data to the local CHC
-            let chc = CHC_LOCAL_MAP.lock().get(cell_id).unwrap().clone();
+            let chc = CHC_LOCAL_MAP.lock().get(dna_id).unwrap().clone();
             let records = chc.clone().get_record_data(None).await.unwrap();
             assert_eq!(records.len(), 3);
             chc.add_records(vec![new_record]).await.unwrap();
@@ -174,11 +170,11 @@ mod tests {
         // Check that a sync picks up the new action
         conductor
             .raw_handle()
-            .chc_sync(cell_id.clone(), None)
+            .chc_sync(dna_id.clone(), None)
             .await
             .unwrap();
 
-        let dump = conductor.dump_full_cell_state(cell_id, None).await.unwrap();
+        let dump = conductor.dump_full_cell_state(dna_id, None).await.unwrap();
         assert_eq!(dump.source_chain_dump.records.len(), 4);
         assert_eq!(
             dump.source_chain_dump
@@ -203,7 +199,7 @@ mod tests {
 
         let (dna_file, _, _) = SweetDnaFile::unique_from_inline_zomes(simple_crud_zome()).await;
         let agent = SweetAgents::alice();
-        let cell_id = CellId::new(dna_file.dna_hash().clone(), agent.clone());
+        let dna_id = DnaId::new(dna_file.dna_hash().clone(), agent.clone());
 
         let flaky_chc = Arc::new(FlakyChc {
             chc: chc_local::ChcLocal::new(conductor.keystore(), agent.clone()),
@@ -213,7 +209,7 @@ mod tests {
         // Set up the flaky CHC ahead of time
         CHC_LOCAL_MAP
             .lock()
-            .insert(cell_id.clone(), flaky_chc.clone());
+            .insert(dna_id.clone(), flaky_chc.clone());
 
         // The app can't be installed, because of a CHC error during genesis
         let err = conductor
@@ -272,7 +268,7 @@ mod tests {
             .unwrap()
             .into_tuple();
 
-        let cell_id = c0.cell_id();
+        let dna_id = c0.dna_id();
 
         // Install two apps with ignore_genesis_failure and one without
         let mk_payload = |ignore: bool| {
@@ -349,12 +345,12 @@ mod tests {
         // TODO: sync conductors 1 and 2 to match conductor 0
         conductors[1]
             .raw_handle()
-            .chc_sync(cell_id.clone(), None)
+            .chc_sync(dna_id.clone(), None)
             .await
             .unwrap();
         conductors[2]
             .raw_handle()
-            .chc_sync(cell_id.clone(), None)
+            .chc_sync(dna_id.clone(), None)
             .await
             .unwrap();
 
@@ -362,20 +358,20 @@ mod tests {
         assert!(matches!(
             conductors[3]
                 .raw_handle()
-                .chc_sync(cell_id.clone(), None)
+                .chc_sync(dna_id.clone(), None)
                 .await,
-            Err(ConductorApiError::ConductorError(ConductorError::CellMissing(id))) if id == *cell_id
+            Err(ConductorApiError::ConductorError(ConductorError::CellMissing(id))) if id == *dna_id
         ));
 
         let dump1 = conductors[1]
-            .dump_full_cell_state(cell_id, None)
+            .dump_full_cell_state(dna_id, None)
             .await
             .unwrap();
 
         assert_eq!(dump1.source_chain_dump.records.len(), 3);
 
-        let c1: SweetCell = conductors[1].get_sweet_cell(cell_id.clone()).unwrap();
-        let c2: SweetCell = conductors[2].get_sweet_cell(cell_id.clone()).unwrap();
+        let c1: SweetCell = conductors[1].get_sweet_cell(dna_id.clone()).unwrap();
+        let c2: SweetCell = conductors[2].get_sweet_cell(dna_id.clone()).unwrap();
 
         let _: ActionHash = conductors[0]
             .call(&c0.zome(TestWasm::Create), "create_entry", ())
@@ -405,26 +401,26 @@ mod tests {
 
         conductors[1]
             .raw_handle()
-            .chc_sync(cell_id.clone(), None)
+            .chc_sync(dna_id.clone(), None)
             .await
             .unwrap();
 
         conductors[2]
             .raw_handle()
-            .chc_sync(cell_id.clone(), None)
+            .chc_sync(dna_id.clone(), None)
             .await
             .unwrap();
 
         let dump0 = conductors[0]
-            .dump_full_cell_state(cell_id, None)
+            .dump_full_cell_state(dna_id, None)
             .await
             .unwrap();
         let dump1 = conductors[1]
-            .dump_full_cell_state(cell_id, None)
+            .dump_full_cell_state(dna_id, None)
             .await
             .unwrap();
         let dump2 = conductors[2]
-            .dump_full_cell_state(cell_id, None)
+            .dump_full_cell_state(dna_id, None)
             .await
             .unwrap();
 

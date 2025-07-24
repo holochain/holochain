@@ -10,7 +10,7 @@ use holochain_state::prelude::{
     current_countersigning_session, CurrentCountersigningSessionOpt, SourceChainResult,
 };
 use holochain_types::prelude::{Signal, SystemSignal};
-use holochain_zome_types::cell::CellId;
+use holochain_zome_types::cell::DnaId;
 use std::sync::Arc;
 use tokio::sync::broadcast::Sender;
 
@@ -28,13 +28,10 @@ use tokio::sync::broadcast::Sender;
 pub async fn refresh_workspace_state(
     space: &Space,
     workspace: Arc<CountersigningWorkspace>,
-    cell_id: CellId,
+    dna_id: DnaId,
     signal: Sender<Signal>,
 ) {
-    tracing::debug!(
-        "Refreshing countersigning workspace state for {:?}",
-        cell_id
-    );
+    tracing::debug!("Refreshing countersigning workspace state for {:?}", dna_id);
 
     // Whether there is a session currently registered in the workspace.
     let session_registered_for_agent = workspace
@@ -44,7 +41,7 @@ pub async fn refresh_workspace_state(
 
     let mut locked_for_agent = false;
 
-    let agent = cell_id.agent_pubkey().clone();
+    let agent = dna_id.agent_pubkey().clone();
     if let Ok(authored_db) = space.get_or_create_authored_db(agent.clone()) {
         let lock = authored_db
             .read_async({

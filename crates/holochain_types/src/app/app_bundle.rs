@@ -94,8 +94,8 @@ impl AppBundle {
                             resolution.role_assignments.push((role_name, role));
                         }
 
-                        CellProvisioningOp::Existing(cell_id, protected) => {
-                            let role = AppRoleDependency { cell_id, protected }.into();
+                        CellProvisioningOp::Existing(dna_id, protected) => {
+                            let role = AppRoleDependency { dna_id, protected }.into();
                             resolution.role_assignments.push((role_name, role));
                         }
 
@@ -148,8 +148,8 @@ impl AppBundle {
                 compatible_hash,
                 protected,
             } => {
-                if let Some(cell_id) = existing_cells.get(&role_name) {
-                    Ok(CellProvisioningOp::Existing(cell_id.clone(), protected))
+                if let Some(dna_id) = existing_cells.get(&role_name) {
+                    Ok(CellProvisioningOp::Existing(dna_id.clone(), protected))
                 } else {
                     Err(AppBundleError::CellResolutionFailure(
                         role_name,
@@ -240,14 +240,14 @@ pub struct AppRoleResolution {
 impl AppRoleResolution {
     /// Return the IDs of new cells to be created as part of the resolution.
     /// Does not return existing cells to be reused.
-    pub fn cells_to_create(&self, agent_key: AgentPubKey) -> Vec<(CellId, Option<MembraneProof>)> {
+    pub fn cells_to_create(&self, agent_key: AgentPubKey) -> Vec<(DnaId, Option<MembraneProof>)> {
         let provisioned = self
             .role_assignments
             .iter()
             .filter_map(|(_name, role)| {
                 let role = role.as_primary()?;
                 if role.is_provisioned {
-                    Some(CellId::new(role.dna_hash().clone(), agent_key.clone()))
+                    Some(DnaId::new(role.dna_hash().clone(), agent_key.clone()))
                 } else {
                     None
                 }
@@ -257,9 +257,9 @@ impl AppRoleResolution {
         self.dnas_to_register
             .iter()
             .filter_map(|(dna, proof)| {
-                let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
-                if provisioned.contains(&cell_id) {
-                    Some((cell_id, proof.clone()))
+                let dna_id = DnaId::new(dna.dna_hash().clone(), agent_key.clone());
+                if provisioned.contains(&dna_id) {
+                    Some((dna_id, proof.clone()))
                 } else {
                     None
                 }
@@ -275,7 +275,7 @@ pub enum CellProvisioningOp {
     /// Create a new Cell from the given DNA file
     CreateFromDnaFile(DnaFile, u32),
     /// Use an existing Cell
-    Existing(CellId, bool),
+    Existing(DnaId, bool),
     /// No creation needed, but there might be a clone_limit, and so we need
     /// to know which DNA to use for making clones
     ProvisionOnly(DnaFile, u32),

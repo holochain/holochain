@@ -15,10 +15,10 @@ async fn dump_full_state() {
         .await
         .0;
     let app = conductor.setup_app("", &[dna_file]).await.unwrap();
-    let cell_id = app.cells()[0].cell_id();
+    let dna_id = app.cells()[0].dna_id();
     let _: ActionHash = conductor
         .call(
-            &SweetZome::new(cell_id.clone(), TestWasm::Crd.coordinator_zome_name()),
+            &SweetZome::new(dna_id.clone(), TestWasm::Crd.coordinator_zome_name()),
             "create",
             (),
         )
@@ -26,7 +26,7 @@ async fn dump_full_state() {
     // Await integration.
     retry_until_timeout!({
         if !conductor
-            .get_dht_db(cell_id.dna_hash())
+            .get_dht_db(dna_id.dna_hash())
             .unwrap()
             .test_read(|txn| {
                 txn.query_row(
@@ -42,12 +42,12 @@ async fn dump_full_state() {
     });
 
     let authored_db = conductor
-        .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())
+        .get_or_create_authored_db(dna_id.dna_hash(), dna_id.agent_pubkey().clone())
         .unwrap();
-    let dht_db = conductor.get_or_create_dht_db(cell_id.dna_hash()).unwrap();
-    let peer_dump = peer_store_dump(&conductor, cell_id).await.unwrap();
+    let dht_db = conductor.get_or_create_dht_db(dna_id.dna_hash()).unwrap();
+    let peer_dump = peer_store_dump(&conductor, dna_id).await.unwrap();
     let source_chain_dump =
-        source_chain::dump_state(authored_db.into(), cell_id.agent_pubkey().clone())
+        source_chain::dump_state(authored_db.into(), dna_id.agent_pubkey().clone())
             .await
             .unwrap();
     let expected_state_dump = FullStateDump {
@@ -56,6 +56,6 @@ async fn dump_full_state() {
         integration_dump: full_integration_dump(&dht_db, None).await.unwrap(),
     };
 
-    let full_state_dump = conductor.dump_full_cell_state(cell_id, None).await.unwrap();
+    let full_state_dump = conductor.dump_full_cell_state(dna_id, None).await.unwrap();
     assert_eq!(full_state_dump, expected_state_dump);
 }

@@ -45,9 +45,7 @@ impl AppClient {
             .values()
             .flat_map(|c| {
                 c.iter().filter_map(|c| match c {
-                    CellInfo::Provisioned(p) => {
-                        Some((p.name.clone(), p.cell_id.dna_hash().clone()))
-                    }
+                    CellInfo::Provisioned(p) => Some((p.name.clone(), p.dna_id.dna_hash().clone())),
                     _ => None,
                 })
             })

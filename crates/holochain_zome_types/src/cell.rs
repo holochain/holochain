@@ -7,9 +7,8 @@ use holo_hash::DnaHash;
 use holochain_serialized_bytes::prelude::*;
 use std::fmt;
 
-/// The unique identifier for a Cell.
-/// Cells are uniquely determined by this pair - this pair is necessary
-/// and sufficient to refer to a cell in a conductor
+/// The unique identifier for an instantiated Dna, where a Dna is a set of
+/// integrity zomes + modifiers.
 #[derive(
     Clone,
     Debug,
@@ -22,7 +21,7 @@ use std::fmt;
     Ord,
     PartialOrd,
 )]
-pub struct CellId(DnaHash, AgentPubKey);
+pub struct DnaId(DnaHash, AgentPubKey);
 
 /// Delimiter in a clone id that separates the base cell's role name from the
 /// clone index.
@@ -106,16 +105,16 @@ impl TryFrom<RoleName> for CloneId {
     }
 }
 
-impl fmt::Display for CellId {
+impl fmt::Display for DnaId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Cell({}, {})", self.dna_hash(), self.agent_pubkey())
     }
 }
 
-impl CellId {
-    /// Create a CellId from its components
+impl DnaId {
+    /// Create a DnaId from its components
     pub fn new(dna_hash: DnaHash, agent_pubkey: AgentPubKey) -> Self {
-        CellId(dna_hash, agent_pubkey)
+        DnaId(dna_hash, agent_pubkey)
     }
 
     /// The dna hash/address for this cell.
@@ -134,7 +133,7 @@ impl CellId {
     }
 }
 
-impl From<(DnaHash, AgentPubKey)> for CellId {
+impl From<(DnaHash, AgentPubKey)> for DnaId {
     fn from(pair: (DnaHash, AgentPubKey)) -> Self {
         Self(pair.0, pair.1)
     }

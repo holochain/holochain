@@ -121,7 +121,7 @@ async fn execute_call(
         CallTarget::NetworkAgent(target_agent) => {
             let zome_call_params = ZomeCallParams {
                 provenance: provenance.clone(),
-                cell_id: CellId::new(ribosome.dna_def().as_hash().clone(), target_agent.clone()),
+                dna_id: DnaId::new(ribosome.dna_def().as_hash().clone(), target_agent.clone()),
                 zome_name,
                 fn_name,
                 cap_secret,
@@ -153,17 +153,17 @@ async fn execute_call(
             }
         }
         CallTarget::ConductorCell(target_cell) => {
-            let cell_id_result: Result<CellId, RuntimeError> = match target_cell {
+            let dna_id_result: Result<DnaId, RuntimeError> = match target_cell {
                 CallTargetCell::OtherRole(role_name) => {
-                    let this_cell_id = call_context
+                    let this_dna_id = call_context
                         .host_context()
                         .call_zome_handle()
-                        .cell_id()
+                        .dna_id()
                         .clone();
                     call_context
                         .host_context()
                         .call_zome_handle()
-                        .find_cell_with_role_alongside_cell(&this_cell_id, &role_name)
+                        .find_cell_with_role_alongside_cell(&this_dna_id, &role_name)
                         .await
                         .map_err(|e| -> RuntimeError { wasm_error!(e).into() })
                         .and_then(|c| {
@@ -174,17 +174,17 @@ async fn execute_call(
                             })
                         })
                 }
-                CallTargetCell::OtherCell(cell_id) => Ok(cell_id),
+                CallTargetCell::OtherCell(dna_id) => Ok(dna_id),
                 CallTargetCell::Local => Ok(call_context
                     .host_context()
                     .call_zome_handle()
-                    .cell_id()
+                    .dna_id()
                     .clone()),
             };
-            match cell_id_result {
-                Ok(cell_id) => {
+            match dna_id_result {
+                Ok(dna_id) => {
                     let zome_call_params = ZomeCallParams {
-                        cell_id,
+                        dna_id,
                         zome_name,
                         fn_name,
                         payload,
@@ -284,7 +284,7 @@ pub mod wasm_test {
 
         {
             let agent_info: AgentInfo = conductor
-                .call(&zome1, "who_are_they_local", cell2.cell_id())
+                .call(&zome1, "who_are_they_local", cell2.dna_id())
                 .await;
             assert_eq!(agent_info.agent_initial_pubkey, agent_pubkey);
         }
@@ -313,7 +313,7 @@ pub mod wasm_test {
         let handle = conductor.raw_handle();
 
         let zome_call_params =
-            new_zome_call_params(alice.cell_id(), "call_create_entry", (), TestWasm::Create)
+            new_zome_call_params(alice.dna_id(), "call_create_entry", (), TestWasm::Create)
                 .unwrap();
         let result = handle.call_zome(zome_call_params).await;
         assert_matches!(result, Ok(Ok(ZomeCallResponse::Ok(_))));
@@ -370,7 +370,7 @@ pub mod wasm_test {
             .call(
                 &bobbo2.zome(TestWasm::WhoAmI),
                 "call_create_entry",
-                alice.cell_id().clone(),
+                alice.dna_id().clone(),
             )
             .await;
 

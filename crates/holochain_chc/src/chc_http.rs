@@ -129,21 +129,17 @@ impl ChainHeadCoordinatorExt for ChcHttp {
 
 impl ChcHttp {
     /// Constructor
-    pub fn new(base_url: Url, keystore: MetaLairClient, cell_id: &CellId) -> Self {
+    pub fn new(base_url: Url, keystore: MetaLairClient, dna_id: &DnaId) -> Self {
         let client = ChcHttpClient {
             base_url: base_url
-                .join(&format!(
-                    "{}/{}/",
-                    cell_id.dna_hash(),
-                    cell_id.agent_pubkey()
-                ))
+                .join(&format!("{}/{}/", dna_id.dna_hash(), dna_id.agent_pubkey()))
                 .expect("invalid URL"),
             client: reqwest::Client::builder().use_rustls_tls().build().unwrap(),
         };
         Self {
             client,
             keystore,
-            agent: cell_id.agent_pubkey().clone(),
+            agent: dna_id.agent_pubkey().clone(),
         }
     }
 }
@@ -194,12 +190,12 @@ mod tests {
     async fn test_add_records_remote() {
         let keystore = holochain_keystore::test_keystore();
         let agent = fake_agent_pubkey_1();
-        let cell_id = CellId::new(::fixt::fixt!(DnaHash), agent.clone());
+        let dna_id = DnaId::new(::fixt::fixt!(DnaHash), agent.clone());
         let chc = Arc::new(ChcHttp::new(
             url::Url::parse("http://127.0.0.1:40845/").unwrap(),
             // url::Url::parse("https://chc.dev.holotest.net/v1/").unwrap(),
             keystore.clone(),
-            &cell_id,
+            &dna_id,
         ));
 
         let chain = valid_arbitrary_chain(&keystore, agent, 20).await;

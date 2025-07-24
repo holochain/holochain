@@ -9,7 +9,7 @@ use holochain_zome_types::clone::{
 ///
 /// # Returns
 ///
-/// A struct with the created cell's clone id and cell id.
+/// A struct with the created cell's clone id and dna id.
 pub fn create_clone_cell(input: CreateCloneCellInput) -> ExternResult<ClonedCell> {
     HDK.with(|h| h.borrow().create_clone_cell(input))
 }
@@ -23,7 +23,7 @@ pub fn disable_clone_cell(input: DisableCloneCellInput) -> ExternResult<()> {
 ///
 /// # Returns
 ///
-/// A struct with the enabled cell's clone id and cell id.
+/// A struct with the enabled cell's clone id and dna id.
 pub fn enable_clone_cell(input: EnableCloneCellInput) -> ExternResult<ClonedCell> {
     HDK.with(|h| h.borrow().enable_clone_cell(input))
 }

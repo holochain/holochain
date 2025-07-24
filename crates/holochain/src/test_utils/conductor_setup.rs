@@ -26,7 +26,7 @@ use tempfile::TempDir;
 
 /// A "factory" for HostFnCaller, which will produce them when given a ZomeName
 pub struct CellHostFnCaller {
-    pub cell_id: CellId,
+    pub dna_id: DnaId,
     pub authored_db: DbWrite<DbKindAuthored>,
     pub dht_db: DbWrite<DbKindDht>,
     pub cache: DbWrite<DbKindCache>,
@@ -40,25 +40,25 @@ pub struct CellHostFnCaller {
 
 impl CellHostFnCaller {
     pub async fn new(
-        cell_id: &CellId,
+        dna_id: &DnaId,
         handle: &ConductorHandle,
         dna_file: &DnaFile,
         chc: Option<ChcImpl>,
     ) -> Self {
-        let authored_db = handle.get_authored_db(cell_id.dna_hash()).unwrap();
-        let dht_db = handle.get_dht_db(cell_id.dna_hash()).unwrap();
-        let cache = handle.get_cache_db(cell_id).await.unwrap();
+        let authored_db = handle.get_authored_db(dna_id.dna_hash()).unwrap();
+        let dht_db = handle.get_dht_db(dna_id.dna_hash()).unwrap();
+        let cache = handle.get_cache_db(dna_id).await.unwrap();
         let keystore = handle.keystore().clone();
         let network = handle
             .holochain_p2p()
-            .to_dna(cell_id.dna_hash().clone(), chc);
-        let triggers = handle.get_cell_triggers(cell_id).await.unwrap();
-        let cell_conductor_api = CellConductorApi::new(handle.clone(), cell_id.clone());
+            .to_dna(dna_id.dna_hash().clone(), chc);
+        let triggers = handle.get_cell_triggers(dna_id).await.unwrap();
+        let cell_conductor_api = CellConductorApi::new(handle.clone(), dna_id.clone());
 
         let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
         let signal_tx = handle.signal_broadcaster();
         CellHostFnCaller {
-            cell_id: cell_id.clone(),
+            dna_id: dna_id.clone(),
             authored_db,
             dht_db,
             cache,
@@ -74,7 +74,7 @@ impl CellHostFnCaller {
     /// Create a HostFnCaller for a specific zome and call
     pub fn get_api<I: Into<ZomeName>>(&self, zome_name: I) -> HostFnCaller {
         let zome_name: ZomeName = zome_name.into();
-        let zome_path = (self.cell_id.clone(), zome_name).into();
+        let zome_path = (self.dna_id.clone(), zome_name).into();
         let call_zome_handle = self.cell_conductor_api.clone().into_call_zome_handle();
         HostFnCaller {
             authored_db: self.authored_db.clone(),
@@ -95,7 +95,7 @@ impl CellHostFnCaller {
 pub struct ConductorTestData {
     _db_dir: TempDir,
     handle: ConductorHandle,
-    cell_apis: BTreeMap<CellId, CellHostFnCaller>,
+    cell_apis: BTreeMap<DnaId, CellHostFnCaller>,
 }
 
 impl ConductorTestData {
@@ -104,22 +104,22 @@ impl ConductorTestData {
         dna_files: Vec<DnaFile>,
         agents: Vec<AgentPubKey>,
         network_config: KitsuneP2pConfig,
-    ) -> (Self, HashMap<DnaHash, Vec<CellId>>) {
+    ) -> (Self, HashMap<DnaHash, Vec<DnaId>>) {
         let num_agents = agents.len();
         let num_dnas = dna_files.len();
         let mut cells = Vec::with_capacity(num_dnas * num_agents);
-        let mut cell_id_by_dna_file = Vec::with_capacity(num_dnas);
+        let mut dna_id_by_dna_file = Vec::with_capacity(num_dnas);
         for (i, dna_file) in dna_files.iter().enumerate() {
-            let mut cell_ids = Vec::with_capacity(num_agents);
+            let mut dna_ids = Vec::with_capacity(num_agents);
             for (j, agent_id) in agents.iter().enumerate() {
-                let cell_id = CellId::new(dna_file.dna_hash().to_owned(), agent_id.clone());
+                let dna_id = DnaId::new(dna_file.dna_hash().to_owned(), agent_id.clone());
                 cells.push((
-                    InstalledCell::new(cell_id.clone(), format!("agent-{}-{}", i, j)),
+                    InstalledCell::new(dna_id.clone(), format!("agent-{}-{}", i, j)),
                     None,
                 ));
-                cell_ids.push(cell_id);
+                dna_ids.push(dna_id);
             }
-            cell_id_by_dna_file.push((dna_file, cell_ids));
+            dna_id_by_dna_file.push((dna_file, dna_ids));
         }
 
         let (_app_api, handle) = setup_app_inner(
@@ -132,11 +132,11 @@ impl ConductorTestData {
 
         let mut cell_apis = BTreeMap::new();
 
-        for (dna_file, cell_ids) in cell_id_by_dna_file.iter() {
-            for cell_id in cell_ids {
+        for (dna_file, dna_ids) in dna_id_by_dna_file.iter() {
+            for dna_id in dna_ids {
                 cell_apis.insert(
-                    cell_id.clone(),
-                    CellHostFnCaller::new(cell_id, &handle, dna_file, None).await,
+                    dna_id.clone(),
+                    CellHostFnCaller::new(dna_id, &handle, dna_file, None).await,
                 );
             }
         }
@@ -147,9 +147,9 @@ impl ConductorTestData {
             handle,
             cell_apis,
         };
-        let installed = cell_id_by_dna_file
+        let installed = dna_id_by_dna_file
             .into_iter()
-            .map(|(dna_file, cell_ids)| (dna_file.dna_hash().clone(), cell_ids))
+            .map(|(dna_file, dna_ids)| (dna_file.dna_hash().clone(), dna_ids))
             .collect();
         (this, installed)
     }
@@ -223,13 +223,13 @@ impl ConductorTestData {
         let dna_file = self.alice_call_data().ribosome.dna_file().clone();
         if self.bob_call_data().is_none() {
             let bob_agent_id = fake_agent_pubkey_2();
-            let bob_cell_id = CellId::new(dna_file.dna_hash().clone(), bob_agent_id.clone());
-            let bob_installed_cell = InstalledCell::new(bob_cell_id.clone(), "bob_handle".into());
+            let bob_dna_id = DnaId::new(dna_file.dna_hash().clone(), bob_agent_id.clone());
+            let bob_installed_cell = InstalledCell::new(bob_dna_id.clone(), "bob_handle".into());
             let cell_data = vec![(bob_installed_cell, None)];
             install_app("bob_app", cell_data, vec![dna_file.clone()], self.handle()).await;
             self.cell_apis.insert(
-                bob_cell_id.clone(),
-                CellHostFnCaller::new(&bob_cell_id, &self.handle(), &dna_file, None).await,
+                bob_dna_id.clone(),
+                CellHostFnCaller::new(&bob_dna_id, &self.handle(), &dna_file, None).await,
             );
         }
     }
@@ -263,7 +263,7 @@ impl ConductorTestData {
         self.cell_apis.get_mut(&key).unwrap()
     }
 
-    pub fn get_cell(&mut self, cell_id: &CellId) -> Option<&mut CellHostFnCaller> {
-        self.cell_apis.get_mut(cell_id)
+    pub fn get_cell(&mut self, dna_id: &DnaId) -> Option<&mut CellHostFnCaller> {
+        self.cell_apis.get_mut(dna_id)
     }
 }

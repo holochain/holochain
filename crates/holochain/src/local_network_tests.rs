@@ -275,7 +275,7 @@ async fn conductors_gossip_inner(
 
     let mut envs = Vec::with_capacity(handles.len() + second_handles.len());
     for h in handles.iter().chain(second_handles.iter()) {
-        let space = h.cell_id.dna_hash();
+        let space = h.dna_id.dna_hash();
         envs.push(h.get_p2p_db(space));
     }
 
@@ -313,7 +313,7 @@ async fn conductors_gossip_inner(
 
     let mut envs = Vec::with_capacity(third_handles.len() + second_handles.len());
     for h in third_handles.iter().chain(second_handles.iter()) {
-        let space = h.cell_id.dna_hash();
+        let space = h.dna_id.dna_hash();
         envs.push(h.get_p2p_db(space));
     }
 
@@ -351,7 +351,7 @@ async fn init_all(handles: &[TestHandle]) -> Vec<ActionHash> {
             let large_msg = std::iter::repeat(b"a"[0]).take(20_000).collect::<Vec<_>>();
             let invocation = new_zome_call(
                 h.keystore(),
-                &h.cell_id,
+                &h.dna_id,
                 "create_post",
                 Post(format!("{}{}", i, String::from_utf8_lossy(&large_msg))),
                 TestWasm::Create,
@@ -387,13 +387,13 @@ async fn check_gossip(
 
     let mut others = Vec::with_capacity(all_handles.len());
     for other in all_handles {
-        let other = other.get_dht_db(other.cell_id.dna_hash()).unwrap().into();
+        let other = other.get_dht_db(other.dna_id.dna_hash()).unwrap().into();
         others.push(other);
     }
     let others_ref = others.iter().collect::<Vec<_>>();
 
     wait_for_integration_with_others(
-        &handle.get_dht_db(handle.cell_id.dna_hash()).unwrap(),
+        &handle.get_dht_db(handle.dna_id.dna_hash()).unwrap(),
         &others_ref,
         expected_count,
         NUM_ATTEMPTS,
@@ -404,7 +404,7 @@ async fn check_gossip(
     for hash in posts {
         let invocation = new_zome_call(
             handle.keystore(),
-            &handle.cell_id,
+            &handle.dna_id,
             "get_post",
             hash,
             TestWasm::Create,
@@ -440,7 +440,7 @@ async fn check_peers(envs: Vec<DbWrite<DbKindP2pAgents>>) {
 struct TestHandle {
     #[shrinkwrap(main_field)]
     handle: ConductorHandle,
-    cell_id: CellId,
+    dna_id: DnaId,
     _db_dir: Arc<TempDir>,
 }
 
@@ -493,12 +493,12 @@ async fn setup(
             setup_app_with_network(vec![], vec![], network.clone().unwrap_or_default()).await;
 
         let agent_key = AgentPubKey::new_random(handle.keystore()).await.unwrap();
-        let cell_id = CellId::new(dna_file.dna_hash().to_owned(), agent_key.clone());
-        let app = InstalledCell::new(cell_id.clone(), "cell_handle".into());
+        let dna_id = DnaId::new(dna_file.dna_hash().to_owned(), agent_key.clone());
+        let app = InstalledCell::new(dna_id.clone(), "cell_handle".into());
         install_app("test_app", vec![(app, None)], dnas.clone(), handle.clone()).await;
         handles.push(TestHandle {
             _db_dir: Arc::new(_db_dir),
-            cell_id,
+            dna_id,
             handle,
         });
     }

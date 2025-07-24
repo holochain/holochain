@@ -93,7 +93,7 @@ async fn create_clone_cell_creates_callable_cell() {
     assert_eq!(clone_cell.name, clone_name);
 
     let zome = SweetZome::new(
-        clone_cell.cell_id.clone(),
+        clone_cell.dna_id.clone(),
         TestWasm::Create.coordinator_zome_name(),
     );
     let zome_call_response: Result<ActionHash, _> = conductor
@@ -176,7 +176,7 @@ async fn create_identical_clone_cell_twice_fails() {
         .await;
     matches!(
         identical_clone_cell_err,
-        Err(ConductorError::AppError(AppError::DuplicateCellId(cell_id))) if cell_id == alice_clone_cell.cell_id
+        Err(ConductorError::AppError(AppError::DuplicateDnaId(dna_id))) if dna_id == alice_clone_cell.dna_id
     );
 
     // disable clone cell and try again to create an identical clone
@@ -185,7 +185,7 @@ async fn create_identical_clone_cell_twice_fails() {
         .disable_clone_cell(
             alice_app.installed_app_id(),
             &DisableCloneCellPayload {
-                clone_cell_id: CloneCellId::DnaHash(alice_clone_cell.cell_id.dna_hash().clone()),
+                clone_dna_id: CloneDnaId::DnaHash(alice_clone_cell.dna_id.dna_hash().clone()),
             },
         )
         .await
@@ -196,7 +196,7 @@ async fn create_identical_clone_cell_twice_fails() {
         .await;
     matches!(
         identical_clone_cell_err,
-        Err(ConductorError::AppError(AppError::DuplicateCellId(cell_id))) if cell_id == alice_clone_cell.cell_id
+        Err(ConductorError::AppError(AppError::DuplicateDnaId(dna_id))) if dna_id == alice_clone_cell.dna_id
     );
 
     // ensure that bob can clone cell with identical hash in same conductor
@@ -210,8 +210,8 @@ async fn create_identical_clone_cell_twice_fails() {
         bob_clone_cell.original_dna_hash
     );
     assert_eq!(
-        alice_clone_cell.cell_id.dna_hash(),
-        bob_clone_cell.cell_id.dna_hash()
+        alice_clone_cell.dna_id.dna_hash(),
+        bob_clone_cell.dna_id.dna_hash()
     );
 }
 
@@ -238,7 +238,7 @@ async fn clone_cell_deletion() {
         )
         .await
         .unwrap();
-    let clone_id = CloneCellId::CloneId(clone_cell.clone().clone_id);
+    let clone_id = CloneDnaId::CloneId(clone_cell.clone().clone_id);
 
     // disable clone cell
     conductor
@@ -246,7 +246,7 @@ async fn clone_cell_deletion() {
         .disable_clone_cell(
             &app_id,
             &DisableCloneCellPayload {
-                clone_cell_id: clone_id.clone(),
+                clone_dna_id: clone_id.clone(),
             },
         )
         .await
@@ -254,7 +254,7 @@ async fn clone_cell_deletion() {
 
     // calling the cell after disabling fails
     let zome = SweetZome::new(
-        clone_cell.cell_id.clone(),
+        clone_cell.dna_id.clone(),
         TestWasm::Create.coordinator_zome_name(),
     );
     let zome_call_response: Result<ActionHash, _> = conductor
@@ -268,7 +268,7 @@ async fn clone_cell_deletion() {
         .enable_clone_cell(
             &app_id,
             &DisableCloneCellPayload {
-                clone_cell_id: clone_id.clone(),
+                clone_dna_id: clone_id.clone(),
             },
         )
         .await
@@ -283,7 +283,7 @@ async fn clone_cell_deletion() {
     assert!(cell_info_for_role
         .iter()
         .any(|cell_info| if let CellInfo::Cloned(cell) = cell_info {
-            cell.cell_id == clone_cell.cell_id.clone()
+            cell.dna_id == clone_cell.dna_id.clone()
         } else {
             false
         }));
@@ -300,19 +300,19 @@ async fn clone_cell_deletion() {
         .disable_clone_cell(
             &app_id,
             &DisableCloneCellPayload {
-                clone_cell_id: clone_id.clone(),
+                clone_dna_id: clone_id.clone(),
             },
         )
         .await
         .unwrap();
 
-    // enable clone cell by cell id
+    // enable clone cell by dna id
     let enabled_clone_cell = conductor
         .raw_handle()
         .enable_clone_cell(
             &app_id,
             &DisableCloneCellPayload {
-                clone_cell_id: CloneCellId::DnaHash(clone_cell.cell_id.dna_hash().clone()),
+                clone_dna_id: CloneDnaId::DnaHash(clone_cell.dna_id.dna_hash().clone()),
             },
         )
         .await
@@ -327,7 +327,7 @@ async fn clone_cell_deletion() {
         .disable_clone_cell(
             &app_id,
             &DisableCloneCellPayload {
-                clone_cell_id: clone_id.clone(),
+                clone_dna_id: clone_id.clone(),
             },
         )
         .await
@@ -336,7 +336,7 @@ async fn clone_cell_deletion() {
         .raw_handle()
         .delete_clone_cell(&DeleteCloneCellPayload {
             app_id: app_id.clone(),
-            clone_cell_id: CloneCellId::DnaHash(clone_cell.cell_id.dna_hash().clone()),
+            clone_dna_id: CloneDnaId::DnaHash(clone_cell.dna_id.dna_hash().clone()),
         })
         .await
         .unwrap();
@@ -346,7 +346,7 @@ async fn clone_cell_deletion() {
         .enable_clone_cell(
             &app_id,
             &DisableCloneCellPayload {
-                clone_cell_id: clone_id.clone(),
+                clone_dna_id: clone_id.clone(),
             },
         )
         .await;
@@ -379,7 +379,7 @@ async fn conductor_can_startup_with_cloned_cell() {
 
     // calling the cell works
     let zome = SweetZome::new(
-        clone_cell.cell_id.clone(),
+        clone_cell.dna_id.clone(),
         TestWasm::Create.coordinator_zome_name(),
     );
     let zome_call_response: Result<ActionHash, _> = conductor
@@ -392,7 +392,7 @@ async fn conductor_can_startup_with_cloned_cell() {
 
     // calling the cell works after restart
     let zome = SweetZome::new(
-        clone_cell.cell_id.clone(),
+        clone_cell.dna_id.clone(),
         TestWasm::Create.coordinator_zome_name(),
     );
     let zome_call_response: Result<ActionHash, _> = conductor
@@ -405,7 +405,7 @@ async fn conductor_can_startup_with_cloned_cell() {
         .disable_clone_cell(
             app.installed_app_id(),
             &DisableCloneCellPayload {
-                clone_cell_id: CloneCellId::DnaHash(clone_cell.cell_id.dna_hash().clone()),
+                clone_dna_id: CloneDnaId::DnaHash(clone_cell.dna_id.dna_hash().clone()),
             },
         )
         .await
@@ -413,24 +413,24 @@ async fn conductor_can_startup_with_cloned_cell() {
 
     // calling the cell after disabling fails
     let zome = SweetZome::new(
-        clone_cell.cell_id.clone(),
+        clone_cell.dna_id.clone(),
         TestWasm::Create.coordinator_zome_name(),
     );
     let zome_call_response: Result<ActionHash, _> = conductor
         .call_fallible(&zome, "call_create_entry", ())
         .await;
-    matches!(zome_call_response, Err(ConductorApiError::CellError(CellError::CellDisabled(cell_id))) if cell_id == clone_cell.cell_id.clone());
+    matches!(zome_call_response, Err(ConductorApiError::CellError(CellError::CellDisabled(dna_id))) if dna_id == clone_cell.dna_id.clone());
 
     conductor.shutdown().await;
     conductor.startup().await;
 
     // calling the cell still fails after restart, cell still disabled
     let zome = SweetZome::new(
-        clone_cell.cell_id.clone(),
+        clone_cell.dna_id.clone(),
         TestWasm::Create.coordinator_zome_name(),
     );
     let zome_call_response: Result<ActionHash, _> = conductor
         .call_fallible(&zome, "call_create_entry", ())
         .await;
-    matches!(zome_call_response, Err(ConductorApiError::CellError(CellError::CellDisabled(cell_id))) if cell_id == clone_cell.cell_id.clone());
+    matches!(zome_call_response, Err(ConductorApiError::CellError(CellError::CellDisabled(dna_id))) if dna_id == clone_cell.dna_id.clone());
 }

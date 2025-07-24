@@ -5,7 +5,7 @@ use crate::core::ribosome::RibosomeT;
 use holochain_keystore::AgentPubKeyExt;
 use holochain_nonce::fresh_nonce;
 use holochain_types::access::Permission;
-use holochain_types::prelude::CellId;
+use holochain_types::prelude::DnaId;
 use holochain_types::prelude::ExternIO;
 use holochain_wasmer_host::prelude::*;
 use holochain_zome_types::prelude::Timestamp;
@@ -56,7 +56,7 @@ pub fn send_remote_signal(
                     for agent in agents {
                         let zome_call_params = ZomeCallParams {
                             provenance: from_agent.clone(),
-                            cell_id: CellId::new(network.dna_hash(), agent.clone()),
+                            dna_id: DnaId::new(network.dna_hash(), agent.clone()),
                             zome_name: zome_name.clone(),
                             fn_name: fn_name.clone(),
                             cap_secret: None,

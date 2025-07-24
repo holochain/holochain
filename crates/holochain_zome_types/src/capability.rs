@@ -37,18 +37,18 @@ pub use holochain_integrity_types::capability::*;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GrantZomeCallCapabilityPayload {
     /// Cell for which to authorize the capability.
-    pub cell_id: CellId,
+    pub dna_id: DnaId,
     /// Specifies the capability, consisting of zomes and functions to allow
     /// signing for as well as access level, secret and assignees.
     pub cap_grant: ZomeCallCapGrant,
 }
 
-/// A list which map a cell ID to their capability grant information.
+/// A list which map a dna id to their capability grant information.
 ///
 /// NOTE: while a map would have been more appropriate, we use a vector here
 /// because it is problematic with msgpack encoding.
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct AppCapGrantInfo(pub Vec<(CellId, Vec<CapGrantInfo>)>);
+pub struct AppCapGrantInfo(pub Vec<(DnaId, Vec<CapGrantInfo>)>);
 
 /// Information about a capability grant.
 #[derive(Debug, Deserialize, Serialize, Clone)]
