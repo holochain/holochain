@@ -428,7 +428,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         }
         AdminRequestCli::ListAppWs => {
             let interface_infos = client.list_app_interfaces().await?;
-            println!("{}", serde_json::to_value(&interface_infos)?);
+            println!("{}", serde_json::to_string(&interface_infos)?);
         }
         AdminRequestCli::RegisterDna(args) => {
             let dna = register_dna(client, args).await?;
@@ -451,11 +451,11 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .into_iter()
                 .map(|d| d.into())
                 .collect();
-            println!("{}", serde_json::to_value(&dnas)?);
+            println!("{}", serde_json::to_string(&dnas)?);
         }
         AdminRequestCli::NewAgent => {
             let agent = client.generate_agent_pub_key().await?;
-            println!("{}", serde_json::to_value(agent.to_string())?);
+            println!("{}", serde_json::to_string(&agent.to_string())?);
         }
         AdminRequestCli::ListCells => {
             let cell_id_jsons: Vec<serde_json::Value> = client
@@ -464,7 +464,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .iter()
                 .map(|id| cell_id_json_to_base64_json(serde_json::to_value(id)?))
                 .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
-            println!("{}", serde_json::to_value(&cell_id_jsons)?);
+            println!("{}", serde_json::to_string(&cell_id_jsons)?);
         }
         AdminRequestCli::ListApps(args) => {
             let apps = client.list_apps(args.status).await?;
@@ -472,7 +472,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .into_iter()
                 .map(app_info_to_base64_json)
                 .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
-            println!("{}", serde_json::to_value(values)?);
+            println!("{}", serde_json::to_string(&values)?);
         }
         AdminRequestCli::EnableApp(args) => {
             client.enable_app(args.app_id.clone()).await?;
@@ -497,8 +497,8 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             // Print without other text so it can be piped
             println!(
                 "{}",
-                serde_json::to_value(
-                    metrics
+                serde_json::to_string(
+                    &metrics
                         .into_iter()
                         .map(|(k, v)| (k.to_string(), v))
                         .collect::<HashMap<_, _>>()
@@ -508,7 +508,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         AdminRequestCli::DumpNetworkStats => {
             let stats = client.dump_network_stats().await?;
             // Print without other text so it can be piped
-            println!("{}", serde_json::to_value(&stats)?);
+            println!("{}", serde_json::to_string(&stats)?);
         }
         AdminRequestCli::RevokeZomeCallCapability(args) => {
             let action_hash = ActionHash::try_from(&args.action_hash)
@@ -532,7 +532,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .list_capability_grants(args.installed_app_id, args.include_revoked)
                 .await?;
             // Print without other text so it can be piped
-            println!("{}", serde_json::to_value(info)?);
+            println!("{}", serde_json::to_string(&info)?);
         }
         AdminRequestCli::AddAgents(args) => {
             let agent_infos_results =
@@ -587,7 +587,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                     url: info.url.clone(),
                 });
             }
-            println!("{}", serde_json::to_value(&out)?);
+            println!("{}", serde_json::to_string(&out)?);
         }
         AdminRequestCli::AgentMetaInfo(args) => {
             let info = client.agent_meta_info(args.url, args.dna).await?;
@@ -595,7 +595,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .into_iter()
                 .map(|(k, v)| (k.to_string(), v))
                 .collect::<BTreeMap<String, BTreeMap<String, AgentMetaInfo>>>();
-            println!("{}", serde_json::to_value(&string_key_info)?);
+            println!("{}", serde_json::to_string(&string_key_info)?);
         }
     }
     Ok(())
