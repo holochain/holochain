@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Replace `Conductor::remove_dangling_cells` method with methods that remove the cells specific to the app and delete their databases.
+- **BREAKING CHANGE**: Remove unused field `ConductorBuilder::state`.
 
 ## 0.6.0-dev.14
 
