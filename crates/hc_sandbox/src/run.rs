@@ -1,6 +1,7 @@
 //! Helpers for running the conductor.
 
 use crate::cli::LaunchInfo;
+use crate::save::HcFile;
 use anyhow::anyhow;
 use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigFilePath;
@@ -33,7 +34,7 @@ const HC_START_2: &str = "HOLOCHAIN_SANDBOX_END";
 /// on the `holochain_path`.
 /// Uses the sandbox provided by the `sandbox_path`.
 /// Adds an app interface specified in the `app_ports`.
-/// Can optionally force the admin port used. Otherwise
+/// Can optionally force the admin port used. Otherwise,
 /// the port in the config will be used if it's free or
 /// a random free port will be chosen.
 pub async fn run(
@@ -60,7 +61,8 @@ pub async fn run(
         launch_info.app_ports.push(port);
     }
 
-    crate::save::lock_live(std::env::current_dir()?, &sandbox_path, admin_port).await?;
+    let hc_file = HcFile::load(std::env::current_dir()?)?;
+    hc_file.lock_live(&sandbox_path, admin_port).await?;
     msg!("Connected successfully to a running holochain");
 
     msg!(

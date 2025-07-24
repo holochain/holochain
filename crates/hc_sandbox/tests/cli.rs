@@ -19,8 +19,8 @@ use kitsune2_test_utils::agent::AgentBuilder;
 use std::collections::HashSet;
 use std::future::Future;
 use std::net::ToSocketAddrs;
-use std::path::PathBuf;
-use std::process::{Output, Stdio};
+use std::path::{Path, PathBuf};
+use std::process::{ExitStatus, Output, Stdio};
 use std::str::from_utf8;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
@@ -168,27 +168,310 @@ async fn package_fixture_if_not_packaged() {
     println!("@@ Package Fixture Complete");
 }
 
-async fn clean_sandboxes() {
-    println!("@@ Clean");
+async fn clean_sandboxes(cur_dir: &Path) {
+    let mut cmd = get_sandbox_command();
+    cmd.arg("clean").current_dir(cur_dir);
+    println!("@@ Clean: {cmd:?}");
+    let status = cmd.status().await.unwrap();
+    assert_eq!(status, ExitStatus::default());
+    println!("@@ Clean Complete");
+}
+
+async fn list_sandboxes(cur_dir: &Path) -> Output {
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("list")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .current_dir(cur_dir)
+        .kill_on_drop(true);
+
+    println!("@@ List: {cmd:?}");
+    let hc_admin = input_piped_password(&mut cmd).await;
+    let output = hc_admin.wait_with_output().await.unwrap();
+    assert!(output.status.success());
+    println!("@@ List Complete");
+    output
+}
+
+/// Test "clean" of an empty folder.
+#[tokio::test(flavor = "multi_thread")]
+async fn clean_empty() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
 
     let mut cmd = get_sandbox_command();
+    cmd.arg("clean").current_dir(temp_dir.path());
+    let output = cmd.output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 1);
+}
 
-    cmd.arg("clean");
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
+/// Test "clean" on a .hc file that we don't have permissions.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn clean_no_permission() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, "/tmp/bogus").unwrap();
+    std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o000)).unwrap();
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("clean").current_dir(temp_dir.path());
+    let output = cmd.output().await.unwrap();
+    assert!(!output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 0);
+}
+
+/// Test "clean" with a ".hc" file containing one path that doesn't exist.
+#[tokio::test(flavor = "multi_thread")]
+async fn clean_one_missing() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, "/tmp/bogus").unwrap();
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("clean").current_dir(temp_dir.path());
+    let output = cmd.output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 2);
+}
+
+/// Test "clean" with a ".hc" file containing one path that exists.
+#[tokio::test(flavor = "multi_thread")]
+async fn clean_one_real() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    // create subfolder
+    let one_path = &temp_dir.path().join("one");
+    std::fs::create_dir_all(one_path).unwrap();
+    // write to .hc
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, one_path.to_str().unwrap()).unwrap();
+    // clean
+    let mut cmd = get_sandbox_command();
+    cmd.arg("clean").current_dir(temp_dir.path());
+    let output = cmd.output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 1);
+    assert!(!one_path.exists());
+}
+
+/// Test "remove" in empty folder
+#[tokio::test(flavor = "multi_thread")]
+async fn remove_empty() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("remove").arg("0").current_dir(temp_dir.path());
+    let output = cmd.output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 2);
+}
+
+/// Test "remove" with a ".hc" file containing one path that doesn't exist.
+#[tokio::test(flavor = "multi_thread")]
+async fn remove_one() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, "/tmp/bogus").unwrap();
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("remove").arg("0").current_dir(temp_dir.path());
+    let output = cmd.output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 2);
+}
+
+/// Test "remove" with a ".hc" file containing a path to an existing folder
+/// and a path to a folder that doesn't exist.
+#[tokio::test(flavor = "multi_thread")]
+async fn remove_two() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, "/tmp/bogus").unwrap();
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
+    package_fixture_if_not_packaged().await;
+    holochain_trace::test_run();
+    // Call generate
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
     println!("@@ {cmd:?}");
+    let hc_admin = input_piped_password(&mut cmd).await;
+    let output = hc_admin.wait_with_output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+    // Read the .hc file and get the created sandbox path
+    let file = tokio::fs::File::open(file_path).await.unwrap();
+    let reader = BufReader::new(file);
+    let mut lines = reader.lines();
+    lines.next_line().await.unwrap();
+    let second_path = PathBuf::from(lines.next_line().await.unwrap().unwrap());
+    assert!(second_path.exists() && second_path.is_dir());
+    // Call remove
+    let mut cmd = get_sandbox_command();
+    cmd.arg("remove").arg("1").current_dir(temp_dir.path());
+    println!("@@ Remove: {cmd:?}");
+    let output = cmd.output().await.unwrap();
+    println!("@@ Remove Complete");
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 1);
+    // Make sure sandbox has been deleted
+    assert!(!second_path.exists());
+}
 
-    cmd.status().await.unwrap();
+/// "list" test
+/// Runs: list, generate, list, clean, list
+#[tokio::test(flavor = "multi_thread")]
+async fn list_and_clean() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
 
-    println!("@@ Clean Complete");
+    clean_sandboxes(temp_dir.path()).await;
+    package_fixture_if_not_packaged().await;
+    holochain_trace::test_run();
+
+    let output = list_sandboxes(temp_dir.path()).await;
+    println!("@@ {output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count1 = stdout.lines().count();
+
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
+
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+    println!("@@ {cmd:?}");
+    let hc_admin = input_piped_password(&mut cmd).await;
+    let output = hc_admin.wait_with_output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+
+    let output = list_sandboxes(temp_dir.path()).await;
+    println!("@@ {output:?}");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count2 = stdout.lines().count();
+    assert!(line_count1 < line_count2);
+
+    clean_sandboxes(temp_dir.path()).await;
+    let output = list_sandboxes(temp_dir.path()).await;
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count3 = stdout.lines().count();
+    assert_eq!(line_count3, line_count1);
+}
+
+/// Test "run" with a missing index
+#[tokio::test(flavor = "multi_thread")]
+async fn run_missing() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, "/tmp/bogus").unwrap();
+
+    package_fixture_if_not_packaged().await;
+    holochain_trace::test_run();
+
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("generate")
+        .arg("--in-process-lair")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .kill_on_drop(true);
+    println!("@@ {cmd:?}");
+    let hc_admin = input_piped_password(&mut cmd).await;
+    let output = hc_admin.wait_with_output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+
+    let mut cmd = get_sandbox_command();
+    cmd.arg("run")
+        .arg("0")
+        .current_dir(temp_dir.path())
+        .kill_on_drop(true);
+    println!("@@ Run: {cmd:?}");
+    let output = cmd.output().await.unwrap();
+    println!("@@ Run Complete");
+    assert!(!output.status.success());
 }
 
 /// Generates a new sandbox with a single app deployed and tries to get app info
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_connect() {
-    clean_sandboxes().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -199,7 +482,8 @@ async fn generate_sandbox_and_connect() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -225,10 +509,14 @@ async fn generate_sandbox_and_connect() {
 /// Generates a new sandbox with a single app deployed and tries to list DNA
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_list_dna() {
-    clean_sandboxes().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -239,7 +527,8 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -254,6 +543,7 @@ async fn generate_sandbox_and_call_list_dna() {
         .arg("call")
         .arg(format!("--running={}", launch_info.admin_port))
         .arg("list-dnas")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -269,10 +559,14 @@ async fn generate_sandbox_and_call_list_dna() {
 /// set to true and tries to list DNA
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
-    clean_sandboxes().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app-deferred/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -283,7 +577,8 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app-deferred/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -298,6 +593,7 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
         .arg("call")
         .arg(format!("--running={}", launch_info.admin_port))
         .arg("list-dnas")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -314,10 +610,14 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
 /// upon calling `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_non_running_sandbox_and_call_list_dna() {
-    clean_sandboxes().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -327,7 +627,8 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -345,6 +646,7 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
         ))
         .arg("call")
         .arg("list-dnas")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -360,10 +662,14 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
 /// ListDna with the correct origin
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_list_dna_with_origin() {
-    clean_sandboxes().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -373,7 +679,8 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
         .arg("--piped")
         .arg("generate")
         .arg("--in-process-lair")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -419,6 +726,7 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
         ))
         .arg("call")
         .arg("list-dnas")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -439,6 +747,7 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
         .arg("--origin")
         .arg("test-origin")
         .arg("list-dnas")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -451,8 +760,9 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
 /// Creates a new sandbox and tries to list apps via `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_and_call_list_apps() {
-    clean_sandboxes().await;
-    package_fixture_if_not_packaged().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    //package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
@@ -464,6 +774,7 @@ async fn create_sandbox_and_call_list_apps() {
         .arg("--piped")
         .arg("create")
         .arg("--in-process-lair")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -480,6 +791,7 @@ async fn create_sandbox_and_call_list_apps() {
         ))
         .arg("call")
         .arg("list-apps")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -495,7 +807,7 @@ async fn create_sandbox_and_call_list_apps() {
 /// correctly
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_with_roles_settings_override() {
-    clean_sandboxes().await;
+    clean_sandboxes(&std::env::current_dir().unwrap()).await;
     package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
@@ -600,8 +912,12 @@ async fn generate_sandbox_with_roles_settings_override() {
 /// upon calling `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_add_and_list_agent() {
-    clean_sandboxes().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
 
     // Helper fn to parse process output for agent pub keys.
     fn get_agent_keys_from_process_output(output: Output) -> Vec<String> {
@@ -624,9 +940,10 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
         .arg("--network-seed")
         .arg(format!("{}", UNIX_EPOCH.elapsed().unwrap().as_millis()))
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -653,6 +970,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg("--piped")
         .arg("call")
         .arg("list-agents")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -676,6 +994,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg(dna_hashes[0].to_string())
         .arg("--dna")
         .arg(dna_hashes[1].to_string())
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -701,6 +1020,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg("list-agents")
         .arg("--dna")
         .arg(dna_hashes[0].to_string())
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -735,6 +1055,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .arg("call")
         .arg("add-agents")
         .arg(agent_infos_to_add)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -753,12 +1074,15 @@ async fn generate_sandbox_and_add_and_list_agent() {
 /// Tests retrieval of agent meta info via `hc sandbox call agent-meta-info`
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_agent_meta_info() {
-    clean_sandboxes().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
-    let mut cmd = get_sandbox_command();
 
+    let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
             "--holochain-path={}",
@@ -768,7 +1092,8 @@ async fn generate_sandbox_and_call_agent_meta_info() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -838,6 +1163,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
         .arg("agent-meta-info")
         .arg("--url")
         .arg("wss://someurl:443")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -881,6 +1207,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
         .arg("wss://someurl:443")
         .arg("--dna")
         .arg(dna_hashes_b64[0].clone())
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -913,9 +1240,14 @@ async fn generate_sandbox_and_call_agent_meta_info() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn authorize_zome_call_credentials() {
-    clean_sandboxes().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -926,7 +1258,8 @@ async fn authorize_zome_call_credentials() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -950,6 +1283,7 @@ async fn authorize_zome_call_credentials() {
         .arg(launch_info.admin_port.to_string())
         .arg("--piped")
         .arg("test-app")
+        .current_dir(temp_dir.path())
         .kill_on_drop(true)
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
@@ -968,17 +1302,21 @@ async fn authorize_zome_call_credentials() {
     let exit_code = child.wait().await.unwrap();
     assert!(exit_code.success());
 
-    assert!(PathBuf::from(".hc_auth").exists());
+    assert!(temp_dir.path().join(".hc_auth").exists());
 
     shutdown_sandbox(hc_admin).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_zome_function() {
-    clean_sandboxes().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -989,7 +1327,8 @@ async fn call_zome_function() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -1026,6 +1365,7 @@ async fn call_zome_function() {
         .arg(launch_info.admin_port.to_string())
         .arg("--piped")
         .arg("test-app")
+        .current_dir(temp_dir.path())
         .kill_on_drop(true)
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
@@ -1056,6 +1396,7 @@ async fn call_zome_function() {
         .arg("zome1")
         .arg("foo")
         .arg("null")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -1088,10 +1429,14 @@ async fn call_zome_function() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn zome_function_can_return_hash() {
-    clean_sandboxes().await;
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
-
+    let app_path = std::env::current_dir()
+        .unwrap()
+        .join("tests/fixtures/my-app/");
     holochain_trace::test_run();
+
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -1102,7 +1447,8 @@ async fn zome_function_can_return_hash() {
         .arg("generate")
         .arg("--in-process-lair")
         .arg("--run=0")
-        .arg("tests/fixtures/my-app/")
+        .arg(app_path)
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -1139,6 +1485,7 @@ async fn zome_function_can_return_hash() {
         .arg(launch_info.admin_port.to_string())
         .arg("--piped")
         .arg("test-app")
+        .current_dir(temp_dir.path())
         .kill_on_drop(true)
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
@@ -1169,6 +1516,7 @@ async fn zome_function_can_return_hash() {
         .arg("zome1")
         .arg("get_dna_hash")
         .arg("null")
+        .current_dir(temp_dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())

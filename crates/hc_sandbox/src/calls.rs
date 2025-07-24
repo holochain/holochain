@@ -14,7 +14,6 @@ use anyhow::bail;
 use holo_hash::ActionHash;
 use holo_hash::DnaHashB64;
 use holochain_client::AdminWebsocket;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::AgentMetaInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
@@ -34,8 +33,8 @@ use kitsune2_core::Ed25519Verifier;
 use std::convert::TryFrom;
 
 use crate::cmds::Existing;
-use crate::ports::get_admin_ports;
 use crate::run::run_async;
+use crate::save::HcFile;
 use clap::{Args, Parser, Subcommand};
 use holochain_trace::Output;
 use holochain_types::websocket::AllowedOrigins;
@@ -325,6 +324,7 @@ pub struct AgentMetaInfoArgs {
 
 #[doc(hidden)]
 pub async fn call(
+    hc_file: &HcFile,
     holochain_path: &Path,
     req: Call,
     force_admin_ports: Vec<u16>,
@@ -346,11 +346,11 @@ pub async fn call(
 
     let admin_clients = if running.is_empty() {
         let paths = if existing.is_empty() {
-            crate::save::load(std::env::current_dir()?)?
+            hc_file.valid_paths()
         } else {
-            existing.load()?
+            existing.load(hc_file)?
         };
-        let ports = get_admin_ports(paths.clone()).await?;
+        let ports = hc_file.get_admin_ports(paths.clone()).await?;
         let mut clients = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
             match AdminWebsocket::connect(format!("localhost:{port}"), origin.clone()).await {
@@ -360,13 +360,8 @@ pub async fn call(
                     // Note that the holochain and lair processes need to be returned here
                     // in order to not get dropped but keep running until the admin call
                     // is being made
-                    let (port, holochain, lair) = run_async(
-                        holochain_path,
-                        ConfigRootPath::from(path),
-                        None,
-                        structured.clone(),
-                    )
-                    .await?;
+                    let (port, holochain, lair) =
+                        run_async(holochain_path, path, None, structured.clone()).await?;
                     clients.push((
                         AdminWebsocket::connect(format!("localhost:{port}"), origin.clone())
                             .await?,

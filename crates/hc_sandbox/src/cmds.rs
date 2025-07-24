@@ -1,7 +1,9 @@
 use holochain_conductor_api::conductor::NetworkConfig;
 use std::path::PathBuf;
 
+use crate::save::HcFile;
 use clap::Parser;
+use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use url2::Url2;
 
 // This creates a new Holochain sandbox
@@ -93,20 +95,9 @@ pub enum NetworkType {
 
 #[derive(Debug, Parser, Clone)]
 pub struct Existing {
-    /// Paths to existing sandbox directories.
-    /// For example `hc sandbox run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
-    #[arg(short, long, value_delimiter = ',')]
-    pub existing_paths: Vec<PathBuf>,
-
     /// Run all the existing conductor sandboxes specified in `$(pwd)/.hc`.
     #[arg(short, long, conflicts_with_all = &["last", "indices"])]
     pub all: bool,
-
-    /// Run the last created conductor sandbox --
-    /// that is, the last line in `$(pwd)/.hc`.
-    #[arg(short, long, conflicts_with_all = &["all", "indices"])]
-    pub last: bool,
-
     /// Run a selection of existing conductor sandboxes
     /// from those specified in `$(pwd)/.hc`.
     /// Existing sandboxes and their indices are visible via `hc list`.
@@ -117,56 +108,92 @@ pub struct Existing {
 }
 
 impl Existing {
-    pub fn load(mut self) -> anyhow::Result<Vec<PathBuf>> {
-        let sandboxes = crate::save::load(std::env::current_dir()?)?;
+    pub fn none() -> Self {
+        Existing {
+            all: false,
+            indices: vec![],
+        }
+    }
+    pub fn all() -> Self {
+        Existing {
+            all: true,
+            indices: vec![],
+        }
+    }
+    pub fn one(index: usize) -> Self {
+        Existing {
+            all: false,
+            indices: vec![index],
+        }
+    }
+    pub fn many(indices: Vec<usize>) -> Self {
+        Existing {
+            all: false,
+            indices,
+        }
+    }
+
+    /// Determine all sandbox paths to use from an `.hc` file based on this struct's state.
+    pub fn load(&self, hc_file: &HcFile) -> std::io::Result<Vec<ConfigRootPath>> {
         if self.all {
-            // Get all the sandboxes
-            self.existing_paths.extend(sandboxes)
-        } else if self.last && sandboxes.last().is_some() {
-            // Get just the last sandbox
-            self.existing_paths
-                .push(sandboxes.last().cloned().expect("Safe due to check above"));
-        } else if !self.indices.is_empty() {
+            // Warn for all invalid paths
+            hc_file
+                .invalid_paths()
+                .iter()
+                .enumerate()
+                .for_each(|(i, inv)| {
+                    msg!("Warning. Sandbox not found at {}: {}", i, inv.display())
+                });
+            // Return all valid sandboxes in .hc
+            return Ok(hc_file.valid_paths());
+        }
+        if !self.indices.is_empty() {
+            let mut selection = Vec::new();
             // Get the indices
-            let e = self
-                .indices
-                .into_iter()
-                .filter_map(|i| sandboxes.get(i).cloned());
-            self.existing_paths.extend(e);
-        } else if !self.existing_paths.is_empty() {
-            // If there is existing paths then use those
-        } else if sandboxes.len() == 1 {
-            // If there is only one sandbox then use that
-            self.existing_paths
-                .push(sandboxes.last().cloned().expect("Safe due to check above"));
-        } else if sandboxes.len() > 1 {
-            // There is multiple sandboxes, the use must disambiguate
-            msg!(
-                "
-There are multiple sandboxes and hc doesn't know which to run.
-You can run:
-    - `--all` `-a` run all sandboxes.
-    - `--last` `-l` run the last created sandbox.
-    - `--existing-paths` `-e` run a list of existing paths to sandboxes.
-    - `1` run a sandbox by index from the list below.
-    - `0 2` run multiple sandboxes by indices from the list below.
-Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more information."
-            );
-            crate::save::list(std::env::current_dir()?, false)?;
-        } else {
-            // There are no sandboxes
-            msg!(
-                "
+            for i in self.indices.clone() {
+                let Some(Ok(selected)) = hc_file.existing_all.get(i) else {
+                    return Err(std::io::Error::other(format!(
+                        "Aborting. Failed to find sandbox at index {}",
+                        i
+                    )));
+                };
+                selection.push(selected.clone());
+            }
+            return Ok(selection);
+        }
+        // No options provided, pick one known sandbox
+        match hc_file.valid_paths().len() {
+            1 => Ok(vec![hc_file.valid_paths()[0].clone()]), // If there is only one saved sandbox then use that.
+            0 => {
+                // There are no sandboxes
+                msg!(
+                    "
 Before running or calling you need to generate a sandbox.
 You can use `hc sandbox generate` to do this.
 Run `hc sandbox generate --help` for more options."
-            );
+                );
+                Ok(vec![])
+            }
+            _ => {
+                // There are multiple saved sandboxes, the user must disambiguate
+                msg!(
+                    "
+There are multiple sandboxes and hc doesn't know which of them to run.
+You can run:
+    - `--all` `-a` run all sandboxes.
+    - `1` run a sandbox by index from the list below.
+    - `0 2` run multiple sandboxes by indices from the list below.
+Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more information."
+                );
+                hc_file.list(false)?;
+                Ok(vec![])
+            }
         }
-        Ok(self.existing_paths)
     }
 
+    /// Returns true if no "existing" option has been set
     pub fn is_empty(&self) -> bool {
-        self.existing_paths.is_empty() && self.indices.is_empty() && !self.all && !self.last
+        self.indices.is_empty() && !self.all
     }
 }
 
@@ -247,4 +274,66 @@ impl Default for Create {
 // e.g., https://users.rust-lang.org/t/implementation-of-fnonce-is-not-general-enough/68294
 fn try_parse_url2(arg: &str) -> url2::Url2Result<Url2> {
     Url2::try_parse(arg)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn existing_is_empty() {
+        assert!(Existing::none().is_empty());
+        assert!(!Existing::all().is_empty());
+        assert!(!Existing::one(1).is_empty());
+        assert!(!Existing::many(vec![1, 2, 3]).is_empty());
+    }
+
+    #[test]
+    fn existing_load_normal() {
+        let hc_file = crate::save::tests::create_test_folder(vec![
+            Ok(".ok1"),
+            Err(".err1"),
+            Ok(".ok2"),
+            Ok(".ok3"),
+            Err(".err2"),
+        ]);
+
+        let res = Existing::none().load(&hc_file).unwrap();
+        assert_eq!(0, res.len());
+
+        let res = Existing::all().load(&hc_file).unwrap();
+        assert_eq!(3, res.len());
+
+        let res = Existing::one(0).load(&hc_file).unwrap();
+        assert_eq!(1, res.len());
+
+        let res = Existing::one(1).load(&hc_file);
+        assert!(res.is_err());
+
+        let res = Existing::many(vec![1, 2, 3]).load(&hc_file);
+        assert!(res.is_err());
+
+        let res = Existing::many(vec![0, 3]).load(&hc_file).unwrap();
+        assert_eq!(2, res.len());
+
+        let res = Existing::many(vec![0, 42]).load(&hc_file);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn existing_load_empty() {
+        let hc_file = crate::save::tests::create_test_folder(Vec::new());
+
+        let res = Existing::none().load(&hc_file).unwrap();
+        assert_eq!(0, res.len());
+
+        let res = Existing::all().load(&hc_file).unwrap();
+        assert_eq!(0, res.len());
+
+        let res = Existing::one(0).load(&hc_file);
+        assert!(res.is_err());
+
+        let res = Existing::many(vec![1, 2, 3]).load(&hc_file);
+        assert!(res.is_err());
+    }
 }

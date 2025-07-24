@@ -1,9 +1,6 @@
 //! Helpers for working with websockets and ports.
 
-use std::path::PathBuf;
-
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::{AdminInterfaceConfig, InterfaceDriver};
 use holochain_conductor_config::config::{read_config, write_config};
 use holochain_conductor_config::ports::set_admin_port;
 
@@ -14,27 +11,4 @@ pub fn force_admin_port(config_root_path: ConfigRootPath, port: u16) -> anyhow::
     set_admin_port(&mut config, port);
     write_config(config_root_path, &config)?;
     Ok(())
-}
-
-/// List the admin ports for each sandbox.
-pub async fn get_admin_ports(paths: Vec<PathBuf>) -> anyhow::Result<Vec<u16>> {
-    let live_ports = crate::save::find_ports(std::env::current_dir()?, &paths[..])?;
-    let mut ports = Vec::new();
-    for (p, port) in paths.into_iter().zip(live_ports) {
-        if let Some(port) = port {
-            ports.push(port);
-            continue;
-        }
-        if let Some(config) = read_config(ConfigRootPath::from(p))? {
-            if let Some(ai) = config.admin_interfaces {
-                if let Some(AdminInterfaceConfig {
-                    driver: InterfaceDriver::Websocket { port, .. },
-                }) = ai.first()
-                {
-                    ports.push(*port)
-                }
-            }
-        }
-    }
-    Ok(ports)
 }

@@ -1,6 +1,7 @@
 //! Definitions of Parser options for use in the CLI
 
 use crate::cmds::*;
+use crate::save::HcFile;
 use clap::{ArgAction, Parser};
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_trace::Output;
@@ -111,8 +112,19 @@ pub enum HcSandboxSubcommand {
         verbose: bool,
     },
 
-    /// Clean (completely remove) sandboxes that are listed in the `$(pwd)/.hc` file.
+    /// Delete all sandboxes that are listed in the `$(pwd)/.hc` file and the file itself.
     Clean,
+
+    /// Delete specified sandboxes that are listed in the `$(pwd)/.hc` file.
+    Remove {
+        /// Remove a selection of existing conductor sandboxes
+        /// from those specified in `$(pwd)/.hc`.
+        /// Existing sandboxes and their indices are visible via `hc list`.
+        /// Use the zero-based index to choose which sandboxes to use.
+        /// For example `hc sandbox remove 1 3 5` or `hc remove run 1`
+        #[arg(required = true, num_args = 1..)]
+        indices: Vec<usize>,
+    },
 
     /// Create a fresh sandbox with no apps installed.
     Create(Create),
@@ -138,6 +150,8 @@ impl HcSandbox {
     /// Run this command
     pub async fn run(self) -> anyhow::Result<()> {
         holochain_util::pw::pw_set_piped(self.piped);
+        // Make sure we can use .hc
+        let mut hc_file = HcFile::load(std::env::current_dir()?)?;
         match self.subcommand {
             HcSandboxSubcommand::Generate {
                 app_id,
@@ -148,6 +162,7 @@ impl HcSandbox {
                 roles_settings,
             } => {
                 let paths = generate(
+                    &mut hc_file,
                     &self.holochain_path,
                     happ,
                     create,
@@ -177,14 +192,14 @@ impl HcSandbox {
                         }
                         result = run_n(&holochain_path, paths, ports, force_admin_ports, structured) => result,
                     };
-                    crate::save::release_ports(std::env::current_dir()?).await?;
+                    hc_file.release_ports().await?;
                     return result;
                 }
             }
             HcSandboxSubcommand::Run(Run { ports, existing }) => {
-                let paths = existing.load()?;
-                if paths.is_empty() {
-                    tracing::warn!("no paths available, exiting.");
+                let requested_paths = existing.load(&hc_file)?;
+                if requested_paths.is_empty() {
+                    tracing::warn!("no sandbox available, exiting.");
                     return Ok(());
                 }
                 let holochain_path = self.holochain_path.clone();
@@ -195,13 +210,14 @@ impl HcSandbox {
                         msg!("Received Ctrl-C, shutting down");
                         result.map_err(anyhow::Error::from)
                     }
-                    result = run_n(&holochain_path, paths.into_iter().map(ConfigRootPath::from).collect(), ports, force_admin_ports, self.structured) => result,
+                    result = run_n(&holochain_path, requested_paths, ports, force_admin_ports, self.structured) => result,
                 };
-                crate::save::release_ports(std::env::current_dir()?).await?;
+                hc_file.release_ports().await?;
                 return result;
             }
             HcSandboxSubcommand::Call(call) => {
                 crate::calls::call(
+                    &hc_file,
                     &self.holochain_path,
                     call,
                     self.force_admin_ports,
@@ -210,16 +226,34 @@ impl HcSandbox {
                 .await?
             }
             HcSandboxSubcommand::ZomeCallAuth(auth) => {
-                crate::zome_call::zome_call_auth(auth, self.force_admin_ports.first().cloned())
-                    .await?
+                crate::zome_call::zome_call_auth(
+                    &hc_file,
+                    auth,
+                    self.force_admin_ports.first().cloned(),
+                )
+                .await?
             }
             HcSandboxSubcommand::ZomeCall(call) => {
-                crate::zome_call::zome_call(call, self.force_admin_ports.first().cloned()).await?
+                crate::zome_call::zome_call(call, &hc_file, self.force_admin_ports.first().cloned())
+                    .await?
             }
-            HcSandboxSubcommand::List { verbose } => {
-                crate::save::list(std::env::current_dir()?, verbose)?
+            HcSandboxSubcommand::List { verbose } => hc_file.list(verbose)?,
+            HcSandboxSubcommand::Clean => {
+                let removed_count = hc_file.remove(Existing::all())?;
+                match removed_count {
+                    0 => msg!("No sandbox path has been removed"),
+                    1 => msg!("1 sandbox path has been removed"),
+                    _ => msg!("{} sandbox paths have been removed", removed_count),
+                }
             }
-            HcSandboxSubcommand::Clean => crate::save::clean(std::env::current_dir()?, Vec::new())?,
+            HcSandboxSubcommand::Remove { indices } => {
+                let removed_count = hc_file.remove(Existing::many(indices))?;
+                match removed_count {
+                    0 => msg!("No sandbox path has been removed"),
+                    1 => msg!("1 sandbox path has been removed"),
+                    _ => msg!("{} sandbox paths have been removed", removed_count),
+                }
+            }
             HcSandboxSubcommand::Create(Create {
                 num_sandboxes,
                 network,
@@ -247,7 +281,7 @@ impl HcSandbox {
                     )?;
                     paths.push(path);
                 }
-                crate::save::save(std::env::current_dir()?, paths.clone())?;
+                hc_file.append(paths.clone())?;
                 msg!("Created {:?}", paths);
             }
         }
@@ -323,7 +357,9 @@ pub async fn run_n(
 }
 
 /// Perform the `generate` subcommand
+#[allow(clippy::too_many_arguments)]
 pub async fn generate(
+    hc_file: &mut HcFile,
     holochain_path: &Path,
     happ: Option<PathBuf>,
     create: Create,
@@ -343,6 +379,6 @@ pub async fn generate(
         structured,
     )
     .await?;
-    crate::save::save(std::env::current_dir()?, paths.clone())?;
+    hc_file.append(paths.clone())?;
     Ok(paths)
 }
