@@ -1261,7 +1261,7 @@ mod app_impls {
                     let disabled_app = self.add_disabled_app_to_db(app).await?;
 
                     // Return the result, which be may be an error if no_rollback was specified
-                    genesis_result.map(|()| disabled_app)
+                    genesis_result.map(|_| disabled_app)
                 } else if let Err(err) = genesis_result {
                     Err(err)
                 } else {
@@ -1350,12 +1350,20 @@ mod app_impls {
             // Only uninstall the app if there are no protected dependents,
             // or if force is used
             if force || deps.is_empty() {
-                let app = self.remove_app_from_db(installed_app_id).await?;
+                let app = state.get_app(installed_app_id)?;
+                let cells_to_remove = app.all_cells().collect::<Vec<_>>();
+                // Delete the cells' databases.
+                self.delete_cell_databases(app.id(), cells_to_remove.clone())
+                    .await?;
+
+                // Delete app from DB and state.
+                self.remove_app_from_db(installed_app_id).await?;
                 tracing::debug!(msg = "Removed app from db.", app = ?app);
 
-                // Remove the cells of the app.
-                self.remove_dangling_cells().await?;
+                // Remove the cells from conductor state.
+                self.remove_cells(&cells_to_remove).await;
 
+                // Remove the app's signal broadcast from conductor.
                 let installed_app_ids = self
                     .get_state()
                     .await?
@@ -1767,18 +1775,27 @@ mod clone_cell_impls {
                 clone_cell_id,
             }: &DeleteCloneCellPayload,
         ) -> ConductorResult<()> {
-            self.update_state_prime({
-                let app_id = app_id.clone();
-                let clone_cell_id = clone_cell_id.clone();
-                move |mut state| {
-                    let app = state.get_app_mut(&app_id)?;
-                    let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
-                    app.delete_clone_cell(&clone_id)?;
-                    Ok((state, ()))
-                }
-            })
-            .await?;
-            self.remove_dangling_cells().await?;
+            let (_, cell_id) = self
+                .update_state_prime({
+                    let app_id = app_id.clone();
+                    let clone_cell_id = clone_cell_id.clone();
+                    move |mut state| {
+                        let app = state.get_app_mut(&app_id)?;
+                        let cell_id = app
+                            .disabled_clone_cells()
+                            .find(|(id, cell_id)| match &clone_cell_id {
+                                CloneCellId::CloneId(clone_id) => *id == clone_id,
+                                CloneCellId::DnaHash(dna_hash) => cell_id.dna_hash() == dna_hash,
+                            })
+                            .expect("disabled clone cell not part of this app")
+                            .1;
+                        let clone_id = app.get_disabled_clone_id(&clone_cell_id)?;
+                        app.delete_clone_cell(&clone_id)?;
+                        Ok((state, cell_id))
+                    }
+                })
+                .await?;
+            self.delete_cell_databases(app_id, vec![cell_id]).await?;
             Ok(())
         }
     }
@@ -1930,25 +1947,8 @@ mod app_status_impls {
             }
 
             // Remove cells from state.
-            let mut cell_ids_to_cleanup = app.all_cells();
-            // self.remove_cells(cell_ids_to_cleanup).await;
-            let mut cells_to_cleanup = Vec::new();
-            self.running_cells.share_mut(|cells| {
-                cells.retain(|cell_id, cell| {
-                    if cell_ids_to_cleanup.contains(cell_id) {
-                        false
-                    } else {
-                        cells_to_cleanup.push(cell.clone());
-                        true
-                    }
-                })
-            });
-
-            // Stop all long-running tasks for cells about to be dropped.
-            tracing::debug!(?cells_to_cleanup, "Cleaning up cells");
-            for cell in cells_to_cleanup {
-                cell.cleanup().await?;
-            }
+            let cell_ids_to_cleanup = app.all_cells().collect::<Vec<_>>();
+            self.remove_cells(&cell_ids_to_cleanup).await;
 
             // Set app status to disabled.
             let (_, app) = self
@@ -2857,116 +2857,90 @@ impl Conductor {
         }
     }
 
-    /// Remove all Cells which are not referenced by any Enabled app.
+    async fn delete_or_purge_database<Kind: DbKindT + Send + Sync + 'static>(
+        &self,
+        db: DbWrite<Kind>,
+    ) -> ConductorResult<()> {
+        let mut path = db.path().clone();
+        if let Err(err) = ffs::remove_file(&path).await {
+            tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
+            db.write_async(|txn| purge_data(txn)).await?;
+        } else {
+            tracing::info!("Deleted primary DB file {}", path.display());
+        }
+        path.set_extension("");
+        let stem = path.to_string_lossy();
+        for ext in ["shm", "wal"] {
+            let path = PathBuf::from(format!("{stem}-{ext}"));
+            if let Err(err) = ffs::remove_file(&path).await {
+                let err = err.remove_backtrace();
+                tracing::warn!(?err, "Failed to remove DB support file");
+            } else {
+                tracing::info!("Deleted file {}", path.display());
+            }
+        }
+        Ok(())
+    }
+
+    /// Delete cell databases.
     ///
-    /// Additionally, if the cell is being removed because the last app referencing it was uninstalled,
-    /// all data used by that cell (across Authored, DHT, and Cache databases) will also be removed.
+    /// All data used by that cell (across Authored, DHT, and Cache databases) will also be deleted.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn remove_dangling_cells(&self) -> ConductorResult<()> {
-        let state = self.get_state().await?;
+    async fn delete_cell_databases(
+        &self,
+        app_id: &InstalledAppId,
+        cell_ids: Vec<CellId>,
+    ) -> ConductorResult<()> {
+        // Delete authored database or purge data
+        for cell_id in cell_ids.clone() {
+            let authored_db = self
+                .spaces
+                .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
+            self.delete_or_purge_database(authored_db).await?;
+        }
 
-        let keepers: HashSet<CellId> = state
-            .enabled_apps()
-            .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
-            .collect();
-
-        let all_cells: HashSet<CellId> = state
+        // Find DNAs of this app which are not used by any other app or agent.
+        let remaining_dnas = self
+            .get_state()
+            .await?
             .installed_apps()
             .iter()
-            .flat_map(|(_, app)| app.all_cells().collect::<HashSet<_>>())
-            .collect();
-
-        let all_dnas: HashSet<_> = all_cells.iter().map(|cell_id| cell_id.dna_hash()).collect();
-
-        // Clean up all cells that will be dropped (leave network, etc.)
-        let cells_to_cleanup: Vec<_> = self.running_cells.share_mut(|cells| {
-            let to_remove: Vec<_> = cells
-                .keys()
-                .filter(|id| !keepers.contains(id))
-                .cloned()
-                .collect();
-
-            // remove all but the keepers
-            to_remove
-                .iter()
-                .filter_map(|cell_id| cells.remove(cell_id))
-                .collect()
-        });
-
-        if !cells_to_cleanup.is_empty() {
-            tracing::debug!(?cells_to_cleanup, "Cleaning up cells");
-        }
-
-        // Stop all long-running tasks for cells about to be dropped
-        for cell in cells_to_cleanup.iter() {
-            cell.cleanup().await?;
-        }
-
-        // Find any cleaned up cells which are no longer used by any app,
-        // so that we can remove their data from the databases.
-        let cells_to_purge: Vec<_> = cells_to_cleanup
+            .filter(|(id, _)| *id != app_id)
+            .flat_map(|(_, app)| app.all_cells().map(|cell_id| cell_id.dna_hash().clone()))
+            .collect::<Vec<_>>();
+        let dnas_to_purge = cell_ids
             .iter()
-            .filter_map(|cell| (!all_cells.contains(cell.id())).then_some(cell.id().clone()))
-            .collect();
+            .map(|cell_id| cell_id.dna_hash())
+            .filter(|dna| !remaining_dnas.contains(dna))
+            .collect::<Vec<_>>();
 
-        // Find any DNAs from cleaned up cells which don't have representation in any cells
-        // in any installed app, so that we can remove their data from the databases.
-        let dnas_to_purge: Vec<_> = cells_to_cleanup
-            .iter()
-            .map(|cell| cell.id().dna_hash())
-            .filter(|dna| !all_dnas.contains(dna))
-            .collect();
-
-        if !cells_to_purge.is_empty() {
-            tracing::info!(?cells_to_purge, "Purging cells");
-        }
         if !dnas_to_purge.is_empty() {
             tracing::info!(?dnas_to_purge, "Purging DNAs");
         }
 
-        // Delete all data from authored databases which are longer installed
-        for cell_id in cells_to_purge {
-            let db = self
-                .spaces
-                .get_or_create_authored_db(cell_id.dna_hash(), cell_id.agent_pubkey().clone())?;
-            let mut path = db.path().clone();
-            if let Err(err) = ffs::remove_file(&path).await {
-                tracing::warn!(?err, "Could not remove primary DB file, probably because it is still in use. Purging all data instead.");
-                db.write_async(|txn| purge_data(txn)).await?;
-            }
-            path.set_extension("");
-            let stem = path.to_string_lossy();
-            for ext in ["db-shm", "db-wal"] {
-                let path = PathBuf::from(format!("{stem}.{ext}"));
-                if let Err(err) = ffs::remove_file(&path).await {
-                    let err = err.remove_backtrace();
-                    tracing::warn!(?err, "Failed to remove DB file");
-                }
-            }
-        }
-
         // For any DNAs no longer represented in any installed app,
-        // purge data from those DNA-specific databases
+        // delete DHT and cache databases or purge data.
         for dna_hash in dnas_to_purge {
+            // Delete all data from DHT and cache databases.
+            // Database files will be deleted after this step, but
+            // the DB continues to exist in memory while the conductor
+            // is running, supposedly because the pool holds the connection
+            // open.
+            let dht_db = self.spaces.dht_db(dna_hash)?;
+            let cache_db = self.spaces.cache(dna_hash)?;
             futures::future::join_all(
                 [
-                    self.spaces
-                        .dht_db(dna_hash)
-                        .unwrap()
-                        .write_async(|txn| purge_data(txn))
-                        .boxed(),
-                    self.spaces
-                        .cache(dna_hash)
-                        .unwrap()
-                        .write_async(|txn| purge_data(txn))
-                        .boxed(),
-                    // TODO: also delete stale Wasms
+                    dht_db.write_async(|txn| purge_data(txn)).boxed(),
+                    cache_db.write_async(|txn| purge_data(txn)).boxed(),
                 ]
                 .into_iter(),
             )
             .await
             .into_iter()
             .collect::<Result<Vec<()>, _>>()?;
+
+            self.delete_or_purge_database(dht_db).await?;
+            self.delete_or_purge_database(cache_db).await?;
         }
 
         Ok(())

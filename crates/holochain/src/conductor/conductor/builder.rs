@@ -24,10 +24,6 @@ pub struct ConductorBuilder {
     /// Optional keystore override
     pub keystore: Option<MetaLairClient>,
 
-    /// Optional state override (for testing)
-    #[cfg(any(test, feature = "test_utils"))]
-    pub state: Option<ConductorState>,
-
     /// Skip printing setup info to stdout
     pub no_print_setup: bool,
 
@@ -244,9 +240,6 @@ impl ConductorBuilder {
             outcome_tx,
         );
 
-        #[cfg(any(test, feature = "test_utils"))]
-        let conductor = Self::update_fake_state(builder.state, conductor).await?;
-
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
 
@@ -358,18 +351,6 @@ impl ConductorBuilder {
         self
     }
 
-    #[cfg(any(test, feature = "test_utils"))]
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    pub(crate) async fn update_fake_state(
-        state: Option<ConductorState>,
-        conductor: Conductor,
-    ) -> ConductorResult<Conductor> {
-        if let Some(state) = state {
-            conductor.update_state(move |_| Ok(state)).await?;
-        }
-        Ok(conductor)
-    }
-
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope)))]
@@ -454,8 +435,6 @@ impl ConductorBuilder {
             post_commit_sender,
             outcome_tx,
         );
-
-        let conductor = Self::update_fake_state(builder.state, conductor).await?;
 
         // Create handle
         let handle: ConductorHandle = Arc::new(conductor);
