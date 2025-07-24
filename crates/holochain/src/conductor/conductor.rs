@@ -147,9 +147,6 @@ pub(crate) mod tests;
 /// of an app having full network access as soon as its UI begins making requests.
 pub const JOIN_NETWORK_WAITING_PERIOD: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// A list of Cells which failed to start, and why
-pub type CellStartupErrors = Vec<(CellId, CellError)>;
-
 /// Cloneable reference to a Conductor
 pub type ConductorHandle = Arc<Conductor>;
 
