@@ -218,7 +218,7 @@ async fn clean_empty() {
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-/// Test "clean" on a bogus .hc file that we don't have permissions.
+/// Test "clean" on a .hc file that we don't have permissions.
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread")]
 async fn clean_no_permission() {
@@ -240,7 +240,7 @@ async fn clean_no_permission() {
 
 /// Test "clean" with a ".hc" file containing one path that doesn't exist.
 #[tokio::test(flavor = "multi_thread")]
-async fn clean_one() {
+async fn clean_one_missing() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
     let file_path = temp_dir.path().join(".hc");
@@ -253,6 +253,28 @@ async fn clean_one() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     let line_count = stdout.lines().count();
     assert_eq!(line_count, 2);
+}
+
+/// Test "clean" with a ".hc" file containing one path that exists.
+#[tokio::test(flavor = "multi_thread")]
+async fn clean_one_real() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    // create subfolder
+    let one_path = &temp_dir.path().join("one");
+    std::fs::create_dir_all(one_path).unwrap();
+    // write to .hc
+    let file_path = temp_dir.path().join(".hc");
+    std::fs::write(&file_path, one_path.to_str().unwrap()).unwrap();
+    // clean
+    let mut cmd = get_sandbox_command();
+    cmd.arg("clean").current_dir(temp_dir.path());
+    let output = cmd.output().await.unwrap();
+    assert_eq!(output.status, ExitStatus::default());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let line_count = stdout.lines().count();
+    assert_eq!(line_count, 1);
+    assert!(!one_path.exists());
 }
 
 /// Test "remove" in empty folder
@@ -270,7 +292,7 @@ async fn remove_empty() {
     assert_eq!(line_count, 2);
 }
 
-/// Test "remove" with a ".hc" file containing one bogus path.
+/// Test "remove" with a ".hc" file containing one path that doesn't exist.
 #[tokio::test(flavor = "multi_thread")]
 async fn remove_one() {
     let temp_dir = tempfile::TempDir::new().unwrap();
@@ -287,20 +309,20 @@ async fn remove_one() {
     assert_eq!(line_count, 2);
 }
 
-/// Test "remove" with a ".hc" file containing one bogus and one real path.
+/// Test "remove" with a ".hc" file containing a path to an existing folder
+/// and a path to a folder that doesn't exist.
 #[tokio::test(flavor = "multi_thread")]
 async fn remove_two() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
     let file_path = temp_dir.path().join(".hc");
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
-
-    package_fixture_if_not_packaged().await;
-    holochain_trace::test_run();
-
     let app_path = std::env::current_dir()
         .unwrap()
         .join("tests/fixtures/my-app/");
+    package_fixture_if_not_packaged().await;
+    holochain_trace::test_run();
+    // Call generate
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
         .arg(format!(
@@ -320,7 +342,14 @@ async fn remove_two() {
     let hc_admin = input_piped_password(&mut cmd).await;
     let output = hc_admin.wait_with_output().await.unwrap();
     assert_eq!(output.status, ExitStatus::default());
-
+    // Read the .hc file and get the created sandbox path
+    let file = tokio::fs::File::open(file_path).await.unwrap();
+    let reader = BufReader::new(file);
+    let mut lines = reader.lines();
+    lines.next_line().await.unwrap();
+    let second_path = PathBuf::from(lines.next_line().await.unwrap().unwrap());
+    assert!(second_path.exists() && second_path.is_dir());
+    // Call remove
     let mut cmd = get_sandbox_command();
     cmd.arg("remove").arg("1").current_dir(temp_dir.path());
     println!("@@ Remove: {cmd:?}");
@@ -330,6 +359,8 @@ async fn remove_two() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     let line_count = stdout.lines().count();
     assert_eq!(line_count, 1);
+    // Make sure sandbox has been deleted
+    assert!(!second_path.exists());
 }
 
 /// "list" test
