@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Replace `Conductor::remove_dangling_cells` method with methods that remove the cells specific to the app and delete their databases.
 - **BREAKING CHANGE**: Remove unused field `ConductorBuilder::state`.
+- Remove network joining timeout. This used to work with the previous version of kitsune, but now all the `join` call does is to join the local peer store which is a matter of acquiring a write lock on a mutex and doesn't indicate whether publishing the agent info to the peer store and the bootstrap has been successful.
 
 ## 0.6.0-dev.14
 
