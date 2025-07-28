@@ -1,6 +1,7 @@
 [![Project](https://img.shields.io/badge/Project-Holochain-blue.svg?style=flat-square)](http://holochain.org/)
 [![Discord](https://img.shields.io/badge/Discord-blue.svg?style=flat-square)](https://discord.gg/k55DS5dmPH)
 [![License: CAL 1.0](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/holochain/holochain?utm_source=oss&utm_medium=github&utm_campaign=holochain%2Fholochain&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 ![Tests](https://github.com/holochain/holochain/actions/workflows/release.yml/badge.svg)
 [![Twitter Follow](https://img.shields.io/twitter/follow/holochain.svg?style=social&label=Follow)](https://twitter.com/holochain)
 
