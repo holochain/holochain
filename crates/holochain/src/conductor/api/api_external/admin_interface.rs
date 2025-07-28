@@ -277,12 +277,12 @@ impl AdminInterfaceApi {
                 }
                 Ok(AdminResponse::AgentInfo(encoded))
             }
-            AgentMetaInfo { url, dna_hashes } => {
+            PeerMetaInfo { url, dna_hashes } => {
                 let r = self
                     .conductor_handle
-                    .agent_meta_info(url, dna_hashes)
+                    .peer_meta_info(url, dna_hashes)
                     .await?;
-                Ok(AdminResponse::AgentMetaInfo(r))
+                Ok(AdminResponse::PeerMetaInfo(r))
             }
             GraftRecords {
                 cell_id,

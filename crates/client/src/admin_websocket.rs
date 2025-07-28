@@ -2,9 +2,9 @@ use crate::error::{ConductorApiError, ConductorApiResult};
 use crate::util::AbortOnDropHandle;
 use holo_hash::{ActionHash, DnaHash};
 use holochain_conductor_api::{
-    AdminInterfaceConfig, AdminRequest, AdminResponse, AgentMetaInfo, AppAuthenticationToken,
+    AdminInterfaceConfig, AdminRequest, AdminResponse, AppAuthenticationToken,
     AppAuthenticationTokenIssued, AppInfo, AppInterfaceInfo, AppStatusFilter, FullStateDump,
-    IssueAppAuthenticationTokenPayload, StorageInfo,
+    IssueAppAuthenticationTokenPayload, PeerMetaInfo, StorageInfo,
 };
 use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
@@ -566,15 +566,15 @@ impl AdminWebsocket {
     ///
     /// If `dna_hashes` is set to `None` it returns the contents
     /// for all dnas that the agent is part of.
-    pub async fn agent_meta_info(
+    pub async fn peer_meta_info(
         &self,
         url: Url,
         dna_hashes: Option<Vec<DnaHash>>,
-    ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>> {
-        let msg = AdminRequest::AgentMetaInfo { url, dna_hashes };
+    ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>> {
+        let msg = AdminRequest::PeerMetaInfo { url, dna_hashes };
         let response = self.send(msg).await?;
         match response {
-            AdminResponse::AgentMetaInfo(info) => Ok(info),
+            AdminResponse::PeerMetaInfo(info) => Ok(info),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

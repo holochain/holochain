@@ -1,4 +1,4 @@
-use crate::peer_meta::AgentMetaInfo;
+use crate::peer_meta::PeerMetaInfo;
 use crate::{AppInfo, FullStateDump, StorageInfo};
 use holo_hash::*;
 use holochain_types::prelude::*;
@@ -328,8 +328,8 @@ pub enum AdminRequest {
     ///
     /// # Returns
     ///
-    /// [`AdminResponse::AgentMetaInfo`]
-    AgentMetaInfo {
+    /// [`AdminResponse::PeerMetaInfo`]
+    PeerMetaInfo {
         url: Url,
         dna_hashes: Option<Vec<DnaHash>>,
     },
@@ -573,10 +573,10 @@ pub enum AdminResponse {
     /// This is all the agent info that was found for the request.
     AgentInfo(Vec<String>),
 
-    /// The successful response to an [`AdminRequest::AgentMetaInfo`].
+    /// The successful response to an [`AdminRequest::PeerMetaInfo`].
     ///
     /// A JSON formatted string.
-    AgentMetaInfo(BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>),
+    PeerMetaInfo(BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>),
 
     /// The successful response to an [`AdminRequest::GraftRecords`].
     RecordsGrafted,

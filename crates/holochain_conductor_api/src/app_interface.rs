@@ -1,4 +1,4 @@
-use crate::peer_meta::AgentMetaInfo;
+use crate::peer_meta::PeerMetaInfo;
 use crate::{AppAuthenticationToken, ExternalApiWireError};
 use holo_hash::AgentPubKey;
 use holochain_keystore::LairResult;
@@ -46,8 +46,8 @@ pub enum AppRequest {
     ///
     /// # Returns
     ///
-    /// [`AppResponse::AgentMetaInfo`]
-    AgentMetaInfo {
+    /// [`AppResponse::PeerMetaInfo`]
+    PeerMetaInfo {
         url: Url,
         dna_hashes: Option<Vec<DnaHash>>,
     },
@@ -270,10 +270,10 @@ pub enum AppResponse {
     /// The successful response to an [`AppRequest::AgentInfo`].
     AgentInfo(Vec<String>),
 
-    /// The successful response to an [`AppRequest::AgentMetaInfo`].
+    /// The successful response to an [`AppRequest::PeerMetaInfo`].
     ///
     /// A JSON formatted string.
-    AgentMetaInfo(BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>),
+    PeerMetaInfo(BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>),
 
     /// The successful response to an [`AppRequest::CallZome`].
     ///

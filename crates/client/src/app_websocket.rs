@@ -4,7 +4,7 @@ use crate::{signing::sign_zome_call, ConductorApiError, ConductorApiResult};
 use anyhow::{anyhow, Result};
 use holo_hash::{AgentPubKey, DnaHash};
 use holochain_conductor_api::{
-    AgentMetaInfo, AppAuthenticationToken, AppInfo, AppRequest, AppResponse, CellInfo,
+    AppAuthenticationToken, AppInfo, AppRequest, AppResponse, CellInfo, PeerMetaInfo,
     ProvisionedCell, ZomeCallParamsSigned,
 };
 use holochain_nonce::fresh_nonce;
@@ -451,15 +451,15 @@ impl AppWebsocket {
     ///
     /// If `dna_hashes` is set to `None` it returns the contents
     /// for all dnas of the app.
-    pub async fn agent_meta_info(
+    pub async fn peer_meta_info(
         &self,
         url: Url,
         dna_hashes: Option<Vec<DnaHash>>,
-    ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>> {
-        let msg = AppRequest::AgentMetaInfo { url, dna_hashes };
+    ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>> {
+        let msg = AppRequest::PeerMetaInfo { url, dna_hashes };
         let response = self.inner.send(msg).await?;
         match response {
-            AppResponse::AgentMetaInfo(info) => Ok(info),
+            AppResponse::PeerMetaInfo(info) => Ok(info),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

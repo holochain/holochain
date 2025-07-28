@@ -9,9 +9,9 @@ pub use admin_websocket::{AdminWebsocket, AuthorizeSigningCredentialsPayload, En
 pub use app_websocket::{AppWebsocket, ZomeCallTarget};
 pub use error::{ConductorApiError, ConductorApiResult};
 pub use holochain_conductor_api::{
-    AdminRequest, AdminResponse, AgentMetaInfo, AppAuthenticationRequest, AppAuthenticationToken,
+    AdminRequest, AdminResponse, AppAuthenticationRequest, AppAuthenticationToken,
     AppAuthenticationTokenIssued, AppInfo, AppRequest, AppResponse, AppStatusFilter, CellInfo,
-    IssueAppAuthenticationTokenPayload, ProvisionedCell,
+    IssueAppAuthenticationTokenPayload, PeerMetaInfo, ProvisionedCell,
 };
 pub use holochain_types::{
     app::{InstallAppPayload, InstalledAppId},
