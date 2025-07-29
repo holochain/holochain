@@ -19,9 +19,9 @@ use clap::{Args, Parser, Subcommand};
 use holo_hash::{ActionHash, AgentPubKeyB64, DnaHashB64};
 use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
-use holochain_conductor_api::AgentMetaInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
+use holochain_conductor_api::PeerMetaInfo;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
 use holochain_trace::Output;
 use holochain_types::app::AppManifest;
@@ -104,8 +104,8 @@ pub enum AdminRequestCli {
     AddAgents(AgentInfos),
     /// Calls [`AdminWebsocket::agent_info`].
     ListAgents(ListAgents),
-    /// Calls [`AdminWebsocket::agent_meta_info`].
-    AgentMetaInfo(AgentMetaInfoArgs),
+    /// Calls [`AdminWebsocket::peer_meta_info`].
+    PeerMetaInfo(PeerMetaInfoArgs),
 }
 
 /// Calls [`AdminWebsocket::add_admin_interfaces`]
@@ -309,10 +309,10 @@ pub struct ListApps {
     pub status: Option<AppStatusFilter>,
 }
 
-/// Calls [`AdminWebsocket::agent_meta_info`]
+/// Calls [`AdminWebsocket::peer_meta_info`]
 /// and prints the agent meta info related to the specified Url
 #[derive(Debug, Args, Clone)]
-pub struct AgentMetaInfoArgs {
+pub struct PeerMetaInfoArgs {
     /// The kitsune Url of the agent to get meta info about.
     #[arg(long)]
     pub url: Url,
@@ -589,12 +589,12 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             }
             println!("{}", serde_json::to_string(&out)?);
         }
-        AdminRequestCli::AgentMetaInfo(args) => {
-            let info = client.agent_meta_info(args.url, args.dna).await?;
+        AdminRequestCli::PeerMetaInfo(args) => {
+            let info = client.peer_meta_info(args.url, args.dna).await?;
             let string_key_info = info
                 .into_iter()
                 .map(|(k, v)| (k.to_string(), v))
-                .collect::<BTreeMap<String, BTreeMap<String, AgentMetaInfo>>>();
+                .collect::<BTreeMap<String, BTreeMap<String, PeerMetaInfo>>>();
             println!("{}", serde_json::to_string(&string_key_info)?);
         }
     }

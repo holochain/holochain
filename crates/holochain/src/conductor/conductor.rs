@@ -60,12 +60,12 @@ use tracing::*;
 pub use builder::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
-use holochain_conductor_api::AgentMetaInfo;
 use holochain_conductor_api::AppInfo;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::FullIntegrationStateDump;
 use holochain_conductor_api::FullStateDump;
 use holochain_conductor_api::IntegrationStateDump;
+use holochain_conductor_api::PeerMetaInfo;
 use holochain_keystore::lair_keystore::spawn_lair_keystore;
 use holochain_keystore::lair_keystore::spawn_lair_keystore_in_proc;
 use holochain_keystore::MetaLairClient;
@@ -822,25 +822,25 @@ mod network_impls {
 
         /// Get the content of the peer meta store(s) for an agent at a given Url
         /// for spaces (dna hashes) of a specific app
-        pub async fn app_agent_meta_info(
+        pub async fn app_peer_meta_info(
             &self,
             installed_app_id: &InstalledAppId,
             url: Url,
             maybe_dna_hashes: Option<Vec<DnaHash>>,
-        ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>> {
+        ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>> {
             let mut app_hashes = self.get_dna_hashes_for_app(installed_app_id).await?;
             if let Some(dna_hashes) = maybe_dna_hashes {
                 app_hashes.retain(|h| dna_hashes.contains(h));
             }
-            self.agent_meta_info(url, Some(app_hashes)).await
+            self.peer_meta_info(url, Some(app_hashes)).await
         }
 
         /// Get the content of the peer meta store(s) for an agent at a given Url
-        pub async fn agent_meta_info(
+        pub async fn peer_meta_info(
             &self,
             url: Url,
             maybe_dna_hashes: Option<Vec<DnaHash>>,
-        ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, AgentMetaInfo>>> {
+        ) -> ConductorApiResult<BTreeMap<DnaHash, BTreeMap<String, PeerMetaInfo>>> {
             let mut space_ids = self
                 .spaces
                 .get_from_spaces(|space| (*space.dna_hash).clone());
@@ -863,8 +863,8 @@ mod network_impls {
 
                 let infos = db
                     .read_async(
-                        move |txn| -> DatabaseResult<BTreeMap<String, AgentMetaInfo>> {
-                            let mut infos: BTreeMap<String, AgentMetaInfo> = BTreeMap::new();
+                        move |txn| -> DatabaseResult<BTreeMap<String, PeerMetaInfo>> {
+                            let mut infos: BTreeMap<String, PeerMetaInfo> = BTreeMap::new();
 
                             let mut stmt = txn.prepare(sql_peer_meta_store::GET_ALL_BY_URL)?;
                             let mut rows = stmt.query(named_params! {
@@ -884,12 +884,12 @@ mod network_impls {
                                         })?;
                                 let expires_at = row.get::<_, i64>(2)?;
 
-                                let agent_meta_info = AgentMetaInfo {
+                                let peer_meta_info = PeerMetaInfo {
                                     meta_value,
                                     expires_at: Timestamp(expires_at),
                                 };
 
-                                infos.insert(meta_key, agent_meta_info);
+                                infos.insert(meta_key, peer_meta_info);
                             }
 
                             Ok(infos)

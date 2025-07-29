@@ -776,9 +776,9 @@ async fn generate_sandbox_and_add_and_list_agent() {
     shutdown_sandbox(hc_admin).await;
 }
 
-/// Tests retrieval of agent meta info via `hc sandbox call agent-meta-info`
+/// Tests retrieval of agent meta info via `hc sandbox call peer-meta-info`
 #[tokio::test(flavor = "multi_thread")]
-async fn generate_sandbox_and_call_agent_meta_info() {
+async fn generate_sandbox_and_call_peer_meta_info() {
     clean_sandboxes().await;
     package_fixture_if_not_packaged().await;
 
@@ -843,7 +843,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
     };
 
     // Needs to get converted to a String (not DnaHashB64) so that the sorting will
-    // match the sorting of the JSON output from the `hc sandbox agent-meta-info` call
+    // match the sorting of the JSON output from the `hc sandbox peer-meta-info` call
     let mut dna_hashes_b64: Vec<String> = dna_hashes
         .into_iter()
         .map(|h| DnaHashB64::from(h).to_string())
@@ -861,7 +861,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
             get_holochain_bin_path().to_str().unwrap()
         ))
         .arg("call")
-        .arg("agent-meta-info")
+        .arg("peer-meta-info")
         .arg("--url")
         .arg("wss://someurl:443")
         .stdin(Stdio::piped())
@@ -899,7 +899,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
             get_holochain_bin_path().to_str().unwrap()
         ))
         .arg("call")
-        .arg("agent-meta-info")
+        .arg("peer-meta-info")
         .arg("--url")
         .arg("wss://someurl:443")
         .arg("--dna")
