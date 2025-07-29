@@ -1188,7 +1188,7 @@ mod test {
             },
             state: conductor_handle.get_state_from_handle().await.unwrap(),
         };
-        let expected_json = serde_json::to_string_pretty(&expected).unwrap();
+        let expected_json = serde_json::to_string(&expected).unwrap();
 
         // Get state
         let admin_api = AdminInterfaceApi::new(conductor_handle.clone());

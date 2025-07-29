@@ -9,37 +9,36 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::cmds::Existing;
+use crate::ports::get_admin_ports;
+use crate::run::run_async;
 use anyhow::anyhow;
 use anyhow::bail;
-use holo_hash::ActionHash;
-use holo_hash::DnaHashB64;
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use clap::{Args, Parser, Subcommand};
+use holo_hash::{ActionHash, AgentPubKeyB64, DnaHashB64};
 use holochain_client::AdminWebsocket;
 use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::PeerMetaInfo;
 use holochain_conductor_api::{AdminInterfaceConfig, AppInfo};
+use holochain_trace::Output;
 use holochain_types::app::AppManifest;
 use holochain_types::app::RoleSettingsMap;
 use holochain_types::app::RoleSettingsMapYaml;
-use holochain_types::prelude::DnaModifiersOpt;
 use holochain_types::prelude::RegisterDnaPayload;
 use holochain_types::prelude::YamlProperties;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
+use holochain_types::prelude::{Deserialize, DnaModifiersOpt, Serialize};
 use holochain_types::prelude::{DnaHash, InstalledAppId};
 use holochain_types::prelude::{DnaSource, NetworkSeed};
+use holochain_types::websocket::AllowedOrigins;
+use kitsune2_api::AgentInfoSigned;
 use kitsune2_api::Url;
 use kitsune2_core::Ed25519Verifier;
 use std::convert::TryFrom;
-
-use crate::cmds::Existing;
-use crate::ports::get_admin_ports;
-use crate::run::run_async;
-use clap::{Args, Parser, Subcommand};
-use holochain_trace::Output;
-use holochain_types::websocket::AllowedOrigins;
-use kitsune2_api::AgentInfoSigned;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]
@@ -429,53 +428,67 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         }
         AdminRequestCli::ListAppWs => {
             let interface_infos = client.list_app_interfaces().await?;
-            msg!("Attached app interfaces {:?}", interface_infos);
+            println!("{}", serde_json::to_string(&interface_infos)?);
         }
         AdminRequestCli::RegisterDna(args) => {
-            let dnas = register_dna(client, args).await?;
-            msg!("Registered DNA: {:?}", dnas);
+            let dna = register_dna(client, args).await?;
+            msg!("Registered DNA: {}", dna);
         }
         AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(client, args).await?;
-            msg!("Installed app: {}", app.installed_app_id,);
+            println!("{}", app_info_to_base64_json(app)?);
         }
         AdminRequestCli::UninstallApp(args) => {
             client
                 .uninstall_app(args.app_id.clone(), args.force)
                 .await?;
-            msg!("Uninstalled app: {}", args.app_id,);
+            msg!("Uninstalled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::ListDnas => {
-            let dnas = client.list_dnas().await?;
-            msg!("DNAs: {:?}", dnas);
+            let dnas: Vec<DnaHashB64> = client
+                .list_dnas()
+                .await?
+                .into_iter()
+                .map(|d| d.into())
+                .collect();
+            println!("{}", serde_json::to_string(&dnas)?);
         }
         AdminRequestCli::NewAgent => {
             let agent = client.generate_agent_pub_key().await?;
-            msg!("Added agent {}", agent);
+            println!("{}", serde_json::to_string(&agent.to_string())?);
         }
         AdminRequestCli::ListCells => {
-            let cells = client.list_cell_ids().await?;
-            msg!("Cell IDs: {:?}", cells);
+            let cell_id_jsons: Vec<serde_json::Value> = client
+                .list_cell_ids()
+                .await?
+                .iter()
+                .map(|id| cell_id_json_to_base64_json(serde_json::to_value(id)?))
+                .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
+            println!("{}", serde_json::to_string(&cell_id_jsons)?);
         }
         AdminRequestCli::ListApps(args) => {
             let apps = client.list_apps(args.status).await?;
-            msg!("List apps: {:?}", apps);
+            let values = apps
+                .into_iter()
+                .map(app_info_to_base64_json)
+                .collect::<Result<Vec<serde_json::Value>, serde_json::Error>>()?;
+            println!("{}", serde_json::to_string(&values)?);
         }
         AdminRequestCli::EnableApp(args) => {
             client.enable_app(args.app_id.clone()).await?;
-            msg!("Activated app: {:?}", args.app_id);
+            msg!("Enabled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::DisableApp(args) => {
             client.disable_app(args.app_id.clone()).await?;
-            msg!("Deactivated app: {:?}", args.app_id);
+            msg!("Disabled app: \"{}\"", args.app_id);
         }
         AdminRequestCli::DumpState(args) => {
             let state = client.dump_state(args.into()).await?;
-            msg!("DUMP STATE \n{}", state);
+            println!("{}", state);
         }
         AdminRequestCli::DumpConductorState => {
             let state = client.dump_conductor_state().await?;
-            msg!("DUMP CONDUCTOR STATE \n{}", state);
+            println!("{}", state);
         }
         AdminRequestCli::DumpNetworkMetrics(args) => {
             let metrics = client
@@ -519,7 +532,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .list_capability_grants(args.installed_app_id, args.include_revoked)
                 .await?;
             // Print without other text so it can be piped
-            println!("{:?}", info);
+            println!("{}", serde_json::to_string(&info)?);
         }
         AdminRequestCli::AddAgents(args) => {
             let agent_infos_results =
@@ -531,31 +544,24 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             add_agent_info(client, agent_infos).await?;
         }
         AdminRequestCli::ListAgents(args) => {
-            use std::fmt::Write;
+            let mut out = Vec::new();
             let agent_infos = request_agent_info(client, args).await?;
+            let cell_info = client.list_cell_ids().await?;
+            let agents = cell_info
+                .iter()
+                .map(|c| c.agent_pubkey().clone())
+                .map(|a| (a.clone(), a.to_k2_agent()))
+                .collect::<Vec<_>>();
+
+            let dnas = cell_info
+                .iter()
+                .map(|c| c.dna_hash().clone())
+                .map(|d| (d.clone(), d.to_k2_space()))
+                .collect::<Vec<_>>();
+
             for info in agent_infos {
-                let mut out = String::new();
-                let cell_info = client.list_cell_ids().await?;
-                let agents = cell_info
-                    .iter()
-                    .map(|c| c.agent_pubkey().clone())
-                    .map(|a| (a.clone(), a.to_k2_agent()))
-                    .collect::<Vec<_>>();
-
-                let dnas = cell_info
-                    .iter()
-                    .map(|c| c.dna_hash().clone())
-                    .map(|d| (d.clone(), d.to_k2_space()))
-                    .collect::<Vec<_>>();
-
                 let this_agent = agents.iter().find(|a| info.agent == a.1);
                 let this_dna = dnas.iter().find(|d| info.space == d.1).unwrap();
-                if let Some(this_agent) = this_agent {
-                    writeln!(out, "This agent {:?} is {:?}", this_agent.0, this_agent.1)?;
-                }
-                writeln!(out, "This DNA {:?} is {:?}", this_dna.0, this_dna.1)?;
-
-                use chrono::{DateTime, Duration, NaiveDateTime, Utc};
                 let duration = Duration::try_milliseconds(info.created_at.as_micros() / 1000)
                     .ok_or_else(|| anyhow!("Agent info timestamp out of range"))?;
                 let s = duration.num_seconds();
@@ -570,33 +576,146 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 // TODO FIXME
                 #[allow(deprecated)]
                 let exp = DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(s, n), Utc);
-                let now = Utc::now();
 
-                writeln!(out, "signed at {}", dt)?;
-                writeln!(
-                    out,
-                    "expires at {} in {}mins",
-                    exp,
-                    (exp - now).num_minutes()
-                )?;
-                writeln!(out, "space: {:?}", info.space)?;
-                writeln!(out, "agent: {:?}", info.agent)?;
-                writeln!(out, "URLs: {:?}", info.url)?;
-                msg!("{}\n", out);
+                out.push(AgentResponse {
+                    agent_pub_key: this_agent.map(|a| a.0.clone().into()),
+                    k2_agent: this_agent.map(|a| a.1.clone()),
+                    dna_hash: this_dna.0.clone().into(),
+                    k2_space: this_dna.1.clone(),
+                    signed_at: dt,
+                    expires_at: exp,
+                    url: info.url.clone(),
+                });
             }
+            println!("{}", serde_json::to_string(&out)?);
         }
         AdminRequestCli::PeerMetaInfo(args) => {
             let info = client.peer_meta_info(args.url, args.dna).await?;
             let string_key_info = info
                 .into_iter()
-                .map(|(k, v)| (DnaHashB64::from(k).to_string(), v))
+                .map(|(k, v)| (k.to_string(), v))
                 .collect::<BTreeMap<String, BTreeMap<String, PeerMetaInfo>>>();
-
-            let info_json = serde_json::to_string_pretty(&string_key_info)?;
-            println!("{}", info_json);
+            println!("{}", serde_json::to_string(&string_key_info)?);
         }
     }
     Ok(())
+}
+
+/// Convert an [`AppInfo`] to JSON with extra base64 conversion of `agent_pub_key` and `cell_id` fields.
+fn app_info_to_base64_json(app_info: AppInfo) -> Result<serde_json::Value, serde_json::Error> {
+    let value = serde_json::to_value(&app_info)?;
+    let serde_json::Value::Object(mut app_info_map) = value else {
+        return Err(serde::de::Error::custom(
+            "Invalid appInfo conversion result",
+        ));
+    };
+    // Convert `agent_pub_key` field
+    if let Some(old_value) = app_info_map.get("agent_pub_key") {
+        let new_value =
+            AgentPubKey::from_raw_39(value_to_base64(old_value.to_owned())?).to_string();
+        app_info_map.insert(
+            "agent_pub_key".to_string(),
+            serde_json::Value::String(new_value),
+        );
+    }
+    // Convert `cell_info` field
+    if let Some(old_value) = app_info_map.get("cell_info") {
+        let new_value = cell_id_to_base64_within_cell_info_map(old_value.clone())?;
+        app_info_map.insert("cell_info".to_string(), new_value);
+    }
+    //
+    Ok(serde_json::Value::Object(app_info_map))
+}
+
+/// Convert the inner `cell_id` fields of the JSON value of a `IndexMap<RoleName, Vec<CellInfo>>`.
+fn cell_id_to_base64_within_cell_info_map(
+    value: serde_json::Value,
+) -> Result<serde_json::Value, serde_json::Error> {
+    let serde_json::Value::Object(mut cell_info_map_map) = value else {
+        return Err(serde::de::Error::custom("Value is not a CellInfo map."));
+    };
+    // For each role
+    for (key, val) in cell_info_map_map.iter_mut() {
+        let serde_json::Value::Array(arr) = val else {
+            return Err(serde::de::Error::custom(format!(
+                "Value for `{}` is not an array.",
+                key
+            )));
+        };
+        // For each cell
+        for item in arr.iter_mut() {
+            let serde_json::Value::Object(ref mut cell_info_map) = item else {
+                return Err(serde::de::Error::custom("Value is not a CellInfo value."));
+            };
+            if let Some(old_map) = cell_info_map.get_mut("value") {
+                let serde_json::Value::Object(ref mut cell_id_map) = old_map else {
+                    return Err(serde::de::Error::custom("Value is not a CellInfo."));
+                };
+                if let Some(old_value) = cell_id_map.get("cell_id") {
+                    let new_value = cell_id_json_to_base64_json(old_value.to_owned())?;
+                    cell_id_map.insert("cell_id".to_string(), new_value);
+                }
+            }
+        }
+    }
+    Ok(serde_json::Value::Object(cell_info_map_map))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CellIdJson {
+    pub dna_hash: String,
+    pub agent_pub_key: String,
+}
+
+fn cell_id_json_to_base64_json(
+    value: serde_json::Value,
+) -> Result<serde_json::Value, serde_json::Error> {
+    let serde_json::Value::Array(arr) = value else {
+        return Err(serde::de::Error::custom("Value is not an array."));
+    };
+    if arr.len() != 2 {
+        return Err(serde::de::Error::custom(
+            "Value of type array does not have a length of 2.",
+        ));
+    };
+    let cell_id_json = CellIdJson {
+        dna_hash: DnaHash::from_raw_39(value_to_base64(arr[0].clone())?).to_string(),
+        agent_pub_key: AgentPubKey::from_raw_39(value_to_base64(arr[1].clone())?).to_string(),
+    };
+    serde_json::to_value(cell_id_json)
+}
+
+/// Converts a JSON Value representing a vector of integers into a Vec<u8>
+fn value_to_base64(value: serde_json::Value) -> Result<Vec<u8>, serde_json::Error> {
+    let serde_json::Value::Array(arr) = value else {
+        return Err(serde::de::Error::custom("Value is not an array."));
+    };
+    // Convert JSON array to Vec<u8>
+    let mut bytes = Vec::new();
+    for item in arr {
+        let serde_json::Value::Number(num) = item else {
+            return Err(serde::de::Error::custom("Value is not a number."));
+        };
+        let Some(n) = num.as_i64() else {
+            return Err(serde::de::Error::custom("Value is not an integer."));
+        };
+        if !(0..=255).contains(&n) {
+            return Err(serde::de::Error::custom("Value is not an u8."));
+        }
+        bytes.push(n as u8);
+    }
+    Ok(bytes)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct AgentResponse {
+    agent_pub_key: Option<AgentPubKeyB64>,
+    k2_agent: Option<kitsune2_api::AgentId>,
+    dna_hash: DnaHashB64,
+    k2_space: kitsune2_api::SpaceId,
+    signed_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+    url: Option<Url>,
 }
 
 /// Calls [`AdminWebsocket::register_dna`] and registers the DNA.
@@ -676,9 +795,6 @@ pub async fn install_app_bundle(
             }
         }
     }
-
-    msg!("App installed with id {:?}.", app_id);
-
     Ok(installed_app)
 }
 
@@ -740,5 +856,152 @@ impl From<CellId> for DumpState {
 impl From<DumpState> for CellId {
     fn from(ds: DumpState) -> Self {
         CellId::new(ds.dna, ds.agent_key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holochain_client::{SerializedBytes, Timestamp};
+    use holochain_conductor_api::CellInfo;
+    use holochain_types::app::{AppManifestV0Builder, AppRoleManifest, AppStatus};
+    use holochain_types::fixt::CellIdFixturator;
+    use holochain_types::prelude::{DnaModifiers, RoleName};
+    use indexmap::IndexMap;
+
+    #[test]
+    fn valid_cell_id_json_to_base64_json() {
+        let cell_id = fixt!(CellId);
+        let cell_id_json = serde_json::to_value(&cell_id).unwrap();
+        let cell_id_base64_json = cell_id_json_to_base64_json(cell_id_json).unwrap();
+        let cell_id_struct: CellIdJson = serde_json::from_value(cell_id_base64_json).unwrap();
+        let _struct_json = serde_json::to_value(&cell_id_struct).unwrap();
+        assert_eq!(cell_id.dna_hash().to_string(), cell_id_struct.dna_hash);
+        assert_eq!(
+            cell_id.agent_pubkey().to_string(),
+            cell_id_struct.agent_pub_key
+        );
+    }
+
+    #[test]
+    fn invalid_cell_id_json_to_base64_json() {
+        let bad_cell_id = vec!["1", "2"];
+        let cell_id_json = serde_json::to_value(&bad_cell_id).unwrap();
+        let cell_id_base64_json = cell_id_json_to_base64_json(cell_id_json);
+        assert!(cell_id_base64_json.is_err());
+    }
+
+    #[test]
+    fn app_info_to_json() {
+        let cell_info = CellInfo::new_provisioned(
+            fixt!(CellId),
+            DnaModifiers {
+                network_seed: "sample-seed".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            "sample-info".to_string(),
+        );
+        let mut cell_info_map: IndexMap<RoleName, Vec<CellInfo>> = IndexMap::new();
+        cell_info_map.insert("sample-role".to_string(), vec![cell_info]);
+
+        let role_manifest = AppRoleManifest::sample("sample-dna".to_string());
+        let sample_app_manifest_v0 = AppManifestV0Builder::default()
+            .name("sample-app".to_string())
+            .description(Some("Some description".to_string()))
+            .roles(vec![role_manifest.clone()])
+            .build()
+            .unwrap();
+        let sample_app_manifest = AppManifest::V0(sample_app_manifest_v0.clone());
+
+        let app_info = AppInfo {
+            installed_app_id: "test-app".to_string(),
+            status: AppStatus::Enabled,
+            agent_pub_key: fixt!(AgentPubKey),
+            installed_at: Timestamp(42),
+            manifest: sample_app_manifest,
+            cell_info: cell_info_map,
+        };
+        let app_info_json = app_info_to_base64_json(app_info.clone()).unwrap();
+        let app_info_2 = serde_json::from_value::<AppInfo>(app_info_json.clone());
+        assert!(app_info_2.is_err());
+
+        let serde_json::Value::Object(app_info_map) = app_info_json else {
+            panic!("Invalid appInfo conversion result");
+        };
+        let Some(agent_value) = app_info_map.get("agent_pub_key") else {
+            panic!("Invalid appInfo conversion result");
+        };
+        let agent_value_str = serde_json::from_value::<String>(agent_value.to_owned()).unwrap();
+        assert_eq!(app_info.agent_pub_key.to_string(), agent_value_str);
+    }
+
+    #[test]
+    fn invalid_cell_info_map_json() {
+        let bad_cell_id = vec!["1", "2"];
+        let cell_id_json = serde_json::to_value(&bad_cell_id).unwrap();
+        let cell_id_base64_json = cell_id_to_base64_within_cell_info_map(cell_id_json);
+        assert!(cell_id_base64_json.is_err());
+    }
+
+    #[test]
+    fn valid_cell_info_map_json() {
+        let cell_id_1 = fixt!(CellId);
+        let cell_info = CellInfo::new_provisioned(
+            cell_id_1.clone(),
+            DnaModifiers {
+                network_seed: "sample-seed".to_string(),
+                properties: SerializedBytes::default(),
+            },
+            "sample-info".to_string(),
+        );
+        let mut cell_info_map: IndexMap<RoleName, Vec<CellInfo>> = IndexMap::new();
+        cell_info_map.insert("role1".to_string(), vec![cell_info.clone()]);
+        cell_info_map.insert(
+            "role2".to_string(),
+            vec![cell_info.clone(), cell_info.clone()],
+        );
+        let cell_info_map_json = serde_json::to_value(&cell_info_map).unwrap();
+        let conv = cell_id_to_base64_within_cell_info_map(cell_info_map_json.clone()).unwrap();
+        let cell_info_map_2 =
+            serde_json::from_value::<IndexMap<RoleName, Vec<CellInfo>>>(conv.clone());
+        assert!(cell_info_map_2.is_err());
+
+        let serde_json::Value::Object(cell_info_map_map) = conv else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let Some(cells_value) = cell_info_map_map.get("role2") else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let serde_json::Value::Array(cell_info_vec) = cells_value else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let serde_json::Value::Object(ref cell_info_2) = cell_info_vec[1] else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let Some(cell_info_obj) = cell_info_2.get("value") else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let serde_json::Value::Object(ref cell_info_value) = cell_info_obj else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let Some(cell_id_value) = cell_info_value.get("cell_id") else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let serde_json::Value::Object(ref cell_id_obj) = cell_id_value else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let Some(dna_value) = cell_id_obj.get("dna_hash") else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let dna_b64 = serde_json::from_value::<String>(dna_value.to_owned()).unwrap();
+        assert_eq!(cell_id_1.dna_hash().to_string(), dna_b64);
+
+        let Some(agent_value) = cell_id_obj.get("agent_pub_key") else {
+            panic!("Invalid cell_info map conversion result");
+        };
+        let agent_b64 = serde_json::from_value::<String>(agent_value.to_owned()).unwrap();
+        assert_eq!(cell_id_1.agent_pubkey().to_string(), agent_b64);
     }
 }
