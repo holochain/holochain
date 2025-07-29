@@ -1310,12 +1310,12 @@ mod app_impls {
             //       essential that the installed_hash is included in the app manifest,
             //       so that the local DNAs with inline zomes can be loaded from
             //       local storage
-            let local_dnas = self
-                .ribosome_store()
-                .share_ref(|store| bundle.get_all_dnas_from_store(store));
+            // let local_dnas = self
+            //     .ribosome_store()
+            //     .share_ref(|store| bundle.get_all_dnas_from_store(store));
 
             let ops = bundle
-                .resolve_cells(&local_dnas, membrane_proofs, existing_cells)
+                .resolve_cells(membrane_proofs, existing_cells)
                 .await?;
 
             self.clone()

@@ -117,9 +117,9 @@ pub async fn install_app(
     data: &[(DnaFile, Option<MembraneProof>)],
     conductor_handle: ConductorHandle,
 ) {
-    for (dna, _) in data.iter() {
-        conductor_handle.register_dna(dna.clone()).await.unwrap();
-    }
+    // for (dna, _) in data.iter() {
+    //     conductor_handle.register_dna(dna.clone()).await.unwrap();
+    // }
     conductor_handle
         .clone()
         .install_app_minimal(name.to_string(), Some(agent), data, None)
@@ -169,9 +169,9 @@ pub async fn install_app_in_conductor(
     agent: Option<AgentPubKey>,
     dnas_with_proofs: &[(DnaFile, Option<MembraneProof>)],
 ) -> AgentPubKey {
-    for (dna, _) in dnas_with_proofs {
-        conductor_handle.register_dna(dna.clone()).await.unwrap();
-    }
+    // for (dna, _) in dnas_with_proofs {
+    //     conductor_handle.register_dna(dna.clone()).await.unwrap();
+    // }
 
     let agent = conductor_handle
         .clone()
@@ -386,9 +386,9 @@ pub async fn get_integrated_ops<Db: ReadAccess<DbKindDht>>(db: &Db) -> Vec<DhtOp
         txn.prepare(
             "
             SELECT
-            DhtOp.type, 
-            Action.author as author, 
-            Action.blob as action_blob, 
+            DhtOp.type,
+            Action.author as author,
+            Action.blob as action_blob,
             Entry.blob as entry_blob
             FROM DhtOp
             JOIN
