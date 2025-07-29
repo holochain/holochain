@@ -12,7 +12,7 @@ use std::sync::Arc;
 use crate::sweettest::*;
 
 #[tokio::test(flavor = "multi_thread")]
-async fn agent_meta_info() {
+async fn peer_meta_info() {
     holochain_trace::test_run();
 
     // We want deterministic dna hashes to get the JSON output in a deterministic
@@ -82,7 +82,7 @@ async fn agent_meta_info() {
         .unwrap();
 
     // Get the agent meta info for all spaces
-    let response = conductor.agent_meta_info(url.clone(), None).await.unwrap();
+    let response = conductor.peer_meta_info(url.clone(), None).await.unwrap();
 
     assert_eq!(response.len(), 2);
 
@@ -92,16 +92,16 @@ async fn agent_meta_info() {
 
     assert_eq!(meta_infos1.len(), 2);
 
-    let agent_meta_info11 = meta_infos1.get("root:unresponsive").unwrap();
-    assert_eq!(agent_meta_info11.meta_value, ktimestamp.as_micros());
-    assert_eq!(agent_meta_info11.expires_at, htimestamp);
+    let peer_meta_info11 = meta_infos1.get("root:unresponsive").unwrap();
+    assert_eq!(peer_meta_info11.meta_value, ktimestamp.as_micros());
+    assert_eq!(peer_meta_info11.expires_at, htimestamp);
 
-    let agent_meta_info12 = meta_infos1.get("test:meta").unwrap();
+    let peer_meta_info12 = meta_infos1.get("test:meta").unwrap();
     assert_eq!(
-        agent_meta_info12.meta_value,
+        peer_meta_info12.meta_value,
         serde_json::Value::String("hello".into())
     );
-    assert_eq!(agent_meta_info12.expires_at, htimestamp);
+    assert_eq!(peer_meta_info12.expires_at, htimestamp);
 
     let meta_infos2 = response
         .get(dna2.dna_hash())
@@ -109,16 +109,16 @@ async fn agent_meta_info() {
 
     assert_eq!(meta_infos2.len(), 1);
 
-    let agent_meta_info2 = meta_infos2.get("test:meta").unwrap();
+    let peer_meta_info2 = meta_infos2.get("test:meta").unwrap();
     assert_eq!(
-        agent_meta_info2.meta_value,
+        peer_meta_info2.meta_value,
         serde_json::Value::String("hello2".into())
     );
-    assert_eq!(agent_meta_info2.expires_at, htimestamp);
+    assert_eq!(peer_meta_info2.expires_at, htimestamp);
 
     // Get the agent meta info for a selected space only
     let response2 = conductor
-        .agent_meta_info(url.clone(), Some(vec![dna2.dna_hash().clone()]))
+        .peer_meta_info(url.clone(), Some(vec![dna2.dna_hash().clone()]))
         .await
         .unwrap();
 
@@ -130,24 +130,24 @@ async fn agent_meta_info() {
 
     assert_eq!(meta_infos2.len(), 1);
 
-    let agent_meta_info2 = meta_infos2.get("test:meta").unwrap();
+    let peer_meta_info2 = meta_infos2.get("test:meta").unwrap();
     assert_eq!(
-        agent_meta_info2.meta_value,
+        peer_meta_info2.meta_value,
         serde_json::Value::String("hello2".into())
     );
-    assert_eq!(agent_meta_info2.expires_at, htimestamp);
+    assert_eq!(peer_meta_info2.expires_at, htimestamp);
 
     // Try to get agent meta info for a non-existent space. Should
     // throw an error.
     let res = conductor
-        .agent_meta_info(url.clone(), Some(vec![fixt!(DnaHash)]))
+        .peer_meta_info(url.clone(), Some(vec![fixt!(DnaHash)]))
         .await;
 
     assert!(res.is_err());
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn app_agent_meta_info() {
+async fn app_peer_meta_info() {
     holochain_trace::test_run();
 
     let (dna1, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
@@ -190,7 +190,7 @@ async fn app_agent_meta_info() {
     // Get the agent meta info for all spaces of app1. Should only return
     // info for the space of app1
     let response = conductor
-        .app_agent_meta_info(&app_id1, url.clone(), None)
+        .app_peer_meta_info(&app_id1, url.clone(), None)
         .await
         .unwrap();
     assert_eq!(response.len(), 1);
@@ -200,10 +200,10 @@ async fn app_agent_meta_info() {
         .expect("No value found for dna");
     assert_eq!(meta_infos.len(), 1);
 
-    let agent_meta_info = meta_infos.get("test:meta").unwrap();
+    let peer_meta_info = meta_infos.get("test:meta").unwrap();
     assert_eq!(
-        agent_meta_info.meta_value,
+        peer_meta_info.meta_value,
         serde_json::Value::String("hello".into())
     );
-    assert_eq!(agent_meta_info.expires_at, htimestamp);
+    assert_eq!(peer_meta_info.expires_at, htimestamp);
 }
