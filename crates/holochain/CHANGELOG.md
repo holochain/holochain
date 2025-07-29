@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fixes a bug where the wrong DhtOp location was reported to Kitsune2. This resulted in conductors not being able to sync
+  with each other. This change can upgrade existing conductors and new data should sync correctly. However, part of the
+  DHT model gets persisted and to fix bad data in the persisted model, the model has to be wiped and rebuilt. This will
+  result in a short startup delay when upgrading to this version. After the first startup, the startup time should be
+  back to normal.
+
 ## 0.6.0-dev.15
 
 - Replace `Conductor::remove_dangling_cells` method with methods that remove the cells specific to the app and delete their databases.

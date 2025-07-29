@@ -1,5 +1,6 @@
 SELECT
-  DhtOp.hash
+  DhtOp.hash,
+  DhtOp.basis_hash
 FROM
   DhtOp
 WHERE

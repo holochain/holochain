@@ -382,7 +382,7 @@ impl DhtOp {
         }
     }
 
-    /// Convert a [DhtOp] to a [DhtOpLite] and basis
+    /// Convert a [DhtOp] to a [DhtOpLite].
     pub fn to_lite(&self) -> DhtOpLite {
         match self {
             Self::ChainOp(op) => DhtOpLite::Chain(op.to_lite().into()),
@@ -468,7 +468,7 @@ impl ChainOp {
         }
     }
 
-    /// Convert a [ChainOp] to a [ChainOpLite] and basis
+    /// Convert a [ChainOp] to a [ChainOpLite].
     pub fn to_lite(&self) -> ChainOpLite {
         let basis = self.dht_basis();
         match self {
