@@ -780,7 +780,8 @@ async fn create_sandbox_and_call_list_apps() {
         .stderr(Stdio::inherit());
 
     let mut hc_create = input_piped_password(&mut cmd).await;
-    hc_create.wait().await.unwrap();
+    let exit_code = hc_create.wait().await.unwrap();
+    assert!(exit_code.success());
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -908,7 +909,7 @@ async fn generate_sandbox_with_roles_settings_override() {
 }
 
 /// Generates a new sandbox with a single app deployed and tries to list DNA
-/// This tests that the conductor gets started up and connected to propely
+/// This tests that the conductor gets started up and connected to properly
 /// upon calling `hc-sandbox call`
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_add_and_list_agent() {
@@ -919,14 +920,40 @@ async fn generate_sandbox_and_add_and_list_agent() {
         .unwrap()
         .join("tests/fixtures/my-app/");
 
+    // Find all values with a given key
+    fn find_values_by_key(
+        json: &serde_json::Value,
+        target_key: &str,
+        results: &mut Vec<serde_json::Value>,
+    ) {
+        match json {
+            serde_json::Value::Object(map) => {
+                for (key, value) in map {
+                    if key == target_key {
+                        results.push(value.clone());
+                    }
+                    // Recursively search nested objects/arrays
+                    find_values_by_key(value, target_key, results);
+                }
+            }
+            serde_json::Value::Array(arr) => {
+                for item in arr {
+                    find_values_by_key(item, target_key, results);
+                }
+            }
+            _ => {}
+        }
+    }
+
     // Helper fn to parse process output for agent pub keys.
-    fn get_agent_keys_from_process_output(output: Output) -> Vec<String> {
-        let mut agents_output = from_utf8(&output.stdout).unwrap().split("AgentPubKey(");
-        // Discard characters before the first agent pub key.
-        agents_output.next();
-        agents_output
-            .map(|pub_key| pub_key.split(")").next().unwrap().to_string())
-            .collect::<Vec<_>>()
+    fn get_agent_keys_from_process_output(output: Output) -> Vec<serde_json::Value> {
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        // Parse JSON
+        let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+        // Find all values with the target key
+        let mut results = Vec::new();
+        find_values_by_key(&json, "agent_pub_key", &mut results);
+        results
     }
 
     holochain_trace::test_run();
@@ -1071,9 +1098,9 @@ async fn generate_sandbox_and_add_and_list_agent() {
     shutdown_sandbox(hc_admin).await;
 }
 
-/// Tests retrieval of agent meta info via `hc sandbox call agent-meta-info`
+/// Tests retrieval of agent meta info via `hc sandbox call peer-meta-info`
 #[tokio::test(flavor = "multi_thread")]
-async fn generate_sandbox_and_call_agent_meta_info() {
+async fn generate_sandbox_and_call_peer_meta_info() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
@@ -1142,7 +1169,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
     };
 
     // Needs to get converted to a String (not DnaHashB64) so that the sorting will
-    // match the sorting of the JSON output from the `hc sandbox agent-meta-info` call
+    // match the sorting of the JSON output from the `hc sandbox peer-meta-info` call
     let mut dna_hashes_b64: Vec<String> = dna_hashes
         .into_iter()
         .map(|h| DnaHashB64::from(h).to_string())
@@ -1160,7 +1187,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
             get_holochain_bin_path().to_str().unwrap()
         ))
         .arg("call")
-        .arg("agent-meta-info")
+        .arg("peer-meta-info")
         .arg("--url")
         .arg("wss://someurl:443")
         .current_dir(temp_dir.path())
@@ -1182,10 +1209,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
         .unwrap();
 
     let expected_output = format!(
-        r#"{{
-  "{}": {{}},
-  "{}": {{}}
-}}
+        r#"{{"{}":{{}},"{}":{{}}}}
 "#,
         dna_hashes_b64[0].clone(),
         dna_hashes_b64[1].clone()
@@ -1202,7 +1226,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
             get_holochain_bin_path().to_str().unwrap()
         ))
         .arg("call")
-        .arg("agent-meta-info")
+        .arg("peer-meta-info")
         .arg("--url")
         .arg("wss://someurl:443")
         .arg("--dna")
@@ -1226,9 +1250,7 @@ async fn generate_sandbox_and_call_agent_meta_info() {
         .unwrap();
 
     let expected_output = format!(
-        r#"{{
-  "{}": {{}}
-}}
+        r#"{{"{}":{{}}}}
 "#,
         dna_hashes_b64[0].clone(),
     );

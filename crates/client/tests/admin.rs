@@ -219,7 +219,7 @@ async fn agent_info() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn agent_meta_info() {
+async fn peer_meta_info() {
     // This is just a rudimentary test. More detailed functionality is tested in
     // conductor tests in the holochain crate where the peer meta store is
     // accessible on the SweetConductor.
@@ -260,7 +260,7 @@ async fn agent_meta_info() {
     let url = Url::from_str("ws://test.com:80/test-url").unwrap();
 
     // Get the agent meta info for all spaces
-    let response = admin_ws.agent_meta_info(url.clone(), None).await.unwrap();
+    let response = admin_ws.peer_meta_info(url.clone(), None).await.unwrap();
     assert_eq!(response.len(), 1);
 
     let meta_infos = response
