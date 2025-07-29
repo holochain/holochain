@@ -10,16 +10,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::cmds::Existing;
-use crate::ports::get_admin_ports;
 use crate::run::run_async;
+use crate::save::HcFile;
 use anyhow::anyhow;
 use anyhow::bail;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use clap::{Args, Parser, Subcommand};
 use holo_hash::{ActionHash, AgentPubKeyB64, DnaHashB64};
 use holochain_client::AdminWebsocket;
-use holochain_conductor_api::AgentMetaInfo;
-use holochain_conductor_api::conductor::paths::ConfigRootPath;
 use holochain_conductor_api::AppStatusFilter;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_conductor_api::PeerMetaInfo;
@@ -40,13 +38,6 @@ use kitsune2_api::AgentInfoSigned;
 use kitsune2_api::Url;
 use kitsune2_core::Ed25519Verifier;
 use std::convert::TryFrom;
-use crate::cmds::Existing;
-use crate::run::run_async;
-use crate::save::HcFile;
-use clap::{Args, Parser, Subcommand};
-use holochain_trace::Output;
-use holochain_types::websocket::AllowedOrigins;
-use kitsune2_api::AgentInfoSigned;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]

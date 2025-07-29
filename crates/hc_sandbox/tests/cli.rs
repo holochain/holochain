@@ -21,7 +21,6 @@ use std::future::Future;
 use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Output, Stdio};
-use std::str::from_utf8;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -204,7 +203,6 @@ async fn list_sandboxes(cur_dir: &Path) -> Output {
 #[tokio::test(flavor = "multi_thread")]
 async fn clean_empty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
 
     let mut cmd = get_sandbox_command();
     cmd.arg("clean").current_dir(temp_dir.path());
@@ -223,7 +221,6 @@ use std::os::unix::fs::PermissionsExt;
 #[tokio::test(flavor = "multi_thread")]
 async fn clean_no_permission() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
 
     let file_path = temp_dir.path().join(".hc");
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
@@ -242,7 +239,6 @@ async fn clean_no_permission() {
 #[tokio::test(flavor = "multi_thread")]
 async fn clean_one_missing() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
     let file_path = temp_dir.path().join(".hc");
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
 
@@ -259,7 +255,6 @@ async fn clean_one_missing() {
 #[tokio::test(flavor = "multi_thread")]
 async fn clean_one_real() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
     // create subfolder
     let one_path = &temp_dir.path().join("one");
     std::fs::create_dir_all(one_path).unwrap();
@@ -281,7 +276,6 @@ async fn clean_one_real() {
 #[tokio::test(flavor = "multi_thread")]
 async fn remove_empty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
 
     let mut cmd = get_sandbox_command();
     cmd.arg("remove").arg("0").current_dir(temp_dir.path());
@@ -296,7 +290,6 @@ async fn remove_empty() {
 #[tokio::test(flavor = "multi_thread")]
 async fn remove_one() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
     let file_path = temp_dir.path().join(".hc");
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
 
@@ -314,7 +307,6 @@ async fn remove_one() {
 #[tokio::test(flavor = "multi_thread")]
 async fn remove_two() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
     let file_path = temp_dir.path().join(".hc");
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
     let app_path = std::env::current_dir()
@@ -368,7 +360,6 @@ async fn remove_two() {
 #[tokio::test(flavor = "multi_thread")]
 async fn list_and_clean() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
 
     clean_sandboxes(temp_dir.path()).await;
     package_fixture_if_not_packaged().await;
@@ -420,7 +411,6 @@ async fn list_and_clean() {
 #[tokio::test(flavor = "multi_thread")]
 async fn run_missing() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
     let file_path = temp_dir.path().join(".hc");
     std::fs::write(&file_path, "/tmp/bogus").unwrap();
 
@@ -465,7 +455,6 @@ async fn run_missing() {
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_connect() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
@@ -510,7 +499,6 @@ async fn generate_sandbox_and_connect() {
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_list_dna() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
@@ -560,7 +548,6 @@ async fn generate_sandbox_and_call_list_dna() {
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
@@ -611,7 +598,6 @@ async fn generate_sandbox_memproof_deferred_and_call_list_dna() {
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_non_running_sandbox_and_call_list_dna() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
@@ -663,7 +649,6 @@ async fn generate_non_running_sandbox_and_call_list_dna() {
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_list_dna_with_origin() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
@@ -761,8 +746,6 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_and_call_list_apps() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
-    //package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
@@ -914,7 +897,7 @@ async fn generate_sandbox_with_roles_settings_override() {
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_add_and_list_agent() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
+
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
@@ -1102,7 +1085,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
 #[tokio::test(flavor = "multi_thread")]
 async fn generate_sandbox_and_call_peer_meta_info() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
+
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
@@ -1263,7 +1246,7 @@ async fn generate_sandbox_and_call_peer_meta_info() {
 #[tokio::test(flavor = "multi_thread")]
 async fn authorize_zome_call_credentials() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
+
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
@@ -1332,7 +1315,7 @@ async fn authorize_zome_call_credentials() {
 #[tokio::test(flavor = "multi_thread")]
 async fn call_zome_function() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
+
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
@@ -1452,7 +1435,7 @@ async fn call_zome_function() {
 #[tokio::test(flavor = "multi_thread")]
 async fn zome_function_can_return_hash() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(&temp_dir).unwrap();
+
     package_fixture_if_not_packaged().await;
     let app_path = std::env::current_dir()
         .unwrap()
