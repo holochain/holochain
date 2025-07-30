@@ -1,5 +1,6 @@
 SELECT
   hash,
+  basis_hash,
   when_integrated,
   serialized_size
 FROM

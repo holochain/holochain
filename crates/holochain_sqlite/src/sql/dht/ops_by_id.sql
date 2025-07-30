@@ -1,5 +1,6 @@
 SELECT
   DhtOp.hash,
+  DhtOp.basis_hash,
   DhtOp.type,
   Action.blob AS action_blob,
   Action.author AS author,

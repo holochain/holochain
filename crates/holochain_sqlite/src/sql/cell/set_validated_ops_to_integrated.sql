@@ -8,4 +8,5 @@ WHERE
   AND validation_status IS NOT NULL
 RETURNING
   hash,
+  basis_hash,
   authored_timestamp

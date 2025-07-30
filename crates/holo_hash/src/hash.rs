@@ -189,14 +189,32 @@ impl crate::AgentPubKey {
 #[cfg(feature = "kitsune2")]
 impl crate::DhtOpHash {
     /// Convert this holo hash into a kitsune2 OpId.
+    #[deprecated(since = "0.5.5", note = "Use `to_located_k2_op_id` instead")]
     pub fn to_k2_op(&self) -> kitsune2_api::OpId {
-        kitsune2_api::OpId::from(bytes::Bytes::copy_from_slice(self.get_raw_32()))
+        kitsune2_api::OpId::from(bytes::Bytes::copy_from_slice(self.get_raw_36()))
+    }
+
+    /// Convert this [`DhtOpHash`](crate::DhtOpHash) into a kitsune2 [`OpId`](kitsune2_api::OpId),
+    /// with appended location bytes.
+    ///
+    /// The location that is reported by a [`DhtOpHash`](crate::DhtOpHash) is the location of the
+    /// op itself but that is not the location of the op in the DHT. The latter is given by the
+    /// [`OpBasis`](crate::OpBasis).
+    ///
+    /// The resulting [`OpId`](kitsune2_api::OpId) will have the first 32 bytes as the core hash of
+    /// the op, and the last 4 bytes as the location bytes taken from the
+    /// [`OpBasis`](crate::OpBasis).
+    pub fn to_located_k2_op_id(&self, op_basis: &crate::OpBasis) -> kitsune2_api::OpId {
+        let mut inner = bytes::BytesMut::with_capacity(HOLO_HASH_UNTYPED_LEN);
+        inner.extend_from_slice(self.get_raw_32());
+        inner.extend_from_slice(&op_basis.get_raw_36()[HOLO_HASH_CORE_LEN..]);
+        kitsune2_api::OpId::from(inner.freeze())
     }
 
     /// Convert a kitsune2 OpId into a DhtOpHash.
     #[cfg(feature = "hashing")]
     pub fn from_k2_op(op: &kitsune2_api::OpId) -> Self {
-        Self::from_raw_32(op.to_vec())
+        Self::from_raw_32(op[..HOLO_HASH_CORE_LEN].to_vec())
     }
 }
 
