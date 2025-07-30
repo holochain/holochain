@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+## 0.6.0-dev.15
+
 ## 0.6.0-dev.14
 
 - Added `AdminRequest::RevokeZomeCallCapability` and `AdminResponse::ZomeCallCapabilityRevoked` to implement an admin API endpoint to revoke capability grants. [Issue 4596](https://github.com/holochain/holochain/issues/4596)

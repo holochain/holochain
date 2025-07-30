@@ -7,11 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-dev.15
+
 - Replace `Conductor::remove_dangling_cells` method with methods that remove the cells specific to the app and delete their databases.
 - **BREAKING CHANGE**: Remove unused field `ConductorBuilder::state`.
-- Remove network joining timeout. This used to work with the previous version of kitsune, but now all the `join` call does is to join the local peer store which is a matter of acquiring a write lock on a mutex and doesn't indicate whether publishing the agent info to the peer store and the bootstrap has been successful.
+- Remove network joining timeout. This used to work with the previous version of kitsune, but now all the `join` call does is to join the local peer store which is a matter of acquiring a write lock on a mutex and doesn’t indicate whether publishing the agent info to the peer store and the bootstrap has been successful.
 - **BREAKING CHANGE**: Remove unused function `get_dependency_apps`.
-- **BREAKING CHANGE**: Rename `AgentMetaInfo` to `PeerMetaInfo` since the info returns meta data for potentially multiple agents at a given peer URL ([#5164](https://github.com/holochain/holochain/pull/5164)).
+- **BREAKING CHANGE**: Rename `AgentMetaInfo` to `PeerMetaInfo` since the info returns meta data for potentially multiple agents at a given peer URL ([\#5164](https://github.com/holochain/holochain/pull/5164)).
 
 ## 0.6.0-dev.14
 
@@ -22,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Remove app status transition functions and `AppInfoStatus`.
 - **BREAKING CHANGE**: Remove types `EnabledApp` and `DisabledApp` in favor of `InstalledApp` to reduce app handling complexity.
 - **BREAKING CHANGE**: Replace and remove legacy constructor for `InstalledAppCommon`.
-- Remove an unnecessary use of `DnaFile` in the genesis workflow ([#5150](https://github.com/holochain/holochain/pull/5150)).
+- Remove an unnecessary use of `DnaFile` in the genesis workflow ([\#5150](https://github.com/holochain/holochain/pull/5150)).
 
 ## 0.6.0-dev.13
 

@@ -14,6 +14,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250730.001323
+
+## [hcterm-0.6.0-dev.15](crates/hcterm/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_cli-0.6.0-dev.15](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_cli\_bundle-0.6.0-dev.15](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.15](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_client-0.8.0-dev.12](crates/holochain_client/CHANGELOG.md#0.8.0-dev.12)
+
+## [holochain-0.6.0-dev.15](crates/holochain/CHANGELOG.md#0.6.0-dev.15)
+
+- Replace `Conductor::remove_dangling_cells` method with methods that remove the cells specific to the app and delete their databases.
+- **BREAKING CHANGE**: Remove unused field `ConductorBuilder::state`.
+- Remove network joining timeout. This used to work with the previous version of kitsune, but now all the `join` call does is to join the local peer store which is a matter of acquiring a write lock on a mutex and doesn’t indicate whether publishing the agent info to the peer store and the bootstrap has been successful.
+- **BREAKING CHANGE**: Remove unused function `get_dependency_apps`.
+- **BREAKING CHANGE**: Rename `AgentMetaInfo` to `PeerMetaInfo` since the info returns meta data for potentially multiple agents at a given peer URL ([\#5164](https://github.com/holochain/holochain/pull/5164)).
+
+## [holochain\_cascade-0.6.0-dev.15](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_conductor\_config-0.6.0-dev.15](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.15](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_websocket-0.6.0-dev.15](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_conductor\_api-0.6.0-dev.15](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_p2p-0.6.0-dev.15](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_state-0.6.0-dev.15](crates/holochain_state/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_chc-0.3.0-dev.15](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.15)
+
+## [holochain\_types-0.6.0-dev.15](crates/holochain_types/CHANGELOG.md#0.6.0-dev.15)
+
 # 20250723.001249
 
 ## [hcterm-0.6.0-dev.14](crates/hcterm/CHANGELOG.md#0.6.0-dev.14)
