@@ -93,7 +93,7 @@ fn get_location_info_from(
             let op_basis = row.get::<_, OpBasis>(1)?;
             let storage_center_loc = row.get::<_, u32>(2)?;
 
-            let op_id = dht_op_hash.to_located_k2_op(&op_basis);
+            let op_id = dht_op_hash.to_located_k2_op_id(&op_basis);
 
             out.insert(FoundLocationInfo {
                 dht_op_hash,

@@ -99,7 +99,7 @@ impl OpStore for HolochainOpStore {
                 let op = decode::<_, DhtOp>(&op_bytes)
                     .map_err(|e| K2Error::other_src("Could not decode op", e))?;
                 let op_hashed = DhtOpHashed::from_content_sync(op.clone());
-                ids.push(op_hashed.hash.to_located_k2_op(&op.dht_basis()));
+                ids.push(op_hashed.hash.to_located_k2_op_id(&op.dht_basis()));
                 dht_ops.push(op);
             }
 
@@ -149,7 +149,7 @@ impl OpStore for HolochainOpStore {
                         let op_basis: OpBasis = row.get(1)?;
                         let serialized_size: u32 = row.get(2)?;
 
-                        let op_id = hash.to_located_k2_op(&op_basis);
+                        let op_id = hash.to_located_k2_op_id(&op_basis);
                         out.push(op_id);
                         out_size += serialized_size;
                     }
@@ -191,7 +191,7 @@ impl OpStore for HolochainOpStore {
                         let dht_op = holochain_state::query::map_sql_dht_op(false, "type", row)?;
 
                         out.push(MetaOp {
-                            op_id: hash.to_located_k2_op(&op_basis),
+                            op_id: hash.to_located_k2_op_id(&op_basis),
                             op_data: holochain_serialized_bytes::prelude::encode(&dht_op)?.into(),
                         });
                     }
@@ -227,7 +227,7 @@ impl OpStore for HolochainOpStore {
                     while let Some(row) = rows.next()? {
                         let op_hash: DhtOpHash = row.get(0)?;
                         let op_basis: OpBasis = row.get(1)?;
-                        out.remove(&op_hash.to_located_k2_op(&op_basis));
+                        out.remove(&op_hash.to_located_k2_op_id(&op_basis));
                     }
 
                     Ok(out.into_iter().collect())
@@ -291,7 +291,7 @@ impl OpStore for HolochainOpStore {
                                     break 'outer;
                                 }
 
-                                let op_id = hash.to_located_k2_op(&op_basis);
+                                let op_id = hash.to_located_k2_op_id(&op_basis);
                                 if out.insert(op_id) {
                                     latest_timestamp = timestamp;
                                     used_bytes += serialized_size;

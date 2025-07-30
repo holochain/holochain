@@ -183,8 +183,12 @@ async fn process_incoming_ops_and_retrieve() {
         .unwrap();
 
     let to_retrieve = vec![
-        dht_op_1.as_hash().to_located_k2_op(&dht_op_1.dht_basis()),
-        dht_op_2.as_hash().to_located_k2_op(&dht_op_2.dht_basis()),
+        dht_op_1
+            .as_hash()
+            .to_located_k2_op_id(&dht_op_1.dht_basis()),
+        dht_op_2
+            .as_hash()
+            .to_located_k2_op_id(&dht_op_2.dht_basis()),
     ];
 
     // Ops are not integrated, we shouldn't be able to retrieve them
@@ -215,8 +219,12 @@ async fn filter_out_existing_ops() {
         .unwrap();
 
     let to_check = vec![
-        dht_op_1.as_hash().to_located_k2_op(&dht_op_1.dht_basis()),
-        dht_op_2.as_hash().to_located_k2_op(&dht_op_2.dht_basis()),
+        dht_op_1
+            .as_hash()
+            .to_located_k2_op_id(&dht_op_1.dht_basis()),
+        dht_op_2
+            .as_hash()
+            .to_located_k2_op_id(&dht_op_2.dht_basis()),
     ];
     let all_exist_filtered = op_store.filter_out_existing_ops(to_check).await.unwrap();
 
@@ -224,7 +232,9 @@ async fn filter_out_existing_ops() {
 
     let non_existent_op_id = OpId::from(Bytes::from_static(&[5; 32]));
     let to_check = vec![
-        dht_op_1.as_hash().to_located_k2_op(&dht_op_1.dht_basis()),
+        dht_op_1
+            .as_hash()
+            .to_located_k2_op_id(&dht_op_1.dht_basis()),
         non_existent_op_id.clone(),
     ];
     let some_exists_filtered = op_store.filter_out_existing_ops(to_check).await.unwrap();

@@ -54,7 +54,7 @@ where
                     let loc: u32 = row.get("loc")?;
                     let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
 
-                    Ok((loc, h.to_located_k2_op(&op_basis), op))
+                    Ok((loc, h.to_located_k2_op_id(&op_basis), op))
                 },
             )?
             .collect::<StateQueryResult<_>>()?
@@ -69,7 +69,7 @@ where
                         let op_basis = row.get::<_, OpBasis>("dht_op_basis")?;
                         let loc: u32 = row.get("loc")?;
                         let op = holochain_state::query::map_sql_dht_op(false, "dht_type", row)?;
-                        StateQueryResult::Ok((loc, h.to_located_k2_op(&op_basis), op))
+                        StateQueryResult::Ok((loc, h.to_located_k2_op_id(&op_basis), op))
                     },
                 )?
                 .collect::<StateQueryResult<_>>()?

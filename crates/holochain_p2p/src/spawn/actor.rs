@@ -1468,7 +1468,7 @@ impl actor::HcP2p for HolochainP2pActor {
 
             let op_hash_list: Vec<OpId> = op_hash_list
                 .into_iter()
-                .map(|h| h.to_located_k2_op(&basis_hash))
+                .map(|h| h.to_located_k2_op_id(&basis_hash))
                 .collect();
 
             let urls: std::collections::HashSet<Url> = get_responsive_remote_agents_near_location(
@@ -2187,7 +2187,7 @@ mod tests {
 
         let h_op = DhtOpHash::from_raw_32(vec![0xdd; 32]);
         let op_basis = OpBasis::from_raw_32_and_type(vec![0xde; 32], hash_type::AnyLinkable::Entry);
-        let k_op = h_op.to_located_k2_op(&op_basis);
+        let k_op = h_op.to_located_k2_op_id(&op_basis);
 
         assert_eq!(op_basis.get_loc(), k_op.loc());
     }
@@ -2209,7 +2209,7 @@ mod tests {
         assert_eq!(h_agent.to_string(), k_agent.to_string());
 
         let h_op = DhtOpHash::from_raw_32(vec![0xdd; 32]);
-        let k_op = h_op.to_located_k2_op(&OpBasis::from_raw_32_and_type(
+        let k_op = h_op.to_located_k2_op_id(&OpBasis::from_raw_32_and_type(
             vec![0xde; 32],
             hash_type::AnyLinkable::Entry,
         ));

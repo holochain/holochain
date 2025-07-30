@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- As part of the fix below, the Holo hash method `to_k2_op` on a DhtOpHash` has been deprecated and replaced with 
+  `to_located_k2_op_id`.
 - Fixes a bug where the wrong DhtOp location was reported to Kitsune2. This resulted in conductors not being able to sync
   with each other. This change can upgrade existing conductors and new data should sync correctly. However, part of the
   DHT model gets persisted and to fix bad data in the persisted model, the model has to be wiped and rebuilt. This will

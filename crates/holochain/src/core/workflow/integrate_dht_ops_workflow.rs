@@ -57,7 +57,7 @@ fn to_stored_op(row: &Row<'_>) -> rusqlite::Result<StoredOp> {
     let created_at = row.get::<_, Timestamp>(2)?;
     let op = StoredOp {
         created_at: kitsune2_api::Timestamp::from_micros(created_at.as_micros()),
-        op_id: op_hash.to_located_k2_op(&op_basis),
+        op_id: op_hash.to_located_k2_op_id(&op_basis),
     };
     Ok(op)
 }

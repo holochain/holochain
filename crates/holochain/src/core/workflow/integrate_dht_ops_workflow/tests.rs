@@ -917,7 +917,7 @@ async fn inform_kitsune_about_integrated_ops() {
             .return_once(move |space_id, ops| {
                 assert_eq!(space_id, dna_hash2.to_k2_space());
                 let expected_op = StoredOp {
-                    op_id: op.to_hash().to_located_k2_op(&op.dht_basis()),
+                    op_id: op.to_hash().to_located_k2_op_id(&op.dht_basis()),
                     created_at: kitsune2_api::Timestamp::from_micros(op.timestamp().as_micros()),
                 };
                 assert_eq!(ops, vec![expected_op]);
