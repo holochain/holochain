@@ -65,6 +65,7 @@ ed25519-dalek = "2.1"
 kitsune2_test_utils = "0.2.12"
 fixt = { version = "^0.6.0-dev.2", path = "../fixt" }
 indexmap = { version = "2.6.0", features = ["serde"] }
+tempfile = "3.20"
 
 [target.'cfg(unix)'.dev-dependencies]
 nix = { version = "0.30", features = ["process", "signal"] }
