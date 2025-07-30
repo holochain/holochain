@@ -1,5 +1,6 @@
 SELECT
   hash,
+  basis_hash,
   serialized_size
 FROM
   DhtOp

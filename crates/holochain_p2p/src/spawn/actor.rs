@@ -779,6 +779,14 @@ impl HolochainP2pActor {
         K2_CONFIG.call_once(|| {
             // Set up some kitsune2 specializations specific to holochain.
 
+            kitsune2_api::OpId::set_loc_callback(|bytes| {
+                u32::from_le_bytes(
+                    bytes[HOLO_HASH_CORE_LEN..HOLO_HASH_UNTYPED_LEN]
+                        .try_into()
+                        .unwrap(),
+                )
+            });
+
             // Kitsune2 by default just xors subsequent bytes of the hash
             // itself and treats that result as a LE u32.
             // Holochain, instead, first does a blake2b hash, and
@@ -805,7 +813,7 @@ impl HolochainP2pActor {
                 write!(f, "{}", AgentPubKey::from_raw_32(bytes.to_vec()))
             });
             kitsune2_api::OpId::set_global_display_callback(|bytes, f| {
-                write!(f, "{}", DhtOpHash::from_raw_32(bytes.to_vec()))
+                write!(f, "{}", DhtOpHash::from_raw_32(bytes[0..32].to_vec()))
             });
         });
 
@@ -1458,7 +1466,10 @@ impl actor::HcP2p for HolochainP2pActor {
 
             // -- actually publish the op hashes -- //
 
-            let op_hash_list: Vec<OpId> = op_hash_list.into_iter().map(|h| h.to_k2_op()).collect();
+            let op_hash_list: Vec<OpId> = op_hash_list
+                .into_iter()
+                .map(|h| h.to_located_k2_op_id(&basis_hash))
+                .collect();
 
             let urls: std::collections::HashSet<Url> = get_responsive_remote_agents_near_location(
                 space.peer_store().clone(),
@@ -2175,9 +2186,10 @@ mod tests {
         assert_eq!(h_agent.get_loc(), k_agent.loc());
 
         let h_op = DhtOpHash::from_raw_32(vec![0xdd; 32]);
-        let k_op = h_op.to_k2_op();
+        let op_basis = OpBasis::from_raw_32_and_type(vec![0xde; 32], hash_type::AnyLinkable::Entry);
+        let k_op = h_op.to_located_k2_op_id(&op_basis);
 
-        assert_eq!(h_op.get_loc(), k_op.loc());
+        assert_eq!(op_basis.get_loc(), k_op.loc());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -2197,7 +2209,10 @@ mod tests {
         assert_eq!(h_agent.to_string(), k_agent.to_string());
 
         let h_op = DhtOpHash::from_raw_32(vec![0xdd; 32]);
-        let k_op = h_op.to_k2_op();
+        let k_op = h_op.to_located_k2_op_id(&OpBasis::from_raw_32_and_type(
+            vec![0xde; 32],
+            hash_type::AnyLinkable::Entry,
+        ));
 
         assert_eq!(h_op.to_string(), k_op.to_string());
     }

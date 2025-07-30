@@ -38,10 +38,10 @@ tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = "0.2.9"
-kitsune2_api = "0.2.9"
-kitsune2_core = "0.2.9"
-kitsune2_gossip = "0.2.9"
+kitsune2 = "0.2.12"
+kitsune2_api = "0.2.12"
+kitsune2_core = "0.2.12"
+kitsune2_gossip = "0.2.12"
 bytes = "1.10"
 holochain_sqlite = { version = "^0.6.0-dev.14", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.2"

@@ -291,5 +291,6 @@ async fn zero_arc_can_delete_link() {
         .await;
 }
 
+mod dht_location;
 pub mod must_get_agent_activity_saturation;
 mod zome_call_atomic;
