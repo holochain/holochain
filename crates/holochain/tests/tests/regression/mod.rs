@@ -234,5 +234,6 @@ async fn zero_arc_can_link_to_uncached_base() {
     println!("@!@!@ link_hash: {link_hash:?}");
 }
 
+mod dht_location;
 pub mod must_get_agent_activity_saturation;
 mod zome_call_atomic;

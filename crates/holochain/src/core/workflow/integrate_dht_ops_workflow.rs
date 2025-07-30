@@ -54,10 +54,11 @@ pub async fn integrate_dht_ops_workflow(
 
 fn to_stored_op(row: &Row<'_>) -> rusqlite::Result<StoredOp> {
     let op_hash = row.get::<_, DhtOpHash>(0)?;
-    let created_at = row.get::<_, Timestamp>(1)?;
+    let op_basis = row.get::<_, OpBasis>(1)?;
+    let created_at = row.get::<_, Timestamp>(2)?;
     let op = StoredOp {
         created_at: kitsune2_api::Timestamp::from_micros(created_at.as_micros()),
-        op_id: op_hash.to_k2_op(),
+        op_id: op_hash.to_located_k2_op_id(&op_basis),
     };
     Ok(op)
 }
