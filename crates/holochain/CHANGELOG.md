@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update Kitsune2 and tx5 to a version that contains a fix for a tx5 bug which would cause failed WebRTC connections to
+  fall back to using the relay over signal instead of closing the connection. When the connection is closed because of
+  an error, it can be reopened. If a connection is treated as relayed, it will stay relayed and not switch back to a
+  direct connection.
+
 ## 0.5.4
 
 ## 0.5.4-rc.0
