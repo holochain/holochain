@@ -43,12 +43,15 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
     };
     let to_remove_len = to_remove.len();
     for p in to_remove {
-        if p.exists() && p.is_dir() {
-            if let Err(e) = std::fs::remove_dir_all(p) {
-                tracing::error!("Failed to remove {} because {:?}", p.display(), e);
+        if let Some(p) = p {
+            if p.exists() && p.is_dir() {
+                if let Err(e) = std::fs::remove_dir_all(p) {
+                    tracing::error!("Failed to remove {} because {:?}", p.display(), e);
+                }
             }
         }
     }
+
     if sandboxes_len == 0 || sandboxes_len == to_remove_len {
         for entry in std::fs::read_dir(&hc_dir)? {
             let entry = entry?;
@@ -78,7 +81,7 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
 }
 
 /// Load sandbox paths from the `.hc` file.
-pub fn load(mut hc_dir: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
+pub fn load(mut hc_dir: PathBuf) -> std::io::Result<Vec<Option<PathBuf>>> {
     let mut paths = Vec::new();
     hc_dir.push(".hc");
     if hc_dir.exists() {
@@ -87,36 +90,45 @@ pub fn load(mut hc_dir: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
             let path = PathBuf::from(sandbox);
             let config_file_path = ConfigFilePath::from(ConfigRootPath::from(path.clone()));
             if config_file_path.as_ref().exists() {
-                paths.push(path);
+                paths.push(Some(path));
             } else {
                 tracing::error!("Failed to load path {} from existing .hc", path.display());
+                paths.push(None);
             }
         }
     }
+
     Ok(paths)
 }
 
 /// Print out the sandboxes contained in the `.hc` file.
-pub fn list(hc_dir: PathBuf, verbose: bool) -> anyhow::Result<()> {
+pub fn list(hc_dir: PathBuf, verbose: bool) -> std::io::Result<()> {
     let out = load(hc_dir)?.into_iter().enumerate().try_fold(
         "\nSandboxes contained in `.hc`\n".to_string(),
         |out, (i, path)| {
-            let r = match verbose {
-                false => format!("{}{}: {}\n", out, i, path.display()),
-                true => {
-                    let config = holochain_conductor_config::config::read_config(
-                        ConfigRootPath::from(path.clone()),
-                    )?;
-                    format!(
-                        "{}{}: {}\nConductor Config:\n{:?}\n",
-                        out,
-                        i,
-                        path.display(),
-                        config
-                    )
+            let r = match path {
+                Some(path) => {
+                    if verbose {
+                        let config = holochain_conductor_config::config::read_config(
+                            ConfigRootPath::from(path.clone()),
+                        ).map_err(|e| std::io::Error::other(e))?;
+                        format!(
+                            "{}{}: {}\nConductor Config:\n{:?}\n",
+                            out,
+                            i,
+                            path.display(),
+                            config
+                        )
+                    } else {
+                        format!("{}{}: {}\n", out, i, path.display())
+                    }
+                }
+                None => {
+                    format!("{}{}: Missing\n", out, i)
                 }
             };
-            anyhow::Result::<_, anyhow::Error>::Ok(r)
+
+            std::io::Result::Ok(r)
         },
     )?;
     msg!("{}", out);
@@ -134,7 +146,7 @@ pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::R
     use std::io::Write;
     std::fs::create_dir_all(&hc_dir)?;
     let paths = load(hc_dir.clone())?;
-    let index = match paths.into_iter().enumerate().find(|p| p.1 == path) {
+    let index = match paths.into_iter().enumerate().find(|p| p.1 == Some(path.to_path_buf())) {
         Some((i, _)) => i,
         None => return Ok(()),
     };
@@ -183,7 +195,7 @@ pub fn find_ports(hc_dir: PathBuf, paths: &[PathBuf]) -> anyhow::Result<Vec<Opti
     let mut ports = Vec::new();
     let all_paths = load(hc_dir.clone())?;
     for path in paths {
-        let index = all_paths.iter().position(|p| p == path);
+        let index = all_paths.iter().position(|p| *p == Some(path.to_path_buf()));
         match index {
             Some(i) => {
                 let mut hc = hc_dir.clone();

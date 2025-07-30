@@ -93,54 +93,68 @@ pub enum NetworkType {
 
 #[derive(Debug, Parser, Clone)]
 pub struct Existing {
-    /// Paths to existing sandbox directories.
-    /// For example `hc sandbox run -e=/tmp/kAOXQlilEtJKlTM_W403b,/tmp/kddsajkaasiIII_sJ`.
-    #[arg(short, long, value_delimiter = ',')]
-    pub existing_paths: Vec<PathBuf>,
-
     /// Run all the existing conductor sandboxes specified in `$(pwd)/.hc`.
-    #[arg(short, long, conflicts_with_all = &["last", "indices"])]
+    #[arg(short, long, conflicts_with_all = &["indices"])]
     pub all: bool,
-
-    /// Run the last created conductor sandbox --
-    /// that is, the last line in `$(pwd)/.hc`.
-    #[arg(short, long, conflicts_with_all = &["all", "indices"])]
-    pub last: bool,
 
     /// Run a selection of existing conductor sandboxes
     /// from those specified in `$(pwd)/.hc`.
     /// Existing sandboxes and their indices are visible via `hc list`.
     /// Use the zero-based index to choose which sandboxes to use.
     /// For example `hc sandbox run 1 3 5` or `hc sandbox run 1`
-    #[arg(conflicts_with_all = &["all", "last"])]
+    #[arg(conflicts_with_all = &["all"])]
     pub indices: Vec<usize>,
 }
 
 impl Existing {
-    pub fn load(mut self) -> anyhow::Result<Vec<PathBuf>> {
+    pub fn load(self) -> std::io::Result<Vec<PathBuf>> {
+        let get_invalid_indices = |sandboxes: &[Option<PathBuf>]| {
+            sandboxes
+                .iter()
+                .enumerate()
+                .filter_map(|(index, path_opt)| path_opt.as_ref().map(|_| index))
+                .collect::<Vec<_>>()
+        };
+
         let sandboxes = crate::save::load(std::env::current_dir()?)?;
         if self.all {
-            // Get all the sandboxes
-            self.existing_paths.extend(sandboxes)
-        } else if self.last && sandboxes.last().is_some() {
-            // Get just the last sandbox
-            self.existing_paths
-                .push(sandboxes.last().cloned().expect("Safe due to check above"));
+            // If any of the sandboxes are missing, warn the user
+            if sandboxes.iter().any(Option::is_none) {
+                let missing_indices = get_invalid_indices(&sandboxes);
+                msg!("There are invalid sandboxes in the list at indices: {missing_indices:?}.",);
+            }
+
+            // Return all the valid sandboxes
+            Ok(sandboxes.into_iter().filter_map(|p| p).collect())
         } else if !self.indices.is_empty() {
-            // Get the indices
-            let e = self
+            // If the user specified indices, then all sandboxes must be present. Otherwise, the
+            // user might be referring to a different sandbox than they expect.
+            if sandboxes.iter().any(Option::is_none) {
+                let missing_indices = get_invalid_indices(&sandboxes);
+
+                msg!("There are invalid sandboxes in the list at indices: {missing_indices:?}.",);
+                return Err(std::io::Error::other("Invalid sandboxes found."));
+            }
+
+            // Return the selected sandboxes
+            Ok(self
                 .indices
                 .into_iter()
-                .filter_map(|i| sandboxes.get(i).cloned());
-            self.existing_paths.extend(e);
-        } else if !self.existing_paths.is_empty() {
-            // If there is existing paths then use those
+                .filter_map(|i| sandboxes.get(i).cloned().flatten())
+                .collect())
         } else if sandboxes.len() == 1 {
             // If there is only one sandbox then use that
-            self.existing_paths
-                .push(sandboxes.last().cloned().expect("Safe due to check above"));
+            match &sandboxes[0] {
+                Some(path) => {
+                    Ok(vec![path.clone()])
+                }
+                None => {
+                    msg!("There is only one sandbox, but it is missing.");
+                    Err(std::io::Error::other("Missing sandbox."))
+                }
+            }
         } else if sandboxes.len() > 1 {
-            // There is multiple sandboxes, the use must disambiguate
+            // There are multiple sandboxes, the use must disambiguate
             msg!(
                 "
 There are multiple sandboxes and hc doesn't know which to run.
@@ -153,6 +167,11 @@ You can run:
 Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more information."
             );
             crate::save::list(std::env::current_dir()?, false)?;
+            Err(
+                std::io::Error::other(
+                    "Multiple sandboxes found, please specify which to run.",
+                )
+            )
         } else {
             // There are no sandboxes
             msg!(
@@ -161,12 +180,12 @@ Before running or calling you need to generate a sandbox.
 You can use `hc sandbox generate` to do this.
 Run `hc sandbox generate --help` for more options."
             );
+            Err(std::io::Error::other("No sandboxes found."))
         }
-        Ok(self.existing_paths)
     }
 
     pub fn is_empty(&self) -> bool {
-        self.existing_paths.is_empty() && self.indices.is_empty() && !self.all && !self.last
+        self.indices.is_empty() && !self.all
     }
 }
 

@@ -344,11 +344,16 @@ pub async fn call(
     };
 
     let admin_clients = if running.is_empty() {
-        let paths = if existing.is_empty() {
-            crate::save::load(std::env::current_dir()?)?
+        let existing = if existing.is_empty() {
+            Existing {
+                all: true,
+                indices: Vec::with_capacity(0)
+            }
         } else {
-            existing.load()?
+            existing
         };
+
+        let paths = existing.load()?;
         let ports = get_admin_ports(paths.clone()).await?;
         let mut clients = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {
