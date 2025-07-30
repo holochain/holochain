@@ -26,7 +26,9 @@ fallible-iterator = "0.3.0"
 futures = "0.3"
 getrandom = "0.2.7"
 hc_deepkey_sdk = { version = "^0.8.5-rc.0", path = "../hc_deepkey_sdk" }
-holo_hash = { version = "^0.5.5-rc.0", path = "../holo_hash", features = ["full"] }
+holo_hash = { version = "^0.5.5-rc.0", path = "../holo_hash", features = [
+  "full",
+] }
 holochain_cascade = { version = "^0.5.5-rc.0", path = "../holochain_cascade" }
 holochain_chc = { version = "^0.2.5-rc.0", path = "../holochain_chc", default-features = false }
 holochain_conductor_api = { version = "^0.5.5-rc.0", path = "../holochain_conductor_api" }
