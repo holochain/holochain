@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update to a new Kitsune2 version that contains a fix for an out-of-bounds array access bug in the DHT model.
 - As part of the fix below, the Holo hash method `to_k2_op` on a DhtOpHash` has been deprecated and replaced with 
   `to_located_k2_op_id`.
 - Fixes a bug where the wrong DhtOp location was reported to Kitsune2. This resulted in conductors not being able to sync
