@@ -347,9 +347,11 @@ pub async fn call(
         let existing = if existing.is_empty() {
             Existing {
                 all: true,
-                indices: Vec::with_capacity(0)
+                indices: Vec::with_capacity(0),
             }
-        } else { existing };
+        } else {
+            existing
+        };
         let paths = existing.load(std::env::current_dir()?)?;
         let ports = get_admin_ports(paths.clone()).await?;
         let mut clients = Vec::with_capacity(ports.len());

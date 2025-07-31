@@ -124,7 +124,13 @@ Run `hc sandbox generate --help` for more options."
                 .iter()
                 .enumerate()
                 .filter_map(|(i, result)| result.as_ref().err().map(|path| (i, path)))
-                .for_each(|(i, path)| msg!("Missing sandbox: {}:{}", i, path.as_path().to_string_lossy()));
+                .for_each(|(i, path)| {
+                    msg!(
+                        "Missing sandbox: {}:{}",
+                        i,
+                        path.as_path().to_string_lossy()
+                    )
+                });
             // Return all available sandboxes.
             Ok(sandboxes.into_iter().flatten().collect())
         } else if !self.indices.is_empty() {
@@ -133,10 +139,18 @@ Run `hc sandbox generate --help` for more options."
             let mut selected = Vec::new();
             for i in self.indices {
                 let Some(result) = sandboxes.get(i) else {
-                  return Err(std::io::Error::other(format!("Index {} is out of bounds.", i)));
+                    return Err(std::io::Error::other(format!(
+                        "Index {} is out of bounds.",
+                        i
+                    )));
                 };
                 match result {
-                    Err(path) => return Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("Missing sandbox {}:{}", i, path.as_path().to_string_lossy()))),
+                    Err(path) => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            format!("Missing sandbox {}:{}", i, path.as_path().to_string_lossy()),
+                        ))
+                    }
                     Ok(path) => selected.push(path.clone()),
                 }
             }
@@ -146,8 +160,11 @@ Run `hc sandbox generate --help` for more options."
             match &sandboxes[0] {
                 Err(path) => {
                     msg!("Missing sandbox {}:{}", 0, path.as_path().to_string_lossy());
-                    Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("Missing sandbox {}:{}", 0, path.as_path().to_string_lossy())))
-                },
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("Missing sandbox {}:{}", 0, path.as_path().to_string_lossy()),
+                    ))
+                }
                 Ok(path) => Ok(vec![path.clone()]),
             }
         } else {
@@ -162,7 +179,9 @@ You can run:
 Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more information."
             );
             crate::save::list(std::env::current_dir()?, false)?;
-            Err(std::io::Error::other("Multiple sandboxes found, please specify which to run."))
+            Err(std::io::Error::other(
+                "Multiple sandboxes found, please specify which to run.",
+            ))
         }
     }
 
@@ -250,14 +269,13 @@ fn try_parse_url2(arg: &str) -> url2::Url2Result<Url2> {
     Url2::try_parse(arg)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use holochain_conductor_api::conductor::paths::{ConfigFilePath, ConfigRootPath};
-    use tempfile;
     use anyhow;
+    use holochain_conductor_api::conductor::paths::{ConfigFilePath, ConfigRootPath};
+    use std::fs;
+    use tempfile;
 
     #[test]
     fn test_existing_is_empty() {
@@ -289,13 +307,13 @@ mod tests {
         let result = Existing {
             all: true,
             indices: vec![],
-        }.load(PathBuf::from("invalid_path"));
+        }
+        .load(PathBuf::from("invalid_path"));
 
         assert!(result.is_err());
 
         Ok(())
     }
-
 
     #[test]
     fn test_existing_load_no_file() -> anyhow::Result<()> {
@@ -305,13 +323,13 @@ mod tests {
         let result = Existing {
             all: true,
             indices: vec![],
-        }.load(test_dir.to_path_buf());
+        }
+        .load(test_dir.to_path_buf());
 
         assert!(result.is_err());
 
         Ok(())
     }
-
 
     #[test]
     fn test_existing_load_empty_file() -> anyhow::Result<()> {
@@ -323,13 +341,13 @@ mod tests {
         let result = Existing {
             all: true,
             indices: vec![],
-        }.load(test_dir.to_path_buf());
+        }
+        .load(test_dir.to_path_buf());
 
         assert!(result.is_err());
 
         Ok(())
     }
-
 
     #[test]
     fn test_existing_load_all_valid_sandboxes() -> anyhow::Result<()> {
@@ -361,7 +379,8 @@ mod tests {
         let paths = Existing {
             all: true,
             indices: vec![],
-        }.load(test_dir.to_path_buf())?;
+        }
+        .load(test_dir.to_path_buf())?;
 
         // Verify the loaded paths
         assert_eq!(paths.len(), 2);
@@ -439,7 +458,10 @@ mod tests {
         fs::write(config_file_path3.as_ref(), "dummy config")?;
 
         // Save the paths to .hc file
-        crate::save::save(test_dir.to_path_buf(), vec![config_path1, config_path2, config_path3])?;
+        crate::save::save(
+            test_dir.to_path_buf(),
+            vec![config_path1, config_path2, config_path3],
+        )?;
 
         // Test loading specific sandboxes by indices
         let existing = Existing {
@@ -502,7 +524,6 @@ mod tests {
 
         Ok(())
     }
-
 
     #[test]
     fn test_existing_load_out_of_range_indices() -> anyhow::Result<()> {
@@ -646,14 +667,16 @@ mod tests {
         let result = Existing {
             all: false,
             indices: vec![],
-        }.load(test_dir.to_path_buf());
+        }
+        .load(test_dir.to_path_buf());
         assert!(result.is_err());
 
         // Test loading all
         let result = Existing {
             all: true,
             indices: vec![],
-        }.load(test_dir.to_path_buf());
+        }
+        .load(test_dir.to_path_buf());
 
         assert!(result.is_err());
 

@@ -337,7 +337,8 @@ async fn admin_port_from_connect_args(
         let paths = Existing {
             all: true,
             indices: Vec::with_capacity(0),
-        }.load(std::env::current_dir()?)?;
+        }
+        .load(std::env::current_dir()?)?;
         if let Some(admin_port) = get_admin_ports(paths).await?.first() {
             Ok(*admin_port)
         } else {

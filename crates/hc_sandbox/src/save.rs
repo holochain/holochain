@@ -42,12 +42,10 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
             .collect()
     };
     let to_remove_len = to_remove.len();
-    for p in to_remove {
-        if let Ok(p) = p {
-            if p.exists() && p.is_dir() {
-                if let Err(e) = std::fs::remove_dir_all(p) {
-                    tracing::error!("Failed to remove {} because {:?}", p.display(), e);
-                }
+    for p in to_remove.into_iter().flatten() {
+        if p.exists() && p.is_dir() {
+            if let Err(e) = std::fs::remove_dir_all(p) {
+                tracing::error!("Failed to remove {} because {:?}", p.display(), e);
             }
         }
     }
@@ -106,26 +104,25 @@ pub fn list(hc_dir: PathBuf, verbose: bool) -> std::io::Result<()> {
         |out, (i, result)| {
             let r = match result {
                 Err(path) => format!("{}{}: Missing ({})\n", out, i, path.display()),
-                Ok(path) => {
-                    match verbose {
-                        false => format!("{}{}: {}\n", out, i, path.display()),
-                        true => {
-                            let config = holochain_conductor_config::config::read_config(
-                                ConfigRootPath::from(path.clone()),
-                            ).map_err(|e| std::io::Error::other(e))?;
-                            format!(
-                                "{}{}: {}\nConductor Config:\n{:?}\n",
-                                out,
-                                i,
-                                path.display(),
-                                config
-                            )
-                        }
+                Ok(path) => match verbose {
+                    false => format!("{}{}: {}\n", out, i, path.display()),
+                    true => {
+                        let config = holochain_conductor_config::config::read_config(
+                            ConfigRootPath::from(path.clone()),
+                        )
+                        .map_err(std::io::Error::other)?;
+                        format!(
+                            "{}{}: {}\nConductor Config:\n{:?}\n",
+                            out,
+                            i,
+                            path.display(),
+                            config
+                        )
                     }
                 },
             };
             std::io::Result::Ok(r)
-        }
+        },
     )?;
     msg!("{}", out);
     Ok(())
@@ -142,7 +139,11 @@ pub async fn lock_live(mut hc_dir: PathBuf, path: &Path, port: u16) -> anyhow::R
     use std::io::Write;
     std::fs::create_dir_all(&hc_dir)?;
     let paths = load(hc_dir.clone())?;
-    let index = match paths.into_iter().enumerate().find(|p| p.1 == Ok(path.to_path_buf())) {
+    let index = match paths
+        .into_iter()
+        .enumerate()
+        .find(|p| p.1 == Ok(path.to_path_buf()))
+    {
         Some((i, _)) => i,
         None => return Ok(()),
     };
@@ -223,12 +224,11 @@ pub async fn release_ports(hc_dir: PathBuf) -> anyhow::Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use holochain_conductor_api::conductor::paths::ConfigRootPath;
+    use std::fs;
 
     #[test]
     fn test_save_single_path() -> anyhow::Result<()> {
@@ -750,7 +750,8 @@ mod tests {
 
         // Create a valid conductor config file
         let config_root_path = ConfigRootPath::from(sandbox1.clone());
-        let config = holochain_conductor_config::config::create_config(config_root_path.clone(), None)?;
+        let config =
+            holochain_conductor_config::config::create_config(config_root_path.clone(), None)?;
         holochain_conductor_config::config::write_config(config_root_path.clone(), &config)?;
 
         // Save the path
