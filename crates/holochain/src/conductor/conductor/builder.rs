@@ -441,10 +441,11 @@ impl ConductorBuilder {
 
         holochain_p2p.register_handler(handle.clone()).await?;
 
-        // Install extra DNAs, in particular:
-        // the ones with InlineZomes will not be registered in the Wasm DB
-        // and cannot be automatically loaded on conductor restart.
-
+        // Register extra DNAs. In particular, the ones with InlineZomes will
+        // not be registered in the Wasm DB and cannot be automatically loaded
+        // on conductor restart. Hence they need to get passed along here
+        // via the extra_dnas argument (populated from the SweetConductor's
+        // DnaFile cache) in order to be added to the RibosomeStore manually.
         for dna_file in extra_dnas {
             handle
                 .register_dna(dna_file.clone())
