@@ -165,10 +165,10 @@
 //!   - Close runs when an agent is deprecating an old source chain in favour of a new one.
 //!   - All zomes in a DNA migrate at the same time.
 //!   - Any failure fails the migration.
-//! - `fn recv_remote_signal(signal: SerializedBytes) -> ExternResult<()>`:
+//! - `fn recv_remote_signal(signal: ExternIO) -> ExternResult<()>`:
 //!   - Allows the guest to receive remote signals sent from other agents via the [`send_remote_signal`](crate::p2p::send_remote_signal) host function.
 //!   - Only receives signals that have been sent from a coordinator zome of the same name in the remote agent's cell.
-//!   - The single input parameter of this callback can be an arbitrary type with a `serde::Deserialize + std::fmt::Debug` implementation, rather than `SerializedBytes`. If you choose to do this, the call will fail if the type cannot be deserialized from the serialized bytes.
+//!   - The single input parameter of this callback can be an arbitrary type with a `serde::Deserialize + std::fmt::Debug` implementation, rather than [`ExternIO`](crate::prelude::ExternIO). If you choose to do this, deserialization will be handled by the HDK and the call will fail if deserialization fails.
 //! - `fn post_commit(actions: Vec<SignedActionHashed>)`:
 //!   - Executes after the WASM call that originated the commits so not bound by the original atomic transaction.
 //!   - Input is all the action hashes that were committed.
