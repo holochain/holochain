@@ -49,7 +49,13 @@ pub struct SweetConductor {
     db_dir: TestDir,
     keystore: MetaLairClient,
     config: Arc<ConductorConfig>,
-    dnas: Vec<DnaFile>,
+    /// A cache for DnaFiles such that they can be reloaded into the
+    /// RibosomeStore from here after a conductor restart.
+    /// This is relevant in particular for DnaFiles containing inline zomes
+    /// since they are not persisted to the wasm database and therefore
+    /// are not automatically loaded into the [`crate::conductor::ribosome_store::RibosomeStore`]
+    /// on conductor restart otherwise.
+    dna_files: Vec<DnaFile>,
     rendezvous: Option<DynSweetRendezvous>,
 }
 
@@ -96,7 +102,7 @@ impl SweetConductor {
             db_dir: env_dir,
             keystore,
             config,
-            dnas: Vec::new(),
+            dna_files: Vec::new(),
             rendezvous,
         }
     }
@@ -298,17 +304,18 @@ impl SweetConductor {
         self.raw_handle().disable_app(id, reason).await
     }
 
-    /// Install the dna first.
-    /// This allows a big speed up when
-    /// installing many apps with the same dna
+    /// Adds the DnaFiles to the SweetConductor cache so that they can be re-added
+    /// to the RibosomeStore after a conductor restart.
+    /// The latter is required for the case of inline zomes since they are not
+    /// persisted to the wasm database and consequently don't automatically get
+    /// reloaded into the [`crate::conductor::ribosome_store::RibosomeStore`] after a conductor restart.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn setup_app_1_register_dna(
+    async fn add_dna_files_to_sweet_conductor_cache(
         &mut self,
         dna_files: impl IntoIterator<Item = &DnaFile>,
     ) -> ConductorApiResult<()> {
         for dna_file in dna_files.into_iter() {
-            self.register_dna(dna_file.to_owned()).await?;
-            self.dnas.push(dna_file.to_owned());
+            self.dna_files.push(dna_file.to_owned());
         }
         Ok(())
     }
@@ -317,7 +324,7 @@ impl SweetConductor {
     // TODO: make this take a more flexible config for specifying things like
     // membrane proofs
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn setup_app_2_install_and_enable(
+    async fn install_and_enable_app(
         &mut self,
         installed_app_id: &str,
         agent: Option<AgentPubKey>,
@@ -349,7 +356,7 @@ impl SweetConductor {
     /// better to do that once for all apps in the case of multiple apps being
     /// set up at once.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn setup_app_3_create_sweet_app(
+    async fn create_sweet_app_for_installed_app(
         &self,
         installed_app_id: &str,
         agent: AgentPubKey,
@@ -412,21 +419,18 @@ impl SweetConductor {
             .map(|dr| dr.dna())
             .collect::<Vec<_>>();
 
-        self.setup_app_1_register_dna(dnas.clone()).await?;
+        self.add_dna_files_to_sweet_conductor_cache(dnas.clone())
+            .await?;
 
         let agent = self
-            .setup_app_2_install_and_enable(
-                installed_app_id,
-                agent.clone(),
-                dnas_with_roles.as_slice(),
-            )
+            .install_and_enable_app(installed_app_id, agent.clone(), dnas_with_roles.as_slice())
             .await?;
 
         let roles = dnas_with_roles
             .iter()
             .map(|dr| dr.role())
             .collect::<Vec<_>>();
-        self.setup_app_3_create_sweet_app(installed_app_id, agent, &roles)
+        self.create_sweet_app_for_installed_app(installed_app_id, agent, &roles)
             .await
     }
 
@@ -474,11 +478,12 @@ impl SweetConductor {
         let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
         let dnas: Vec<&DnaFile> = dnas_with_roles.iter().map(|dr| dr.dna()).collect();
         let roles: Vec<RoleName> = dnas_with_roles.iter().map(|dr| dr.role()).collect();
-        self.setup_app_1_register_dna(dnas.clone()).await?;
+        self.add_dna_files_to_sweet_conductor_cache(dnas.clone())
+            .await?;
 
         for &agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
-            self.setup_app_2_install_and_enable(
+            self.install_and_enable_app(
                 &installed_app_id,
                 Some(agent.to_owned()),
                 &dnas_with_roles,
@@ -490,7 +495,7 @@ impl SweetConductor {
         for agent in agents {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
             apps.push(
-                self.setup_app_3_create_sweet_app(&installed_app_id, agent.clone(), &roles)
+                self.create_sweet_app_for_installed_app(&installed_app_id, agent.clone(), &roles)
                     .await?,
             );
         }
@@ -531,7 +536,7 @@ impl SweetConductor {
             .create_clone_cell(installed_app_id, payload)
             .await?;
         let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
-        self.dnas.push(dna_file);
+        self.dna_files.push(dna_file);
         Ok(clone)
     }
 
@@ -619,7 +624,7 @@ impl SweetConductor {
                 Self::handle_from_existing(
                     self.keystore.clone(),
                     &self.config,
-                    self.dnas.as_slice(),
+                    self.dna_files.as_slice(),
                     false,
                 )
                 .await,
@@ -1033,7 +1038,7 @@ impl std::fmt::Debug for SweetConductor {
         f.debug_struct("SweetConductor")
             .field("db_dir", &self.db_dir)
             .field("config", &self.config)
-            .field("dnas", &self.dnas)
+            .field("dna_files", &self.dna_files)
             .finish()
     }
 }
