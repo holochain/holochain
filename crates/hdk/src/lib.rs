@@ -168,7 +168,7 @@
 //! - `fn recv_remote_signal(signal: ExternIO) -> ExternResult<()>`:
 //!   - Allows the guest to receive remote signals sent from other agents via the [`send_remote_signal`](crate::p2p::send_remote_signal) host function.
 //!   - Only receives signals that have been sent from a coordinator zome of the same name in the remote agent's cell.
-//!   - The single input parameter of this callback can be an arbitrary type with a `serde::Deserialize + std::fmt::Debug` implementation, rather than [`ExternIO`](crate::prelude::ExternIO). If you choose to do this, deserialization will be handled by the HDK and the call will fail if deserialization fails.
+//!   - As with all zome functions and callbacks, the single input parameter of this callback can be an arbitrary type with a `serde::Deserialize + std::fmt::Debug` implementation, rather than [`ExternIO`](crate::prelude::ExternIO). If you choose to do this, deserialization will be handled by the HDK and the call will fail if deserialization fails.
 //! - `fn post_commit(actions: Vec<SignedActionHashed>)`:
 //!   - Executes after the WASM call that originated the commits so not bound by the original atomic transaction.
 //!   - Input is all the action hashes that were committed.
