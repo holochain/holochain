@@ -350,7 +350,7 @@ pub async fn call(
                 indices: Vec::with_capacity(0)
             }
         } else { existing };
-        let paths = existing.load()?;
+        let paths = existing.load(std::env::current_dir()?)?;
         let ports = get_admin_ports(paths.clone()).await?;
         let mut clients = Vec::with_capacity(ports.len());
         for (port, path) in ports.into_iter().zip(paths.into_iter()) {

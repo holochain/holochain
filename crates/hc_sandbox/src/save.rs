@@ -80,10 +80,10 @@ pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
 }
 
 /// Load sandbox paths from the `.hc` file.
-pub fn load(mut hc_dir: PathBuf) -> std::io::Result<Vec<Result<PathBuf, PathBuf>>> {
+pub fn load(hc_dir: PathBuf) -> std::io::Result<Vec<Result<PathBuf, PathBuf>>> {
     let mut paths = Vec::new();
-    hc_dir.push(".hc");
-    if hc_dir.exists() {
+    let hc_file = hc_dir.join(".hc");
+    if hc_file.exists() {
         let existing = std::fs::read_to_string(hc_dir)?;
         for sandbox in existing.lines() {
             let path = PathBuf::from(sandbox);

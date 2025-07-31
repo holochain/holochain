@@ -107,8 +107,8 @@ pub struct Existing {
 }
 
 impl Existing {
-    pub fn load(self) -> std::io::Result<Vec<PathBuf>> {
-        let sandboxes = crate::save::load(std::env::current_dir()?)?;
+    pub fn load(self, hc_dir: PathBuf) -> std::io::Result<Vec<PathBuf>> {
+        let sandboxes = crate::save::load(hc_dir)?;
         if self.all {
             // Report any missing sandbox
             sandboxes
