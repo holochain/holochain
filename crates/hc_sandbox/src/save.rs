@@ -84,7 +84,7 @@ pub fn load(hc_dir: PathBuf) -> std::io::Result<Vec<Result<PathBuf, PathBuf>>> {
     let mut paths = Vec::new();
     let hc_file = hc_dir.join(".hc");
     if hc_file.exists() {
-        let existing = std::fs::read_to_string(hc_dir)?;
+        let existing = std::fs::read_to_string(hc_file)?;
         for sandbox in existing.lines() {
             let path = PathBuf::from(sandbox);
             let config_file_path = ConfigFilePath::from(ConfigRootPath::from(path.clone()));

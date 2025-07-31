@@ -109,7 +109,16 @@ pub struct Existing {
 impl Existing {
     pub fn load(self, hc_dir: PathBuf) -> std::io::Result<Vec<PathBuf>> {
         let sandboxes = crate::save::load(hc_dir)?;
-        if self.all {
+        if sandboxes.is_empty() {
+            // There are no sandboxes
+            msg!(
+                "
+Before running or calling you need to generate a sandbox.
+You can use `hc sandbox generate` to do this.
+Run `hc sandbox generate --help` for more options."
+            );
+            Err(std::io::Error::other("No sandboxes found."))
+        } else if self.all {
             // Report any missing sandbox
             sandboxes
                 .iter()
@@ -141,7 +150,7 @@ impl Existing {
                 },
                 Ok(path) => Ok(vec![path.clone()]),
             }
-        } else if sandboxes.len() > 1 {
+        } else {
             // There are multiple sandboxes, the user must disambiguate
             msg!(
                 "
@@ -154,15 +163,6 @@ Run `hc sandbox list` to see the sandboxes or `hc sandbox run --help` for more i
             );
             crate::save::list(std::env::current_dir()?, false)?;
             Err(std::io::Error::other("Multiple sandboxes found, please specify which to run."))
-        } else {
-            // There are no sandboxes
-            msg!(
-                "
-Before running or calling you need to generate a sandbox.
-You can use `hc sandbox generate` to do this.
-Run `hc sandbox generate --help` for more options."
-            );
-            Err(std::io::Error::other("No sandboxes found."))
         }
     }
 
@@ -248,4 +248,415 @@ impl Default for Create {
 // e.g., https://users.rust-lang.org/t/implementation-of-fnonce-is-not-general-enough/68294
 fn try_parse_url2(arg: &str) -> url2::Url2Result<Url2> {
     Url2::try_parse(arg)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use holochain_conductor_api::conductor::paths::{ConfigFilePath, ConfigRootPath};
+    use tempfile;
+    use anyhow;
+
+    #[test]
+    fn test_existing_is_empty() {
+        // Test when both all is false and indices is empty
+        let existing = Existing {
+            all: false,
+            indices: vec![],
+        };
+        assert!(existing.is_empty());
+
+        // Test when all is true
+        let existing = Existing {
+            all: true,
+            indices: vec![],
+        };
+        assert!(!existing.is_empty());
+
+        // Test when indices is not empty
+        let existing = Existing {
+            all: false,
+            indices: vec![0],
+        };
+        assert!(!existing.is_empty());
+    }
+
+    #[test]
+    fn test_existing_load_invalid_path() -> anyhow::Result<()> {
+        // Test loading all sandboxes
+        let result = Existing {
+            all: true,
+            indices: vec![],
+        }.load(PathBuf::from("invalid_path"));
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+
+    #[test]
+    fn test_existing_load_no_file() -> anyhow::Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        let result = Existing {
+            all: true,
+            indices: vec![],
+        }.load(test_dir.to_path_buf());
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+
+    #[test]
+    fn test_existing_load_empty_file() -> anyhow::Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        crate::save::save(test_dir.to_path_buf(), vec![])?;
+
+        let result = Existing {
+            all: true,
+            indices: vec![],
+        }.load(test_dir.to_path_buf());
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+
+    #[test]
+    fn test_existing_load_all_valid_sandboxes() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        // Create test sandbox directories
+        let sandbox1 = test_dir.join("sandbox1");
+        let sandbox2 = test_dir.join("sandbox2");
+        fs::create_dir_all(&sandbox1)?;
+        fs::create_dir_all(&sandbox2)?;
+
+        // Create conductor config files
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+        let config_file_path1 = ConfigFilePath::from(config_path1.clone());
+        fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
+        fs::write(config_file_path1.as_ref(), "dummy config")?;
+
+        let config_path2 = ConfigRootPath::from(sandbox2.clone());
+        let config_file_path2 = ConfigFilePath::from(config_path2.clone());
+        fs::create_dir_all(config_file_path2.as_ref().parent().unwrap())?;
+        fs::write(config_file_path2.as_ref(), "dummy config")?;
+
+        // Save the paths to .hc file
+        crate::save::save(test_dir.to_path_buf(), vec![config_path1, config_path2])?;
+
+        // Test loading all sandboxes
+        let paths = Existing {
+            all: true,
+            indices: vec![],
+        }.load(test_dir.to_path_buf())?;
+
+        // Verify the loaded paths
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], sandbox1);
+        assert_eq!(paths[1], sandbox2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_existing_load_all_with_invalid_sandboxes() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        // Create test sandbox directories
+        let sandbox1 = test_dir.join("sandbox1");
+        let sandbox2 = test_dir.join("sandbox2");
+        fs::create_dir_all(&sandbox1)?;
+        fs::create_dir_all(&sandbox2)?;
+
+        // Create conductor config file only for sandbox1
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+        let config_file_path1 = ConfigFilePath::from(config_path1.clone());
+        fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
+        fs::write(config_file_path1.as_ref(), "dummy config")?;
+
+        let config_path2 = ConfigRootPath::from(sandbox2.clone());
+
+        // Save the paths to .hc file
+        crate::save::save(test_dir.to_path_buf(), vec![config_path1, config_path2])?;
+
+        // Test loading all sandboxes
+        let existing = Existing {
+            all: true,
+            indices: vec![],
+        };
+        let paths = existing.load(test_dir.to_path_buf())?;
+
+        // Verify the loaded paths (only valid ones should be returned)
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0], sandbox1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_existing_load_specific_indices() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        // Create test sandbox directories
+        let sandbox1 = test_dir.join("sandbox1");
+        let sandbox2 = test_dir.join("sandbox2");
+        let sandbox3 = test_dir.join("sandbox3");
+        fs::create_dir_all(&sandbox1)?;
+        fs::create_dir_all(&sandbox2)?;
+        fs::create_dir_all(&sandbox3)?;
+
+        // Create conductor config files
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+        let config_file_path1 = ConfigFilePath::from(config_path1.clone());
+        fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
+        fs::write(config_file_path1.as_ref(), "dummy config")?;
+
+        let config_path2 = ConfigRootPath::from(sandbox2.clone());
+        let config_file_path2 = ConfigFilePath::from(config_path2.clone());
+        fs::create_dir_all(config_file_path2.as_ref().parent().unwrap())?;
+        fs::write(config_file_path2.as_ref(), "dummy config")?;
+
+        let config_path3 = ConfigRootPath::from(sandbox3.clone());
+        let config_file_path3 = ConfigFilePath::from(config_path3.clone());
+        fs::create_dir_all(config_file_path3.as_ref().parent().unwrap())?;
+        fs::write(config_file_path3.as_ref(), "dummy config")?;
+
+        // Save the paths to .hc file
+        crate::save::save(test_dir.to_path_buf(), vec![config_path1, config_path2, config_path3])?;
+
+        // Test loading specific sandboxes by indices
+        let existing = Existing {
+            all: false,
+            indices: vec![0, 2],
+        };
+        let paths = existing.load(test_dir.to_path_buf())?;
+
+        // Verify the loaded paths
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], sandbox1);
+        assert_eq!(paths[1], sandbox3);
+
+        // Test loading specific sandboxes by indices
+        let existing = Existing {
+            all: false,
+            indices: vec![1],
+        };
+        let paths = existing.load(test_dir.to_path_buf())?;
+
+        // Verify the loaded paths
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0], sandbox2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_existing_load_specific_indices_with_invalid_sandboxes() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        // Create test sandbox directories
+        let sandbox1 = test_dir.join("sandbox1");
+        let sandbox2 = test_dir.join("sandbox2");
+        fs::create_dir_all(&sandbox1)?;
+        fs::create_dir_all(&sandbox2)?;
+
+        // Create conductor config file only for sandbox1
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+        let config_file_path1 = ConfigFilePath::from(config_path1.clone());
+        fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
+        fs::write(config_file_path1.as_ref(), "dummy config")?;
+
+        let config_path2 = ConfigRootPath::from(sandbox2.clone());
+
+        // Save the paths to .hc file
+        crate::save::save(test_dir.to_path_buf(), vec![config_path1, config_path2])?;
+
+        // Test loading specific sandboxes by indices
+        let existing = Existing {
+            all: false,
+            indices: vec![0, 1],
+        };
+
+        // This should return an error because one of the sandboxes is invalid
+        let result = existing.load(test_dir.to_path_buf());
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+
+    #[test]
+    fn test_existing_load_out_of_range_indices() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        // Create test sandbox directory
+        let sandbox1 = test_dir.join("sandbox1");
+        fs::create_dir_all(&sandbox1)?;
+
+        // Create conductor config file
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+        let config_file_path1 = ConfigFilePath::from(config_path1.clone());
+        fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
+        fs::write(config_file_path1.as_ref(), "dummy config")?;
+
+        // Save the path to .hc file
+        crate::save::save(test_dir.to_path_buf(), vec![config_path1])?;
+
+        // Test loading with an out-of-range index
+        let existing = Existing {
+            all: false,
+            indices: vec![1], // Only index 0 exists
+        };
+
+        let result = existing.load(test_dir.to_path_buf());
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_existing_load_single_sandbox() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        // Create test sandbox directory
+        let sandbox1 = test_dir.join("sandbox1");
+        fs::create_dir_all(&sandbox1)?;
+
+        // Create conductor config file
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+        let config_file_path1 = ConfigFilePath::from(config_path1.clone());
+        fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
+        fs::write(config_file_path1.as_ref(), "dummy config")?;
+
+        // Save the path to .hc file
+        crate::save::save(test_dir.to_path_buf(), vec![config_path1])?;
+
+        // Test loading with empty indices (should use the single sandbox)
+        let existing = Existing {
+            all: false,
+            indices: vec![],
+        };
+
+        let paths = existing.load(test_dir.to_path_buf())?;
+
+        // Should return the single sandbox
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0], sandbox1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_existing_load_single_invalid_sandbox() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        // Create test sandbox directory
+        let sandbox1 = test_dir.join("sandbox1");
+        fs::create_dir_all(&sandbox1)?;
+
+        // Create path but don't create the config file
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+
+        // Save the path to .hc file
+        crate::save::save(test_dir.to_path_buf(), vec![config_path1])?;
+
+        // Test loading with empty indices (should fail because the single sandbox is invalid)
+        let existing = Existing {
+            all: false,
+            indices: vec![],
+        };
+
+        let result = existing.load(test_dir.to_path_buf());
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_existing_load_multiple_sandboxes_no_indices() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        // Create test sandbox directories
+        let sandbox1 = test_dir.join("sandbox1");
+        let sandbox2 = test_dir.join("sandbox2");
+        fs::create_dir_all(&sandbox1)?;
+        fs::create_dir_all(&sandbox2)?;
+
+        // Create conductor config files
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+        let config_file_path1 = ConfigFilePath::from(config_path1.clone());
+        fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
+        fs::write(config_file_path1.as_ref(), "dummy config")?;
+
+        let config_path2 = ConfigRootPath::from(sandbox2.clone());
+        let config_file_path2 = ConfigFilePath::from(config_path2.clone());
+        fs::create_dir_all(config_file_path2.as_ref().parent().unwrap())?;
+        fs::write(config_file_path2.as_ref(), "dummy config")?;
+
+        // Save the paths to .hc file
+        crate::save::save(test_dir.to_path_buf(), vec![config_path1, config_path2])?;
+
+        // Test loading with empty indices (should fail because there are multiple sandboxes)
+        let existing = Existing {
+            all: false,
+            indices: vec![],
+        };
+
+        let result = existing.load(test_dir.to_path_buf());
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_existing_load_no_sandboxes() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        // Test loading none
+        let result = Existing {
+            all: false,
+            indices: vec![],
+        }.load(test_dir.to_path_buf());
+        assert!(result.is_err());
+
+        // Test loading all
+        let result = Existing {
+            all: true,
+            indices: vec![],
+        }.load(test_dir.to_path_buf());
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }
