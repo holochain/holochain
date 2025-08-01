@@ -107,8 +107,11 @@ pub fn remove(hc_dir: PathBuf, existing: Existing) -> std::io::Result<usize> {
             )
         })?;
     }
-    // Delete all files if no sandbox path remains
-    if remaining.is_empty() {
+    // If some valid paths remain, write a new .hc file.
+    // Otherwise, delete all files created by hc-sandbox in `hc_dir`
+    if !remaining.is_empty() {
+        save(hc_dir, remaining.clone())?;
+    } else {
         // Erase all .hc_live* files
         for entry in std::fs::read_dir(&hc_dir)? {
             let Ok(entry) = entry else { continue };
@@ -147,9 +150,6 @@ pub fn remove(hc_dir: PathBuf, existing: Existing) -> std::io::Result<usize> {
                 )
             })?;
         }
-    } else {
-        // Otherwise, overwrite new .hc file
-        save(hc_dir, remaining.clone())?;
     }
 
     Ok(sandboxes.len() - remaining.len())
