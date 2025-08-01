@@ -94,7 +94,7 @@ pub enum NetworkType {
 #[derive(Debug, Parser, Clone)]
 pub struct Existing {
     /// Run all the existing conductor sandboxes specified in `$(pwd)/.hc`.
-    #[arg(short, long, conflicts_with_all = &["indices"])]
+    #[arg(short, long, conflicts_with = "indices")]
     pub all: bool,
 
     /// Run a selection of existing conductor sandboxes
@@ -102,7 +102,7 @@ pub struct Existing {
     /// Existing sandboxes and their indices are visible via `hc list`.
     /// Use the zero-based index to choose which sandboxes to use.
     /// For example `hc sandbox run 1 3 5` or `hc sandbox run 1`
-    #[arg(conflicts_with_all = &["all"])]
+    #[arg(conflicts_with = "all")]
     pub indices: Vec<usize>,
 }
 
@@ -114,8 +114,8 @@ impl Existing {
             msg!(
                 "
 Before running or calling you need to generate a sandbox.
-You can use `hc sandbox generate` to do this.
-Run `hc sandbox generate --help` for more options."
+You can use `hc sandbox generate` or `hc sandbox create` to do this.
+Run `hc sandbox generate --help` or `hc sandbox create --help` for more options."
             );
             Err(std::io::Error::other("No sandboxes found."))
         } else if self.all {
@@ -134,9 +134,9 @@ Run `hc sandbox generate --help` for more options."
             // Return all available sandboxes.
             Ok(sandboxes.into_iter().flatten().collect())
         } else if !self.indices.is_empty() {
-            // Return all sandboxed at provided indices.
+            // Return all sandboxes at provided indices.
             // Return an error if any index is out of bounds or if a sandbox is missing at any given index.
-            let mut selected = Vec::new();
+            let mut selected = Vec::with_capacity(self.indices.len());
             for i in self.indices {
                 let Some(result) = sandboxes.get(i) else {
                     return Err(std::io::Error::other(format!(
@@ -171,7 +171,7 @@ Run `hc sandbox generate --help` for more options."
             // There are multiple sandboxes, the user must disambiguate
             msg!(
                 "
-There are multiple sandboxes and hc doesn't know which to run.
+There are multiple sandboxes and hc doesn't know which one to run.
 You can run:
     - `--all` `-a` run all sandboxes.
     - `1` run a sandbox by index from the list below.
@@ -316,7 +316,7 @@ mod tests {
     }
 
     #[test]
-    fn test_existing_load_no_file() -> anyhow::Result<()> {
+    fn test_existing_load_no_conductor_config_file() -> anyhow::Result<()> {
         let temp_dir = tempfile::tempdir()?;
         let test_dir = temp_dir.path();
 

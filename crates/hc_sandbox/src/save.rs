@@ -102,24 +102,22 @@ pub fn list(hc_dir: PathBuf, verbose: bool) -> std::io::Result<()> {
     let out = load(hc_dir)?.into_iter().enumerate().try_fold(
         "\nSandboxes contained in `.hc`\n".to_string(),
         |out, (i, result)| {
-            let r = match result {
-                Err(path) => format!("{}{}: Missing ({})\n", out, i, path.display()),
-                Ok(path) => match verbose {
-                    false => format!("{}{}: {}\n", out, i, path.display()),
-                    true => {
-                        let config = holochain_conductor_config::config::read_config(
-                            ConfigRootPath::from(path.clone()),
-                        )
-                        .map_err(std::io::Error::other)?;
-                        format!(
-                            "{}{}: {}\nConductor Config:\n{:?}\n",
-                            out,
-                            i,
-                            path.display(),
-                            config
-                        )
-                    }
-                },
+            let r = match (result, verbose) {
+                (Err(path), _) => format!("{}{}: Missing ({})\n", out, i, path.display()),
+                (Ok(path), false) => format!("{}{}: {}\n", out, i, path.display()),
+                (Ok(path), true) => {
+                    let config = holochain_conductor_config::config::read_config(
+                        ConfigRootPath::from(path.clone()),
+                    )
+                    .map_err(std::io::Error::other)?;
+                    format!(
+                        "{}{}: {}\nConductor Config:\n{:?}\n",
+                        out,
+                        i,
+                        path.display(),
+                        config
+                    )
+                }
             };
             std::io::Result::Ok(r)
         },
