@@ -48,11 +48,7 @@ async fn provisioning_1_create() {
         .await;
 
     let resolution = bundle
-        .resolve_cells(
-            &std::collections::HashMap::new(),
-            Default::default(),
-            Default::default(),
-        )
+        .resolve_cells(Default::default(), Default::default())
         .await
         .unwrap();
 

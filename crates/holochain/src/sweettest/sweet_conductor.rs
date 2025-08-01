@@ -407,12 +407,12 @@ impl SweetConductor {
         dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
     ) -> ConductorApiResult<SweetApp> {
         let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
-        let dnas = dnas_with_roles
-            .iter()
-            .map(|dr| dr.dna())
-            .collect::<Vec<_>>();
+        // let dnas = dnas_with_roles
+        //     .iter()
+        //     .map(|dr| dr.dna())
+        //     .collect::<Vec<_>>();
 
-        self.setup_app_1_register_dna(dnas.clone()).await?;
+        // self.setup_app_1_register_dna(dnas.clone()).await?;
 
         let agent = self
             .setup_app_2_install_and_enable(
