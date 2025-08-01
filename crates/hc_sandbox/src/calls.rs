@@ -27,13 +27,11 @@ use holochain_trace::Output;
 use holochain_types::app::AppManifest;
 use holochain_types::app::RoleSettingsMap;
 use holochain_types::app::RoleSettingsMapYaml;
-use holochain_types::prelude::RegisterDnaPayload;
-use holochain_types::prelude::YamlProperties;
+use holochain_types::prelude::NetworkSeed;
 use holochain_types::prelude::{AgentPubKey, AppBundleSource};
 use holochain_types::prelude::{CellId, InstallAppPayload};
-use holochain_types::prelude::{Deserialize, DnaModifiersOpt, Serialize};
+use holochain_types::prelude::{Deserialize, Serialize};
 use holochain_types::prelude::{DnaHash, InstalledAppId};
-use holochain_types::prelude::{DnaSource, NetworkSeed};
 use holochain_types::websocket::AllowedOrigins;
 use kitsune2_api::AgentInfoSigned;
 use kitsune2_api::Url;
@@ -68,8 +66,6 @@ pub enum AdminRequestCli {
     AddAdminWs(AddAdminWs),
     /// Calls [`AdminWebsocket::attach_app_interface`].
     AddAppWs(AddAppWs),
-    /// Calls [`AdminWebsocket::register_dna`].
-    RegisterDna(RegisterDna),
     /// Calls [`AdminWebsocket::install_app`].
     InstallApp(InstallApp),
     /// Calls [`AdminWebsocket::uninstall_app`].
@@ -149,24 +145,6 @@ pub struct AddAppWs {
     /// will be allowed to connect to this interface.
     #[arg(long)]
     pub installed_app_id: Option<InstalledAppId>,
-}
-
-/// Calls [`AdminWebsocket::register_dna`]
-/// and registers a DNA. You can only use a path or a hash, not both.
-#[derive(Debug, Args, Clone)]
-pub struct RegisterDna {
-    #[arg(short, long)]
-    /// Network seed to override when installing this DNA
-    pub network_seed: Option<String>,
-    #[arg(long)]
-    /// Properties to override when installing this DNA
-    pub properties: Option<PathBuf>,
-    #[arg(long, conflicts_with = "hash", required_unless_present = "hash")]
-    /// Path to a DnaBundle file.
-    pub path: Option<PathBuf>,
-    #[arg(short, long, value_parser = parse_dna_hash, required_unless_present = "path")]
-    /// Hash of an existing DNA you want to register.
-    pub hash: Option<DnaHash>,
 }
 
 /// Calls [`AdminWebsocket::install_app`]
@@ -433,10 +411,6 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         AdminRequestCli::ListAppWs => {
             let interface_infos = client.list_app_interfaces().await?;
             println!("{}", serde_json::to_string(&interface_infos)?);
-        }
-        AdminRequestCli::RegisterDna(args) => {
-            let dna = register_dna(client, args).await?;
-            msg!("Registered DNA: {}", dna);
         }
         AdminRequestCli::InstallApp(args) => {
             let app = install_app_bundle(client, args).await?;
@@ -720,36 +694,6 @@ struct AgentResponse {
     signed_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     url: Option<Url>,
-}
-
-/// Calls [`AdminWebsocket::register_dna`] and registers the DNA.
-async fn register_dna(client: &mut AdminWebsocket, args: RegisterDna) -> anyhow::Result<DnaHash> {
-    let RegisterDna {
-        network_seed,
-        properties,
-        path,
-        hash,
-    } = args;
-    let properties = match properties {
-        Some(path) => Some(YamlProperties::new(serde_yaml::from_str(
-            &std::fs::read_to_string(path)?,
-        )?)),
-        None => None,
-    };
-    let source = match (path, hash) {
-        (None, Some(hash)) => DnaSource::Hash(hash),
-        (Some(path), None) => DnaSource::Path(path),
-        _ => unreachable!("Can't have hash and path for DNA source"),
-    };
-    let dna = RegisterDnaPayload {
-        modifiers: DnaModifiersOpt {
-            properties,
-            network_seed,
-        },
-        source,
-    };
-
-    Ok(client.register_dna(dna).await?)
 }
 
 /// Constructs install payload with roles settings and calls
