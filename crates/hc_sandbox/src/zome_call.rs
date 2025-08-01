@@ -323,12 +323,10 @@ async fn admin_port_from_connect_args(
         Ok(admin_port)
     } else if let Some(index) = connect_args.index {
         let paths = Existing {
-            existing_paths: vec![],
             all: false,
-            last: false,
             indices: vec![index as usize],
         }
-        .load()?;
+        .load(std::env::current_dir()?)?;
 
         if let Some(admin_port) = get_admin_ports(paths).await?.first() {
             Ok(*admin_port)
@@ -336,8 +334,11 @@ async fn admin_port_from_connect_args(
             anyhow::bail!("No admin port found")
         }
     } else {
-        let paths = crate::save::load(std::env::current_dir()?)?;
-
+        let paths = Existing {
+            all: true,
+            indices: Vec::with_capacity(0),
+        }
+        .load(std::env::current_dir()?)?;
         if let Some(admin_port) = get_admin_ports(paths).await?.first() {
             Ok(*admin_port)
         } else {

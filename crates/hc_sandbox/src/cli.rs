@@ -182,7 +182,7 @@ impl HcSandbox {
                 }
             }
             HcSandboxSubcommand::Run(Run { ports, existing }) => {
-                let paths = existing.load()?;
+                let paths = existing.load(std::env::current_dir()?)?;
                 if paths.is_empty() {
                     tracing::warn!("no paths available, exiting.");
                     return Ok(());
