@@ -29,15 +29,6 @@ pub enum AdminRequest {
     /// [`AdminResponse::AdminInterfacesAdded`]
     AddAdminInterfaces(Vec<crate::config::AdminInterfaceConfig>),
 
-    /// Register a DNA for later app installation.
-    ///
-    /// Stores the given DNA into the Holochain DNA database and returns the hash of it.
-    ///
-    /// # Returns
-    ///
-    /// [`AdminResponse::DnaRegistered`]
-    RegisterDna(Box<RegisterDnaPayload>),
-
     /// Get the definition of a DNA.
     ///
     /// # Returns
@@ -465,9 +456,6 @@ pub enum AdminResponse {
     ///
     /// There has been an error during the handling of the request.
     Error(ExternalApiWireError),
-
-    /// The successful response to an [`AdminRequest::RegisterDna`]
-    DnaRegistered(DnaHash),
 
     /// The successful response to an [`AdminRequest::GetDnaDefinition`]
     DnaDefinitionReturned(DnaDef),

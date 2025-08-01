@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE**: The admin call `RegisterDna` has been removed ([#5175](https://github.com/holochain/holochain/pull/5175))
 - As part of the fix below, the Holo hash method `to_k2_op` on a DhtOpHash` has been deprecated and replaced with 
   `to_located_k2_op_id`.
 - Fixes a bug where the wrong DhtOp location was reported to Kitsune2. This resulted in conductors not being able to sync
