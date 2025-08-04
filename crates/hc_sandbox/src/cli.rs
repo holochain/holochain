@@ -286,8 +286,18 @@ impl HcSandbox {
                     )?;
                     paths.push(path);
                 }
+                let pre_existing = crate::save::load(std::env::current_dir()?)?;
                 crate::save::save(std::env::current_dir()?, paths.clone())?;
-                msg!("Created {:?}", paths);
+                match paths.len() {
+                    0 => msg!("No sandboxes have been created"),
+                    1 => msg!("1 sandbox has been created:\n  - {}:{}", pre_existing.len(), paths[0].display()),
+                    _ => {
+                        msg!("{} sandboxes have been created:", paths.len());
+                        for (i, path) in paths.into_iter().enumerate() {
+                            msg!("  - {}:{}", pre_existing.len() + i, path.display());
+                        }
+                    },
+                }
             }
         }
 
