@@ -1271,14 +1271,8 @@ async fn get_config_root_path(child: &mut Child) -> PathBuf {
 
     while let Ok(Some(line)) = lines.next_line().await {
         println!("@@@-{line}-@@@");
-        if line.contains("Created [ConfigRootPath(\"") {
-            let start = line
-                .find("(\"")
-                .expect("Unexpected config root path line format.");
-            let end = line
-                .find("\")]")
-                .expect("Unexpected config root path line format.");
-            return PathBuf::from(&line[(start + 2)..end]);
+        if line.contains("0:") {
+            return PathBuf::from(&line[2..line.len()]);
         }
     }
     panic!("Unable to find conductor root path in sandbox output. See stderr above.")
