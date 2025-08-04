@@ -272,7 +272,10 @@ impl HcSandbox {
 
                 match num_sandboxes.into() {
                     1 => msg!("Creating 1 conductor sandbox"),
-                    _ => msg!("Creating {} conductor sandboxes with same settings", num_sandboxes)
+                    _ => msg!(
+                        "Creating {} conductor sandboxes with same settings",
+                        num_sandboxes
+                    ),
                 }
 
                 for i in 0..num_sandboxes.into() {
@@ -376,7 +379,10 @@ pub async fn generate(
 
     match create.num_sandboxes.into() {
         1 => msg!("Creating 1 conductor sandbox"),
-        _ => msg!("Creating {} conductor sandboxes with same settings", create.num_sandboxes)
+        _ => msg!(
+            "Creating {} conductor sandboxes with same settings",
+            create.num_sandboxes
+        ),
     }
 
     let paths = crate::sandbox::default_n(
