@@ -59,7 +59,14 @@ pub fn remove(hc_dir: PathBuf, existing: Existing) -> std::io::Result<usize> {
             .into_iter()
             .for_each(|i| match sandboxes.get(i) {
                 None => msg!("Warning: Provided index is out of range: {}", i),
-                Some(Err(path)) => msg!("Warning: Missing sandbox {}:{}", i, path.display()),
+                Some(Err(path)) => {
+                    msg!(
+                        "Warning: Missing or invalid sandbox {}:{}",
+                        i,
+                        path.display()
+                    );
+                    to_remove_indices.push(i);
+                }
                 Some(Ok(_)) => to_remove_indices.push(i),
             });
     }
@@ -80,19 +87,18 @@ pub fn remove(hc_dir: PathBuf, existing: Existing) -> std::io::Result<usize> {
         .collect();
     // Attempt to delete each sandbox
     for i in to_remove_indices.iter() {
-        let Some(Ok(p)) = sandboxes.get(*i) else {
-            continue;
+        let p = match sandboxes.get(*i).unwrap() {
+            Ok(p) => p,
+            Err(p) => p,
         };
-        if p.exists() && p.is_dir() {
-            if let Err(e) = std::fs::remove_dir_all(p) {
-                tracing::error!("Failed to remove {} because {:?}", p.display(), e);
-                msg!(
-                    "Failed to remove sandbox {}:{}\nReason: {}",
-                    i,
-                    p.display(),
-                    e
-                );
-            }
+        if let Err(e) = std::fs::remove_dir_all(p) {
+            tracing::error!("Failed to remove {} because {:?}", p.display(), e);
+            msg!(
+                "Failed to remove sandbox {}:{}\nReason: {}",
+                i,
+                p.display(),
+                e
+            );
         }
     }
     // Erase .hc file
@@ -815,6 +821,56 @@ mod tests {
         assert!(!sandbox3.exists());
         // Verify the .hc file was removed (since all sandboxes were cleaned)
         assert!(!hc_file.exists());
+
+        // No need for explicit cleanup, TempDir will handle it
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_with_missing_config_file() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+        let hc_dir = test_dir.join("hc_dir");
+        let hc_file = hc_dir.join(".hc");
+        fs::create_dir_all(&hc_dir)?;
+
+        // Create test sandbox directories
+        let sandbox1 = test_dir.join("sandbox1");
+        let sandbox2 = test_dir.join("sandbox2");
+        fs::create_dir_all(&sandbox1)?;
+        fs::create_dir_all(&sandbox2)?;
+
+        // Create conductor config files
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+        let config_file_path1 = ConfigFilePath::from(config_path1.clone());
+        fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
+        fs::write(config_file_path1.as_ref(), "dummy config")?;
+
+        let config_path2 = ConfigRootPath::from(sandbox2.clone());
+        let config_file_path2 = ConfigFilePath::from(config_path2.clone());
+        fs::create_dir_all(config_file_path2.as_ref().parent().unwrap())?;
+        fs::write(config_file_path2.as_ref(), "dummy config")?;
+
+        // Save the paths
+        let paths = vec![config_path1, config_path2];
+        save(hc_dir.clone(), paths)?;
+
+        // Remove one of the directories manually
+        fs::remove_file(&config_file_path1.as_ref())?;
+
+        // Remove missing sandbox
+        remove(
+            hc_dir.clone(),
+            Existing {
+                all: false,
+                indices: vec![0],
+            },
+        )?;
+        assert!(!sandbox1.exists());
+        assert!(sandbox2.exists());
+        assert!(hc_file.exists());
 
         // No need for explicit cleanup, TempDir will handle it
 
