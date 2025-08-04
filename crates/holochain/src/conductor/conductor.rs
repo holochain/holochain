@@ -882,11 +882,11 @@ mod network_impls {
                                                 e.into(),
                                             )
                                         })?;
-                                let expires_at = row.get::<_, i64>(2)?;
+                                let expires_at = row.get::<_, Option<i64>>(2)?;
 
                                 let peer_meta_info = PeerMetaInfo {
                                     meta_value,
-                                    expires_at: Timestamp(expires_at),
+                                    expires_at: expires_at.map(Timestamp),
                                 };
 
                                 infos.insert(meta_key, peer_meta_info);
