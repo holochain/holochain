@@ -269,10 +269,12 @@ impl HcSandbox {
                 chc_url,
             }) => {
                 let mut paths = Vec::with_capacity(num_sandboxes.into());
-                msg!(
-                    "Creating {} conductor sandboxes with same settings",
-                    num_sandboxes
-                );
+
+                match num_sandboxes.into() {
+                    1 => msg!("Creating 1 conductor sandbox"),
+                    _ => msg!("Creating {} conductor sandboxes with same settings", num_sandboxes)
+                }
+
                 for i in 0..num_sandboxes.into() {
                     let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
                     let path = holochain_conductor_config::generate::generate(
@@ -371,6 +373,7 @@ pub async fn generate(
     structured: Output,
 ) -> anyhow::Result<Vec<ConfigRootPath>> {
     let happ = crate::bundles::parse_happ(happ)?;
+
     match create.num_sandboxes.into() {
         1 => msg!("Creating 1 conductor sandbox"),
         _ => msg!("Creating {} conductor sandboxes with same settings", create.num_sandboxes)
