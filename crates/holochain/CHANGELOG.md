@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fixes the type of the `expires_at` field in `PeerMetaInfo` returned by the admin API from `Timestamp` to `Option<Timestamp>` ([#5183](https://github.com/holochain/holochain/pull/5183)).
 - **BREAKING CHANGE**: The admin call `RegisterDna` has been removed ([#5175](https://github.com/holochain/holochain/pull/5175))
 - As part of the fix below, the Holo hash method `to_k2_op` on a DhtOpHash` has been deprecated and replaced with 
   `to_located_k2_op_id`.
