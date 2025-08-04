@@ -240,7 +240,7 @@ impl HcSandbox {
                     },
                 )?;
                 match removed_count {
-                    0 => msg!("No sandbox path has been removed"),
+                    0 => msg!("No sandbox paths have been removed"),
                     1 => msg!("1 sandbox path has been removed"),
                     _ => msg!("{} sandbox paths have been removed", removed_count),
                 }
