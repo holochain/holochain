@@ -42,8 +42,10 @@ pub fn save(hc_dir: PathBuf, paths: Vec<ConfigRootPath>) -> std::io::Result<()> 
 }
 
 /// Remove sandbox paths from the `.hc` file and attempt to delete the sandbox folders.
+///
 /// If no sandbox paths remain in the `.hc` file, then the `.hc`, `.hc_auth`, and all `.hc_live*`
 /// files will be removed from `hc_dir`.
+///
 /// Returns the number of removed paths from `.hc`.
 pub fn remove(hc_dir: PathBuf, existing: Existing) -> std::io::Result<usize> {
     let sandboxes = load(hc_dir.clone())?;
