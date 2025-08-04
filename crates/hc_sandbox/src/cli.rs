@@ -111,8 +111,20 @@ pub enum HcSandboxSubcommand {
         verbose: bool,
     },
 
-    /// Clean (completely remove) sandboxes that are listed in the `$(pwd)/.hc` file.
+    /// Delete all sandboxes that are listed in the `$(pwd)/.hc` file and
+    /// all files created by `hc sandbox` in `$(pwd)`.
     Clean,
+
+    /// Delete specified sandboxes that are listed in the `$(pwd)/.hc` file.
+    Remove {
+        /// Remove a selection of existing conductor sandboxes
+        /// from those specified in `$(pwd)/.hc`.
+        /// Existing sandboxes and their indices are visible via `hc list`.
+        /// Use the zero-based index to choose which sandboxes to use.
+        /// For example `hc sandbox remove 1 3 5` or `hc remove run 1`
+        #[arg(required = true, num_args = 1..)]
+        indices: Vec<usize>,
+    },
 
     /// Create a fresh sandbox with no apps installed.
     Create(Create),
@@ -219,7 +231,34 @@ impl HcSandbox {
             HcSandboxSubcommand::List { verbose } => {
                 crate::save::list(std::env::current_dir()?, verbose)?
             }
-            HcSandboxSubcommand::Clean => crate::save::clean(std::env::current_dir()?, Vec::new())?,
+            HcSandboxSubcommand::Clean => {
+                let removed_count = crate::save::remove(
+                    std::env::current_dir()?,
+                    Existing {
+                        all: true,
+                        indices: vec![],
+                    },
+                )?;
+                match removed_count {
+                    0 => msg!("No sandbox paths have been removed"),
+                    1 => msg!("1 sandbox path has been removed"),
+                    _ => msg!("{} sandbox paths have been removed", removed_count),
+                }
+            }
+            HcSandboxSubcommand::Remove { indices } => {
+                let removed_count = crate::save::remove(
+                    std::env::current_dir()?,
+                    Existing {
+                        all: false,
+                        indices,
+                    },
+                )?;
+                match removed_count {
+                    0 => msg!("No sandbox path has been removed"),
+                    1 => msg!("1 sandbox path has been removed"),
+                    _ => msg!("{} sandbox paths have been removed", removed_count),
+                }
+            }
             HcSandboxSubcommand::Create(Create {
                 num_sandboxes,
                 network,

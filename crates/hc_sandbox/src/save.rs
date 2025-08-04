@@ -4,77 +4,163 @@
 //! to / from a `.hc` file.
 //! This is very much WIP and subject to change.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use anyhow::Context;
+use crate::cmds::Existing;
 use holochain_conductor_api::conductor::paths::{ConfigFilePath, ConfigRootPath};
 
-/// Save all sandboxes to the `.hc` file in the `hc_dir` directory.
-pub fn save(mut hc_dir: PathBuf, paths: Vec<ConfigRootPath>) -> anyhow::Result<()> {
+/// Save all sandbox paths to the `.hc` file in the `hc_dir` directory.
+pub fn save(hc_dir: PathBuf, paths: Vec<ConfigRootPath>) -> std::io::Result<()> {
     use std::io::Write;
-    std::fs::create_dir_all(&hc_dir)?;
-    hc_dir.push(".hc");
+    std::fs::create_dir_all(&hc_dir).map_err(|err| {
+        std::io::Error::new(
+            err.kind(),
+            format!("Failed to create directory '{}': {}", hc_dir.display(), err),
+        )
+    })?;
+    let hc_file = hc_dir.join(".hc");
     let mut file = std::fs::OpenOptions::new()
         .append(true)
         .create(true)
-        .open(hc_dir)?;
-
+        .open(hc_file)
+        .map_err(|err| {
+            std::io::Error::new(
+                err.kind(),
+                format!(
+                    "Failed to create `.hc` file at '{}': {}",
+                    hc_dir.display(),
+                    err
+                ),
+            )
+        })?;
     for path in paths {
         writeln!(file, "{}", path.display())?;
     }
     Ok(())
 }
 
-/// Remove sandboxes by their index in the file.
-/// You can get the index by calling [`load`].
-/// If no sandboxes are passed in then all are deleted.
-/// If all sandboxes are deleted the `.hc` file will be removed.
-pub fn clean(mut hc_dir: PathBuf, sandboxes: Vec<usize>) -> anyhow::Result<()> {
-    let existing = load(hc_dir.clone())?;
-    let sandboxes_len = sandboxes.len();
-    let to_remove: Vec<_> = if sandboxes.is_empty() {
-        existing.iter().collect()
+/// Remove sandbox paths from the `.hc` file and attempt to delete the sandbox folders.
+///
+/// If no sandbox paths remain in the `.hc` file, then the `.hc`, `.hc_auth`, and all `.hc_live*`
+/// files will be removed from `hc_dir`.
+///
+/// Returns the number of removed paths from `.hc`.
+pub fn remove(hc_dir: PathBuf, existing: Existing) -> std::io::Result<usize> {
+    let sandboxes = load(hc_dir.clone())?;
+    // Determine sandbox paths to delete
+    let mut to_remove_indices: Vec<usize> = Vec::new();
+    if existing.all {
+        to_remove_indices = (0..sandboxes.len()).collect();
     } else {
-        sandboxes
+        existing
+            .indices
             .into_iter()
-            .filter_map(|i| existing.get(i))
-            .collect()
-    };
-    let to_remove_len = to_remove.len();
-    for p in to_remove.into_iter().flatten() {
-        if p.exists() && p.is_dir() {
-            if let Err(e) = std::fs::remove_dir_all(p) {
-                tracing::error!("Failed to remove {} because {:?}", p.display(), e);
+            .for_each(|i| match sandboxes.get(i) {
+                None => msg!("Warning: Provided index is out of range: {}", i),
+                Some(Err(path)) => {
+                    msg!(
+                        "Warning: Missing or invalid sandbox {}:{}",
+                        i,
+                        path.display()
+                    );
+                    to_remove_indices.push(i);
+                }
+                Some(Ok(_)) => to_remove_indices.push(i),
+            });
+    }
+    // Determine remaining paths
+    let indices_to_remove: HashSet<_> = to_remove_indices.iter().collect();
+    let remaining: Vec<ConfigRootPath> = sandboxes
+        .iter()
+        .enumerate()
+        .filter_map(|(i, item)| {
+            if indices_to_remove.contains(&i) {
+                return None;
             }
+            let Ok(item) = item else {
+                return None;
+            };
+            Some(ConfigRootPath::from(item.clone()))
+        })
+        .collect();
+    // Attempt to delete each sandbox
+    for i in to_remove_indices.iter() {
+        let p = match sandboxes.get(*i).unwrap() {
+            Ok(p) => p,
+            Err(p) => p,
+        };
+        if let Err(e) = std::fs::remove_dir_all(p) {
+            tracing::error!("Failed to remove {} because {:?}", p.display(), e);
+            msg!(
+                "Failed to remove sandbox {}:{}\nReason: {}",
+                i,
+                p.display(),
+                e
+            );
         }
     }
-    if sandboxes_len == 0 || sandboxes_len == to_remove_len {
+    // Erase .hc file
+    let hc_file = hc_dir.join(".hc");
+    if hc_file.exists() {
+        std::fs::remove_file(&hc_file).map_err(|err| {
+            std::io::Error::new(
+                err.kind(),
+                format!(
+                    "Failed to remove '.hc' at {}\nReason: {}",
+                    hc_dir.display(),
+                    err
+                ),
+            )
+        })?;
+    }
+    // If some valid paths remain, write a new .hc file.
+    // Otherwise, delete all files created by hc-sandbox in `hc_dir`
+    if !remaining.is_empty() {
+        save(hc_dir, remaining.clone())?;
+    } else {
+        // Erase all .hc_live* files
         for entry in std::fs::read_dir(&hc_dir)? {
-            let entry = entry?;
-            if entry.file_type()?.is_file() {
+            let Ok(entry) = entry else { continue };
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_file() {
                 if let Some(s) = entry.file_name().to_str() {
                     if s.starts_with(".hc_live_") {
-                        std::fs::remove_file(entry.path())
-                            .with_context(|| format!("Failed to remove live lock at {}", s))?;
+                        std::fs::remove_file(entry.path()).map_err(|err| {
+                            std::io::Error::new(
+                                err.kind(),
+                                format!(
+                                    "Failed to remove '{}' at {}\nReason: {}",
+                                    s,
+                                    hc_dir.display(),
+                                    err
+                                ),
+                            )
+                        })?
                     }
                 }
             }
         }
-        hc_dir.push(".hc");
-        if hc_dir.exists() {
-            std::fs::remove_file(&hc_dir)
-                .with_context(|| format!("Failed to remove .hc file at {}", hc_dir.display()))?;
-        }
-        hc_dir.pop();
-        hc_dir.push(".hc_auth");
-        if hc_dir.exists() {
-            std::fs::remove_file(&hc_dir).with_context(|| {
-                format!("Failed to remove .hc_auth file at {}", hc_dir.display())
+        // Erase .hc_auth file
+        let hc_auth = hc_dir.join(".hc_auth");
+        if hc_auth.exists() {
+            std::fs::remove_file(&hc_auth).map_err(|err| {
+                std::io::Error::new(
+                    err.kind(),
+                    format!(
+                        "Failed to remove '.hc_auth' at {}\nReason: {}",
+                        hc_dir.display(),
+                        err
+                    ),
+                )
             })?;
         }
     }
-    Ok(())
+
+    Ok(sandboxes.len() - remaining.len())
 }
 
 /// Load sandbox paths from the `.hc` file.
@@ -82,7 +168,12 @@ pub fn load(hc_dir: PathBuf) -> std::io::Result<Vec<Result<PathBuf, PathBuf>>> {
     let mut paths = Vec::new();
     let hc_file = hc_dir.join(".hc");
     if hc_file.exists() {
-        let existing = std::fs::read_to_string(hc_file)?;
+        let existing = std::fs::read_to_string(hc_file).map_err(|err| {
+            std::io::Error::new(
+                err.kind(),
+                format!("Failed to read file at '{}': {}", hc_dir.display(), err),
+            )
+        })?;
         for sandbox in existing.lines() {
             let path = PathBuf::from(sandbox);
             let config_file_path = ConfigFilePath::from(ConfigRootPath::from(path.clone()));
@@ -99,7 +190,12 @@ pub fn load(hc_dir: PathBuf) -> std::io::Result<Vec<Result<PathBuf, PathBuf>>> {
 
 /// Print out the sandboxes contained in the `.hc` file.
 pub fn list(hc_dir: PathBuf, verbose: bool) -> std::io::Result<()> {
-    let out = load(hc_dir)?.into_iter().enumerate().try_fold(
+    let sandboxes = load(hc_dir.clone())?;
+    if sandboxes.is_empty() {
+        msg!("No sandboxes contained in {}", hc_dir.join(".hc").display());
+        return Ok(());
+    }
+    let out = sandboxes.into_iter().enumerate().try_fold(
         "\nSandboxes contained in `.hc`\n".to_string(),
         |out, (i, result)| {
             let r = match (result, verbose) {
@@ -502,7 +598,7 @@ mod tests {
     }
 
     #[test]
-    fn test_clean_specific_sandboxes() -> anyhow::Result<()> {
+    fn test_remove_specific_sandboxes() -> anyhow::Result<()> {
         // Create a temporary directory for testing
         let temp_dir = tempfile::tempdir()?;
         let test_dir = temp_dir.path();
@@ -538,16 +634,42 @@ mod tests {
         save(hc_dir.clone(), paths)?;
 
         // Clean specific sandboxes (index 1, which is sandbox2)
-        clean(hc_dir.clone(), vec![1])?;
+        remove(
+            hc_dir.clone(),
+            Existing {
+                all: false,
+                indices: vec![1],
+            },
+        )?;
 
         // Verify sandbox2 was removed but sandbox1 and sandbox3 still exist
         assert!(sandbox1.exists());
         assert!(!sandbox2.exists());
         assert!(sandbox3.exists());
 
-        // Note: The .hc file is removed when all specified sandboxes are cleaned,
-        // even if not all sandboxes in the file are cleaned. This is the behavior
-        // of the clean function as implemented.
+        // .hc file must still exist
+        let hc_file = hc_dir.join(".hc");
+        assert!(hc_file.exists());
+
+        let loaded_paths = load(hc_dir.clone())?;
+        assert_eq!(loaded_paths.len(), 2);
+        assert_eq!(loaded_paths[0], Ok(sandbox1.clone()));
+        assert_eq!(loaded_paths[1], Ok(sandbox3.clone()));
+
+        // Clean specific sandboxes (index 1, which is sandbox2)
+        remove(
+            hc_dir.clone(),
+            Existing {
+                all: false,
+                indices: vec![0, 1],
+            },
+        )?;
+
+        // Verify sandbox2 was removed but sandbox1 and sandbox3 still exist
+        assert!(!sandbox1.exists());
+        assert!(!sandbox3.exists());
+
+        // .hc file must still exist
         let hc_file = hc_dir.join(".hc");
         assert!(!hc_file.exists());
 
@@ -557,12 +679,24 @@ mod tests {
     }
 
     #[test]
-    fn test_clean_all_sandboxes() -> anyhow::Result<()> {
+    fn test_remove_all_sandboxes() -> anyhow::Result<()> {
         // Create a temporary directory for testing
         let temp_dir = tempfile::tempdir()?;
         let test_dir = temp_dir.path();
         let hc_dir = test_dir.join("hc_dir");
         fs::create_dir_all(&hc_dir)?;
+
+        // Remove all in empty folder
+        remove(
+            hc_dir.clone(),
+            Existing {
+                all: true,
+                indices: vec![],
+            },
+        )?;
+        // Verify the .hc file does not exist
+        let hc_file = hc_dir.join(".hc");
+        assert!(!hc_file.exists());
 
         // Create test sandbox directories
         let sandbox1 = test_dir.join("sandbox1");
@@ -590,7 +724,13 @@ mod tests {
         save(hc_dir.clone(), paths)?;
 
         // Clean all sandboxes (empty vector)
-        clean(hc_dir.clone(), vec![])?;
+        remove(
+            hc_dir.clone(),
+            Existing {
+                all: true,
+                indices: vec![],
+            },
+        )?;
 
         // Verify all sandboxes were removed
         assert!(!sandbox1.exists());
@@ -609,11 +749,91 @@ mod tests {
     }
 
     #[test]
-    fn test_clean_with_missing_directories() -> anyhow::Result<()> {
+    fn test_remove_with_missing_directories() -> anyhow::Result<()> {
         // Create a temporary directory for testing
         let temp_dir = tempfile::tempdir()?;
         let test_dir = temp_dir.path();
         let hc_dir = test_dir.join("hc_dir");
+        let hc_file = hc_dir.join(".hc");
+        fs::create_dir_all(&hc_dir)?;
+
+        // Create test sandbox directories
+        let sandbox1 = test_dir.join("sandbox1");
+        let sandbox2 = test_dir.join("sandbox2");
+        let sandbox3 = test_dir.join("sandbox3");
+        fs::create_dir_all(&sandbox1)?;
+        fs::create_dir_all(&sandbox2)?;
+        fs::create_dir_all(&sandbox3)?;
+
+        // Create conductor config files
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+        let config_file_path1 = ConfigFilePath::from(config_path1.clone());
+        fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
+        fs::write(config_file_path1.as_ref(), "dummy config")?;
+
+        let config_path2 = ConfigRootPath::from(sandbox2.clone());
+        let config_file_path2 = ConfigFilePath::from(config_path2.clone());
+        fs::create_dir_all(config_file_path2.as_ref().parent().unwrap())?;
+        fs::write(config_file_path2.as_ref(), "dummy config")?;
+
+        let config_path3 = ConfigRootPath::from(sandbox3.clone());
+        let config_file_path3 = ConfigFilePath::from(config_path3.clone());
+        fs::create_dir_all(config_file_path3.as_ref().parent().unwrap())?;
+        fs::write(config_file_path3.as_ref(), "dummy config")?;
+
+        // Save the paths
+        let paths = vec![config_path1, config_path2, config_path3];
+        save(hc_dir.clone(), paths)?;
+
+        // Remove one of the directories manually
+        fs::remove_dir_all(&sandbox1)?;
+
+        // Remove missing sandbox
+        remove(
+            hc_dir.clone(),
+            Existing {
+                all: false,
+                indices: vec![0],
+            },
+        )?;
+        assert!(!sandbox1.exists());
+        assert!(sandbox2.exists());
+        assert!(sandbox3.exists());
+        assert!(hc_file.exists());
+        let loaded_paths = load(hc_dir.clone())?;
+        assert_eq!(loaded_paths.len(), 2);
+        assert_eq!(loaded_paths[0], Ok(sandbox2.clone()));
+        assert_eq!(loaded_paths[1], Ok(sandbox3.clone()));
+
+        // Remove one of the directories manually
+        fs::remove_dir_all(&sandbox2)?;
+
+        remove(
+            hc_dir.clone(),
+            Existing {
+                all: false,
+                indices: vec![0, 1],
+            },
+        )?;
+
+        // Verify sandbox2 was removed (sandbox1 was already removed)
+        assert!(!sandbox2.exists());
+        assert!(!sandbox3.exists());
+        // Verify the .hc file was removed (since all sandboxes were cleaned)
+        assert!(!hc_file.exists());
+
+        // No need for explicit cleanup, TempDir will handle it
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_with_missing_config_file() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+        let hc_dir = test_dir.join("hc_dir");
+        let hc_file = hc_dir.join(".hc");
         fs::create_dir_all(&hc_dir)?;
 
         // Create test sandbox directories
@@ -638,18 +858,19 @@ mod tests {
         save(hc_dir.clone(), paths)?;
 
         // Remove one of the directories manually
-        fs::remove_dir_all(&sandbox1)?;
+        fs::remove_file(config_file_path1.as_ref())?;
 
-        // Clean specific sandboxes (index 0 and 1)
-        clean(hc_dir.clone(), vec![0, 1])?;
-
-        // Verify sandbox2 was removed (sandbox1 was already removed)
+        // Remove missing sandbox
+        remove(
+            hc_dir.clone(),
+            Existing {
+                all: false,
+                indices: vec![0],
+            },
+        )?;
         assert!(!sandbox1.exists());
-        assert!(!sandbox2.exists());
-
-        // Verify the .hc file was removed (since all sandboxes were cleaned)
-        let hc_file = hc_dir.join(".hc");
-        assert!(!hc_file.exists());
+        assert!(sandbox2.exists());
+        assert!(hc_file.exists());
 
         // No need for explicit cleanup, TempDir will handle it
 
@@ -657,36 +878,68 @@ mod tests {
     }
 
     #[test]
-    fn test_clean_nonexistent_sandbox_index() -> anyhow::Result<()> {
+    fn test_remove_nonexistent_sandbox_index() -> anyhow::Result<()> {
         // Create a temporary directory for testing
         let temp_dir = tempfile::tempdir()?;
         let test_dir = temp_dir.path();
         let hc_dir = test_dir.join("hc_dir");
+        let hc_file = hc_dir.join(".hc");
         fs::create_dir_all(&hc_dir)?;
 
-        // Create test sandbox directory
+        // Create test sandbox directories
         let sandbox1 = test_dir.join("sandbox1");
+        let sandbox2 = test_dir.join("sandbox2");
         fs::create_dir_all(&sandbox1)?;
+        fs::create_dir_all(&sandbox2)?;
 
-        // Create conductor config file
+        // Create conductor config files
         let config_path1 = ConfigRootPath::from(sandbox1.clone());
         let config_file_path1 = ConfigFilePath::from(config_path1.clone());
         fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
         fs::write(config_file_path1.as_ref(), "dummy config")?;
 
-        // Save the path
-        let paths = vec![config_path1];
+        let config_path2 = ConfigRootPath::from(sandbox2.clone());
+        let config_file_path2 = ConfigFilePath::from(config_path2.clone());
+        fs::create_dir_all(config_file_path2.as_ref().parent().unwrap())?;
+        fs::write(config_file_path2.as_ref(), "dummy config")?;
+
+        // Save the paths
+        let paths = vec![config_path1, config_path2];
         save(hc_dir.clone(), paths)?;
 
         // Try to clean a nonexistent sandbox index
-        clean(hc_dir.clone(), vec![1])?; // Index 1 doesn't exist
-
-        // Verify sandbox1 still exists
+        remove(
+            hc_dir.clone(),
+            Existing {
+                all: false,
+                indices: vec![2],
+            },
+        )?;
+        // Verify sandboxes still exists
         assert!(sandbox1.exists());
-
+        assert!(sandbox2.exists());
         // Verify the .hc file still exists
-        let hc_file = hc_dir.join(".hc");
         assert!(hc_file.exists());
+
+        // Try to clean a valid and nonexistent sandbox index
+        remove(
+            hc_dir.clone(),
+            Existing {
+                all: false,
+                indices: vec![0, 2],
+            },
+        )?;
+        // Verify sandboxes still exists
+        assert!(!sandbox1.exists());
+        assert!(sandbox2.exists());
+        // Verify the .hc file still exists
+        assert!(hc_file.exists());
+
+        // Load the paths
+        let loaded_paths = load(hc_dir.clone())?;
+        // Verify the loaded paths
+        assert_eq!(loaded_paths.len(), 1);
+        assert_eq!(loaded_paths[0], Ok(sandbox2.clone()));
 
         // No need for explicit cleanup, TempDir will handle it
 
