@@ -94,14 +94,14 @@ async fn peer_meta_info() {
 
     let peer_meta_info11 = meta_infos1.get("root:unresponsive").unwrap();
     assert_eq!(peer_meta_info11.meta_value, ktimestamp.as_micros());
-    assert_eq!(peer_meta_info11.expires_at, htimestamp);
+    assert_eq!(peer_meta_info11.expires_at, Some(htimestamp));
 
     let peer_meta_info12 = meta_infos1.get("test:meta").unwrap();
     assert_eq!(
         peer_meta_info12.meta_value,
         serde_json::Value::String("hello".into())
     );
-    assert_eq!(peer_meta_info12.expires_at, htimestamp);
+    assert_eq!(peer_meta_info12.expires_at, Some(htimestamp));
 
     let meta_infos2 = response
         .get(dna2.dna_hash())
@@ -114,7 +114,7 @@ async fn peer_meta_info() {
         peer_meta_info2.meta_value,
         serde_json::Value::String("hello2".into())
     );
-    assert_eq!(peer_meta_info2.expires_at, htimestamp);
+    assert_eq!(peer_meta_info2.expires_at, Some(htimestamp));
 
     // Get the agent meta info for a selected space only
     let response2 = conductor
@@ -135,7 +135,7 @@ async fn peer_meta_info() {
         peer_meta_info2.meta_value,
         serde_json::Value::String("hello2".into())
     );
-    assert_eq!(peer_meta_info2.expires_at, htimestamp);
+    assert_eq!(peer_meta_info2.expires_at, Some(htimestamp));
 
     // Try to get agent meta info for a non-existent space. Should
     // throw an error.
@@ -205,5 +205,5 @@ async fn app_peer_meta_info() {
         peer_meta_info.meta_value,
         serde_json::Value::String("hello".into())
     );
-    assert_eq!(peer_meta_info.expires_at, htimestamp);
+    assert_eq!(peer_meta_info.expires_at, Some(htimestamp));
 }
