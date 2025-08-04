@@ -10,7 +10,7 @@ use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
     dna::AgentPubKey,
     prelude::{
-        AppCapGrantInfo, CellId, DeleteCloneCellPayload, InstallAppPayload, RegisterDnaPayload,
+        AppCapGrantInfo, CellId, DeleteCloneCellPayload, InstallAppPayload,
         UpdateCoordinatorsPayload,
     },
 };
@@ -317,16 +317,6 @@ impl AdminWebsocket {
 
         match response {
             AdminResponse::AppUninstalled => Ok(()),
-            _ => unreachable!("Unexpected response {:?}", response),
-        }
-    }
-
-    pub async fn register_dna(&self, payload: RegisterDnaPayload) -> ConductorApiResult<DnaHash> {
-        let response = self
-            .send(AdminRequest::RegisterDna(Box::new(payload)))
-            .await?;
-        match response {
-            AdminResponse::DnaRegistered(dna_hash) => Ok(dna_hash),
             _ => unreachable!("Unexpected response {:?}", response),
         }
     }

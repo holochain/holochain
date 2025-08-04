@@ -52,16 +52,6 @@ pub enum CoordinatorSource {
     Bundle(Box<CoordinatorBundle>),
 }
 
-/// The instructions on how to get the DNA to be registered
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct RegisterDnaPayload {
-    /// Modifier overrides
-    #[serde(default)]
-    pub modifiers: DnaModifiersOpt<YamlProperties>,
-    /// Where to find the DNA
-    pub source: DnaSource,
-}
-
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 /// The instructions on how to update coordinators for a dna file.
 pub struct UpdateCoordinatorsPayload {

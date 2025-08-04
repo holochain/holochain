@@ -490,15 +490,11 @@ async fn conductor_admin_interface_runs_from_config() -> Result<()> {
     let (client, rx) = websocket_client(&conductor_handle).await?;
     let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
-    let dna = fake_dna_zomes("", vec![(TestWasm::Foo.into(), TestWasm::Foo.into())]);
-    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
-    let register_payload = RegisterDnaPayload {
-        modifiers: DnaModifiersOpt::none(),
-        source: DnaSource::Path(fake_dna_path),
+    let request = AdminRequest::ListApps {
+        status_filter: None,
     };
-    let request = AdminRequest::RegisterDna(Box::new(register_payload));
     let response = client.request(request).await.unwrap();
-    assert_matches!(response, AdminResponse::DnaRegistered(_));
+    assert_matches!(response, AdminResponse::AppsListed(_));
 
     conductor_handle.shutdown();
 
@@ -596,13 +592,9 @@ async fn conductor_admin_interface_ends_with_shutdown_inner() -> Result<()> {
 
     info!("About to make failing request");
 
-    let dna = fake_dna_zomes("", vec![(TestWasm::Foo.into(), TestWasm::Foo.into())]);
-    let (fake_dna_path, _tmpdir) = write_fake_dna_file(dna).await.unwrap();
-    let register_payload = RegisterDnaPayload {
-        modifiers: DnaModifiersOpt::none(),
-        source: DnaSource::Path(fake_dna_path),
+    let request = AdminRequest::ListApps {
+        status_filter: None,
     };
-    let request = AdminRequest::RegisterDna(Box::new(register_payload));
 
     // send a request after the conductor has shutdown
     // let response: Result<Result<AdminResponse, _>, tokio::time::Elapsed> =
