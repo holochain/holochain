@@ -79,9 +79,3 @@ impl RibosomeStore {
         self.entry_defs.get(k).cloned()
     }
 }
-
-impl DnaStore for RibosomeStore {
-    fn get_dna(&self, dna_hash: &DnaHash) -> Option<DnaFile> {
-        self.get_dna_file(dna_hash)
-    }
-}

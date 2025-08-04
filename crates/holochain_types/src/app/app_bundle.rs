@@ -6,7 +6,7 @@ use bytes::Buf;
 use mr_bundle::error::MrBundleError;
 use mr_bundle::{Bundle, ResourceIdentifier};
 use std::io::Read;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 #[allow(missing_docs)]
 mod error;
@@ -43,17 +43,6 @@ impl AppBundle {
     /// Convert to the inner Bundle
     pub fn into_inner(self) -> Bundle<AppManifest> {
         self.0
-    }
-
-    /// Look up every installed_hash of every role, getting the DnaFiles from the DnaStore
-    pub fn get_all_dnas_from_store(&self, dna_store: &impl DnaStore) -> HashMap<DnaHash, DnaFile> {
-        self.manifest()
-            .app_roles()
-            .iter()
-            .flat_map(|role| role.dna.installed_hash.to_owned())
-            .map(Into::into)
-            .flat_map(|hash| dna_store.get_dna(&hash).map(|dna| (hash, dna)))
-            .collect()
     }
 
     /// Given a partial list of already available DnaFiles, fetch the missing others via
