@@ -68,11 +68,7 @@ pub async fn default_n(
     roles_settings: Option<PathBuf>,
     structured: Output,
 ) -> anyhow::Result<Vec<ConfigRootPath>> {
-    let num_sandboxes = create.num_sandboxes;
-    msg!(
-        "Creating {} conductor sandboxes with same settings",
-        num_sandboxes
-    );
+    let num_sandboxes = create.num_sandboxes.into();
     let mut paths = Vec::with_capacity(num_sandboxes);
     for i in 0..num_sandboxes {
         let p = default_with_network(
@@ -88,6 +84,5 @@ pub async fn default_n(
         .await?;
         paths.push(p);
     }
-    msg!("Created {:?}", paths);
     Ok(paths)
 }

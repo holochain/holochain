@@ -268,12 +268,12 @@ impl HcSandbox {
                 #[cfg(feature = "chc")]
                 chc_url,
             }) => {
-                let mut paths = Vec::with_capacity(num_sandboxes);
+                let mut paths = Vec::with_capacity(num_sandboxes.into());
                 msg!(
                     "Creating {} conductor sandboxes with same settings",
                     num_sandboxes
                 );
-                for i in 0..num_sandboxes {
+                for i in 0..num_sandboxes.into() {
                     let network = Network::to_kitsune(&NetworkCmd::as_inner(&network)).await;
                     let path = holochain_conductor_config::generate::generate(
                         network,
@@ -286,18 +286,7 @@ impl HcSandbox {
                     )?;
                     paths.push(path);
                 }
-                let pre_existing = crate::save::load(std::env::current_dir()?)?;
-                crate::save::save(std::env::current_dir()?, paths.clone())?;
-                match paths.len() {
-                    0 => msg!("No sandboxes have been created"),
-                    1 => msg!("1 sandbox has been created:\n  - {}:{}", pre_existing.len(), paths[0].display()),
-                    _ => {
-                        msg!("{} sandboxes have been created:", paths.len());
-                        for (i, path) in paths.into_iter().enumerate() {
-                            msg!("  - {}:{}", pre_existing.len() + i, path.display());
-                        }
-                    },
-                }
+                save_and_print(std::env::current_dir()?, paths)?;
             }
         }
 
@@ -382,6 +371,11 @@ pub async fn generate(
     structured: Output,
 ) -> anyhow::Result<Vec<ConfigRootPath>> {
     let happ = crate::bundles::parse_happ(happ)?;
+    match create.num_sandboxes.into() {
+        1 => msg!("Creating 1 conductor sandbox"),
+        _ => msg!("Creating {} conductor sandboxes with same settings", create.num_sandboxes)
+    }
+
     let paths = crate::sandbox::default_n(
         holochain_path,
         create,
@@ -392,6 +386,25 @@ pub async fn generate(
         structured,
     )
     .await?;
-    crate::save::save(std::env::current_dir()?, paths.clone())?;
+    save_and_print(std::env::current_dir()?, paths.clone())?;
     Ok(paths)
+}
+
+fn save_and_print(hc_dir: PathBuf, paths: Vec<ConfigRootPath>) -> std::io::Result<()> {
+    let pre_existing = crate::save::load(hc_dir.clone())?;
+    crate::save::save(hc_dir, paths.clone())?;
+    match paths.len() {
+        1 => msg!(
+            "Created 1 sandbox:\n{}:{}",
+            pre_existing.len(),
+            paths[0].display()
+        ),
+        _ => {
+            msg!("Created {} sandboxes:", paths.len());
+            for (i, path) in paths.into_iter().enumerate() {
+                msg!("{}:{}", pre_existing.len() + i, path.display());
+            }
+        }
+    }
+    Ok(())
 }
