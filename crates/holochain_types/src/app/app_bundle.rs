@@ -60,7 +60,6 @@ impl AppBundle {
     /// mr_bundle::Location resolution
     pub async fn resolve_cells(
         self,
-        dna_store: &impl DnaStore,
         membrane_proofs: MemproofMap,
         existing_cells: ExistingCellsMap,
     ) -> AppBundleResult<AppRoleResolution> {
@@ -71,7 +70,7 @@ impl AppBundle {
             Ok((
                 role_name.clone(),
                 bundle
-                    .resolve_cell(dna_store, role_name, role, &existing_cells)
+                    .resolve_cell(role_name, role, &existing_cells)
                     .await?,
             ))
         });
@@ -119,28 +118,19 @@ impl AppBundle {
 
     async fn resolve_cell(
         &self,
-        dna_store: &impl DnaStore,
         role_name: RoleName,
         role: AppRoleManifestValidated,
         existing_cells: &ExistingCellsMap,
     ) -> AppBundleResult<CellProvisioningOp> {
         match role {
             AppRoleManifestValidated::Create {
-                path: file,
-                installed_hash,
+                path: resource_id,
+                installed_hash: _,
                 clone_limit,
                 modifiers,
                 deferred: _,
             } => {
-                let dna = self
-                    .resolve_dna(
-                        role_name,
-                        dna_store,
-                        &file,
-                        installed_hash.as_ref(),
-                        modifiers,
-                    )
-                    .await?;
+                let dna = self.get_modified_dna_file(&resource_id, modifiers).await?.0;
                 Ok(CellProvisioningOp::CreateFromDnaFile(dna, clone_limit))
             }
 
@@ -160,53 +150,14 @@ impl AppBundle {
 
             AppRoleManifestValidated::CloneOnly {
                 clone_limit,
-                path: file,
+                path: resource_id,
                 modifiers,
-                installed_hash,
+                installed_hash: _,
             } => {
-                let dna = self
-                    .resolve_dna(
-                        role_name,
-                        dna_store,
-                        &file,
-                        installed_hash.as_ref(),
-                        modifiers,
-                    )
-                    .await?;
+                let dna = self.get_modified_dna_file(&resource_id, modifiers).await?.0;
                 Ok(CellProvisioningOp::ProvisionOnly(dna, clone_limit))
             }
         }
-    }
-
-    async fn resolve_dna(
-        &self,
-        role_name: RoleName,
-        dna_store: &impl DnaStore,
-        resource_id: &ResourceIdentifier,
-        expected_hash: Option<&DnaHashB64>,
-        modifiers: DnaModifiersOpt,
-    ) -> AppBundleResult<DnaFile> {
-        let dna_file = if let Some(expected_hash) = expected_hash {
-            let expected_hash = expected_hash.clone().into();
-            let (dna_file, original_hash) =
-                if let Some(mut dna_file) = dna_store.get_dna(&expected_hash) {
-                    let original_hash = dna_file.dna_hash().clone();
-                    dna_file = dna_file.update_modifiers(modifiers);
-                    (dna_file, original_hash)
-                } else {
-                    self.get_modified_dna_file(resource_id, modifiers).await?
-                };
-            if expected_hash != original_hash {
-                return Err(AppBundleError::CellResolutionFailure(
-                    role_name,
-                    format!("Hash mismatch: {} != {}", expected_hash, original_hash),
-                ));
-            }
-            dna_file
-        } else {
-            self.get_modified_dna_file(resource_id, modifiers).await?.0
-        };
-        Ok(dna_file)
     }
 
     async fn get_modified_dna_file(

@@ -20,11 +20,6 @@ pub async fn app_bundle_from_dnas(
                 dna: AppRoleDnaManifest {
                     path: Some(path.clone()),
                     modifiers,
-                    // NOTE: for testing with inline zomes, it's essential that the
-                    //       installed_hash is included, so it can be used to fetch
-                    //       the DNA file from the conductor's DNA store rather
-                    //       than the one in the bundle which lacks inline zomes
-                    //       due to serialization.
                     installed_hash: Some(dr.dna().dna_hash().clone().into()),
                     clone_limit: 255,
                 },
