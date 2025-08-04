@@ -14,6 +14,64 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250806.001301
+
+## [hcterm-0.6.0-dev.16](crates/hcterm/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_cli-0.6.0-dev.16](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_cli\_bundle-0.6.0-dev.16](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.16](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_client-0.8.0-dev.13](crates/holochain_client/CHANGELOG.md#0.8.0-dev.13)
+
+## [holochain-0.6.0-dev.16](crates/holochain/CHANGELOG.md#0.6.0-dev.16)
+
+- Removed redundant usages of `register_dna()` in test code and removed unused test utils ([\#5174](https://github.com/holochain/holochain/pull/5174)).
+- Fixes the type of the `expires_at` field in `PeerMetaInfo` returned by the admin API from `Timestamp` to `Option<Timestamp>` ([\#5183](https://github.com/holochain/holochain/pull/5183)).
+- **BREAKING CHANGE**: The admin call `RegisterDna` has been removed ([\#5175](https://github.com/holochain/holochain/pull/5175))
+- As part of the fix below, the Holo hash method `to_k2_op` on a DhtOpHash` has been deprecated and replaced with  `to\_located\_k2\_op\_id\`.
+- Fixes a bug where the wrong DhtOp location was reported to Kitsune2. This resulted in conductors not being able to sync with each other. This change can upgrade existing conductors and new data should sync correctly. However, part of the DHT model gets persisted and to fix bad data in the persisted model, the model has to be wiped and rebuilt. This will result in a short startup delay when upgrading to this version. After the first startup, the startup time should be back to normal.
+
+## [holochain\_cascade-0.6.0-dev.16](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_conductor\_config-0.6.0-dev.16](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_test\_wasm\_common-0.6.0-dev.12](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.16](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_websocket-0.6.0-dev.16](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.16)
+
+## [hdk-0.6.0-dev.12](crates/hdk/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_conductor\_api-0.6.0-dev.16](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_p2p-0.6.0-dev.16](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.16)
+
+## [hdi-0.7.0-dev.11](crates/hdi/CHANGELOG.md#0.7.0-dev.11)
+
+## [holochain\_state-0.6.0-dev.16](crates/holochain_state/CHANGELOG.md#0.6.0-dev.16)
+
+## [hdk\_derive-0.6.0-dev.10](crates/hdk_derive/CHANGELOG.md#0.6.0-dev.10)
+
+## [holochain\_chc-0.3.0-dev.16](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.16)
+
+## [holochain\_state\_types-0.6.0-dev.10](crates/holochain_state_types/CHANGELOG.md#0.6.0-dev.10)
+
+## [holochain\_types-0.6.0-dev.16](crates/holochain_types/CHANGELOG.md#0.6.0-dev.16)
+
+## [holochain\_keystore-0.6.0-dev.12](crates/holochain_keystore/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_sqlite-0.6.0-dev.15](crates/holochain_sqlite/CHANGELOG.md#0.6.0-dev.15)
+
+## [holochain\_zome\_types-0.6.0-dev.12](crates/holochain_zome_types/CHANGELOG.md#0.6.0-dev.12)
+
+## [holochain\_integrity\_types-0.6.0-dev.10](crates/holochain_integrity_types/CHANGELOG.md#0.6.0-dev.10)
+
+## [holo\_hash-0.6.0-dev.9](crates/holo_hash/CHANGELOG.md#0.6.0-dev.9)
+
 # 20250730.001323
 
 ## [hcterm-0.6.0-dev.15](crates/hcterm/CHANGELOG.md#0.6.0-dev.15)
