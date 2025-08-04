@@ -858,7 +858,7 @@ mod tests {
         save(hc_dir.clone(), paths)?;
 
         // Remove one of the directories manually
-        fs::remove_file(&config_file_path1.as_ref())?;
+        fs::remove_file(config_file_path1.as_ref())?;
 
         // Remove missing sandbox
         remove(
