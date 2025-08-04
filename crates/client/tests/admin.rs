@@ -270,7 +270,7 @@ async fn peer_meta_info() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn list_cell_ids() {
+async fn install_app_then_list_apps_and_list_cell_ids() {
     let conductor = SweetConductor::from_standard_config().await;
     let admin_port = conductor.get_arbitrary_admin_websocket_port().unwrap();
     let admin_ws = AdminWebsocket::connect(format!("127.0.0.1:{}", admin_port), None)
@@ -289,7 +289,7 @@ async fn list_cell_ids() {
         })
         .await
         .unwrap();
-    admin_ws.enable_app(app_id).await.unwrap();
+    admin_ws.enable_app(app_id.clone()).await.unwrap();
     let cell_id =
         if let CellInfo::Provisioned(cell) = &app_info.cell_info.get(ROLE_NAME).unwrap()[0] {
             cell.cell_id.clone()
@@ -301,6 +301,11 @@ async fn list_cell_ids() {
     // Check if list includes cell id.
     assert_eq!(cell_ids.len(), 1);
     assert!(cell_ids.contains(&cell_id));
+
+    let app_infos = admin_ws.list_apps(None).await.unwrap();
+    // Check if list includes AppInfo with the correct installed_app_id.
+    assert_eq!(app_infos.len(), 1);
+    assert!(app_infos.iter().any(|a| a.installed_app_id == app_id));
 }
 
 #[tokio::test(flavor = "multi_thread")]
