@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::conductor::InstallAppCommonFlags;
 use crate::conductor::ConductorHandle;
 use crate::conductor::{
     api::error::ConductorApiResult, config::ConductorConfig, error::ConductorResult, Conductor,
@@ -320,15 +321,16 @@ impl SweetConductor {
         Ok(())
     }
 
-    /// Install the app and enable it
+    /// Install an app
     // TODO: make this take a more flexible config for specifying things like
     // membrane proofs
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn install_and_enable_app(
+    pub async fn install_app(
         &mut self,
         installed_app_id: &str,
         agent: Option<AgentPubKey>,
         dnas_with_roles: &[impl DnaWithRole],
+        flags: Option<InstallAppCommonFlags>,
     ) -> ConductorApiResult<AgentPubKey> {
         let installed_app_id = installed_app_id.to_string();
 
@@ -343,10 +345,34 @@ impl SweetConductor {
 
         let agent = self
             .raw_handle()
-            .install_app_minimal(installed_app_id.clone(), agent, &dnas_with_proof, None)
+            .install_app_minimal(
+                installed_app_id.clone(),
+                agent,
+                &dnas_with_proof,
+                None,
+                flags,
+            )
             .await?;
+        Ok(agent)
+    }
 
-        self.raw_handle().enable_app(installed_app_id).await?;
+    /// Install an app and enable it
+    // TODO: make this take a more flexible config for specifying things like
+    // membrane proofs
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    async fn install_and_enable_app(
+        &mut self,
+        installed_app_id: &str,
+        agent: Option<AgentPubKey>,
+        dnas_with_roles: &[impl DnaWithRole],
+        flags: Option<InstallAppCommonFlags>,
+    ) -> ConductorApiResult<AgentPubKey> {
+        let agent = self
+            .install_app(installed_app_id, agent, dnas_with_roles, flags)
+            .await?;
+        self.raw_handle()
+            .enable_app(installed_app_id.to_string())
+            .await?;
         Ok(agent)
     }
 
@@ -423,7 +449,12 @@ impl SweetConductor {
             .await?;
 
         let agent = self
-            .install_and_enable_app(installed_app_id, agent.clone(), dnas_with_roles.as_slice())
+            .install_and_enable_app(
+                installed_app_id,
+                agent.clone(),
+                dnas_with_roles.as_slice(),
+                None,
+            )
             .await?;
 
         let roles = dnas_with_roles
@@ -487,6 +518,7 @@ impl SweetConductor {
                 &installed_app_id,
                 Some(agent.to_owned()),
                 &dnas_with_roles,
+                None,
             )
             .await?;
         }

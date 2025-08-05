@@ -5,6 +5,7 @@ use ::fixt::prelude::*;
 use hdk::prelude::*;
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holochain::conductor::api::error::ConductorApiError;
+use holochain::conductor::conductor::InstallAppCommonFlags;
 use holochain::sweettest::{
     DynSweetRendezvous, SweetConductor, SweetConductorConfig, SweetDnaFile,
 };
@@ -214,17 +215,9 @@ async fn grafting() {
     drop(conductor_1);
 
     // Start a second conductor.
-    let conductor_2 =
+    let mut conductor_2 =
         SweetConductor::create_with_defaults(config, Some(keystore), None::<DynSweetRendezvous>)
             .await;
-
-    let mut payload = holochain::sweettest::get_install_app_payload_from_dnas(
-        "app",
-        Some(alice_cell_1.agent_pubkey().clone()),
-        &[(dna_file, None)],
-        None,
-    )
-    .await;
 
     let _records = conductor_2
         .get_chc(alice_cell_1.cell_id())
@@ -236,8 +229,17 @@ async fn grafting() {
 
     // This results in an error since the CHC already contains genesis, but this
     // is just to create the necessary cell for grafting onto.
-    payload.ignore_genesis_failure = true;
-    let install_result = conductor_2.raw_handle().install_app_bundle(payload).await;
+    let install_result = conductor_2
+        .install_app(
+            "app",
+            Some(alice_cell_1.agent_pubkey().clone()),
+            &[dna_file],
+            Some(InstallAppCommonFlags {
+                defer_memproofs: false,
+                ignore_genesis_failure: true,
+            }),
+        )
+        .await;
     assert!(install_result.is_err());
 
     // Insert the chain from the original conductor.

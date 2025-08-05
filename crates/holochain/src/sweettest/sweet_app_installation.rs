@@ -47,37 +47,3 @@ pub async fn app_bundle_from_dnas(
 
     AppBundle::new(manifest, resources).unwrap()
 }
-
-/// Get a "standard" InstallAppPayload from a single DNA
-pub async fn get_install_app_payload_from_dnas(
-    installed_app_id: impl Into<InstalledAppId>,
-    agent_key: Option<AgentPubKey>,
-    data: &[(impl DnaWithRole, Option<MembraneProof>)],
-    network_seed: Option<NetworkSeed>,
-) -> InstallAppPayload {
-    let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
-    let bundle = app_bundle_from_dnas(&dnas_with_roles, false, network_seed).await;
-    let roles_settings = Some(
-        data.iter()
-            .map(|(dr, memproof)| {
-                (
-                    dr.role(),
-                    RoleSettings::Provisioned {
-                        modifiers: Default::default(),
-                        membrane_proof: memproof.clone(),
-                    },
-                )
-            })
-            .collect(),
-    );
-
-    let bytes = bundle.pack().expect("failed to encode app bundle as bytes");
-    InstallAppPayload {
-        agent_key,
-        source: AppBundleSource::Bytes(bytes),
-        installed_app_id: Some(installed_app_id.into()),
-        network_seed: None,
-        roles_settings,
-        ignore_genesis_failure: false,
-    }
-}

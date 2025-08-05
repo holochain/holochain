@@ -690,7 +690,13 @@ mod test {
 
         conductor_handle
             .clone()
-            .install_app_minimal("test app".to_string(), Some(agent), &dnas_with_proofs, None)
+            .install_app_minimal(
+                "test app".to_string(),
+                Some(agent),
+                &dnas_with_proofs,
+                None,
+                None,
+            )
             .await
             .unwrap();
 

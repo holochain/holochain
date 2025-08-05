@@ -1140,6 +1140,7 @@ mod app_impls {
             agent: Option<AgentPubKey>,
             data: &[(impl DnaWithRole, Option<MembraneProof>)],
             network_seed: Option<NetworkSeed>,
+            flags: Option<InstallAppCommonFlags>,
         ) -> ConductorResult<AgentPubKey> {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
             let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false, network_seed);
@@ -1167,10 +1168,10 @@ mod app_impls {
                     manifest,
                     agent.clone(),
                     ops,
-                    InstallAppCommonFlags {
+                    flags.unwrap_or(InstallAppCommonFlags {
                         defer_memproofs: false,
                         ignore_genesis_failure: false,
-                    },
+                    }),
                 )
                 .await?;
 
