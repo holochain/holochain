@@ -1271,7 +1271,7 @@ async fn get_config_root_path(child: &mut Child) -> PathBuf {
 
     while let Ok(Some(line)) = lines.next_line().await {
         println!("@@@-{line}-@@@");
-        if line.contains("0:") {
+        if line.starts_with("0:") {
             return PathBuf::from(&line[2..line.len()]);
         }
     }
