@@ -56,7 +56,7 @@ pub struct SweetConductor {
     /// since they are not persisted to the wasm database and therefore
     /// are not automatically loaded into the [`crate::conductor::ribosome_store::RibosomeStore`]
     /// on conductor restart otherwise.
-    dna_files: Vec<DnaFile>,
+    dna_files: Vec<(CellId, DnaFile)>,
     rendezvous: Option<DynSweetRendezvous>,
 }
 
@@ -250,7 +250,7 @@ impl SweetConductor {
     pub async fn handle_from_existing(
         keystore: MetaLairClient,
         config: &ConductorConfig,
-        extra_dnas: &[DnaFile],
+        extra_dna_files: &[(CellId, DnaFile)],
         test_builder_uses_production_k2_builder: bool,
     ) -> ConductorHandle {
         NUM_CREATED.fetch_add(1, Ordering::SeqCst);
@@ -260,7 +260,7 @@ impl SweetConductor {
             .with_keystore(keystore)
             .no_print_setup()
             .test_builder_uses_production_k2_builder(test_builder_uses_production_k2_builder)
-            .test(extra_dnas)
+            .test(extra_dna_files)
             .await
             .unwrap()
     }
@@ -313,10 +313,14 @@ impl SweetConductor {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     async fn add_dna_files_to_sweet_conductor_cache(
         &mut self,
+        agent_key: AgentPubKey,
         dna_files: impl IntoIterator<Item = &DnaFile>,
     ) -> ConductorApiResult<()> {
         for dna_file in dna_files.into_iter() {
-            self.dna_files.push(dna_file.to_owned());
+            self.dna_files.push((
+                CellId::new(dna_file.dna_hash().clone(), agent_key.clone()),
+                dna_file.to_owned(),
+            ));
         }
         Ok(())
     }
@@ -445,9 +449,6 @@ impl SweetConductor {
             .map(|dr| dr.dna())
             .collect::<Vec<_>>();
 
-        self.add_dna_files_to_sweet_conductor_cache(dnas.clone())
-            .await?;
-
         let agent = self
             .install_and_enable_app(
                 installed_app_id,
@@ -455,6 +456,9 @@ impl SweetConductor {
                 dnas_with_roles.as_slice(),
                 None,
             )
+            .await?;
+
+        self.add_dna_files_to_sweet_conductor_cache(agent.clone(), dnas.clone())
             .await?;
 
         let roles = dnas_with_roles
@@ -509,8 +513,6 @@ impl SweetConductor {
         let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
         let dnas: Vec<&DnaFile> = dnas_with_roles.iter().map(|dr| dr.dna()).collect();
         let roles: Vec<RoleName> = dnas_with_roles.iter().map(|dr| dr.role()).collect();
-        self.add_dna_files_to_sweet_conductor_cache(dnas.clone())
-            .await?;
 
         for &agent in agents.iter() {
             let installed_app_id = format!("{}{}", app_id_prefix, agent);
@@ -521,6 +523,9 @@ impl SweetConductor {
                 None,
             )
             .await?;
+
+            self.add_dna_files_to_sweet_conductor_cache(agent.clone(), dnas.clone())
+                .await?;
         }
 
         let mut apps = Vec::new();
@@ -567,8 +572,8 @@ impl SweetConductor {
             .raw_handle()
             .create_clone_cell(installed_app_id, payload)
             .await?;
-        let dna_file = self.get_dna_file(clone.cell_id.dna_hash()).unwrap();
-        self.dna_files.push(dna_file);
+        let dna_file = self.get_dna_file(&clone.cell_id).unwrap();
+        self.dna_files.push((clone.cell_id.clone(), dna_file));
         Ok(clone)
     }
 
@@ -643,7 +648,7 @@ impl SweetConductor {
     }
 
     /// Start up this conductor if it's not already running.
-    pub async fn startup(&mut self) {
+    pub async fn startup(&mut self, ignore_dna_files_cache: Option<bool>) {
         if self.handle.is_none() {
             // There's a db dir in the sweet conductor and the config, that are
             // supposed to be the same. Let's assert that they are.
@@ -652,11 +657,26 @@ impl SweetConductor {
                 self.config.data_root_path,
                 "SweetConductor db_dir and config.data_root_path are not the same",
             );
+
+            // Inline zomes are not persisted in the database. In order for them to be
+            // reloaded into the ribosome store after a conductor restart, we load all
+            // DnaFiles associated to apps that we have installed (including non-inline
+            // zomes) from the cache here and pass them to Self::handle_from_existing
+            // as extra_dna_files to be loaded into the ribosome store explicitly
+            // (and thereby overwrite ribosomes with DnaFiles loaded from the database).
+            // But there are cases when testing with actual wasms (not inline-zomes)
+            // where we want to ensure that the wasms can get correctly loaded from
+            // the database so we offer the option to explicitly ignore the cache here.
+            let ignore_dna_files_cache = ignore_dna_files_cache.unwrap_or(false);
+            let extra_dna_files = match ignore_dna_files_cache {
+                true => &[],
+                false => self.dna_files.as_slice(),
+            };
             self.handle = Some(SweetConductorHandle(
                 Self::handle_from_existing(
                     self.keystore.clone(),
                     &self.config,
-                    self.dna_files.as_slice(),
+                    extra_dna_files,
                     false,
                 )
                 .await,

@@ -96,7 +96,7 @@ async fn gossip_resumes_after_restart() {
     let record: Option<Record> = conductors[1].call(&zome_1, "read", hash.clone()).await;
     assert!(record.is_none());
 
-    conductors[0].startup().await;
+    conductors[0].startup(None).await;
     conductors.exchange_peer_info().await;
 
     // Ensure that gossip loops resume upon startup.

@@ -360,8 +360,8 @@ impl AdminWebsocket {
         }
     }
 
-    pub async fn get_dna_definition(&self, hash: DnaHash) -> ConductorApiResult<DnaDef> {
-        let msg = AdminRequest::GetDnaDefinition(Box::new(hash));
+    pub async fn get_dna_definition(&self, cell_id: CellId) -> ConductorApiResult<DnaDef> {
+        let msg = AdminRequest::GetDnaDefinition(Box::new(cell_id));
         let response = self.send(msg).await?;
         match response {
             AdminResponse::DnaDefinitionReturned(dna_definition) => Ok(dna_definition),

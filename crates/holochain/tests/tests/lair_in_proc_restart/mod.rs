@@ -70,7 +70,7 @@ async fn lair_in_proc_sql_pool_factory_restart() {
     let _: String = conductor.call(&cell.zome("foo"), "foo", ()).await;
 
     conductor.shutdown().await;
-    conductor.startup().await;
+    conductor.startup(None).await;
 
     // Test that zome calls still work after a restart
     let _: String = conductor.call(&cell.zome("foo"), "foo", ()).await;

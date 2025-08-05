@@ -56,7 +56,7 @@ pub enum CoordinatorSource {
 /// The instructions on how to update coordinators for a dna file.
 pub struct UpdateCoordinatorsPayload {
     /// The hash of the dna to swap coordinators for.
-    pub dna_hash: DnaHash,
+    pub cell_id: CellId,
     /// Where to find the coordinators.
     pub source: CoordinatorSource,
 }

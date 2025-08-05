@@ -19,11 +19,11 @@ pub fn dna_info_1(
             bindings_deterministic: Permission::Allow,
             ..
         } => Ok(DnaInfoV1 {
-            name: ribosome.dna_def().name.clone(),
-            hash: ribosome.dna_def().as_hash().clone(),
-            properties: ribosome.dna_def().modifiers.properties.clone(),
+            name: ribosome.dna_def_hashed().name.clone(),
+            hash: ribosome.dna_def_hashed().as_hash().clone(),
+            properties: ribosome.dna_def_hashed().modifiers.properties.clone(),
             zome_names: ribosome
-                .dna_def()
+                .dna_def_hashed()
                 .integrity_zomes
                 .iter()
                 .map(|(zome_name, _zome_def)| zome_name.to_owned())

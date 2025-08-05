@@ -852,7 +852,7 @@ impl Cell {
     pub(crate) fn get_ribosome(&self) -> CellResult<RealRibosome> {
         Ok(self
             .conductor_handle
-            .get_ribosome(self.dna_hash())
+            .get_ribosome(self.id())
             .map_err(|_| DnaError::DnaMissing(self.dna_hash().to_owned()))?)
     }
 

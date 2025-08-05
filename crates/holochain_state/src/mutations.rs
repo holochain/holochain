@@ -404,12 +404,21 @@ pub fn insert_wasm(txn: &mut Transaction, wasm: DnaWasmHashed) -> StateMutationR
 }
 
 /// Insert a [`DnaDef`] into the database.
-pub fn insert_dna_def(txn: &mut Transaction, dna_def: &DnaDefHashed) -> StateMutationResult<()> {
-    let hash = dna_def.as_hash();
-    let dna_def = dna_def.as_content();
-    sql_insert!(txn, DnaDef, {
-        "hash": hash,
-        "blob": to_blob(dna_def)?,
+pub fn upsert_dna_def(
+    txn: &mut Transaction,
+    cell_id: &CellId,
+    dna_def: &DnaDef,
+) -> StateMutationResult<()> {
+    let mut stmt = txn.prepare(
+        r#"INSERT INTO DnaDef
+    (cell_id, dna_def)
+    VALUES (:cell_id, :dna_def)
+    ON CONFLICT (cell_id) DO UPDATE
+    SET dna_def = :dna_def"#,
+    )?;
+    stmt.execute(named_params! {
+        ":cell_id": to_blob(cell_id)?,
+        ":dna_def": to_blob(dna_def)?,
     })?;
     Ok(())
 }

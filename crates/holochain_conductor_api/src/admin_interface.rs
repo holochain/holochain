@@ -29,12 +29,12 @@ pub enum AdminRequest {
     /// [`AdminResponse::AdminInterfacesAdded`]
     AddAdminInterfaces(Vec<crate::config::AdminInterfaceConfig>),
 
-    /// Get the definition of a DNA.
+    /// Get the definition of a Cell.
     ///
     /// # Returns
     ///
     /// [`AdminResponse::DnaDefinitionReturned`]
-    GetDnaDefinition(Box<DnaHash>),
+    GetDnaDefinition(Box<CellId>),
 
     /// Update coordinator zomes for an already installed DNA.
     ///

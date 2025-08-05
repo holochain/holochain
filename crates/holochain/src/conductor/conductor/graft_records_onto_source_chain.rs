@@ -142,7 +142,7 @@ impl Conductor {
         records: &[Record],
     ) -> ConductorApiResult<()> {
         let space = self.get_or_create_space(cell_id.dna_hash())?;
-        let ribosome = self.get_ribosome(cell_id.dna_hash())?;
+        let ribosome = self.get_ribosome(cell_id)?;
         let chc = None;
         let network = holochain_p2p::HolochainP2pDna::new(
             self.holochain_p2p().clone(),

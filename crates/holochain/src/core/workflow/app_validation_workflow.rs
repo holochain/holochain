@@ -474,9 +474,12 @@ async fn validate_op_outer(
     // Get the workspace for the validation calls
     let host_fn_workspace = workspace.validation_workspace().await?;
 
-    // Get the ribosome
+    // Get any Ribosome associated to a cell id with the given dna hash
+    // (for app validation we only care about using the correct integrity
+    // zomes so it doesn't matter which Ribosome exactly we pick if there are
+    // multiple Ribosomes for the same dna hash in the RibosomeStore).
     let ribosome = conductor_handle
-        .get_ribosome(dna_hash.as_ref())
+        .get_any_ribosome_for_dna_hash(dna_hash.as_ref())
         .map_err(|_| AppValidationError::DnaMissing((*dna_hash).clone()))?;
 
     validate_op(
@@ -540,8 +543,12 @@ async fn check_app_entry_def(
 ) -> SysValidationResult<()> {
     // We want to be careful about holding locks open to the conductor api
     // so calls are made in blocks
+
+    // For entry defs we only care about using the correct integrity
+    // zomes so it doesn't matter which Ribosome exactly we pick if there are
+    // multiple Ribosomes for the same dna hash in the RibosomeStore.
     let ribosome = conductor
-        .get_ribosome(dna_hash)
+        .get_any_ribosome_for_dna_hash(dna_hash)
         .map_err(|_| SysValidationError::DnaMissing(dna_hash.clone()))?;
 
     // Check if the zome is found

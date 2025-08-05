@@ -19,8 +19,12 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum ConductorApiError {
     /// The Dna for this Cell is not installed in the conductor.
-    #[error("The Dna for this Cell is not installed in the conductor! DnaHash: {0}")]
+    #[error("A Dna with this dna hash is not installed in the conductor! DnaHash: {0}")]
     DnaMissing(DnaHash),
+
+    /// The Cell for this CellId is not installed in the conductor.
+    #[error("The Cell for this cell id is not installed in the conductor! CellId: {0}")]
+    CellMissing(CellId),
 
     /// Cell was referenced, but is missing from the conductor.
     #[error(

@@ -1,62 +1,68 @@
-use holo_hash::DnaHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
+use holochain_types::prelude::CellId;
 use holochain_types::prelude::DnaDef;
-use holochain_types::prelude::DnaDefHashed;
 
 use crate::mutations;
 use crate::prelude::from_blob;
 use crate::prelude::StateMutationResult;
 use crate::prelude::StateQueryResult;
+use crate::query::to_blob;
 
-pub fn get(txn: &Transaction<'_>, hash: &DnaHash) -> StateQueryResult<Option<DnaDefHashed>> {
+pub fn get(txn: &Transaction<'_>, cell_id: &CellId) -> StateQueryResult<Option<(CellId, DnaDef)>> {
     let item = txn
         .query_row(
-            "SELECT hash, blob FROM DnaDef WHERE hash = :hash",
+            "SELECT cell_id, dna_def FROM DnaDef WHERE cell_id = :cell_id",
             named_params! {
-                ":hash": hash
+                ":cell_id": to_blob(cell_id)?
             },
             |row| {
-                let hash: DnaHash = row.get("hash")?;
-                let wasm = row.get("blob")?;
-                Ok((hash, wasm))
+                let cell_id_blob = row.get("cell_id")?;
+                let dna_def_blob = row.get("dna_def")?;
+                Ok((cell_id_blob, dna_def_blob))
             },
         )
         .optional()?;
     match item {
-        Some((hash, wasm)) => Ok(Some(DnaDefHashed::with_pre_hashed(from_blob(wasm)?, hash))),
+        Some((cell_id_blob, dna_def_blob)) => {
+            Ok(Some((from_blob(cell_id_blob)?, from_blob(dna_def_blob)?)))
+        }
         None => Ok(None),
     }
 }
 
 #[allow(clippy::let_and_return)] // required to drop temporary
-pub fn get_all(txn: &Transaction<'_>) -> StateQueryResult<Vec<DnaDefHashed>> {
+pub fn get_all(txn: &Transaction<'_>) -> StateQueryResult<Vec<(CellId, DnaDef)>> {
     let mut stmt = txn.prepare(
         "
-            SELECT hash, blob FROM DnaDef
+            SELECT cell_id, dna_def FROM DnaDef
         ",
     )?;
     let items = stmt
         .query_and_then([], |row| {
-            let hash: DnaHash = row.get("hash")?;
-            let wasm = row.get("blob")?;
-            StateQueryResult::Ok(DnaDefHashed::with_pre_hashed(from_blob(wasm)?, hash))
+            let cell_id: CellId = from_blob(row.get("cell_id")?)?;
+            let dna_def_blob = row.get("dna_def")?;
+            StateQueryResult::Ok((cell_id, from_blob(dna_def_blob)?))
         })?
         .collect();
     items
 }
 
-pub fn contains(txn: &Transaction<'_>, hash: &DnaHash) -> StateQueryResult<bool> {
+pub fn contains(txn: &Transaction<'_>, cell_id: &CellId) -> StateQueryResult<bool> {
     Ok(txn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM DnaDef WHERE hash = :hash)",
+        "SELECT EXISTS(SELECT 1 FROM DnaDef WHERE cell_id = :cell_id)",
         named_params! {
-            ":hash": hash
+            ":cell_id": to_blob(cell_id)?
         },
         |row| row.get(0),
     )?)
 }
 
-pub fn put(txn: &mut Transaction, dna_def: DnaDef) -> StateMutationResult<()> {
-    mutations::insert_dna_def(txn, &DnaDefHashed::from_content_sync(dna_def))
+pub fn upsert(
+    txn: &mut Transaction,
+    cell_id: &CellId,
+    dna_def: &DnaDef,
+) -> StateMutationResult<()> {
+    mutations::upsert_dna_def(txn, cell_id, dna_def)
 }

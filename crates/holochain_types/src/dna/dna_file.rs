@@ -174,7 +174,7 @@ impl DnaFile {
     }
 
     /// The DnaDef along with its hash
-    pub fn dna(&self) -> &DnaDefHashed {
+    pub fn dna_def_hashed(&self) -> &DnaDefHashed {
         &self.dna
     }
 

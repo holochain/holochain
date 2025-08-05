@@ -267,36 +267,38 @@ impl RealRibosome {
         // Collect the number of entry and link types
         // for each integrity zome.
         // TODO: should this be in parallel? Are they all beholden to the same lock?
-        let items = futures::future::join_all(ribosome.dna_def().integrity_zomes.iter().map(
-            |(name, zome)| async {
-                let zome = Zome::new(name.clone(), zome.clone().erase_type());
+        let items =
+            futures::future::join_all(ribosome.dna_def_hashed().integrity_zomes.iter().map(
+                |(name, zome)| async {
+                    let zome = Zome::new(name.clone(), zome.clone().erase_type());
 
-                // Call the const functions that return the number of types.
-                let num_entry_types =
-                    match ribosome.get_const_fn(&zome, "__num_entry_types").await? {
-                        Some(i) => {
-                            let i: u8 = i
-                                .try_into()
-                                .map_err(|_| ZomeTypesError::EntryTypeIndexOverflow)?;
-                            i
-                        }
-                        None => 0,
-                    };
-                let num_link_types = match ribosome.get_const_fn(&zome, "__num_link_types").await? {
-                    Some(i) => {
-                        let i: u8 = i
-                            .try_into()
-                            .map_err(|_| ZomeTypesError::LinkTypeIndexOverflow)?;
-                        i
-                    }
-                    None => 0,
-                };
-                RibosomeResult::Ok((num_entry_types, num_link_types))
-            },
-        ))
-        .await
-        .into_iter()
-        .collect::<RibosomeResult<Vec<_>>>()?;
+                    // Call the const functions that return the number of types.
+                    let num_entry_types =
+                        match ribosome.get_const_fn(&zome, "__num_entry_types").await? {
+                            Some(i) => {
+                                let i: u8 = i
+                                    .try_into()
+                                    .map_err(|_| ZomeTypesError::EntryTypeIndexOverflow)?;
+                                i
+                            }
+                            None => 0,
+                        };
+                    let num_link_types =
+                        match ribosome.get_const_fn(&zome, "__num_link_types").await? {
+                            Some(i) => {
+                                let i: u8 = i
+                                    .try_into()
+                                    .map_err(|_| ZomeTypesError::LinkTypeIndexOverflow)?;
+                                i
+                            }
+                            None => 0,
+                        };
+                    RibosomeResult::Ok((num_entry_types, num_link_types))
+                },
+            ))
+            .await
+            .into_iter()
+            .collect::<RibosomeResult<Vec<_>>>()?;
 
         // Create the global zome types from the totals.
         let map = GlobalZomeTypes::from_ordered_iterator(items.into_iter());
@@ -305,7 +307,7 @@ impl RealRibosome {
 
         // Create a map of integrity zome names to ZomeIndexes.
         let integrity_zomes: HashMap<_, _> = ribosome
-            .dna_def()
+            .dna_def_hashed()
             .integrity_zomes
             .iter()
             .enumerate()
@@ -315,13 +317,13 @@ impl RealRibosome {
 
         // Collect the dependencies for each zome.
         ribosome.zome_dependencies = ribosome
-            .dna_def()
+            .dna_def_hashed()
             .all_zomes()
             .map(|(zome_name, def)| {
                 let mut dependencies = Vec::new();
 
                 // Integrity zomes need to have themselves as a dependency.
-                if ribosome.dna_def().is_integrity_zome(zome_name) {
+                if ribosome.dna_def_hashed().is_integrity_zome(zome_name) {
                     // Get the ZomeIndex for this zome.
                     let id = integrity_zomes.get(zome_name).copied().ok_or_else(|| {
                         ZomeTypesError::MissingDependenciesForZome(zome_name.clone())
@@ -379,7 +381,7 @@ impl RealRibosome {
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
     pub fn get_module_cache_key(&self, zome_name: &ZomeName) -> Result<CacheKey, DnaError> {
         let mut key = [0; 32];
-        let wasm_zome_hash = self.dna_file.dna().get_wasm_zome_hash(zome_name)?;
+        let wasm_zome_hash = self.dna_file.dna_def().get_wasm_zome_hash(zome_name)?;
         let bytes = wasm_zome_hash.get_raw_32();
         key.copy_from_slice(bytes);
         Ok(key)
@@ -784,7 +786,10 @@ impl RealRibosome {
         fn_name: FunctionName,
     ) -> Result<Option<ExternIO>, RibosomeError> {
         let mut otel_info = vec![
-            opentelemetry_api::KeyValue::new("dna", self.dna_file.dna().hash.to_string()),
+            opentelemetry_api::KeyValue::new(
+                "dna",
+                self.dna_file.dna_def_hashed().hash.to_string(),
+            ),
             opentelemetry_api::KeyValue::new("zome", zome.zome_name().to_string()),
             opentelemetry_api::KeyValue::new("fn", fn_name.to_string()),
         ];
@@ -861,8 +866,8 @@ impl RealRibosome {
 }
 
 impl RibosomeT for RealRibosome {
-    fn dna_def(&self) -> &DnaDefHashed {
-        self.dna_file.dna()
+    fn dna_def_hashed(&self) -> &DnaDefHashed {
+        self.dna_file.dna_def_hashed()
     }
 
     async fn zome_info(&self, zome: Zome) -> RibosomeResult<ZomeInfo> {
@@ -897,7 +902,9 @@ impl RibosomeT for RealRibosome {
                         let vec = zome_dependencies
                             .iter()
                             .filter_map(|zome_index| {
-                                self.dna_def().integrity_zomes.get(zome_index.0 as usize)
+                                self.dna_def_hashed()
+                                    .integrity_zomes
+                                    .get(zome_index.0 as usize)
                             })
                             .flat_map(|(zome_name, _)| {
                                 defs.get(zome_name).map(|e| e.0.clone()).unwrap_or_default()

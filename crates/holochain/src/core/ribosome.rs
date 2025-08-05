@@ -529,7 +529,7 @@ impl ZomeCallInvocation {
             zome_name,
         } = params;
         let zome = conductor_api
-            .get_zome(cell_id.dna_hash(), &zome_name)
+            .get_zome(&cell_id, &zome_name)
             .map_err(|conductor_api_error| RibosomeError::from(Box::new(conductor_api_error)))?;
         Ok(Self {
             cell_id,
@@ -601,7 +601,7 @@ impl From<&ZomeCallHostAccess> for HostFnAccess {
 #[automock]
 #[allow(async_fn_in_trait)]
 pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
-    fn dna_def(&self) -> &DnaDefHashed;
+    fn dna_def_hashed(&self) -> &DnaDefHashed;
 
     fn dna_hash(&self) -> &DnaHash;
 
@@ -612,13 +612,13 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
     fn zomes_to_invoke(&self, zomes_to_invoke: ZomesToInvoke) -> Vec<Zome> {
         match zomes_to_invoke {
             ZomesToInvoke::AllIntegrity => self
-                .dna_def()
+                .dna_def_hashed()
                 .integrity_zomes
                 .iter()
                 .map(|(n, d)| (n.clone(), d.clone().erase_type()).into())
                 .collect(),
             ZomesToInvoke::All => self
-                .dna_def()
+                .dna_def_hashed()
                 .all_zomes()
                 .map(|(n, d)| (n.clone(), d.clone()).into())
                 .collect(),
@@ -630,7 +630,7 @@ pub trait RibosomeT: Sized + std::fmt::Debug + Send + Sync {
 
     fn zome_name_to_id(&self, zome_name: &ZomeName) -> RibosomeResult<ZomeIndex> {
         match self
-            .dna_def()
+            .dna_def_hashed()
             .all_zomes()
             .position(|(name, _)| name == zome_name)
         {

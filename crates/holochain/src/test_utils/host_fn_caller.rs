@@ -127,7 +127,7 @@ impl HostFnCaller {
         let zome_path = (
             cell_id.clone(),
             dna_file
-                .dna()
+                .dna_def_hashed()
                 .integrity_zomes
                 .get(zome_index)
                 .unwrap()
@@ -135,7 +135,7 @@ impl HostFnCaller {
                 .clone(),
         )
             .into();
-        let ribosome = handle.get_ribosome(dna_file.dna_hash()).unwrap();
+        let ribosome = handle.get_ribosome(cell_id).unwrap();
         let signal_tx = handle.get_signal_tx(cell_id).await.unwrap();
         let call_zome_handle =
             CellConductorApi::new(handle.clone(), cell_id.clone()).into_call_zome_handle();
@@ -193,7 +193,7 @@ impl HostFnCaller {
             call_zome_handle,
         );
         let ribosome = Arc::new(ribosome);
-        let zome = ribosome.dna_def().get_zome(&zome_name).unwrap();
+        let zome = ribosome.dna_def_hashed().get_zome(&zome_name).unwrap();
         let call_context = Arc::new(CallContext::new(
             zome,
             FunctionName::new("not_sure_what_should_be_here"),
@@ -214,7 +214,7 @@ impl HostFnCaller {
         let TestWasmPair { integrity, .. } = zome.into();
         let zome_index = self
             .ribosome
-            .dna_def()
+            .dna_def_hashed()
             .integrity_zomes
             .iter()
             .position(|(z, _)| *z == integrity)
@@ -239,7 +239,7 @@ impl HostFnCaller {
         let TestWasmPair { integrity, .. } = zome.into();
         let zome_index = self
             .ribosome
-            .dna_def()
+            .dna_def_hashed()
             .integrity_zomes
             .iter()
             .position(|(z, _)| *z == integrity)
