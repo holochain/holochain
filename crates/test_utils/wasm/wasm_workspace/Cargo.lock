@@ -1750,6 +1750,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_wasm_ribosome_lookup_1"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+]
+
+[[package]]
+name = "test_wasm_ribosome_lookup_2"
+version = "0.0.1"
+dependencies = [
+ "hdi",
+ "hdk",
+]
+
+[[package]]
 name = "test_wasm_schedule"
 version = "0.0.1"
 dependencies = [

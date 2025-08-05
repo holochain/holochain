@@ -6,4 +6,5 @@ mod network_info;
 mod network_seed_regression;
 mod peer_meta_info;
 mod request_dna_def;
+mod ribosome_lookup;
 mod signed_zome_call;

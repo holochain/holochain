@@ -45,6 +45,8 @@ members = [
   "post_commit_volley",
   "query",
   "random_bytes",
+  "ribosome_lookup_1",
+  "ribosome_lookup_2",
   "schedule",
   "x_salsa20_poly1305",
   "ser_regression",

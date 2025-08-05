@@ -61,6 +61,8 @@ pub enum TestWasm {
     PostCommitVolley,
     Query,
     RandomBytes,
+    RibosomeLookup1,
+    RibosomeLookup2,
     Schedule,
     XSalsa20Poly1305,
     SerRegression,
@@ -179,6 +181,8 @@ impl From<TestWasm> for ZomeName {
             TestWasm::PostCommitVolley => "post_commit_volley",
             TestWasm::Query => "query",
             TestWasm::RandomBytes => "random_bytes",
+            TestWasm::RibosomeLookup1 => "ribosome_lookup",
+            TestWasm::RibosomeLookup2 => "ribosome_lookup",
             TestWasm::Schedule => "schedule",
             TestWasm::XSalsa20Poly1305 => "x_salsa20_poly1305",
             TestWasm::SerRegression => "ser_regression",
@@ -280,6 +284,8 @@ impl From<TestWasm> for PathBuf {
             }
             TestWasm::Query => "wasm32-unknown-unknown/release/test_wasm_query.wasm",
             TestWasm::RandomBytes => "wasm32-unknown-unknown/release/test_wasm_random_bytes.wasm",
+            TestWasm::RibosomeLookup1 => "wasm32-unknown-unknown/release/test_wasm_ribosome_lookup_1.wasm",
+            TestWasm::RibosomeLookup2 => "wasm32-unknown-unknown/release/test_wasm_ribosome_lookup_2.wasm",
             TestWasm::Schedule => "wasm32-unknown-unknown/release/test_wasm_schedule.wasm",
             TestWasm::XSalsa20Poly1305 => {
                 "wasm32-unknown-unknown/release/test_wasm_x_salsa20_poly1305.wasm"
