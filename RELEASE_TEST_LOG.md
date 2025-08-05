@@ -2,6 +2,23 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2025-08-05: v0.5.5-rc.0
+
+*Failure*
+- Ran a test where two nodes were started and created data, then two other nodes joined later.
+  - All test steps were successful for signals and entry creation.
+  - However, the users who joined later were not able to reach full arc. Data was synced through gossip but not publish
+    due to the lack of full arc.
+  - This was a different test to what we normally do because we wanted to verify a fix to the data syncing issues that
+    should have been fixed in this release.
+
+- Ran a second test where all 4 nodes started with a new network seed at the same time.
+- Initially, all checks passed and everyone was able to reach full arc quickly.
+- After one node was shut down, the other three nodes were able to create data and sync it with each other.
+- When the offline node was brought back online, it was able to sync all data created while it was offline. However, it
+  was unable to declare full arc and appeared to cease gossiping.
+- Upon restarting the offline node, having synced all data, it was able to quickly declare full arc.
+
 ## 2025-07-09: v0.4.4-rc.0
 
 *Success*
