@@ -688,10 +688,6 @@ mod test {
             .await
             .unwrap();
 
-        for (dna, _) in dnas_with_proofs.iter() {
-            conductor_handle.register_dna(dna.clone()).await.unwrap();
-        }
-
         conductor_handle
             .clone()
             .install_app_minimal("test app".to_string(), Some(agent), &dnas_with_proofs, None)
