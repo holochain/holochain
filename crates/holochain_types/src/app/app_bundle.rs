@@ -114,10 +114,9 @@ impl AppBundle {
         match role {
             AppRoleManifestValidated::Create {
                 path: resource_id,
-                installed_hash: _,
                 clone_limit,
                 modifiers,
-                deferred: _,
+                ..
             } => {
                 let dna = self.get_modified_dna_file(&resource_id, modifiers).await?.0;
                 Ok(CellProvisioningOp::CreateFromDnaFile(dna, clone_limit))
