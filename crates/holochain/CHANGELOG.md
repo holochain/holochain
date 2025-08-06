@@ -7,16 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Removed redundant usages of `register_dna()` in test code and removed unused test utils ([#5174](https://github.com/holochain/holochain/pull/5174)).
-- Fixes the type of the `expires_at` field in `PeerMetaInfo` returned by the admin API from `Timestamp` to `Option<Timestamp>` ([#5183](https://github.com/holochain/holochain/pull/5183)).
-- **BREAKING CHANGE**: The admin call `RegisterDna` has been removed ([#5175](https://github.com/holochain/holochain/pull/5175))
-- As part of the fix below, the Holo hash method `to_k2_op` on a DhtOpHash` has been deprecated and replaced with 
-  `to_located_k2_op_id`.
-- Fixes a bug where the wrong DhtOp location was reported to Kitsune2. This resulted in conductors not being able to sync
-  with each other. This change can upgrade existing conductors and new data should sync correctly. However, part of the
-  DHT model gets persisted and to fix bad data in the persisted model, the model has to be wiped and rebuilt. This will
-  result in a short startup delay when upgrading to this version. After the first startup, the startup time should be
-  back to normal.
+## 0.6.0-dev.16
+
+- Removed redundant usages of `register_dna()` in test code and removed unused test utils ([\#5174](https://github.com/holochain/holochain/pull/5174)).
+- Fixes the type of the `expires_at` field in `PeerMetaInfo` returned by the admin API from `Timestamp` to `Option<Timestamp>` ([\#5183](https://github.com/holochain/holochain/pull/5183)).
+- **BREAKING CHANGE**: The admin call `RegisterDna` has been removed ([\#5175](https://github.com/holochain/holochain/pull/5175))
+- As part of the fix below, the Holo hash method `to_k2_op` on a DhtOpHash` has been deprecated and replaced with  `to\_located\_k2\_op\_id\`.
+- Fixes a bug where the wrong DhtOp location was reported to Kitsune2. This resulted in conductors not being able to sync with each other. This change can upgrade existing conductors and new data should sync correctly. However, part of the DHT model gets persisted and to fix bad data in the persisted model, the model has to be wiped and rebuilt. This will result in a short startup delay when upgrading to this version. After the first startup, the startup time should be back to normal.
 
 ## 0.6.0-dev.15
 
@@ -560,7 +557,7 @@ Now it serializes to
 - Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
 
 - Major refactor of the sys validation workflow to improve reliability and performance:
-
+  
   - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
   - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
   - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
@@ -797,7 +794,7 @@ Now it serializes to
 ## 0.0.154
 
 - Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
-
+  
   Reason: it causes a build failure of the *holochain*  crate on crates.io
 
 ## 0.0.153
@@ -963,7 +960,7 @@ network:
 - **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 
 - **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
-
+  
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
@@ -993,7 +990,7 @@ network:
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
-
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`
