@@ -138,6 +138,25 @@ impl DnaBundle {
     /// Build a bundle from a DnaFile. Useful for tests.
     #[cfg(feature = "test_utils")]
     pub fn from_dna_file(dna_file: DnaFile) -> DnaResult<Self> {
+        // Check that there are no inline zome in this dna bundle, otherwise
+        // panic because inline zomes are not serializable and therefore cannot
+        // be bundled.
+        // Before introduction of this check, bundles would have been created
+        // with empty lists of integrity zomes and coordinator zomes which in some
+        // cases could e.g. lead, when such a bundle was installed in the conductor,
+        // to the conductor silently not doing any genesis self check for the
+        // inline zomes since they were not present in the bundle (but may have
+        // been manually registered in the ribosome store before via
+        // register_dna_file() so no failing would be apparent in a test
+        // unknowingly using such an empty bundle).
+        if dna_file
+            .dna_def()
+            .all_zomes()
+            .any(|(_, zome_def)| matches!(zome_def, ZomeDef::Inline { .. }))
+        {
+            panic!("Cannot construct a valid dna bundle from a DnaFile containing inline zomes!");
+        }
+
         let DnaFile { ref dna, code, .. } = dna_file;
         let manifest = Self::manifest_from_dna_def(dna.clone().into_content())?;
         let resources = code
@@ -162,7 +181,7 @@ impl DnaBundle {
         let integrity = dna_def
             .integrity_zomes
             .into_iter()
-            .filter_map(|(name, zome)| {
+            .map(|(name, zome)| {
                 let dependencies = zome
                     .as_any_zome_def()
                     .dependencies()
@@ -170,21 +189,28 @@ impl DnaBundle {
                     .cloned()
                     .map(|name| ZomeDependency { name })
                     .collect();
-                zome.wasm_hash(&name).ok().map(|hash| {
-                    let hash = WasmHashB64::from(hash);
-                    ZomeManifest {
-                        name: name.clone(),
-                        hash: Some(hash),
-                        path: format!("{}.wasm", name),
-                        dependencies: Some(dependencies),
+
+                // The wasm hash will be None here for inline zomes and we should
+                // not be allowed to build a manifest in the first place given that
+                // we cannot bundle inline zomes since they are not serializable.
+                match zome.wasm_hash(&name).ok() {
+                    None => panic!("Cannot construct a valid dna manifest from a DnaDef containing inline zomes!"),
+                    Some(hash) => {
+                        let hash = WasmHashB64::from(hash);
+                        ZomeManifest {
+                            name: name.clone(),
+                            hash: Some(hash),
+                            path: format!("{}.wasm", name),
+                            dependencies: Some(dependencies),
+                        }
                     }
-                })
+                }
             })
             .collect();
         let coordinator = dna_def
             .coordinator_zomes
             .into_iter()
-            .filter_map(|(name, zome)| {
+            .map(|(name, zome)| {
                 let dependencies = zome
                     .as_any_zome_def()
                     .dependencies()
@@ -192,15 +218,22 @@ impl DnaBundle {
                     .cloned()
                     .map(|name| ZomeDependency { name })
                     .collect();
-                zome.wasm_hash(&name).ok().map(|hash| {
-                    let hash = WasmHashB64::from(hash);
-                    ZomeManifest {
-                        name: name.clone(),
-                        hash: Some(hash),
-                        path: format!("{}.wasm", name),
-                        dependencies: Some(dependencies),
+
+                // The wasm hash will be None here for inline zomes and we should
+                // not be allowed to build a manifest in the first place given that
+                // we cannot bundle inline zomes since they are not serializable.
+                match zome.wasm_hash(&name).ok() {
+                    None => panic!("Cannot construct a valid dna manifest from a DnaDef containing inline zomes!"),
+                    Some(hash) => {
+                        let hash = WasmHashB64::from(hash);
+                        ZomeManifest {
+                            name: name.clone(),
+                            hash: Some(hash),
+                            path: format!("{}.wasm", name),
+                            dependencies: Some(dependencies),
+                        }
                     }
-                })
+                }
             })
             .collect();
         #[cfg(feature = "unstable-migration")]
@@ -356,5 +389,103 @@ mod tests {
             dna_file.dna.modifiers.properties,
             SerializedBytes::try_from(properties).unwrap()
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[should_panic(
+        expected = "Cannot construct a valid dna bundle from a DnaFile containing inline zomes!"
+    )]
+    async fn attempting_to_bundle_with_inline_zomes_panics() {
+        // Context: Inline zomes are not serializable and therefore cannot
+        // be bundled.
+        // Before introduction of the logic that this test checks, bundles
+        // would have been created with empty lists of integrity zomes and
+        // coordinator zomes if the dna def contained inline zomes, which in some
+        // cases could e.g. lead, when such a bundle was installed in the conductor,
+        // to the conductor silently not doing any genesis self check for the
+        // inline zomes since they were not present in the bundle (but may have
+        // been manually registered in the ribosome store before via
+        // register_dna_file() so no failing would be apparent in a test
+        // unknowingly using such an empty dna bundle).
+
+        let coordinator_zome_def = CoordinatorZomeDef::from(InlineCoordinatorZome::new_unique());
+        let integrity_zome_def = IntegrityZomeDef::from(InlineIntegrityZome::new_unique(vec![], 0));
+
+        let dna_def = DnaDef::unique_from_zomes(
+            vec![("integrity".into(), integrity_zome_def).into()],
+            vec![("coordinator".into(), coordinator_zome_def).into()],
+        );
+
+        let dna_file = DnaFile::new(dna_def, vec![]).await;
+
+        let _ = DnaBundle::from_dna_file(dna_file);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[should_panic(
+        expected = "Cannot construct a valid dna bundle from a DnaFile containing inline zomes!"
+    )]
+    async fn attempting_to_bundle_with_inline_coordinator_zomes_panics() {
+        // Same as above test but only coordinator inline zomes
+        let coordinator_zome_def = CoordinatorZomeDef::from(InlineCoordinatorZome::new_unique());
+
+        let dna_def = DnaDef::unique_from_zomes(
+            vec![],
+            vec![("coordinator".into(), coordinator_zome_def).into()],
+        );
+
+        let dna_file = DnaFile::new(dna_def, vec![]).await;
+
+        let _ = DnaBundle::from_dna_file(dna_file);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[should_panic(
+        expected = "Cannot construct a valid dna bundle from a DnaFile containing inline zomes!"
+    )]
+    async fn attempting_to_bundle_with_inline_integrity_zomes_panics() {
+        // Same as above test but only integrity inline zomes
+        let integrity_zome_def = IntegrityZomeDef::from(InlineIntegrityZome::new_unique(vec![], 0));
+
+        let dna_def = DnaDef::unique_from_zomes(
+            vec![("integrity".into(), integrity_zome_def).into()],
+            vec![],
+        );
+
+        let dna_file = DnaFile::new(dna_def, vec![]).await;
+
+        let _ = DnaBundle::from_dna_file(dna_file);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[should_panic(
+        expected = "Cannot construct a valid dna manifest from a DnaDef containing inline zomes!"
+    )]
+    async fn constructing_manifest_from_dna_def_with_inline_coordinator_zomes_panics() {
+        // See test attempting_to_bundle_with_inline_zomes_panics above for context
+        let coordinator_zome_def = CoordinatorZomeDef::from(InlineCoordinatorZome::new_unique());
+
+        let dna_def = DnaDef::unique_from_zomes(
+            vec![],
+            vec![("coordinator".into(), coordinator_zome_def).into()],
+        );
+
+        let _ = DnaBundle::manifest_from_dna_def(dna_def);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[should_panic(
+        expected = "Cannot construct a valid dna manifest from a DnaDef containing inline zomes!"
+    )]
+    async fn constructing_manifest_from_dna_def_with_inline_integrity_zomes_panics() {
+        // See test attempting_to_bundle_with_inline_zomes_panics above for context
+        let integrity_zome_def = IntegrityZomeDef::from(InlineIntegrityZome::new_unique(vec![], 0));
+
+        let dna_def = DnaDef::unique_from_zomes(
+            vec![("integrity".into(), integrity_zome_def).into()],
+            vec![],
+        );
+
+        let _ = DnaBundle::manifest_from_dna_def(dna_def);
     }
 }

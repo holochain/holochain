@@ -1140,6 +1140,7 @@ mod app_impls {
             agent: Option<AgentPubKey>,
             data: &[(impl DnaWithRole, Option<MembraneProof>)],
             network_seed: Option<NetworkSeed>,
+            flags: Option<InstallAppCommonFlags>,
         ) -> ConductorResult<AgentPubKey> {
             let dnas_with_roles: Vec<_> = data.iter().map(|(dr, _)| dr).cloned().collect();
             let manifest = app_manifest_from_dnas(&dnas_with_roles, 255, false, network_seed);
@@ -1167,10 +1168,10 @@ mod app_impls {
                     manifest,
                     agent.clone(),
                     ops,
-                    InstallAppCommonFlags {
+                    flags.unwrap_or(InstallAppCommonFlags {
                         defer_memproofs: false,
                         ignore_genesis_failure: false,
-                    },
+                    }),
                 )
                 .await?;
 
@@ -1306,16 +1307,8 @@ mod app_impls {
             let installed_app_id =
                 installed_app_id.unwrap_or_else(|| manifest.app_name().to_owned());
 
-            // NOTE: for testing with inline zomes when the conductor is restarted, it's
-            //       essential that the installed_hash is included in the app manifest,
-            //       so that the local DNAs with inline zomes can be loaded from
-            //       local storage
-            let local_dnas = self
-                .ribosome_store()
-                .share_ref(|store| bundle.get_all_dnas_from_store(store));
-
             let ops = bundle
-                .resolve_cells(&local_dnas, membrane_proofs, existing_cells)
+                .resolve_cells(membrane_proofs, existing_cells)
                 .await?;
 
             self.clone()
