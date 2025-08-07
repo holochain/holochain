@@ -1,4 +1,5 @@
 use holochain_conductor_api::conductor::NetworkConfig;
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -13,7 +14,7 @@ use url2::Url2;
 pub struct Create {
     /// Number of conductor sandboxes to create.
     #[arg(short, long, default_value = "1")]
-    pub num_sandboxes: usize,
+    pub num_sandboxes: NonZeroUsize,
 
     /// Add an optional network config.
     #[command(subcommand)]
@@ -251,7 +252,7 @@ impl Network {
 impl Default for Create {
     fn default() -> Self {
         Self {
-            num_sandboxes: 1,
+            num_sandboxes: NonZeroUsize::new(1).unwrap(),
             network: None,
             root: None,
             directories: Vec::with_capacity(0),
