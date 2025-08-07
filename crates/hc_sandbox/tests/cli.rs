@@ -516,7 +516,6 @@ async fn generate_sandbox_with_roles_settings_override() {
     let settings_path = std::env::current_dir()
         .unwrap()
         .join("tests/fixtures/roles-settings.yaml");
-    package_fixture_if_not_packaged().await;
 
     holochain_trace::test_run();
     let mut cmd = get_sandbox_command();
