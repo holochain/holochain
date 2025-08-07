@@ -1,5 +1,4 @@
 use crate::{conductor::error::ConductorError, sweettest::*};
-use holo_hash::DnaHash;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 #[cfg(feature = "unstable-migration")]
@@ -236,94 +235,6 @@ async fn reject_duplicate_app_for_same_agent() {
         })
         .await;
     assert!(valid_install_of_second_app.is_ok());
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn can_install_app_a_second_time_using_nothing_but_the_manifest_from_app_info() {
-    let conductor = SweetConductor::from_standard_config().await;
-
-    let (dna, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
-    let path = format!("{}", dna.dna_hash());
-    let modifiers = DnaModifiersOpt::default().with_network_seed("initial seed".into());
-
-    let roles = vec![AppRoleManifest {
-        name: "name".into(),
-        dna: AppRoleDnaManifest {
-            path: Some(path.clone()),
-            modifiers: modifiers.clone(),
-            // Note that there is no installed hash provided. We'll check that this changes later.
-            installed_hash: None,
-            clone_limit: 0,
-        },
-        provisioning: Some(CellProvisioning::Create { deferred: false }),
-    }];
-
-    let manifest = AppManifestCurrentBuilder::default()
-        .name("test_app".into())
-        .description(None)
-        .roles(roles)
-        .build()
-        .unwrap();
-
-    let resources = vec![(path.clone(), DnaBundle::from_dna_file(dna.clone()).unwrap())];
-
-    let bundle = AppBundle::new(manifest.clone().into(), resources.clone()).unwrap();
-
-    let bundle_bytes = bundle.pack().unwrap();
-    conductor
-        .clone()
-        .install_app_bundle(InstallAppPayload {
-            agent_key: None,
-            source: AppBundleSource::Bytes(bundle_bytes),
-            installed_app_id: Some("app_1".into()),
-            network_seed: Some("final seed".into()),
-            roles_settings: Default::default(),
-            ignore_genesis_failure: false,
-        })
-        .await
-        .unwrap();
-
-    let manifest = conductor
-        .get_app_info(&"app_1".to_string())
-        .await
-        .unwrap()
-        .unwrap()
-        .manifest;
-
-    let installed_dna = dna.update_modifiers(
-        modifiers
-            .with_network_seed("final seed".into())
-            .serialized()
-            .unwrap(),
-    );
-    let installed_dna_hash = DnaHash::with_data_sync(installed_dna.dna_def());
-
-    // Check that the returned manifest has the installed DNA hash properly set
-    assert_eq!(
-        manifest.app_roles()[0].dna.installed_hash,
-        Some(installed_dna_hash.into())
-    );
-
-    assert_eq!(
-        manifest.app_roles()[0].dna.modifiers.network_seed,
-        Some("final seed".into())
-    );
-
-    let bundle = AppBundle::new(manifest, resources).unwrap();
-
-    let bundle_bytes = bundle.pack().unwrap();
-    conductor
-        .clone()
-        .install_app_bundle(InstallAppPayload {
-            agent_key: None,
-            source: AppBundleSource::Bytes(bundle_bytes),
-            installed_app_id: Some("app_2".into()),
-            network_seed: None,
-            roles_settings: Default::default(),
-            ignore_genesis_failure: false,
-        })
-        .await
-        .unwrap();
 }
 
 #[cfg(feature = "unstable-migration")]

@@ -66,6 +66,7 @@ pub fn build_chc(
 #[cfg(test)]
 mod tests {
 
+    use crate::conductor::conductor::InstallAppCommonFlags;
     use crate::conductor::CellError;
     use crate::core::workflow::WorkflowError;
     use crate::{
@@ -274,34 +275,38 @@ mod tests {
 
         let cell_id = c0.cell_id();
 
-        // Install two apps with ignore_genesis_failure and one without
-        let mk_payload = |ignore: bool| {
-            let agent = agent.clone();
-            let dna_file = dna_file.clone();
-            async move {
-                let mut payload = get_install_app_payload_from_dnas(
-                    "app",
-                    Some(agent),
-                    &[(dna_file, None)],
-                    None,
-                )
-                .await;
-                payload.ignore_genesis_failure = ignore;
-                payload
-            }
-        };
-
         let install_result_1 = conductors[1]
-            .raw_handle()
-            .install_app_bundle(mk_payload(true).await)
+            .install_app(
+                "app",
+                Some(agent.clone()),
+                &[dna_file.clone()],
+                Some(InstallAppCommonFlags {
+                    defer_memproofs: false,
+                    ignore_genesis_failure: true,
+                }),
+            )
             .await;
         let install_result_2 = conductors[2]
-            .raw_handle()
-            .install_app_bundle(mk_payload(true).await)
+            .install_app(
+                "app",
+                Some(agent.clone()),
+                &[dna_file.clone()],
+                Some(InstallAppCommonFlags {
+                    defer_memproofs: false,
+                    ignore_genesis_failure: true,
+                }),
+            )
             .await;
         let install_result_3 = conductors[3]
-            .raw_handle()
-            .install_app_bundle(mk_payload(false).await)
+            .install_app(
+                "app",
+                Some(agent),
+                &[dna_file],
+                Some(InstallAppCommonFlags {
+                    defer_memproofs: false,
+                    ignore_genesis_failure: false,
+                }),
+            )
             .await;
 
         // It's not ideal to match on a string, but it seems like the only option:
