@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.5.5-rc.1
+
 ## 0.5.5-rc.0
 
 - Update to a new Kitsune2 version that contains a fix for an out-of-bounds array access bug in the DHT model.
