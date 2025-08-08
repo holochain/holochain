@@ -11,7 +11,7 @@
 //! metrics instance that will be created is largely controlled by
 //! the existence of environment variables.
 //!
-//! Curently, by default, the Null metrics collector will be used, meaning
+//! Currently, by default, the Null metrics collector will be used, meaning
 //! metrics will not be collected, and all metrics operations will be no-ops.
 //!
 //! If you wish to enable metrics, the current options are:
@@ -37,16 +37,16 @@
 //! enumerated at
 //! [https://opentelemetry.io/docs/specs/otel/metrics/semantic_conventions/](https://opentelemetry.io/docs/specs/otel/metrics/semantic_conventions/),
 //! with additional rules made to fit with our particular project.
-//! We will also attempt to keep this documentation up-to-date on a best-effort
-//! basis to act as an example and registry of metrics avaliable in Holochain,
+//! We will also attempt to keep this documentation up to date on a best-effort
+//! basis to act as an example and registry of metrics available in Holochain
 //! and related support dependency crates managed by the organization.
 //!
 //! Generic naming convention rules:
 //!
 //! - Dot notation logical module hierarchy. This need not, and perhaps should
-//!   not, match the rust crate/module hierarchy. As we may rearange crates
+//!   not, match the rust crate/module hierarchy. As we may rearrange crates
 //!   and modules, but the metric names themselves should remain more
-//!   consistant.
+//!   consistent.
 //!   - Examples:
 //!     - `hc.db`
 //!     - `hc.workflow.integration`
