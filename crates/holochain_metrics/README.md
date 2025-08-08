@@ -1,3 +1,5 @@
 # holochain_metrics
 
-metrics helpers
+<!-- cargo-rdme start -->
+
+<!-- cargo-rdme end -->
