@@ -1028,7 +1028,7 @@ async fn authorize_zome_call_credentials() {
     let exit_code = child.wait().await.unwrap();
     assert!(exit_code.success());
 
-    assert!(PathBuf::from(".hc_auth").exists());
+    assert!(temp_dir.path().join(".hc_auth").exists());
 
     shutdown_sandbox(hc_admin).await;
 }
