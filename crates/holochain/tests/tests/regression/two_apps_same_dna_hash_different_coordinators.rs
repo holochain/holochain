@@ -41,11 +41,15 @@ async fn can_install_two_apps_with_the_same_dna_hash_but_different_coordinators(
     // Verify that the dna hashes match
     assert_eq!(dna_file_1.dna_hash(), dna_file_2.dna_hash());
 
-    // Install the first app and write an entry to its integrity zome
+    // Install the first app and write an entry to the DHT
     let mut conductor = SweetConductor::from_standard_config().await;
 
-    let app_1 = conductor.setup_app("app_1", [&dna_file_1]).await.unwrap();
-    let cells_1 = app_1.into_cells();
+    let cells_1 = conductor
+        .setup_app("app_1", [&dna_file_1])
+        .await
+        .unwrap()
+        .into_cells();
+
     let hash: ActionHash = conductor
         .call(
             &cells_1[0].zome(TestCoordinatorWasm::CoordinatorZome),
@@ -64,10 +68,14 @@ async fn can_install_two_apps_with_the_same_dna_hash_but_different_coordinators(
         .await;
     assert!(record_1.is_some());
 
-    // Install the second app and make a zome call to its coordinator zomez, reading
-    // the same entry from the shared integrity zome
-    let app_2 = conductor.setup_app("app_2", [&dna_file_2]).await.unwrap();
-    let cells_2 = app_2.into_cells();
+    // Install the second app and make a zome call to its coordinator zome, reading
+    // the same entry from the shared DHT
+    let cells_2 = conductor
+        .setup_app("app_2", [&dna_file_2])
+        .await
+        .unwrap()
+        .into_cells();
+
     let record_2: Option<Record> = conductor
         .call(
             &cells_2[0].zome(TestCoordinatorWasm::CoordinatorZomeUpdate),

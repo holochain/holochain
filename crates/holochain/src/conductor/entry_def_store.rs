@@ -110,7 +110,7 @@ pub(crate) async fn get_entry_defs(
 mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
-    use holo_hash::HasHash;
+    use holo_hash::{fixt::AgentPubKeyFixturator, HasHash};
     use holochain_state::prelude::test_db_dir;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_dna_zomes;
@@ -159,7 +159,7 @@ mod tests {
             entry_def_position: 1.into(),
         };
 
-        let fake_agent = fake_agent_pub_key(0);
+        let fake_agent = ::fixt::fixt!(AgentPubKey);
 
         handle
             .register_dna_file(

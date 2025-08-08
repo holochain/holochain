@@ -892,7 +892,7 @@ async fn check_app_entry_def_test() {
         Err(SysValidationError::DnaMissing(_))
     );
 
-    let agent_key = fake_agent_pub_key(0);
+    let agent_key = fixt!(AgentPubKey);
     let cell_id = CellId::new(dna_file.dna_hash().clone(), agent_key);
 
     // # Dna but no entry def in buffer

@@ -30,7 +30,7 @@ async fn test_coordinator_zome_update() {
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cells = app.into_cells();
 
-    println!("Create entry from the coordinator zome into the integrity zome.");
+    println!("Create an entry.");
     let hash: ActionHash = conductor
         .call(
             &cells[0].zome(TestCoordinatorWasm::CoordinatorZome),

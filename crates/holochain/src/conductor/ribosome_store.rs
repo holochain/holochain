@@ -54,7 +54,6 @@ impl RibosomeStore {
     }
 
     /// Get the DNA file for a given CellId.
-    // TODO: use Arc, eliminate cloning
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub fn get_dna_file(&self, cell_id: &CellId) -> Option<DnaFile> {
         self.ribosomes.get(cell_id).map(|r| r.dna_file().clone())
