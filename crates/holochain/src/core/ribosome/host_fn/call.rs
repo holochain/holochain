@@ -1,3 +1,5 @@
+use crate::conductor::api::error::ConductorApiError;
+use crate::conductor::error::ConductorError;
 use crate::core::ribosome::guest_callback::post_commit::PostCommitHostAccess;
 use crate::core::ribosome::HostFnAccess;
 use crate::core::ribosome::RibosomeError;
@@ -225,6 +227,12 @@ async fn execute_call(
                             ribosome_error.to_string()
                         ))
                         .into()),
+                        Err(ConductorApiError::ConductorError(ConductorError::CellMissing(
+                            cell_id,
+                        ))) => Err(wasm_error!(WasmErrorInner::Host(format!(
+                            "Call to missing cell: Cell with ID {cell_id} not found"
+                        )))
+                        .into()),
                         Err(conductor_api_error) => Err(wasm_error!(WasmErrorInner::Host(
                             conductor_api_error.to_string()
                         ))
@@ -240,9 +248,15 @@ async fn execute_call(
 
 #[cfg(test)]
 pub mod wasm_test {
+    use crate::conductor::api::error::ConductorApiError;
+    use crate::conductor::CellError;
+    use crate::core::ribosome::error::RibosomeError;
+    use crate::core::workflow::WorkflowError;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetDnaFile;
     use hdk::prelude::AgentInfo;
+    use hdk::prelude::WasmError;
+    use hdk::prelude::WasmErrorInner;
     use holo_hash::ActionHash;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
@@ -346,15 +360,14 @@ pub mod wasm_test {
         assert!(has_hash);
     }
 
-    /// test calling a different zome
-    /// in a different cell.
-    // FIXME: we should NOT be able to do a "bridge" call to another cell in a different app, by a different agent!
-    //        Local bridge calls are always within the same app. So this test is testing something that should
-    //        not be supported.
+    /// Test calling a cell in a different app, a so-called bridge call.
     #[tokio::test(flavor = "multi_thread")]
     async fn bridge_call() {
         holochain_trace::test_run();
 
+        // The init function of this test wasm creates an unrestricted cap grant for the `create_entry` function.
+        // When Bob calls the function that makes the bridge call to the `create_entry` function, it succeeds
+        // because of this cap grant.
         let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
         let mut conductor = SweetConductor::from_standard_config().await;
@@ -379,7 +392,7 @@ pub mod wasm_test {
 
         // Check alice's source chain contains the new value
         let has_hash: bool = alice
-            .dht_db()
+            .authored_db()
             .read_async(move |txn| -> DatabaseResult<bool> {
                 Ok(txn.query_row(
                     "SELECT EXISTS(SELECT 1 FROM DhtOp WHERE action_hash = :hash)",
@@ -392,6 +405,39 @@ pub mod wasm_test {
             .await
             .unwrap();
         assert!(has_hash);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn bridge_call_returns_specific_error_when_cell_missing() {
+        let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::WhoAmI])
+            .await
+            .0;
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app = conductor.setup_app("app", &[dna_file]).await.unwrap();
+        let missing_cell_id = ::fixt::fixt!(CellId);
+        let error = conductor
+            .call_fallible::<_, ActionHash>(
+                &app.cells()[0].zome(TestWasm::WhoAmI.coordinator_zome_name()),
+                "call_create_entry",
+                missing_cell_id.clone(),
+            )
+            .await
+            .unwrap_err();
+        if let ConductorApiError::CellError(CellError::WorkflowError(wf_err)) = error {
+            if let WorkflowError::RibosomeError(RibosomeError::WasmRuntimeError(err)) = *wf_err {
+                let actual_error = err.downcast::<WasmError>().unwrap().error;
+                assert_eq!(
+                    actual_error,
+                    WasmErrorInner::Host(format!(
+                        "Call to missing cell: Cell with ID {missing_cell_id} not found"
+                    ))
+                );
+            } else {
+                panic!("unexpected error: {wf_err}");
+            }
+        } else {
+            panic!("unexpected error: {error}");
+        }
     }
 
     /// we can call a fn on a remote
