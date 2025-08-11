@@ -56,7 +56,7 @@ pub struct SweetConductor {
     /// since they are not persisted to the wasm database and therefore
     /// are not automatically loaded into the [`crate::conductor::ribosome_store::RibosomeStore`]
     /// on conductor restart otherwise.
-    dna_files: Vec<(CellId, DnaFile)>,
+    dna_files: HashMap<CellId, DnaFile>,
     rendezvous: Option<DynSweetRendezvous>,
 }
 
@@ -103,7 +103,7 @@ impl SweetConductor {
             db_dir: env_dir,
             keystore,
             config,
-            dna_files: Vec::new(),
+            dna_files: HashMap::new(),
             rendezvous,
         }
     }
@@ -317,10 +317,10 @@ impl SweetConductor {
         dna_files: impl IntoIterator<Item = &DnaFile>,
     ) -> ConductorApiResult<()> {
         for dna_file in dna_files.into_iter() {
-            self.dna_files.push((
+            self.dna_files.insert(
                 CellId::new(dna_file.dna_hash().clone(), agent_key.clone()),
                 dna_file.to_owned(),
-            ));
+            );
         }
         Ok(())
     }
@@ -573,7 +573,7 @@ impl SweetConductor {
             .create_clone_cell(installed_app_id, payload)
             .await?;
         let dna_file = self.get_dna_file(&clone.cell_id).unwrap();
-        self.dna_files.push((clone.cell_id.clone(), dna_file));
+        self.dna_files.insert(clone.cell_id.clone(), dna_file);
         Ok(clone)
     }
 
@@ -669,14 +669,14 @@ impl SweetConductor {
             // the database so we offer the option to explicitly ignore the cache here.
             let ignore_dna_files_cache = ignore_dna_files_cache.unwrap_or(false);
             let extra_dna_files = match ignore_dna_files_cache {
-                true => &[],
-                false => self.dna_files.as_slice(),
+                true => vec![],
+                false => self.dna_files.clone().into_iter().collect::<Vec<_>>(),
             };
             self.handle = Some(SweetConductorHandle(
                 Self::handle_from_existing(
                     self.keystore.clone(),
                     &self.config,
-                    extra_dna_files,
+                    &extra_dna_files,
                     false,
                 )
                 .await,
