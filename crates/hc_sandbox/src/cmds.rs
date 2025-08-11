@@ -137,10 +137,12 @@ Run `hc sandbox generate --help` or `hc sandbox create --help` for more options.
         } else if !self.indices.is_empty() {
             // Return all sandboxes at provided indices.
             // Return an error if any index is out of bounds or if a sandbox is missing at any given index.
-            let dedup_indices = self
+            let mut set = std::collections::HashSet::new();
+            let dedup_indices: Vec<usize> = self
                 .indices
                 .into_iter()
-                .collect::<std::collections::HashSet<_>>();
+                .filter(|x| set.insert(*x))
+                .collect();
             let mut selected = Vec::with_capacity(dedup_indices.len());
             for i in dedup_indices.into_iter() {
                 let Some(result) = sandboxes.get(i) else {
