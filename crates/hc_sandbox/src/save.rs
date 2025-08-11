@@ -4,7 +4,6 @@
 //! to / from a `.hc` file.
 //! This is very much WIP and subject to change.
 
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -54,8 +53,8 @@ pub fn remove(hc_dir: PathBuf, existing: Existing) -> std::io::Result<usize> {
     if existing.all {
         to_remove_indices = (0..sandboxes.len()).collect();
     } else {
-        let dedup_indices = existing.indices.into_iter().collect::<HashSet<_>>();
-        dedup_indices
+        existing
+            .indices
             .into_iter()
             .for_each(|i| match sandboxes.get(i) {
                 None => msg!("Warning: Provided index is out of range: {}", i),
@@ -65,18 +64,23 @@ pub fn remove(hc_dir: PathBuf, existing: Existing) -> std::io::Result<usize> {
                         i,
                         path.display()
                     );
-                    to_remove_indices.push(i);
+                    if !to_remove_indices.contains(&i) {
+                        to_remove_indices.push(i);
+                    }
                 }
-                Some(Ok(_)) => to_remove_indices.push(i),
+                Some(Ok(_)) => {
+                    if !to_remove_indices.contains(&i) {
+                        to_remove_indices.push(i);
+                    }
+                }
             });
     }
     // Determine remaining paths
-    let indices_to_remove: HashSet<_> = to_remove_indices.iter().collect();
     let remaining: Vec<ConfigRootPath> = sandboxes
         .iter()
         .enumerate()
         .filter_map(|(i, item)| {
-            if indices_to_remove.contains(&i) {
+            if to_remove_indices.contains(&i) {
                 return None;
             }
             let Ok(item) = item else {
