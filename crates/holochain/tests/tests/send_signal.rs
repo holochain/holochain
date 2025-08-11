@@ -99,7 +99,7 @@ async fn send_signal_after_conductor_restart() {
 
     // restart conductor
     conductor.shutdown().await;
-    conductor.startup().await;
+    conductor.startup(false).await;
 
     // emitting signal without connected app ws must not produce an error
     let _: () = conductor

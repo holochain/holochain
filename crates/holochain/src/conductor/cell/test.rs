@@ -41,7 +41,10 @@ async fn test_cell_handle_publish() {
         .test(&[])
         .await
         .unwrap();
-    handle.register_dna(dna_file.clone()).await.unwrap();
+    handle
+        .register_dna_file(cell_id.clone(), dna_file.clone())
+        .await
+        .unwrap();
     let wasmer_module_cache = Some(Arc::new(ModuleCacheLock::new(ModuleCache::new(Some(
         db_dir.join("wasm-cache"),
     )))));

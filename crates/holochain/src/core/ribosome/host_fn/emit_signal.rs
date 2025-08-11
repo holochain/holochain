@@ -19,7 +19,7 @@ pub fn emit_signal(
             ..
         } => {
             let cell_id = CellId::new(
-                ribosome.dna_def().as_hash().clone(),
+                ribosome.dna_def_hashed().as_hash().clone(),
                 call_context
                     .host_context
                     .workspace()

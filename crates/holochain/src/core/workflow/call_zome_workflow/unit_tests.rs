@@ -134,8 +134,8 @@ impl TestCase {
         .unwrap();
         let (signal_tx, _signal_rx) = tokio::sync::broadcast::channel(1);
         let args = CallZomeWorkflowArgs {
-            cell_id,
-            ribosome: conductor.get_ribosome(&dna_hash).unwrap(),
+            cell_id: cell_id.clone(),
+            ribosome: conductor.get_ribosome(&cell_id).unwrap(),
             invocation,
             signal_tx: signal_tx.clone(),
             conductor_handle: conductor.clone(),

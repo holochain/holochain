@@ -55,11 +55,11 @@ where
 {
     let coordinator_zome = args
         .ribosome
-        .dna_def()
+        .dna_def_hashed()
         .get_coordinator_zome(args.invocation.zome.zome_name())
         .or_else(|_| {
             args.ribosome
-                .dna_def()
+                .dna_def_hashed()
                 .get_integrity_zome(args.invocation.zome.zome_name())
                 .map(CoordinatorZome::from)
         })

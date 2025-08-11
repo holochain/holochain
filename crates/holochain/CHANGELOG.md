@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- **BREAKING CHANGE** The field `dna_hash: DnaHash` in the `UpdateCoordinatorsPayload` of the `UpdateCoordinators` admin call is replaced with a field `cell_id: CellId` ([#5189](https://github.com/holochain/holochain/pull/5189)).
+- **BREAKING CHANGE** The admin call `GetDnaDefinition` now takes a `CellId` as argument instead of a `DnaHash` because there can be two identical DNAs for different agents in the conductor and they were not looked up correctly prior to this change ([#5189](https://github.com/holochain/holochain/pull/5189)).
+- Fixed issue [#2145](https://github.com/holochain/holochain/issues/2145) in ([#5189](https://github.com/holochain/holochain/pull/5189)) by
+  - indexing Ribosomes by cell id instead of by dna hash in the in-memory RibosomeStore
+  - indexing DnaFiles by cell id instead of by dna hash in the DnaDef database on disk
+  - fixing the update_coordinators() method in the conductor and the associated SQL query to actually update DnaDef's in the database if a DnaDef already exists in the database for the given cell id.
 - Panic when attempting to bundle a dna from a DnaFile with inline zomes or when attempting to construct a dna manifest from a DnaDef with inline zomes ([#5185](https://github.com/holochain/holochain/issues/5185)).
 - Refactor chain head coordinator related tests to not rely on the ability to install dnas by specifying the `installed_hash` in the manifest only ([#5185](https://github.com/holochain/holochain/issues/5185)).
 - **BREAKING CHANGE** Remove support for installing a dna (as part of an app) only by specifying an `installed_hash` and without bundling the actual dna code ([#5185](https://github.com/holochain/holochain/issues/5185)).

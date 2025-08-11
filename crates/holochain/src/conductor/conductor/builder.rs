@@ -273,7 +273,7 @@ impl ConductorBuilder {
                         invocation,
                         cell_id,
                     } = post_commit_args;
-                    match conductor_handle.clone().get_ribosome(cell_id.dna_hash()) {
+                    match conductor_handle.clone().get_ribosome(&cell_id) {
                         Ok(ribosome) => {
                             if let Err(e) = ribosome.run_post_commit(host_access, invocation).await
                             {
@@ -354,7 +354,10 @@ impl ConductorBuilder {
     /// Build a Conductor with a test environment
     #[cfg(any(test, feature = "test_utils"))]
     #[cfg_attr(feature = "instrument", tracing::instrument(skip_all, fields(scope = self.config.network.tracing_scope)))]
-    pub async fn test(self, extra_dnas: &[DnaFile]) -> ConductorResult<ConductorHandle> {
+    pub async fn test(
+        self,
+        extra_dna_files: &[(CellId, DnaFile)],
+    ) -> ConductorResult<ConductorHandle> {
         let builder = self;
 
         let keystore = builder
@@ -444,11 +447,11 @@ impl ConductorBuilder {
         // Register extra DNAs. In particular, the ones with InlineZomes will
         // not be registered in the Wasm DB and cannot be automatically loaded
         // on conductor restart. Hence they need to get passed along here
-        // via the extra_dnas argument (populated from the SweetConductor's
+        // via the extra_dna_files argument (populated from the SweetConductor's
         // DnaFile cache) in order to be added to the RibosomeStore manually.
-        for dna_file in extra_dnas {
+        for (cell_id, dna_file) in extra_dna_files {
             handle
-                .register_dna(dna_file.clone())
+                .register_dna_file(cell_id.clone(), dna_file.clone())
                 .await
                 .expect("Could not install DNA");
         }

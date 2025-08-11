@@ -121,7 +121,10 @@ async fn execute_call(
         CallTarget::NetworkAgent(target_agent) => {
             let zome_call_params = ZomeCallParams {
                 provenance: provenance.clone(),
-                cell_id: CellId::new(ribosome.dna_def().as_hash().clone(), target_agent.clone()),
+                cell_id: CellId::new(
+                    ribosome.dna_def_hashed().as_hash().clone(),
+                    target_agent.clone(),
+                ),
                 zome_name,
                 fn_name,
                 cap_secret,

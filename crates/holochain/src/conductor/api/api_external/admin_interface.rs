@@ -71,15 +71,15 @@ impl AdminInterfaceApi {
                     .await?;
                 Ok(AdminResponse::AdminInterfacesAdded)
             }
-            GetDnaDefinition(dna_hash) => {
+            GetDnaDefinition(cell_id) => {
                 let dna_def = self
                     .conductor_handle
-                    .get_dna_def(&dna_hash)
-                    .ok_or(ConductorApiError::DnaMissing(*dna_hash))?;
+                    .get_dna_def(&cell_id)
+                    .ok_or(ConductorApiError::CellMissing(*cell_id))?;
                 Ok(AdminResponse::DnaDefinitionReturned(dna_def))
             }
             UpdateCoordinators(payload) => {
-                let UpdateCoordinatorsPayload { dna_hash, source } = *payload;
+                let UpdateCoordinatorsPayload { cell_id, source } = *payload;
                 let (coordinator_zomes, wasms) = match source {
                     CoordinatorSource::Path(ref path) => {
                         let bundle = FileSystemBundler::load_from::<CoordinatorManifest>(path)
@@ -91,7 +91,7 @@ impl AdminInterfaceApi {
                 };
 
                 self.conductor_handle
-                    .update_coordinators(&dna_hash, coordinator_zomes, wasms)
+                    .update_coordinators(cell_id, coordinator_zomes, wasms)
                     .await?;
 
                 Ok(AdminResponse::CoordinatorsUpdated)
@@ -119,8 +119,8 @@ impl AdminInterfaceApi {
                 Ok(AdminResponse::AppUninstalled)
             }
             ListDnas => {
-                let dna_list = self.conductor_handle.list_dnas();
-                Ok(AdminResponse::DnasListed(dna_list))
+                let dna_list = self.conductor_handle.list_dna_hashes();
+                Ok(AdminResponse::DnasListed(dna_list.into_iter().collect()))
             }
             GenerateAgentPubKey => {
                 let agent_pub_key = self

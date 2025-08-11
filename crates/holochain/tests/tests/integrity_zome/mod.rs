@@ -25,13 +25,12 @@ async fn test_coordinator_zome_update() {
         ],
     )
     .await;
-    let dna_hash = dna.dna_hash().clone();
 
     println!("Install Dna with integrity and coordinator zomes.");
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cells = app.into_cells();
 
-    println!("Create entry from the coordinator zome into the integrity zome.");
+    println!("Create an entry.");
     let hash: ActionHash = conductor
         .call(
             &cells[0].zome(TestCoordinatorWasm::CoordinatorZome),
@@ -39,7 +38,6 @@ async fn test_coordinator_zome_update() {
             (),
         )
         .await;
-    println!("Success!");
 
     println!("Try getting the entry from the coordinator zome.");
     let record: Option<Record> = conductor
@@ -51,20 +49,35 @@ async fn test_coordinator_zome_update() {
         .await;
 
     assert!(record.is_some());
-    println!("Success!");
 
-    println!("Update the coordinator zomes for a totally different coordinator zome (conductor is still running)");
+    // Update the coordinator zomes for a totally different coordinator zome (conductor is still running)
     conductor
         .update_coordinators(
-            &dna_hash,
+            cells[0].cell_id().clone(),
             vec![CoordinatorZome::from(TestCoordinatorWasm::CoordinatorZomeUpdate).into_inner()],
             vec![TestCoordinatorWasm::CoordinatorZomeUpdate.into()],
         )
         .await
         .unwrap();
-    println!("Success!");
 
-    println!("Try getting the entry from the new coordinator zome.");
+    // Try getting the entry from the new coordinator zome
+    let record: Option<Record> = conductor
+        .call(
+            &cells[0].zome(TestCoordinatorWasm::CoordinatorZomeUpdate),
+            "get_entry",
+            hash.clone(),
+        )
+        .await;
+
+    assert!(record.is_some());
+
+    // Now restart the conductor with 'ignore_dna_files_cache = true' and try
+    // calling the updated coordinator zome again to verify that the coordinator
+    // zome update is persisted correctly in the database and not only in the
+    // in-memory ribosome store
+    conductor.shutdown().await;
+    conductor.startup(true).await;
+
     let record: Option<Record> = conductor
         .call(
             &cells[0].zome(TestCoordinatorWasm::CoordinatorZomeUpdate),
@@ -74,7 +87,6 @@ async fn test_coordinator_zome_update() {
         .await;
 
     assert!(record.is_some());
-    println!("Success! Success! Success! ");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -121,8 +133,6 @@ async fn test_coordinator_zome_update_multi_integrity() {
     )
     .await;
 
-    let dna_hash = dna.dna_hash().clone();
-
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cells = app.into_cells();
 
@@ -156,7 +166,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
     // Add a completely new coordinator with the same dependency
     conductor
         .update_coordinators(
-            &dna_hash,
+            cells[0].cell_id().clone(),
             vec![CoordinatorZome::from(TestCoordinatorWasm::CoordinatorZomeUpdate).into_inner()],
             vec![TestCoordinatorWasm::CoordinatorZomeUpdate.into()],
         )
@@ -184,12 +194,25 @@ async fn test_coordinator_zome_update_multi_integrity() {
 
     conductor
         .update_coordinators(
-            &dna_hash,
+            cells[0].cell_id().clone(),
             vec![("2_coord".into(), new_coordinator)],
             vec![TestCoordinatorWasm::CoordinatorZomeUpdate.into()],
         )
         .await
         .unwrap();
+
+    let record: Option<Record> = conductor
+        .call(&cells[0].zome("2_coord"), "get_entry", hash2.clone())
+        .await;
+
+    assert!(record.is_some());
+
+    // Now restart the conductor with 'ignore_dna_files_cache = true' and try
+    // calling the updated coordinator zome again to verify that the coordinator
+    // zome update is persisted correctly in the database and not only in the
+    // in-memory ribosome store
+    conductor.shutdown().await;
+    conductor.startup(true).await;
 
     let record: Option<Record> = conductor
         .call(&cells[0].zome("2_coord"), "get_entry", hash2)
@@ -210,8 +233,6 @@ async fn test_update_admin_interface() {
         ],
     )
     .await;
-
-    let dna_hash = dna.dna_hash().clone();
 
     let app = conductor.setup_app("app", [&dna]).await.unwrap();
     let cells = app.into_cells();
@@ -256,7 +277,7 @@ async fn test_update_admin_interface() {
     println!("Bundle: {source:?}");
 
     let req = UpdateCoordinatorsPayload {
-        dna_hash,
+        cell_id: cells[0].cell_id().clone(),
         source: CoordinatorSource::Bundle(Box::new(source)),
     };
     let req = AdminRequest::UpdateCoordinators(Box::new(req));

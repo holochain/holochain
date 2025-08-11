@@ -333,9 +333,10 @@ mod startup_shutdown_impls {
             outcome_rx: OutcomeReceiver,
             admin_configs: Vec<AdminInterfaceConfig>,
         ) -> ConductorResult<()> {
-            self.load_dnas().await?;
+            // Load the wasms and dna defs from the database and populate the RibosomeStore
+            self.load_ribosomes().await?;
 
-            info!("Conductor startup: DNAs loaded.");
+            info!("Conductor startup: Ribosomes loaded.");
 
             // Start the task manager
             self.outcomes_task.share_mut(|lock| {
@@ -521,18 +522,20 @@ mod dna_impls {
 
     impl Conductor {
         /// Get the list of hashes of installed Dnas in this Conductor
-        pub fn list_dnas(&self) -> Vec<DnaHash> {
-            self.ribosome_store().share_ref(|ds| ds.list())
+        pub fn list_dna_hashes(&self) -> HashSet<DnaHash> {
+            self.ribosome_store().share_ref(|ds| ds.list_dna_hashes())
         }
 
         /// Get a [`DnaDef`] from the [`RibosomeStore`]
-        pub fn get_dna_def(&self, hash: &DnaHash) -> Option<DnaDef> {
-            self.ribosome_store().share_ref(|ds| ds.get_dna_def(hash))
+        pub fn get_dna_def(&self, cell_id: &CellId) -> Option<DnaDef> {
+            self.ribosome_store()
+                .share_ref(|ds| ds.get_dna_def(cell_id))
         }
 
         /// Get a [`DnaFile`] from the [`RibosomeStore`]
-        pub fn get_dna_file(&self, hash: &DnaHash) -> Option<DnaFile> {
-            self.ribosome_store().share_ref(|ds| ds.get_dna_file(hash))
+        pub fn get_dna_file(&self, cell_id: &CellId) -> Option<DnaFile> {
+            self.ribosome_store()
+                .share_ref(|ds| ds.get_dna_file(cell_id))
         }
 
         /// Get an [`EntryDef`] from the [`EntryDefBufferKey`]
@@ -548,25 +551,26 @@ mod dna_impls {
         ) -> ConductorResult<IndexMap<CellId, DnaDefHashed>> {
             let mut dna_defs = IndexMap::new();
             for cell_id in app.all_cells() {
-                let ribosome = self.get_ribosome(cell_id.dna_hash())?;
-                let dna_def = ribosome.dna_def();
-                dna_defs.insert(cell_id.to_owned(), dna_def.to_owned());
+                let ribosome = self.get_ribosome(&cell_id)?;
+                let dna_def_hashed = ribosome.dna_def_hashed();
+                dna_defs.insert(cell_id.to_owned(), dna_def_hashed.to_owned());
             }
             Ok(dna_defs)
         }
 
         pub(crate) async fn register_dna_wasm(
             &self,
+            cell_id: CellId,
             ribosome: RealRibosome,
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
             let is_full_wasm_dna = ribosome
-                .dna_def()
+                .dna_def_hashed()
                 .all_zomes()
                 .all(|(_, zome_def)| matches!(zome_def, ZomeDef::Wasm(_)));
 
             // Only install wasm if the DNA is composed purely of WasmZomes (no InlineZomes)
             if is_full_wasm_dna {
-                Ok(self.put_wasm(ribosome).await?)
+                Ok(self.put_wasm_and_defs(cell_id, ribosome).await?)
             } else {
                 Ok(Vec::with_capacity(0))
             }
@@ -580,30 +584,29 @@ mod dna_impls {
                 .share_mut(|d| d.add_entry_defs(entry_defs));
         }
 
-        pub(crate) fn add_ribosome_to_store(&self, ribosome: RealRibosome) {
-            self.ribosome_store.share_mut(|d| d.add_ribosome(ribosome));
+        pub(crate) fn add_ribosome_to_store(&self, cell_id: CellId, ribosome: RealRibosome) {
+            self.ribosome_store
+                .share_mut(|d| d.add_ribosome(cell_id, ribosome));
         }
 
         pub(crate) async fn load_wasms_into_dna_files(
             &self,
         ) -> ConductorResult<(
-            impl IntoIterator<Item = (DnaHash, RealRibosome)>,
+            impl IntoIterator<Item = (CellId, RealRibosome)>,
             impl IntoIterator<Item = (EntryDefBufferKey, EntryDef)>,
         )> {
             let db = &self.spaces.wasm_db;
 
-            // Load out all dna defs
-            let (wasms, defs) = db
+            // Load out all dna defs and associated wasms and entry defs from the database
+            let (dna_defs_with_wasms, entry_defs) = db
                 .read_async(move |txn| {
                     // Get all the dna defs.
-                    let dna_defs: Vec<_> = holochain_state::dna_def::get_all(txn)?
-                        .into_iter()
-                        .collect();
+                    let dna_defs_with_cell_id = holochain_state::dna_def::get_all(txn)?;
 
-                    // Gather all the unique wasms.
-                    let unique_wasms = dna_defs
+                    // Gather all the unique wasm hashes.
+                    let unique_wasm_hashes = dna_defs_with_cell_id
                         .iter()
-                        .flat_map(|dna_def| {
+                        .flat_map(|(_cell_id, dna_def)| {
                             dna_def
                                 .all_zomes()
                                 .map(|(zome_name, zome)| Ok(zome.wasm_hash(zome_name)?))
@@ -611,7 +614,7 @@ mod dna_impls {
                         .collect::<ConductorResult<HashSet<_>>>()?;
 
                     // Get the code for each unique wasm.
-                    let wasms = unique_wasms
+                    let wasms_and_hashes = unique_wasm_hashes
                         .into_iter()
                         .map(|wasm_hash| {
                             holochain_state::wasm::get(txn, &wasm_hash)?
@@ -620,38 +623,46 @@ mod dna_impls {
                                 .map(|wasm| (wasm_hash, wasm))
                         })
                         .collect::<ConductorResult<HashMap<_, _>>>()?;
-                    let wasms = holochain_state::dna_def::get_all(txn)?
+
+                    let dna_defs_with_wasms = dna_defs_with_cell_id
                         .into_iter()
-                        .map(|dna_def| {
+                        .map(|(cell_id, dna_def)| {
                             // Load all wasms for each dna_def from the wasm db into memory
                             let wasms = dna_def.all_zomes().filter_map(|(zome_name, zome)| {
                                 let wasm_hash = zome.wasm_hash(zome_name).ok()?;
                                 // Note this is a cheap arc clone.
-                                wasms.get(&wasm_hash).cloned()
+                                wasms_and_hashes.get(&wasm_hash).cloned()
                             });
                             let wasms = wasms.collect::<Vec<_>>();
-                            (dna_def, wasms)
+                            ((cell_id, dna_def), wasms)
                         })
                         // This needs to happen due to the environment not being Send
                         .collect::<Vec<_>>();
-                    let defs = holochain_state::entry_def::get_all(txn)?;
-                    ConductorResult::Ok((wasms, defs))
+                    let entry_defs = holochain_state::entry_def::get_all(txn)?;
+                    ConductorResult::Ok((dna_defs_with_wasms, entry_defs))
                 })
                 .await?;
+
             // try to join all the tasks and return the list of dna files
-            let wasms = wasms.into_iter().map(|(dna_def, wasms)| async move {
-                let dna_file = DnaFile::new(dna_def.into_content(), wasms).await;
+            let ribosomes_with_cell_id_future =
+                dna_defs_with_wasms
+                    .into_iter()
+                    .map(|((cell_id, dna_def), wasms)| async move {
+                        let dna_file = DnaFile::new(dna_def, wasms).await;
 
-                #[cfg(feature = "wasmer_sys")]
-                let ribosome =
-                    RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
-                #[cfg(feature = "wasmer_wamr")]
-                let ribosome = RealRibosome::new(dna_file, None).await?;
+                        #[cfg(feature = "wasmer_sys")]
+                        let ribosome =
+                            RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
+                        #[cfg(feature = "wasmer_wamr")]
+                        let ribosome = RealRibosome::new(dna_file, None).await?;
 
-                ConductorResult::Ok((ribosome.dna_hash().clone(), ribosome))
-            });
-            let dnas = futures::future::try_join_all(wasms).await?;
-            Ok((dnas, defs))
+                        ConductorResult::Ok((cell_id, ribosome))
+                    });
+
+            let ribosomes_with_cell_id =
+                futures::future::try_join_all(ribosomes_with_cell_id_future).await?;
+
+            Ok((ribosomes_with_cell_id, entry_defs))
         }
 
         /// Get the root environment directory.
@@ -685,20 +696,23 @@ mod dna_impls {
             .await;
         }
 
-        pub(crate) async fn put_wasm(
+        pub(crate) async fn put_wasm_and_defs(
             &self,
+            cell_id: CellId,
             ribosome: RealRibosome,
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
-            let dna_def = ribosome.dna_def().clone();
+            let dna_def = ribosome.dna_def_hashed().clone();
             let code = ribosome.dna_file().code().clone().into_values();
             let zome_defs = get_entry_defs(ribosome).await?;
-            self.put_wasm_code(dna_def, code, zome_defs).await
+            self.put_code_and_defs_in_databases(cell_id, dna_def, code, zome_defs)
+                .await
         }
 
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub(crate) async fn put_wasm_code(
+        pub(crate) async fn put_code_and_defs_in_databases(
             &self,
-            dna: DnaDefHashed,
+            cell_id: CellId,
+            dna_def_hashed: DnaDefHashed,
             code: impl Iterator<Item = wasm::DnaWasm>,
             zome_defs: Vec<(EntryDefBufferKey, EntryDef)>,
         ) -> ConductorResult<Vec<(EntryDefBufferKey, EntryDef)>> {
@@ -710,9 +724,9 @@ mod dna_impls {
                 .write_async({
                     let zome_defs = zome_defs.clone();
                     move |txn| {
-                        for dna_wasm in wasms {
-                            if !holochain_state::wasm::contains(txn, dna_wasm.as_hash())? {
-                                holochain_state::wasm::put(txn, dna_wasm)?;
+                        for wasm in wasms {
+                            if !holochain_state::wasm::contains(txn, wasm.as_hash())? {
+                                holochain_state::wasm::put(txn, wasm)?;
                             }
                         }
 
@@ -720,9 +734,12 @@ mod dna_impls {
                             holochain_state::entry_def::put(txn, key, &entry_def)?;
                         }
 
-                        if !holochain_state::dna_def::contains(txn, dna.as_hash())? {
-                            holochain_state::dna_def::put(txn, dna.into_content())?;
-                        }
+                        holochain_state::dna_def::upsert(
+                            txn,
+                            &cell_id,
+                            &dna_def_hashed.into_content(),
+                        )?;
+
                         StateMutationResult::Ok(())
                     }
                 })
@@ -732,7 +749,7 @@ mod dna_impls {
         }
 
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub(crate) async fn load_dnas(&self) -> ConductorResult<()> {
+        pub(crate) async fn load_ribosomes(&self) -> ConductorResult<()> {
             let (ribosomes, entry_defs) = self.load_wasms_into_dna_files().await?;
             self.ribosome_store().share_mut(|ds| {
                 ds.add_ribosomes(ribosomes);
@@ -743,19 +760,25 @@ mod dna_impls {
 
         /// Install a [`DnaFile`] in this Conductor
         #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-        pub async fn register_dna(&self, dna: DnaFile) -> ConductorResult<()> {
-            if self.get_ribosome(dna.dna_hash()).is_ok() {
+        pub async fn register_dna_file(
+            &self,
+            cell_id: CellId,
+            dna_file: DnaFile,
+        ) -> ConductorResult<()> {
+            if self.get_ribosome(&cell_id).is_ok() {
                 // ribosome for dna is already registered in store
                 return Ok(());
             }
 
-            let ribosome = RealRibosome::new(dna, self.wasmer_module_cache.clone()).await?;
+            let ribosome = RealRibosome::new(dna_file, self.wasmer_module_cache.clone()).await?;
 
-            let entry_defs = self.register_dna_wasm(ribosome.clone()).await?;
+            let entry_defs = self
+                .register_dna_wasm(cell_id.clone(), ribosome.clone())
+                .await?;
 
             self.register_dna_entry_defs(entry_defs);
 
-            self.add_ribosome_to_store(ribosome);
+            self.add_ribosome_to_store(cell_id, ribosome);
 
             Ok(())
         }
@@ -1214,7 +1237,8 @@ mod app_impls {
             };
 
             for (dna, _) in ops.dnas_to_register {
-                self.clone().register_dna(dna).await?;
+                let cell_id = CellId::new(dna.dna_hash().clone(), agent_key.clone());
+                self.clone().register_dna_file(cell_id, dna).await?;
             }
 
             if flags.defer_memproofs {
@@ -1605,7 +1629,7 @@ mod cell_impls {
                                 Some(cell_id.clone())
                             } else {
                                 // If this cell *contains* the given DNA in *its* lineage, include it.
-                                self.get_dna_def(cell_id.dna_hash())
+                                self.get_dna_def(&cell_id)
                                     .map(|dna_def| dna_def.lineage.contains(dna_hash))
                                     .unwrap_or(false)
                                     .then(|| cell_id.clone())
@@ -1665,11 +1689,11 @@ mod clone_cell_impls {
                 .await?;
                 source_chain.valid_create_agent_key_action().await?;
             }
-
             // add cell to app
             let clone_cell = self
                 .add_clone_cell_to_app(
                     installed_app_id.clone(),
+                    app.agent_key.clone(),
                     role_name.clone(),
                     modifiers.serialized()?,
                     name,
@@ -1727,10 +1751,10 @@ mod clone_cell_impls {
                         let (cell_id, _) = app.enable_clone_cell(&clone_id)?.into_inner();
                         let app_role = app.primary_role(&clone_id.as_base_role_name())?;
                         let original_dna_hash = app_role.dna_hash().clone();
-                        let ribosome = conductor.get_ribosome(cell_id.dna_hash())?;
-                        let dna = ribosome.dna_file.dna();
-                        let dna_modifiers = dna.modifiers.clone();
-                        let name = dna.name.clone();
+                        let ribosome = conductor.get_ribosome(&cell_id)?;
+                        let dna_def = ribosome.dna_file.dna_def();
+                        let dna_modifiers = dna_def.modifiers.clone();
+                        let name = dna_def.name.clone();
                         let enabled_cell = ClonedCell {
                             cell_id,
                             clone_id,
@@ -2515,26 +2539,27 @@ mod misc_impls {
         /// Update coordinator zomes on an existing dna.
         pub async fn update_coordinators(
             &self,
-            hash: &DnaHash,
+            cell_id: CellId,
             coordinator_zomes: CoordinatorZomes,
             wasms: Vec<wasm::DnaWasm>,
         ) -> ConductorResult<()> {
             // Note this isn't really concurrent safe. It would be a race condition to update the
             // same dna concurrently.
-            let mut ribosome = self
-                .ribosome_store()
-                .share_ref(|d| match d.get_ribosome(hash) {
-                    Some(dna) => Ok(dna),
-                    None => Err(DnaError::DnaMissing(hash.to_owned())),
-                })?;
+            let mut ribosome =
+                self.ribosome_store()
+                    .share_ref(|d| match d.get_ribosome(&cell_id) {
+                        Some(dna) => Ok(dna),
+                        None => Err(ConductorError::CellMissing(cell_id.clone())),
+                    })?;
             let _old_wasms = ribosome
                 .dna_file
                 .update_coordinators(coordinator_zomes.clone(), wasms.clone())
                 .await?;
 
-            // Add new wasm code to db.
-            self.put_wasm_code(
-                ribosome.dna_def().clone(),
+            // Write new wasm code and dna def into the database.
+            self.put_code_and_defs_in_databases(
+                cell_id.clone(),
+                ribosome.dna_def_hashed().clone(),
                 wasms.into_iter(),
                 Vec::with_capacity(0),
             )
@@ -2542,7 +2567,7 @@ mod misc_impls {
 
             // Update RibosomeStore.
             self.ribosome_store()
-                .share_mut(|d| d.add_ribosome(ribosome));
+                .share_mut(|d| d.add_ribosome(cell_id, ribosome));
 
             // TODO: Remove old wasm code? (Maybe this needs to be done on restart as it could be in use).
 
@@ -2578,10 +2603,22 @@ mod accessor_impls {
             Ok(self.app_broadcast.create_send_handle(app.id().clone()))
         }
 
-        /// Instantiate a Ribosome for use with a DNA
-        pub(crate) fn get_ribosome(&self, dna_hash: &DnaHash) -> ConductorResult<RealRibosome> {
+        /// Get the Ribosome for a given CellId from the RibosomeStore
+        pub(crate) fn get_ribosome(&self, cell_id: &CellId) -> ConductorResult<RealRibosome> {
             self.ribosome_store
-                .share_ref(|d| match d.get_ribosome(dna_hash) {
+                .share_ref(|d| match d.get_ribosome(cell_id) {
+                    Some(r) => Ok(r),
+                    None => Err(ConductorError::CellMissing(cell_id.to_owned())),
+                })
+        }
+
+        /// Get any Ribosome associated to a CellId matching the given DnaHash from the RibosomeStore.
+        pub(crate) fn get_any_ribosome_for_dna_hash(
+            &self,
+            dna_hash: &DnaHash,
+        ) -> ConductorResult<RealRibosome> {
+            self.ribosome_store
+                .share_ref(|d| match d.get_any_ribosome_for_dna_hash(dna_hash) {
                     Some(r) => Ok(r),
                     None => Err(DnaError::DnaMissing(dna_hash.to_owned()).into()),
                 })
@@ -2936,6 +2973,7 @@ impl Conductor {
     async fn add_clone_cell_to_app(
         &self,
         app_id: InstalledAppId,
+        agent_key: AgentPubKey,
         role_name: RoleName,
         dna_modifiers: DnaModifiersOpt,
         name: Option<String>,
@@ -2964,42 +3002,43 @@ impl Conductor {
 
         // clone cell from base cell DNA
         let clone_dna = ribosome_store.share_ref(|rs| {
+            let base_cell_id = CellId::new(base_cell_dna_hash, agent_key.clone());
             let mut dna_file = rs
-                .get_dna_file(&base_cell_dna_hash)
-                .ok_or(DnaError::DnaMissing(base_cell_dna_hash))?
+                .get_dna_file(&base_cell_id)
+                .ok_or(ConductorError::CellMissing(base_cell_id))?
                 .update_modifiers(dna_modifiers);
             if let Some(name) = name {
                 dna_file = dna_file.set_name(name);
             }
-            Ok::<_, DnaError>(dna_file)
+            Ok::<_, ConductorError>(dna_file)
         })?;
-        let name = clone_dna.dna().name.clone();
-        let dna_modifiers = clone_dna.dna().modifiers.clone();
+        let name = clone_dna.dna_def().name.clone();
+        let dna_modifiers = clone_dna.dna_def().modifiers.clone();
         let clone_dna_hash = clone_dna.dna_hash().to_owned();
+        let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
 
+        let clone_cell_id_move = clone_cell_id.clone();
         // add clone cell to app and instantiate resulting clone cell
         let (_, installed_clone_cell) = self
             .update_state_prime(move |mut state| {
                 let state_copy = state.clone();
                 let app = state.get_app_mut(&app_id)?;
-                let agent_key = app.agent_key().to_owned();
-                let clone_cell_id = CellId::new(clone_dna_hash, agent_key);
 
                 // if cell id of new clone cell already exists, reject as duplicate
                 if state_copy
                     .installed_apps()
                     .iter()
                     .flat_map(|(_, app)| app.all_cells())
-                    .any(|cell_id| cell_id == clone_cell_id)
+                    .any(|cell_id| cell_id == clone_cell_id_move)
                 {
                     return Err(ConductorError::AppError(AppError::DuplicateCellId(
-                        clone_cell_id,
+                        clone_cell_id_move,
                     )));
                 }
 
-                let clone_id = app.add_clone(&role_name, clone_cell_id.dna_hash())?;
+                let clone_id = app.add_clone(&role_name, clone_cell_id_move.dna_hash())?;
                 let installed_clone_cell = ClonedCell {
-                    cell_id: clone_cell_id,
+                    cell_id: clone_cell_id_move,
                     clone_id,
                     original_dna_hash,
                     dna_modifiers,
@@ -3011,7 +3050,7 @@ impl Conductor {
             .await?;
 
         // register clone cell dna in ribosome store
-        self.register_dna(clone_dna).await?;
+        self.register_dna_file(clone_cell_id, clone_dna).await?;
         Ok(installed_clone_cell)
     }
 
@@ -3107,9 +3146,7 @@ pub(crate) async fn genesis_cells(
                 space.get_or_create_authored_db(cell_id_inner.agent_pubkey().clone())?;
             let dht_db = space.dht_db;
             let chc = conductor.get_chc(&cell_id_inner);
-            let ribosome = conductor
-                .get_ribosome(cell_id_inner.dna_hash())
-                .map_err(Box::new)?;
+            let ribosome = conductor.get_ribosome(&cell_id_inner).map_err(Box::new)?;
 
             Cell::genesis(
                 cell_id_inner.clone(),

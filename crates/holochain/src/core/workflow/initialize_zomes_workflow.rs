@@ -33,7 +33,7 @@ where
     Ribosome: RibosomeT + 'static,
 {
     pub fn dna_def(&self) -> &DnaDef {
-        self.ribosome.dna_def().as_content()
+        self.ribosome.dna_def_hashed().as_content()
     }
 }
 
@@ -48,7 +48,7 @@ where
     Ribosome: RibosomeT + Clone + 'static,
 {
     let conductor_handle = args.conductor_handle.clone();
-    let coordinators = args.ribosome.dna_def().get_all_coordinators();
+    let coordinators = args.ribosome.dna_def_hashed().get_all_coordinators();
     let integrate_dht_ops_trigger = args.integrate_dht_ops_trigger.clone();
     let signal_tx = args.signal_tx.clone();
     let result =
@@ -199,7 +199,7 @@ mod tests {
             .expect_run_validate()
             .returning(move |_, _| Ok(ValidateResult::Valid));
         ribosome
-            .expect_dna_def()
+            .expect_dna_def_hashed()
             .return_const(dna_def_hashed.clone());
 
         let db_dir = test_db_dir();
