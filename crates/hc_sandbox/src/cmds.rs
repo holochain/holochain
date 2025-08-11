@@ -546,18 +546,28 @@ mod tests {
         fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
         fs::write(config_file_path1.as_ref(), "dummy config")?;
 
-        // Save the path to .hc file
-        crate::save::save(test_dir.to_path_buf(), vec![config_path1])?;
+        // write the path twice to .hc file
+        crate::save::save(
+            test_dir.to_path_buf(),
+            vec![config_path1.clone(), config_path1],
+        )?;
 
-        // Test loading with an out-of-range index
+        // Test loading with duplicate indices
         let existing = Existing {
             all: false,
             indices: vec![0, 0],
         };
 
         let result = existing.load(test_dir.to_path_buf())?;
-        dbg!(&result);
         assert_eq!(result.len(), 1);
+
+        // Test loading with duplicate indices
+        let existing = Existing {
+            all: false,
+            indices: vec![0, 1, 0],
+        };
+        let result = existing.load(test_dir.to_path_buf())?;
+        assert_eq!(result.len(), 2);
 
         Ok(())
     }

@@ -549,7 +549,6 @@ async fn create_sandbox_and_remove_dedup() {
     // Should not output error strings because of duplicate
     let output_str = String::from_utf8_lossy(&output.stdout);
     let lines = output_str.split("\n").collect::<Vec<_>>();
-    dbg!(&lines);
     assert_eq!(lines.len(), 2);
 }
 
