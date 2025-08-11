@@ -522,7 +522,7 @@ mod dna_impls {
 
     impl Conductor {
         /// Get the list of hashes of installed Dnas in this Conductor
-        pub fn list_dna_hashes(&self) -> Vec<DnaHash> {
+        pub fn list_dna_hashes(&self) -> HashSet<DnaHash> {
             self.ribosome_store().share_ref(|ds| ds.list_dna_hashes())
         }
 

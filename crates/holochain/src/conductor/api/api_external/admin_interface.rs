@@ -120,7 +120,7 @@ impl AdminInterfaceApi {
             }
             ListDnas => {
                 let dna_list = self.conductor_handle.list_dna_hashes();
-                Ok(AdminResponse::DnasListed(dna_list))
+                Ok(AdminResponse::DnasListed(dna_list.into_iter().collect()))
             }
             GenerateAgentPubKey => {
                 let agent_pub_key = self

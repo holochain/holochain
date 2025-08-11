@@ -2,7 +2,7 @@
 
 use holochain_types::{prelude::*, share::RwShare};
 use holochain_zome_types::entry_def::EntryDef;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::core::ribosome::{real_ribosome::RealRibosome, RibosomeT};
 
@@ -37,7 +37,7 @@ impl RibosomeStore {
 
     /// List all DNA hashes in the store.
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
-    pub fn list_dna_hashes(&self) -> Vec<DnaHash> {
+    pub fn list_dna_hashes(&self) -> HashSet<DnaHash> {
         self.ribosomes
             .keys()
             .cloned()
