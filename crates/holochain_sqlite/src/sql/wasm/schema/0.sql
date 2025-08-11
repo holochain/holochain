@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS Wasm (
 );
 
 CREATE TABLE IF NOT EXISTS DnaDef (
-    cell_id            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
-    dna_def            BLOB           NOT NULL
+    hash            BLOB           PRIMARY KEY ON CONFLICT IGNORE,
+    blob            BLOB           NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS EntryDef (
