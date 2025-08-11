@@ -490,6 +490,56 @@ async fn create_sandbox_and_call_list_apps() {
     assert!(exit_code.success());
 }
 
+/// Creates a new sandbox and remove it
+#[tokio::test(flavor = "multi_thread")]
+async fn create_sandbox_and_remove_dedup() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    package_fixture_if_not_packaged().await;
+
+    holochain_trace::test_run();
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("--piped")
+        .arg("create")
+        .arg("--in-process-lair")
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit());
+
+    let mut hc_create = input_piped_password(&mut cmd).await;
+    let exit_code = hc_create.wait().await.unwrap();
+    assert!(exit_code.success());
+
+    let mut cmd = get_sandbox_command();
+    cmd.env("RUST_BACKTRACE", "1")
+        .arg("--piped")
+        .arg(format!(
+            "--holochain-path={}",
+            get_holochain_bin_path().to_str().unwrap()
+        ))
+        .arg("remove")
+        .arg("0")
+        .arg("0") // intentional duplicate index
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit());
+
+    let hc_call = input_piped_password(&mut cmd).await;
+    let output = hc_call.wait_with_output().await.unwrap();
+    assert!(output.status.success());
+    // Should not output error strings because of duplicate
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    let lines = output_str.split("\n").collect::<Vec<_>>();
+    dbg!(&lines);
+    assert_eq!(lines.len(), 2);
+}
+
 /// Generates a new sandbox with roles settings overridden by a yaml file passed via
 /// the --roles-settings argument and verifies that the modifiers have been set
 /// correctly

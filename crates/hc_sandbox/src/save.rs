@@ -54,8 +54,8 @@ pub fn remove(hc_dir: PathBuf, existing: Existing) -> std::io::Result<usize> {
     if existing.all {
         to_remove_indices = (0..sandboxes.len()).collect();
     } else {
-        existing
-            .indices
+        let dedup_indices = existing.indices.into_iter().collect::<HashSet<_>>();
+        dedup_indices
             .into_iter()
             .for_each(|i| match sandboxes.get(i) {
                 None => msg!("Warning: Provided index is out of range: {}", i),
