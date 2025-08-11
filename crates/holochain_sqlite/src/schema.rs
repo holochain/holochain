@@ -58,7 +58,12 @@ pub static SCHEMA_CONDUCTOR: Lazy<Schema> = Lazy::new(|| Schema {
 });
 
 pub static SCHEMA_WASM: Lazy<Schema> = Lazy::new(|| Schema {
-    migrations: vec![M::initial(include_str!("sql/wasm/schema/0.sql"))],
+    migrations: vec![
+        M::initial(include_str!("sql/wasm/schema/0.sql")),
+        M {
+            forward: include_str!("sql/wasm/schema/1-up.sql").into(),
+        },
+    ],
 });
 
 pub static SCHEMA_PEER_META_STORE: Lazy<Schema> = Lazy::new(|| Schema {

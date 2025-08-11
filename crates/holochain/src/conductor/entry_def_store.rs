@@ -27,8 +27,10 @@ pub(crate) async fn get_entry_def(
     // Try to get the entry def from the entry def store
     let key = EntryDefBufferKey::new(zome, entry_def_index);
     let entry_def = conductor_handle.get_entry_def(&key);
+    // For entry defs we only care about getting the correct integrity zomes so we can
+    // get any ribosome associated to a CellId with a matching dna hash.
     let ribosome = conductor_handle
-        .get_ribosome(dna_hash)
+        .get_any_ribosome_for_dna_hash(dna_hash)
         .map_err(|_| EntryDefStoreError::DnaFileMissing(dna_hash.clone()))?;
 
     // If it's not found run the ribosome and get the entry defs
@@ -58,7 +60,7 @@ pub(crate) async fn get_entry_defs(
 
     // Get the zomes hashes
     let zomes = ribosome
-        .dna_def()
+        .dna_def_hashed()
         .integrity_zomes
         .iter()
         .cloned()
@@ -108,7 +110,7 @@ pub(crate) async fn get_entry_defs(
 mod tests {
     use super::EntryDefBufferKey;
     use crate::conductor::Conductor;
-    use holo_hash::HasHash;
+    use holo_hash::{fixt::AgentPubKeyFixturator, HasHash};
     use holochain_state::prelude::test_db_dir;
     use holochain_types::prelude::*;
     use holochain_types::test_utils::fake_dna_zomes;
@@ -126,7 +128,7 @@ mod tests {
             .await
             .unwrap();
 
-        let dna = fake_dna_zomes(
+        let dna_file = fake_dna_zomes(
             "",
             vec![(TestWasm::EntryDefs.into(), TestWasm::EntryDefs.into())],
         );
@@ -157,7 +159,15 @@ mod tests {
             entry_def_position: 1.into(),
         };
 
-        handle.register_dna(dna).await.unwrap();
+        let fake_agent = ::fixt::fixt!(AgentPubKey);
+
+        handle
+            .register_dna_file(
+                CellId::new(dna_file.dna_hash().clone(), fake_agent),
+                dna_file,
+            )
+            .await
+            .unwrap();
         // Check entry defs are here
         assert_eq!(handle.get_entry_def(&post_def_key), Some(post_def.clone()));
         assert_eq!(

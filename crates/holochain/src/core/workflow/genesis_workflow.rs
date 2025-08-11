@@ -74,7 +74,7 @@ where
         modifiers: DnaModifiers { properties, .. },
         integrity_zomes,
         ..
-    } = &ribosome.dna_def().content;
+    } = &ribosome.dna_def_hashed().content;
     let dna_info = DnaInfoV1 {
         zome_names: integrity_zomes.iter().map(|(n, _)| n.clone()).collect(),
         name: name.clone(),
@@ -196,7 +196,7 @@ mod tests {
                 .expect_run_genesis_self_check()
                 .returning(|_, _| Ok(GenesisSelfCheckResult::Valid));
             let dna_def = DnaDefHashed::from_content_sync(dna.dna_def().clone());
-            ribosome.expect_dna_def().return_const(dna_def);
+            ribosome.expect_dna_def_hashed().return_const(dna_def);
             let args = GenesisWorkflowArgs {
                 cell_id: CellId::new(dna.dna_hash().clone(), author.clone()),
                 membrane_proof: None,

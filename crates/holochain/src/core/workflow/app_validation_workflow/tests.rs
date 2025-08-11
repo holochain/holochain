@@ -892,9 +892,15 @@ async fn check_app_entry_def_test() {
         Err(SysValidationError::DnaMissing(_))
     );
 
+    let agent_key = fixt!(AgentPubKey);
+    let cell_id = CellId::new(dna_file.dna_hash().clone(), agent_key);
+
     // # Dna but no entry def in buffer
     // ## ZomeIndex out of range
-    conductor_handle.register_dna(dna_file).await.unwrap();
+    conductor_handle
+        .register_dna_file(cell_id, dna_file)
+        .await
+        .unwrap();
 
     // ## EntryId is out of range
     let app_entry_def_1 = AppEntryDef::new(10.into(), 0.into(), EntryVisibility::Public);
@@ -1164,7 +1170,7 @@ async fn app_validation_produces_warrants() {
     .unwrap();
 
     conductors[0].shutdown().await;
-    conductors[2].startup().await;
+    conductors[2].startup(false).await;
 
     //- Ensure that bob authored a warrant
     let alice_pubkey = alice.agent_pubkey().clone();

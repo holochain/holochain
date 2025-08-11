@@ -4,6 +4,11 @@ use holochain::conductor::conductor::WASM_CACHE;
 use holochain::{sweettest::*, test_utils::retry_fn_until_timeout};
 use holochain_wasm_test_utils::TestWasm;
 
+mod dht_location;
+pub mod must_get_agent_activity_saturation;
+mod two_apps_same_dna_hash_different_coordinators;
+mod zome_call_atomic;
+
 // Make sure the wasm cache at least creates files.
 // This is not run with the `wasmer_wamr` feature flag,
 // as the cache is not used.
@@ -290,7 +295,3 @@ async fn zero_arc_can_delete_link() {
         )
         .await;
 }
-
-mod dht_location;
-pub mod must_get_agent_activity_saturation;
-mod zome_call_atomic;
