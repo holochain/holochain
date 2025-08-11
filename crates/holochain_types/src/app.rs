@@ -53,7 +53,7 @@ pub enum CoordinatorSource {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-/// The instructions on how to update coordinators for a dna file.
+/// The instructions on how to update coordinators for a cell.
 pub struct UpdateCoordinatorsPayload {
     /// The cell id of the cell to swap coordinators for.
     pub cell_id: CellId,
