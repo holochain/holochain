@@ -648,7 +648,13 @@ impl SweetConductor {
     }
 
     /// Start up this conductor if it's not already running.
-    pub async fn startup(&mut self, ignore_dna_files_cache: Option<bool>) {
+    ///
+    /// * `ignore_dna_files_cache` - Force the SweetConductor to load wasms and
+    ///   dna definitions from the database instead of using cached values.
+    ///   When using inline zomes, this means that the inline zomes are no
+    ///   longer available after startup since they cannot be persisted
+    ///   to and read from the database.
+    pub async fn startup(&mut self, ignore_dna_files_cache: bool) {
         if self.handle.is_none() {
             // There's a db dir in the sweet conductor and the config, that are
             // supposed to be the same. Let's assert that they are.
@@ -667,7 +673,6 @@ impl SweetConductor {
             // But there are cases when testing with actual wasms (not inline-zomes)
             // where we want to ensure that the wasms can get correctly loaded from
             // the database so we offer the option to explicitly ignore the cache here.
-            let ignore_dna_files_cache = ignore_dna_files_cache.unwrap_or(false);
             let extra_dna_files = match ignore_dna_files_cache {
                 true => vec![],
                 false => self.dna_files.clone().into_iter().collect::<Vec<_>>(),

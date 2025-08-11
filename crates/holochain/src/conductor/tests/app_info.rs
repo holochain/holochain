@@ -106,7 +106,7 @@ async fn app_info_returns_all_cells_with_info() {
     });
 
     conductor.shutdown().await;
-    conductor.startup(None).await;
+    conductor.startup(false).await;
 
     // make sure app info is identical after conductor restart
     let app_info_after_restart = conductor

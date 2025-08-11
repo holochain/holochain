@@ -101,7 +101,7 @@ async fn can_install_two_apps_with_the_same_dna_hash_but_different_coordinators(
     // coordinator zomes had been persisted in the database and are loaded
     // correctly into the ribosome store on startup
     conductor.shutdown().await;
-    conductor.startup(Some(true)).await; // important: ignore_dna_files_cache = true
+    conductor.startup(true).await; // important: ignore_dna_files_cache = true
 
     // Repeat the zome calls to verify that both coordinator zomes can be addressed
     // correctly

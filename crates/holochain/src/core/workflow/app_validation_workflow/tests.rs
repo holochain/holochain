@@ -1170,7 +1170,7 @@ async fn app_validation_produces_warrants() {
     .unwrap();
 
     conductors[0].shutdown().await;
-    conductors[2].startup(None).await;
+    conductors[2].startup(false).await;
 
     //- Ensure that bob authored a warrant
     let alice_pubkey = alice.agent_pubkey().clone();

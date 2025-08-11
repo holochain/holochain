@@ -76,7 +76,7 @@ async fn test_coordinator_zome_update() {
     // zome update is persisted correctly in the database and not only in the
     // in-memory ribosome store
     conductor.shutdown().await;
-    conductor.startup(Some(true)).await;
+    conductor.startup(true).await;
 
     let record: Option<Record> = conductor
         .call(
@@ -212,7 +212,7 @@ async fn test_coordinator_zome_update_multi_integrity() {
     // zome update is persisted correctly in the database and not only in the
     // in-memory ribosome store
     conductor.shutdown().await;
-    conductor.startup(Some(true)).await;
+    conductor.startup(true).await;
 
     let record: Option<Record> = conductor
         .call(&cells[0].zome("2_coord"), "get_entry", hash2)
