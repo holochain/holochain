@@ -503,7 +503,7 @@ async fn create_sandbox_and_call_list_apps() {
     assert!(exit_code.success());
 }
 
-/// Creates a new sandbox and remove it
+/// Create a new sandbox and remove it by providing a duplicate index
 #[tokio::test(flavor = "multi_thread")]
 async fn create_sandbox_and_remove_dedup() {
     let temp_dir = tempfile::TempDir::new().unwrap();
