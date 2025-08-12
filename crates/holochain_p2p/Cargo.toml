@@ -40,10 +40,10 @@ tokio-stream = "0.1"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = "0.1.13"
-kitsune2_api = "0.1.13"
-kitsune2_core = "0.1.13"
-kitsune2_gossip = "0.1.13"
+kitsune2 = { git = "https://github.com/holochain/kitsune2", rev = "73fe36c078c2f4ab2d16dd5730ec2510331194c4" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "73fe36c078c2f4ab2d16dd5730ec2510331194c4" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "73fe36c078c2f4ab2d16dd5730ec2510331194c4" }
+kitsune2_gossip = { git = "https://github.com/holochain/kitsune2", rev = "73fe36c078c2f4ab2d16dd5730ec2510331194c4" }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.5.5-rc.1", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.2"
