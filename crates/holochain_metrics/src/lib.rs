@@ -11,11 +11,16 @@
 //! metrics instance that will be created is largely controlled by
 //! the existence of environment variables.
 //!
-//! Curently, by default, the Null metrics collector will be used, meaning
+//! Currently, by default, the Null metrics collector will be used, meaning
 //! metrics will not be collected, and all metrics operations will be no-ops.
 //!
 //! If you wish to enable metrics, the current options are:
 //!
+//! - InfluxDB with a Line Protocol file on Disk to be pushed later with Telegraf.
+//!   - Enable via environment variable: `HOLOCHAIN_INFLUXIVE_FILE=1`
+//!   - Configure via environment variables:
+//!     - `HOLOCHAIN_INFLUXIVE_FILE_PATH=[my filepath]`
+//!   - holochain must have permission to write to disk.
 //! - InfluxDB as a zero-config child-process.
 //!   - Enable via environment variable: `HOLOCHAIN_INFLUXIVE_CHILD_SVC=1`
 //!   - The binaries `influxd` and `influx` will be downloaded and verified
@@ -37,16 +42,16 @@
 //! enumerated at
 //! [https://opentelemetry.io/docs/specs/otel/metrics/semantic_conventions/](https://opentelemetry.io/docs/specs/otel/metrics/semantic_conventions/),
 //! with additional rules made to fit with our particular project.
-//! We will also attempt to keep this documentation up-to-date on a best-effort
-//! basis to act as an example and registry of metrics avaliable in Holochain,
+//! We will also attempt to keep this documentation up to date on a best-effort
+//! basis to act as an example and registry of metrics available in Holochain
 //! and related support dependency crates managed by the organization.
 //!
 //! Generic naming convention rules:
 //!
 //! - Dot notation logical module hierarchy. This need not, and perhaps should
-//!   not, match the rust crate/module hierarchy. As we may rearange crates
+//!   not, match the rust crate/module hierarchy. As we may rearrange crates
 //!   and modules, but the metric names themselves should remain more
-//!   consistant.
+//!   consistent.
 //!   - Examples:
 //!     - `hc.db`
 //!     - `hc.workflow.integration`
@@ -65,7 +70,7 @@
 //!             .with_description("tx5 signal server request duration")
 //!             .with_unit(Unit::new("s"))
 //!             .init();
-//!         req_dur.record(&Context::new(), 0.42, &[
+//!         req_dur.record(0.42, &[
 //!             KeyValue::new("remote_id", "abcd"),
 //!         ]);
 //!       ```
@@ -76,7 +81,7 @@
 //!             .with_description("tx5 signal server request byte count")
 //!             .with_unit(Unit::new("By"))
 //!             .init();
-//!         req_size.record(&Context::new(), 42, &[
+//!         req_size.record(42, &[
 //!             KeyValue::new("remote_id", "abcd"),
 //!         ]);
 //!       ```
@@ -116,6 +121,16 @@ const DASH_CONDUCTOR: &[u8] = include_bytes!("dashboards/conductor.json");
 pub enum HolochainMetricsConfig {
     /// Metrics are disabled.
     Disabled,
+
+    /// Use influxive to write metrics to a file.
+    /// NOTE: this means we cannot initialize any dashboards.
+    #[cfg(feature = "influxive")]
+    InfluxiveFile {
+        /// The writer config for writing metrics to a file.
+        writer_config: influxive::InfluxiveWriterConfig,
+        /// The meter provider config for setting up opentelemetry.
+        otel_config: influxive::InfluxiveMeterProviderConfig,
+    },
 
     #[cfg(feature = "influxive")]
     /// Use influxive to connect to an already running InfluxDB instance.
@@ -159,6 +174,9 @@ impl HolochainMetricsConfig {
         {
             const E_CHILD_SVC: &str = "HOLOCHAIN_INFLUXIVE_CHILD_SVC";
 
+            const E_FILE: &str = "HOLOCHAIN_INFLUXIVE_FILE";
+            const E_FILE_PATH: &str = "HOLOCHAIN_INFLUXIVE_FILE_PATH";
+
             const E_EXTERNAL: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL";
             const E_EXTERNAL_HOST: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST";
             const E_EXTERNAL_BUCKET: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET";
@@ -171,6 +189,26 @@ impl HolochainMetricsConfig {
                     child_svc_config: Box::new(
                         influxive::InfluxiveChildSvcConfig::default()
                             .with_database_path(Some(database_path)),
+                    ),
+                    otel_config: influxive::InfluxiveMeterProviderConfig::default(),
+                };
+            }
+
+            if std::env::var_os(E_FILE).is_some() {
+                let filepath = match std::env::var(E_FILE_PATH) {
+                    Ok(host) => host,
+                    Err(err) => {
+                        tracing::error!(env = %E_FILE_PATH, ?err, "invalid");
+                        return Self::Disabled;
+                    }
+                };
+                if filepath.is_empty() {
+                    tracing::error!(env = %E_FILE_PATH, "missing");
+                    return Self::Disabled;
+                }
+                return Self::InfluxiveFile {
+                    writer_config: influxive::InfluxiveWriterConfig::create_with_influx_file(
+                        std::path::PathBuf::from(filepath),
                     ),
                     otel_config: influxive::InfluxiveMeterProviderConfig::default(),
                 };
@@ -223,6 +261,13 @@ impl HolochainMetricsConfig {
                 tracing::info!("Running without metrics");
             }
             #[cfg(feature = "influxive")]
+            Self::InfluxiveFile {
+                writer_config,
+                otel_config,
+            } => {
+                Self::init_influxive_file(writer_config, otel_config);
+            }
+            #[cfg(feature = "influxive")]
             Self::InfluxiveExternal {
                 writer_config,
                 otel_config,
@@ -240,6 +285,19 @@ impl HolochainMetricsConfig {
                 Self::init_influxive_child_svc(*child_svc_config, otel_config).await;
             }
         }
+    }
+
+    #[cfg(feature = "influxive")]
+    fn init_influxive_file(
+        writer_config: influxive::InfluxiveWriterConfig,
+        otel_config: influxive::InfluxiveMeterProviderConfig,
+    ) {
+        tracing::info!(?writer_config, "initializing holochain_metrics");
+
+        let meter_provider = influxive::influxive_file_meter_provider(writer_config, otel_config);
+
+        // setup opentelemetry to use our metrics collector
+        opentelemetry_api::global::set_meter_provider(meter_provider);
     }
 
     #[cfg(feature = "influxive")]
@@ -304,3 +362,6 @@ impl HolochainMetricsConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod test;
