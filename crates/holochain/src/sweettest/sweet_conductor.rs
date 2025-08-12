@@ -340,11 +340,7 @@ impl SweetConductor {
 
         let dnas_with_proof: Vec<_> = dnas_with_roles
             .iter()
-            .cloned()
-            .map(|dr| {
-                let dna = dr.dna().clone().update_modifiers(Default::default());
-                (dr.replace_dna(dna), None)
-            })
+            .map(|dr| (dr.to_owned(), None))
             .collect();
 
         let agent = self
