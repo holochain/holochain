@@ -79,10 +79,13 @@ pub fn sys_time() -> ExternResult<Timestamp> {
 /// for no further triggers. The initial input schedule of a scheduled function will
 /// be `None`. The following inputs will be whatever was returned by the previous invocation
 /// that triggered the current invocation.
-/// If an invalid crontab is returned, the function will keep its last known valid
-/// schedule. If the last valid schedule is `None`, then it will be unscheduled.
-/// If for any reason the function call fails, it will still be scheduled with the
-/// last known valid schedule.
+/// If an invalid crontab is returned (e.g. "*/0 * * * * * *"), the function will be unscheduled.
+/// An ephemeral trigger set with a duration of zero will schedule the function to run at the
+/// next [`SCHEDULER_INTERVAL`].
+/// If a persisted trigger is not run at the time of its intended schedule (because the
+/// conductor is not running or the host is not running, for example),
+/// the function will not be triggered, and it will be rescheduled for the next intended run time.
+/// If for any reason the function call fails, it will be unscheduled.
 ///
 /// Scheduling a function will trigger it once unconditionally on the next iteration
 /// of the conductor's internal scheduler loop. The frequency of the loop is subject
