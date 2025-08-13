@@ -4,6 +4,7 @@
 //! to / from a `.hc` file.
 //! This is very much WIP and subject to change.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -64,23 +65,18 @@ pub fn remove(hc_dir: PathBuf, existing: Existing) -> std::io::Result<usize> {
                         i,
                         path.display()
                     );
-                    if !to_remove_indices.contains(&i) {
-                        to_remove_indices.push(i);
-                    }
+                    to_remove_indices.push(i);
                 }
-                Some(Ok(_)) => {
-                    if !to_remove_indices.contains(&i) {
-                        to_remove_indices.push(i);
-                    }
-                }
+                Some(Ok(_)) => to_remove_indices.push(i),
             });
     }
     // Determine remaining paths
+    let indices_to_remove: HashSet<_> = to_remove_indices.iter().collect();
     let remaining: Vec<ConfigRootPath> = sandboxes
         .iter()
         .enumerate()
         .filter_map(|(i, item)| {
-            if to_remove_indices.contains(&i) {
+            if indices_to_remove.contains(&i) {
                 return None;
             }
             let Ok(item) = item else {
