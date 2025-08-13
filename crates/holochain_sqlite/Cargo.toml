@@ -51,7 +51,7 @@ getrandom = "0.2.7"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 schemars = "0.8.21"
 
-kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "0c3a57324f41f3146bc9c4948183d2782b841900" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "d036e6c05f7761f2c3702d5be1d56bda95678886" }
 bytes = "1.10"
 
 rusqlite = { version = "0.36", features = [

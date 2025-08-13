@@ -54,8 +54,8 @@ holochain_conductor_config = { version = "^0.5.5-rc.1", path = "../holochain_con
 holochain_timestamp = { version = "^0.5.4", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.12" }
-kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "0c3a57324f41f3146bc9c4948183d2782b841900" }
-kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "0c3a57324f41f3146bc9c4948183d2782b841900" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "d036e6c05f7761f2c3702d5be1d56bda95678886" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "d036e6c05f7761f2c3702d5be1d56bda95678886" }
 mockall = "0.11.3"
 mr_bundle = { version = "^0.5.4", path = "../mr_bundle" }
 must_future = "0.1.1"
@@ -108,7 +108,7 @@ matches = { version = "0.1.8", optional = true }
 holochain_wasm_test_utils = { version = "^0.5.5-rc.1", path = "../test_utils/wasm", optional = true }
 holochain_test_wasm_common = { version = "^0.5.5-rc.1", path = "../test_utils/wasm_common", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
-kitsune2_bootstrap_srv = { git = "https://github.com/holochain/kitsune2", rev = "0c3a57324f41f3146bc9c4948183d2782b841900", optional = true }
+kitsune2_bootstrap_srv = { git = "https://github.com/holochain/kitsune2", rev = "d036e6c05f7761f2c3702d5be1d56bda95678886", optional = true }
 async-once-cell = { version = "0.5", optional = true }
 get_if_addrs = { version = "0.5.3", optional = true }
 schemars = "0.8.21"
