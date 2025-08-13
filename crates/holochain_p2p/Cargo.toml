@@ -40,10 +40,10 @@ tokio-stream = "0.1"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = { git = "https://github.com/holochain/kitsune2", rev = "8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1", default-features = false }
-kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1" }
-kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1" }
-kitsune2_gossip = { git = "https://github.com/holochain/kitsune2", rev = "8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1" }
+kitsune2 = { git = "https://github.com/holochain/kitsune2", rev = "0c3a57324f41f3146bc9c4948183d2782b841900", default-features = false }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "0c3a57324f41f3146bc9c4948183d2782b841900" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "0c3a57324f41f3146bc9c4948183d2782b841900" }
+kitsune2_gossip = { git = "https://github.com/holochain/kitsune2", rev = "0c3a57324f41f3146bc9c4948183d2782b841900" }
 bytes = "1.10"
 holochain_sqlite = { version = "^0.5.5-rc.1", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.2"

@@ -2505,7 +2505,7 @@ version = "0.2.5-rc.1"
 dependencies = [
  "clap 4.5.45",
  "tokio",
- "tx5-signal",
+ "tx5-signal 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "ureq 3.0.12",
  "url2",
 ]
@@ -4229,7 +4229,7 @@ dependencies = [
 [[package]]
 name = "kitsune2"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
+source = "git+https://github.com/holochain/kitsune2?rev=0c3a57324f41f3146bc9c4948183d2782b841900#0c3a57324f41f3146bc9c4948183d2782b841900"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4241,7 +4241,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_api"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
+source = "git+https://github.com/holochain/kitsune2?rev=0c3a57324f41f3146bc9c4948183d2782b841900#0c3a57324f41f3146bc9c4948183d2782b841900"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4257,7 +4257,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_bootstrap_client"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
+source = "git+https://github.com/holochain/kitsune2?rev=0c3a57324f41f3146bc9c4948183d2782b841900#0c3a57324f41f3146bc9c4948183d2782b841900"
 dependencies = [
  "base64 0.22.1",
  "kitsune2_api",
@@ -4269,7 +4269,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_bootstrap_srv"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
+source = "git+https://github.com/holochain/kitsune2?rev=0c3a57324f41f3146bc9c4948183d2782b841900#0c3a57324f41f3146bc9c4948183d2782b841900"
 dependencies = [
  "async-channel",
  "axum",
@@ -4295,7 +4295,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_core"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
+source = "git+https://github.com/holochain/kitsune2?rev=0c3a57324f41f3146bc9c4948183d2782b841900#0c3a57324f41f3146bc9c4948183d2782b841900"
 dependencies = [
  "backon",
  "bytes",
@@ -4316,7 +4316,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_dht"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
+source = "git+https://github.com/holochain/kitsune2?rev=0c3a57324f41f3146bc9c4948183d2782b841900#0c3a57324f41f3146bc9c4948183d2782b841900"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4326,7 +4326,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_gossip"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
+source = "git+https://github.com/holochain/kitsune2?rev=0c3a57324f41f3146bc9c4948183d2782b841900#0c3a57324f41f3146bc9c4948183d2782b841900"
 dependencies = [
  "bytes",
  "futures",
@@ -4345,7 +4345,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_transport_tx5"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
+source = "git+https://github.com/holochain/kitsune2?rev=0c3a57324f41f3146bc9c4948183d2782b841900#0c3a57324f41f3146bc9c4948183d2782b841900"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4355,7 +4355,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tx5",
- "tx5-core",
+ "tx5-core 0.3.9 (git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e)",
  "url",
 ]
 
@@ -8017,8 +8017,7 @@ dependencies = [
 [[package]]
 name = "tx5"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77cb4d29fe08f80062158de5942d79ba86d80efa5b2280933457212f84dbbb6f"
+source = "git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e#b48f5d82147ac24073840fb3529d8076579df72e"
 dependencies = [
  "base64 0.22.1",
  "futures",
@@ -8028,15 +8027,14 @@ dependencies = [
  "tokio",
  "tracing",
  "tx5-connection",
- "tx5-core",
+ "tx5-core 0.3.9 (git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e)",
  "url",
 ]
 
 [[package]]
 name = "tx5-connection"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3cf96dcd01754f154b71a16ee26b5efe1d4284e732b5f77c6a3b045a93815a2"
+source = "git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e#b48f5d82147ac24073840fb3529d8076579df72e"
 dependencies = [
  "bit_field",
  "datachannel",
@@ -8045,9 +8043,9 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.3.9 (git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e)",
  "tx5-go-pion",
- "tx5-signal",
+ "tx5-signal 0.3.9 (git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e)",
 ]
 
 [[package]]
@@ -8055,6 +8053,20 @@ name = "tx5-core"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b592d1c0640b7c761b92db3e7261ad0800ebe49e1c8d8e5b32b99d3fc158cfd5"
+dependencies = [
+ "base64 0.22.1",
+ "once_cell",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "tx5-core"
+version = "0.3.9"
+source = "git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e#b48f5d82147ac24073840fb3529d8076579df72e"
 dependencies = [
  "app_dirs2",
  "base64 0.22.1",
@@ -8071,8 +8083,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37405e2620a525f364372913fab4e942e0451abb46be0b1a30abbdb1b6978070"
+source = "git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e#b48f5d82147ac24073840fb3529d8076579df72e"
 dependencies = [
  "futures",
  "tokio",
@@ -8083,8 +8094,7 @@ dependencies = [
 [[package]]
 name = "tx5-go-pion-sys"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f7b3200cad816f2fa336c74c03495b2308233e8232c094a400e1db6114675aa"
+source = "git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e#b48f5d82147ac24073840fb3529d8076579df72e"
 dependencies = [
  "Inflector",
  "base64 0.22.1",
@@ -8094,7 +8104,7 @@ dependencies = [
  "ouroboros",
  "sha2",
  "tracing",
- "tx5-core",
+ "tx5-core 0.3.9 (git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e)",
  "zip 0.6.6",
 ]
 
@@ -8108,7 +8118,19 @@ dependencies = [
  "sbd-e2e-crypto-client",
  "tokio",
  "tracing",
- "tx5-core",
+ "tx5-core 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tx5-signal"
+version = "0.3.9"
+source = "git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e#b48f5d82147ac24073840fb3529d8076579df72e"
+dependencies = [
+ "rand 0.8.5",
+ "sbd-e2e-crypto-client",
+ "tokio",
+ "tracing",
+ "tx5-core 0.3.9 (git+https://github.com/holochain/tx5?rev=b48f5d82147ac24073840fb3529d8076579df72e)",
 ]
 
 [[package]]
