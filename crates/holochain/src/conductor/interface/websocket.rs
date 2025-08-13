@@ -7,6 +7,7 @@ use crate::conductor::conductor::app_broadcast::AppBroadcast;
 use crate::conductor::manager::TaskManagerClient;
 use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, AppRequest, AppResponse,
+    ExternalApiWireError,
 };
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_types::app::InstalledAppId;
@@ -437,6 +438,13 @@ async fn handle_incoming_admin_message(
             respond.respond(result).await?;
             Ok(())
         }
+        ReceiveMessage::BadRequest(respond) => {
+            let result: AdminResponse = AdminResponse::Error(
+                ExternalApiWireError::Deserialization("Failed to deserialize request".to_string()),
+            );
+            respond.respond(result).await?;
+            Ok(())
+        }
     }
 }
 
@@ -470,6 +478,13 @@ async fn handle_incoming_app_message(
                 }
             }
             let result = Cnv(result);
+            respond.respond(result).await?;
+            Ok(())
+        }
+        ReceiveMessage::BadRequest(respond) => {
+            let result: AppResponse = AppResponse::Error(ExternalApiWireError::Deserialization(
+                "Failed to deserialize request".to_string(),
+            ));
             respond.respond(result).await?;
             Ok(())
         }
