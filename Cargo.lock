@@ -3,6 +3,16 @@
 version = 4
 
 [[package]]
+name = "Inflector"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
+dependencies = [
+ "lazy_static",
+ "regex",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -56,6 +66,12 @@ checksum = "8e60d3430d3a69478ad0993f19238d2df97c507009a52b3c10addcd7f6bcb916"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "aliasable"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "250f629c0161ad8107cf89319e990051fae62832fd343083bea452d93e2205fd"
 
 [[package]]
 name = "allocator-api2"
@@ -3958,7 +3974,7 @@ dependencies = [
  "tar",
  "tempfile",
  "tokio",
- "zip",
+ "zip 2.4.2",
 ]
 
 [[package]]
@@ -4213,7 +4229,7 @@ dependencies = [
 [[package]]
 name = "kitsune2"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=73fe36c078c2f4ab2d16dd5730ec2510331194c4#73fe36c078c2f4ab2d16dd5730ec2510331194c4"
+source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4225,7 +4241,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_api"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=73fe36c078c2f4ab2d16dd5730ec2510331194c4#73fe36c078c2f4ab2d16dd5730ec2510331194c4"
+source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4241,7 +4257,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_bootstrap_client"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=73fe36c078c2f4ab2d16dd5730ec2510331194c4#73fe36c078c2f4ab2d16dd5730ec2510331194c4"
+source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
 dependencies = [
  "base64 0.22.1",
  "kitsune2_api",
@@ -4253,7 +4269,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_bootstrap_srv"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=73fe36c078c2f4ab2d16dd5730ec2510331194c4#73fe36c078c2f4ab2d16dd5730ec2510331194c4"
+source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
 dependencies = [
  "async-channel",
  "axum",
@@ -4279,7 +4295,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_core"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=73fe36c078c2f4ab2d16dd5730ec2510331194c4#73fe36c078c2f4ab2d16dd5730ec2510331194c4"
+source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
 dependencies = [
  "backon",
  "bytes",
@@ -4300,7 +4316,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_dht"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=73fe36c078c2f4ab2d16dd5730ec2510331194c4#73fe36c078c2f4ab2d16dd5730ec2510331194c4"
+source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4310,7 +4326,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_gossip"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=73fe36c078c2f4ab2d16dd5730ec2510331194c4#73fe36c078c2f4ab2d16dd5730ec2510331194c4"
+source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
 dependencies = [
  "bytes",
  "futures",
@@ -4329,7 +4345,7 @@ dependencies = [
 [[package]]
 name = "kitsune2_transport_tx5"
 version = "0.1.13"
-source = "git+https://github.com/holochain/kitsune2?rev=73fe36c078c2f4ab2d16dd5730ec2510331194c4#73fe36c078c2f4ab2d16dd5730ec2510331194c4"
+source = "git+https://github.com/holochain/kitsune2?rev=8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1#8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4473,7 +4489,7 @@ dependencies = [
  "tar",
  "ureq 2.12.1",
  "vcpkg",
- "zip",
+ "zip 2.4.2",
 ]
 
 [[package]]
@@ -5143,6 +5159,29 @@ dependencies = [
  "plist",
  "serde",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "ouroboros"
+version = "0.15.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1358bd1558bd2a083fed428ffeda486fbfb323e698cdda7794259d592ca72db"
+dependencies = [
+ "aliasable",
+ "ouroboros_macro",
+]
+
+[[package]]
+name = "ouroboros_macro"
+version = "0.15.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f7d21ccd03305a674437ee1248f3ab5d4b1db095cf1caf49f1713ddf61956b7"
+dependencies = [
+ "Inflector",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -8007,6 +8046,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tx5-core",
+ "tx5-go-pion",
  "tx5-signal",
 ]
 
@@ -8026,6 +8066,36 @@ dependencies = [
  "tempfile",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "tx5-go-pion"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37405e2620a525f364372913fab4e942e0451abb46be0b1a30abbdb1b6978070"
+dependencies = [
+ "futures",
+ "tokio",
+ "tracing",
+ "tx5-go-pion-sys",
+]
+
+[[package]]
+name = "tx5-go-pion-sys"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f7b3200cad816f2fa336c74c03495b2308233e8232c094a400e1db6114675aa"
+dependencies = [
+ "Inflector",
+ "base64 0.22.1",
+ "libc",
+ "libloading",
+ "once_cell",
+ "ouroboros",
+ "sha2",
+ "tracing",
+ "tx5-core",
+ "zip 0.6.6",
 ]
 
 [[package]]
@@ -8474,7 +8544,7 @@ dependencies = [
  "wat",
  "which 7.0.3",
  "windows-sys 0.59.0",
- "zip",
+ "zip 2.4.2",
 ]
 
 [[package]]
@@ -9360,6 +9430,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.104",
+]
+
+[[package]]
+name = "zip"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "760394e246e4c28189f19d488c058bf16f564016aefac5d32bb1f3b51d5e9261"
+dependencies = [
+ "byteorder",
+ "crc32fast",
+ "crossbeam-utils",
+ "flate2",
 ]
 
 [[package]]

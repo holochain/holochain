@@ -1381,6 +1381,8 @@ impl actor::HcP2p for HolochainP2pActor {
             })
             .collect();
 
+            tracing::info!(?urls, "Publishing {} ops to URLs", op_hash_list.len());
+
             for url in urls {
                 space
                     .publish()

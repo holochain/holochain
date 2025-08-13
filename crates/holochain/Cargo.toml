@@ -29,12 +29,12 @@ hc_deepkey_sdk = { version = "^0.8.5-rc.1", path = "../hc_deepkey_sdk" }
 holo_hash = { version = "^0.5.5-rc.1", path = "../holo_hash", features = [
   "full",
 ] }
-holochain_cascade = { version = "^0.5.5-rc.1", path = "../holochain_cascade" }
+holochain_cascade = { version = "^0.5.5-rc.1", path = "../holochain_cascade", default-features = false }
 holochain_chc = { version = "^0.2.5-rc.1", path = "../holochain_chc", default-features = false }
 holochain_conductor_api = { version = "^0.5.5-rc.1", path = "../holochain_conductor_api" }
 holochain_deepkey_dna = "0.0.8-dev.2"
 holochain_keystore = { version = "^0.5.5-rc.1", path = "../holochain_keystore", default-features = false }
-holochain_p2p = { version = "^0.5.5-rc.1", path = "../holochain_p2p" }
+holochain_p2p = { version = "^0.5.5-rc.1", path = "../holochain_p2p", default-features = false }
 holochain_sqlite = { version = "^0.5.5-rc.1", path = "../holochain_sqlite" }
 holochain_serialized_bytes = "=0.0.56"
 holochain_state = { version = "^0.5.5-rc.1", path = "../holochain_state" }
@@ -54,8 +54,8 @@ holochain_conductor_config = { version = "^0.5.5-rc.1", path = "../holochain_con
 holochain_timestamp = { version = "^0.5.4", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.12" }
-kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "73fe36c078c2f4ab2d16dd5730ec2510331194c4" }
-kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "73fe36c078c2f4ab2d16dd5730ec2510331194c4" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1" }
 mockall = "0.11.3"
 mr_bundle = { version = "^0.5.4", path = "../mr_bundle" }
 must_future = "0.1.1"
@@ -108,7 +108,7 @@ matches = { version = "0.1.8", optional = true }
 holochain_wasm_test_utils = { version = "^0.5.5-rc.1", path = "../test_utils/wasm", optional = true }
 holochain_test_wasm_common = { version = "^0.5.5-rc.1", path = "../test_utils/wasm_common", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
-kitsune2_bootstrap_srv = { git = "https://github.com/holochain/kitsune2", rev = "73fe36c078c2f4ab2d16dd5730ec2510331194c4", optional = true }
+kitsune2_bootstrap_srv = { git = "https://github.com/holochain/kitsune2", rev = "8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1", optional = true }
 async-once-cell = { version = "0.5", optional = true }
 get_if_addrs = { version = "0.5.3", optional = true }
 schemars = "0.8.21"
@@ -187,7 +187,7 @@ path = "src/bin/holochain/main.rs"
 workspace = true
 
 [features]
-default = ["sqlite-encrypted", "metrics_influxive", "wasmer_sys"]
+default = ["sqlite-encrypted", "metrics_influxive", "wasmer_sys", "datachannel-vendored"]
 
 # Use the "Influxive" opentelemetry metrics binding to write metrics
 # to an InfluxDB time series database.
@@ -261,6 +261,22 @@ sqlite = [
   "holochain_state/sqlite",
   "holochain_types/sqlite",
   "holochain_zome_types/sqlite",
+]
+
+backend-libdatachannel = [
+  "holochain_p2p/backend-libdatachannel",
+  "holochain_cascade/backend-libdatachannel",
+]
+
+backend-go-pion = [
+  "holochain_p2p/backend-go-pion",
+  "holochain_cascade/backend-go-pion",
+]
+
+datachannel-vendored = [
+  "backend-libdatachannel",
+  "holochain_p2p/datachannel-vendored",
+  "holochain_cascade/datachannel-vendored",
 ]
 
 # Extremely verbose wasm memory read/write logging

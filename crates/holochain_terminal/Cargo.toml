@@ -31,9 +31,9 @@ holochain_conductor_api = { version = "^0.5.5-rc.1", path = "../holochain_conduc
 holochain_websocket = { version = "^0.5.5-rc.1", path = "../holochain_websocket" }
 holochain_types = { version = "^0.5.5-rc.1", path = "../holochain_types" }
 tokio = { version = "1.36.0", features = ["full"] }
-kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "73fe36c078c2f4ab2d16dd5730ec2510331194c4" }
-kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "73fe36c078c2f4ab2d16dd5730ec2510331194c4" }
-kitsune2_bootstrap_client = { git = "https://github.com/holochain/kitsune2", rev = "73fe36c078c2f4ab2d16dd5730ec2510331194c4" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1" }
+kitsune2_bootstrap_client = { git = "https://github.com/holochain/kitsune2", rev = "8e09443f1fbf06aaea32a0d1729dcc4c2a24efc1" }
 
 [lints]
 workspace = true
