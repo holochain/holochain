@@ -340,11 +340,7 @@ impl SweetConductor {
 
         let dnas_with_proof: Vec<_> = dnas_with_roles
             .iter()
-            .cloned()
-            .map(|dr| {
-                let dna = dr.dna().clone().update_modifiers(Default::default());
-                (dr.replace_dna(dna), None)
-            })
+            .map(|dr| (dr.to_owned(), None))
             .collect();
 
         let agent = self
@@ -357,6 +353,18 @@ impl SweetConductor {
                 flags,
             )
             .await?;
+
+        // Add the dna files to the SweetConductor's dna files cache to be able to re-inject them
+        // when restarting the conductor since inline zomes can't otherwise be persisted across
+        // conductor restarts.
+        let dna_files = dnas_with_roles
+            .iter()
+            .map(|dr| dr.dna())
+            .collect::<Vec<_>>();
+
+        self.add_dna_files_to_sweet_conductor_cache(agent.clone(), dna_files.clone())
+            .await?;
+
         Ok(agent)
     }
 
@@ -444,10 +452,6 @@ impl SweetConductor {
         dnas_with_roles: impl IntoIterator<Item = &'a (impl DnaWithRole + 'a)>,
     ) -> ConductorApiResult<SweetApp> {
         let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
-        let dnas = dnas_with_roles
-            .iter()
-            .map(|dr| dr.dna())
-            .collect::<Vec<_>>();
 
         let agent = self
             .install_and_enable_app(
@@ -456,9 +460,6 @@ impl SweetConductor {
                 dnas_with_roles.as_slice(),
                 None,
             )
-            .await?;
-
-        self.add_dna_files_to_sweet_conductor_cache(agent.clone(), dnas.clone())
             .await?;
 
         let roles = dnas_with_roles
@@ -511,7 +512,6 @@ impl SweetConductor {
     ) -> ConductorApiResult<SweetAppBatch> {
         let agents: Vec<_> = agents.into_iter().collect();
         let dnas_with_roles: Vec<_> = dnas_with_roles.into_iter().cloned().collect();
-        let dnas: Vec<&DnaFile> = dnas_with_roles.iter().map(|dr| dr.dna()).collect();
         let roles: Vec<RoleName> = dnas_with_roles.iter().map(|dr| dr.role()).collect();
 
         for &agent in agents.iter() {
@@ -523,9 +523,6 @@ impl SweetConductor {
                 None,
             )
             .await?;
-
-            self.add_dna_files_to_sweet_conductor_cache(agent.clone(), dnas.clone())
-                .await?;
         }
 
         let mut apps = Vec::new();
@@ -575,6 +572,29 @@ impl SweetConductor {
         let dna_file = self.get_dna_file(&clone.cell_id).unwrap();
         self.dna_files.insert(clone.cell_id.clone(), dna_file);
         Ok(clone)
+    }
+
+    /// Call into the underlying [`Conductor::update_coordinators`] function and update the
+    /// associated [`DnaFile`] in the [`SweetConductor`] such that the up-to-date [`DnaFile`]
+    /// will be loaded into the [`crate::conductor::ribosome_store::RibosomeStore`] in case of
+    /// a conductor restart.
+    pub async fn update_coordinators(
+        &mut self,
+        cell_id: CellId,
+        coordinator_zomes: CoordinatorZomes,
+        wasms: Vec<wasm::DnaWasm>,
+    ) -> ConductorResult<()> {
+        // Update the coordinators in the dna files cache
+        let mut dna_file = self.get_dna_file(&cell_id).unwrap();
+        dna_file
+            .update_coordinators(coordinator_zomes.clone(), wasms.clone())
+            .await
+            .unwrap();
+        self.dna_files.insert(cell_id.clone(), dna_file);
+        // Update the coordinators in the conductor
+        self.raw_handle()
+            .update_coordinators(cell_id.clone(), coordinator_zomes, wasms)
+            .await
     }
 
     /// Get a new websocket client which can send requests over the admin

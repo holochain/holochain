@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Move the logic of adding `DnaFile`s to the dna files cache upon installing apps in a `SweetConductor` up to the `SweetConductor`'s `install_app()` method to ensure that `DnaFile`s also get added to the cache if the `install_app()` method is being used directly.
+- Add an `update_coordinators()` method to the `SweetConductor` that also updates the `DnaFile` associated with the cell whose coordinators got updated in the `SweetConductor`'s dna files cache.
 - **BREAKING CHANGE** The field `dna_hash: DnaHash` in the `UpdateCoordinatorsPayload` of the `UpdateCoordinators` admin call is replaced with a field `cell_id: CellId` ([#5189](https://github.com/holochain/holochain/pull/5189)).
 - **BREAKING CHANGE** The admin call `GetDnaDefinition` now takes a `CellId` as argument instead of a `DnaHash` because there can be two identical DNAs for different agents in the conductor and they were not looked up correctly prior to this change ([#5189](https://github.com/holochain/holochain/pull/5189)).
 - Fixed issue [#2145](https://github.com/holochain/holochain/issues/2145) in ([#5189](https://github.com/holochain/holochain/pull/5189)) by
