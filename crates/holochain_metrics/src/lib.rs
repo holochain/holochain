@@ -95,11 +95,11 @@
 //! | `tx5.conn.data.recv` | `u64_observable_counter` | `By` | Bytes received on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.data.send.message.count` | `u64_observable_counter` | | Message count sent on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `tx5.conn.data.recv.message.count` | `u64_observable_counter` | | Message count received on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
-//! | `hc.holochain_p2p.request.duration`  | `f64_histogram` | `s` | The time spent processing a p2p event. |- `dna_hash`: The DNA hash that this event is being sent on behalf of. |
+//! | `hc.holochain_p2p.request.duration` | `f64_histogram` | `s` | The time spent processing a p2p event. |- `dna_hash`: The DNA hash that this event is being sent on behalf of. |
 //! | `hc.conductor.post_commit.duration` | `f64_histogram` | `s` | The time spent executing a post commit. |- `dna_hash`: The DNA hash that this post commit is running for.<br />- `agent`: The agent running the post commit. |
 //! | `hc.conductor.workflow.duration` | `f64_histogram` | `s` | The time spent running a workflow. |- `workflow`: The name of the workflow.<br />- `dna_hash`: The DNA hash that this workflow is running for.<br />- `agent`: (optional) The agent that this workflow is running for if the workflow is cell bound. |
 //! | `hc.cascade.duration` | `f64_histogram` | `s` | The time taken to execute a cascade query. | |
-//! | `hc.db.pool.utilization` | `f64_gauge` | | The utilisation of connections in the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
+//! | `hc.db.pool.utilization` | `f64_gauge` | | The utilization of connections in the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
 //! | `hc.db.connections.use_time` | `f64_histogram` | `s` | The time between borrowing a connection and returning it to the pool. |- `kind`: The kind of database such as Conductor, Wasm or Dht etc.<br />- `id`: The unique identifier for this database if multiple instances can exist, such as a Dht database. |
 //! | `hc.ribosome.wasm.usage` | `u64_counter` | | The metered usage of a wasm ribosome. | - `dna`: The DNA hash that this wasm is metered for.<br />- `zome`: The zome that this wasm is metered for.<br />- `fn`: The function that this wasm is metered for.<br />- `agent`: The agent that this wasm is metered for (if there is one). |
 
@@ -111,6 +111,75 @@ const DASH_TX5: &[u8] = include_bytes!("dashboards/tx5.json");
 const DASH_DATABASE: &[u8] = include_bytes!("dashboards/database.json");
 #[cfg(feature = "influxive")]
 const DASH_CONDUCTOR: &[u8] = include_bytes!("dashboards/conductor.json");
+
+/// Configuration for holochain metrics set by environment variables.
+enum HolochainMetricsEnv {
+    None,
+    #[cfg(feature = "influxive")]
+    InfluxiveChildSvc,
+    #[cfg(feature = "influxive")]
+    InfluxiveExternal {
+        host: String,
+        bucket: String,
+        token: String,
+    },
+}
+
+impl HolochainMetricsEnv {
+    #[cfg(not(feature = "influxive"))]
+    pub fn load() -> Self {
+        Self::None
+    }
+
+    #[cfg(feature = "influxive")]
+    pub fn load() -> Self {
+        // Environment variable to set for enabling metrics with influxDB run as a child service.
+        const E_CHILD_SVC: &str = "HOLOCHAIN_INFLUXIVE_CHILD_SVC";
+
+        // Environment variable to set for enabling metrics with an externally running influxDB.
+        const E_EXTERNAL: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL";
+        // Environment variable of the external influxDB host to use.
+        const E_EXTERNAL_HOST: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST";
+        // Environment variable of the influxDB bucket to use.
+        const E_EXTERNAL_BUCKET: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET";
+        // Environment variable of the influxDB token to use.
+        const E_EXTERNAL_TOKEN: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_TOKEN";
+
+        if std::env::var_os(E_CHILD_SVC).is_some() {
+            return Self::InfluxiveChildSvc;
+        };
+
+        if std::env::var_os(E_EXTERNAL).is_some() {
+            let host = match std::env::var(E_EXTERNAL_HOST) {
+                Ok(host) => host,
+                Err(err) => {
+                    tracing::error!(env = %E_EXTERNAL_HOST, ?err, "invalid");
+                    return Self::None;
+                }
+            };
+            let bucket = match std::env::var(E_EXTERNAL_BUCKET) {
+                Ok(bucket) => bucket,
+                Err(err) => {
+                    tracing::error!(env = %E_EXTERNAL_BUCKET, ?err, "invalid");
+                    return Self::None;
+                }
+            };
+            let token = match std::env::var(E_EXTERNAL_TOKEN) {
+                Ok(token) => token,
+                Err(err) => {
+                    tracing::error!(env = %E_EXTERNAL_TOKEN, ?err, "invalid");
+                    return Self::None;
+                }
+            };
+            return Self::InfluxiveExternal {
+                host,
+                bucket,
+                token,
+            };
+        }
+        Self::None
+    }
+}
 
 /// Configuration for holochain metrics.
 pub enum HolochainMetricsConfig {
@@ -155,65 +224,43 @@ impl HolochainMetricsConfig {
     /// The output of this function is largely controlled by environment
     /// variables, please see the [crate-level documentation](crate) for usage.
     pub fn new(root_path: &std::path::Path) -> Self {
-        #[cfg(feature = "influxive")]
-        {
-            const E_CHILD_SVC: &str = "HOLOCHAIN_INFLUXIVE_CHILD_SVC";
+        Self::from_env(root_path, HolochainMetricsEnv::load())
+    }
 
-            const E_EXTERNAL: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL";
-            const E_EXTERNAL_HOST: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST";
-            const E_EXTERNAL_BUCKET: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET";
-            const E_EXTERNAL_TOKEN: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_TOKEN";
-
-            if std::env::var_os(E_CHILD_SVC).is_some() {
+    fn from_env(root_path: &std::path::Path, env: HolochainMetricsEnv) -> Self {
+        match env {
+            #[cfg(feature = "influxive")]
+            HolochainMetricsEnv::InfluxiveChildSvc => {
                 let mut database_path = std::path::PathBuf::from(root_path);
                 database_path.push("influxive");
-                return Self::InfluxiveChildSvc {
+                Self::InfluxiveChildSvc {
                     child_svc_config: Box::new(
                         influxive::InfluxiveChildSvcConfig::default()
                             .with_database_path(Some(database_path)),
                     ),
                     otel_config: influxive::InfluxiveMeterProviderConfig::default(),
-                };
+                }
             }
-
-            if std::env::var_os(E_EXTERNAL).is_some() {
-                let host = match std::env::var(E_EXTERNAL_HOST) {
-                    Ok(host) => host,
-                    Err(err) => {
-                        tracing::error!(env = %E_EXTERNAL_HOST, ?err, "invalid");
-                        return Self::Disabled;
-                    }
-                };
-                let bucket = match std::env::var(E_EXTERNAL_BUCKET) {
-                    Ok(bucket) => bucket,
-                    Err(err) => {
-                        tracing::error!(env = %E_EXTERNAL_BUCKET, ?err, "invalid");
-                        return Self::Disabled;
-                    }
-                };
-                let token = match std::env::var(E_EXTERNAL_TOKEN) {
-                    Ok(token) => token,
-                    Err(err) => {
-                        tracing::error!(env = %E_EXTERNAL_TOKEN, ?err, "invalid");
-                        return Self::Disabled;
-                    }
-                };
-                return Self::InfluxiveExternal {
-                    writer_config: influxive::InfluxiveWriterConfig::default(),
-                    otel_config: influxive::InfluxiveMeterProviderConfig::default(),
-                    host,
-                    bucket,
-                    token,
-                };
+            #[cfg(feature = "influxive")]
+            HolochainMetricsEnv::InfluxiveExternal {
+                host,
+                bucket,
+                token,
+            } => Self::InfluxiveExternal {
+                writer_config: influxive::InfluxiveWriterConfig::default(),
+                otel_config: influxive::InfluxiveMeterProviderConfig::default(),
+                host,
+                bucket,
+                token,
+            },
+            HolochainMetricsEnv::None => {
+                #[cfg(not(feature = "influxive"))]
+                {
+                    let _root_path = root_path;
+                }
+                Self::Disabled
             }
         }
-
-        #[cfg(not(feature = "influxive"))]
-        {
-            let _root_path = root_path;
-        }
-
-        Self::Disabled
     }
 
     /// Initialize holochain metrics based on this configuration.
