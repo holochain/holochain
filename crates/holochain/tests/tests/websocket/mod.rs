@@ -1058,9 +1058,7 @@ async fn filter_messages_that_do_not_deserialize() {
         .get_arbitrary_admin_websocket_port()
         .expect("No admin port open on conductor");
 
-    let mut config = WebsocketConfig::CLIENT_DEFAULT;
-    config.default_request_timeout = Duration::from_secs(1);
-    let config = Arc::new(config);
+    let config = Arc::new(WebsocketConfig::CLIENT_DEFAULT);
 
     let (admin_client, rx) = connect(
         config.clone(),
@@ -1078,10 +1076,14 @@ async fn filter_messages_that_do_not_deserialize() {
     let _rx = WsPollRecv::new::<AdminResponse>(rx);
 
     // Try sending an app request to the admin interface
-    admin_client
+    let res = admin_client
         .request::<_, AppResponse>(AppRequest::AppInfo)
         .await
-        .unwrap_err();
+        .unwrap();
+    assert_matches!(
+        res,
+        AppResponse::Error(ExternalApiWireError::Deserialization(_))
+    );
 
     // Now the connection should still be usable
     for _ in 0..5 {
@@ -1111,10 +1113,14 @@ async fn filter_messages_that_do_not_deserialize() {
     authenticate_app_ws_client(app_client.clone(), admin_port, "test".to_string()).await;
 
     // Try sending an admin request to the app interface
-    app_client
+    let res = app_client
         .request::<_, AdminResponse>(AdminRequest::ListDnas)
         .await
-        .unwrap_err();
+        .unwrap();
+    assert_matches!(
+        res,
+        AdminResponse::Error(ExternalApiWireError::Deserialization(_))
+    );
 
     // Now the connection should still be usable
     for _ in 0..5 {
