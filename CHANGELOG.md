@@ -14,6 +14,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Bump holonix rust version to 1.71.1. [\#2660](https://github.com/holochain/holochain/pull/2660)
 - Add `override` to `devSells.holonix` and `packages.holochain` [\#2862](https://github.com/holochain/holochain/pull/2862)
 
+# 20250813.001217
+
+## [hcterm-0.6.0-dev.17](crates/hcterm/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_cli-0.6.0-dev.17](crates/holochain_cli/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_cli\_bundle-0.6.0-dev.17](crates/holochain_cli_bundle/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_cli\_sandbox-0.6.0-dev.17](crates/holochain_cli_sandbox/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_client-0.8.0-dev.14](crates/holochain_client/CHANGELOG.md#0.8.0-dev.14)
+
+## [holochain-0.6.0-dev.17](crates/holochain/CHANGELOG.md#0.6.0-dev.17)
+
+- Move the logic of adding `DnaFile`s to the dna files cache upon installing apps in a `SweetConductor` up to the `SweetConductor`’s `install_app()` method to ensure that `DnaFile`s also get added to the cache if the `install_app()` method is being used directly.
+- Add an `update_coordinators()` method to the `SweetConductor` that also updates the `DnaFile` associated with the cell whose coordinators got updated in the `SweetConductor`’s dna files cache.
+- **BREAKING CHANGE** The field `dna_hash: DnaHash` in the `UpdateCoordinatorsPayload` of the `UpdateCoordinators` admin call is replaced with a field `cell_id: CellId` ([\#5189](https://github.com/holochain/holochain/pull/5189)).
+- **BREAKING CHANGE** The admin call `GetDnaDefinition` now takes a `CellId` as argument instead of a `DnaHash` because there can be two identical DNAs for different agents in the conductor and they were not looked up correctly prior to this change ([\#5189](https://github.com/holochain/holochain/pull/5189)).
+- Fixed issue [\#2145](https://github.com/holochain/holochain/issues/2145) in ([\#5189](https://github.com/holochain/holochain/pull/5189)) by
+  - indexing Ribosomes by cell id instead of by dna hash in the in-memory RibosomeStore
+  - indexing DnaFiles by cell id instead of by dna hash in the DnaDef database on disk
+  - fixing the update\_coordinators() method in the conductor and the associated SQL query to actually update DnaDef’s in the database if a DnaDef already exists in the database for the given cell id.
+- Panic when attempting to bundle a dna from a DnaFile with inline zomes or when attempting to construct a dna manifest from a DnaDef with inline zomes ([\#5185](https://github.com/holochain/holochain/issues/5185)).
+- Refactor chain head coordinator related tests to not rely on the ability to install dnas by specifying the `installed_hash` in the manifest only ([\#5185](https://github.com/holochain/holochain/issues/5185)).
+- **BREAKING CHANGE** Remove support for installing a dna (as part of an app) only by specifying an `installed_hash` and without bundling the actual dna code ([\#5185](https://github.com/holochain/holochain/issues/5185)).
+
+## [holochain\_cascade-0.6.0-dev.17](crates/holochain_cascade/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_conductor\_config-0.6.0-dev.17](crates/holochain_conductor_config/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_test\_wasm\_common-0.6.0-dev.13](crates/holochain_test_wasm_common/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_wasm\_test\_utils-0.6.0-dev.17](crates/holochain_wasm_test_utils/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_websocket-0.6.0-dev.17](crates/holochain_websocket/CHANGELOG.md#0.6.0-dev.17)
+
+## [hdk-0.6.0-dev.13](crates/hdk/CHANGELOG.md#0.6.0-dev.13)
+
+## [holochain\_conductor\_api-0.6.0-dev.17](crates/holochain_conductor_api/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_p2p-0.6.0-dev.17](crates/holochain_p2p/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_state-0.6.0-dev.17](crates/holochain_state/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_chc-0.3.0-dev.17](crates/holochain_chc/CHANGELOG.md#0.3.0-dev.17)
+
+## [holochain\_types-0.6.0-dev.17](crates/holochain_types/CHANGELOG.md#0.6.0-dev.17)
+
+## [holochain\_sqlite-0.6.0-dev.16](crates/holochain_sqlite/CHANGELOG.md#0.6.0-dev.16)
+
 # 20250806.001301
 
 ## [hcterm-0.6.0-dev.16](crates/hcterm/CHANGELOG.md#0.6.0-dev.16)
