@@ -137,40 +137,40 @@ impl HolochainMetricsEnv {
     #[cfg(feature = "influxive")]
     pub fn load() -> Self {
         // Environment variable to set for enabling metrics with influxDB run as a child service.
-        const E_CHILD_SVC: &str = "HOLOCHAIN_INFLUXIVE_CHILD_SVC";
+        const ENV_CHILD_SVC: &str = "HOLOCHAIN_INFLUXIVE_CHILD_SVC";
 
         // Environment variable to set for enabling metrics with an externally running influxDB.
-        const E_EXTERNAL: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL";
+        const ENV_EXTERNAL: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL";
         // Environment variable of the external influxDB host to use.
-        const E_EXTERNAL_HOST: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST";
+        const ENV_EXTERNAL_HOST: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_HOST";
         // Environment variable of the influxDB bucket to use.
-        const E_EXTERNAL_BUCKET: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET";
+        const ENV_EXTERNAL_BUCKET: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_BUCKET";
         // Environment variable of the influxDB token to use.
-        const E_EXTERNAL_TOKEN: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_TOKEN";
+        const ENV_EXTERNAL_TOKEN: &str = "HOLOCHAIN_INFLUXIVE_EXTERNAL_TOKEN";
 
-        if std::env::var_os(E_CHILD_SVC).is_some() {
+        if std::env::var_os(ENV_CHILD_SVC).is_some() {
             return Self::InfluxiveChildSvc;
         };
 
-        if std::env::var_os(E_EXTERNAL).is_some() {
-            let host = match std::env::var(E_EXTERNAL_HOST) {
+        if std::env::var_os(ENV_EXTERNAL).is_some() {
+            let host = match std::env::var(ENV_EXTERNAL_HOST) {
                 Ok(host) => host,
                 Err(err) => {
-                    tracing::error!(env = %E_EXTERNAL_HOST, ?err, "invalid");
+                    tracing::error!(env = %ENV_EXTERNAL_HOST, ?err, "invalid");
                     return Self::None;
                 }
             };
-            let bucket = match std::env::var(E_EXTERNAL_BUCKET) {
+            let bucket = match std::env::var(ENV_EXTERNAL_BUCKET) {
                 Ok(bucket) => bucket,
                 Err(err) => {
-                    tracing::error!(env = %E_EXTERNAL_BUCKET, ?err, "invalid");
+                    tracing::error!(env = %ENV_EXTERNAL_BUCKET, ?err, "invalid");
                     return Self::None;
                 }
             };
-            let token = match std::env::var(E_EXTERNAL_TOKEN) {
+            let token = match std::env::var(ENV_EXTERNAL_TOKEN) {
                 Ok(token) => token,
                 Err(err) => {
-                    tracing::error!(env = %E_EXTERNAL_TOKEN, ?err, "invalid");
+                    tracing::error!(env = %ENV_EXTERNAL_TOKEN, ?err, "invalid");
                     return Self::None;
                 }
             };
