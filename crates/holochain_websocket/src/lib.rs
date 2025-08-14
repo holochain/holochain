@@ -381,6 +381,8 @@ where
 
     /// Received a request from the remote.
     Request(D, WebsocketRespond),
+    /// Received a request that is malformed.
+    BadRequest(WebsocketRespond),
 }
 
 /// Receive signals and requests from a websocket connection.
@@ -498,7 +500,12 @@ impl WebsocketReceiver {
                                 core: core_sync,
                             };
                             let data: D =
-                                SerializedBytes::from(UnsafeBytes::from(data)).try_into()?;
+                                match SerializedBytes::from(UnsafeBytes::from(data)).try_into() {
+                                    Ok(value) => value,
+                                    Err(_) => {
+                                        return Ok(Some(ReceiveMessage::BadRequest(resp)));
+                                    }
+                                };
                             tracing::trace!(?data, %id, "InRequest");
                             Ok(Some(ReceiveMessage::Request(data, resp)))
                         }
