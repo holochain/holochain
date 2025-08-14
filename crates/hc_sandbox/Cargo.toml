@@ -47,8 +47,8 @@ holochain_util = { version = "^0.5.4", path = "../holochain_util", features = [
 ] }
 holochain_nonce = { version = "^0.5.4", path = "../holochain_nonce" }
 holochain_trace = { version = "^0.5.4", path = "../holochain_trace" }
-kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "37b305a885861ce71be612afb827da69563e4097" }
-kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "37b305a885861ce71be612afb827da69563e4097" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "7abf5d34e11398df918e99c5e379bc917ea45a6f" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "7abf5d34e11398df918e99c5e379bc917ea45a6f" }
 nanoid = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"

@@ -31,7 +31,7 @@ thiserror = "1.0"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "37b305a885861ce71be612afb827da69563e4097" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "7abf5d34e11398df918e99c5e379bc917ea45a6f" }
 
 async-trait = "0.1"
 mockall = { version = "0.11.3", optional = true }
