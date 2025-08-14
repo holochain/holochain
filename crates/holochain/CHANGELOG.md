@@ -7,17 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Move the logic of adding `DnaFile`s to the dna files cache upon installing apps in a `SweetConductor` up to the `SweetConductor`'s `install_app()` method to ensure that `DnaFile`s also get added to the cache if the `install_app()` method is being used directly.
-- Add an `update_coordinators()` method to the `SweetConductor` that also updates the `DnaFile` associated with the cell whose coordinators got updated in the `SweetConductor`'s dna files cache.
-- **BREAKING CHANGE** The field `dna_hash: DnaHash` in the `UpdateCoordinatorsPayload` of the `UpdateCoordinators` admin call is replaced with a field `cell_id: CellId` ([#5189](https://github.com/holochain/holochain/pull/5189)).
-- **BREAKING CHANGE** The admin call `GetDnaDefinition` now takes a `CellId` as argument instead of a `DnaHash` because there can be two identical DNAs for different agents in the conductor and they were not looked up correctly prior to this change ([#5189](https://github.com/holochain/holochain/pull/5189)).
-- Fixed issue [#2145](https://github.com/holochain/holochain/issues/2145) in ([#5189](https://github.com/holochain/holochain/pull/5189)) by
+## 0.6.0-dev.17
+
+- Move the logic of adding `DnaFile`s to the dna files cache upon installing apps in a `SweetConductor` up to the `SweetConductor`’s `install_app()` method to ensure that `DnaFile`s also get added to the cache if the `install_app()` method is being used directly.
+- Add an `update_coordinators()` method to the `SweetConductor` that also updates the `DnaFile` associated with the cell whose coordinators got updated in the `SweetConductor`’s dna files cache.
+- **BREAKING CHANGE** The field `dna_hash: DnaHash` in the `UpdateCoordinatorsPayload` of the `UpdateCoordinators` admin call is replaced with a field `cell_id: CellId` ([\#5189](https://github.com/holochain/holochain/pull/5189)).
+- **BREAKING CHANGE** The admin call `GetDnaDefinition` now takes a `CellId` as argument instead of a `DnaHash` because there can be two identical DNAs for different agents in the conductor and they were not looked up correctly prior to this change ([\#5189](https://github.com/holochain/holochain/pull/5189)).
+- Fixed issue [\#2145](https://github.com/holochain/holochain/issues/2145) in ([\#5189](https://github.com/holochain/holochain/pull/5189)) by
   - indexing Ribosomes by cell id instead of by dna hash in the in-memory RibosomeStore
   - indexing DnaFiles by cell id instead of by dna hash in the DnaDef database on disk
-  - fixing the update_coordinators() method in the conductor and the associated SQL query to actually update DnaDef's in the database if a DnaDef already exists in the database for the given cell id.
-- Panic when attempting to bundle a dna from a DnaFile with inline zomes or when attempting to construct a dna manifest from a DnaDef with inline zomes ([#5185](https://github.com/holochain/holochain/issues/5185)).
-- Refactor chain head coordinator related tests to not rely on the ability to install dnas by specifying the `installed_hash` in the manifest only ([#5185](https://github.com/holochain/holochain/issues/5185)).
-- **BREAKING CHANGE** Remove support for installing a dna (as part of an app) only by specifying an `installed_hash` and without bundling the actual dna code ([#5185](https://github.com/holochain/holochain/issues/5185)).
+  - fixing the update\_coordinators() method in the conductor and the associated SQL query to actually update DnaDef’s in the database if a DnaDef already exists in the database for the given cell id.
+- Panic when attempting to bundle a dna from a DnaFile with inline zomes or when attempting to construct a dna manifest from a DnaDef with inline zomes ([\#5185](https://github.com/holochain/holochain/issues/5185)).
+- Refactor chain head coordinator related tests to not rely on the ability to install dnas by specifying the `installed_hash` in the manifest only ([\#5185](https://github.com/holochain/holochain/issues/5185)).
+- **BREAKING CHANGE** Remove support for installing a dna (as part of an app) only by specifying an `installed_hash` and without bundling the actual dna code ([\#5185](https://github.com/holochain/holochain/issues/5185)).
 
 ## 0.6.0-dev.16
 
@@ -569,7 +571,7 @@ Now it serializes to
 - Fix: Countersigning test `lock_chain` which ensures that source chain is locked while in a countersigning session.
 
 - Major refactor of the sys validation workflow to improve reliability and performance:
-
+  
   - Reliability: The workflow will now prioritise validating ops that have their dependencies available locally. As soon as it has finished with those it will trigger app validation before dealing with missing dependencies.
   - Reliability: For ops which have dependencies we aren’t holding locally, the network get will now be retried. This was a cause of undesirable behaviour for validation where a failed get would result in validation for ops with missing dependencies not being retried until new ops arrived. The workflow now retries the get on an interval until it finds dependencies and can proceed with validation.
   - Performance and correctness: A feature which captured and processed ops that were discovered during validation has been removed. This had been added as an attempt to avoid deadlocks within validation but if that happens there’s a bug somewhere else. Sys validation needs to trust that Holochain will correctly manage its current arc and that we will get that data eventually through publishing or gossip. This probably wasn’t doing a lot of harm but it was uneccessary and doing database queries so it should be good to have that gone.
@@ -806,7 +808,7 @@ Now it serializes to
 ## 0.0.154
 
 - Revert: “Add the `hdi_version_req` key:value field to the output of the `--build-info` argument” because it broke. [\#1521](https://github.com/holochain/holochain/pull/1521)
-
+  
   Reason: it causes a build failure of the *holochain*  crate on crates.io
 
 ## 0.0.153
@@ -972,7 +974,7 @@ network:
 - **BREAKING CHANGE** `entry_defs` added to `zome_info` and referenced by macros [PR1055](https://github.com/holochain/holochain/pull/1055)
 
 - **BREAKING CHANGE**: The notion of “cell nicknames” (“nicks”) and “app slots” has been unified into the notion of “app roles”. This introduces several breaking changes. In general, you will need to rebuild any app bundles you are using, and potentially update some usages of the admin interface. In particular:
-
+  
   - The `slots` field in App manifests is now called `roles`
   - The `InstallApp` admin method now takes a `role_id` field instead of a `nick` field
   - In the return value for any admin method which lists installed apps, e.g. `ListEnabledApps`, any reference to `"slots"` is now named `"roles"`
@@ -1002,7 +1004,7 @@ network:
 - `call_info` is now implemented [1047](https://github.com/holochain/holochain/pull/1047)
 
 - `dna_info` now returns `DnaInfo` correctly [\#1044](https://github.com/holochain/holochain/pull/1044)
-
+  
   - `ZomeInfo` no longer includes what is now on `DnaInfo`
   - `ZomeInfo` renames `zome_name` and `zome_id` to `name` and `id`
   - `DnaInfo` includes `name`, `hash`, `properties`
