@@ -25,7 +25,7 @@ fixt = { version = "^0.5.4", path = "../fixt", optional = true }
 futures = { version = "0.3", optional = true }
 holochain_serialized_bytes = { version = "=0.0.56", optional = true }
 holochain_util = { version = "^0.5.4", path = "../holochain_util", default-features = false }
-kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "7abf5d34e11398df918e99c5e379bc917ea45a6f", optional = true }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "3f7c36b410e05787d79b1400b9cd314e67cb8672", optional = true }
 must_future = { version = "0.1", optional = true }
 proptest = { version = "1", optional = true }
 proptest-derive = { version = "0", optional = true }

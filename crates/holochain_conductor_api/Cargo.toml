@@ -22,8 +22,8 @@ holochain_zome_types = { version = "^0.5.5-rc.1", path = "../holochain_zome_type
 holochain_util = { version = "^0.5.4", default-features = false, path = "../holochain_util", features = [
   "jsonschema",
 ] }
-kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "7abf5d34e11398df918e99c5e379bc917ea45a6f" }
-kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "7abf5d34e11398df918e99c5e379bc917ea45a6f" }
+kitsune2_api = { git = "https://github.com/holochain/kitsune2", rev = "3f7c36b410e05787d79b1400b9cd314e67cb8672" }
+kitsune2_core = { git = "https://github.com/holochain/kitsune2", rev = "3f7c36b410e05787d79b1400b9cd314e67cb8672" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
