@@ -37,6 +37,7 @@ members = [
   "crates/hc_demo_cli",
   "crates/hc_service_check",
   "crates/holochain_terminal",
+  "crates/export_ts",
 
   "crates/test_utils/wasm",
   "crates/test_utils/wasm_common",
