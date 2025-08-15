@@ -65,7 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fill_and_save_buffer!(buffer, path, "types.ts", {
         // TODO: Fill in the code that exports types.
         // Recommend creating a new function for each library, as below.
-        types_file_buffer.push_str(output_holo_hash_types().as_str());
+        buffer.push_str(output_holo_hash_types().as_str());
     });
 
     Ok(())
