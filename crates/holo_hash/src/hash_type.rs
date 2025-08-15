@@ -30,7 +30,9 @@ pub trait HashType:
     #[cfg(feature = "export_ts")]
     fn static_hash_name() -> &'static str;
 
-    /// Used in exporting the base HoloHash type to TypeScript.
+    /// Return true for the base HoloHash/HoloHashB64 type, and false for
+    /// concreate alias types (AgentPubKey, DnaHash, etc). Only used when
+    /// exporting the base hash types to TypeScript.
     #[cfg(feature = "export_ts")]
     fn is_base() -> bool;
 }

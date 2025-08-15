@@ -2,6 +2,7 @@
 name = "export_ts"
 version = "0.1.0"
 edition = "2024"
+publish = false
 
 [dependencies]
 holo_hash = { path = "../holo_hash", features = ["encoding", "export_ts"] }

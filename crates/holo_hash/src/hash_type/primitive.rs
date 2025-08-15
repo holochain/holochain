@@ -84,7 +84,7 @@ impl<P: PrimitiveHashType> HashType for P {
     }
 
     fn hash_name(self) -> &'static str {
-        <P as HashType>::static_hash_name()
+        <P as PrimitiveHashType>::static_hash_name()
     }
 
     #[cfg(feature = "export_ts")]

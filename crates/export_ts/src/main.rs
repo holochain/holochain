@@ -27,23 +27,16 @@ macro_rules! fill_and_save_buffer {
 macro_rules! add_type_to_buffer {
     ($type: ty, $buf: ident, $inline_comment: expr) => {
         print!("Exporting {}... ", stringify!($type));
-        let result = <$type as TS>::export_to_string();
-        match result {
-            Ok(out) => {
-                let out_trimmed_l = out.replace(TS_RS_PREAMBLE_STR, "");
-                let out_trimmed = out_trimmed_l.replace("\n", "");
-                $buf.push_str(out_trimmed.as_str());
-                if !$inline_comment.is_empty() {
-                    $buf.push_str(" // ");
-                    $buf.push_str($inline_comment);
-                }
-                $buf.push_str("\n");
-                print!("done.\n");
-            }
-            Err(err) => {
-                print!("Error: {}\n", err);
-            }
+        let out = <$type as TS>::export_to_string()?;
+        let out_trimmed_l = out.strip_prefix(TS_RS_PREAMBLE_STR).unwrap();
+        let out_trimmed = out_trimmed_l.trim();
+        $buf.push_str(out_trimmed);
+        if !$inline_comment.is_empty() {
+            $buf.push_str(" // ");
+            $buf.push_str($inline_comment);
         }
+        $buf.push_str("\n");
+        print!("done.\n");
     };
 
     ($type: ty, $buf: ident) => {
@@ -54,7 +47,7 @@ macro_rules! add_type_to_buffer {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Accept a path to export files to (files will be overwritten)
     // or default to the current working directory.
-    let path_str = args().skip(1).take(1).next().unwrap_or(".".to_string());
+    let path_str = args().nth(1).unwrap_or(".".to_string());
     let path = PathBuf::from(path_str);
 
     print!(
@@ -63,19 +56,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     fill_and_save_buffer!(buffer, path, "types.ts", {
-        // TODO: Fill in the code that exports types.
+        // Fill in the code that exports types.
         // Recommend creating a new function for each library, as below.
-        buffer.push_str(output_holo_hash_types().as_str());
+        buffer.push_str(output_holo_hash_types()?.as_str());
     });
 
     Ok(())
 }
 
-fn output_holo_hash_types() -> String {
+fn output_holo_hash_types() -> Result<String, Box<(dyn std::error::Error + 'static)>> {
     let mut buffer = String::new();
     print!("** holo_hash types\n\n");
     buffer.push_str("/** Raw hash types */\n\n");
-    add_type_to_buffer!(BaseHoloHash, buffer, "length 39");
+    buffer.push_str("/**
+ * Hash types
+ *
+ * All HoloHashes are 39 bytes: a 3-byte multihash prefix, followed by a
+ * 32-byte hash, and finally a 4-byte location.
+ */\n\n");
+    add_type_to_buffer!(BaseHoloHash, buffer);
     add_type_to_buffer!(AgentPubKey, buffer);
     add_type_to_buffer!(DnaHash, buffer);
     add_type_to_buffer!(WasmHash, buffer);
@@ -84,7 +83,11 @@ fn output_holo_hash_types() -> String {
     add_type_to_buffer!(AnyDhtHash, buffer);
     add_type_to_buffer!(AnyLinkableHash, buffer);
     add_type_to_buffer!(ExternalHash, buffer);
-    buffer.push_str("\n/** Base64 hash types */\n\n");
+    buffer.push_str("\n/**
+ * Base64 hash types
+ *
+ * Base64-encoded versions of all the HoloHashes.
+ */\n\n");
     add_type_to_buffer!(BaseHoloHashB64, buffer);
     add_type_to_buffer!(AgentPubKeyB64, buffer);
     add_type_to_buffer!(DnaHashB64, buffer);
@@ -96,5 +99,5 @@ fn output_holo_hash_types() -> String {
     add_type_to_buffer!(ExternalHashB64, buffer);
     print!("Done.\n----------------\n\n");
 
-    buffer
+    Ok(buffer)
 }

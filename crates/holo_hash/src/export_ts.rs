@@ -28,15 +28,15 @@ pub struct BaseHashType;
 
 impl HashType for BaseHashType {
     fn get_prefix(self) -> &'static [u8] {
-        unimplemented!("This hash type should not be used outside of exporting to TypeScript")
+        unreachable!("This hash type should not be used outside of exporting to TypeScript")
     }
 
     fn try_from_prefix(_: &[u8]) -> HoloHashResult<Self> {
-        unimplemented!("This hash type should not be used outside of exporting to TypeScript")
+        unreachable!("This hash type should not be used outside of exporting to TypeScript")
     }
 
     fn hash_name(self) -> &'static str {
-        unimplemented!("This hash type should not be used outside of exporting to TypeScript")
+        unreachable!("This hash type should not be used outside of exporting to TypeScript")
     }
 
     fn static_hash_name() -> &'static str {
@@ -95,16 +95,16 @@ impl<T: HashType> TS for HoloHash<T> {
     }
 
     fn decl() -> String {
-        format!("type {} = {};", Self::name(), Self::inline()).into()
+        format!("type {} = {};", Self::name(), Self::inline())
     }
 
     fn decl_concrete() -> String {
         Self::decl()
     }
 
-    // Not used -- only used to make ts-rs be quiet; otherwise it fails with
-    // an "Error: this type cannot be exported". I suspect this is an upstream
-    // bug but am not interested in fixing it.
+    // Not useful -- only used to make ts-rs be quiet; otherwise it fails with
+    // an "Error: this type cannot be exported". I suspect this ought to be
+    // considered a bug upstream, but am not interested in fixing it.
     fn output_path() -> Option<PathBuf> {
         let mut path = PathBuf::new();
         path.push(".");
@@ -130,13 +130,13 @@ impl<T: HashType> TS for HoloHashB64<T> {
     type OptionInnerType = Self;
 
     fn name() -> String {
-        format!("{}B64", T::static_hash_name()).into()
+        format!("{}B64", T::static_hash_name())
     }
 
     fn inline() -> String {
         match T::is_base() {
             true => "string".into(),
-            false => format!("{}B64", BASE_HASH_NAME).into(),
+            false => format!("{}B64", BASE_HASH_NAME),
         }
     }
 
@@ -145,7 +145,7 @@ impl<T: HashType> TS for HoloHashB64<T> {
     }
 
     fn decl() -> String {
-        format!("type {} = {};", Self::name(), Self::inline()).into()
+        format!("type {} = {};", Self::name(), Self::inline())
     }
 
     fn decl_concrete() -> String {
@@ -194,7 +194,7 @@ mod tests {
             let output = strip_extras(result.unwrap());
             assert_eq!(
                 output,
-                format!("export type {} = HoloHash;", stringify!($hash_type)).to_string()
+                format!("export type {} = HoloHash;", stringify!($hash_type))
             );
         };
     }
