@@ -55,7 +55,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path_str = args().skip(1).take(1).next().unwrap_or(".".to_string());
     let path = PathBuf::from(path_str);
 
-    print!("Outputting typescript types to {}:\n\n", path.display());
+    print!(
+        "Outputting TypeScript types to '{}' folder...\n\n",
+        path.display()
+    );
 
     fill_and_save_buffer!(buffer, path, "types.ts", {
         // TODO: Fill in the code that exports types.
