@@ -26,10 +26,7 @@ async fn metrics_influxive_file() {
     );
     assert!(matches!(
         config,
-        HolochainMetricsConfig::InfluxiveFile {
-            writer_config: _,
-            otel_config: _
-        }
+        HolochainMetricsConfig::InfluxiveFile { .. }
     ));
 
     config.init().await;
@@ -73,10 +70,7 @@ fn metrics_influxive_svc() {
     );
     assert!(matches!(
         config,
-        HolochainMetricsConfig::InfluxiveChildSvc {
-            child_svc_config: _,
-            otel_config: _
-        }
+        HolochainMetricsConfig::InfluxiveChildSvc { .. }
     ));
 }
 
@@ -93,12 +87,6 @@ fn metrics_influxive_external() {
     );
     assert!(matches!(
         config,
-        HolochainMetricsConfig::InfluxiveExternal {
-            writer_config: _,
-            otel_config: _,
-            host: _,
-            bucket: _,
-            token: _,
-        }
+        HolochainMetricsConfig::InfluxiveExternal { .. }
     ));
 }
