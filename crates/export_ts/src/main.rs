@@ -63,16 +63,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fill_and_save_buffer!(buffer, path, "types.ts", {
         // TODO: Fill in the code that exports types.
         // Recommend creating a new function for each library, as below.
-        buffer.push_str(output_types_for_x().as_str());
+        types_file_buffer.push_str(output_holo_hash_types().as_str());
     });
 
     Ok(())
 }
 
-fn output_types_for_x() -> String {
+fn output_holo_hash_types() -> String {
     let mut buffer = String::new();
-    print!("** x types\n\n");
-    // Add lines that use add_type_to_buffer for each type you want to output.
+    print!("** holo_hash types\n\n");
+    buffer.push_str("/** Raw hash types */\n\n");
+    add_type_to_buffer!(BaseHoloHash, buffer, "length 39");
+    add_type_to_buffer!(AgentPubKey, buffer);
+    add_type_to_buffer!(DnaHash, buffer);
+    add_type_to_buffer!(WasmHash, buffer);
+    add_type_to_buffer!(EntryHash, buffer);
+    add_type_to_buffer!(ActionHash, buffer);
+    add_type_to_buffer!(AnyDhtHash, buffer);
+    add_type_to_buffer!(AnyLinkableHash, buffer);
+    add_type_to_buffer!(ExternalHash, buffer);
+    buffer.push_str("\n/** Base64 hash types */\n\n");
+    add_type_to_buffer!(BaseHoloHashB64, buffer);
+    add_type_to_buffer!(AgentPubKeyB64, buffer);
+    add_type_to_buffer!(DnaHashB64, buffer);
+    add_type_to_buffer!(WasmHashB64, buffer);
+    add_type_to_buffer!(EntryHashB64, buffer);
+    add_type_to_buffer!(ActionHashB64, buffer);
+    add_type_to_buffer!(AnyDhtHashB64, buffer);
+    add_type_to_buffer!(AnyLinkableHashB64, buffer);
+    add_type_to_buffer!(ExternalHashB64, buffer);
     print!("Done.\n----------------\n\n");
 
     buffer
