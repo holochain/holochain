@@ -1953,9 +1953,6 @@ dependencies = [
 name = "export_ts"
 version = "0.1.0"
 dependencies = [
- "holo_hash",
- "holochain_types",
- "holochain_zome_types",
  "ts-rs",
 ]
 

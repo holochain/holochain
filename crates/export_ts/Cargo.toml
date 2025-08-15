@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-holo_hash = { path = "../holo_hash", features = ["export_ts"] }
-holochain_types = { path = "../holochain_types", features = ["export_ts"] }
-holochain_zome_types = { path = "../holochain_zome_types", features = ["export_ts"] }
 ts-rs = { version = "11.0.1" }
 
 [lints]
