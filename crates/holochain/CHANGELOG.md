@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix: `hc-sandbox run` dedups indices before proceeding.
+
 ## 0.6.0-dev.17
 
 - Move the logic of adding `DnaFile`s to the dna files cache upon installing apps in a `SweetConductor` up to the `SweetConductor`’s `install_app()` method to ensure that `DnaFile`s also get added to the cache if the `install_app()` method is being used directly.
@@ -28,6 +30,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE**: The admin call `RegisterDna` has been removed ([\#5175](https://github.com/holochain/holochain/pull/5175))
 - As part of the fix below, the Holo hash method `to_k2_op` on a DhtOpHash` has been deprecated and replaced with  `to\_located\_k2\_op\_id\`.
 - Fixes a bug where the wrong DhtOp location was reported to Kitsune2. This resulted in conductors not being able to sync with each other. This change can upgrade existing conductors and new data should sync correctly. However, part of the DHT model gets persisted and to fix bad data in the persisted model, the model has to be wiped and rebuilt. This will result in a short startup delay when upgrading to this version. After the first startup, the startup time should be back to normal.
+- **BREAKING CHANGE**: `hc-sandbox` API and behavior changes:
+  - Remove `--existing-paths` and `--last` options.
+  - When `hc s run <INDICES>` and a sandbox folder from `.hc` is missing, command will abort and display an error message.
+  - When calling `hc s run --all` and a sandbox folder from `.hc` is missing, command will proceed and display a warning for each missing sandbox.
+  - When the `.hc` file is missing, the command will abort and display an error message.
+  - Add new command `hc s remove <INDICES>`
+  - `hc s clean` displays a short message upon completion telling how many paths were removed.
+  - `hc s list` displays a specific message when there are no sandboxes.
 
 ## 0.6.0-dev.15
 
@@ -36,6 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Remove network joining timeout. This used to work with the previous version of kitsune, but now all the `join` call does is to join the local peer store which is a matter of acquiring a write lock on a mutex and doesn’t indicate whether publishing the agent info to the peer store and the bootstrap has been successful.
 - **BREAKING CHANGE**: Remove unused function `get_dependency_apps`.
 - **BREAKING CHANGE**: Rename `AgentMetaInfo` to `PeerMetaInfo` since the info returns meta data for potentially multiple agents at a given peer URL ([\#5164](https://github.com/holochain/holochain/pull/5164)).
+- **BREAKING CHANGE**: `hc-sandbox call` now returns structured data as JSON.
 
 ## 0.6.0-dev.14
 
