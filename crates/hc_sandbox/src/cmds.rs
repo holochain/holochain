@@ -137,8 +137,14 @@ Run `hc sandbox generate --help` or `hc sandbox create --help` for more options.
         } else if !self.indices.is_empty() {
             // Return all sandboxes at provided indices.
             // Return an error if any index is out of bounds or if a sandbox is missing at any given index.
-            let mut selected = Vec::with_capacity(self.indices.len());
-            for i in self.indices {
+            let mut set = std::collections::BTreeSet::new();
+            let dedup_indices = self
+                .indices
+                .into_iter()
+                .filter(|x| set.insert(*x))
+                .collect::<Vec<_>>();
+            let mut selected = Vec::with_capacity(dedup_indices.len());
+            for i in dedup_indices.into_iter() {
                 let Some(result) = sandboxes.get(i) else {
                     return Err(std::io::Error::other(format!(
                         "Index {} is out of bounds.",
@@ -522,6 +528,48 @@ mod tests {
         // This should return an error because one of the sandboxes is invalid
         let result = existing.load(test_dir.to_path_buf());
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_existing_load_duplicate_indices() -> anyhow::Result<()> {
+        // Create a temporary directory for testing
+        let temp_dir = tempfile::tempdir()?;
+        let test_dir = temp_dir.path();
+
+        // Create test sandbox directory
+        let sandbox1 = test_dir.join("sandbox1");
+        fs::create_dir_all(&sandbox1)?;
+
+        // Create conductor config file
+        let config_path1 = ConfigRootPath::from(sandbox1.clone());
+        let config_file_path1 = ConfigFilePath::from(config_path1.clone());
+        fs::create_dir_all(config_file_path1.as_ref().parent().unwrap())?;
+        fs::write(config_file_path1.as_ref(), "dummy config")?;
+
+        // write the path twice to .hc file
+        crate::save::save(
+            test_dir.to_path_buf(),
+            vec![config_path1.clone(), config_path1],
+        )?;
+
+        // Test loading with duplicate indices
+        let existing = Existing {
+            all: false,
+            indices: vec![0, 0],
+        };
+
+        let result = existing.load(test_dir.to_path_buf())?;
+        assert_eq!(result.len(), 1);
+
+        // Test loading with duplicate indices
+        let existing = Existing {
+            all: false,
+            indices: vec![0, 1, 0],
+        };
+        let result = existing.load(test_dir.to_path_buf())?;
+        assert_eq!(result.len(), 2);
 
         Ok(())
     }
