@@ -31,7 +31,7 @@ macro_rules! add_type_to_buffer {
                 let out_trimmed_l = out.replace(TS_RS_PREAMBLE_STR, "");
                 let out_trimmed = out_trimmed_l.replace("\n", "");
                 $buf.push_str(out_trimmed.as_str());
-                if $inline_comment.is_empty() {
+                if !$inline_comment.is_empty() {
                     $buf.push_str(" // ");
                     $buf.push_str($inline_comment);
                 }
