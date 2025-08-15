@@ -165,12 +165,12 @@ impl HolochainMetricsEnv {
             let filepath = match std::env::var(ENV_FILE_PATH) {
                 Ok(host) => host,
                 Err(err) => {
-                    tracing::error!(env = %ENV_FILE_PATH, ?err, "invalid");
+                    tracing::error!(env = %ENV_FILE_PATH, ?err, "ENV_FILE_PATH was invalid");
                     return Self::None;
                 }
             };
             if filepath.is_empty() {
-                tracing::error!(env = %ENV_FILE_PATH, "missing");
+                tracing::error!(env = %ENV_FILE_PATH, "ENV_FILE_PATH was not set");
                 return Self::None;
             }
             return Self::InfluxiveFile { filepath };
