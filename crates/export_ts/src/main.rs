@@ -1,3 +1,5 @@
+use holo_hash::export_ts::*;
+use holo_hash::*;
 use std::env::args;
 use std::fs::write;
 use std::path::PathBuf;

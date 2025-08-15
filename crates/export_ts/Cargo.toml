@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+holo_hash = { path = "../holo_hash", features = ["encoding", "export_ts"] }
 ts-rs = { version = "11.0.1" }
 
 [lints]

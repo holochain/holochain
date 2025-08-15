@@ -1953,6 +1953,7 @@ dependencies = [
 name = "export_ts"
 version = "0.1.0"
 dependencies = [
+ "holo_hash",
  "ts-rs",
 ]
 
