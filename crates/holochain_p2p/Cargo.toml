@@ -40,10 +40,10 @@ tokio-stream = "0.1"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = "0.1.13"
-kitsune2_api = "0.1.13"
-kitsune2_core = "0.1.13"
-kitsune2_gossip = "0.1.13"
+kitsune2 = "0.1.14"
+kitsune2_api = "0.1.14"
+kitsune2_core = "0.1.14"
+kitsune2_gossip = "0.1.14"
 bytes = "1.10"
 holochain_sqlite = { version = "^0.5.5-rc.1", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.2"
@@ -61,6 +61,7 @@ holochain_sqlite = { version = "^0.5.5-rc.1", path = "../holochain_sqlite", feat
 workspace = true
 
 [features]
+default = ["datachannel-vendored"]
 
 test_utils = [
   "holochain_zome_types/test_utils",
@@ -76,6 +77,15 @@ sqlite-encrypted = [
 ]
 sqlite = ["holo_hash/sqlite", "holochain_keystore/sqlite"]
 
-# Enables tracing instrumentation 
+backend-libdatachannel = ["kitsune2/backend-libdatachannel"]
+
+backend-go-pion = ["kitsune2/backend-go-pion"]
+
+datachannel-vendored = [
+  "backend-libdatachannel",
+  "kitsune2/datachannel-vendored",
+]
+
+# Enables tracing instrumentation
 # (we experience segfaults in some tests if there is too much instrumentation)
 instrument = []
