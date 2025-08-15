@@ -1,5 +1,5 @@
-use holo_hash::*;
 use holo_hash::export_ts::*;
+use holo_hash::*;
 use std::env::args;
 use std::fs::write;
 use std::path::PathBuf;
@@ -38,8 +38,7 @@ macro_rules! add_type_to_buffer {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Accept a path to export files to (files will be overwritten)
     // or default to the current working directory.
-    let path_str = args().skip(1).take(1).next()
-        .unwrap_or(".".to_string());
+    let path_str = args().skip(1).take(1).next().unwrap_or(".".to_string());
     let path = PathBuf::from(path_str);
 
     print!("Outputting typescript types to {}:\n\n", path.display());
@@ -55,7 +54,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Write all the types we've collected into types.ts.
     let mut types_file_path = path.clone();
     types_file_path.push("types.ts");
-    write(types_file_path.into_os_string().into_string().unwrap(), types_file_buffer.as_str())?;
+    write(
+        types_file_path.into_os_string().into_string().unwrap(),
+        types_file_buffer.as_str(),
+    )?;
 
     Ok(())
 }
