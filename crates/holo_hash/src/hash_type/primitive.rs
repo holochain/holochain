@@ -61,6 +61,9 @@ pub trait PrimitiveHashType: HashType {
     fn static_prefix() -> &'static [u8];
 
     /// Get a Display-worthy name for this hash type
+    fn static_hash_name() -> &'static str;
+
+    /// Get a Display-worthy name for this hash type
     fn hash_name(self) -> &'static str;
 }
 
@@ -81,8 +84,14 @@ impl<P: PrimitiveHashType> HashType for P {
     }
 
     fn hash_name(self) -> &'static str {
-        PrimitiveHashType::hash_name(self)
+        <P as HashType>::static_hash_name()
     }
+
+    #[cfg(feature = "export_ts")]
+    fn static_hash_name() -> &'static str { <P as PrimitiveHashType>::static_hash_name() }
+
+    #[cfg(feature = "export_ts")]
+    fn is_base() -> bool { false }
 }
 
 macro_rules! primitive_hash_type {
@@ -100,8 +109,12 @@ macro_rules! primitive_hash_type {
                 &$prefix
             }
 
-            fn hash_name(self) -> &'static str {
+            fn static_hash_name() -> &'static str {
                 stringify!($display)
+            }
+
+            fn hash_name(self) -> &'static str {
+                <Self as PrimitiveHashType>::static_hash_name()
             }
         }
 
@@ -161,6 +174,9 @@ macro_rules! primitive_hash_type {
         }
     };
 }
+
+// NOTE: As you add new hash types, add any ones that are exposed to clients
+// into crates/export_ts/src/main.ts, in the function output_holo_hash_types.
 
 primitive_hash_type!(Agent, AgentPubKey, AgentVisitor, AGENT_PREFIX);
 primitive_hash_type!(Entry, EntryHash, EntryVisitor, ENTRY_PREFIX);

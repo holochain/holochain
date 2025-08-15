@@ -23,6 +23,16 @@ pub trait HashType:
 
     /// Get a Display-worthy name for this hash type
     fn hash_name(self) -> &'static str;
+
+    /// Get a Display-worthy name for this hash type without needing an
+    /// instance. Currently only used in exporting hash types to TypeScript
+    /// definitions.
+    #[cfg(feature = "export_ts")]
+    fn static_hash_name() -> &'static str;
+
+    /// Used in exporting the base HoloHash type to TypeScript.
+    #[cfg(feature = "export_ts")]
+    fn is_base() -> bool;
 }
 
 /// HashTypes whose content are hashable synchronously, i.e. the content is guaranteed to be small

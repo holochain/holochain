@@ -67,6 +67,8 @@ impl<T: HashType> schemars::JsonSchema for HoloHashB64<T> {
 
 // NB: These could be macroized, but if we spell it out, we get better IDE
 // support
+// NOTE: As you add new hash types, add any ones that are exposed to clients
+// into crates/export_ts/src/main.ts, in the function output_holo_hash_types.
 
 /// Base64-ready version of AgentPubKey
 pub type AgentPubKeyB64 = HoloHashB64<hash_type::Agent>;

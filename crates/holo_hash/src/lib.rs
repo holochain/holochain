@@ -70,3 +70,8 @@ pub use hash_ext::*;
 // provides fixturators for all hash types
 #[cfg(feature = "fixturators")]
 pub mod fixt;
+
+/// feature: export_ts
+/// Provides TypeScript typedef conversion functions for this crate's types.
+#[cfg(feature = "export_ts")]
+pub mod export_ts;

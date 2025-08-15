@@ -64,7 +64,8 @@ macro_rules! assert_length {
 /// plus 4 bytes representing a DHT location. It also contains a zero-sized
 /// type which specifies what it is a hash of.
 ///
-/// There is custom de/serialization implemented in [ser.rs]
+/// There is custom de/serialization implemented in [ser.rs] and custom
+/// TypeScript export implemented in [export_ts.rs].
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HoloHash<T: HashType> {
     hash: Vec<u8>,

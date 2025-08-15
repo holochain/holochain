@@ -5,6 +5,9 @@ use std::convert::TryInto;
 #[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
 
+// NOTE: As you add new hash types, add any ones that are exposed to clients
+// into crates/export_ts/src/main.ts, in the function output_holo_hash_types.
+
 /// The AnyDht (composite) HashType
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(
@@ -39,8 +42,14 @@ impl HashType for AnyDht {
     }
 
     fn hash_name(self) -> &'static str {
-        "AnyDhtHash"
+        Self::static_hash_name()
     }
+
+    #[cfg(feature = "export_ts")]
+    fn static_hash_name() -> &'static str { "AnyDhtHash" }
+
+    #[cfg(feature = "export_ts")]
+    fn is_base() -> bool { false }
 }
 
 impl HashTypeAsync for AnyDht {}
@@ -112,8 +121,14 @@ impl HashType for AnyLinkable {
     }
 
     fn hash_name(self) -> &'static str {
-        "AnyLinkableHash"
+        Self::static_hash_name()
     }
+
+    #[cfg(feature = "export_ts")]
+    fn static_hash_name() -> &'static str { "AnyLinkableHash" }
+
+    #[cfg(feature = "export_ts")]
+    fn is_base() -> bool { false }
 }
 
 impl HashTypeSync for AnyLinkable {}
