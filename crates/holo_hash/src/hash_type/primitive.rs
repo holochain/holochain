@@ -96,7 +96,11 @@ impl<P: PrimitiveHashType> HashType for P {
 
 macro_rules! primitive_hash_type {
     ($name: ident, $display: ident, $visitor: ident, $prefix: ident) => {
-        /// The $name PrimitiveHashType
+        #[doc = "The [`PrimitiveHashType`] for [`"]
+        #[doc = stringify!($display)]
+        #[doc = "`]("]
+        #[doc = concat!("crate::", stringify!($display))]
+        #[doc = ")"]
         #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
         pub struct $name;
 
