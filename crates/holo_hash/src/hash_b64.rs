@@ -91,6 +91,9 @@ pub type NetIdHashB64 = HoloHashB64<hash_type::NetId>;
 /// Base64-ready version of WasmHash
 pub type WasmHashB64 = HoloHashB64<hash_type::Wasm>;
 
+/// Base64-ready version of WarrantHash
+pub type WarrantHashB64 = HoloHashB64<hash_type::Warrant>;
+
 /// Base64-ready version of ExternalHash
 pub type ExternalHashB64 = HoloHashB64<hash_type::External>;
 
