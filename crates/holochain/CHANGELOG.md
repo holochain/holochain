@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Update Kitsune2 to 0.2.15 and tx5 to 0.7.1 to get various bugfixes.
+- As part of the tx5 update, go-pion has been upgraded to v4, and as part of the Kitsune2 update, there are now features
+  to allow either libdatachannel or go-pion to be used as the WebRTC backend. The default is still libdatachannel.
+
 ## 0.6.0-dev.17
 
 - Move the logic of adding `DnaFile`s to the dna files cache upon installing apps in a `SweetConductor` up to the `SweetConductor`’s `install_app()` method to ensure that `DnaFile`s also get added to the cache if the `install_app()` method is being used directly.
