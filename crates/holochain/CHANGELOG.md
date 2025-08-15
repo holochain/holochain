@@ -7,9 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.5.5-rc.2
+
 - Update Kitsune2 to 0.1.14 and tx5 to 0.3.11 to get various bugfixes.
-- As part of the tx5 update, go-pion has been upgraded to v4, and as part of the Kitsune2 update, there are now features
-  to allow either libdatachannel or go-pion to be used as the WebRTC backend. The default is still libdatachannel.
+- As part of the tx5 update, go-pion has been upgraded to v4, and as part of the Kitsune2 update, there are now features to allow either libdatachannel or go-pion to be used as the WebRTC backend. The default is still libdatachannel.
 
 ## 0.5.5-rc.1
 

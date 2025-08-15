@@ -1,6 +1,6 @@
 [package]
 name = "holochain_chc"
-version = "0.2.5-rc.1"
+version = "0.2.5-rc.2"
 description = "Defines the Chain Head Coordinator (CHC) API for Holochain and provides an HTTP client implementation."
 license = "Apache-2.0"
 homepage = "https://github.com/holochain/holochain"
@@ -14,9 +14,9 @@ async-trait = "0.1"
 derive_more = "0.99"
 futures = "0.3"
 getrandom = "0.2.7"
-holochain_keystore = { version = "^0.5.5-rc.1", path = "../holochain_keystore", default-features = false }
+holochain_keystore = { version = "^0.5.5-rc.2", path = "../holochain_keystore", default-features = false }
 holochain_nonce = { version = "^0.5.4", path = "../holochain_nonce" }
-holochain_types = { path = "../holochain_types", version = "^0.5.5-rc.1" }
+holochain_types = { path = "../holochain_types", version = "^0.5.5-rc.2"}
 one_err = "0.0.8"
 must_future = "0.1.1"
 parking_lot = "0.12"
@@ -28,7 +28,7 @@ tracing = "0.1"
 url = "2.4"
 
 holochain_serialized_bytes = { version = "=0.0.56", optional = true }
-holo_hash = { version = "^0.5.5-rc.1", path = "../holo_hash", optional = true }
+holo_hash = { version = "^0.5.5-rc.2", path = "../holo_hash", optional = true }
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
