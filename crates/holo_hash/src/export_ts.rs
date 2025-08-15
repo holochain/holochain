@@ -10,7 +10,9 @@
 
 use std::path::PathBuf;
 use ts_rs::TS;
-use crate::{HashType, HoloHash, HoloHashB64, HoloHashResult};
+use crate::{HashType, HoloHash, HoloHashResult};
+#[cfg(feature = "encoding")]
+use crate::HoloHashB64;
 
 // RAW HASH TYPES
 
@@ -106,6 +108,7 @@ pub type BaseHoloHash = HoloHash<BaseHashType>;
 
 // BASE64-ENCODED HASH TYPES
 
+#[cfg(feature = "encoding")]
 impl<T: HashType> TS for HoloHashB64<T> {
     type WithoutGenerics = HoloHashB64<BaseHashType>;
     type OptionInnerType = Self;
@@ -147,4 +150,5 @@ impl<T: HashType> TS for HoloHashB64<T> {
 }
 
 /// The base type for all Base64-encoded hashes.
+#[cfg(feature = "encoding")]
 pub type BaseHoloHashB64 = HoloHashB64<BaseHashType>;
