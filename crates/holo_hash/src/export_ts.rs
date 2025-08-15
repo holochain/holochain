@@ -8,11 +8,11 @@
 //! Rust types and their serde implementations, because those implementations
 //! are custom rather than simple proc macros.
 
-use std::path::PathBuf;
-use ts_rs::TS;
-use crate::{HashType, HoloHash, HoloHashResult};
 #[cfg(feature = "encoding")]
 use crate::HoloHashB64;
+use crate::{HashType, HoloHash, HoloHashResult};
+use std::path::PathBuf;
+use ts_rs::TS;
 
 // RAW HASH TYPES
 
@@ -27,30 +27,46 @@ pub(crate) const BASE_HASH_NAME: &str = "HoloHash";
 pub struct BaseHashType;
 
 impl HashType for BaseHashType {
-    fn get_prefix(self) -> &'static [u8] { unimplemented!("This hash type should not be used outside of exporting to TypeScript") }
+    fn get_prefix(self) -> &'static [u8] {
+        unimplemented!("This hash type should not be used outside of exporting to TypeScript")
+    }
 
-    fn try_from_prefix(_: &[u8]) -> HoloHashResult<Self> { unimplemented!("This hash type should not be used outside of exporting to TypeScript") }
+    fn try_from_prefix(_: &[u8]) -> HoloHashResult<Self> {
+        unimplemented!("This hash type should not be used outside of exporting to TypeScript")
+    }
 
-    fn hash_name(self) -> &'static str { unimplemented!("This hash type should not be used outside of exporting to TypeScript") }
+    fn hash_name(self) -> &'static str {
+        unimplemented!("This hash type should not be used outside of exporting to TypeScript")
+    }
 
-    fn static_hash_name() -> &'static str { BASE_HASH_NAME }
+    fn static_hash_name() -> &'static str {
+        BASE_HASH_NAME
+    }
 
-    fn is_base() -> bool { true }
+    fn is_base() -> bool {
+        true
+    }
 }
 
 impl TS for BaseHashType {
     type WithoutGenerics = Self;
     type OptionInnerType = Self;
 
-    fn name() -> String { "".into() }
+    fn name() -> String {
+        "".into()
+    }
 
-    fn inline() -> String { "".into() }
+    fn inline() -> String {
+        "".into()
+    }
 
     fn inline_flattened() -> String {
         Self::inline()
     }
 
-    fn decl() -> String { "".into() }
+    fn decl() -> String {
+        "".into()
+    }
 
     fn decl_concrete() -> String {
         Self::decl()
@@ -176,8 +192,11 @@ mod tests {
             let result = $hash_type::export_to_string();
             assert!(result.is_ok());
             let output = strip_extras(result.unwrap());
-            assert_eq!(output, format!("export type {} = HoloHash;", stringify!($hash_type)).to_string());
-        }
+            assert_eq!(
+                output,
+                format!("export type {} = HoloHash;", stringify!($hash_type)).to_string()
+            );
+        };
     }
 
     #[test]
@@ -212,8 +231,11 @@ mod tests {
             let result = $hash_type::export_to_string();
             assert!(result.is_ok());
             let output = strip_extras(result.unwrap());
-            assert_eq!(output, format!("export type {} = HoloHashB64;", stringify!($hash_type)).to_string());
-        }
+            assert_eq!(
+                output,
+                format!("export type {} = HoloHashB64;", stringify!($hash_type)).to_string()
+            );
+        };
     }
 
     #[test]

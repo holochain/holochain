@@ -88,10 +88,14 @@ impl<P: PrimitiveHashType> HashType for P {
     }
 
     #[cfg(feature = "export_ts")]
-    fn static_hash_name() -> &'static str { <P as PrimitiveHashType>::static_hash_name() }
+    fn static_hash_name() -> &'static str {
+        <P as PrimitiveHashType>::static_hash_name()
+    }
 
     #[cfg(feature = "export_ts")]
-    fn is_base() -> bool { false }
+    fn is_base() -> bool {
+        false
+    }
 }
 
 macro_rules! primitive_hash_type {

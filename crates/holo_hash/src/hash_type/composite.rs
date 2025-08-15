@@ -46,10 +46,14 @@ impl HashType for AnyDht {
     }
 
     #[cfg(feature = "export_ts")]
-    fn static_hash_name() -> &'static str { "AnyDhtHash" }
+    fn static_hash_name() -> &'static str {
+        "AnyDhtHash"
+    }
 
     #[cfg(feature = "export_ts")]
-    fn is_base() -> bool { false }
+    fn is_base() -> bool {
+        false
+    }
 }
 
 impl HashTypeAsync for AnyDht {}
@@ -125,10 +129,14 @@ impl HashType for AnyLinkable {
     }
 
     #[cfg(feature = "export_ts")]
-    fn static_hash_name() -> &'static str { "AnyLinkableHash" }
+    fn static_hash_name() -> &'static str {
+        "AnyLinkableHash"
+    }
 
     #[cfg(feature = "export_ts")]
-    fn is_base() -> bool { false }
+    fn is_base() -> bool {
+        false
+    }
 }
 
 impl HashTypeSync for AnyLinkable {}
