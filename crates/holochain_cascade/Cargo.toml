@@ -17,7 +17,7 @@ holo_hash = { version = "^0.6.0-dev.9", path = "../holo_hash", features = [
 ] }
 holochain_chc = { version = "^0.3.0-dev.17", path = "../holochain_chc" }
 holochain_sqlite = { version = "^0.6.0-dev.16", path = "../holochain_sqlite" }
-holochain_p2p = { version = "^0.6.0-dev.17", path = "../holochain_p2p" }
+holochain_p2p = { version = "^0.6.0-dev.17", default-features = false, path = "../holochain_p2p" }
 holochain_serialized_bytes = "=0.0.56"
 holochain_state = { version = "^0.6.0-dev.17", path = "../holochain_state" }
 holochain_types = { version = "^0.6.0-dev.17", path = "../holochain_types" }
@@ -30,7 +30,7 @@ thiserror = "2.0"
 tracing = "0.1"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2_api = "0.2.12"
+kitsune2_api = "0.2.15"
 
 async-trait = "0.1"
 mockall = { version = "0.13", optional = true }
@@ -46,7 +46,7 @@ test-case = "3.3"
 workspace = true
 
 [features]
-default = []
+default = ["datachannel-vendored"]
 
 test_utils = [
   "mockall",
@@ -71,6 +71,15 @@ sqlite = [
   "holochain_state/sqlite",
   "holochain_types/sqlite",
   "holochain_zome_types/sqlite",
+]
+
+backend-libdatachannel = ["holochain_p2p/backend-libdatachannel"]
+
+backend-go-pion = ["holochain_p2p/backend-go-pion"]
+
+datachannel-vendored = [
+  "backend-libdatachannel",
+  "holochain_p2p/datachannel-vendored",
 ]
 
 unstable-warrants = ["holochain_state/unstable-warrants"]
