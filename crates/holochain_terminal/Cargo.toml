@@ -31,9 +31,9 @@ holochain_util = { version = "^0.6.0-dev.3", path = "../holochain_util" }
 holochain_conductor_api = { version = "^0.6.0-dev.17", path = "../holochain_conductor_api" }
 holochain_types = { version = "^0.6.0-dev.17", path = "../holochain_types" }
 tokio = { version = "1.36.0", features = ["full"] }
-kitsune2_api = "0.2.12"
-kitsune2_core = "0.2.12"
-kitsune2_bootstrap_client = "0.2.12"
+kitsune2_api = "0.2.15"
+kitsune2_core = "0.2.15"
+kitsune2_bootstrap_client = "0.2.15"
 
 [lints]
 workspace = true
