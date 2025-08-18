@@ -13,8 +13,12 @@ use holochain_zome_types::signal::AppSignal;
 use tokio::sync::broadcast;
 use tokio::time::error::Elapsed;
 
+const SCHEDULED_FN: &str = "scheduled";
+const SCHEDULING_FN: &str = "start";
+const COORDINATOR: &str = "coordinator";
+
 /// Test schedule ephemeral fn
-/// Assuming a schedular interval of 100ms
+/// Assuming a scheduler interval of 100ms
 #[tokio::test(flavor = "multi_thread")]
 async fn schedule_ephemeral_ok() {
     holochain_trace::test_run();
@@ -45,7 +49,7 @@ async fn schedule_ephemeral_ok() {
 
     // Start test: schedule function
     conductor
-        .call::<(), ()>(&cell.zome("coordinator"), "start", ())
+        .call::<(), ()>(&cell.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
     // Scheduled function is first called with None input.
     // Then should be called with decreasing durations until it gets unscheduled.
@@ -67,7 +71,7 @@ async fn schedule_ephemeral_ok() {
 }
 
 /// Test schedule ephemeral function which gives an error
-/// Assuming a schedular interval of 100ms
+/// Assuming a scheduler interval of 100ms
 #[tokio::test(flavor = "multi_thread")]
 async fn schedule_ephemeral_error() {
     holochain_trace::test_run();
@@ -93,7 +97,7 @@ async fn schedule_ephemeral_error() {
 
     // Start test: schedule function
     conductor
-        .call::<(), ()>(&cell.zome("coordinator"), "start", ())
+        .call::<(), ()>(&cell.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
 
     // Scheduled function is first called with None input.
@@ -105,11 +109,12 @@ async fn schedule_ephemeral_error() {
     assert!(!is_scheduled(&host_fn_caller, &cell).await);
 }
 
-/// Test schedule persisted function with changing crontab
-/// Assuming a schedular interval of 100ms
+/// Test schedule a persisted function that changes the crontab a couple of times
+/// before unscheduling.
+/// Assuming a scheduler interval of 100ms
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Test not passing ; awaiting bug fix"]
-async fn schedule_persisted_ok() {
+async fn schedule_persisted_fn_then_unschedule() {
     holochain_trace::test_run();
 
     // Start with a crontab that triggers every 3 secs, then decrease frequency by 1 sec
@@ -141,7 +146,7 @@ async fn schedule_persisted_ok() {
 
     // Start test: schedule function
     conductor
-        .call::<(), ()>(&cell.zome("coordinator"), "start", ())
+        .call::<(), ()>(&cell.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
 
     // Scheduled function is first called with None input.
@@ -161,11 +166,11 @@ async fn schedule_persisted_ok() {
     assert!(!is_scheduled(&host_fn_caller, &cell).await);
 }
 
-/// Test persisted schedule with invalid crontab output
-/// Assuming a schedular interval of 100ms
+/// Test persisted schedule with invalid crontab output which should unschedule the function.
+/// Assuming a scheduler interval of 100ms
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Test not passing ; awaiting bug fix"]
-async fn schedule_persisted_bad_crontab() {
+async fn schedule_persisted_fn_with_bad_crontab() {
     holochain_trace::test_run();
 
     // Start with a valid crontab then set an invalid one.
@@ -186,7 +191,7 @@ async fn schedule_persisted_bad_crontab() {
         HostFnCaller::create_for_zome(cell.cell_id(), &conductor.raw_handle(), &dna.0, 0).await;
 
     conductor
-        .call::<(), ()>(&cell.zome("coordinator"), "start", ())
+        .call::<(), ()>(&cell.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
 
     // Scheduled function is first called with None input
@@ -200,11 +205,11 @@ async fn schedule_persisted_bad_crontab() {
     assert!(!is_scheduled(&host_fn_caller, &cell).await);
 }
 
-/// Test schedule persisted function which gives an error
-/// Assuming a schedular interval of 100ms
+/// Test schedule persisted function which gives an error, which should unschedule the function.
+/// Assuming a scheduler interval of 100ms
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Test not passing ; awaiting bug fix"]
-async fn schedule_persisted_error() {
+async fn schedule_persisted_fn_that_errors() {
     holochain_trace::test_run();
 
     // Start with a crontab that triggers every second, then have it return an error.
@@ -228,7 +233,7 @@ async fn schedule_persisted_error() {
 
     // Start test: schedule function
     conductor
-        .call::<(), ()>(&cell.zome("coordinator"), "start", ())
+        .call::<(), ()>(&cell.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
 
     // Scheduled function is first called with None input.
@@ -268,7 +273,7 @@ async fn schedule_persisted_crontab_end() {
 
     // Start test: schedule function
     conductor
-        .call::<(), ()>(&cell.zome("coordinator"), "start", ())
+        .call::<(), ()>(&cell.zome(COORDINATOR), SCHEDULING_FN, ())
         .await;
     // Should be scheduled
     assert!(is_scheduled(&host_fn_caller, &cell).await);
@@ -310,7 +315,7 @@ async fn schedule_persisted_expired() {
             schedule_fn(
                 txn,
                 &pubkey,
-                ScheduledFn::new("coordinator".into(), "scheduled".into()),
+                ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
                 Some(Schedule::Persisted("0 * * * * * *".into())), // every minute
                 expired,
             )
@@ -326,23 +331,23 @@ async fn schedule_persisted_expired() {
     assert!(is_scheduled(&host_fn_caller, &cell).await);
 }
 
-/// Helper for creating a zome with just one schedulable function called "scheduled"
-/// that can be scheduled by calling "start"
+/// Helper for creating a zome with just one schedulable function called [`SCHEDULED_FN`]
+/// that can be scheduled by calling [`SCHEDULING_FN`]
 fn create_schedule_zome(
     func: impl Fn(BoxApi, Option<Schedule>) -> InlineZomeResult<Option<Schedule>>
         + 'static
         + Send
         + Sync,
 ) -> InlineZomeSet {
-    InlineZomeSet::new_unique_single("integrity", "coordinator", vec![], 0)
-        .function::<_, (), ()>("coordinator", "start", |api, _| {
-            let _ = api.schedule("scheduled".to_string());
+    InlineZomeSet::new_unique_single("integrity", COORDINATOR, vec![], 0)
+        .function::<_, (), ()>(COORDINATOR, SCHEDULING_FN, |api, _| {
+            let _ = api.schedule(SCHEDULED_FN.to_string());
             Ok(())
         })
-        .function::<_, Option<Schedule>, Option<Schedule>>("coordinator", "scheduled", func)
+        .function::<_, Option<Schedule>, Option<Schedule>>(COORDINATOR, SCHEDULED_FN, func)
 }
 
-/// Helper for checking if a function is scheduled
+/// Helper for checking if [`SCHEDULED_FN`] function has been scheduled
 async fn is_scheduled(host_fn_caller: &HostFnCaller, cell: &SweetCell) -> bool {
     let pubkey = cell.cell_id().agent_pubkey().clone();
     host_fn_caller
@@ -352,7 +357,7 @@ async fn is_scheduled(host_fn_caller: &HostFnCaller, cell: &SweetCell) -> bool {
                 Result::<bool, DatabaseError>::Ok(
                     fn_is_scheduled(
                         txn,
-                        ScheduledFn::new("coordinator".into(), "scheduled".into()),
+                        ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
                         &pubkey,
                     )
                     .unwrap(),
