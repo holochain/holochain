@@ -1,6 +1,6 @@
 [package]
 name = "hc_deepkey_types"
-version = "0.9.5-rc.2"
+version = "0.9.5-rc.3"
 authors = ["Matthew Brisebois <matthew.brisebois@holo.host>"]
 edition = "2021"
 license = "Apache-2.0"
@@ -11,12 +11,12 @@ readme = "README.md"
 
 [dependencies]
 # TODO: remove path designation to allow this crate to trail behind the current monorepo version
-hdi = { version = "^0.6.5-rc.2", path = "../hdi" }
-holo_hash = { version = "^0.5.5-rc.2", path = "../holo_hash", features = [
+hdi = { version = "^0.6.5-rc.3", path = "../hdi" }
+holo_hash = { version = "^0.5.5-rc.3", path = "../holo_hash", features = [
   "hashing",
   "encoding",
 ] }
-holochain_integrity_types = { version = "^0.5.5-rc.2", path = "../holochain_integrity_types" }
+holochain_integrity_types = { version = "^0.5.5-rc.3", path = "../holochain_integrity_types" }
 rmpv = { version = "1", features = ["with-serde"] }
 serde = "1"
 holochain_serialized_bytes = "=0.0.56"
