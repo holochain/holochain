@@ -1,6 +1,6 @@
 [package]
 name = "holochain_conductor_api"
-version = "0.6.0-dev.16"
+version = "0.6.0-dev.17"
 description = "Message types for Holochain admin and app interface protocols"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -10,21 +10,21 @@ edition = "2021"
 
 # reminder - do not use workspace deps
 [dependencies]
-kitsune2_transport_tx5 = { version = "0.2.12", optional = true }
+kitsune2_transport_tx5 = { version = "0.2.15", optional = true }
 derive_more = { version = "2.0", features = ["from"] }
 holo_hash = { version = "^0.6.0-dev.9", path = "../holo_hash", features = [
   "full",
 ] }
 holochain_state_types = { version = "^0.6.0-dev.10", path = "../holochain_state_types" }
 holochain_serialized_bytes = "=0.0.56"
-holochain_types = { version = "^0.6.0-dev.16", path = "../holochain_types" }
+holochain_types = { version = "^0.6.0-dev.17", path = "../holochain_types" }
 holochain_zome_types = { version = "^0.6.0-dev.12", path = "../holochain_zome_types" }
 holochain_util = { version = "^0.6.0-dev.3", default-features = false, path = "../holochain_util", features = [
   "jsonschema",
 ] }
-kitsune2_api = "0.2.12"
-kitsune2_core = { version = "0.2.12" }
-kitsune2_gossip = { version = "0.2.12", optional = true }
+kitsune2_api = "0.2.15"
+kitsune2_core = { version = "0.2.15" }
+kitsune2_gossip = { version = "0.2.15", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
