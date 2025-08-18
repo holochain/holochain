@@ -16,7 +16,7 @@
 //!
 //! If you wish to enable metrics, the current options are:
 //!
-//! - InfluxDB with a Line Protocol file on disk to be pushed later with Telegraf.
+//! - A file, containing InfluxDB line protocol metrics. These can be pushed to InfluxDB later with Telegraf.
 //!   - Enable via environment variable: `HOLOCHAIN_INFLUXIVE_FILE=1`
 //!   - Configure via environment variables:
 //!     - `HOLOCHAIN_INFLUXIVE_FILE_PATH=[my influx file path]`
@@ -163,14 +163,14 @@ impl HolochainMetricsEnv {
 
         if std::env::var_os(ENV_FILE).is_some() {
             let filepath = match std::env::var(ENV_FILE_PATH) {
-                Ok(host) => host,
+                Ok(path) => path,
                 Err(err) => {
                     tracing::error!(env = %ENV_FILE_PATH, ?err, "ENV_FILE_PATH was invalid");
                     return Self::None;
                 }
             };
             if filepath.is_empty() {
-                tracing::error!(env = %ENV_FILE_PATH, "ENV_FILE_PATH was not set");
+                tracing::error!(env = %ENV_FILE_PATH, "Influxive file output is enabled but ENV_FILE_PATH was not set, no metrics will be reported");
                 return Self::None;
             }
             return Self::InfluxiveFile { filepath };
@@ -351,7 +351,10 @@ impl HolochainMetricsConfig {
         writer_config: influxive::InfluxiveWriterConfig,
         otel_config: influxive::InfluxiveMeterProviderConfig,
     ) {
-        tracing::info!(?writer_config, "initializing holochain_metrics");
+        tracing::info!(
+            ?writer_config,
+            "initializing holochain_metrics for file output"
+        );
 
         let meter_provider = influxive::influxive_file_meter_provider(writer_config, otel_config);
 

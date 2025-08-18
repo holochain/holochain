@@ -42,7 +42,6 @@ async fn metrics_influxive_file() {
     let mut line = String::new();
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         loop {
-            // Check file content for metric
             let file = std::fs::File::open(&filepath).unwrap();
             let reader = std::io::BufReader::new(file);
             let res = reader.lines().next().transpose().unwrap();
@@ -56,6 +55,7 @@ async fn metrics_influxive_file() {
     .await
     .unwrap();
 
+    // Check file content for metric
     let split = line.split(' ').collect::<Vec<&str>>();
     assert_eq!(split[0], "my.metric");
     assert!(split[1].contains("3.42"));
