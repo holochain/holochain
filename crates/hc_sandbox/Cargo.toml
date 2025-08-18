@@ -47,8 +47,8 @@ holochain_util = { version = "^0.5.4", path = "../holochain_util", features = [
 ] }
 holochain_nonce = { version = "^0.5.4", path = "../holochain_nonce" }
 holochain_trace = { version = "^0.5.4", path = "../holochain_trace" }
-kitsune2_api = "0.1.14"
-kitsune2_core = "0.1.14"
+kitsune2_api = "0.1.15"
+kitsune2_core = "0.1.15"
 nanoid = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
