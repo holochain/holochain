@@ -68,6 +68,7 @@ pub trait PrimitiveHashType: HashType {
 }
 
 impl<P: PrimitiveHashType> HashType for P {
+    #[inline]
     fn get_prefix(self) -> &'static [u8] {
         P::static_prefix()
     }
@@ -83,16 +84,19 @@ impl<P: PrimitiveHashType> HashType for P {
         }
     }
 
+    #[inline]
     fn hash_name(self) -> &'static str {
         <P as PrimitiveHashType>::static_hash_name()
     }
 
     #[cfg(feature = "export_ts")]
+    #[inline]
     fn static_hash_name() -> &'static str {
         <P as PrimitiveHashType>::static_hash_name()
     }
 
     #[cfg(feature = "export_ts")]
+    #[inline]
     fn is_base() -> bool {
         false
     }
@@ -109,14 +113,17 @@ macro_rules! primitive_hash_type {
                 Self
             }
 
+            #[inline]
             fn static_prefix() -> &'static [u8] {
                 &$prefix
             }
 
+            #[inline]
             fn static_hash_name() -> &'static str {
                 stringify!($display)
             }
 
+            #[inline]
             fn hash_name(self) -> &'static str {
                 <Self as PrimitiveHashType>::static_hash_name()
             }

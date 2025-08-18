@@ -124,16 +124,19 @@ impl HashType for AnyLinkable {
         }
     }
 
+    #[inline]
     fn hash_name(self) -> &'static str {
         Self::static_hash_name()
     }
 
     #[cfg(feature = "export_ts")]
+    #[inline]
     fn static_hash_name() -> &'static str {
         "AnyLinkableHash"
     }
 
     #[cfg(feature = "export_ts")]
+    #[inline]
     fn is_base() -> bool {
         false
     }

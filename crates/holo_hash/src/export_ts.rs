@@ -90,6 +90,7 @@ impl<T: HashType> TS for HoloHash<T> {
         }
     }
 
+    #[inline]
     fn inline_flattened() -> String {
         Self::inline()
     }
@@ -98,6 +99,7 @@ impl<T: HashType> TS for HoloHash<T> {
         format!("type {} = {};", Self::name(), Self::inline())
     }
 
+    #[inline]
     fn decl_concrete() -> String {
         Self::decl()
     }
