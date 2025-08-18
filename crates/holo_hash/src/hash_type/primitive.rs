@@ -78,7 +78,7 @@ impl<P: PrimitiveHashType> HashType for P {
             Ok(P::new())
         } else {
             Err(HoloHashError::BadPrefix(
-                PrimitiveHashType::hash_name(P::new()).to_string(),
+                <P as PrimitiveHashType>::static_hash_name().to_string(),
                 prefix.try_into().expect("3 byte prefix"),
             ))
         }
