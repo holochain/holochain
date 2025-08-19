@@ -49,8 +49,8 @@ async fn metrics_influxive_file() {
                 line = fileline;
                 break;
             }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     })
     .await
     .unwrap();
