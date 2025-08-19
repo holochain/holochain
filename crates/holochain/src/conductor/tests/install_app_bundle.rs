@@ -481,6 +481,7 @@ async fn use_existing_integration() {
         .unwrap()
         .to_owned();
 
+    #[allow(deprecated)]
     let role_settings = ("extant".into(), RoleSettings::UseExisting { cell_id });
 
     let app_2 = conductor

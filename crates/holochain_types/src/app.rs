@@ -7,6 +7,9 @@
 //! Each Cell maintains its own identity separate from any App.
 //! Access to Cells can be shared between different Apps.
 
+// Temporarily allowing deprecation because of [`RoleSettings::UseExisting`].
+#![allow(deprecated)]
+
 mod app_bundle;
 mod app_manifest;
 mod error;
@@ -149,6 +152,10 @@ pub type RoleSettingsMapYaml = HashMap<RoleName, RoleSettingsYaml>;
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum RoleSettings {
+    #[deprecated(
+        since = "0.6.0-dev.17",
+        note = "for late binding, bundle your own coordinators and for calling cells of other apps, use bridge calls"
+    )]
     /// If the role has the UseExisting strategy defined in the app manifest
     /// the cell id to use needs to be specified here.
     UseExisting {
@@ -188,6 +195,7 @@ impl From<RoleSettingsYaml> for RoleSettings {
                 membrane_proof,
                 modifiers,
             },
+            #[allow(deprecated)]
             RoleSettingsYaml::UseExisting { cell_id } => Self::UseExisting { cell_id },
         }
     }
@@ -197,6 +205,10 @@ impl From<RoleSettingsYaml> for RoleSettings {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RoleSettingsYaml {
+    #[deprecated(
+        since = "0.6.0-dev.17",
+        note = "for late binding, bundle your own coordinators and for cells of other apps, use bridge calls"
+    )]
     /// If the role has the UseExisting strategy defined in the app manifest
     /// the cell id to use needs to be specified here.
     UseExisting {
