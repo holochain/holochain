@@ -71,28 +71,34 @@ pub fn sys_time() -> ExternResult<Timestamp> {
 /// their next trigger time. Trigger times are expressed as either "ephemeral"
 /// which means they will run as "best effort" after some duration, or "persisted"
 /// which uses crontab like syntax to trigger the scheduled function many times.
-/// Ephemeral scheduled functions do not outlive the running conductor but
+/// Ephemeral scheduled functions do not outlive the running conductor, but
 /// persisted scheduled functions will continue to function after a reboot.
 /// Persisted functions MUST continue to return the same persisted crontab every
 /// time they are triggered if they wish to maintain their schedule. They MAY change
-/// their schedule by returning a different crontab or even returning an ephemeral
-/// trigger or `None` for no further triggers. If this is the initial trigger of
-/// a scheduled function the input schedule will be `None`, otherwise it will be
-/// whatever was returned by the previous invocation that triggered the current
-/// invocation.
+/// their schedule by returning a different crontab, an ephemeral trigger or `None`
+/// for no further triggers. The initial input schedule of a scheduled function will
+/// be `None`. The following inputs will be whatever was returned by the previous invocation
+/// that triggered the current invocation.
+/// If an invalid crontab is returned (e.g. "*/0 * * * * * *"), the function will be unscheduled.
+/// An ephemeral trigger set with a duration of zero will schedule the function to run at the
+/// next [`SCHEDULER_INTERVAL`].
+/// If a persisted trigger is not run at the time of its intended schedule (because the
+/// conductor is not running or the host is not running, for example),
+/// the function will not be triggered, and it will be rescheduled for the next intended run time.
+/// If for any reason the function call fails, it will be unscheduled.
 ///
 /// Scheduling a function will trigger it once unconditionally on the next iteration
 /// of the conductor's internal scheduler loop. The frequency of the loop is subject
 /// to change between conductor versions and MAY be configurable in the future, so
 /// happ devs are advised NOT to assume or rely on any specific granularity. For
-/// example the loop has historically ranged from once every 100ms to every 10s.
+/// example, the loop has historically ranged from once every 100ms to every 10s.
 ///
-/// As `schedule` is callable in any coordination context it could even be called
+/// As `schedule` is callable in any coordination context. It could even be called
 /// as the result of inbound remote calls or many times concurrently by some client.
 /// Both floods of inbound scheduling requests and "confused deputy" situations
 /// must be handled by the conductor.
 ///
-/// - Scheduling a function is idempotent. If it is already scheduled the existing
+/// - Scheduling a function is idempotent. If it is already scheduled, the existing
 ///   schedule will be respected and the `schedule` call is a noop. If the function
 ///   is not currently scheduled, even if it recently returned `None` from a previous
 ///   schedule, it will immediately be added for inclusion in the next scheduler
@@ -112,9 +118,9 @@ pub fn sys_time() -> ExternResult<Timestamp> {
 ///   #[hdk_extern(infallible)]
 ///   fn scheduled_fn(_: Option<Schedule>) -> Option<Schedule> {}
 ///   ```
-///   This is because the scheduler runs in a background loop and unlike regular
-///   zome calls there is no client or workflow attached to report back to or
-///   handle errors. There are no inputs and outputs to scheduleable functions as
+///   This is because the scheduler runs in a background loop, and unlike regular
+///   zome calls, there is no client or workflow attached to report back to or
+///   handle errors. There are no inputs and outputs to scheduled functions as
 ///   we don't want to provide the opportunity to smuggle in data that will be run
 ///   by the author as themselves if the input originated from some caller who
 ///   merely held a cap grant to trigger the schedule.

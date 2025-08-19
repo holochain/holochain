@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add tests for the `schedule` host fn
 - Fix: `hc-sandbox run` dedupes indices before proceeding.
 - Update Kitsune2 to 0.2.15 and tx5 to 0.7.1 to get various bugfixes.
 - As part of the tx5 update, go-pion has been upgraded to v4, and as part of the Kitsune2 update, there are now features
