@@ -175,14 +175,19 @@ mod tests {
                 assert_eq!(
                     vec![(
                         persisted_scheduled_fn.clone(),
-                        Some(persisted_schedule.clone())
+                        Some(persisted_schedule.clone()),
+                        false,
                     )],
                     live_scheduled_fns(txn, the_future, &alice_pubkey,).unwrap(),
                 );
                 assert_eq!(
                     vec![
-                        (persisted_scheduled_fn, Some(persisted_schedule)),
-                        (ephemeral_scheduled_fn, Some(ephemeral_future_schedule)),
+                        (persisted_scheduled_fn, Some(persisted_schedule), false),
+                        (
+                            ephemeral_scheduled_fn,
+                            Some(ephemeral_future_schedule),
+                            true
+                        ),
                     ],
                     live_scheduled_fns(txn, the_distant_future, &alice_pubkey,).unwrap(),
                 );

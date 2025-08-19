@@ -30,17 +30,19 @@ pub fn fn_is_scheduled(
         .is_some())
 }
 
+/// A scheduled function is "live" if it is in the database with now between its start and end times.
 pub fn live_scheduled_fns(
     txn: &Transaction,
     now: Timestamp,
     author: &AgentPubKey,
-) -> StateMutationResult<Vec<(ScheduledFn, Option<Schedule>)>> {
+) -> StateMutationResult<Vec<(ScheduledFn, Option<Schedule>, bool)>> {
     let mut stmt = txn.prepare(
         "
         SELECT
         zome_name,
         scheduled_fn,
-        maybe_schedule
+        maybe_schedule,
+        ephemeral
         FROM ScheduledFunctions
         WHERE
         start <= :now
@@ -60,13 +62,18 @@ pub fn live_scheduled_fns(
                     FunctionName(row.get(1)?),
                 ),
                 row.get(2)?,
+                row.get(3)?,
             ))
         },
     )?;
     let mut ret = vec![];
     for row in rows {
-        let (scheduled_fn, maybe_schedule_serialized) = row?;
-        ret.push((scheduled_fn, from_blob(maybe_schedule_serialized)?));
+        let (scheduled_fn, maybe_schedule_serialized, ephemeral) = row?;
+        ret.push((
+            scheduled_fn,
+            from_blob(maybe_schedule_serialized)?,
+            ephemeral,
+        ));
     }
     Ok(ret)
 }

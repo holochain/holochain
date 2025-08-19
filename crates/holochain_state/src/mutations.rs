@@ -1021,6 +1021,24 @@ pub fn reschedule_expired(
     Ok(())
 }
 
+pub fn unschedule_fn(
+    txn: &mut Transaction,
+    author: &AgentPubKey,
+    scheduled_fn: &ScheduledFn,
+) -> StateMutationResult<()> {
+    let _ = txn
+        .execute(
+            holochain_sqlite::sql::sql_cell::schedule::DELETE,
+            named_params! {
+                ":zome_name": scheduled_fn.zome_name().to_string(),
+                ":scheduled_fn": scheduled_fn.fn_name().to_string(),
+                ":author" : author,
+            },
+        )
+        .map_err(StateMutationError::from)?;
+    Ok(())
+}
+
 pub fn schedule_fn(
     txn: &mut Transaction,
     author: &AgentPubKey,
@@ -1042,16 +1060,8 @@ pub fn schedule_fn(
             {
                 start
             } else {
-                // If there are no further executions then scheduling is a
-                // delete and bail.
-                let _ = txn.execute(
-                    holochain_sqlite::sql::sql_cell::schedule::DELETE,
-                    named_params! {
-                        ":zome_name": scheduled_fn.zome_name().to_string(),
-                        ":scheduled_fn": scheduled_fn.fn_name().to_string(),
-                        ":author" : author,
-                    },
-                )?;
+                // Unschedule and bail if there are no further crontab schedules.
+                unschedule_fn(txn, author, &scheduled_fn)?;
                 return Ok(());
             };
             let end = start

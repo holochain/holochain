@@ -113,7 +113,6 @@ async fn schedule_ephemeral_error() {
 /// before unscheduling.
 /// Assuming a scheduler interval of 100ms
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Test not passing ; awaiting bug fix"]
 async fn schedule_persisted_fn_then_unschedule() {
     holochain_trace::test_run();
 
@@ -169,7 +168,6 @@ async fn schedule_persisted_fn_then_unschedule() {
 /// Test persisted schedule with invalid crontab output which should unschedule the function.
 /// Assuming a scheduler interval of 100ms
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Test not passing ; awaiting bug fix"]
 async fn schedule_persisted_fn_with_bad_crontab() {
     holochain_trace::test_run();
 
@@ -208,7 +206,6 @@ async fn schedule_persisted_fn_with_bad_crontab() {
 /// Test schedule persisted function which gives an error, which should unschedule the function.
 /// Assuming a scheduler interval of 100ms
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Test not passing ; awaiting bug fix"]
 async fn schedule_persisted_fn_that_errors() {
     holochain_trace::test_run();
 
