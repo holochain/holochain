@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Add support for writing metrics to InfluxDB file on disk.
 - Add tests for the `schedule` host fn
 - Fix: `hc-sandbox run` dedupes indices before proceeding.
 - Update Kitsune2 to 0.2.15 and tx5 to 0.7.1 to get various bugfixes.
