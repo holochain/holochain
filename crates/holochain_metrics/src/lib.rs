@@ -17,9 +17,7 @@
 //! If you wish to enable metrics, the current options are:
 //!
 //! - A file, containing InfluxDB line protocol metrics. These can be pushed to InfluxDB later with Telegraf.
-//!   - Enable via environment variable: `HOLOCHAIN_INFLUXIVE_FILE=1`
-//!   - Configure via environment variables:
-//!     - `HOLOCHAIN_INFLUXIVE_FILE_PATH=[my influx file path]`
+//!   - Enable and configure via environment variable: `HOLOCHAIN_INFLUXIVE_FILE="path/to/influx/file"`
 //! - InfluxDB as a zero-config child-process.
 //!   - Enable via environment variable: `HOLOCHAIN_INFLUXIVE_CHILD_SVC=1`
 //!   - The binaries `influxd` and `influx` will be downloaded and verified
@@ -158,22 +156,11 @@ impl HolochainMetricsEnv {
 
         // Environment variable to set for enabling metrics to a file on disk.
         const ENV_FILE: &str = "HOLOCHAIN_INFLUXIVE_FILE";
-        // Environment variable of the filepath to use for writing metrics.
-        const ENV_FILE_PATH: &str = "HOLOCHAIN_INFLUXIVE_FILE_PATH";
 
-        if std::env::var_os(ENV_FILE).is_some() {
-            let filepath = match std::env::var(ENV_FILE_PATH) {
-                Ok(path) => path,
-                Err(err) => {
-                    tracing::error!(env = %ENV_FILE_PATH, ?err, "ENV_FILE_PATH was invalid");
-                    return Self::None;
-                }
+        if let Some(filepath) = std::env::var_os(ENV_FILE) {
+            return Self::InfluxiveFile {
+                filepath: filepath.to_string_lossy().to_string(),
             };
-            if filepath.is_empty() {
-                tracing::error!(env = %ENV_FILE_PATH, "Influxive file output is enabled but ENV_FILE_PATH was not set, no metrics will be reported");
-                return Self::None;
-            }
-            return Self::InfluxiveFile { filepath };
         }
 
         if std::env::var_os(ENV_CHILD_SVC).is_some() {
