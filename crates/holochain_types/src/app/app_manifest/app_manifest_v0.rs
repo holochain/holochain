@@ -10,6 +10,9 @@
 //! - Using existing Cells is not implemented
 //! - Specifying DNA version is not implemented (DNA migration needs to land first)
 
+// Temporarily allowing deprecation because of [`CellProvisioning::UseExisting`].
+#![allow(deprecated)]
+
 use super::{
     app_manifest_validated::{AppManifestValidated, AppRoleManifestValidated},
     error::{AppManifestError, AppManifestResult},
@@ -140,6 +143,10 @@ pub enum CellProvisioning {
     /// Always create a new Cell when installing this App
     Create { deferred: bool },
 
+    #[deprecated(
+        since = "0.6.0-dev.17",
+        note = "For late binding, update the coordinators of a DNA. For calling cells of other apps, use bridge calls."
+    )]
     /// Require that a Cell is already installed which has a DNA that's compatible with the
     /// `installed_hash` specified in the manifest.
     ///
@@ -243,6 +250,7 @@ impl AppManifestV0 {
                             modifiers,
                             installed_hash,
                         },
+                        #[allow(deprecated)]
                         CellProvisioning::UseExisting { protected } => {
                             AppRoleManifestValidated::UseExisting {
                                 protected,

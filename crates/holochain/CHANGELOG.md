@@ -6,13 +6,16 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-
+- **BREAKING CHANGE**: Deprecate `AppManifest::UseExisting`. For late binding, update the coordinators of a DNA. For calling cells of other apps, bridge calls can be used.
 - Fix: Unschedule already scheduled persisted functions on error or when the schedule is set to `None`.
+
+## 0.6.0-dev.18
+
+- Add support for writing metrics to InfluxDB file on disk.
 - Add tests for the `schedule` host fn
 - Fix: `hc-sandbox run` dedupes indices before proceeding.
 - Update Kitsune2 to 0.2.15 and tx5 to 0.7.1 to get various bugfixes.
-- As part of the tx5 update, go-pion has been upgraded to v4, and as part of the Kitsune2 update, there are now features
-  to allow either libdatachannel or go-pion to be used as the WebRTC backend. The default is still libdatachannel.
+- As part of the tx5 update, go-pion has been upgraded to v4, and as part of the Kitsune2 update, there are now features to allow either libdatachannel or go-pion to be used as the WebRTC backend. The default is still libdatachannel.
 - **BREAKING CHANGE**: Deprecate `RoleSettings::UseExisting`. For late binding, update the coordinators of a DNA. For calling cells of other apps, bridge calls can be used.
 - **BREAKING CHANGE**: Host function `call` returns a specific error when calling another cell by cell ID that cannot be found.
 
