@@ -6,6 +6,7 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- **BREAKING CHANGE**: Deprecate `AppManifest::UseExisting`. For late binding, update the coordinators of a DNA. For calling cells of other apps, bridge calls can be used.
 
 ## 0.6.0-dev.18
 

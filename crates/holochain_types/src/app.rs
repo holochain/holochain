@@ -154,7 +154,7 @@ pub type RoleSettingsMapYaml = HashMap<RoleName, RoleSettingsYaml>;
 pub enum RoleSettings {
     #[deprecated(
         since = "0.6.0-dev.17",
-        note = "for late binding, bundle your own coordinators and for calling cells of other apps, use bridge calls"
+        note = "For late binding, update the coordinators of a DNA. For calling cells of other apps, use bridge calls."
     )]
     /// If the role has the UseExisting strategy defined in the app manifest
     /// the cell id to use needs to be specified here.
@@ -207,7 +207,7 @@ impl From<RoleSettingsYaml> for RoleSettings {
 pub enum RoleSettingsYaml {
     #[deprecated(
         since = "0.6.0-dev.17",
-        note = "for late binding, bundle your own coordinators and for cells of other apps, use bridge calls"
+        note = "For late binding, update the coordinators of a DNA. For calling cells of other apps, use bridge calls."
     )]
     /// If the role has the UseExisting strategy defined in the app manifest
     /// the cell id to use needs to be specified here.

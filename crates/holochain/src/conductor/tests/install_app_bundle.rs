@@ -397,6 +397,7 @@ async fn use_existing_integration() {
                         installed_hash,
                         clone_limit: 0,
                     },
+                    #[allow(deprecated)]
                     provisioning: Some(CellProvisioning::UseExisting { protected: true }),
                 },
             ];

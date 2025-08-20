@@ -122,6 +122,7 @@ impl AppBundle {
                 Ok(CellProvisioningOp::CreateFromDnaFile(dna, clone_limit))
             }
 
+            #[allow(deprecated)]
             AppRoleManifestValidated::UseExisting {
                 compatible_hash,
                 protected,
