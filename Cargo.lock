@@ -3094,6 +3094,8 @@ version = "0.5.5"
 dependencies = [
  "influxive",
  "opentelemetry_api",
+ "tempfile",
+ "tokio",
  "tracing",
 ]
 
@@ -3959,9 +3961,9 @@ dependencies = [
 
 [[package]]
 name = "influxive"
-version = "0.0.4-alpha.1"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3680518e6abe9c1d1f7d9983dcf2c4d4b3b0bcc1b34c2c02f375e9f7d467a68"
+checksum = "b6d0b6985380cf881e6b3228a6f80cddcda367def4db1789905917625a217998"
 dependencies = [
  "influxive-child-svc",
  "influxive-otel",
@@ -3970,9 +3972,9 @@ dependencies = [
 
 [[package]]
 name = "influxive-child-svc"
-version = "0.0.4-alpha.1"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73581cf719096a1d127ecd0c166eac4479fd64cc25e9950700ef2d3904e95cfd"
+checksum = "1cbd657d59c9e4ad6c37f80ac253bed584cbfe64a17802ef99724c24daa490b3"
 dependencies = [
  "hex-literal",
  "influxive-core",
@@ -3985,15 +3987,15 @@ dependencies = [
 
 [[package]]
 name = "influxive-core"
-version = "0.0.4-alpha.1"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "516f0d73d7c5c0268aafc343ff95f9536dd49c29057ee2d752acd3808e7df8ce"
+checksum = "c055d67219b8b73dcb777fb46acb7b812ad83b9007af9b2713b21d663c21aeaa"
 
 [[package]]
 name = "influxive-downloader"
-version = "0.0.4-alpha.1"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8dd10c3e1416f5d99c447fa238f452f4c6353a48cff6b3be7afa17850e4bb7e"
+checksum = "db841bcd61baa5670e37b992bc3e1ad3de720f38ecc1ba68bc5e8cdaa7423817"
 dependencies = [
  "base64 0.22.1",
  "digest",
@@ -4013,9 +4015,9 @@ dependencies = [
 
 [[package]]
 name = "influxive-otel"
-version = "0.0.4-alpha.1"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5d8e663336807ed8864618db6cb4d3c05309535323d7be429224ba7f952a282"
+checksum = "93bddd13d48687fabfcb920638f7113c4b35acddcec7eeacd54b6201c9c724c8"
 dependencies = [
  "influxive-core",
  "opentelemetry_api",
@@ -4033,9 +4035,9 @@ dependencies = [
 
 [[package]]
 name = "influxive-writer"
-version = "0.0.4-alpha.1"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48ac6efbbfafec11613fc1264214a1add55c02063716f2d448080eac9097e62b"
+checksum = "1120f1a6467ee14139cca30bc0222b3593331d58a2c1b066cc29b7aae2d2daed"
 dependencies = [
  "influxdb",
  "influxive-core",
