@@ -30,7 +30,12 @@ pub fn fn_is_scheduled(
         .is_some())
 }
 
-/// A scheduled function is "live" if it is in the database with now between its start and end times.
+/// Get a list of "live" scheduled functions.
+///
+/// A scheduled function is "live" if it is in the database with `now` between its start and end times.
+///
+/// Returns the list of scheduled functions with their next schedule and a bool indicating
+/// if the schedule is ephemeral or not.
 pub fn live_scheduled_fns(
     txn: &Transaction,
     now: Timestamp,

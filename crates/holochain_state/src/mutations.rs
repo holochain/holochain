@@ -1021,24 +1021,30 @@ pub fn reschedule_expired(
     Ok(())
 }
 
-pub fn unschedule_fn(
-    txn: &mut Transaction,
-    author: &AgentPubKey,
-    scheduled_fn: &ScheduledFn,
-) -> StateMutationResult<()> {
-    let _ = txn
-        .execute(
-            holochain_sqlite::sql::sql_cell::schedule::DELETE,
-            named_params! {
-                ":zome_name": scheduled_fn.zome_name().to_string(),
-                ":scheduled_fn": scheduled_fn.fn_name().to_string(),
-                ":author" : author,
-            },
-        )
-        .map_err(StateMutationError::from)?;
-    Ok(())
+/// Remove a function from the schedule.
+pub fn unschedule_fn(txn: &mut Transaction, author: &AgentPubKey, scheduled_fn: &ScheduledFn) {
+    match txn.execute(
+        holochain_sqlite::sql::sql_cell::schedule::DELETE,
+        named_params! {
+            ":zome_name": scheduled_fn.zome_name().to_string(),
+            ":scheduled_fn": scheduled_fn.fn_name().to_string(),
+            ":author" : author,
+        },
+    ) {
+        Ok(n) => {
+            tracing::debug!("Unscheduled {n} {scheduled_fn:?} for author {author} in database")
+        }
+        Err(e) => {
+            tracing::error!(
+                "Error unscheduling {scheduled_fn:?} for author {author} in database: {e}"
+            );
+        }
+    }
 }
 
+/// Set a function to be called by the scheduler at a later time determined by `maybe_schedule`.
+///
+/// If the function was already scheduled, its schedule will be updated.
 pub fn schedule_fn(
     txn: &mut Transaction,
     author: &AgentPubKey,
@@ -1060,8 +1066,8 @@ pub fn schedule_fn(
             {
                 start
             } else {
-                // Unschedule and bail if there are no further crontab schedules.
-                unschedule_fn(txn, author, &scheduled_fn)?;
+                // Unschedule and bail if there are no further cron schedules.
+                unschedule_fn(txn, author, &scheduled_fn);
                 return Ok(());
             };
             let end = start

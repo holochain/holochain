@@ -293,7 +293,7 @@ impl Cell {
                     };
 
                     tasks.push(self.call_zome(zome_call_params, None));
-                    // keep track of fns that actually dispatched.
+                    // keep track of fns that were dispatched.
                     dispatched.push((scheduled_fn.clone(), *ephemeral));
                 }
                 let results: Vec<CellResult<ZomeCallResult>> =
@@ -301,7 +301,6 @@ impl Cell {
 
                 let author = self.id.agent_pubkey().clone();
                 // In case of an error, a persisted fn needs to be unscheduled.
-                // If unscheduling fails, don't do anything.
                 let _ = authored_db
                     .write_async(move |txn| {
                         for ((scheduled_fn, ephemeral), result) in dispatched.into_iter().zip(results.iter()) {
@@ -312,14 +311,14 @@ impl Cell {
                                         Ok(None) => {
                                             // If the schedule of a persisted fn is `None` then it should be unscheduled.
                                             if !ephemeral {
-                                                let _ = unschedule_fn(txn, &author, &scheduled_fn);
+                                                unschedule_fn(txn, &author, &scheduled_fn);
                                             }
                                             continue;
                                         }
                                         Err(e) => {
                                             error!("scheduled zome call error in ExternIO::decode: {:?}", e);
                                             if !ephemeral {
-                                                let _ = unschedule_fn(txn, &author, &scheduled_fn);
+                                                unschedule_fn(txn, &author, &scheduled_fn);
                                             }
                                             continue;
                                         }
@@ -333,7 +332,7 @@ impl Cell {
                                     ) {
                                         error!("scheduled zome call error in schedule_fn: {:?}", e);
                                         if !ephemeral {
-                                            let _ = unschedule_fn(txn, &author, &scheduled_fn);
+                                            unschedule_fn(txn, &author, &scheduled_fn);
                                         }
                                         continue;
                                     }
@@ -341,7 +340,7 @@ impl Cell {
                                 errorish => {
                                     error!("scheduled zome call error: {:?}", errorish);
                                     if !ephemeral {
-                                        let _ = unschedule_fn(txn, &author, &scheduled_fn);
+                                        unschedule_fn(txn, &author, &scheduled_fn);
                                     }
                                 },
                             }
