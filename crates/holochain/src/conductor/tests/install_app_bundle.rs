@@ -330,6 +330,23 @@ async fn cells_by_dna_lineage() {
     pretty_assertions::assert_eq!(linx, btreeset![app_cells(&app1, &[1]),]);
 }
 
+/// Integration test for AppManifest `UseExisting` provisioning and related lifecycle behavior.
+///
+/// Installs a "dependency" app that creates a cell, then installs a "dependent" app whose role uses
+/// `UseExisting` to reference the dependency's cell. Verifies manifest/installation errors when the
+/// dependency is not specified, that role resolution succeeds when a concrete `CellId` is provided,
+/// that cross-cell zome calls fail until a zome-call capability is granted and then succeed using the
+/// granted secret, and that disabling and uninstall semantics respect dependents (uninstall fails
+/// without `force` and succeeds with `force`).
+///
+/// # Examples
+///
+/// ```no_run
+/// # async fn example() {
+/// // Run the full integration scenario as an async test.
+/// use_existing_integration().await;
+/// # }
+/// ```
 #[tokio::test(flavor = "multi_thread")]
 async fn use_existing_integration() {
     let conductor = SweetConductor::from_standard_config().await;

@@ -105,6 +105,19 @@ impl AppBundle {
             )
     }
 
+    /// Resolve how a single app role should be provisioned into a cell.
+    ///
+    /// Returns a CellProvisioningOp describing whether the role requires creating a new
+    /// cell from a DNA file, using an existing cell, or provisioning only (for cloning).
+    ///
+    /// - For `Create` roles this fetches the modified DNA file (applying modifiers) and
+    ///   returns `CreateFromDnaFile` with the role's clone limit.
+    /// - For `UseExisting` roles this looks up an existing CellId in `existing_cells` for
+    ///   `role_name` and returns `Existing(cell_id, protected)`. If no existing cell is
+    ///   found, an `AppBundleError::CellResolutionFailure` is returned.
+    ///
+    /// The function is async because fetching and unpacking the associated DNA bundle
+    /// may perform I/O and deserialization.
     async fn resolve_cell(
         &self,
         role_name: RoleName,

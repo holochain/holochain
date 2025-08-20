@@ -218,7 +218,22 @@ impl AppManifestV0 {
         Ok(())
     }
 
-    /// Convert this human-focused manifest into a validated, concise representation
+    /// Convert this human-focused manifest into a validated, concise representation.
+    ///
+    /// This consumes the v0 manifest and produces an AppManifestValidated by:
+    /// - Translating each role's provisioning strategy into the corresponding validated variant.
+    /// - Ensuring required fields (e.g., `dna.path` for Create/CloneOnly or `dna.installed_hash` for UseExisting)
+    ///   are present, returning an error if any required field is missing.
+    /// - Serializing any provided DNA modifiers.
+    ///
+    /// Returns an `Err` when required fields are absent or when modifiers fail to serialize.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let validated = AppManifestV0::sample().validate().unwrap();
+    /// assert_eq!(validated.name(), "test-app");
+    /// ```
     pub fn validate(self) -> AppManifestResult<AppManifestValidated> {
         let AppManifestV0 {
             name,

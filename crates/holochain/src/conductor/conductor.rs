@@ -3311,7 +3311,43 @@ fn query_dht_ops_from_statement(
     Ok(r)
 }
 
-/// Extract the modifiers from the RoleSettingsMap into their own HashMap
+/// Extracts modifier settings for roles.
+///
+/// Returns a map from role name to its `modifiers` for every role whose
+/// `RoleSettings` is `Provisioned`. Entries with the deprecated `UseExisting`
+/// variant or roles with no modifiers are omitted.
+///
+/// # Examples
+///
+/// ```
+/// # use std::collections::HashMap;
+/// # use crate::{RoleSettings, RoleSettingsMap, ModifiersMap};
+/// // `RoleSettingsMap` is a HashMap<String, RoleSettings>
+/// let mut rs: RoleSettingsMap = HashMap::new();
+/// rs.insert(
+///     "a".into(),
+///     RoleSettings::Provisioned {
+///         modifiers: Some("mods_a".into()),
+///         ..Default::default()
+///     },
+/// );
+/// rs.insert(
+///     "b".into(),
+///     RoleSettings::Provisioned {
+///         modifiers: None,
+///         ..Default::default()
+///     },
+/// );
+/// rs.insert(
+///     "c".into(),
+///     RoleSettings::UseExisting { ..Default::default() }
+/// );
+///
+/// let mods: ModifiersMap = get_modifiers_map_from_role_settings(&Some(rs));
+/// assert_eq!(mods.get("a").map(|m| m.as_str()), Some("mods_a"));
+/// assert!(!mods.contains_key("b"));
+/// assert!(!mods.contains_key("c"));
+/// ```
 fn get_modifiers_map_from_role_settings(roles_settings: &Option<RoleSettingsMap>) -> ModifiersMap {
     match roles_settings {
         Some(role_settings_map) => role_settings_map
@@ -3328,7 +3364,20 @@ fn get_modifiers_map_from_role_settings(roles_settings: &Option<RoleSettingsMap>
     }
 }
 
-/// Extract the memproofs from the RoleSettingsMap into their own HashMap
+/// Extracts membrane proofs from an optional RoleSettingsMap.
+///
+/// Returns a `MemproofMap` that maps role names to their associated membrane proof.
+/// - Roles with `RoleSettings::Provisioned { membrane_proof: Some(..), .. }` are included.
+/// - Roles with `RoleSettings::Provisioned { membrane_proof: None, .. }` or
+///   `RoleSettings::UseExisting { .. }` are skipped.
+/// - If `role_settings` is `None`, an empty map is returned.
+///
+/// # Examples
+///
+/// ```
+/// let map = get_memproof_map_from_role_settings(&None);
+/// assert!(map.is_empty());
+/// ```
 fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) -> MemproofMap {
     match role_settings {
         Some(role_settings_map) => role_settings_map
@@ -3345,7 +3394,28 @@ fn get_memproof_map_from_role_settings(role_settings: &Option<RoleSettingsMap>) 
     }
 }
 
-/// Extract the existing cells ids from the RoleSettingsMap into their own HashMap
+/// Extracts a map of role name -> existing CellId from optional role settings.
+///
+/// For each role in `roles_settings` that uses the `RoleSettings::UseExisting { cell_id }`
+/// variant, this returns an entry mapping the role name to that `cell_id`. If `roles_settings`
+/// is `None` or a role does not use `UseExisting`, it is not included in the result.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use std::collections::HashMap;
+/// // Assume the following types are in scope:
+/// // type RoleSettingsMap = HashMap<String, RoleSettings>;
+/// // enum RoleSettings { UseExisting { cell_id: CellId }, Provisioned { .. }, /* .. */ }
+/// // type ExistingCellsMap = HashMap<String, CellId>;
+///
+/// let mut map = RoleSettingsMap::new();
+/// map.insert("alice".into(), RoleSettings::UseExisting { cell_id: "cell-a".into() });
+/// map.insert("bob".into(), RoleSettings::Provisioned { /* ... */ });
+///
+/// let existing = get_existing_cells_map_from_role_settings(&Some(map));
+/// // `existing` contains only the mapping for "alice" -> "cell-a"
+/// ```
 fn get_existing_cells_map_from_role_settings(
     roles_settings: &Option<RoleSettingsMap>,
 ) -> ExistingCellsMap {
