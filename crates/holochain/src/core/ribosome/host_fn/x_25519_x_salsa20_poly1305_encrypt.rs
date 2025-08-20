@@ -57,8 +57,7 @@ pub fn x_25519_x_salsa20_poly1305_encrypt(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
-
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::test_utils::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 

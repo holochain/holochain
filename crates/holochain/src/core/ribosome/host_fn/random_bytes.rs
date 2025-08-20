@@ -43,11 +43,11 @@ pub fn random_bytes(
 pub mod wasm_test {
     use crate::core::ribosome::host_fn::random_bytes::random_bytes;
 
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::HostContext;
     use crate::fixt::CallContextFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::ZomeCallHostAccessFixturator;
+    use crate::test_utils::RibosomeTestFixture;
     use ::fixt::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;

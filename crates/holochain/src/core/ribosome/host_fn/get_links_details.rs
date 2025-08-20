@@ -80,8 +80,8 @@ pub fn get_links_details(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::sweettest::{SweetConductorBatch, SweetConductorConfig, SweetDnaFile};
+    use crate::test_utils::RibosomeTestFixture;
     use holo_hash::ActionHash;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::link::LinkDetails;

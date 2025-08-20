@@ -107,8 +107,8 @@ pub fn must_get_entry(
 
 #[cfg(test)]
 pub mod test {
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::test_entry_impl;
+    use crate::test_utils::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_state::prelude::*;
     use holochain_wasm_test_utils::TestWasm;

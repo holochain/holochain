@@ -42,7 +42,7 @@ pub fn zome_info(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod test {
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::test_utils::RibosomeTestFixture;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::prelude::*;
 

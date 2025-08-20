@@ -186,7 +186,6 @@ mod test {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod slow_tests {
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::PostCommitHostAccessFixturator;
     use crate::fixt::PostCommitInvocationFixturator;
@@ -195,6 +194,7 @@ mod slow_tests {
     use crate::sweettest::SweetConductor;
     use crate::sweettest::{SweetDnaFile, SweetInlineZomes};
     use crate::test_utils::inline_zomes::AppString;
+    use crate::test_utils::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_types::inline_zome::InlineZomeSet;
     use holochain_types::signal::Signal;

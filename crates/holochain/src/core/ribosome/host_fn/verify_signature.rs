@@ -43,8 +43,8 @@ pub fn verify_signature(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::{
-        core::ribosome::wasm_test::RibosomeTestFixture,
         sweettest::{SweetConductor, SweetZome},
+        test_utils::RibosomeTestFixture,
     };
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;

@@ -62,21 +62,21 @@ pub fn accept_countersigning_preflight_request<'a>(
 #[cfg(test)]
 #[cfg(all(feature = "slow_tests", feature = "unstable-countersigning"))]
 pub mod wasm_test {
-    use assert2::let_assert;
     use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::CellError;
     use crate::core::ribosome::error::RibosomeError;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::workflow::WorkflowError;
+    use crate::prelude::{Signal, SystemSignal};
     use crate::sweettest::*;
+    use crate::test_utils::RibosomeTestFixture;
+    use assert2::let_assert;
     use hdk::prelude::*;
+    use holochain_nonce::fresh_nonce;
     use holochain_state::source_chain::SourceChainError;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallParams;
     use matches::assert_matches;
     use wasmer::RuntimeError;
-    use holochain_nonce::fresh_nonce;
-    use crate::prelude::{Signal, SystemSignal};
 
     /// Allow ChainLocked error, panic on anything else
     fn expect_chain_locked(

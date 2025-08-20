@@ -178,11 +178,11 @@ mod test {
 mod slow_tests {
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
     use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeT;
     use crate::fixt::EntryDefsInvocationFixturator;
     use crate::fixt::RealRibosomeFixturator;
     use crate::fixt::Zomes;
+    use crate::test_utils::RibosomeTestFixture;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     pub use holochain_zome_types::entry_def::EntryVisibility;

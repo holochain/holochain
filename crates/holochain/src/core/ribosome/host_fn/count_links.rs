@@ -56,8 +56,8 @@ pub fn count_links<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 mod tests {
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::sweettest::{SweetConductorHandle, SweetZome};
+    use crate::test_utils::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
     use tokio::time::error::Elapsed;

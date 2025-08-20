@@ -103,8 +103,8 @@ pub fn get_links(
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
     use crate::{
-        core::ribosome::wasm_test::RibosomeTestFixture,
         sweettest::{await_consistency, SweetConductorBatch, SweetConductorConfig, SweetDnaFile},
+        test_utils::RibosomeTestFixture,
     };
     use hdk::prelude::*;
     use holochain_test_wasm_common::*;

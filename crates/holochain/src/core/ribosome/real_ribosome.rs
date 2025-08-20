@@ -1131,11 +1131,11 @@ impl RibosomeT for RealRibosome {
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use crate::core::ribosome::real_ribosome::CONTEXT_MAP;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::sweettest::SweetConductor;
     use crate::sweettest::SweetConductorConfig;
     use crate::sweettest::SweetDnaFile;
     use crate::sweettest::SweetLocalRendezvous;
+    use crate::test_utils::RibosomeTestFixture;
     use crate::wait_for_10s;
     use hdk::prelude::*;
     use holochain_nonce::fresh_nonce;
