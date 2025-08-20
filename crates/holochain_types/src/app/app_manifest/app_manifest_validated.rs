@@ -5,6 +5,9 @@
 //! may contain various invalid combinations of data. In contrast, these types
 //! are structured to ensure validity, and are used internally by Holochain.
 
+// Temporarily allowing deprecation because of [`AppRoleManifestValidated::UseExisting`].
+#![allow(deprecated)]
+
 use super::error::{AppManifestError, AppManifestResult};
 use crate::prelude::*;
 use holo_hash::DnaHashB64;
@@ -54,6 +57,10 @@ pub enum AppRoleManifestValidated {
         modifiers: DnaModifiersOpt,
         installed_hash: Option<DnaHashB64>,
     },
+    #[deprecated(
+        since = "0.6.0-dev.17",
+        note = "for late binding, bundle your own coordinators and for calling cells of other apps, use bridge calls"
+    )]
     /// Require that a Cell is already installed which has a DNA that's compatible with the
     /// `compatible_hash` specified in the manifest.
     UseExisting {
