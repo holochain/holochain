@@ -256,7 +256,8 @@ impl Cell {
             }
             Ok(live_fns) => {
                 let mut tasks = vec![];
-                for (scheduled_fn, schedule) in &live_fns {
+                let mut dispatched: Vec<(ScheduledFn, bool)> = Vec::with_capacity(live_fns.len());
+                for (scheduled_fn, schedule, ephemeral) in &live_fns {
                     // Failing to encode a schedule should never happen.
                     // If it does log the error and bail.
                     let payload = match ExternIO::encode(schedule) {
@@ -292,30 +293,36 @@ impl Cell {
                     };
 
                     tasks.push(self.call_zome(zome_call_params, None));
+                    // keep track of fns that were dispatched.
+                    dispatched.push((scheduled_fn.clone(), *ephemeral));
                 }
                 let results: Vec<CellResult<ZomeCallResult>> =
                     futures::future::join_all(tasks).await;
 
                 let author = self.id.agent_pubkey().clone();
-                // We don't do anything with errors in here.
+                // In case of an error, a persisted fn needs to be unscheduled.
                 let _ = authored_db
                     .write_async(move |txn| {
-                        for ((scheduled_fn, _), result) in live_fns.iter().zip(results.iter()) {
+                        for ((scheduled_fn, ephemeral), result) in dispatched.into_iter().zip(results.iter()) {
                             match result {
                                 Ok(Ok(ZomeCallResponse::Ok(extern_io))) => {
                                     let next_schedule: Schedule = match extern_io.decode() {
                                         Ok(Some(v)) => v,
                                         Ok(None) => {
+                                            // If the schedule of a persisted fn is `None` then it should be unscheduled.
+                                            if !ephemeral {
+                                                unschedule_fn(txn, &author, &scheduled_fn);
+                                            }
                                             continue;
                                         }
                                         Err(e) => {
                                             error!("scheduled zome call error in ExternIO::decode: {:?}", e);
+                                            if !ephemeral {
+                                                unschedule_fn(txn, &author, &scheduled_fn);
+                                            }
                                             continue;
                                         }
                                     };
-                                    // Ignore errors so that failing to schedule
-                                    // one function doesn't error others.
-                                    // For example if a zome returns a bad cron.
                                     if let Err(e) = schedule_fn(
                                         txn,
                                         &author,
@@ -324,10 +331,18 @@ impl Cell {
                                         now,
                                     ) {
                                         error!("scheduled zome call error in schedule_fn: {:?}", e);
+                                        if !ephemeral {
+                                            unschedule_fn(txn, &author, &scheduled_fn);
+                                        }
                                         continue;
                                     }
                                 }
-                                errorish => error!("scheduled zome call error: {:?}", errorish),
+                                errorish => {
+                                    error!("scheduled zome call error: {:?}", errorish);
+                                    if !ephemeral {
+                                        unschedule_fn(txn, &author, &scheduled_fn);
+                                    }
+                                },
                             }
                         }
                         Result::<(), DatabaseError>::Ok(())
