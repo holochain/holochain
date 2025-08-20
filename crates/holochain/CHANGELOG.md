@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## 0.6.0-dev.18
 
+- Malformed websocket requests are responded to with an error ([\#5209](https://github.com/holochain/holochain/pull/5209)).
 - Add support for writing metrics to InfluxDB file on disk.
 - Add tests for the `schedule` host fn
 - Fix: `hc-sandbox run` dedupes indices before proceeding.
