@@ -13,7 +13,7 @@ This file documents results of release tests as described in the [Holochain rele
 - A node going offline and then coming back online received all entries created while it was offline, taking a little 
   over 30 seconds to sync.
 - Started a 4th node and waited for it to sync with the network. It took a few minutes to sync which is a little slower
-  then when the network had less test data but still acceptable.
+  than when the network had less test data, but still acceptable.
 
 ## 2025-08-05: v0.5.5-rc.0
 
