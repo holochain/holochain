@@ -152,13 +152,6 @@ pub(crate) mod app_broadcast;
 #[cfg(test)]
 pub(crate) mod tests;
 
-/// How long we should attempt to achieve a "network join" when first activating a cell,
-/// before moving on and letting the network health activity go on in the background.
-///
-/// This gives us a chance to start an app in an "online" state, increasing the probability
-/// of an app having full network access as soon as its UI begins making requests.
-pub const JOIN_NETWORK_WAITING_PERIOD: std::time::Duration = std::time::Duration::from_secs(5);
-
 /// A list of Cells which failed to start, and why
 pub type CellStartupErrors = Vec<(CellId, CellError)>;
 
@@ -2335,38 +2328,18 @@ mod app_status_impls {
                     let cell_id = cell.id().clone();
                     let agent_pubkey = cell_id.agent_pubkey().clone();
 
-                    let res = tokio::time::timeout(
-                        JOIN_NETWORK_WAITING_PERIOD,
-                        cell.holochain_p2p_dna().clone().join(
-                            agent_pubkey,
-                            None,
-                        ),
-                    )
-                        .await;
-
-                    match res {
-                        Ok(r) => {
-                            match r {
-                                Ok(_) => {
-                                    // all good
-
-                                }
-                                Err(e) => {
-                                    tracing::error!(
-                                        "Network join failed for {cell_id}. This should never happen. Error: {e:?}"
-                                    );
-                                }
-                            }
-                        }
-                        Err(_) => {
-                            tracing::warn!(
-                                "Network join took longer than {JOIN_NETWORK_WAITING_PERIOD:?} for {cell_id}. Cell startup proceeding anyway."
-                            );
-                        }
+                    if let Err(e) = cell
+                        .holochain_p2p_dna()
+                        .clone()
+                        .join(agent_pubkey, None)
+                        .await
+                    {
+                        tracing::error!(?e, ?cell_id, "Network join failed.");
                     }
-                }.instrument(tracing::info_span!("network join task", ?i))
+                }
+                .instrument(tracing::info_span!("network join task", ?i))
             }))
-                .await;
+            .await;
 
             // Add the newly created cells to the Conductor
             self.add_and_initialize_cells(new_cells);
