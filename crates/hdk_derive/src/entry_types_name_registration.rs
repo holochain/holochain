@@ -1,3 +1,4 @@
+use crate::util::get_unit_ident;
 use darling::FromMeta;
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
@@ -5,8 +6,6 @@ use syn::parse_macro_input;
 use syn::AttributeArgs;
 use syn::Item;
 use syn::ItemEnum;
-
-use crate::util::get_unit_ident;
 
 #[derive(Debug, FromMeta)]
 pub struct MacroArgs {

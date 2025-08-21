@@ -1,11 +1,10 @@
-use std::sync::Arc;
-
 use super::SweetZome;
 use hdk::prelude::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::ConductorConfig;
 use holochain_sqlite::db::{DbKindAuthored, DbKindDht};
 use holochain_types::db::DbWrite;
+use std::sync::Arc;
 /// A reference to a Cell created by a SweetConductor installation function.
 /// It has very concise methods for calling a zome on this cell
 #[derive(Clone, Debug)]

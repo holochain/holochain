@@ -1,14 +1,13 @@
-use holochain_sqlite::rusqlite::named_params;
-use holochain_sqlite::rusqlite::OptionalExtension;
-use holochain_sqlite::rusqlite::Transaction;
-use holochain_types::prelude::CellId;
-use holochain_types::prelude::DnaDef;
-
 use crate::mutations;
 use crate::prelude::from_blob;
 use crate::prelude::StateMutationResult;
 use crate::prelude::StateQueryResult;
 use crate::query::to_blob;
+use holochain_sqlite::rusqlite::named_params;
+use holochain_sqlite::rusqlite::OptionalExtension;
+use holochain_sqlite::rusqlite::Transaction;
+use holochain_types::prelude::CellId;
+use holochain_types::prelude::DnaDef;
 
 pub fn get(txn: &Transaction<'_>, cell_id: &CellId) -> StateQueryResult<Option<(CellId, DnaDef)>> {
     let item = txn

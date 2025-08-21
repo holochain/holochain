@@ -146,8 +146,7 @@ mod manifest;
 mod pack;
 
 pub use bundle::{resource::ResourceBytes, Bundle, ResourceMap};
-pub use manifest::{Manifest, ResourceIdentifier};
-pub use pack::{pack, unpack};
-
 #[cfg(feature = "fs")]
 pub use fs::{resource_id_for_path, FileSystemBundler};
+pub use manifest::{Manifest, ResourceIdentifier};
+pub use pack::{pack, unpack};

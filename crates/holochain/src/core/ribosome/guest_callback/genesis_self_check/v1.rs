@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::core::ribosome::FnComponents;
 use crate::core::ribosome::HostContext;
 use crate::core::ribosome::Invocation;
@@ -8,6 +6,7 @@ use crate::core::ribosome::ZomesToInvoke;
 use derive_more::Constructor;
 use holochain_serialized_bytes::prelude::*;
 use holochain_types::prelude::*;
+use std::sync::Arc;
 
 #[derive(Clone, Constructor, Debug)]
 pub struct GenesisSelfCheckHostAccessV1;
@@ -84,14 +83,13 @@ impl From<Vec<ValidateCallbackResult>> for GenesisSelfCheckResultV1 {
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub(crate) mod slow_tests {
-    use std::sync::Arc;
-
     use super::GenesisSelfCheckInvocationV1;
     use crate::sweettest::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_types::prelude::*;
     use holochain_wasm_test_utils::{TestCoordinatorWasm, TestIntegrityWasm};
+    use std::sync::Arc;
 
     pub(crate) fn invocation_fixture() -> GenesisSelfCheckInvocationV1 {
         GenesisSelfCheckInvocationV1 {

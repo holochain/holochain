@@ -57,11 +57,10 @@
 //! Most standard msgpack encoders should work just fine for the return types being used here.
 //!
 
-use std::sync::Arc;
-
 use super::ChainHeadCoordinatorExt;
 use super::*;
 use holochain_keystore::MetaLairClient;
+use std::sync::Arc;
 use url::Url;
 
 /// An HTTP client which can talk to a remote CHC implementation

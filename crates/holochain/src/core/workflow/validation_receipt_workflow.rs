@@ -1,19 +1,17 @@
+use super::error::WorkflowResult;
+use crate::core::queue_consumer::WorkComplete;
 use futures::future::BoxFuture;
 use futures::{stream, StreamExt};
-use itertools::Itertools;
-use std::collections::HashSet;
-use std::sync::Arc;
-
 use holochain_keystore::MetaLairClient;
 use holochain_p2p::DynHolochainP2pDna;
 use holochain_state::prelude::*;
-use tracing::*;
-
-use super::error::WorkflowResult;
-use crate::core::queue_consumer::WorkComplete;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTarget;
 use holochain_zome_types::block::CellBlockReason;
+use itertools::Itertools;
+use std::collections::HashSet;
+use std::sync::Arc;
+use tracing::*;
 
 #[cfg(test)]
 mod tests;

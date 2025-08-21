@@ -45,16 +45,14 @@
 //! considered correct and the local chain should always be modified to match the CHC's state.
 //!
 
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
-
 use futures::FutureExt;
 use holochain_keystore::{AgentPubKeyExt, MetaLairClient};
 use holochain_nonce::Nonce256Bits;
 use holochain_serialized_bytes::SerializedBytesError;
+use holochain_types::chain::ChainItem;
 use holochain_types::prelude::*;
 use must_future::MustBoxFuture;
-
-use holochain_types::chain::ChainItem;
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 pub mod chc_local;
 

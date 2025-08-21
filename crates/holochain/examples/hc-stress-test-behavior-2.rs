@@ -1,6 +1,5 @@
-use holochain::test_utils::hc_stress_test::*;
-
 use clap::Parser;
+use holochain::test_utils::hc_stress_test::*;
 
 #[derive(Parser, Debug)]
 struct Args {

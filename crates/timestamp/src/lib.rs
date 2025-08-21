@@ -6,17 +6,14 @@ mod error;
 #[cfg(feature = "now")]
 mod human;
 
-#[cfg(feature = "now")]
-pub use human::*;
-
-use core::ops::{Add, Sub};
-use serde::{Deserialize, Serialize};
-use std::convert::{TryFrom, TryInto};
-
 pub use crate::error::{TimestampError, TimestampResult};
-
 #[cfg(feature = "now")]
 pub(crate) use chrono_ext::*;
+use core::ops::{Add, Sub};
+#[cfg(feature = "now")]
+pub use human::*;
+use serde::{Deserialize, Serialize};
+use std::convert::{TryFrom, TryInto};
 
 #[cfg(feature = "now")]
 mod chrono_ext;
@@ -224,9 +221,8 @@ impl InclusiveTimestampInterval {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryInto;
-
     use super::*;
+    use std::convert::TryInto;
 
     const TEST_TS: &str = "2020-05-05T19:16:04.266431Z";
 

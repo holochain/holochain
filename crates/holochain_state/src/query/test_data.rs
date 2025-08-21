@@ -1,13 +1,12 @@
 #![allow(clippy::redundant_clone)]
+use super::link::*;
+use super::link_details::GetLinkDetailsQuery;
+use super::live_entry::*;
 use ::fixt::prelude::*;
 use holo_hash::*;
 use holochain_types::action::NewEntryAction;
 use holochain_types::dht_op::{ChainOp, ChainOpHashed};
 use holochain_zome_types::prelude::*;
-
-use super::link::*;
-use super::link_details::GetLinkDetailsQuery;
-use super::live_entry::*;
 
 pub struct LinkTestData {
     pub create_link_op: ChainOpHashed,

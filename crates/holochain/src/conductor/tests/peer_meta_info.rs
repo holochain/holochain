@@ -1,3 +1,4 @@
+use crate::sweettest::*;
 use fixt::fixt;
 use holo_hash::fixt::DnaHashFixturator;
 use holochain_p2p::HolochainPeerMetaStore;
@@ -8,8 +9,6 @@ use kitsune2_api::PeerMetaStore;
 use kitsune2_api::Timestamp;
 use kitsune2_api::Url;
 use std::sync::Arc;
-
-use crate::sweettest::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn peer_meta_info() {

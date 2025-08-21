@@ -1,7 +1,6 @@
+use holochain_serialized_bytes::prelude::*;
 use std::borrow::Borrow;
 use std::borrow::Cow;
-
-use holochain_serialized_bytes::prelude::*;
 
 const DEFAULT_REQUIRED_VALIDATIONS: u8 = 5;
 

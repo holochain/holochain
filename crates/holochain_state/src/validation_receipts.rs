@@ -1,8 +1,9 @@
 //! Module for items related to aggregating validation_receipts
 
+use crate::mutations;
+use crate::prelude::*;
 use holo_hash::DhtOpHash;
 use holo_hash::{ActionHash, AgentPubKey};
-use holochain_sqlite::prelude::*;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::rusqlite::{named_params, Params, Statement};
@@ -11,9 +12,6 @@ use holochain_types::prelude::{SignedValidationReceipt, ValidationReceipt};
 use holochain_zome_types::prelude::{ValidationReceiptInfo, ValidationReceiptSet};
 use mutations::StateMutationResult;
 use std::collections::HashMap;
-
-use crate::mutations;
-use crate::prelude::*;
 
 pub fn list_receipts(
     txn: &Transaction,

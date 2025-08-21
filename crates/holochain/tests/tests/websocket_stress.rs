@@ -11,11 +11,10 @@ use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AdminInterfaceConfig;
 use holochain_conductor_api::InterfaceDriver;
 use holochain_websocket::WireMessage;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::TempDir;
 use tokio_tungstenite::*;
 use tungstenite::Message;
-
-use std::sync::atomic::{AtomicU64, Ordering};
 
 static ID: AtomicU64 = AtomicU64::new(1);
 

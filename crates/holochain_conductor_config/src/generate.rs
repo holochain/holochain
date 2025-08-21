@@ -128,7 +128,6 @@ pub(crate) fn init_lair_inner(
 mod test {
     use super::*;
     use crate::config::read_config;
-
     use anyhow::Context;
     use holochain_conductor_api::{
         conductor::{paths::KEYSTORE_DIRECTORY, ConductorConfig, KeystoreConfig},

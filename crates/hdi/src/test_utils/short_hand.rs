@@ -1,6 +1,5 @@
-use std::sync::Arc;
-
 use crate::prelude::*;
+use std::sync::Arc;
 
 /// Create [`EntryHash`].
 pub fn eh(i: u8) -> EntryHash {

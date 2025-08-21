@@ -76,6 +76,9 @@
 //! - Once all ops have an outcome, the workflow is complete and will wait to be triggered again by new incoming ops.
 //!
 
+use self::validation_deps::SysValDeps;
+use self::validation_deps::ValidationDependencies;
+use self::validation_deps::ValidationDependencyState;
 use crate::conductor::Conductor;
 use crate::core::queue_consumer::TriggerSender;
 use crate::core::queue_consumer::WorkComplete;
@@ -100,10 +103,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
 use types::Outcome;
-
-use self::validation_deps::SysValDeps;
-use self::validation_deps::ValidationDependencies;
-use self::validation_deps::ValidationDependencyState;
 
 pub mod types;
 

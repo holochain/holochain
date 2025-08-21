@@ -7,6 +7,7 @@ use ed25519_dalek::{Signer, SigningKey};
 use futures::Future;
 use hdk::prelude::*;
 use holochain::conductor::ConductorHandle;
+pub use holochain::sweettest::websocket_client_by_port;
 use holochain::{
     conductor::api::ZomeCallParamsSigned,
     conductor::api::{AdminRequest, AdminResponse, AppRequest},
@@ -24,6 +25,7 @@ use holochain_util::tokio_helper;
 use holochain_websocket::WebsocketSender;
 use holochain_websocket::{WebsocketReceiver, WebsocketResult};
 use matches::assert_matches;
+use mr_bundle::FileSystemBundler;
 use serde::Serialize;
 use std::time::Duration;
 use std::{path::PathBuf, process::Stdio};
@@ -32,9 +34,6 @@ use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::process::Child;
 use tokio::process::Command;
-
-pub use holochain::sweettest::websocket_client_by_port;
-use mr_bundle::FileSystemBundler;
 
 pub async fn admin_port(conductor: &ConductorHandle) -> u16 {
     conductor

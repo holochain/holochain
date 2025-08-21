@@ -5,7 +5,6 @@ use crate::Action;
 use holo_hash::hash_type;
 use holo_hash::HashableContent;
 use holo_hash::HashableContentBytes;
-
 pub use holochain_integrity_types::record::*;
 
 /// A combination of an action and its signature.

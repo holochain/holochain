@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use holo_hash::EntryHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::Row;
 use holochain_state::prelude::*;
 use holochain_state::query::StateQueryError;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct GetEntryOpsQuery(EntryHash);

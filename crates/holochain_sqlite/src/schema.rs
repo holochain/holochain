@@ -13,10 +13,9 @@
 //! file has a change according to `git diff`. This will hopefully help prevent accidental
 //! modification of schemas, which should never be committed.
 
+use crate::db::DbKind;
 use once_cell::sync::Lazy;
 use rusqlite::{Connection, Transaction};
-
-use crate::db::DbKind;
 
 pub static SCHEMA_CELL: Lazy<Schema> = Lazy::new(|| Schema {
     migrations: vec![

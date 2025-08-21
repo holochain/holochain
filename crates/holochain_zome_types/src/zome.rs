@@ -6,9 +6,8 @@
 //! using Rust closures, and is useful for quickly defining zomes on-the-fly
 //! for tests.
 
-use holochain_serialized_bytes::prelude::*;
-
 pub use holochain_integrity_types::zome::*;
+use holochain_serialized_bytes::prelude::*;
 
 mod error;
 pub use error::*;

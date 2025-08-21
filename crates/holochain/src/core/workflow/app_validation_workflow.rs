@@ -107,6 +107,7 @@ use crate::core::validation::OutcomeOrError;
 use crate::core::SysValidationError;
 use crate::core::SysValidationResult;
 use crate::core::ValidationOutcome;
+pub use error::*;
 use holo_hash::DhtOpHash;
 use holochain_cascade::Cascade;
 use holochain_cascade::CascadeImpl;
@@ -123,8 +124,6 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
-
-pub use error::*;
 pub use types::Outcome;
 
 #[cfg(test)]

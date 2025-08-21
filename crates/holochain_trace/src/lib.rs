@@ -73,6 +73,11 @@
 //! tad log.csv
 //! ```
 
+use derive_more::Display;
+use flames::FlameTimed;
+use fmt::*;
+use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 use tracing::Subscriber;
 use tracing_subscriber::{
     filter::EnvFilter,
@@ -86,13 +91,6 @@ use tracing_subscriber::{
     Layer, Registry,
 };
 
-use derive_more::Display;
-use std::str::FromStr;
-use std::sync::{Arc, Mutex};
-
-use flames::FlameTimed;
-use fmt::*;
-
 mod flames;
 mod fmt;
 pub mod metrics;
@@ -100,9 +98,8 @@ mod writer;
 
 mod open;
 
-pub use open::{Config, Context, MsgWrap, OpenSpanExt};
-
 use crate::writer::InMemoryWriter;
+pub use open::{Config, Context, MsgWrap, OpenSpanExt};
 pub use tracing;
 use tracing_subscriber::fmt::MakeWriter;
 

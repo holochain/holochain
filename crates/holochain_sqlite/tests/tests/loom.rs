@@ -1,7 +1,6 @@
 #[cfg(loom)]
 mod tests {
     use loom::sync::atomic::AtomicUsize;
-
     use std::sync::atomic::Ordering::SeqCst;
     use std::sync::Arc;
 

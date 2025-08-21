@@ -1,13 +1,12 @@
 //! # Source Chain Filtering
 //! Types for filtering the source chain.
 
-use std::collections::HashSet;
-
 use crate::MigrationTarget;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 use holochain_timestamp::Timestamp;
+use std::collections::HashSet;
 
 #[cfg(test)]
 mod test;

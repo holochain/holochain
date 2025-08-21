@@ -1,8 +1,7 @@
-use crate::conductor::space::TestSpace;
-use holo_hash::fixt::DnaHashFixturator;
-
 use super::*;
+use crate::conductor::space::TestSpace;
 use ::fixt::prelude::*;
+use holo_hash::fixt::DnaHashFixturator;
 use holochain_keystore::test_keystore;
 use holochain_keystore::AgentPubKeyExt;
 

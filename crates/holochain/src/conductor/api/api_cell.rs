@@ -1,7 +1,5 @@
 //! The CellConductorApi allows Cells to talk to their Conductor
 
-use std::sync::Arc;
-
 use super::error::ConductorApiError;
 use super::error::ConductorApiResult;
 use crate::conductor::error::ConductorResult;
@@ -17,6 +15,7 @@ use holochain_state::prelude::DatabaseResult;
 use holochain_types::prelude::*;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTargetId;
+use std::sync::Arc;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::OwnedPermit;
 

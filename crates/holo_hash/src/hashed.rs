@@ -1,7 +1,6 @@
 use crate::HasHash;
 use crate::HashableContent;
 use crate::HoloHashOf;
-
 #[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
 

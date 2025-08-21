@@ -1,8 +1,7 @@
+use crate::sweettest::*;
 use holochain_types::network::Kitsune2NetworkMetricsRequest;
 use holochain_types::prelude::InstalledAppId;
 use holochain_wasm_test_utils::TestWasm;
-
-use crate::sweettest::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn network_metrics() {

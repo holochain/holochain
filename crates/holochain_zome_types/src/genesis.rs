@@ -9,6 +9,5 @@
 
 #[doc(no_inline)]
 pub use holochain_integrity_types::genesis;
-
 #[doc(inline)]
 pub use holochain_integrity_types::genesis::*;

@@ -1,7 +1,6 @@
+use crate::prelude::{AppManifestError, DnaError, RoleName};
 use holochain_util::ffs;
 use mr_bundle::error::MrBundleError;
-
-use crate::prelude::{AppManifestError, DnaError, RoleName};
 
 /// Errors occurring while installing an AppBundle
 #[derive(thiserror::Error, Debug)]

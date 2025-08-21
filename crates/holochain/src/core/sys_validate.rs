@@ -4,14 +4,13 @@
 use super::queue_consumer::TriggerSender;
 use super::workflow::incoming_dht_ops_workflow::incoming_dht_ops_workflow;
 use crate::conductor::space::Space;
-use holochain_keystore::AgentPubKeyExt;
-use holochain_types::prelude::*;
-use std::sync::Arc;
-
 pub use error::*;
 pub use holo_hash::*;
+use holochain_keystore::AgentPubKeyExt;
 pub use holochain_state::source_chain::SourceChainError;
 pub use holochain_state::source_chain::SourceChainResult;
+use holochain_types::prelude::*;
+use std::sync::Arc;
 
 mod error;
 #[cfg(test)]

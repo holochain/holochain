@@ -1,5 +1,6 @@
 use crate::scratch::FilteredScratch;
 use crate::scratch::Scratch;
+pub use error::*;
 use fallible_iterator::FallibleIterator;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
@@ -18,8 +19,6 @@ use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
-
-pub use error::*;
 
 #[cfg(test)]
 mod test_data;

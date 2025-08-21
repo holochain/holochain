@@ -1,11 +1,9 @@
-use record_details::GetRecordDetailsQuery;
-
+use super::*;
 use crate::{
     prelude::mutations_helpers::insert_valid_integrated_op,
     query::entry_details::GetEntryDetailsQuery,
 };
-
-use super::*;
+use record_details::GetRecordDetailsQuery;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn entry_scratch_same_as_sql() {

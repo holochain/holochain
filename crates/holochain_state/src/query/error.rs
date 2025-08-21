@@ -1,7 +1,6 @@
+use crate::scratch::SyncScratchError;
 use holochain_types::prelude::*;
 use thiserror::Error;
-
-use crate::scratch::SyncScratchError;
 #[derive(Error, Debug)]
 pub enum StateQueryError {
     #[error(transparent)]

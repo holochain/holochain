@@ -1,11 +1,8 @@
-use holo_hash::*;
+use super::*;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_types::sql::ToSqlStatement;
 use holochain_zome_types::op::ChainOpType;
-use holochain_zome_types::prelude::*;
 use std::fmt::Debug;
-
-use super::*;
 
 #[derive(Debug, Clone)]
 pub struct GetLinksQuery {

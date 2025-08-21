@@ -1,9 +1,8 @@
 use super::*;
 use crate::error::HoloHashError;
-use std::convert::TryInto;
-
 #[cfg(feature = "serialization")]
 use holochain_serialized_bytes::prelude::*;
+use std::convert::TryInto;
 
 /// The AnyDht (composite) HashType
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]

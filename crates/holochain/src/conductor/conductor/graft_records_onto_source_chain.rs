@@ -1,7 +1,6 @@
+use super::*;
 use holochain_state::source_chain::SourceChain;
 use holochain_types::prelude::ChainItem;
-
-use super::*;
 
 impl Conductor {
     /// Inject records into a source chain for a cell.

@@ -1,3 +1,4 @@
+use super::test_utils::*;
 use assert_cmd::prelude::*;
 use holochain::sweettest::WsPollRecv;
 use holochain_conductor_api::config::conductor::ConductorConfig;
@@ -10,8 +11,6 @@ use lair_keystore_api::ipc_keystore::*;
 use lair_keystore_api::mem_store::*;
 use lair_keystore_api::prelude::*;
 use std::sync::{Arc, Mutex};
-
-use super::test_utils::*;
 
 const ADMIN_PORT: u16 = 12909;
 

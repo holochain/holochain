@@ -56,10 +56,9 @@ impl Eq for HumanTimestamp {}
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use super::*;
     use holochain_serialized_bytes::{holochain_serial, SerializedBytes};
+    use std::str::FromStr;
 
     holochain_serial!(HumanTimestamp);
 

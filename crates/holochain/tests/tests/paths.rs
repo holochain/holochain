@@ -1,7 +1,6 @@
-use std::time::Duration;
-
 use holochain::sweettest::{await_consistency, SweetConductor, SweetConductorBatch, SweetDnaFile};
 use holochain_wasm_test_utils::TestWasm;
+use std::time::Duration;
 
 #[derive(Debug, PartialEq, Eq, serde::Deserialize)]
 pub struct BookEntry {

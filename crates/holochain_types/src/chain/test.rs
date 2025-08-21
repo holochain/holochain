@@ -1,13 +1,10 @@
 // clippy... this is just the test_case syntax...
 #![allow(clippy::single_range_in_vec_init)]
-use holo_hash::*;
+use super::*;
+use crate::test_utils::chain::*;
 use std::collections::HashMap;
 use std::ops::Range;
 use test_case::test_case;
-
-use crate::test_utils::chain::*;
-
-use super::*;
 
 type TestHash = <TestChainItem as ChainItem>::Hash;
 type TestFilter = ChainFilter<TestHash>;

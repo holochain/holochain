@@ -1,6 +1,5 @@
-use holochain_integrity_types::{CapClaimEntry, CapGrantEntry};
-
 use super::*;
+use holochain_integrity_types::{CapClaimEntry, CapGrantEntry};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Data specific to the [`Op::StoreEntry`](holochain_integrity_types::op::Op::StoreEntry)

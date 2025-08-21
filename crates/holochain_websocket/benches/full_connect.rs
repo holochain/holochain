@@ -1,10 +1,9 @@
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
-use std::net::ToSocketAddrs;
-
 use holochain_serialized_bytes::prelude::*;
 use holochain_websocket::*;
+use std::net::ToSocketAddrs;
 use tokio::runtime::Builder;
 use tokio::runtime::Runtime;
 

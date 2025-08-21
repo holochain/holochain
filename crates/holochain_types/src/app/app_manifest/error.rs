@@ -1,7 +1,6 @@
+use crate::prelude::RoleName;
 use holochain_serialized_bytes::SerializedBytesError;
 use thiserror::Error;
-
-use crate::prelude::RoleName;
 
 #[allow(missing_docs)]
 #[derive(Debug, Error, PartialEq, Eq)]

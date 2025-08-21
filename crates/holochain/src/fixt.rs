@@ -28,6 +28,7 @@ use holochain_keystore::MetaLairClient;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::host_fn_workspace::HostFnWorkspace;
 use holochain_state::host_fn_workspace::HostFnWorkspaceRead;
+pub use holochain_types::fixt::*;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 #[cfg(feature = "wasmer_sys")]
@@ -39,8 +40,6 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 use tokio::sync::broadcast;
-
-pub use holochain_types::fixt::*;
 
 /// A collection of test WASMs.
 pub struct Zomes(pub Vec<TestWasm>);

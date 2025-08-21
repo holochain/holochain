@@ -16,13 +16,12 @@
 //! persisted in a `.hc` file which is created wherever you are using
 //! the CLI.
 
-use std::process::Command;
-
 // Useful to have this public when using this as a library.
 use clap::{crate_version, Parser, Subcommand};
 pub use holochain_cli_bundle as hc_bundle;
 use holochain_cli_sandbox as hc_sandbox;
 use lazy_static::lazy_static;
+use std::process::Command;
 
 mod external_subcommands;
 

@@ -1,7 +1,6 @@
 use crate::prelude::*;
-use holochain_wasmer_common::*;
-
 pub use holochain_integrity_types::validate::*;
+use holochain_wasmer_common::*;
 
 /// The validation status for an op or record
 /// much of this happens in the subconscious

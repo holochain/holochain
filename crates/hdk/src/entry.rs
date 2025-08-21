@@ -1,5 +1,4 @@
 use crate::prelude::*;
-
 pub use hdi::entry::*;
 
 /// General function that can create any entry type.

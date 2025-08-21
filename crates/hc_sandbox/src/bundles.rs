@@ -1,10 +1,9 @@
 //! Helpers for working with DNA files.
 
-use std::path::Path;
-use std::path::PathBuf;
-
 use anyhow::bail;
 use anyhow::ensure;
+use std::path::Path;
+use std::path::PathBuf;
 use walkdir::WalkDir;
 
 /// Parse a list of DNAs.

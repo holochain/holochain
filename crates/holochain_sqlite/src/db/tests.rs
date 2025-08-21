@@ -1,9 +1,7 @@
-use tempfile::TempDir;
-
-use crate::prelude::{DatabaseResult, DbKindWasm};
-
 use super::pool::num_read_threads;
 use super::DbWrite;
+use crate::prelude::{DatabaseResult, DbKindWasm};
+use tempfile::TempDir;
 
 /// This test does prove that making all transactions
 /// synchronous fixes the db timeout issue but it's slow

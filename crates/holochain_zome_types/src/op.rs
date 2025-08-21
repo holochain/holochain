@@ -6,7 +6,6 @@ use holochain_integrity_types::Action;
 
 #[doc(no_inline)]
 pub use holochain_integrity_types::op;
-
 #[doc(inline)]
 pub use holochain_integrity_types::op::*;
 

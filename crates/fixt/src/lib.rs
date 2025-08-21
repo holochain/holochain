@@ -10,7 +10,6 @@ pub mod serialized_bytes;
 pub mod string;
 pub mod unit;
 pub use paste;
-
 pub use rng::rng;
 
 /// the Fixturator is the struct that we wrap in our FooFixturator newtypes to impl Iterator over

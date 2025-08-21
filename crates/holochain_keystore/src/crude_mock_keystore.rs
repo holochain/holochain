@@ -2,9 +2,6 @@
 //! call. This is about as close as we can get to a true mock which would allow
 //! tweaking individual handlers, hence why this is a "crude" mock.
 
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
-
 use crate::spawn_test_keystore;
 use crate::MetaLairClient;
 use futures::FutureExt;
@@ -12,6 +9,8 @@ use lair_keystore::dependencies::lair_keystore_api::lair_client::client_traits::
 use lair_keystore::dependencies::lair_keystore_api::prelude::{LairApiEnum, LairClient};
 use lair_keystore::dependencies::lair_keystore_api::types::SharedSizedLockedArray;
 use lair_keystore::dependencies::lair_keystore_api::LairResult;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 /// Spawn a test keystore which always returns the same LairError for every call.
 pub async fn spawn_crude_mock_keystore<F>(err_fn: F) -> MetaLairClient

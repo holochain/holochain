@@ -1,8 +1,7 @@
 //! Rate limiting data types
 
-use holochain_serialized_bytes::prelude::*;
-
 use crate::{Create, CreateLink, Delete, Entry, Update};
+use holochain_serialized_bytes::prelude::*;
 
 /// Input to the `weigh` callback. Includes an "unweighed" action, and Entry
 /// if applicable.

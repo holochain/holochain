@@ -1,8 +1,7 @@
 //! Paths for the keystore.
 
-use std::path::PathBuf;
-
 use schemars::JsonSchema;
+use std::path::PathBuf;
 
 /// Subdirectory of the data directory where the conductor stores its
 /// keystore. Keep the path short so that when it's used in CI the path doesn't

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-
 pub use hdk_derive::hdk_entry_helper;
 pub use hdk_derive::hdk_entry_types;
 

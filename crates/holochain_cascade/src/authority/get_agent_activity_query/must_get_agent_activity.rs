@@ -1,5 +1,3 @@
-use std::ops::RangeInclusive;
-
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_sqlite::prelude::{DbKindDht, DbRead};
@@ -8,6 +6,7 @@ use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::must_get_agent_activity::*;
 use holochain_state::prelude::*;
+use std::ops::RangeInclusive;
 
 #[cfg(test)]
 mod test;

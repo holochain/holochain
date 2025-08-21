@@ -1,9 +1,8 @@
+use crate::sweettest::{SweetConductor, SweetDnaFile};
 use holochain_conductor_api::CellInfo;
 use holochain_types::prelude::*;
 use holochain_wasm_test_utils::TestWasm;
 use matches::matches;
-
-use crate::sweettest::{SweetConductor, SweetDnaFile};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn app_info_returns_all_cells_with_info() {

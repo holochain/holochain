@@ -3,12 +3,6 @@
 //! This module is designed for use in a CLI so it is more simplified
 //! than calling the [`AdminWebsocket`] directly.
 
-use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::path::Path;
-use std::path::PathBuf;
-use std::sync::Arc;
-
 use crate::cmds::Existing;
 use crate::ports::get_admin_ports;
 use crate::run::run_async;
@@ -36,7 +30,12 @@ use holochain_types::websocket::AllowedOrigins;
 use kitsune2_api::AgentInfoSigned;
 use kitsune2_api::Url;
 use kitsune2_core::Ed25519Verifier;
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::path::Path;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 #[doc(hidden)]
 #[derive(Debug, Parser)]

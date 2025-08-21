@@ -3,13 +3,12 @@ pub mod genesis_self_check;
 pub mod init;
 pub mod post_commit;
 pub mod validate;
-use std::collections::VecDeque;
-
 use super::HostContext;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::ribosome::Invocation;
 use crate::core::ribosome::RibosomeT;
 use holochain_types::prelude::*;
+use std::collections::VecDeque;
 use tokio::task::JoinHandle;
 
 pub type CallStreamItem = Result<(Zome, ExternIO), (Zome, RibosomeError)>;

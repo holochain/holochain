@@ -1,7 +1,6 @@
+use crate::core::workflow::WorkflowResult;
 use holochain_sqlite::db::DbKindDht;
 use holochain_state::prelude::*;
-
-use crate::core::workflow::WorkflowResult;
 
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
@@ -91,14 +90,13 @@ async fn get_ops_to_validate(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use ::fixt::prelude::*;
     use holo_hash::HasHash;
     use holochain_sqlite::prelude::DatabaseResult;
-    use holochain_state::prelude::*;
+
     use holochain_state::validation_db::ValidationStage;
     use std::collections::HashSet;
-
-    use super::*;
 
     #[derive(Debug, Clone, Copy)]
     struct Facts {

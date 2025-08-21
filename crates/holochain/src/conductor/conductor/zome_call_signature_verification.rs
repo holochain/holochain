@@ -1,8 +1,7 @@
+use crate::conductor::api::error::ConductorApiResult;
 use holo_hash::{sha2_512, AgentPubKey};
 use holochain_keystore::AgentPubKeyExt;
 use holochain_types::prelude::Signature;
-
-use crate::conductor::api::error::ConductorApiResult;
 
 pub(crate) async fn is_valid_signature(
     provenance: &AgentPubKey,
@@ -18,11 +17,10 @@ pub(crate) async fn is_valid_signature(
 
 #[cfg(test)]
 mod tests {
+    use super::is_valid_signature;
     use holo_hash::{sha2_512, AgentPubKey};
     use holochain_keystore::{test_keystore, AgentPubKeyExt};
     use holochain_types::prelude::Signature;
-
-    use super::is_valid_signature;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn valid_signature() {

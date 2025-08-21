@@ -1,6 +1,3 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-
 use assert2::{assert, let_assert};
 use holochain::conductor::api::error::ConductorApiError;
 use holochain::conductor::CellError;
@@ -8,6 +5,8 @@ use holochain::core::workflow::WorkflowError;
 use holochain::prelude::*;
 use holochain::sweettest::*;
 use holochain_state::source_chain::SourceChainError;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_to_validate_in_inline_zomes_passes() {

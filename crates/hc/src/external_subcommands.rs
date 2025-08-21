@@ -1,9 +1,8 @@
+use crate::builtin_commands;
 use std::{
     env, fs,
     path::{Path, PathBuf},
 };
-
-use crate::builtin_commands;
 
 /// List all runnable commands.
 pub fn list_external_subcommands() -> Vec<String> {

@@ -1,3 +1,4 @@
+use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
 use crate::db::conn::PConn;
 use crate::db::databases::DATABASE_HANDLES;
 use crate::db::guard::{PConnGuard, PTxnGuard};
@@ -20,8 +21,6 @@ use std::{collections::HashMap, path::Path};
 use std::{path::PathBuf, sync::atomic::AtomicUsize};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tracing::Instrument;
-
-use super::metrics::{create_connection_use_time_metric, create_pool_usage_metric, UseTimeMetric};
 
 static ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(10_000);
 static THREAD_ACQUIRE_TIMEOUT_MS: AtomicU64 = AtomicU64::new(30_000);

@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use holochain_cascade::test_utils::*;
 use holochain_cascade::CascadeImpl;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::action_hash;
+use std::sync::Arc;
 
 // Checks that links can be counted by asking a remote peer who is an authority on the base for the count
 #[tokio::test(flavor = "multi_thread")]

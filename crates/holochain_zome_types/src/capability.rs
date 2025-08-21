@@ -24,13 +24,11 @@
 //! information needed to refer to the capability as well as the secret needed
 //! to send to the Grantor.
 
-use serde::{Deserialize, Serialize};
-
 use crate::prelude::*;
+use serde::{Deserialize, Serialize};
 
 mod grant;
 pub use grant::*;
-
 pub use holochain_integrity_types::capability::*;
 
 /// Parameters for granting a zome call capability.

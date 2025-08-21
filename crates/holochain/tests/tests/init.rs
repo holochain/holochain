@@ -1,6 +1,3 @@
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::Arc;
-
 use assert2::{assert, let_assert};
 use hdk::prelude::{WasmError, WasmErrorInner};
 use holochain::conductor::api::error::ConductorApiError;
@@ -10,6 +7,8 @@ use holochain::core::workflow::WorkflowError;
 use holochain::prelude::*;
 use holochain::sweettest::*;
 use holochain_wasm_test_utils::TestWasm;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn call_init_in_inline_zomes_passes() {

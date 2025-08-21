@@ -518,11 +518,9 @@ pub enum UnitEnumEither<E: UnitEnum> {
 #[cfg(test)]
 mod tests {
 
-    use holo_hash::AnyLinkableHash;
-
-    use crate::{AppEntryBytes, EntryVisibility, Signature, SIGNATURE_BYTES};
-
     use super::*;
+    use crate::{AppEntryBytes, EntryVisibility, Signature, SIGNATURE_BYTES};
+    use holo_hash::AnyLinkableHash;
 
     #[test]
     fn test_should_get_action_hash_for_store_record() {

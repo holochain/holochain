@@ -1,11 +1,10 @@
+use super::metrics::UseTimeMetric;
 use crate::db::conn::PConn;
 use crate::error::DatabaseResult;
 use rusqlite::Transaction;
 use std::ops::{Deref, DerefMut};
 use std::time::Instant;
 use tokio::sync::OwnedSemaphorePermit;
-
-use super::metrics::UseTimeMetric;
 
 pub(super) struct PConnGuard {
     conn: PConn,

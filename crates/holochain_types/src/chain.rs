@@ -1,7 +1,4 @@
 //! Types related to an agents for chain activity
-use std::iter::Peekable;
-use std::ops::RangeInclusive;
-
 use crate::activity::AgentActivityResponse;
 use crate::activity::ChainItems;
 use crate::warrant::WarrantOp;
@@ -10,6 +7,8 @@ use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
+use std::iter::Peekable;
+use std::ops::RangeInclusive;
 
 #[cfg(all(test, feature = "test_utils"))]
 mod test;

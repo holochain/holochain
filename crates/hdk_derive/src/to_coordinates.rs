@@ -1,3 +1,6 @@
+use crate::util::get_single_tuple_variant;
+use crate::util::ignore_enum_data;
+use crate::util::index_to_u8;
 use darling::FromMeta;
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
@@ -7,10 +10,6 @@ use syn::AttributeArgs;
 use syn::Item;
 use syn::ItemEnum;
 use syn::Variant;
-
-use crate::util::get_single_tuple_variant;
-use crate::util::ignore_enum_data;
-use crate::util::index_to_u8;
 
 #[derive(Debug, FromMeta)]
 /// Type for parsing the `#[hdk_to_coordinates(nested = true)]`

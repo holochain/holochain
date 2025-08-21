@@ -35,9 +35,8 @@ pub fn fresh_nonce(
 
 #[cfg(test)]
 pub mod test {
-    use holochain_timestamp::Timestamp;
-
     use crate::{fresh_nonce, FRESH_NONCE_EXPIRES_AFTER};
+    use holochain_timestamp::Timestamp;
 
     #[test]
     fn test_fresh_nonce() {

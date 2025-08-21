@@ -14,6 +14,8 @@ pub use crate::crdt::*;
 pub use crate::dna_def::*;
 pub use crate::entry::*;
 pub use crate::entry_def::*;
+#[cfg(feature = "fixturators")]
+pub use crate::fixt::*;
 pub use crate::genesis::*;
 pub use crate::info::*;
 pub use crate::init::*;
@@ -30,20 +32,14 @@ pub use crate::request::*;
 pub use crate::schedule::*;
 pub use crate::signal::*;
 pub use crate::signature::*;
+#[cfg(feature = "test_utils")]
+pub use crate::test_utils::*;
 pub use crate::validate::*;
 pub use crate::warrant::*;
 pub use crate::x_salsa20_poly1305::*;
+#[cfg(feature = "full-dna-def")]
+pub use crate::zome::inline_zome::*;
 pub use crate::zome::*;
 pub use crate::zome_io::ExternIO;
 pub use crate::zome_io::*;
-
 pub use holochain_integrity_types::prelude::*;
-
-#[cfg(feature = "full-dna-def")]
-pub use crate::zome::inline_zome::*;
-
-#[cfg(feature = "fixturators")]
-pub use crate::fixt::*;
-
-#[cfg(feature = "test_utils")]
-pub use crate::test_utils::*;

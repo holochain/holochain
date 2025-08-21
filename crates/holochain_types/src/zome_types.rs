@@ -1,8 +1,7 @@
 //! Helpers for constructing and using zome types correctly.
-use std::collections::HashMap;
-
 pub use error::*;
 use holochain_zome_types::prelude::*;
+use std::collections::HashMap;
 
 #[allow(missing_docs)]
 mod error;
