@@ -110,7 +110,7 @@ pub fn delete_link<'a>(
 #[cfg(test)]
 #[cfg(feature = "slow_tests")]
 pub mod slow_tests {
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::test_utils::RibosomeTestFixture;
     use hdk::prelude::*;
     use holo_hash::ActionHash;
     use holochain_wasm_test_utils::TestWasm;

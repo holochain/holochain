@@ -40,9 +40,9 @@ pub fn block_agent(
 #[cfg(test)]
 mod test {
     use crate::conductor::api::error::ConductorApiResult;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::sweettest::*;
     use crate::test_utils::conditional_consistency::*;
+    use crate::test_utils::RibosomeTestFixture;
     use holo_hash::ActionHash;
     use holo_hash::AgentPubKey;
     use holochain_types::prelude::CapSecret;

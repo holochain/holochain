@@ -6,6 +6,7 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- Changed `schedule` host fn unit tests to integration tests. 
 - **BREAKING CHANGE**: Deprecate `AppManifest::UseExisting`. For late binding, update the coordinators of a DNA. For calling cells of other apps, bridge calls can be used.
 - Fix: Unschedule already scheduled persisted functions on error or when the schedule is set to `None`.
 

@@ -732,14 +732,9 @@ pub fn weigh_placeholder() -> EntryRateWeight {
 #[cfg(test)]
 pub mod wasm_test {
     use crate::core::ribosome::FnComponents;
-    use crate::sweettest::SweetCell;
-    use crate::sweettest::SweetConductor;
-    use crate::sweettest::SweetDnaFile;
-    use crate::sweettest::SweetZome;
-    use crate::test_utils::host_fn_caller::HostFnCaller;
+    use crate::test_utils;
     use core::time::Duration;
     use hdk::prelude::*;
-    use holo_hash::AgentPubKey;
     use holochain_nonce::fresh_nonce;
     use holochain_wasm_test_utils::TestWasm;
     use holochain_zome_types::zome_io::ZomeCallParams;
@@ -753,13 +748,13 @@ pub mod wasm_test {
     #[tokio::test(flavor = "multi_thread")]
     async fn verify_zome_call_test() {
         holochain_trace::test_run();
-        let RibosomeTestFixture {
+        let test_utils::RibosomeTestFixture {
             conductor,
             alice,
             alice_pubkey,
             bob_pubkey,
             ..
-        } = RibosomeTestFixture::new(TestWasm::Capability).await;
+        } = test_utils::RibosomeTestFixture::new(TestWasm::Capability).await;
 
         let now = Timestamp::now();
         let (nonce, expires_at) = fresh_nonce(now).unwrap();
@@ -816,63 +811,5 @@ pub mod wasm_test {
         let expected = vec!["foo_bar_baz", "foo_bar", "foo"];
 
         assert_eq!(fn_components.into_iter().collect::<Vec<String>>(), expected,);
-    }
-
-    pub struct RibosomeTestFixture {
-        pub conductor: SweetConductor,
-        pub alice_pubkey: AgentPubKey,
-        pub bob_pubkey: AgentPubKey,
-        pub alice: SweetZome,
-        pub bob: SweetZome,
-        pub alice_cell: SweetCell,
-        pub bob_cell: SweetCell,
-        pub alice_host_fn_caller: HostFnCaller,
-        pub bob_host_fn_caller: HostFnCaller,
-    }
-
-    impl RibosomeTestFixture {
-        pub async fn new(test_wasm: TestWasm) -> Self {
-            let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
-
-            let mut conductor = SweetConductor::from_standard_config().await;
-
-            let apps = conductor.setup_apps("app-", 2, [&dna_file]).await.unwrap();
-
-            let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
-
-            let alice_host_fn_caller = HostFnCaller::create_for_zome(
-                alice_cell.cell_id(),
-                &conductor.raw_handle(),
-                &dna_file,
-                0,
-            )
-            .await;
-
-            let bob_host_fn_caller = HostFnCaller::create_for_zome(
-                bob_cell.cell_id(),
-                &conductor.raw_handle(),
-                &dna_file,
-                0,
-            )
-            .await;
-
-            let alice = alice_cell.zome(test_wasm);
-            let bob = bob_cell.zome(test_wasm);
-
-            let alice_pubkey = alice_cell.agent_pubkey().clone();
-            let bob_pubkey = bob_cell.agent_pubkey().clone();
-
-            Self {
-                conductor,
-                alice_pubkey,
-                bob_pubkey,
-                alice,
-                bob,
-                alice_cell,
-                bob_cell,
-                alice_host_fn_caller,
-                bob_host_fn_caller,
-            }
-        }
     }
 }

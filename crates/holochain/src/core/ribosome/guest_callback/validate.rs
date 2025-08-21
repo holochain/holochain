@@ -244,7 +244,6 @@ mod slow_tests {
     use crate::conductor::api::error::ConductorApiError;
     use crate::conductor::CellError;
     use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::core::ribosome::RibosomeError;
     use crate::core::ribosome::RibosomeT;
     use crate::core::ribosome::ZomesToInvoke;
@@ -252,6 +251,7 @@ mod slow_tests {
     use crate::fixt::Zomes;
     use crate::fixt::*;
     use crate::sweettest::{SweetConductor, SweetDnaFile};
+    use crate::test_utils::RibosomeTestFixture;
     use ::fixt::prelude::*;
     use assert2::{assert, let_assert};
     use holochain_state::source_chain::SourceChainError;

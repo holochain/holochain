@@ -132,7 +132,7 @@ pub fn must_get_agent_activity(
 
 #[cfg(test)]
 pub mod test {
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
+    use crate::test_utils::RibosomeTestFixture;
     use hdk::prelude::*;
     use holochain_wasm_test_utils::TestWasm;
 

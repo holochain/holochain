@@ -55,9 +55,9 @@ pub fn trace(
 pub mod wasm_test {
     use super::*;
 
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::fixt::CallContextFixturator;
     use crate::fixt::RealRibosomeFixturator;
+    use crate::test_utils::RibosomeTestFixture;
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
 

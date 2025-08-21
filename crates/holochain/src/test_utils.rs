@@ -49,6 +49,8 @@ pub mod conditional_consistency;
 
 mod big_stack_test;
 
+use crate::sweettest::{SweetCell, SweetConductor, SweetDnaFile, SweetZome};
+use crate::test_utils::host_fn_caller::HostFnCaller;
 use holochain_types::websocket::AllowedOrigins;
 
 /// Produce file and line number info at compile-time
@@ -549,4 +551,73 @@ pub async fn force_publish_dht_ops(
         .await?;
     publish_trigger.trigger(&"force_publish_dht_ops");
     Ok(())
+}
+
+/// Fixture of two cells running a given TestWasm
+pub struct RibosomeTestFixture {
+    /// conductor running the cells
+    pub conductor: SweetConductor,
+    /// first cell's agent key
+    pub alice_pubkey: AgentPubKey,
+    /// second cell's agent key
+    pub bob_pubkey: AgentPubKey,
+    /// first cell's SweetZome
+    pub alice: SweetZome,
+    /// second cell's SweetZome
+    pub bob: SweetZome,
+    /// first cell's SweetCell
+    pub alice_cell: SweetCell,
+    /// second cell's SweetCell
+    pub bob_cell: SweetCell,
+    /// first cell's HostFnCaller
+    pub alice_host_fn_caller: HostFnCaller,
+    /// second cell's HostFnCaller
+    pub bob_host_fn_caller: HostFnCaller,
+}
+
+impl RibosomeTestFixture {
+    /// Create and setup the fixture with the given TestWasm
+    pub async fn new(test_wasm: TestWasm) -> Self {
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![test_wasm]).await;
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let apps = conductor.setup_apps("app-", 2, [&dna_file]).await.unwrap();
+
+        let ((alice_cell,), (bob_cell,)) = apps.into_tuples();
+
+        let alice_host_fn_caller = HostFnCaller::create_for_zome(
+            alice_cell.cell_id(),
+            &conductor.raw_handle(),
+            &dna_file,
+            0,
+        )
+        .await;
+
+        let bob_host_fn_caller = HostFnCaller::create_for_zome(
+            bob_cell.cell_id(),
+            &conductor.raw_handle(),
+            &dna_file,
+            0,
+        )
+        .await;
+
+        let alice = alice_cell.zome(test_wasm);
+        let bob = bob_cell.zome(test_wasm);
+
+        let alice_pubkey = alice_cell.agent_pubkey().clone();
+        let bob_pubkey = bob_cell.agent_pubkey().clone();
+
+        Self {
+            conductor,
+            alice_pubkey,
+            bob_pubkey,
+            alice,
+            bob,
+            alice_cell,
+            bob_cell,
+            alice_host_fn_caller,
+            bob_host_fn_caller,
+        }
+    }
 }

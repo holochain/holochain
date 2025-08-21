@@ -106,9 +106,9 @@ pub fn create<'a>(
 #[cfg(feature = "slow_tests")]
 pub mod wasm_test {
     use super::create;
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::fixt::*;
     use crate::sweettest::*;
+    use crate::test_utils::RibosomeTestFixture;
     use ::fixt::prelude::*;
     use hdk::prelude::*;
     use holo_hash::AnyDhtHash;

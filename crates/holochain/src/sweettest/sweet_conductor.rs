@@ -16,6 +16,7 @@ use holochain_conductor_api::{
     AdminRequest, AdminResponse, AppAuthenticationRequest, CellInfo, ProvisionedCell,
 };
 use holochain_keystore::MetaLairClient;
+use holochain_state::mutations::StateMutationResult;
 use holochain_state::prelude::test_db_dir;
 use holochain_state::source_chain::SourceChain;
 use holochain_state::test_utils::TestDir;
@@ -987,6 +988,19 @@ impl SweetConductor {
                 .unwrap();
             Ok(all_integrated)
         })
+    }
+
+    /// Manually trigger scheduled fn dispatch
+    pub async fn dispatch_scheduled_fns(&self, now: Timestamp) {
+        self.raw_handle().dispatch_scheduled_fns(now).await;
+    }
+
+    /// Manually start the scheduler
+    pub async fn start_scheduler(
+        &self,
+        interval_period: std::time::Duration,
+    ) -> StateMutationResult<()> {
+        self.raw_handle().start_scheduler(interval_period).await
     }
 }
 

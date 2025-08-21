@@ -263,8 +263,8 @@ pub mod wasm_test {
     use matches::assert_matches;
     use rusqlite::named_params;
 
-    use crate::core::ribosome::wasm_test::RibosomeTestFixture;
     use crate::test_utils::new_zome_call_params;
+    use crate::test_utils::RibosomeTestFixture;
     use holochain_sqlite::prelude::DatabaseResult;
 
     #[tokio::test(flavor = "multi_thread")]
