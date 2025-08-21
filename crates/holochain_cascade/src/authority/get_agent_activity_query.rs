@@ -8,7 +8,7 @@ use holochain_types::prelude::{
 };
 use holochain_zome_types::prelude::{
     ChainFork, ChainHead, ChainQueryFilter, ChainStatus, HasValidationStatus, HighestObserved,
-    Judged, ValidationStatus, Warrant,
+    Judged, SignedWarrant, ValidationStatus,
 };
 
 pub mod hashes;
@@ -20,7 +20,7 @@ pub struct State<T> {
     pub(super) valid: Vec<T>,
     pub(super) rejected: Vec<T>,
     pub(super) pending: Vec<T>,
-    pub(super) warrants: Vec<Warrant>,
+    pub(super) warrants: Vec<SignedWarrant>,
     pub(super) status: Option<ChainStatus>,
 }
 
@@ -40,7 +40,7 @@ impl<T> Default for State<T> {
 pub enum Item<T> {
     Integrated(T),
     Pending(T),
-    Warrant(Warrant),
+    Warrant(SignedWarrant),
 }
 
 fn fold<T: ActionHashedContainer>(
@@ -90,7 +90,7 @@ fn fold<T: ActionHashedContainer>(
 
 /// Find the highest observed sequence number from multiple action lists.
 ///
-/// THe function searches the valid, rejected, and pending action lists for the highest sequence
+/// The function searches the valid, rejected, and pending action lists for the highest sequence
 /// number. If there are multiple actions with the same sequence number, all of their hashes are
 /// returned.
 fn compute_highest_observed<T: ActionSequenceAndHash>(state: &State<T>) -> Option<HighestObserved> {

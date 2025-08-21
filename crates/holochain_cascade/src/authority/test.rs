@@ -200,16 +200,14 @@ async fn get_agent_activity() {
         fixt!(AgentPubKey),
         td.agent.clone(),
     );
-    {
-        let warrant_op_valid =
-            WarrantOp::from(SignedWarrant::new(warrant_valid.clone(), fixt!(Signature)))
-                .into_hashed();
 
-        let warrant_op_invalid = WarrantOp::from(SignedWarrant::new(
-            warrant_invalid.clone(),
-            fixt!(Signature),
-        ))
-        .into_hashed();
+    let signed_warrant_valid = SignedWarrant::new(warrant_valid.clone(), fixt!(Signature));
+    let signed_warrant_invalid = SignedWarrant::new(warrant_invalid.clone(), fixt!(Signature));
+
+    {
+        let warrant_op_valid = WarrantOp::from(signed_warrant_valid.clone()).into_hashed();
+
+        let warrant_op_invalid = WarrantOp::from(signed_warrant_invalid).into_hashed();
 
         db.write_async(move |txn| {
             {
@@ -251,7 +249,7 @@ async fn get_agent_activity() {
         agent: td.agent.clone(),
         valid_activity: td.valid_hashes.clone(),
         rejected_activity: ChainItems::NotRequested,
-        warrants: vec![warrant_valid],
+        warrants: vec![signed_warrant_valid],
         status: ChainStatus::Valid(td.chain_head.clone()),
         highest_observed: Some(td.highest_observed.clone()),
     };
