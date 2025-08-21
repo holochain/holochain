@@ -1,5 +1,6 @@
 //! Types for warrants
 
+use crate::op::ChainOpType;
 use crate::signature::Signed;
 use holo_hash::*;
 use holochain_integrity_types::Signature;
@@ -130,25 +131,25 @@ impl FromSql for WarrantType {
     }
 }
 
-/// A warrant which is sent to AgentActivity authorities
+/// A warrant which is sent to agent activity authorities.
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash)]
 pub enum ChainIntegrityWarrant {
     /// Something invalid was authored on a chain.
-    /// When we receive this warrant, we fetch the Action and validate it
-    /// under every applicable DhtOpType.
-    // TODO: include ChainOpType, which allows the receipient to only run
-    //       validation for that op type. At the time of writing, this was
-    //       non-trivial because ChainOpType is in a downstream crate.
+    ///
+    /// When we receive this warrant, we fetch the Action and validate it as the specified chain
+    /// op type.
     InvalidChainOp {
-        /// The author of the action
+        /// The author of the invalid action.
         action_author: AgentPubKey,
-        /// The hash of the action to fetch by
+        /// The action hash and its signature.
         action: ActionHashAndSig,
-        /// Whether to run app or sys validation
+        /// The type of validation that produced the warrant.
         validation_type: ValidationType,
+        /// The chain op type that was the validation context for this action being judged invalid.
+        chain_op_type: ChainOpType,
     },
 
-    /// Proof of chain fork.
+    /// Proof of a chain fork.
     ChainFork {
         /// Author of the chain which is forked
         chain_author: AgentPubKey,
@@ -157,7 +158,7 @@ pub enum ChainIntegrityWarrant {
     },
 }
 
-/// Action hash with the signature of the action at that hash
+/// Action hash with the signature of the action at that hash.
 pub type ActionHashAndSig = (ActionHash, Signature);
 
 impl WarrantProof {
@@ -186,7 +187,7 @@ impl WarrantProof {
     }
 }
 
-/// Not necessary but nice to have
+/// The type of validation discovered the validation failure that led to a warrant.
 #[derive(
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
 )]
@@ -197,5 +198,5 @@ pub enum ValidationType {
     App,
 }
 
-/// A signed warrant with timestamp
+/// A signed warrant with a timestamp
 pub type SignedWarrant = Signed<Warrant>;

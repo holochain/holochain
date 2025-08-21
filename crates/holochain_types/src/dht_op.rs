@@ -238,94 +238,6 @@ impl FromSql for DhtOpType {
     }
 }
 
-/// A sys validation dependency
-pub type SysValDeps = Vec<ActionHash>;
-
-/// This enum is used to encode just the enum variant of ChainOp
-#[allow(missing_docs)]
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    Serialize,
-    Deserialize,
-    Eq,
-    PartialEq,
-    Hash,
-    derive_more::Display,
-    strum_macros::EnumString,
-)]
-pub enum ChainOpType {
-    #[display("StoreRecord")]
-    StoreRecord,
-    #[display("StoreEntry")]
-    StoreEntry,
-    #[display("RegisterAgentActivity")]
-    RegisterAgentActivity,
-    #[display("RegisterUpdatedContent")]
-    RegisterUpdatedContent,
-    #[display("RegisterUpdatedRecord")]
-    RegisterUpdatedRecord,
-    #[display("RegisterDeletedBy")]
-    RegisterDeletedBy,
-    #[display("RegisterDeletedEntryAction")]
-    RegisterDeletedEntryAction,
-    #[display("RegisterAddLink")]
-    RegisterAddLink,
-    #[display("RegisterRemoveLink")]
-    RegisterRemoveLink,
-}
-impl ChainOpType {
-    /// Calculate the op's sys validation dependencies (action hashes)
-    pub fn sys_validation_dependencies(&self, action: &Action) -> SysValDeps {
-        match self {
-            ChainOpType::StoreRecord | ChainOpType::StoreEntry => vec![],
-            ChainOpType::RegisterAgentActivity => action
-                .prev_action()
-                .map(|p| vec![p.clone()])
-                .unwrap_or_default(),
-            ChainOpType::RegisterUpdatedContent | ChainOpType::RegisterUpdatedRecord => {
-                match action {
-                    Action::Update(update) => vec![update.original_action_address.clone()],
-                    _ => vec![],
-                }
-            }
-            ChainOpType::RegisterDeletedBy | ChainOpType::RegisterDeletedEntryAction => {
-                match action {
-                    Action::Delete(delete) => vec![delete.deletes_address.clone()],
-                    _ => vec![],
-                }
-            }
-            ChainOpType::RegisterAddLink => vec![],
-            ChainOpType::RegisterRemoveLink => match action {
-                Action::DeleteLink(delete_link) => vec![delete_link.link_add_address.clone()],
-                _ => vec![],
-            },
-        }
-    }
-}
-
-impl rusqlite::ToSql for ChainOpType {
-    fn to_sql(
-        &self,
-    ) -> holochain_sqlite::rusqlite::Result<holochain_sqlite::rusqlite::types::ToSqlOutput> {
-        Ok(holochain_sqlite::rusqlite::types::ToSqlOutput::Owned(
-            format!("{}", self).into(),
-        ))
-    }
-}
-
-impl rusqlite::types::FromSql for ChainOpType {
-    fn column_result(
-        value: holochain_sqlite::rusqlite::types::ValueRef<'_>,
-    ) -> holochain_sqlite::rusqlite::types::FromSqlResult<Self> {
-        String::column_result(value).and_then(|string| {
-            ChainOpType::from_str(&string)
-                .map_err(|_| holochain_sqlite::rusqlite::types::FromSqlError::InvalidType)
-        })
-    }
-}
-
 impl DhtOp {
     /// If this is a chain op, return that
     pub fn as_chain_op(&self) -> Option<&ChainOp> {
@@ -391,7 +303,7 @@ impl DhtOp {
     }
 
     /// Calculate the op's sys validation dependency action hash
-    pub fn sys_validation_dependencies(&self) -> SysValDeps {
+    pub fn sys_validation_dependencies(&self) -> Vec<ActionHash> {
         match self {
             Self::ChainOp(op) => op.get_type().sys_validation_dependencies(&op.action()),
             Self::WarrantOp(op) => match &op.proof {
@@ -707,7 +619,7 @@ impl ChainOp {
     }
 
     /// Calculate the op's sys validation dependency action hash
-    pub fn sys_validation_dependencies(&self) -> SysValDeps {
+    pub fn sys_validation_dependencies(&self) -> Vec<ActionHash> {
         self.get_type().sys_validation_dependencies(&self.action())
     }
 

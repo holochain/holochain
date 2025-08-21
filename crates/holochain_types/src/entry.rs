@@ -5,16 +5,15 @@
 //! It defines serialization behaviour for entries. Here you can find the complete list of
 //! entry_types, and special entries, like deletion_entry and cap_entry.
 
-use holo_hash::*;
-use holochain_zome_types::prelude::*;
-
 use crate::action::WireDelete;
 use crate::action::WireNewEntryAction;
 use crate::action::WireUpdateRelationship;
-use crate::dht_op::ChainOpType;
 use crate::dht_op::DhtOpResult;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
+use holo_hash::*;
+use holochain_zome_types::op::ChainOpType;
+use holochain_zome_types::prelude::*;
 
 /// Convenience function for when you have a RecordEntry but need
 /// a Option EntryHashed

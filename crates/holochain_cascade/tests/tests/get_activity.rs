@@ -472,6 +472,7 @@ fn warrant(warrantee: u8) -> WarrantOp {
         action_author: ::fixt::fixt!(AgentPubKey),
         action: (::fixt::fixt!(ActionHash), ::fixt::fixt!(Signature)),
         validation_type: ValidationType::Sys,
+        chain_op_type: ChainOpType::StoreRecord,
     });
     let warrant = Warrant::new(
         p,

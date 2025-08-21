@@ -7,9 +7,10 @@ use holochain_state::prelude::{
 };
 use holochain_state::query::QueryData;
 use holochain_types::activity::AgentActivityResponse;
-use holochain_types::dht_op::{ChainOpType, DhtOpType};
+use holochain_types::dht_op::DhtOpType;
 use holochain_types::prelude::WarrantOpType;
 use holochain_zome_types::judged::Judged;
+use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::{
     ChainQueryFilter, SignedAction, SignedWarrant, ValidationStatus,
 };

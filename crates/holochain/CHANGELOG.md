@@ -6,6 +6,10 @@ default_semver_increment_mode: !pre_minor dev
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+- **BREAKING CHANGE**: Move `ChainOpType` from `holochain_types` to `holochain_zome_types`. #5236
+- **BREAKING CHANGE**: Remove the `SysValDeps` typedef and use instead `Vec<ActionHash>` in the few places that was used. #5236
+- **BREAKING CHANGE**: Modify the fields of `ChainIntegrityWarrant::ChainIntegrityWarrant` to add a `ChainOpType` field which allows just one op type to be validated when checking the warrant. #5236
 - Changed `schedule` host fn unit tests to integration tests. 
 - **BREAKING CHANGE**: Deprecate `AppManifest::UseExisting`. For late binding, update the coordinators of a DNA. For calling cells of other apps, bridge calls can be used.
 - Fix: Unschedule already scheduled persisted functions on error or when the schedule is set to `None`.
