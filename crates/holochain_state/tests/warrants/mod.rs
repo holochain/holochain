@@ -14,6 +14,7 @@ use holochain_types::{
         WarrantType,
     },
 };
+use holochain_zome_types::prelude::ChainOpType;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn write_invalid_op_warrant_to_database() {
@@ -23,6 +24,7 @@ async fn write_invalid_op_warrant_to_database() {
             action_author: fixt!(AgentPubKey),
             action: (fixt!(ActionHash), fixt!(Signature)),
             validation_type: ValidationType::Sys,
+            chain_op_type: ChainOpType::StoreRecord,
         }),
         fixt!(AgentPubKey),
         Timestamp::now(),

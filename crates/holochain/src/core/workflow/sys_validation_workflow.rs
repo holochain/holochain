@@ -1263,6 +1263,7 @@ pub async fn make_invalid_chain_warrant_op_inner(
         action_author: action_author.clone(),
         action: (action.to_hash().clone(), op.signature().clone()),
         validation_type,
+        chain_op_type: op.get_type(),
     });
     let warrant = Warrant::new(proof, warrant_author, Timestamp::now(), action_author);
     let warrant_op = WarrantOp::sign(keystore, warrant)

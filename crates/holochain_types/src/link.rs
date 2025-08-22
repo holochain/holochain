@@ -1,17 +1,16 @@
 //! Links interrelate entries in a source chain.
 
-use holo_hash::ActionHash;
-use holo_hash::AgentPubKey;
-use holo_hash::AnyLinkableHash;
-use holochain_serialized_bytes::prelude::*;
-use holochain_zome_types::prelude::*;
-use regex::Regex;
-
-use crate::dht_op::ChainOpType;
 use crate::dht_op::DhtOpError;
 use crate::dht_op::DhtOpResult;
 use crate::dht_op::RenderedOp;
 use crate::dht_op::RenderedOps;
+use holo_hash::ActionHash;
+use holo_hash::AgentPubKey;
+use holo_hash::AnyLinkableHash;
+use holochain_serialized_bytes::prelude::*;
+use holochain_zome_types::op::ChainOpType;
+use holochain_zome_types::prelude::*;
+use regex::Regex;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// Link key for sending across the wire for get links requests.

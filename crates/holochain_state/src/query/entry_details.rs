@@ -1,8 +1,8 @@
 use holo_hash::*;
 use holochain_sqlite::rusqlite::named_params;
-use holochain_types::dht_op::ChainOpType;
 use holochain_types::prelude::DhtOpError;
 use holochain_types::prelude::Judged;
+use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::*;
 use std::fmt::Debug;
 

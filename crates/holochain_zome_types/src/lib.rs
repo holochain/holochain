@@ -40,7 +40,6 @@ pub mod judged;
 #[allow(missing_docs)]
 pub mod link;
 pub mod metadata;
-#[allow(missing_docs)]
 pub mod op;
 pub mod prelude;
 #[cfg(feature = "properties")]

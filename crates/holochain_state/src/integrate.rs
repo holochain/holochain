@@ -1,9 +1,10 @@
 use crate::{prelude::*, query::get_public_op_from_db};
 use holo_hash::{AnyLinkableHash, DhtOpHash, HasHash};
 use holochain_types::{
-    dht_op::{ChainOpType, DhtOp, DhtOpHashed},
+    dht_op::{DhtOp, DhtOpHashed},
     prelude::*,
 };
+use holochain_zome_types::op::ChainOpType;
 use kitsune2_api::DhtArc;
 
 /// Insert any authored ops that have been locally validated
