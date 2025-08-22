@@ -24,8 +24,8 @@
 //!    function without the proper functioning of that cell.
 
 mod error;
+use super::ConductorHandle;
 pub use error::*;
-
 use futures::Future;
 use futures::FutureExt;
 use holochain_types::prelude::*;
@@ -35,8 +35,6 @@ use task_motel::StopListener;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tracing::*;
-
-use super::ConductorHandle;
 
 /// The main interface for interacting with a task manager.
 /// Contains functions for adding tasks to groups, stopping task groups,

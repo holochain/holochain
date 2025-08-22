@@ -52,12 +52,11 @@ pub async fn witness_nonce(
 
 #[cfg(test)]
 pub mod test {
+    use crate::{nonce::WitnessNonceResult, prelude::test_conductor_db};
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holochain_nonce::fresh_nonce;
     use holochain_zome_types::prelude::*;
-
-    use crate::{nonce::WitnessNonceResult, prelude::test_conductor_db};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_witness_nonce() {

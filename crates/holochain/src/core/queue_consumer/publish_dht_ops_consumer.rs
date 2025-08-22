@@ -1,7 +1,6 @@
 //! The workflow and queue consumer for sys validation
 
 use super::*;
-
 use crate::core::workflow::publish_dht_ops_workflow::publish_dht_ops_workflow;
 
 /// Spawn the QueueConsumer for Publish workflow

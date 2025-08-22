@@ -1,12 +1,10 @@
+use super::*;
+use crate::mutations::insert_op_scratch;
+use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 use holochain_sqlite::rusqlite::Connection;
 use holochain_sqlite::rusqlite::TransactionBehavior;
 use holochain_sqlite::schema::SCHEMA_CELL;
 use test_data::RecordTestData;
-
-use crate::mutations::insert_op_scratch;
-use crate::prelude::mutations_helpers::insert_valid_integrated_op;
-
-use super::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn can_handle_update_in_scratch() {

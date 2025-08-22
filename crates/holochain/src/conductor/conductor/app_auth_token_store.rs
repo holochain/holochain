@@ -1,11 +1,10 @@
+use crate::conductor::error::{ConductorError, ConductorResult};
 use holochain_conductor_api::AppAuthenticationToken;
+use holochain_types::prelude::InstalledAppId;
 use rand::RngCore;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::time::SystemTime;
-
-use crate::conductor::error::{ConductorError, ConductorResult};
-use holochain_types::prelude::InstalledAppId;
 
 pub struct AppAuthTokenStore {
     issued_tokens: HashMap<AppAuthenticationToken, TokenMeta>,

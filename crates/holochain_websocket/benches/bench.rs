@@ -2,7 +2,6 @@ use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::BenchmarkId;
 use criterion::Criterion;
-
 use holochain_serialized_bytes::prelude::*;
 use holochain_websocket::*;
 use tokio::runtime::Builder;

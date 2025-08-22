@@ -1,8 +1,5 @@
 //! Types for source chain queries
 
-use std::collections::HashMap;
-use std::collections::HashSet;
-
 use crate::prelude::*;
 use crate::warrant::Warrant;
 use holo_hash::EntryHash;
@@ -11,6 +8,8 @@ use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
 use holochain_integrity_types::{LinkTag, LinkTypeFilter};
 pub use holochain_serialized_bytes::prelude::*;
 use holochain_wasmer_common::WasmError;
+use std::collections::HashMap;
+use std::collections::HashSet;
 
 /// Defines several ways that queries can be restricted to a range.
 /// Notably hash bounded ranges disambiguate forks whereas sequence indexes do

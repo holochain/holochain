@@ -1,14 +1,13 @@
 //! Countersigned entries involve preflights between many agents to build a session that is part of the entry.
 
-use std::iter::FromIterator;
-use std::time::Duration;
-
 use crate::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::SerializedBytesError;
 use holochain_timestamp::Timestamp;
+use std::iter::FromIterator;
+use std::time::Duration;
 
 /// The timestamps on actions for a session use this offset relative to the session start time.
 /// This makes it easier for agents to accept a preflight request with actions that are after their current chain top, after network latency.

@@ -1,13 +1,11 @@
-use std::time::Duration;
-
-use rusqlite::named_params;
-
 use holo_hash::AnyDhtHash;
 use holochain::sweettest::*;
 use holochain::test_utils::wait_for_integration;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_zome_types::prelude::*;
+use rusqlite::named_params;
+use std::time::Duration;
 
 /// - Alice commits an entry and it is in their authored store
 /// - Bob doesn't have the entry in their authored store

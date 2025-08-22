@@ -1,11 +1,10 @@
-use std::io::Write;
-use std::{io, path::PathBuf};
-
 use holochain_types::prelude::{
     AppBundle, AppManifest, AppManifestCurrentBuilder, AppRoleManifest, DnaBundle, DnaManifest,
 };
 use holochain_types::web_app::{WebAppBundle, WebAppManifest};
 use mr_bundle::FileSystemBundler;
+use std::io::Write;
+use std::{io, path::PathBuf};
 
 fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {
     let mut input = String::new();

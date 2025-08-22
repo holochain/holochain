@@ -3,6 +3,8 @@
 use crate::authority;
 use crate::authority::get_entry_ops_query::GetEntryOpsQuery;
 use crate::authority::get_record_query::GetRecordOpsQuery;
+pub use activity_test_data::*;
+pub use entry_test_data::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
@@ -13,25 +15,22 @@ use holochain_p2p::actor;
 use holochain_p2p::event::CountersigningSessionNegotiationMessage;
 use holochain_p2p::HolochainP2pDnaT;
 use holochain_p2p::HolochainP2pError;
+use holochain_p2p::HolochainP2pResult;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_state::prelude::*;
 use holochain_types::test_utils::chain::chain_to_ops;
 use holochain_types::test_utils::chain::entry_hash;
 use holochain_types::test_utils::chain::TestChainItem;
+use holochain_types::test_utils::ActionRefMut;
+use holochain_types::validation_receipt::ValidationReceiptBundle;
 use kitsune2_api::AgentInfoSigned;
 use kitsune2_api::StoredOp;
+pub use record_test_data::*;
 use std::collections::HashSet;
 use std::sync::Arc;
 use QueryFilter;
 use Signature;
 use ValidationStatus;
-
-pub use activity_test_data::*;
-pub use entry_test_data::*;
-use holochain_p2p::HolochainP2pResult;
-use holochain_types::test_utils::ActionRefMut;
-use holochain_types::validation_receipt::ValidationReceiptBundle;
-pub use record_test_data::*;
 
 mod activity_test_data;
 mod entry_test_data;

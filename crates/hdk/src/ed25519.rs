@@ -1,5 +1,4 @@
 use crate::prelude::*;
-
 pub use hdi::ed25519::*;
 
 /// Sign something that is serializable using the private key for the passed public key.

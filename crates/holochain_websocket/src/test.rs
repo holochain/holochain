@@ -1,9 +1,8 @@
 //! holochain_websocket tests
 
+use crate::*;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::task::JoinHandle;
-
-use crate::*;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn sanity() {

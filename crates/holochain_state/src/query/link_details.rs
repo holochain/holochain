@@ -1,10 +1,7 @@
-use crate::query::link::GetLinksFilter;
-use holo_hash::*;
-use holochain_zome_types::prelude::*;
-use std::fmt::Debug;
-
 use super::link::LinksQuery;
 use super::*;
+use crate::query::link::GetLinksFilter;
+use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct GetLinkDetailsQuery {

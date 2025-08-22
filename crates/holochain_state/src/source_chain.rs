@@ -1,21 +1,22 @@
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-
 use crate::chain_lock::{get_chain_lock, ChainLock};
 use crate::integrate::authored_ops_to_dht_db;
 use crate::integrate::authored_ops_to_dht_db_without_check;
+use crate::prelude::*;
 use crate::query::chain_head::AuthoredChainHeadQuery;
 use crate::scratch::ScratchError;
 use crate::scratch::SyncScratchError;
+use crate::source_chain;
 use async_recursion::async_recursion;
+pub use error::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holo_hash::DnaHash;
+use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holochain_chc::*;
 use holochain_keystore::MetaLairClient;
+use holochain_sqlite::rusqlite;
 use holochain_sqlite::rusqlite::params;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_sqlite::sql::sql_cell::SELECT_VALID_AGENT_PUB_KEY;
@@ -24,13 +25,9 @@ use holochain_sqlite::sql::sql_conductor::SELECT_VALID_UNRESTRICTED_CAP_GRANT;
 use holochain_state_types::SourceChainDumpRecord;
 use holochain_types::sql::AsSql;
 use kitsune2_api::DhtArc;
-
-use crate::prelude::*;
-use crate::source_chain;
-use holo_hash::EntryHash;
-
-pub use error::*;
-use holochain_sqlite::rusqlite;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 mod error;
 
@@ -1335,18 +1332,16 @@ impl From<SourceChain> for SourceChainRead {
 
 #[cfg(test)]
 mod tests {
-    use holo_hash::fixt::AgentPubKeyFixturator;
-    use holo_hash::fixt::DnaHashFixturator;
-    use std::collections::BTreeSet;
-
     use super::*;
     use crate::prelude::*;
-    use ::fixt::prelude::*;
-    use holochain_keystore::test_keystore;
-    use matches::assert_matches;
-
     use crate::source_chain::SourceChainResult;
+    use ::fixt::prelude::*;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::fixt::DnaHashFixturator;
+    use holochain_keystore::test_keystore;
     use holochain_zome_types::Entry;
+    use matches::assert_matches;
+    use std::collections::BTreeSet;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_relaxed_ordering() -> SourceChainResult<()> {

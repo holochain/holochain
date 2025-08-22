@@ -1,5 +1,4 @@
 use crate::prelude::*;
-
 pub use holochain_integrity_types::x_salsa20_poly1305::*;
 
 #[derive(PartialEq, Clone, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]

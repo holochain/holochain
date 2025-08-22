@@ -3,10 +3,9 @@
 
 mod composite;
 mod primitive;
+use crate::error::HoloHashResult;
 pub use composite::*;
 pub use primitive::*;
-
-use crate::error::HoloHashResult;
 
 /// Every HoloHash is generic over HashType.
 /// Additionally, every HashableContent has an associated HashType.

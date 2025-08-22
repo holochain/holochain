@@ -46,13 +46,11 @@ pub mod app_manifest_validated;
 mod current;
 mod error;
 
+use self::app_manifest_validated::AppManifestValidated;
+use super::ModifiersMap;
 pub use app_manifest_v0::{AppRoleDnaManifest, CellProvisioning};
 pub use current::*;
 pub use error::*;
-
-use self::app_manifest_validated::AppManifestValidated;
-
-use super::ModifiersMap;
 
 /// Container struct which uses the `manifest_version` field to determine
 /// which manifest version to deserialize to.
@@ -149,9 +147,8 @@ impl AppManifest {
 
 #[cfg(test)]
 mod tests {
-    use mr_bundle::{resource_id_for_path, Manifest};
-
     use crate::app::app_manifest::{AppManifest, AppManifestV0Builder, AppRoleManifest};
+    use mr_bundle::{resource_id_for_path, Manifest};
 
     #[test]
     /// Replicate this test for any new version of the manifest that gets created

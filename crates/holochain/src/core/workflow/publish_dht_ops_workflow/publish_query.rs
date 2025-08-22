@@ -1,7 +1,4 @@
-use std::time::Duration;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
-
+use crate::core::workflow::WorkflowResult;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
 use holochain_sqlite::db::DbKindAuthored;
@@ -10,8 +7,9 @@ use holochain_state::prelude::*;
 use holochain_state::query::map_sql_dht_op;
 use rusqlite::named_params;
 use rusqlite::Transaction;
-
-use crate::core::workflow::WorkflowResult;
+use std::time::Duration;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
 /// Get all dht ops on an agents chain that need to be published.
 /// - Don't publish private entries.
@@ -111,6 +109,7 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use ::fixt::prelude::*;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::EntryHash;
@@ -118,9 +117,6 @@ mod tests {
     use holochain_conductor_api::conductor::ConductorTuningParams;
     use holochain_sqlite::db::DbWrite;
     use holochain_sqlite::prelude::DatabaseResult;
-    use holochain_state::prelude::*;
-
-    use super::*;
 
     #[derive(Debug, Clone, Copy)]
     struct Facts {

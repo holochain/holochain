@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use holo_hash::AgentPubKey;
@@ -10,6 +8,7 @@ use holochain_zome_types::{
     dependencies::holochain_integrity_types::Signature,
     zome_io::{ExternIO, ZomeCallParams},
 };
+use std::sync::Arc;
 
 pub(crate) mod client_signing;
 

@@ -26,12 +26,18 @@ use crate::core::ribosome::guest_callback::post_commit::PostCommitInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateInvocation;
 use crate::core::ribosome::guest_callback::validate::ValidateResult;
 use crate::core::ribosome::guest_callback::CallStream;
+#[cfg(feature = "unstable-countersigning")]
+use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
 use crate::core::ribosome::host_fn::agent_info::agent_info;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::block_agent::block_agent;
 use crate::core::ribosome::host_fn::call::call;
 use crate::core::ribosome::host_fn::call_info::call_info;
 use crate::core::ribosome::host_fn::capability_claims::capability_claims;
 use crate::core::ribosome::host_fn::capability_grants::capability_grants;
 use crate::core::ribosome::host_fn::capability_info::capability_info;
+use crate::core::ribosome::host_fn::close_chain::close_chain;
+use crate::core::ribosome::host_fn::count_links::count_links;
 use crate::core::ribosome::host_fn::create::create;
 use crate::core::ribosome::host_fn::create_clone_cell::create_clone_cell;
 use crate::core::ribosome::host_fn::create_link::create_link;
@@ -47,17 +53,25 @@ use crate::core::ribosome::host_fn::get::get;
 use crate::core::ribosome::host_fn::get_details::get_details;
 use crate::core::ribosome::host_fn::get_links::get_links;
 use crate::core::ribosome::host_fn::get_links_details::get_links_details;
+use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
 use crate::core::ribosome::host_fn::must_get_action::must_get_action;
 use crate::core::ribosome::host_fn::must_get_agent_activity::must_get_agent_activity;
 use crate::core::ribosome::host_fn::must_get_entry::must_get_entry;
 use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record;
+use crate::core::ribosome::host_fn::open_chain::open_chain;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::send_remote_signal::send_remote_signal;
 use crate::core::ribosome::host_fn::sign::sign;
 use crate::core::ribosome::host_fn::sign_ephemeral::sign_ephemeral;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::sleep::sleep;
 use crate::core::ribosome::host_fn::sys_time::sys_time;
 use crate::core::ribosome::host_fn::trace::trace;
+#[cfg(feature = "unstable-functions")]
+use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
 use crate::core::ribosome::host_fn::update::update;
 use crate::core::ribosome::host_fn::verify_signature::verify_signature;
 use crate::core::ribosome::host_fn::version::version;
@@ -77,13 +91,22 @@ use crate::core::ribosome::RibosomeT;
 use crate::core::ribosome::ZomeCallInvocation;
 use futures::FutureExt;
 use holochain_types::prelude::*;
+use holochain_types::zome_types::GlobalZomeTypes;
+use holochain_types::zome_types::ZomeTypesError;
 use holochain_util::timed;
 use holochain_wasmer_host::module::build_module as build_wasmer_module;
 use holochain_wasmer_host::module::CacheKey;
 use holochain_wasmer_host::module::InstanceWithStore;
 use holochain_wasmer_host::module::ModuleCache;
+use holochain_wasmer_host::prelude::*;
 use holochain_wasmer_host::prelude::{wasm_error, WasmError, WasmErrorInner};
 use must_future::MustBoxFuture;
+use once_cell::sync::Lazy;
+use opentelemetry_api::global::meter_with_version;
+use opentelemetry_api::metrics::Counter;
+use std::collections::HashMap;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use tokio_stream::StreamExt;
 use wasmer::AsStoreMut;
 use wasmer::Exports;
@@ -96,31 +119,6 @@ use wasmer::Module;
 use wasmer::RuntimeError;
 use wasmer::Store;
 use wasmer::Type;
-
-#[cfg(feature = "unstable-countersigning")]
-use crate::core::ribosome::host_fn::accept_countersigning_preflight_request::accept_countersigning_preflight_request;
-#[cfg(feature = "unstable-functions")]
-use crate::core::ribosome::host_fn::block_agent::block_agent;
-#[cfg(feature = "unstable-functions")]
-use crate::core::ribosome::host_fn::schedule::schedule;
-#[cfg(feature = "unstable-functions")]
-use crate::core::ribosome::host_fn::sleep::sleep;
-#[cfg(feature = "unstable-functions")]
-use crate::core::ribosome::host_fn::unblock_agent::unblock_agent;
-
-use crate::core::ribosome::host_fn::close_chain::close_chain;
-use crate::core::ribosome::host_fn::count_links::count_links;
-use crate::core::ribosome::host_fn::get_validation_receipts::get_validation_receipts;
-use crate::core::ribosome::host_fn::open_chain::open_chain;
-use holochain_types::zome_types::GlobalZomeTypes;
-use holochain_types::zome_types::ZomeTypesError;
-use holochain_wasmer_host::prelude::*;
-use once_cell::sync::Lazy;
-use opentelemetry_api::global::meter_with_version;
-use opentelemetry_api::metrics::Counter;
-use std::collections::HashMap;
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
 
 #[cfg(feature = "wasmer_sys")]
 mod wasmer_sys;

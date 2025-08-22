@@ -1,9 +1,8 @@
+use darling::FromDeriveInput;
+use darling::FromVariant;
 use holochain_integrity_types::EntryVisibility;
 use holochain_integrity_types::RequiredValidations;
 use proc_macro::TokenStream;
-
-use darling::FromDeriveInput;
-use darling::FromVariant;
 use proc_macro_error::abort;
 use syn::parse_macro_input;
 

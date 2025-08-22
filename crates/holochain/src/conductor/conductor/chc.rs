@@ -1,6 +1,5 @@
-use holochain_chc::ChcImpl;
-
 use super::*;
+use holochain_chc::ChcImpl;
 
 impl Conductor {
     /// Get access to the CHC used by the conductor

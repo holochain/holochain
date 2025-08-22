@@ -5,10 +5,9 @@
 use crate::action::NewEntryAction;
 use crate::prelude::*;
 use ::fixt::prelude::*;
+pub use holochain_zome_types::fixt::*;
 use rand::seq::IteratorRandom;
 use std::iter::Iterator;
-
-pub use holochain_zome_types::fixt::*;
 
 fixturator!(
     Permission;

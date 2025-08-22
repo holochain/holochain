@@ -27,13 +27,12 @@ use holochain_types::prelude::*;
 use holochain_types::test_utils::fake_dna_file;
 use holochain_types::test_utils::fake_dna_zomes;
 use holochain_wasm_test_utils::TestWasm;
+pub use itertools;
 use rusqlite::named_params;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::time::error::Elapsed;
-
-pub use itertools;
 
 pub mod consistency;
 pub mod hc_stress_test;

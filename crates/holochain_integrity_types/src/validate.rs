@@ -1,8 +1,7 @@
+use crate::chain::ChainFilter;
 use holo_hash::AgentPubKey;
 use holo_hash::AnyDhtHash;
 use holochain_serialized_bytes::prelude::*;
-
-use crate::chain::ChainFilter;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub enum ValidateCallbackResult {

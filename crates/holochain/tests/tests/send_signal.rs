@@ -1,6 +1,3 @@
-use std::net::ToSocketAddrs;
-use std::sync::Arc;
-
 use holochain::sweettest::{
     authenticate_app_ws_client, SweetConductor, SweetConductorConfig, SweetDnaFile,
     SweetLocalRendezvous,
@@ -11,6 +8,8 @@ use holochain_types::signal::Signal;
 use holochain_types::websocket::AllowedOrigins;
 use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::{ConnectRequest, WebsocketConfig};
+use std::net::ToSocketAddrs;
+use std::sync::Arc;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn send_signal_after_conductor_restart() {

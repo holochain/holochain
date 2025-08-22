@@ -1,15 +1,13 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::Mutex;
-
+use crate::prelude::*;
+use crate::query::StmtIter;
 use holo_hash::ActionHash;
 use holo_hash::AnyDhtHash;
 use holo_hash::EntryHash;
 use holochain_keystore::KeystoreError;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::Mutex;
 use thiserror::Error;
-
-use crate::prelude::*;
-use crate::query::StmtIter;
 
 /// The "scratch" is an in-memory space to stage Actions to be committed at the
 /// end of the CallZome workflow.

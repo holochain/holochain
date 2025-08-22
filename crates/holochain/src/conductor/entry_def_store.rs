@@ -1,18 +1,16 @@
 //! # Entry Defs Store
 //! Stores all the entry definitions across zomes
+use super::Conductor;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsHostAccess;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsInvocation;
 use crate::core::ribosome::guest_callback::entry_defs::EntryDefsResult;
 use crate::core::ribosome::real_ribosome::RealRibosome;
 use crate::core::ribosome::RibosomeT;
-
 use error::EntryDefStoreError;
 use error::EntryDefStoreResult;
 use holo_hash::*;
 use holochain_types::prelude::*;
 use std::collections::HashMap;
-
-use super::Conductor;
 
 pub mod error;
 

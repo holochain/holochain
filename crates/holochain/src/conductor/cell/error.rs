@@ -10,7 +10,6 @@ use holochain_p2p::HolochainP2pError;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use holochain_zome_types::cell::CellId;
-
 use std::path::PathBuf;
 use thiserror::Error;
 

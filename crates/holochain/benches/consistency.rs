@@ -2,7 +2,6 @@ use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::BenchmarkId;
 use criterion::Criterion;
-
 use holo_hash::EntryHash;
 use holo_hash::EntryHashes;
 use holochain::sweettest::*;

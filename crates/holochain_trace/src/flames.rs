@@ -1,9 +1,8 @@
-use tracing_core::field::Field;
-use tracing_subscriber::field::Visit;
-
 use crate::writer::InMemoryWriter;
 use chrono::SecondsFormat;
 use std::path::PathBuf;
+use tracing_core::field::Field;
+use tracing_subscriber::field::Visit;
 
 pub(crate) struct EventFieldFlameVisitor {
     pub samples: usize,

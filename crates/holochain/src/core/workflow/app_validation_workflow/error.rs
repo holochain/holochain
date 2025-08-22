@@ -1,14 +1,12 @@
-use holochain_p2p::HolochainP2pError;
-use holochain_types::prelude::*;
-use thiserror::Error;
-
+use super::types::Outcome;
 use crate::conductor::entry_def_store::error::EntryDefStoreError;
 use crate::core::ribosome::error::RibosomeError;
 use crate::core::validation::OutcomeOrError;
 use crate::core::{SourceChainError, SysValidationError};
 use crate::from_sub_error;
-
-use super::types::Outcome;
+use holochain_p2p::HolochainP2pError;
+use holochain_types::prelude::*;
+use thiserror::Error;
 
 #[allow(missing_docs)]
 #[derive(Error, Debug)]

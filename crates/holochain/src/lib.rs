@@ -8,7 +8,6 @@ pub mod docs;
 
 #[cfg(feature = "hdk")]
 pub use hdk::HDI_VERSION;
-
 #[cfg(feature = "hdk")]
 pub use hdk::HDK_VERSION;
 
@@ -36,18 +35,14 @@ mod local_network_tests;
 
 /// Common imports when using the Holochain crate.
 pub mod prelude {
-    pub use holo_hash;
-
     #[cfg(feature = "hdk")]
     pub use hdk::link::GetLinksInputBuilder;
-
-    pub use holochain_types::prelude::{fixt, *};
-
-    #[cfg(feature = "fuzzing")]
-    pub use kitsune_p2p::{NOISE, *};
-
+    pub use holo_hash;
     #[cfg(feature = "test_utils")]
     pub use holochain_types::inline_zome::*;
+    pub use holochain_types::prelude::{fixt, *};
+    #[cfg(feature = "fuzzing")]
+    pub use kitsune_p2p::{NOISE, *};
 }
 
 #[cfg(all(feature = "wasmer_sys", feature = "wasmer_wamr"))]

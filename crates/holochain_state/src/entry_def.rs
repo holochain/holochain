@@ -1,3 +1,7 @@
+use crate::mutations;
+use crate::prelude::from_blob;
+use crate::prelude::StateMutationResult;
+use crate::prelude::StateQueryResult;
 use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::rusqlite;
 use holochain_sqlite::rusqlite::named_params;
@@ -6,11 +10,6 @@ use holochain_sqlite::rusqlite::ToSql;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::EntryDefBufferKey;
 use holochain_zome_types::prelude::*;
-
-use crate::mutations;
-use crate::prelude::from_blob;
-use crate::prelude::StateMutationResult;
-use crate::prelude::StateQueryResult;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub struct EntryDefStoreKey(SerializedBytes);

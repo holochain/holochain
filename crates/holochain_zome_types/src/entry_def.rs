@@ -1,6 +1,5 @@
-pub use holochain_integrity_types::entry_def::*;
-
 use crate::prelude::*;
+pub use holochain_integrity_types::entry_def::*;
 use holochain_wasmer_common::WasmError;
 
 impl CallbackResult for EntryDefsCallbackResult {

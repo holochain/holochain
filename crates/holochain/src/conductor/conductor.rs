@@ -37,27 +37,47 @@ pub const WASM_CACHE: &str = "wasm-cache";
 
 pub use self::share::RwShare;
 use super::api::error::ConductorApiError;
-
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
-use std::time::Instant;
-
+use super::api::AppInterfaceApi;
+use super::config::AdminInterfaceConfig;
+use super::config::InterfaceDriver;
+use super::entry_def_store::get_entry_defs;
+use super::error::ConductorError;
+use super::interface::error::InterfaceResult;
+use super::interface::websocket::spawn_admin_interface_tasks;
+use super::interface::websocket::spawn_app_interface_task;
+use super::interface::websocket::spawn_websocket_listener;
+use super::manager::TaskManagerResult;
+use super::ribosome_store::RibosomeStore;
+use super::space::Space;
+use super::space::Spaces;
+use super::state::AppInterfaceConfig;
+use super::state::AppInterfaceId;
+use super::state::ConductorState;
+use super::CellError;
+use super::{api::AdminInterfaceApi, manager::TaskManagerClient};
+use crate::conductor::cell::Cell;
+use crate::conductor::conductor::app_auth_token_store::AppAuthTokenStore;
+use crate::conductor::conductor::app_broadcast::AppBroadcast;
+use crate::conductor::config::ConductorConfig;
+use crate::conductor::error::ConductorResult;
+use crate::core::queue_consumer::InitialQueueTriggers;
+use crate::core::queue_consumer::QueueConsumerMap;
+#[cfg(any(test, feature = "test_utils"))]
+use crate::core::queue_consumer::QueueTriggers;
+use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
+use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
+use crate::core::ribosome::real_ribosome::ModuleCacheLock;
+use crate::core::ribosome::RibosomeT;
+use crate::core::workflow::ZomeCallResult;
+use crate::{
+    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
+};
+pub use builder::*;
 use futures::future;
 use futures::future::FutureExt;
 use futures::future::TryFutureExt;
 use futures::stream::StreamExt;
-#[cfg(feature = "wasmer_sys")]
-use holochain_wasmer_host::module::ModuleCache;
-use indexmap::IndexMap;
-use itertools::Itertools;
-use rusqlite::Transaction;
-use tokio::sync::mpsc::error::SendError;
-use tokio::task::JoinHandle;
-use tracing::*;
-
-pub use builder::*;
 use holo_hash::DnaHash;
 use holochain_conductor_api::conductor::KeystoreConfig;
 use holochain_conductor_api::AppInfo;
@@ -77,46 +97,21 @@ use holochain_state::nonce::WitnessNonceResult;
 use holochain_state::prelude::*;
 use holochain_state::source_chain;
 pub use holochain_types::share;
+#[cfg(feature = "wasmer_sys")]
+use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::prelude::{AppCapGrantInfo, ClonedCell, Signature, Timestamp};
+use indexmap::IndexMap;
+use itertools::Itertools;
 use kitsune2_api::AgentInfoSigned;
-
-use crate::conductor::cell::Cell;
-use crate::conductor::conductor::app_auth_token_store::AppAuthTokenStore;
-use crate::conductor::conductor::app_broadcast::AppBroadcast;
-use crate::conductor::config::ConductorConfig;
-use crate::conductor::error::ConductorResult;
-use crate::core::queue_consumer::InitialQueueTriggers;
-use crate::core::queue_consumer::QueueConsumerMap;
-#[cfg(any(test, feature = "test_utils"))]
-use crate::core::queue_consumer::QueueTriggers;
-use crate::core::ribosome::guest_callback::post_commit::PostCommitArgs;
-use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CHANNEL_BOUND;
-use crate::core::ribosome::guest_callback::post_commit::POST_COMMIT_CONCURRENT_LIMIT;
-use crate::core::ribosome::real_ribosome::ModuleCacheLock;
-use crate::core::ribosome::RibosomeT;
-use crate::core::workflow::ZomeCallResult;
-use crate::{
-    conductor::api::error::ConductorApiResult, core::ribosome::real_ribosome::RealRibosome,
-};
-
-use super::api::AppInterfaceApi;
-use super::config::AdminInterfaceConfig;
-use super::config::InterfaceDriver;
-use super::entry_def_store::get_entry_defs;
-use super::error::ConductorError;
-use super::interface::error::InterfaceResult;
-use super::interface::websocket::spawn_admin_interface_tasks;
-use super::interface::websocket::spawn_app_interface_task;
-use super::interface::websocket::spawn_websocket_listener;
-use super::manager::TaskManagerResult;
-use super::ribosome_store::RibosomeStore;
-use super::space::Space;
-use super::space::Spaces;
-use super::state::AppInterfaceConfig;
-use super::state::AppInterfaceId;
-use super::state::ConductorState;
-use super::CellError;
-use super::{api::AdminInterfaceApi, manager::TaskManagerClient};
+use rusqlite::Transaction;
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+use std::time::Instant;
+use tokio::sync::mpsc::error::SendError;
+use tokio::task::JoinHandle;
+use tracing::*;
 
 mod builder;
 
@@ -239,9 +234,8 @@ impl Conductor {
 
 /// Methods related to conductor startup/shutdown
 mod startup_shutdown_impls {
-    use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
-
     use super::*;
+    use crate::conductor::manager::{spawn_task_outcome_handler, OutcomeReceiver, OutcomeSender};
 
     //-----------------------------------------------------------------------------
     /// Methods used by the [ConductorHandle]
@@ -1148,9 +1142,8 @@ pub struct InstallAppCommonFlags {
 ///
 /// Tests related to app installation can be found in ../../tests/tests/app_installation/mod.rs
 mod app_impls {
-    use holochain_conductor_api::CellInfo;
-
     use super::*;
+    use holochain_conductor_api::CellInfo;
 
     impl Conductor {
         /// Install an app from minimal elements, without needing to construct a whole AppBundle.
@@ -1649,9 +1642,8 @@ mod cell_impls {
 
 /// Methods related to clone cell management
 mod clone_cell_impls {
-    use holochain_zome_types::prelude::ClonedCell;
-
     use super::*;
+    use holochain_zome_types::prelude::ClonedCell;
 
     impl Conductor {
         /// Create a new cell in an existing app based on an existing DNA.

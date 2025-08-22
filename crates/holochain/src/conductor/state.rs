@@ -1,6 +1,7 @@
 //! Structs which allow the Conductor's state to be persisted across
 //! startups and shutdowns
 
+use super::error::{ConductorError, ConductorResult};
 use holochain_conductor_api::config::InterfaceDriver;
 use holochain_conductor_api::signal_subscription::SignalSubscription;
 use holochain_p2p::NetworkCompatParams;
@@ -11,8 +12,6 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
-
-use super::error::{ConductorError, ConductorResult};
 
 /// Unique conductor tag / identifier.
 #[derive(Clone, Deserialize, Serialize, Debug, SerializedBytes)]

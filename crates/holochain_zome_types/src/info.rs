@@ -1,9 +1,8 @@
 use crate::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
-use holochain_serialized_bytes::prelude::*;
-
 pub use holochain_integrity_types::info::*;
+use holochain_serialized_bytes::prelude::*;
 
 /// The struct containing all information about the executing agent's identity.
 #[allow(missing_docs)]

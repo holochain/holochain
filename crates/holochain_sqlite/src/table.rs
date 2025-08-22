@@ -1,8 +1,7 @@
 //! Functionality for safely accessing databases.
 
-use rusqlite::Connection;
-
 use crate::db::DbKind;
+use rusqlite::Connection;
 
 /// Enumeration of all databases needed by Holochain
 pub(crate) fn initialize_database(conn: &mut Connection, db_kind: DbKind) -> rusqlite::Result<()> {

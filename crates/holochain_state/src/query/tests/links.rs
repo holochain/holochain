@@ -1,6 +1,5 @@
-use crate::prelude::mutations_helpers::insert_valid_integrated_op;
-
 use super::*;
+use crate::prelude::mutations_helpers::insert_valid_integrated_op;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn link_queries_are_ordered_by_timestamp() {

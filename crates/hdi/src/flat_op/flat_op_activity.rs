@@ -1,6 +1,5 @@
-use holochain_integrity_types::MigrationTarget;
-
 use super::*;
+use holochain_integrity_types::MigrationTarget;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Data specific to the

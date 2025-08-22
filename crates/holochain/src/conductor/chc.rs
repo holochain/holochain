@@ -1,12 +1,11 @@
 //! Types for Chain Head Coordination
 
+pub use holochain_chc::*;
 use holochain_keystore::MetaLairClient;
 use holochain_zome_types::prelude::*;
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
 use url::Url;
-
-pub use holochain_chc::*;
 
 /// Storage for the local CHC implementations
 pub static CHC_LOCAL_MAP: Lazy<parking_lot::Mutex<HashMap<CellId, ChcImpl>>> =

@@ -1,7 +1,6 @@
-use std::sync::Arc;
-
 use crate::*;
 use holochain_keystore::MetaLairClient;
+use std::sync::Arc;
 
 /// Mutable wrapper around local CHC
 pub struct ChcLocal {

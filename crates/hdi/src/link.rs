@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-
+use crate::prelude::*;
 use holochain_integrity_types::LinkTypeFilter;
 use holochain_wasmer_guest::WasmError;
-
-use crate::prelude::*;
+use std::collections::HashMap;
 
 #[cfg(doc)]
 pub mod examples;

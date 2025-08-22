@@ -1,9 +1,8 @@
 use crate::prelude::*;
 use holo_hash::{ActionHash, AgentPubKey};
+pub use holochain_integrity_types::link::*;
 use holochain_integrity_types::ZomeIndex;
 use holochain_serialized_bytes::prelude::*;
-
-pub use holochain_integrity_types::link::*;
 use holochain_timestamp::Timestamp;
 
 #[derive(

@@ -1,7 +1,6 @@
-use std::sync::Arc;
-
 use holo_hash::{AgentPubKey, DnaHash};
 use opentelemetry_api::{global::meter_with_version, metrics::*, KeyValue};
+use std::sync::Arc;
 
 pub type WorkflowDurationMetric = Histogram<f64>;
 

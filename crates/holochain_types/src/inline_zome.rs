@@ -1,8 +1,7 @@
 //! Extra types that help with inline zomes that are not needed in the wasm.
-use std::collections::HashMap;
-
 use holochain_zome_types::prelude::*;
 use serde::de::DeserializeOwned;
+use std::collections::HashMap;
 
 #[derive(Default, Clone)]
 /// A set of inline integrity and coordinator zomes.

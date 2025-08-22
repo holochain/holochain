@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use holo_hash::ActionHash;
 use holo_hash::WasmHash;
 use holochain::conductor::api::AdminInterfaceApi;
@@ -12,6 +10,7 @@ use holochain_wasm_test_utils::TestIntegrityWasm;
 use holochain_wasm_test_utils::TestWasm;
 use mr_bundle::Bundle;
 use serde::Serialize;
+use std::path::PathBuf;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_coordinator_zome_update() {

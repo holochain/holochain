@@ -1,15 +1,13 @@
 #![allow(clippy::await_holding_lock)]
 
+use crate::{core::ribosome::guest_callback::validate::ValidateResult, sweettest::*};
+use holo_hash::{ActionHash, AgentPubKey};
+use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Write,
     sync::Arc,
 };
-
-use holo_hash::{ActionHash, AgentPubKey};
-use holochain_types::{inline_zome::InlineZomeSet, prelude::*};
-
-use crate::{core::ribosome::guest_callback::validate::ValidateResult, sweettest::*};
 
 const ZOME_A_0: &str = "ZOME_A_0";
 const ZOME_A_1: &str = "ZOME_A_1";

@@ -1,11 +1,10 @@
+use ::fixt::prelude::*;
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holochain_serialized_bytes::SerializedBytes;
 use holochain_serialized_bytes::UnsafeBytes;
 use holochain_state::prelude::*;
 use std::convert::TryInto;
-
-use ::fixt::prelude::*;
 
 /// A collection of fixtures for use in Cascade tests
 #[derive(Debug)]

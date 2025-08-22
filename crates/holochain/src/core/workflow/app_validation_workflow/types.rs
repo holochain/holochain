@@ -1,8 +1,6 @@
-use std::convert::TryFrom;
-
-use holo_hash::AnyDhtHash;
-
 use crate::core::validation::OutcomeOrError;
+use holo_hash::AnyDhtHash;
+use std::convert::TryFrom;
 
 #[derive(Debug)]
 /// The outcome of app validation

@@ -1,7 +1,6 @@
+use holochain_types::prelude::*;
 use std::ffi::OsString;
 use std::path::PathBuf;
-
-use holochain_types::prelude::*;
 use strum_macros::EnumIter;
 
 const WASM_WORKSPACE_TARGET: &str = "wasm_workspace/target";

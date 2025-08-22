@@ -3,8 +3,6 @@
 //! - AgentValidationPkg
 //! - AgentId
 
-use std::sync::Arc;
-
 use super::error::WorkflowError;
 use super::error::WorkflowResult;
 use crate::core::ribosome::guest_callback::genesis_self_check::v1::GenesisSelfCheckHostAccessV1;
@@ -21,6 +19,7 @@ use holochain_sqlite::prelude::*;
 use holochain_state::source_chain;
 use holochain_types::prelude::*;
 use rusqlite::named_params;
+use std::sync::Arc;
 
 /// The struct which implements the genesis Workflow
 #[derive(Constructor)]

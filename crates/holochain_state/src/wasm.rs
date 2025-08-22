@@ -1,12 +1,11 @@
+use crate::mutations;
+use crate::prelude::StateMutationResult;
+use crate::prelude::StateQueryResult;
 use holo_hash::WasmHash;
 use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::OptionalExtension;
 use holochain_sqlite::rusqlite::Transaction;
 use holochain_types::prelude::*;
-
-use crate::mutations;
-use crate::prelude::StateMutationResult;
-use crate::prelude::StateQueryResult;
 
 pub fn get(txn: &Transaction<'_>, hash: &WasmHash) -> StateQueryResult<Option<DnaWasmHashed>> {
     let item = txn

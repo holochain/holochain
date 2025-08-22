@@ -8,6 +8,8 @@ pub use crate::chain::must_get_agent_activity;
 pub use crate::chain::query;
 pub use crate::clone::*;
 #[cfg(feature = "unstable-countersigning")]
+pub use crate::countersigning::accept_countersigning_preflight_request;
+#[cfg(feature = "unstable-countersigning")]
 pub use crate::countersigning::session_times_from_millis;
 pub use crate::ed25519::sign;
 pub use crate::ed25519::sign_ephemeral;
@@ -35,6 +37,8 @@ pub use crate::hash_path::anchor::list_anchor_tags;
 pub use crate::hash_path::anchor::list_anchor_type_addresses;
 pub use crate::hash_path::anchor::TryFromPath;
 pub use crate::hash_path::path::HdkPathExt;
+#[cfg(feature = "mock")]
+pub use crate::hdk::MockHdkT;
 pub use crate::hdk::*;
 pub use crate::info::agent_info;
 pub use crate::info::call_info;
@@ -55,6 +59,8 @@ pub use crate::p2p::call_remote;
 pub use crate::p2p::emit_signal;
 pub use crate::p2p::send_remote_signal;
 pub use crate::random::*;
+#[cfg(feature = "unstable-functions")]
+pub use crate::time::schedule;
 pub use crate::time::sys_time;
 pub use crate::validation_receipt::get_validation_receipts;
 pub use crate::x_salsa20_poly1305::create_x25519_keypair;
@@ -102,23 +108,13 @@ pub use holo_hash::HoloHashed;
 pub use holochain_wasmer_guest::*;
 pub use holochain_zome_types;
 pub use holochain_zome_types::prelude::*;
+#[cfg(feature = "mock")]
+pub use mockall;
 pub use std::collections::BTreeSet;
 pub use std::collections::HashSet;
 pub use std::convert::TryFrom;
 pub use tracing;
 pub use tracing::{debug, error, info, instrument, trace, warn};
-
-#[cfg(feature = "unstable-countersigning")]
-pub use crate::countersigning::accept_countersigning_preflight_request;
-
-#[cfg(feature = "unstable-functions")]
-pub use crate::time::schedule;
-
-#[cfg(feature = "mock")]
-pub use mockall;
-
-#[cfg(feature = "mock")]
-pub use crate::hdk::MockHdkT;
 
 // This needs to be called at least once _somewhere_ and is idempotent.
 #[macro_export]

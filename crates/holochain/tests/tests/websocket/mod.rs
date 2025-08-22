@@ -1,7 +1,9 @@
+use crate::tests::test_utils::*;
 use ::fixt::prelude::*;
 use anyhow::Result;
 use ed25519_dalek::ed25519::signature::SignerMut;
 use ed25519_dalek::SigningKey;
+use either::Either;
 use hdk::prelude::RemoteSignal;
 use holochain::conductor::interface::websocket::MAX_CONNECTIONS;
 use holochain::sweettest::SweetConductorBatch;
@@ -18,10 +20,6 @@ use holochain::{
 };
 use holochain_conductor_api::ExternalApiWireError;
 use holochain_conductor_api::ZomeCallParamsSigned;
-use std::net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs};
-use std::path::PathBuf;
-
-use either::Either;
 use holochain_conductor_api::{AdminInterfaceConfig, AppRequest, InterfaceDriver};
 use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
@@ -32,12 +30,12 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
 use rand_dalek::rngs::OsRng;
+use std::net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use tracing::*;
-
-use crate::tests::test_utils::*;
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "slow_tests")]

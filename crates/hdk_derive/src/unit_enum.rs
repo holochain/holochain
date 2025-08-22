@@ -1,11 +1,9 @@
-use proc_macro::TokenStream;
-
+use crate::util::get_unit_ident;
 use darling::FromDeriveInput;
 use darling::FromVariant;
+use proc_macro::TokenStream;
 use proc_macro_error::abort;
 use syn::parse_macro_input;
-
-use crate::util::get_unit_ident;
 
 #[derive(FromVariant)]
 /// Type for gathering each variants ident and fields.

@@ -1,4 +1,6 @@
 use super::flames::*;
+use serde_json::json;
+use std::fmt::Write;
 use tracing::{Event, Metadata, Subscriber};
 use tracing_core::field::Field;
 use tracing_serde::AsSerde;
@@ -7,9 +9,6 @@ use tracing_subscriber::{
     fmt::{format::Writer, FmtContext, FormatFields},
     registry::LookupSpan,
 };
-
-use serde_json::json;
-use std::fmt::Write;
 
 struct EventFieldVisitor {
     json: serde_json::Map<String, serde_json::Value>,

@@ -1,11 +1,10 @@
 #![cfg(all(feature = "slow_tests", feature = "test_utils"))]
 
+use crate::tests::common;
 use common::TestDatabaseKind;
 use holochain_sqlite::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-
-use crate::tests::common;
 
 #[cfg(all(feature = "slow_tests", feature = "test_utils"))]
 #[tokio::test(flavor = "multi_thread")]

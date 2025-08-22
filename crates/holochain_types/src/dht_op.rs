@@ -4,8 +4,6 @@
 //!
 //! [DhtOp]: enum.DhtOp.html
 
-use std::str::FromStr;
-
 use crate::action::NewEntryAction;
 use crate::prelude::*;
 use crate::record::RecordGroup;
@@ -17,6 +15,7 @@ use holochain_zome_types::action;
 use holochain_zome_types::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
+use std::str::FromStr;
 
 mod error;
 pub use error::*;

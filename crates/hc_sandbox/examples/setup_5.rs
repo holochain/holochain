@@ -1,13 +1,11 @@
-use std::path::PathBuf;
-
+use clap::Parser;
 use holochain_cli_sandbox as hc_sandbox;
 use holochain_cli_sandbox::run;
 use holochain_client::AdminWebsocket;
 use holochain_trace::Output;
 use holochain_types::prelude::AppBundleSource;
 use holochain_types::prelude::InstallAppPayload;
-
-use clap::Parser;
+use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
 struct Input {

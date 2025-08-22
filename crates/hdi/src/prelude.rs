@@ -6,6 +6,9 @@ pub use crate::entry::must_get_action;
 pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_valid_record;
 pub use crate::entry_types;
+#[cfg(not(feature = "trace"))]
+/// Needed as a noop for map_extern! when trace is off.
+pub use crate::error;
 pub use crate::flat_op::*;
 pub use crate::hash::*;
 pub use crate::hash_path::anchor::Anchor;
@@ -57,10 +60,6 @@ pub use std::convert::TryFrom;
 pub use tracing;
 #[cfg(feature = "trace")]
 pub use tracing::{debug, error, info, instrument, trace, warn};
-
-#[cfg(not(feature = "trace"))]
-/// Needed as a noop for map_extern! when trace is off.
-pub use crate::error;
 
 #[doc(hidden)]
 #[cfg(not(feature = "trace"))]

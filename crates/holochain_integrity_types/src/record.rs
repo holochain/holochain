@@ -1,7 +1,5 @@
 //! Defines a Record, the basic unit of Holochain data.
 
-use std::borrow::Borrow;
-
 use crate::action::conversions::WrongActionError;
 use crate::action::ActionHashed;
 use crate::action::CreateLink;
@@ -17,6 +15,7 @@ use holo_hash::HoloHashOf;
 use holo_hash::HoloHashed;
 use holo_hash::PrimitiveHashType;
 use holochain_serialized_bytes::prelude::*;
+use std::borrow::Borrow;
 
 /// a chain record containing the signed action along with the
 /// entry if the action type has one.

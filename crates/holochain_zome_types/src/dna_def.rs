@@ -1,17 +1,14 @@
 //! Defines DnaDef struct
 
-#[cfg(feature = "unstable-migration")]
-use std::collections::HashSet;
-
 use crate::prelude::*;
-
-#[cfg(feature = "full-dna-def")]
-use holochain_integrity_types::DnaModifiersBuilder;
-
 #[cfg(feature = "full-dna-def")]
 use crate::zome::ZomeError;
 #[cfg(feature = "full-dna-def")]
 use holo_hash::*;
+#[cfg(feature = "full-dna-def")]
+use holochain_integrity_types::DnaModifiersBuilder;
+#[cfg(feature = "unstable-migration")]
+use std::collections::HashSet;
 
 /// Ordered list of integrity zomes in this DNA.
 pub type IntegrityZomes = Vec<(ZomeName, IntegrityZomeDef)>;

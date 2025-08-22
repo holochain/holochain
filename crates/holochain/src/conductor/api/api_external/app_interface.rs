@@ -4,12 +4,9 @@ use crate::conductor::api::error::SerializationError;
 use crate::conductor::interface::error::InterfaceError;
 use crate::conductor::interface::error::InterfaceResult;
 use crate::conductor::ConductorHandle;
-
-use holochain_serialized_bytes::prelude::*;
-
-use holochain_types::prelude::*;
-
 pub use holochain_conductor_api::*;
+use holochain_serialized_bytes::prelude::*;
+use holochain_types::prelude::*;
 
 /// The Conductor lives inside an Arc<RwLock<_>> which is shared with all
 /// other Api references

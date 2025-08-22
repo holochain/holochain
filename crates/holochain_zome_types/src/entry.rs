@@ -15,7 +15,6 @@ use holochain_serialized_bytes::prelude::*;
 
 mod app_entry_bytes;
 pub use app_entry_bytes::*;
-
 pub use holochain_integrity_types::entry::*;
 
 #[derive(

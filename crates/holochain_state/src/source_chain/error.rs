@@ -1,4 +1,9 @@
 // use crate::holochain::core::workflow::produce_dht_ops_workflow::dht_op_light::error::DhtOpConvertError;
+use super::HeadInfo;
+use crate::prelude::StateMutationError;
+use crate::query::StateQueryError;
+use crate::scratch::ScratchError;
+use crate::scratch::SyncScratchError;
 use holo_hash::ActionHash;
 use holo_hash::EntryHash;
 use holochain_chc::ChcError;
@@ -6,13 +11,6 @@ use holochain_serialized_bytes::prelude::*;
 use holochain_sqlite::error::DatabaseError;
 use holochain_types::prelude::*;
 use thiserror::Error;
-
-use crate::prelude::StateMutationError;
-use crate::query::StateQueryError;
-use crate::scratch::ScratchError;
-use crate::scratch::SyncScratchError;
-
-use super::HeadInfo;
 
 #[derive(Error, Debug)]
 pub enum SourceChainError {

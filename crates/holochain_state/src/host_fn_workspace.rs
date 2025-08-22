@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
+use crate::prelude::*;
 use holo_hash::AgentPubKey;
 use holochain_keystore::MetaLairClient;
-
-use crate::prelude::*;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct HostFnWorkspace<

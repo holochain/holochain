@@ -751,9 +751,8 @@ pub struct AppAuthenticationTokenIssued {
 
 #[cfg(test)]
 mod tests {
-    use serde::Deserialize;
-
     use crate::{AdminRequest, AdminResponse, ExternalApiWireError};
+    use serde::Deserialize;
 
     #[test]
     fn admin_request_serialization() {
