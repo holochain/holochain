@@ -359,17 +359,16 @@ async fn sys_validation_workflow_inner(
     #[cfg(feature = "unstable-warrants")]
     {
         let mut warrants = vec![];
-        for (_, op) in _invalid_ops {
-            if let Some(chain_op) = op.as_chain_op() {
-                let warrant_op = crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op_inner(
-                &_keystore,
-                _representative_agent.clone(),
-                chain_op,
-                ValidationType::Sys,
-            )
-            .await?;
-                warrants.push(warrant_op);
-            }
+        for chain_op in _invalid_ops.iter().filter_map(|op| op.1.as_chain_op()) {
+            let warrant_op =
+                crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
+                    &_keystore,
+                    _representative_agent.clone(),
+                    chain_op,
+                    ValidationType::Sys,
+                )
+                .await?;
+            warrants.push(warrant_op);
         }
 
         for (author, pair) in _forked_pairs {
