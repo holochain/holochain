@@ -160,9 +160,16 @@ pub async fn app_validation_workflow(
     trigger_publish: TriggerSender,
     conductor_handle: ConductorHandle,
     network: DynHolochainP2pDna,
+    representative_agent: AgentPubKey,
 ) -> WorkflowResult<WorkComplete> {
-    let outcome_summary =
-        app_validation_workflow_inner(dna_hash, workspace, conductor_handle, network).await?;
+    let outcome_summary = app_validation_workflow_inner(
+        dna_hash,
+        workspace,
+        conductor_handle,
+        network,
+        representative_agent,
+    )
+    .await?;
     // --- END OF WORKFLOW, BEGIN FINISHER BOILERPLATE ---
 
     // If ops have been accepted or rejected, trigger integration.
@@ -192,6 +199,7 @@ async fn app_validation_workflow_inner(
     workspace: Arc<AppValidationWorkspace>,
     conductor: ConductorHandle,
     network: DynHolochainP2pDna,
+    _representative_agent: AgentPubKey,
 ) -> WorkflowResult<OutcomeSummary> {
     let db = workspace.dht_db.clone().into();
     let sorted_dht_ops = validation_query::get_ops_to_app_validate(&db).await?;
@@ -264,10 +272,11 @@ async fn app_validation_workflow_inner(
 
                 #[cfg(feature = "unstable-warrants")]
                 if let Outcome::Rejected(_) = &outcome {
+                    let keystore = conductor.keystore();
                     let warrant_op =
-                        crate::core::workflow::sys_validation_workflow::make_warrant_op(
-                            &conductor,
-                            &dna_hash,
+                        crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
+                            keystore,
+                            _representative_agent.clone(),
                             &chain_op,
                             ValidationType::App,
                         )

@@ -46,7 +46,7 @@ pub fn spawn_sys_validation_consumer(
                     representative_agent,
                 ))
             } else {
-                tracing::warn!("No agent found for DNA, skipping sys validation");
+                tracing::warn!("No representative agent found for DNA, skipping sys validation.");
                 Either::Right(async move { Ok(WorkComplete::Complete) })
             }
         },
