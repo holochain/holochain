@@ -1,0 +1,182 @@
+[
+  {
+    "apiVersion": "influxdata.com/v2alpha1",
+    "kind": "Dashboard",
+    "metadata": {
+      "name": "victorious-keller-a69001"
+    },
+    "spec": {
+      "charts": [
+        {
+          "colors": [
+            {
+              "id": "base",
+              "name": "white",
+              "type": "text",
+              "hex": "#ffffff"
+            }
+          ],
+          "fieldOptions": [
+            {
+              "displayName": "time",
+              "fieldName": "_time"
+            },
+            {
+              "displayName": "value",
+              "fieldName": "_value",
+              "visible": true
+            },
+            {
+              "displayName": "_start",
+              "fieldName": "_start"
+            },
+            {
+              "displayName": "_stop",
+              "fieldName": "_stop"
+            },
+            {
+              "displayName": "_field",
+              "fieldName": "_field"
+            },
+            {
+              "displayName": "_measurement",
+              "fieldName": "_measurement"
+            },
+            {
+              "displayName": "agent",
+              "fieldName": "agent"
+            },
+            {
+              "displayName": "dna",
+              "fieldName": "dna"
+            },
+            {
+              "displayName": "zome",
+              "fieldName": "zome",
+              "visible": true
+            },
+            {
+              "displayName": "fn",
+              "fieldName": "fn",
+              "visible": true
+            },
+            {
+              "displayName": "max",
+              "fieldName": "max",
+              "visible": true
+            },
+            {
+              "displayName": "mean",
+              "fieldName": "mean",
+              "visible": true
+            },
+            {
+              "displayName": "min",
+              "fieldName": "min",
+              "visible": true
+            }
+          ],
+          "height": 7,
+          "kind": "Table",
+          "name": "zome functions (mean & max)",
+          "queries": [
+            {
+              "query": "data = from(bucket: \"influxive\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r[\"_measurement\"] == \"hc.ribosome.wasm.usage\")\n  |> filter(fn: (r) => r[\"dna\"] + \"___\" + r[\"agent\"] == v.CellId)\n  |> filter(fn: (r) => \n    if exists r[\"run_id\"] then r[\"run_id\"] == v.RunId\n    else true\n  )\n  |> group(columns: [\"fn\", \"zome\"])\n  \nmean_data = data\n  |> mean()\n  |> rename(columns: {_value: \"mean\"})\n  |> map(fn: (r) => ({ r with mean: int(v: r.mean) }))\n  |> keep(columns: [\"fn\", \"zome\", \"mean\"])\n\nmax_data = data\n  |> max()\n  |> rename(columns: {_value: \"max\"})\n  |> map(fn: (r) => ({ r with max: int(v: r.max) }))\n  |> keep(columns: [\"fn\", \"zome\", \"max\"])\n\njoin(tables: {mean: mean_data, max: max_data}, on: [\"fn\", \"zome\"], method: \"inner\")\n  |> sort(columns: [\"mean\"], desc: true)\n  |> keep(columns: [\"zome\", \"fn\", \"mean\", \"max\"])"
+            }
+          ],
+          "staticLegend": {},
+          "tableOptions": {
+            "sortBy": "_value",
+            "verticalTimeAxis": true
+          },
+          "timeFormat": "HH:mm:ss.sss",
+          "width": 5
+        },
+        {
+          "colors": [
+            {
+              "id": "base",
+              "name": "white",
+              "type": "text",
+              "hex": "#ffffff"
+            }
+          ],
+          "fieldOptions": [
+            {
+              "displayName": "time",
+              "fieldName": "_time",
+              "visible": true
+            },
+            {
+              "displayName": "value",
+              "fieldName": "_value",
+              "visible": true
+            },
+            {
+              "displayName": "_start",
+              "fieldName": "_start"
+            },
+            {
+              "displayName": "_stop",
+              "fieldName": "_stop"
+            },
+            {
+              "displayName": "_field",
+              "fieldName": "_field"
+            },
+            {
+              "displayName": "_measurement",
+              "fieldName": "_measurement"
+            },
+            {
+              "displayName": "agent",
+              "fieldName": "agent"
+            },
+            {
+              "displayName": "dna",
+              "fieldName": "dna"
+            },
+            {
+              "displayName": "fn",
+              "fieldName": "fn",
+              "visible": true
+            },
+            {
+              "displayName": "zome",
+              "fieldName": "zome",
+              "visible": true
+            },
+            {
+              "displayName": "mean_value",
+              "fieldName": "mean_value",
+              "visible": true
+            },
+            {
+              "displayName": "stat_type",
+              "fieldName": "stat_type",
+              "visible": true
+            }
+          ],
+          "height": 7,
+          "kind": "Table",
+          "name": "All function calls",
+          "queries": [
+            {
+              "query": "from(bucket: \"windtunnel\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"hc.ribosome.wasm.usage\")\n  |> filter(fn: (r) => r[\"dna\"] + \"___\" + r[\"agent\"] == v.CellId)\n  |> filter(fn: (r) => \n    if exists r[\"run_id\"] then r[\"run_id\"] == v.RunId\n    else true\n  )"
+            }
+          ],
+          "staticLegend": {},
+          "tableOptions": {
+            "sortBy": "_value",
+            "verticalTimeAxis": true
+          },
+          "timeFormat": "HH:mm:ss.sss",
+          "width": 7,
+          "xPos": 5
+        }
+      ],
+      "description": "Wasm usage per zome function",
+      "name": "Wasm Usage"
+    }
+  }
+]

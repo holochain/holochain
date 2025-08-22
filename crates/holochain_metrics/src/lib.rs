@@ -52,8 +52,7 @@
 //!   - Examples:
 //!     - `hc.db`
 //!     - `hc.workflow.integration`
-//!     - `kitsune.gossip`
-//!     - `tx5.signal`
+//!     - `hc.ribosome.wasm`
 //! - A dot notation metric name or context should follow the logical module
 //!   name. The thing that can be charted should be the actual metric. Related
 //!   context that may want to be filtered for the chart should be attributes.
@@ -63,8 +62,8 @@
 //!     - ```
 //!         use opentelemetry_api::{Context, KeyValue, metrics::Unit};
 //!         let req_dur = opentelemetry_api::global::meter("tx5")
-//!             .f64_histogram("tx5.signal.request.duration")
-//!             .with_description("tx5 signal server request duration")
+//!             .f64_histogram("hc.holochain_p2p.request.duration")
+//!             .with_description("holochain p2p request duration")
 //!             .with_unit(Unit::new("s"))
 //!             .init();
 //!         req_dur.record(0.42, &[
@@ -74,8 +73,8 @@
 //!     - ```
 //!         use opentelemetry_api::{Context, KeyValue, metrics::Unit};
 //!         let req_size = opentelemetry_api::global::meter("tx5")
-//!             .u64_histogram("tx5.signal.request.byte.count")
-//!             .with_description("tx5 signal server request byte count")
+//!             .u64_histogram("hc.holochain_p2p.request.request.byte.count")
+//!             .with_description("holochain p2p request byte count")
 //!             .with_unit(Unit::new("By"))
 //!             .init();
 //!         req_size.record(42, &[
@@ -87,16 +86,6 @@
 //!
 //! | Full Metric Name | Type | Unit (optional) | Description | Attributes |
 //! | ---------------- | ---- | --------------- | ----------- | ---------- |
-//! | `kitsune.peer.send.duration` | `f64_histogram` | `s` | When kitsune sends data to a remote peer. |- `remote_id`: the base64 remote peer id.<br />- `is_error`: if the send failed. |
-//! | `kitsune.peer.send.byte.count` | `u64_histogram` | `By` | When kitsune sends data to a remote peer. |- `remote_id`: the base64 remote peer id.<br />- `is_error`: if the send failed. |
-//! | `kitsune.gossip.generate_op_blooms.duration` | `f64_histogram` | `s` | The time taken to generate op blooms for gossip. | - `space`: The space (dna_hash representation) that gossip is being performed for.<br />- `batch_size`: The number of ops that were included in the bloom batch for this observation. |
-//! | `kitsune.gossip.generate_op_region_set.duration` | `f64_histogram` | `s` | The time taken to generate op region sets for gossip. | - `space`: The space (dna_hash representation) that gossip is being performed for. |
-//! | `tx5.conn.ice.send` | `u64_observable_counter` | `By` | Bytes sent on ice channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
-//! | `tx5.conn.ice.recv` | `u64_observable_counter` | `By` | Bytes received on ice channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
-//! | `tx5.conn.data.send` | `u64_observable_counter` | `By` | Bytes sent on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
-//! | `tx5.conn.data.recv` | `u64_observable_counter` | `By` | Bytes received on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
-//! | `tx5.conn.data.send.message.count` | `u64_observable_counter` | | Message count sent on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
-//! | `tx5.conn.data.recv.message.count` | `u64_observable_counter` | | Message count received on data channel. |- `remote_id`: the base64 remote peer id.<br />- `state_uniq`: endpoint identifier.<br />- `conn_uniq`: connection identifier. |
 //! | `hc.holochain_p2p.request.duration` | `f64_histogram` | `s` | The time spent processing a p2p event. |- `dna_hash`: The DNA hash that this event is being sent on behalf of. |
 //! | `hc.conductor.post_commit.duration` | `f64_histogram` | `s` | The time spent executing a post commit. |- `dna_hash`: The DNA hash that this post commit is running for.<br />- `agent`: The agent running the post commit. |
 //! | `hc.conductor.workflow.duration` | `f64_histogram` | `s` | The time spent running a workflow. |- `workflow`: The name of the workflow.<br />- `dna_hash`: The DNA hash that this workflow is running for.<br />- `agent`: (optional) The agent that this workflow is running for if the workflow is cell bound. |
@@ -109,13 +98,13 @@
 mod test;
 
 #[cfg(feature = "influxive")]
-const DASH_NETWORK_STATS: &[u8] = include_bytes!("dashboards/networkstats.json");
-#[cfg(feature = "influxive")]
-const DASH_TX5: &[u8] = include_bytes!("dashboards/tx5.json");
-#[cfg(feature = "influxive")]
 const DASH_DATABASE: &[u8] = include_bytes!("dashboards/database.json");
 #[cfg(feature = "influxive")]
 const DASH_CONDUCTOR: &[u8] = include_bytes!("dashboards/conductor.json");
+#[cfg(feature = "influxive")]
+const DASH_WASM: &[u8] = include_bytes!("dashboards/wasm.json");
+#[cfg(feature = "influxive")]
+const VAR_CELL_ID: &[u8] = include_bytes!("variables/cellid.json");
 
 /// Configuration for holochain metrics set by environment variables.
 enum HolochainMetricsEnv {
@@ -383,19 +372,19 @@ impl HolochainMetricsConfig {
             Ok((influxive, meter_provider)) => {
                 // apply templates
                 if let Ok(cur) = influxive.list_dashboards().await {
-                    // only initialize dashboards if the db is new
+                    // only initialize templates if the db is new
                     if cur.contains("\"dashboards\": []") {
-                        if let Err(err) = influxive.apply(DASH_NETWORK_STATS).await {
-                            tracing::warn!(?err, "failed to initialize network stats dashboard");
-                        }
-                        if let Err(err) = influxive.apply(DASH_TX5).await {
-                            tracing::warn!(?err, "failed to initialize tx5 dashboard");
-                        }
                         if let Err(err) = influxive.apply(DASH_DATABASE).await {
                             tracing::warn!(?err, "failed to initialize database dashboard");
                         }
                         if let Err(err) = influxive.apply(DASH_CONDUCTOR).await {
                             tracing::warn!(?err, "failed to initialize conductor dashboard");
+                        }
+                        if let Err(err) = influxive.apply(DASH_WASM).await {
+                            tracing::warn!(?err, "failed to initialize wasm dashboard");
+                        }
+                        if let Err(err) = influxive.apply(VAR_CELL_ID).await {
+                            tracing::warn!(?err, "failed to initialize CellId variable");
                         }
                     }
                 }

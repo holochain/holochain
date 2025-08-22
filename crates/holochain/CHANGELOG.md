@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Changed holochain_metrics dashboards to match available metrics
 - **BREAKING CHANGE**: Move `ChainOpType` from `holochain_types` to `holochain_zome_types`. #5236
 - **BREAKING CHANGE**: Remove the `SysValDeps` typedef and use instead `Vec<ActionHash>` in the few places that was used. #5236
 - **BREAKING CHANGE**: Modify the fields of `ChainIntegrityWarrant::ChainIntegrityWarrant` to add a `ChainOpType` field which allows just one op type to be validated when checking the warrant. #5236
