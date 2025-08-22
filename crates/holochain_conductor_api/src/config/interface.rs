@@ -3,7 +3,7 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// Information neeeded to spawn an admin interface
+/// Information needed to spawn an admin interface
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 pub struct AdminInterfaceConfig {
     /// By what means the interface will be exposed.
