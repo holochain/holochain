@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Remove network joining timeout ([#5238](https://github.com/holochain/holochain/pull/5238)). This used to work with the previous version of kitsune, but now all the `join` call does is to join the local peer store which is a matter of acquiring a write lock on a mutex and doesn't indicate whether publishing the agent info to the peer store and the bootstrap has been successful.
 - Add support for writing metrics to InfluxDB file on disk.
 
 ## 0.5.5
