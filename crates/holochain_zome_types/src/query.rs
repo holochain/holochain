@@ -1,7 +1,6 @@
 //! Types for source chain queries
 
 use crate::prelude::*;
-use crate::warrant::Warrant;
 use holo_hash::EntryHash;
 use holo_hash::HasHash;
 use holo_hash::{ActionHash, AgentPubKey, AnyLinkableHash};
@@ -106,8 +105,8 @@ pub struct LinkQuery {
     pub author: Option<AgentPubKey>,
 }
 
+/// An agent's chain records, returned from an agent activity query.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
-/// An agents chain records returned from a agent_activity_query
 pub struct AgentActivity {
     /// Valid actions on this chain. `(sequence, action_hash)`.
     pub valid_activity: Vec<(u32, ActionHash)>,
@@ -120,7 +119,7 @@ pub struct AgentActivity {
     pub highest_observed: Option<HighestObserved>,
     /// Warrants about this AgentActivity.
     /// Placeholder for future.
-    pub warrants: Vec<Warrant>,
+    pub warrants: Vec<SignedWarrant>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
