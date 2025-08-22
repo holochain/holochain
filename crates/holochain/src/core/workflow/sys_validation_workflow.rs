@@ -359,17 +359,16 @@ async fn sys_validation_workflow_inner(
     #[cfg(feature = "unstable-warrants")]
     {
         let mut warrants = vec![];
-        for (_, op) in _invalid_ops {
-            if let Some(chain_op) = op.as_chain_op() {
-                let warrant_op = crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op_inner(
-                &_keystore,
-                _representative_agent.clone(),
-                chain_op,
-                ValidationType::Sys,
-            )
-            .await?;
-                warrants.push(warrant_op);
-            }
+        for chain_op in _invalid_ops.iter().filter_map(|op| op.1.as_chain_op()) {
+            let warrant_op =
+                crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
+                    &_keystore,
+                    _representative_agent.clone(),
+                    chain_op,
+                    ValidationType::Sys,
+                )
+                .await?;
+            warrants.push(warrant_op);
         }
 
         for (author, pair) in _forked_pairs {
@@ -1227,17 +1226,6 @@ fn put_integration_limbo(
     Ok(())
 }
 
-pub async fn make_warrant_op(
-    conductor: &Conductor,
-    dna_hash: &DnaHash,
-    op: &ChainOp,
-    validation_type: ValidationType,
-) -> WorkflowResult<DhtOpHashed> {
-    let keystore = conductor.keystore();
-    let warrant_author = get_representative_agent(conductor, dna_hash).expect("TODO: handle");
-    make_invalid_chain_warrant_op_inner(keystore, warrant_author, op, validation_type).await
-}
-
 /// Gets an arbitrary agent with a cell running the given DNA, needed for processes
 /// which require an agent signature but happen at the DNA level, i.e. not bound to any
 /// particular cell.
@@ -1249,7 +1237,7 @@ pub fn get_representative_agent(conductor: &Conductor, dna_hash: &DnaHash) -> Op
         .map(|id| id.agent_pubkey().clone())
 }
 
-pub async fn make_invalid_chain_warrant_op_inner(
+pub async fn make_invalid_chain_warrant_op(
     keystore: &MetaLairClient,
     warrant_author: AgentPubKey,
     op: &ChainOp,

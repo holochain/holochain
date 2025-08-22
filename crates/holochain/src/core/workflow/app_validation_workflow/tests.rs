@@ -151,6 +151,7 @@ async fn main_workflow() {
         app_validation_workspace.clone(),
         conductor.raw_handle(),
         network,
+        fixt!(AgentPubKey),
     )
     .await
     .unwrap();
@@ -192,6 +193,7 @@ async fn main_workflow() {
             dna_hash.clone(),
             None,
         )),
+        fixt!(AgentPubKey),
     )
     .await
     .unwrap();
@@ -341,6 +343,7 @@ async fn validate_ops_in_sequence_must_get_agent_activity() {
             dna_hash.clone(),
             None,
         )),
+        fixt!(AgentPubKey),
     )
     .await
     .unwrap();
@@ -478,6 +481,7 @@ async fn validate_ops_in_sequence_must_get_action() {
             dna_hash.clone(),
             None,
         )),
+        fixt!(AgentPubKey),
     )
     .await
     .unwrap();
@@ -636,6 +640,7 @@ async fn handle_error_in_op_validation() {
             dna_hash.clone(),
             None,
         )),
+        fixt!(AgentPubKey),
     )
     .await
     .unwrap();
@@ -1018,6 +1023,7 @@ async fn app_validation_workflow_correctly_sets_state_and_status() {
             dna_hash.clone(),
             None,
         )),
+        fixt!(AgentPubKey),
     )
     .await
     .unwrap();
