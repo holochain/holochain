@@ -452,7 +452,7 @@ async fn get_activity_with_warrants() {
         .await
         .unwrap();
 
-    expected.warrants = vec![warrant.into_warrant()];
+    expected.warrants = vec![(*warrant).clone()];
 
     assert_eq!(r2, expected);
 }

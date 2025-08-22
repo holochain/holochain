@@ -21,7 +21,7 @@ pub struct AgentActivityResponse {
     /// been observed by this authority.
     pub highest_observed: Option<HighestObserved>,
     /// Any warrants at the basis of this agent.
-    pub warrants: Vec<Warrant>,
+    pub warrants: Vec<SignedWarrant>,
 }
 
 impl AgentActivityResponse {

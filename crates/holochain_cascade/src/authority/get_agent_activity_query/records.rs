@@ -124,7 +124,7 @@ impl Query for GetAgentActivityRecordsQuery {
                 DhtOpType::Warrant(_) => {
                     let _hash: WarrantHash = row.get("hash")?;
                     from_blob::<SignedWarrant>(row.get("action_blob")?).map(|warrant| {
-                        let item = Item::Warrant(warrant.into_data());
+                        let item = Item::Warrant(warrant);
                         Judged::raw(item, None)
                     })
                 }

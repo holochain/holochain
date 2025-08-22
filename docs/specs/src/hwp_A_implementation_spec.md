@@ -884,7 +884,7 @@ It is the application's responsibility to retrieve a stored capability claim usi
         rejected_activity: Vec<(u32, ActionHash)>,
         status: ChainStatus,
         highest_observed: Option<(u32, ActionHash)>,
-        warrants: Vec<Warrant>,
+        warrants: Vec<SignedWarrant>,
     }
 
     enum ChainStatus {

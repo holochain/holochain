@@ -42,11 +42,6 @@ impl WarrantOp {
     pub fn warrant(&self) -> &Warrant {
         self
     }
-
-    /// Accessor for the warrant
-    pub fn into_warrant(self) -> Warrant {
-        self.0.into_data()
-    }
 }
 
 /// Different types of warrants
