@@ -370,9 +370,8 @@ impl HolochainMetricsConfig {
         match influxive::influxive_child_process_meter_provider(child_svc_config, otel_config).await
         {
             Ok((influxive, meter_provider)) => {
-                // apply templates
+                // apply templates if the db is new
                 if let Ok(cur) = influxive.list_dashboards().await {
-                    // only initialize templates if the db is new
                     if cur.contains("\"dashboards\": []") {
                         if let Err(err) = influxive.apply(DASH_DATABASE).await {
                             tracing::warn!(?err, "failed to initialize database dashboard");
