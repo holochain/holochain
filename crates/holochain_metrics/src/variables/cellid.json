@@ -8,7 +8,7 @@
     "spec": {
       "language": "flux",
       "name": "CellId",
-      "query": "from(bucket: \"influxive\")\n  |> range(start: -10y)\n  |> filter(fn: (r) => r._measurement == \"hc.ribosome.wasm.usage\")\n  |> map(fn: (r) => ({r with combined: r[\"dna\"] + \"___\" + r[\"agent\"]}))\n  |> keep(columns: [\"combined\"])\n  |> distinct(column: \"combined\")\n  |> sort()",
+      "query": "from(bucket: \"influxive\")\n  |> range(start: 0)\n  |> filter(fn: (r) => r._measurement == \"hc.ribosome.wasm.usage\")\n  |> map(fn: (r) => ({r with combined: r[\"dna\"] + \"___\" + r[\"agent\"]}))\n  |> keep(columns: [\"combined\"])\n  |> distinct(column: \"combined\")\n  |> sort()",
       "type": "query"
     }
   }

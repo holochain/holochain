@@ -162,7 +162,7 @@
           "name": "All function calls",
           "queries": [
             {
-              "query": "from(bucket: \"windtunnel\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"hc.ribosome.wasm.usage\")\n  |> filter(fn: (r) => r[\"dna\"] + \"___\" + r[\"agent\"] == v.CellId)\n  |> filter(fn: (r) => \n    if exists r[\"run_id\"] then r[\"run_id\"] == v.RunId\n    else true\n  )"
+              "query": "from(bucket: \"influxive\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"hc.ribosome.wasm.usage\")\n  |> filter(fn: (r) => r[\"dna\"] + \"___\" + r[\"agent\"] == v.CellId)\n  |> filter(fn: (r) => \n    if exists r[\"run_id\"] then r[\"run_id\"] == v.RunId\n    else true\n  )"
             }
           ],
           "staticLegend": {},
