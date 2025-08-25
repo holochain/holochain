@@ -61,7 +61,7 @@
 //!   - Examples
 //!     - ```
 //!         use opentelemetry_api::{Context, KeyValue, metrics::Unit};
-//!         let req_dur = opentelemetry_api::global::meter("tx5")
+//!         let req_dur = opentelemetry_api::global::meter("hc")
 //!             .f64_histogram("hc.holochain_p2p.request.duration")
 //!             .with_description("holochain p2p request duration")
 //!             .with_unit(Unit::new("s"))
@@ -72,8 +72,8 @@
 //!       ```
 //!     - ```
 //!         use opentelemetry_api::{Context, KeyValue, metrics::Unit};
-//!         let req_size = opentelemetry_api::global::meter("tx5")
-//!             .u64_histogram("hc.holochain_p2p.request.request.byte.count")
+//!         let req_size = opentelemetry_api::global::meter("hc")
+//!             .u64_histogram("hc.holochain_p2p.request.byte.count")
 //!             .with_description("holochain p2p request byte count")
 //!             .with_unit(Unit::new("By"))
 //!             .init();
