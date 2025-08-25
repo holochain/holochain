@@ -249,8 +249,8 @@ async fn validate_create_op_with_prev_from_network() {
     // Simulate the dep being found on the network
     test_case
         .current_validation_dependencies
-        .same_dht
         .lock()
+        .expect("poisoned")
         .insert(previous_action, CascadeSource::Network);
 
     // Run again to process new ops from the network
