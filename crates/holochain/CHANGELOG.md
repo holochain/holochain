@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Internal refactor to remove the `same_dht` field of `SysValDeps`. This field was redundant because the `SysValDeps` are always for the same DHT as the cell they are part of. #5243
 - **BREAKING CHANGE**: The agent activity response has been changed to return warrants as a `Vec<SignedWarrant>` instead of a `Vec<Warrant>`. This change ensures that warrant integrity can be checked and discovered warrants can be validated. Note that this also affects the HDK's `get_agent_activity` function which will now also return `SignedWarrant`s instead of `Warrant`s. #5237
 - **BREAKING CHANGE**: Move `ChainOpType` from `holochain_types` to `holochain_zome_types`. #5236
 - **BREAKING CHANGE**: Remove the `SysValDeps` typedef and use instead `Vec<ActionHash>` in the few places that was used. #5236
