@@ -160,8 +160,8 @@ pub async fn sys_validation_workflow(
     // Now go to the network to try to fetch missing dependencies
     let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
     let missing_action_hashes = current_validation_dependencies
-        .same_dht
         .lock()
+        .expect("poisoned")
         .get_missing_hashes();
     let num_fetched: usize = futures::stream::iter(missing_action_hashes.into_iter().map(|hash| {
         let network_cascade = network_cascade.clone();
@@ -172,7 +172,7 @@ pub async fn sys_validation_workflow(
                 .await
             {
                 Ok(Some((action, source))) => {
-                    let mut deps = current_validation_dependencies.same_dht.lock();
+                    let mut deps = current_validation_dependencies.lock().expect("poisoned");
 
                     // If the source was local then that means some other fetch has put this action into the cache,
                     // that's fine we'll just grab it here.
@@ -242,8 +242,8 @@ async fn sys_validation_workflow_inner(
 
     // Forget what dependencies are currently in use
     current_validation_dependencies
-        .same_dht
         .lock()
+        .expect("poisoned")
         .clear_retained_deps();
 
     if sorted_ops.is_empty() {
@@ -253,8 +253,8 @@ async fn sys_validation_workflow_inner(
 
         // If there's nothing to validate then we can clear the dependencies and save some memory.
         current_validation_dependencies
-            .same_dht
             .lock()
+            .expect("poisoned")
             .purge_held_deps();
 
         return Ok(OutcomeSummary::new());
@@ -274,8 +274,8 @@ async fn sys_validation_workflow_inner(
 
     // Now drop all the dependencies that we didn't just try to access while searching the current set of ops to validate.
     current_validation_dependencies
-        .same_dht
         .lock()
+        .expect("poisoned")
         .purge_held_deps();
 
     let mut validation_outcomes = Vec::with_capacity(sorted_ops.len());
@@ -420,7 +420,12 @@ async fn retrieve_actions(
     action_hashes: impl Iterator<Item = ActionHash>,
 ) {
     let action_fetches = action_hashes
-        .filter(|hash| !current_validation_dependencies.same_dht.lock().has(hash))
+        .filter(|hash| {
+            !current_validation_dependencies
+                .lock()
+                .expect("poisoned")
+                .has(hash)
+        })
         .map(|h| {
             // For each previous action that will be needed for validation, map the action to a fetch Action for its hash
             let cascade = cascade.clone();
@@ -452,8 +457,8 @@ async fn retrieve_actions(
         }));
 
     current_validation_dependencies
-        .same_dht
         .lock()
+        .expect("poisoned")
         .merge(new_deps);
 }
 
@@ -680,7 +685,8 @@ async fn validate_chain_op(
                         session_data,
                     )? {
                         // Just require that we are holding all the other actions
-                        let validation_dependencies = validation_dependencies.same_dht.lock();
+                        let validation_dependencies =
+                            validation_dependencies.lock().expect("poisoned");
                         validation_dependencies
                             .get(&action_hash)
                             .and_then(|s| s.as_action())
@@ -710,7 +716,7 @@ async fn validate_chain_op(
                     session_data,
                 )? {
                     // Just require that we are holding all the other actions
-                    let validation_dependencies = validation_dependencies.same_dht.lock();
+                    let validation_dependencies = validation_dependencies.lock().expect("poisoned");
                     validation_dependencies
                         .get(&action_hash)
                         .and_then(|s| s.as_action())
@@ -778,7 +784,7 @@ async fn validate_warrant_op(
                 ..
             } => {
                 let action = {
-                    let deps = validation_dependencies.same_dht.lock();
+                    let deps = validation_dependencies.lock().expect("poisoned");
                     let action = deps
                         .get(action_hash)
                         .and_then(|s| s.as_action())
@@ -805,7 +811,7 @@ async fn validate_warrant_op(
                 ..
             } => {
                 let (action1, action2) = {
-                    let deps = validation_dependencies.same_dht.lock();
+                    let deps = validation_dependencies.lock().expect("poisoned");
                     let action1 = deps
                         .get(a1)
                         .and_then(|s| s.as_action())
@@ -980,7 +986,7 @@ fn register_agent_activity(
     check_valid_if_dna(action, dna_hash)?;
     if let Some(prev_action_hash) = prev_action_hash {
         // Just make sure we have the dependency and if not then don't mark this action as valid yet
-        let validation_dependencies = validation_dependencies.same_dht.lock();
+        let validation_dependencies = validation_dependencies.lock().expect("poisoned");
         let prev_action = validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
@@ -1005,7 +1011,7 @@ fn store_record(action: &Action, validation_dependencies: SysValDeps) -> SysVali
     // Checks
     check_prev_action(action)?;
     if let Some(prev_action_hash) = prev_action_hash {
-        let validation_dependencies = validation_dependencies.same_dht.lock();
+        let validation_dependencies = validation_dependencies.lock().expect("poisoned");
         let prev_action = validation_dependencies
             .get(prev_action_hash)
             .and_then(|s| s.as_action())
@@ -1036,7 +1042,7 @@ async fn store_entry(
     // Additional checks if this is an Update
     if let NewEntryActionRef::Update(entry_update) = action {
         let original_action_address = &entry_update.original_action_address;
-        let validation_dependencies = validation_dependencies.same_dht.lock();
+        let validation_dependencies = validation_dependencies.lock().expect("poisoned");
         let original_action = validation_dependencies
             .get(original_action_address)
             .and_then(|s| s.as_action())
@@ -1061,7 +1067,7 @@ fn register_updated_content(
     // Get data ready to validate
     let original_action_address = &entry_update.original_action_address;
 
-    let validation_dependencies = validation_dependencies.same_dht.lock();
+    let validation_dependencies = validation_dependencies.lock().expect("poisoned");
     let original_action = validation_dependencies
         .get(original_action_address)
         .and_then(|s| s.as_action())
@@ -1079,7 +1085,7 @@ fn register_updated_record(
     // Get data ready to validate
     let original_action_address = &record_update.original_action_address;
 
-    let validation_dependencies = validation_dependencies.same_dht.lock();
+    let validation_dependencies = validation_dependencies.lock().expect("poisoned");
     let original_action = validation_dependencies
         .get(original_action_address)
         .and_then(|s| s.as_action())
@@ -1097,7 +1103,7 @@ fn register_deleted_by(
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    let validation_dependencies = validation_dependencies.same_dht.lock();
+    let validation_dependencies = validation_dependencies.lock().expect("poisoned");
     let action = validation_dependencies
         .get(removed_action_address)
         .and_then(|s| s.as_action())
@@ -1115,7 +1121,7 @@ fn register_deleted_entry_action(
     // Get data ready to validate
     let removed_action_address = &record_delete.deletes_address;
 
-    let validation_dependencies = validation_dependencies.same_dht.lock();
+    let validation_dependencies = validation_dependencies.lock().expect("poisoned");
     let action = validation_dependencies
         .get(removed_action_address)
         .and_then(|s| s.as_action())
@@ -1138,7 +1144,7 @@ fn register_delete_link(
     let link_add_address = &link_remove.link_add_address;
 
     // Just require that this link exists, don't need to check anything else about it here
-    let validation_dependencies = validation_dependencies.same_dht.lock();
+    let validation_dependencies = validation_dependencies.lock().expect("poisoned");
     let add_link_action = validation_dependencies
         .get(link_add_address)
         .and_then(|s| s.as_action())

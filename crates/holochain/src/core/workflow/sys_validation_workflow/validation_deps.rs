@@ -1,31 +1,41 @@
 use holo_hash::HoloHash;
 use holochain_cascade::CascadeSource;
 use holochain_types::prelude::*;
+use std::ops::Deref;
+use std::sync::Mutex;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
 
-#[derive(Clone)]
 /// The sources of all dependencies needed in sys validation.
-/// Currently this comprises only action hashes within the same DHT, but could
-/// some day include items from other DHTs or other sources.
+#[derive(Clone)]
 pub struct SysValDeps {
     /// Dependencies found in the same DHT as the dependent
-    pub same_dht: Arc<parking_lot::Mutex<ValidationDependencies<SignedActionHashed>>>,
+    validation_dependencies: Arc<Mutex<ValidationDependencies<SignedActionHashed>>>,
 }
 
 impl Default for SysValDeps {
     fn default() -> Self {
         Self {
-            same_dht: Arc::new(parking_lot::Mutex::new(ValidationDependencies::new())),
+            validation_dependencies: Arc::new(Mutex::new(ValidationDependencies::new())),
         }
     }
 }
 
+impl Deref for SysValDeps {
+    type Target = Arc<Mutex<ValidationDependencies<SignedActionHashed>>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.validation_dependencies
+    }
+}
+
 /// A collection of validation dependencies for the current set of DHT ops requiring validation.
+///
 /// This is used as an in-memory cache of dependency info, held across all validation workflow calls,
-/// to minimize the amount of network and database calls needed to check if dependencies have been satisfied
+/// to minimize the number of network and database calls needed to check if dependencies have been
+/// satisfied.
 pub struct ValidationDependencies<T: HasHash = SignedActionHashed> {
     /// The state of each dependency, keyed by its hash.
     states: HashMap<HoloHash<T::HashType>, ValidationDependencyState<T>>,
