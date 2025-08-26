@@ -26,7 +26,7 @@
 //! // conductors are cloneable
 //! let conductor2 = conductor.clone();
 //!
-//! assert_eq!(conductor.list_dnas(), vec![]);
+//! assert_eq!(conductor.list_dna_hashes(), vec![]);
 //! conductor.shutdown();
 //!
 //! }
