@@ -11,17 +11,23 @@ use crate::{
     sweettest::{SweetDnaFile, SweetInlineZomes},
 };
 use fixt::fixt;
+use hdk::prelude::{CreateLinkFixturator, EntryFixturator, RecordEntry, RegisterCreateLink};
 use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::{ActionHash, AgentPubKey, HashableContentExtSync};
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::exports::FallibleIterator;
-use holochain_state::{host_fn_workspace::HostFnWorkspaceRead, prelude::insert_op_cache};
+use holochain_state::{
+    host_fn_workspace::HostFnWorkspaceRead,
+    prelude::{insert_op_cache, set_validation_status, set_when_integrated},
+};
+use holochain_timestamp::Timestamp;
 use holochain_types::{
     chain::MustGetAgentActivityResponse,
     db::{DbKindCache, DbWrite},
-    dht_op::{ChainOp, DhtOpHashed, WireOps},
+    dht_op::{ChainOp, DhtOp, DhtOpHashed, WireOps},
     record::WireRecordOps,
 };
+use holochain_wasm_test_utils::TestWasm;
 use holochain_wasmer_host::module::ModuleCache;
 use holochain_zome_types::{
     chain::{ChainFilter, LimitConditions, MustGetAgentActivityInput},
@@ -340,6 +346,83 @@ async fn validation_callback_awaiting_deps_agent_activity() {
         .await
         .unwrap();
     assert_matches!(outcome, Outcome::Accepted);
+}
+
+// An op under validation that depends on an invalid op should be rejected.
+#[tokio::test(flavor = "multi_thread")]
+async fn validation_callback_rejects_op_depending_on_invalid_op() {
+    holochain_trace::test_run();
+    let (dna_file, integrity_zomes, _) =
+        SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Link]).await;
+    let zomes_to_invoke = ZomesToInvoke::OneIntegrity(integrity_zomes[0].clone());
+    let dna_hash = dna_file.dna_hash().clone();
+    let ribosome = RealRibosome::new(
+        dna_file.clone(),
+        Some(Arc::new(RwLock::new(ModuleCache::new(None)))),
+    )
+    .await
+    .unwrap();
+    let test_space = TestSpace::new(dna_hash.clone());
+    let alice = fixt!(AgentPubKey);
+    let workspace = HostFnWorkspaceRead::new(
+        test_space
+            .space
+            .get_or_create_authored_db(alice.clone())
+            .unwrap()
+            .into(),
+        test_space.space.dht_db.clone().into(),
+        test_space.space.cache_db.clone(),
+        fixt!(MetaLairClient),
+        None,
+    )
+    .await
+    .unwrap();
+
+    // An invalid Create action by Alice.
+    let mut create = fixt!(Create);
+    create.author = alice.clone();
+    create.action_seq = 0;
+    let create_action = Action::Create(create.clone());
+    let create_action_op =
+        DhtOpHashed::from_content_sync(DhtOp::ChainOp(Box::new(ChainOp::StoreRecord(
+            fixt!(Signature),
+            create_action.clone(),
+            RecordEntry::Present(fixt!(Entry)),
+        ))));
+    // A CreateLink to be validated that does a must_get_valid_record to the invalid Create
+    // in the validate callback.
+    let mut create_link = fixt!(CreateLink);
+    create_link.action_seq = 1;
+    create_link.zome_index = 0.into();
+    // This link type will lead to a must_get_valid_record in the validate callback.
+    create_link.link_type = 2.into();
+    create_link.base_address = create_action.to_hash().into();
+    let create_link_signed_hashed =
+        SignedHashed::new_unchecked(create_link.clone(), fixt!(Signature));
+    let create_link_op = Op::RegisterCreateLink(RegisterCreateLink {
+        create_link: create_link_signed_hashed,
+    });
+    let invocation = ValidateInvocation::new(zomes_to_invoke, &create_link_op).unwrap();
+    let network = Arc::new(MockHolochainP2pDnaT::new());
+
+    // Insert invalid Create op into the cache db.
+    test_space.space.cache_db.test_write(move |txn| {
+        insert_op_cache(txn, &create_action_op).unwrap();
+        set_validation_status(txn, &create_action_op.hash, ValidationStatus::Rejected).unwrap();
+        set_when_integrated(txn, &create_action_op.hash, Timestamp::now()).unwrap();
+    });
+
+    // App validation should reject the CreateLink op because the record at the base address of the link is invalid.
+    let outcome = run_validation_callback(
+        invocation.clone(),
+        &ribosome,
+        workspace.clone(),
+        network.clone(),
+        false,
+    )
+    .await
+    .unwrap();
+    assert_matches!(outcome, Outcome::Rejected(reason) if reason == "Found a record, but it is invalid");
 }
 
 // test case with alice and bob agent keys

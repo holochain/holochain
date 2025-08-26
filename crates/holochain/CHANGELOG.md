@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **BREAKING CHANGE**: Deprecate `AppManifest::UseExisting`. For late binding, update the coordinators of a DNA. For calling cells of other apps, bridge calls can be used.
 - Fix: Unschedule already scheduled persisted functions on error or when the schedule is set to `None`.
 - Refactor: When representative agent is missing, skip app validation workflow instead of panicking.
+- Fix: Return an error with an `Invalid` result from `must_get_valid_record` when a record that is invalid is found. Previously the error returned indicated `UnresolvedDependencies`.
 
 ## 0.6.0-dev.18
 
