@@ -61,6 +61,7 @@ holochain_trace = { version = "^0.6.0-dev.2", path = "../holochain_trace" }
 matches = "0.1.8"
 tempfile = "3.3"
 rand = "0.9"
+test-case = "3.3"
 
 [lints]
 workspace = true
