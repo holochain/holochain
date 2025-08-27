@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix a reference to a method that no longer exists in the conductor documentation `list_dnas` -> `list_dna_hashes`. #5245
+- Remove generic type parameters in `SysValDeps` and related types that are always used with the default types. #5245
 - Changed holochain_metrics dashboards to match available metrics.
 - Internal refactor to remove the `same_dht` field of `SysValDeps`. This field was redundant because the `SysValDeps` are always for the same DHT as the cell they are part of. #5243
 - **BREAKING CHANGE**: The agent activity response has been changed to return warrants as a `Vec<SignedWarrant>` instead of a `Vec<Warrant>`. This change ensures that warrant integrity can be checked and discovered warrants can be validated. Note that this also affects the HDK's `get_agent_activity` function which will now also return `SignedWarrant`s instead of `Warrant`s. #5237
