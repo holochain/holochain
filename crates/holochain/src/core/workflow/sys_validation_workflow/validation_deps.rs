@@ -43,15 +43,13 @@ pub struct ValidationDependencies {
     retained_deps: HashSet<ActionHash>,
 }
 
-impl Default for ValidationDependencies
-{
+impl Default for ValidationDependencies {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ValidationDependencies
-{
+impl ValidationDependencies {
     pub fn new() -> Self {
         Self {
             states: HashMap::new(),
@@ -82,10 +80,7 @@ impl ValidationDependencies
         }
     }
 
-    pub fn get_mut(
-        &mut self,
-        hash: &ActionHash,
-    ) -> Option<&mut ValidationDependencyState> {
+    pub fn get_mut(&mut self, hash: &ActionHash) -> Option<&mut ValidationDependencyState> {
         match self.states.get_mut(hash) {
             Some(dep) => Some(dep),
             None => {
@@ -166,9 +161,7 @@ impl ValidationDependencies
         self.states.extend(other.states);
     }
 
-    pub fn new_from_iter<
-        I: IntoIterator<Item = (ActionHash, ValidationDependencyState)>,
-    >(
+    pub fn new_from_iter<I: IntoIterator<Item = (ActionHash, ValidationDependencyState)>>(
         iter: I,
     ) -> Self {
         Self {
