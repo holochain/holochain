@@ -1,6 +1,8 @@
 use crate::sweettest::*;
 use hdk::prelude::DnaModifiersOpt;
 use holochain_types::app::CreateCloneCellPayload;
+use hdk::prelude::{CloneCellId, DnaModifiersOpt};
+use holochain_types::app::{CreateCloneCellPayload, EnableCloneCellPayload};
 use holochain_types::network::Kitsune2NetworkMetricsRequest;
 use holochain_types::prelude::InstalledAppId;
 use holochain_wasm_test_utils::TestWasm;
@@ -60,6 +62,10 @@ async fn network_metrics() {
         )
         .await
         .unwrap();
+    
+    let clone_cell_id = CloneCellId::CloneId(clone_cell.clone_id);
+    let response = conductors[0].clone().enable_clone_cell(&app_id, &EnableCloneCellPayload{ clone_cell_id}).await;
+    assert!(!response.is_err());
 
     let response = conductors[0]
     .dump_network_metrics_for_app(
