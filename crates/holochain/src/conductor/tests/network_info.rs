@@ -78,6 +78,7 @@ async fn network_metrics() {
             },
         )
         .await;
-    assert!(response.unwrap().contains_key(clone_cell.cell_id.dna_hash()));
+    assert!(response
+        .unwrap()
+        .contains_key(clone_cell.cell_id.dna_hash()));
 }
-
