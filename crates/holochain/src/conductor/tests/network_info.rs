@@ -67,7 +67,7 @@ async fn network_metrics() {
         .clone()
         .enable_clone_cell(&app_id, &EnableCloneCellPayload { clone_cell_id })
         .await;
-    assert!(!response.is_err());
+    assert!(response.is_ok());
 
     let response = conductors[0]
         .dump_network_metrics_for_app(
