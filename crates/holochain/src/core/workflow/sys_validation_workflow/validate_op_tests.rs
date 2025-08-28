@@ -251,7 +251,7 @@ async fn validate_create_op_with_prev_from_network() {
         .current_validation_dependencies
         .lock()
         .expect("poisoned")
-        .insert(previous_action, CascadeSource::Network);
+        .insert_action(previous_action, CascadeSource::Network);
 
     // Run again to process new ops from the network
     let outcome = test_case.run().await.unwrap();
