@@ -214,6 +214,14 @@ async fn app_validation_workflow_inner(
     #[cfg(feature = "unstable-warrants")]
     let mut warrant_op_hashes = vec![];
 
+    #[cfg(all(feature = "unstable-warrants", feature = "test_utils"))]
+    let disable_warrant_issuance = conductor
+        .config
+        .conductor_tuning_params()
+        .disable_warrant_issuance;
+    #[cfg(all(feature = "unstable-warrants", not(feature = "test_utils")))]
+    let disable_warrant_issuance = false;
+
     // Validate ops sequentially
     for sorted_dht_op in sorted_dht_ops.into_iter() {
         let (dht_op, dht_op_hash) = sorted_dht_op.into_inner();
@@ -270,9 +278,10 @@ async fn app_validation_workflow_inner(
                 let rejected_ops = rejected_ops.clone();
 
                 #[cfg(feature = "unstable-warrants")]
-                if let Outcome::Rejected(_) = &outcome {
-                    let keystore = conductor.keystore();
-                    let warrant_op =
+                if !disable_warrant_issuance {
+                    if let Outcome::Rejected(_) = &outcome {
+                        let keystore = conductor.keystore();
+                        let warrant_op =
                         crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
                             keystore,
                             _representative_agent.clone(),
@@ -281,20 +290,22 @@ async fn app_validation_workflow_inner(
                         )
                         .await?;
 
-                    warrant_op_hashes.push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
+                        warrant_op_hashes
+                            .push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
 
-                    if let Err(err) = workspace
-                        .authored_db
-                        .write_async(move |txn| {
-                            warn!("Inserting warrant op");
-                            insert_op_authored(txn, &warrant_op)
-                        })
-                        .await
-                    {
-                        tracing::warn!("Error writing warrant op: {err}");
+                        if let Err(err) = workspace
+                            .authored_db
+                            .write_async(move |txn| {
+                                warn!("Inserting warrant op");
+                                insert_op_authored(txn, &warrant_op)
+                            })
+                            .await
+                        {
+                            tracing::warn!("Error writing warrant op: {err}");
+                        }
+
+                        warranted_ops.fetch_add(1, Ordering::SeqCst);
                     }
-
-                    warranted_ops.fetch_add(1, Ordering::SeqCst);
                 }
 
                 let write_result = workspace

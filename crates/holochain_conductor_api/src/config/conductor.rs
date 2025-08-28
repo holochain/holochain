@@ -508,6 +508,12 @@ pub struct ConductorTuningParams {
     ///
     /// Default: None
     pub publish_trigger_interval: Option<std::time::Duration>,
+    /// Prevent issuance of warrants. Useful for testing whether warrants are gossiped
+    /// and published.
+    ///
+    /// Default: false
+    #[cfg(feature = "test-utils")]
+    pub disable_warrant_issuance: bool,
 }
 
 impl ConductorTuningParams {
@@ -519,6 +525,8 @@ impl ConductorTuningParams {
             countersigning_resolution_retry_limit: None,
             min_publish_interval: None,
             publish_trigger_interval: None,
+            #[cfg(feature = "test-utils")]
+            disable_warrant_issuance: false,
         }
     }
 
@@ -552,6 +560,8 @@ impl Default for ConductorTuningParams {
             countersigning_resolution_retry_limit: None,
             publish_trigger_interval: None,
             min_publish_interval: None,
+            #[cfg(feature = "test-utils")]
+            disable_warrant_issuance: false,
         }
     }
 }
