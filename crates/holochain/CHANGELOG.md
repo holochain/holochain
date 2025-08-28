@@ -9,13 +9,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Fix a reference to a method that no longer exists in the conductor documentation `list_dnas` -> `list_dna_hashes`. #5245
 - Remove generic type parameters in `SysValDeps` and related types that are always used with the default types. #5245
-- Changed holochain_metrics dashboards to match available metrics.
-- Internal refactor to remove the `same_dht` field of `SysValDeps`. This field was redundant because the `SysValDeps` are always for the same DHT as the cell they are part of. #5243
-- **BREAKING CHANGE**: The agent activity response has been changed to return warrants as a `Vec<SignedWarrant>` instead of a `Vec<Warrant>`. This change ensures that warrant integrity can be checked and discovered warrants can be validated. Note that this also affects the HDK's `get_agent_activity` function which will now also return `SignedWarrant`s instead of `Warrant`s. #5237
-- **BREAKING CHANGE**: Move `ChainOpType` from `holochain_types` to `holochain_zome_types`. #5236
-- **BREAKING CHANGE**: Remove the `SysValDeps` typedef and use instead `Vec<ActionHash>` in the few places that was used. #5236
-- **BREAKING CHANGE**: Modify the fields of `ChainIntegrityWarrant::ChainIntegrityWarrant` to add a `ChainOpType` field which allows just one op type to be validated when checking the warrant. #5236
-- Changed `schedule` host fn unit tests to integration tests. 
+
+## 0.6.0-dev.19
+
+- Changed holochain\_metrics dashboards to match available metrics.
+- Internal refactor to remove the `same_dht` field of `SysValDeps`. This field was redundant because the `SysValDeps` are always for the same DHT as the cell they are part of. \#5243
+- **BREAKING CHANGE**: The agent activity response has been changed to return warrants as a `Vec<SignedWarrant>` instead of a `Vec<Warrant>`. This change ensures that warrant integrity can be checked and discovered warrants can be validated. Note that this also affects the HDK’s `get_agent_activity` function which will now also return `SignedWarrant`s instead of `Warrant`s. \#5237
+- **BREAKING CHANGE**: Move `ChainOpType` from `holochain_types` to `holochain_zome_types`. \#5236
+- **BREAKING CHANGE**: Remove the `SysValDeps` typedef and use instead `Vec<ActionHash>` in the few places that was used. \#5236
+- **BREAKING CHANGE**: Modify the fields of `ChainIntegrityWarrant::ChainIntegrityWarrant` to add a `ChainOpType` field which allows just one op type to be validated when checking the warrant. \#5236
+- Changed `schedule` host fn unit tests to integration tests.
 - **BREAKING CHANGE**: Deprecate `AppManifest::UseExisting`. For late binding, update the coordinators of a DNA. For calling cells of other apps, bridge calls can be used.
 - Fix: Unschedule already scheduled persisted functions on error or when the schedule is set to `None`.
 - Refactor: When representative agent is missing, skip app validation workflow instead of panicking.
