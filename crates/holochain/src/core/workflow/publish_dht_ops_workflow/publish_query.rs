@@ -15,7 +15,6 @@ use std::time::UNIX_EPOCH;
 /// - Don't publish private entries.
 /// - Only get ops that haven't been published within the minimum publish interval
 /// - Only get ops that have less than the RECEIPT_BUNDLE_SIZE
-// TODO: should we not filter by author here?
 pub async fn get_ops_to_publish<AuthorDb>(
     agent: AgentPubKey,
     db: &AuthorDb,
@@ -54,6 +53,29 @@ where
             Action.author = :author
             AND
             (DhtOp.type != :store_entry OR Action.private_entry = 0)
+            AND
+            DhtOp.withhold_publish IS NULL
+            AND
+            (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
+            AND
+            DhtOp.receipts_complete IS NULL
+
+            UNION
+            ALL
+
+            SELECT
+            Warrant.blob as action_blob,
+            Warrant.author as author,
+            LENGTH(Warrant.blob) AS action_size,
+            0 AS entry_size,
+            NULL as entry_blob,
+            DhtOp.type as dht_type,
+            DhtOp.hash as dht_hash
+            FROM Warrant
+            JOIN
+            DhtOp ON DhtOp.action_hash = Warrant.hash
+            WHERE
+            Warrant.author = :author
             AND
             DhtOp.withhold_publish IS NULL
             AND
