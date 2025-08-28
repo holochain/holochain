@@ -1,12 +1,11 @@
+use crate::prelude::fake_dna_hash;
 use crate::sweettest::*;
+use hdk::prelude::CloneCellId;
 use hdk::prelude::DnaModifiersOpt;
-use holochain_types::app::CreateCloneCellPayload;
-use hdk::prelude::{CloneCellId, DnaModifiersOpt};
 use holochain_types::app::{CreateCloneCellPayload, EnableCloneCellPayload};
 use holochain_types::network::Kitsune2NetworkMetricsRequest;
 use holochain_types::prelude::InstalledAppId;
 use holochain_wasm_test_utils::TestWasm;
-use crate::prelude::fake_dna_hash;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn network_metrics() {
@@ -39,14 +38,14 @@ async fn network_metrics() {
 
     let fake_dna = fake_dna_hash(1);
     let response = conductors[0]
-    .dump_network_metrics_for_app(
-        &app_id,
-        Kitsune2NetworkMetricsRequest {
-            dna_hash: Some(fake_dna),
-            include_dht_summary: false,
-        },
-    )
-    .await;
+        .dump_network_metrics_for_app(
+            &app_id,
+            Kitsune2NetworkMetricsRequest {
+                dna_hash: Some(fake_dna),
+                include_dht_summary: false,
+            },
+        )
+        .await;
     assert!(response.is_err());
 
     // Create a disabled clone cell for app1
@@ -62,20 +61,23 @@ async fn network_metrics() {
         )
         .await
         .unwrap();
-    
+
     let clone_cell_id = CloneCellId::CloneId(clone_cell.clone_id);
-    let response = conductors[0].clone().enable_clone_cell(&app_id, &EnableCloneCellPayload{ clone_cell_id}).await;
+    let response = conductors[0]
+        .clone()
+        .enable_clone_cell(&app_id, &EnableCloneCellPayload { clone_cell_id })
+        .await;
     assert!(!response.is_err());
 
     let response = conductors[0]
-    .dump_network_metrics_for_app(
-        &app_id,
-        Kitsune2NetworkMetricsRequest {
-            dna_hash: Some(clone_cell.cell_id.dna_hash().clone()),
-            include_dht_summary: false,
-        },
-    )
-    .await;
-    assert!(!response.is_err());
-
+        .dump_network_metrics_for_app(
+            &app_id,
+            Kitsune2NetworkMetricsRequest {
+                dna_hash: Some(clone_cell.cell_id.dna_hash().clone()),
+                include_dht_summary: false,
+            },
+        )
+        .await;
+    assert!(response.unwrap().contains_key(clone_cell.cell_id.dna_hash()));
 }
+
