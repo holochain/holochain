@@ -57,7 +57,7 @@ impl FromSql for ValidationStage {
     }
 }
 
-/// Get the validation state of a [`DhtOp`] by its action hash and type.
+/// Get the validation state of a DHT op by its action hash and type.
 ///
 /// Returns `Ok(None)` if the action is not found or there is no matching op type for the action.
 /// Otherwise, returns a combination of stage and status:
