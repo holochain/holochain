@@ -72,7 +72,7 @@ pub async fn get_dht_op_validation_state(
 ) -> StateQueryResult<Option<(Option<ValidationStage>, Option<ValidationStatus>)>> {
     dht_db.read_async(move |txn| -> StateQueryResult<_> {
         let mut stmt = txn.prepare(
-            "SELECT validation_stage, validation_status, when_integrated FROM DhtOp WHERE action_hash = ? AND type = ?"
+            "SELECT validation_stage, validation_status FROM DhtOp WHERE action_hash = ? AND type = ?"
         )?;
 
         Ok(stmt.query_row(params![action_hash, op_type], |row| -> Result<(Option<ValidationStage>, Option<ValidationStatus>), _> {
