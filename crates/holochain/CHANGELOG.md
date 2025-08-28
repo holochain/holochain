@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Fix a reference to a method that no longer exists in the conductor documentation `list_dnas` -> `list_dna_hashes`. #5245
+- Remove generic type parameters in `SysValDeps` and related types that are always used with the default types. #5245
+
 ## 0.6.0-dev.19
 
 - Changed holochain\_metrics dashboards to match available metrics.
