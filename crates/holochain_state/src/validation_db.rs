@@ -121,7 +121,6 @@ mod tests {
             let op = op.clone();
             let op_hashed = DhtOpHashed::from_content_sync(op);
             let test_stage = test_stage.clone();
-            let test_validation_status = test_validation_status;
             move |txn| -> StateMutationResult<()> {
                 insert_op_dht(txn, &op_hashed, 0, None)?;
 
