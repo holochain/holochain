@@ -345,16 +345,6 @@ async fn app_validation_workflow_inner(
         }
     }
 
-    // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
-    #[cfg(feature = "unstable-warrants")]
-    holochain_state::integrate::authored_ops_to_dht_db(
-        network.target_arcs().await?,
-        warrant_op_hashes,
-        workspace.authored_db.clone().into(),
-        workspace.dht_db.clone(),
-    )
-    .await?;
-
     let accepted_ops = accepted_ops.load(Ordering::SeqCst);
     let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
     let rejected_ops = rejected_ops.load(Ordering::SeqCst);
@@ -364,6 +354,18 @@ async fn app_validation_workflow_inner(
         .expect("must be only reference")
         .into_inner();
     tracing::info!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected, failed ops {failed_ops:?}.");
+
+    // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
+    #[cfg(feature = "unstable-warrants")]
+    if warranted_ops > 0 {
+        holochain_state::integrate::authored_ops_to_dht_db(
+            network.target_arcs().await?,
+            warrant_op_hashes,
+            workspace.authored_db.clone().into(),
+            workspace.dht_db.clone(),
+        )
+        .await?;
+    }
 
     let outcome_summary = OutcomeSummary {
         ops_to_validate: num_ops_to_validate,
