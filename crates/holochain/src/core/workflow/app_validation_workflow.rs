@@ -278,10 +278,9 @@ async fn app_validation_workflow_inner(
                 let rejected_ops = rejected_ops.clone();
 
                 #[cfg(feature = "unstable-warrants")]
-                if !disable_warrant_issuance {
-                    if let Outcome::Rejected(_) = &outcome {
-                        let keystore = conductor.keystore();
-                        let warrant_op =
+                if let Outcome::Rejected(_) = &outcome {
+                    let keystore = conductor.keystore();
+                    let warrant_op =
                         crate::core::workflow::sys_validation_workflow::make_invalid_chain_warrant_op(
                             keystore,
                             _representative_agent.clone(),
@@ -290,6 +289,9 @@ async fn app_validation_workflow_inner(
                         )
                         .await?;
 
+                    if disable_warrant_issuance {
+                        tracing::warn!("Warrant issuance disabled - skipping issuing a warrant");
+                    } else {
                         warrant_op_hashes
                             .push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
 
