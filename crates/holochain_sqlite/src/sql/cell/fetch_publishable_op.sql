@@ -24,4 +24,3 @@ FROM
   JOIN Warrant ON DhtOp.action_hash = Warrant.hash
 WHERE
   DhtOp.hash = :hash
-  AND DhtOp.withhold_publish IS NULL

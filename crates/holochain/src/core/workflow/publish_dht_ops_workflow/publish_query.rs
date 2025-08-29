@@ -79,11 +79,7 @@ where
             WHERE
             Warrant.author = :author
             AND
-            DhtOp.withhold_publish IS NULL
-            AND
             (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
-            AND
-            DhtOp.receipts_complete IS NULL
 
             ORDER BY op_order
             ",
@@ -128,8 +124,6 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
           JOIN DhtOp ON DhtOp.action_hash = Warrant.hash
           WHERE
             Warrant.author = :author
-            AND DhtOp.withhold_publish IS NULL
-            AND DhtOp.receipts_complete IS NULL
         )
         AS num_ops
         ",
@@ -283,7 +277,6 @@ mod tests {
                         - ConductorTuningParams::default().min_publish_interval(),
                 )
                 .unwrap();
-                set_receipts_complete(txn, &invalid_op_warrant.hash, false).unwrap();
             }
         });
         warrant_op
