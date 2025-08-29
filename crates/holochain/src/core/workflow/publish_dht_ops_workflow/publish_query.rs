@@ -43,7 +43,8 @@ where
             END AS entry_size,
             Entry.blob as entry_blob,
             DhtOp.type as dht_type,
-            DhtOp.hash as dht_hash
+            DhtOp.hash as dht_hash,
+            DhtOp.op_order as op_order
             FROM Action
             JOIN
             DhtOp ON DhtOp.action_hash = Action.hash
@@ -70,7 +71,8 @@ where
             0 AS entry_size,
             NULL as entry_blob,
             DhtOp.type as dht_type,
-            DhtOp.hash as dht_hash
+            DhtOp.hash as dht_hash,
+            DhtOp.op_order as op_order
             FROM Warrant
             JOIN
             DhtOp ON DhtOp.action_hash = Warrant.hash
@@ -82,6 +84,8 @@ where
             (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
             AND
             DhtOp.receipts_complete IS NULL
+
+            ORDER BY op_order
             ",
         )?;
         let r = stmt.query_and_then(
