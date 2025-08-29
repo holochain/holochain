@@ -141,7 +141,9 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
+    #[cfg(feature = "unstable-warrants")]
+    use holo_hash::fixt::ActionHashFixturator;
+    use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
     use holochain_conductor_api::conductor::ConductorTuningParams;
@@ -202,6 +204,7 @@ mod tests {
         assert_eq!(expected.results.len() + 1, num_to_publish);
     }
 
+    #[cfg(feature = "unstable-warrants")]
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query_includes_warrants() {
         holochain_trace::test_run();
@@ -246,6 +249,7 @@ mod tests {
         assert_eq!(num_to_publish, 2);
     }
 
+    #[cfg(feature = "unstable-warrants")]
     fn insert_invalid_chain_op_warrant_op(
         db: &DbWrite<DbKindAuthored>,
         agent: &AgentPubKey,
