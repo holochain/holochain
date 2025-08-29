@@ -79,7 +79,7 @@ where
             WHERE
             Warrant.author = :author
             AND
-            (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
+            DhtOp.last_publish_time IS NULL
 
             ORDER BY op_order
             ",
@@ -124,6 +124,7 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
           JOIN DhtOp ON DhtOp.action_hash = Warrant.hash
           WHERE
             Warrant.author = :author
+            AND DhtOp.last_publish_time IS NULL
         )
         AS num_ops
         ",
@@ -225,7 +226,7 @@ mod tests {
         )
         .await
         .content;
-        let warrant_op = insert_invalid_op_warrant_op(&db, &agent).content;
+        let warrant_op = insert_invalid_chain_op_warrant_op(&db, &agent).content;
 
         let ops_to_publish = get_ops_to_publish(
             agent.clone(),
@@ -270,13 +271,6 @@ mod tests {
         db.test_write({
             move |txn| {
                 insert_op_authored(txn, &invalid_op_warrant).unwrap();
-                set_last_publish_time(
-                    txn,
-                    &invalid_op_warrant.hash,
-                    SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-                        - ConductorTuningParams::default().min_publish_interval(),
-                )
-                .unwrap();
             }
         });
         warrant_op
