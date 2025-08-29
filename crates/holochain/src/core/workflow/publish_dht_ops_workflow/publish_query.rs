@@ -81,7 +81,7 @@ where
             AND
             DhtOp.last_publish_time IS NULL
 
-            ORDER BY op_order
+            ORDER BY op_order, dht_hash
             ",
         )?;
         let r = stmt.query_and_then(
