@@ -29,6 +29,9 @@ pub enum StateMutationError {
 
     #[error("Cannot remove a fully published countersigning session")]
     CannotRemoveFullyPublished,
+
+    #[error("The operation was not found in the cache")]
+    OpNotFoundInCache,
 }
 
 pub type StateMutationResult<T> = Result<T, StateMutationError>;
