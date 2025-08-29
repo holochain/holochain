@@ -107,18 +107,27 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
     let count = txn.query_row(
         "
         SELECT
-        COUNT(DhtOp.rowid) as num_ops
-        FROM Action
-        JOIN
-        DhtOp ON DhtOp.action_hash = Action.hash
-        WHERE
-        Action.author = :author
-        AND
-        DhtOp.withhold_publish IS NULL
-        AND
-        (DhtOp.type != :store_entry OR Action.private_entry = 0)
-        AND
-        DhtOp.receipts_complete IS NULL
+        (
+          SELECT COUNT(DhtOp.rowid)
+          FROM Action
+          JOIN DhtOp ON DhtOp.action_hash = Action.hash
+          WHERE
+            Action.author = :author
+            AND DhtOp.withhold_publish IS NULL
+            AND (DhtOp.type != :store_entry OR Action.private_entry = 0)
+            AND DhtOp.receipts_complete IS NULL
+        )
+        +
+        (
+          SELECT COUNT(DhtOp.rowid)
+          FROM Warrant
+          JOIN DhtOp ON DhtOp.action_hash = Warrant.hash
+          WHERE
+            Warrant.author = :author
+            AND DhtOp.withhold_publish IS NULL
+            AND DhtOp.receipts_complete IS NULL
+        )
+        AS num_ops
         ",
         named_params! {
             ":author": agent,
@@ -133,7 +142,7 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
-    use holo_hash::fixt::AgentPubKeyFixturator;
+    use holo_hash::fixt::{ActionHashFixturator, AgentPubKeyFixturator};
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
     use holochain_conductor_api::conductor::ConductorTuningParams;
@@ -192,6 +201,88 @@ mod tests {
         // +1 because `get_ops_to_publish` will filter on `last_publish_time` where `num_still_needing_publish` should
         // not because those ops may need publishing again in the future if we don't get enough validation receipts.
         assert_eq!(expected.results.len() + 1, num_to_publish);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn publish_query_includes_warrants() {
+        holochain_trace::test_run();
+
+        let agent = fixt!(AgentPubKey);
+        let db = test_authored_db();
+
+        // Insert one chain op and one warrant op into database.
+        let chain_op = create_and_insert_op(
+            &db,
+            Facts {
+                private: false,
+                within_min_period: false,
+                has_required_receipts: false,
+                is_this_agent: true,
+                store_entry: false,
+                withold_publish: false,
+            },
+            &Consistent {
+                this_agent: agent.clone(),
+            },
+        )
+        .await
+        .content;
+        let warrant_op = insert_invalid_op_warrant_op(&db, &agent).content;
+
+        let ops_to_publish = get_ops_to_publish(
+            agent.clone(),
+            &db.to_db(),
+            ConductorTuningParams::default().min_publish_interval(),
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(_, _, op)| op)
+        .collect::<Vec<_>>();
+        assert_eq!(ops_to_publish, vec![chain_op, warrant_op]);
+
+        let num_to_publish = db
+            .to_db()
+            .test_read(|txn| num_still_needing_publish(txn, agent).unwrap());
+        assert_eq!(num_to_publish, 2);
+    }
+
+    fn insert_invalid_op_warrant_op(
+        db: &DbWrite<DbKindAuthored>,
+        agent: &AgentPubKey,
+    ) -> DhtOpHashed {
+        let invalid_op_warrant = SignedWarrant::new(
+            Warrant::new(
+                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                    action_author: fixt!(AgentPubKey),
+                    action: (fixt!(ActionHash), fixt!(Signature)),
+                    validation_type: ValidationType::App,
+                    chain_op_type: ChainOpType::RegisterAddLink,
+                }),
+                agent.clone(),
+                Timestamp::now(),
+                fixt!(AgentPubKey),
+            ),
+            fixt!(Signature),
+        );
+        let invalid_op_warrant = DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(
+            WarrantOp::from(invalid_op_warrant),
+        )));
+        let warrant_op = invalid_op_warrant.clone();
+        db.test_write({
+            move |txn| {
+                insert_op_authored(txn, &invalid_op_warrant).unwrap();
+                set_last_publish_time(
+                    txn,
+                    &invalid_op_warrant.hash,
+                    SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+                        - ConductorTuningParams::default().min_publish_interval(),
+                )
+                .unwrap();
+                set_receipts_complete(txn, &invalid_op_warrant.hash, false).unwrap();
+            }
+        });
+        warrant_op
     }
 
     async fn create_and_insert_op(
