@@ -208,10 +208,8 @@ async fn app_validation_workflow_inner(
     let accepted_ops = Arc::new(AtomicUsize::new(0));
     let awaiting_ops = Arc::new(AtomicUsize::new(0));
     let rejected_ops = Arc::new(AtomicUsize::new(0));
-    let warranted_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
-    #[cfg(feature = "unstable-warrants")]
     let mut warrant_op_hashes = vec![];
 
     #[cfg(all(feature = "unstable-warrants", feature = "test_utils"))]
@@ -305,8 +303,6 @@ async fn app_validation_workflow_inner(
                         {
                             tracing::warn!("Error writing warrant op: {err}");
                         }
-
-                        warranted_ops.fetch_add(1, Ordering::SeqCst);
                     }
                 }
 
@@ -350,7 +346,7 @@ async fn app_validation_workflow_inner(
     let accepted_ops = accepted_ops.load(Ordering::SeqCst);
     let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
     let rejected_ops = rejected_ops.load(Ordering::SeqCst);
-    let warranted_ops = warranted_ops.load(Ordering::SeqCst);
+    let warranted_ops = warrant_op_hashes.len();
     let ops_validated = accepted_ops + rejected_ops;
     let failed_ops = Arc::try_unwrap(failed_ops)
         .expect("must be only reference")
