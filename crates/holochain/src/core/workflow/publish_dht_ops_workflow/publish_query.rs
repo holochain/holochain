@@ -15,7 +15,6 @@ use std::time::UNIX_EPOCH;
 /// - Don't publish private entries.
 /// - Only get ops that haven't been published within the minimum publish interval
 /// - Only get ops that have less than the RECEIPT_BUNDLE_SIZE
-// TODO: should we not filter by author here?
 pub async fn get_ops_to_publish<AuthorDb>(
     agent: AgentPubKey,
     db: &AuthorDb,
@@ -44,7 +43,8 @@ where
             END AS entry_size,
             Entry.blob as entry_blob,
             DhtOp.type as dht_type,
-            DhtOp.hash as dht_hash
+            DhtOp.hash as dht_hash,
+            DhtOp.op_order as op_order
             FROM Action
             JOIN
             DhtOp ON DhtOp.action_hash = Action.hash
@@ -60,6 +60,28 @@ where
             (DhtOp.last_publish_time IS NULL OR DhtOp.last_publish_time <= :recency_threshold)
             AND
             DhtOp.receipts_complete IS NULL
+
+            UNION
+            ALL
+
+            SELECT
+            Warrant.blob as action_blob,
+            Warrant.author as author,
+            LENGTH(Warrant.blob) AS action_size,
+            0 AS entry_size,
+            NULL as entry_blob,
+            DhtOp.type as dht_type,
+            DhtOp.hash as dht_hash,
+            DhtOp.op_order as op_order
+            FROM Warrant
+            JOIN
+            DhtOp ON DhtOp.action_hash = Warrant.hash
+            WHERE
+            Warrant.author = :author
+            AND
+            DhtOp.last_publish_time IS NULL
+
+            ORDER BY op_order, dht_hash
             ",
         )?;
         let r = stmt.query_and_then(
@@ -85,18 +107,26 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
     let count = txn.query_row(
         "
         SELECT
-        COUNT(DhtOp.rowid) as num_ops
-        FROM Action
-        JOIN
-        DhtOp ON DhtOp.action_hash = Action.hash
-        WHERE
-        Action.author = :author
-        AND
-        DhtOp.withhold_publish IS NULL
-        AND
-        (DhtOp.type != :store_entry OR Action.private_entry = 0)
-        AND
-        DhtOp.receipts_complete IS NULL
+        (
+          SELECT COUNT(DhtOp.rowid)
+          FROM Action
+          JOIN DhtOp ON DhtOp.action_hash = Action.hash
+          WHERE
+            Action.author = :author
+            AND DhtOp.withhold_publish IS NULL
+            AND (DhtOp.type != :store_entry OR Action.private_entry = 0)
+            AND DhtOp.receipts_complete IS NULL
+        )
+        +
+        (
+          SELECT COUNT(DhtOp.rowid)
+          FROM Warrant
+          JOIN DhtOp ON DhtOp.action_hash = Warrant.hash
+          WHERE
+            Warrant.author = :author
+            AND DhtOp.last_publish_time IS NULL
+        )
+        AS num_ops
         ",
         named_params! {
             ":author": agent,
@@ -111,6 +141,8 @@ pub fn num_still_needing_publish(txn: &Transaction, agent: AgentPubKey) -> Workf
 mod tests {
     use super::*;
     use ::fixt::prelude::*;
+    #[cfg(feature = "unstable-warrants")]
+    use holo_hash::fixt::ActionHashFixturator;
     use holo_hash::fixt::AgentPubKeyFixturator;
     use holo_hash::EntryHash;
     use holo_hash::HasHash;
@@ -170,6 +202,82 @@ mod tests {
         // +1 because `get_ops_to_publish` will filter on `last_publish_time` where `num_still_needing_publish` should
         // not because those ops may need publishing again in the future if we don't get enough validation receipts.
         assert_eq!(expected.results.len() + 1, num_to_publish);
+    }
+
+    #[cfg(feature = "unstable-warrants")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn publish_query_includes_warrants() {
+        holochain_trace::test_run();
+
+        let agent = fixt!(AgentPubKey);
+        let db = test_authored_db();
+
+        // Insert one chain op and one warrant op into database.
+        let chain_op = create_and_insert_op(
+            &db,
+            Facts {
+                private: false,
+                within_min_period: false,
+                has_required_receipts: false,
+                is_this_agent: true,
+                store_entry: false,
+                withold_publish: false,
+            },
+            &Consistent {
+                this_agent: agent.clone(),
+            },
+        )
+        .await
+        .content;
+        let warrant_op = insert_invalid_chain_op_warrant_op(&db, &agent).content;
+
+        let ops_to_publish = get_ops_to_publish(
+            agent.clone(),
+            &db.to_db(),
+            ConductorTuningParams::default().min_publish_interval(),
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(_, _, op)| op)
+        .collect::<Vec<_>>();
+        assert_eq!(ops_to_publish, vec![chain_op, warrant_op]);
+
+        let num_to_publish = db
+            .to_db()
+            .test_read(|txn| num_still_needing_publish(txn, agent).unwrap());
+        assert_eq!(num_to_publish, 2);
+    }
+
+    #[cfg(feature = "unstable-warrants")]
+    fn insert_invalid_chain_op_warrant_op(
+        db: &DbWrite<DbKindAuthored>,
+        agent: &AgentPubKey,
+    ) -> DhtOpHashed {
+        let invalid_op_warrant = SignedWarrant::new(
+            Warrant::new(
+                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                    action_author: fixt!(AgentPubKey),
+                    action: (fixt!(ActionHash), fixt!(Signature)),
+                    validation_type: ValidationType::App,
+                    chain_op_type: ChainOpType::RegisterAddLink,
+                }),
+                agent.clone(),
+                Timestamp::now(),
+                fixt!(AgentPubKey),
+            ),
+            fixt!(Signature),
+        );
+        let invalid_op_warrant = DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(
+            WarrantOp::from(invalid_op_warrant),
+        )));
+        let warrant_op = invalid_op_warrant.clone();
+        db.test_write({
+            move |txn| {
+                insert_op_authored(txn, &invalid_op_warrant).unwrap();
+            }
+        });
+        warrant_op
     }
 
     async fn create_and_insert_op(

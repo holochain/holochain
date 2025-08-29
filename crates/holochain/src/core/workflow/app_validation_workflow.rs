@@ -208,11 +208,19 @@ async fn app_validation_workflow_inner(
     let accepted_ops = Arc::new(AtomicUsize::new(0));
     let awaiting_ops = Arc::new(AtomicUsize::new(0));
     let rejected_ops = Arc::new(AtomicUsize::new(0));
-    let warranted_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
+    let warrant_op_hashes: Vec<(DhtOpHash, OpBasis)> = vec![];
     #[cfg(feature = "unstable-warrants")]
-    let mut warrant_op_hashes = vec![];
+    let mut warrant_op_hashes = warrant_op_hashes;
+
+    #[cfg(all(feature = "unstable-warrants", feature = "test_utils"))]
+    let disable_warrant_issuance = conductor
+        .config
+        .conductor_tuning_params()
+        .disable_warrant_issuance;
+    #[cfg(all(feature = "unstable-warrants", not(feature = "test_utils")))]
+    let disable_warrant_issuance = false;
 
     // Validate ops sequentially
     for sorted_dht_op in sorted_dht_ops.into_iter() {
@@ -281,20 +289,23 @@ async fn app_validation_workflow_inner(
                         )
                         .await?;
 
-                    warrant_op_hashes.push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
+                    if disable_warrant_issuance {
+                        tracing::warn!("Warrant issuance disabled - skipping issuing a warrant");
+                    } else {
+                        warrant_op_hashes
+                            .push((warrant_op.to_hash(), warrant_op.dht_basis().clone()));
 
-                    if let Err(err) = workspace
-                        .authored_db
-                        .write_async(move |txn| {
-                            warn!("Inserting warrant op");
-                            insert_op_authored(txn, &warrant_op)
-                        })
-                        .await
-                    {
-                        tracing::warn!("Error writing warrant op: {err}");
+                        if let Err(err) = workspace
+                            .authored_db
+                            .write_async(move |txn| {
+                                warn!("Inserting warrant op");
+                                insert_op_authored(txn, &warrant_op)
+                            })
+                            .await
+                        {
+                            tracing::warn!("Error writing warrant op: {err}");
+                        }
                     }
-
-                    warranted_ops.fetch_add(1, Ordering::SeqCst);
                 }
 
                 let write_result = workspace
@@ -334,25 +345,27 @@ async fn app_validation_workflow_inner(
         }
     }
 
-    // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
-    #[cfg(feature = "unstable-warrants")]
-    holochain_state::integrate::authored_ops_to_dht_db(
-        network.target_arcs().await?,
-        warrant_op_hashes,
-        workspace.authored_db.clone().into(),
-        workspace.dht_db.clone(),
-    )
-    .await?;
-
     let accepted_ops = accepted_ops.load(Ordering::SeqCst);
     let awaiting_ops = awaiting_ops.load(Ordering::SeqCst);
     let rejected_ops = rejected_ops.load(Ordering::SeqCst);
-    let warranted_ops = warranted_ops.load(Ordering::SeqCst);
+    let warranted_ops = warrant_op_hashes.len();
     let ops_validated = accepted_ops + rejected_ops;
     let failed_ops = Arc::try_unwrap(failed_ops)
         .expect("must be only reference")
         .into_inner();
     tracing::info!("{ops_validated} out of {num_ops_to_validate} validated: {accepted_ops} accepted, {awaiting_ops} awaiting deps, {rejected_ops} rejected, failed ops {failed_ops:?}.");
+
+    // "self-publish" warrants, i.e. insert them into the DHT db as if they were published to us by another node
+    #[cfg(feature = "unstable-warrants")]
+    if warranted_ops > 0 {
+        holochain_state::integrate::authored_ops_to_dht_db(
+            network.target_arcs().await?,
+            warrant_op_hashes,
+            workspace.authored_db.clone().into(),
+            workspace.dht_db.clone(),
+        )
+        .await?;
+    }
 
     let outcome_summary = OutcomeSummary {
         ops_to_validate: num_ops_to_validate,

@@ -12,3 +12,18 @@ FROM
 WHERE
   DhtOp.hash IN rarray(:hashes)
   AND DhtOp.when_integrated IS NOT NULL
+UNION
+ALL
+SELECT
+  DhtOp.hash,
+  DhtOp.basis_hash,
+  DhtOp.type,
+  Warrant.blob AS action_blob,
+  Warrant.author AS author,
+  NULL AS entry_blob
+FROM
+  DhtOp
+  JOIN Warrant ON DhtOp.action_hash = Warrant.hash
+WHERE
+  DhtOp.hash IN rarray(:hashes)
+  AND DhtOp.when_integrated IS NOT NULL
