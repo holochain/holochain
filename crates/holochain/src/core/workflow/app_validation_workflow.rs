@@ -210,7 +210,9 @@ async fn app_validation_workflow_inner(
     let rejected_ops = Arc::new(AtomicUsize::new(0));
     let failed_ops = Arc::new(Mutex::new(HashSet::new()));
     let mut agent_activity_ops = vec![];
-    let mut warrant_op_hashes = vec![];
+    let warrant_op_hashes: Vec<(DhtOpHash, OpBasis)> = vec![];
+    #[cfg(feature = "unstable-warrants")]
+    let mut warrant_op_hashes = warrant_op_hashes;
 
     #[cfg(all(feature = "unstable-warrants", feature = "test_utils"))]
     let disable_warrant_issuance = conductor
