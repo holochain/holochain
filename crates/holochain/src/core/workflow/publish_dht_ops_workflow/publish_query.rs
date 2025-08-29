@@ -251,7 +251,7 @@ mod tests {
         assert_eq!(num_to_publish, 2);
     }
 
-    fn insert_invalid_op_warrant_op(
+    fn insert_invalid_chain_op_warrant_op(
         db: &DbWrite<DbKindAuthored>,
         agent: &AgentPubKey,
     ) -> DhtOpHashed {
