@@ -2397,7 +2397,9 @@ mod misc_impls {
                     .values()
                     .flat_map(|r| match r {
                         AppRoleAssignment::Primary(p) if p.is_provisioned => {
-                            vec![p.base_dna_hash.clone()]
+                            let mut hashes = vec![p.base_dna_hash.clone()];
+                            hashes.extend(p.clones.values().cloned().collect::<Vec<_>>());
+                            hashes
                         }
                         AppRoleAssignment::Primary(p) => {
                             p.clones.values().cloned().collect::<Vec<_>>()
@@ -2463,7 +2465,9 @@ mod misc_impls {
                     .values()
                     .flat_map(|r| match r {
                         AppRoleAssignment::Primary(p) if p.is_provisioned => {
-                            vec![p.base_dna_hash.clone()]
+                            let mut hashes = vec![p.base_dna_hash.clone()];
+                            hashes.extend(p.clones.values().cloned().collect::<Vec<_>>());
+                            hashes
                         }
                         AppRoleAssignment::Primary(p) => {
                             p.clones.values().cloned().collect::<Vec<_>>()
