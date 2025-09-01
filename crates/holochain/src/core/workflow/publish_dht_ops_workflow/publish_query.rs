@@ -160,24 +160,15 @@ mod tests {
         withold_publish: bool,
     }
 
-    struct Consistent {
-        this_agent: AgentPubKey,
-    }
-
-    struct Expected {
-        agent: AgentPubKey,
-        results: Vec<DhtOpHashed>,
-    }
-
     #[tokio::test(flavor = "multi_thread")]
     async fn publish_query() {
         holochain_trace::test_run();
 
         let agent = fixt!(AgentPubKey);
         let db = test_authored_db();
-        let expected = test_data(&db.to_db(), agent.clone()).await;
+        let expected = test_data(&db.to_db(), agent.clone());
         let r = get_ops_to_publish(
-            expected.agent.clone(),
+            agent.clone(),
             &db.to_db(),
             ConductorTuningParams::default().min_publish_interval(),
         )
@@ -186,7 +177,6 @@ mod tests {
         assert_eq!(
             r.into_iter().map(|t| t.1).collect::<Vec<_>>(),
             expected
-                .results
                 .iter()
                 .cloned()
                 .map(|op| op.into_inner().1)
@@ -194,14 +184,12 @@ mod tests {
         );
 
         let num_to_publish = db
-            .to_db()
-            .read_async(|txn| num_still_needing_publish(txn, agent))
-            .await
+            .test_read(|txn| num_still_needing_publish(txn, agent))
             .unwrap();
 
         // +1 because `get_ops_to_publish` will filter on `last_publish_time` where `num_still_needing_publish` should
         // not because those ops may need publishing again in the future if we don't get enough validation receipts.
-        assert_eq!(expected.results.len() + 1, num_to_publish);
+        assert_eq!(expected.len() + 1, num_to_publish);
     }
 
     #[cfg(feature = "unstable-warrants")]
@@ -215,6 +203,7 @@ mod tests {
         // Insert one chain op and one warrant op into database.
         let chain_op = create_and_insert_op(
             &db,
+            &agent,
             Facts {
                 private: false,
                 within_min_period: false,
@@ -223,11 +212,7 @@ mod tests {
                 store_entry: false,
                 withold_publish: false,
             },
-            &Consistent {
-                this_agent: agent.clone(),
-            },
         )
-        .await
         .content;
         let warrant_op = insert_invalid_chain_op_warrant_op(&db, &agent).content;
 
@@ -280,15 +265,14 @@ mod tests {
         warrant_op
     }
 
-    async fn create_and_insert_op(
+    fn create_and_insert_op(
         db: &DbWrite<DbKindAuthored>,
+        agent: &AgentPubKey,
         facts: Facts,
-        consistent_data: &Consistent,
     ) -> DhtOpHashed {
-        let this_agent = consistent_data.this_agent.clone();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let mut action = fixt!(Create);
-        action.author = this_agent.clone();
+        action.author = agent.clone();
         action.entry_hash = EntryHash::with_data_sync(&entry);
         if facts.private {
             // - Private: true
@@ -332,7 +316,7 @@ mod tests {
             ))
         };
 
-        db.write_async({
+        db.test_write({
             let query_state = state.clone();
 
             move |txn| -> DatabaseResult<()> {
@@ -345,15 +329,12 @@ mod tests {
                 }
                 Ok(())
             }
-        })
-        .await
-        .unwrap();
+        });
         state
     }
 
-    async fn test_data(db: &DbWrite<DbKindAuthored>, agent: AgentPubKey) -> Expected {
+    fn test_data(db: &DbWrite<DbKindAuthored>, agent: AgentPubKey) -> Vec<DhtOpHashed> {
         let mut results = Vec::new();
-        let cd = Consistent { this_agent: agent };
         // We **do** expect any of these in the results:
         // - Private: false.
         // - WithinMinPeriod: false.
@@ -369,7 +350,7 @@ mod tests {
             store_entry: true,
             withold_publish: false,
         };
-        let op = create_and_insert_op(db, facts, &cd).await;
+        let op = create_and_insert_op(db, &agent, facts);
         results.push(op);
 
         // All facts are the same unless stated:
@@ -379,38 +360,35 @@ mod tests {
         let mut f = facts;
         f.private = true;
         f.store_entry = false;
-        let op = create_and_insert_op(db, f, &cd).await;
+        let op = create_and_insert_op(db, &agent, f);
         results.push(op);
 
         // We **don't** expect any of these in the results:
         // - Private: true.
         let mut f = facts;
         f.private = true;
-        create_and_insert_op(db, f, &cd).await;
+        create_and_insert_op(db, &agent, f);
 
         // - WithinMinPeriod: true.
         let mut f = facts;
         f.within_min_period = true;
-        create_and_insert_op(db, f, &cd).await;
+        create_and_insert_op(db, &agent, f);
 
         // - HasRequireReceipts: true.
         let mut f = facts;
         f.has_required_receipts = true;
-        create_and_insert_op(db, f, &cd).await;
+        create_and_insert_op(db, &agent, f);
 
         // - IsThisAgent: false.
         let mut f = facts;
         f.is_this_agent = false;
-        create_and_insert_op(db, f, &cd).await;
+        create_and_insert_op(db, &agent, f);
 
         // - WitholdPublish: true.
         let mut f = facts;
         f.withold_publish = true;
-        create_and_insert_op(db, f, &cd).await;
+        create_and_insert_op(db, &agent, f);
 
-        Expected {
-            agent: cd.this_agent.clone(),
-            results,
-        }
+        results
     }
 }
