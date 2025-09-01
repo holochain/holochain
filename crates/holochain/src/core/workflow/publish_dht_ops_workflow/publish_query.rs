@@ -287,6 +287,41 @@ mod tests {
     }
 
     #[cfg(feature = "unstable-warrants")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn num_warrants_to_publish_corresponds_to_get_ops_to_publish() {
+        let db = test_authored_db();
+        let agent = fixt!(AgentPubKey);
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
+
+        // Insert a warrant op into the DB.
+        let warrant_op_hash = insert_invalid_chain_op_warrant_op(&db, &agent).hash;
+
+        // num_to_publish and length of get_ops_to_publish should be 1.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 1);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 1);
+
+        // Set last publish time for warrant op to stop publishing.
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap() - min_publish_interval;
+        db.test_write(move |txn| set_last_publish_time(txn, &warrant_op_hash, now).unwrap());
+
+        // Should both be 0 again.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 0);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 0);
+    }
+
+    #[cfg(feature = "unstable-warrants")]
     fn insert_invalid_chain_op_warrant_op(
         db: &DbWrite<DbKindAuthored>,
         agent: &AgentPubKey,
