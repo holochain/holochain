@@ -148,7 +148,6 @@ mod tests {
     use holo_hash::HasHash;
     use holochain_conductor_api::conductor::ConductorTuningParams;
     use holochain_sqlite::db::DbWrite;
-    use holochain_sqlite::prelude::DatabaseResult;
 
     #[derive(Debug, Clone, Copy)]
     struct Facts {
@@ -190,6 +189,59 @@ mod tests {
         // +1 because `get_ops_to_publish` will filter on `last_publish_time` where `num_still_needing_publish` should
         // not because those ops may need publishing again in the future if we don't get enough validation receipts.
         assert_eq!(expected.len() + 1, num_to_publish);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn num_ops_to_publish_corresponds_to_get_ops_to_publish() {
+        let db = test_authored_db();
+        let agent = fixt!(AgentPubKey);
+        let agent_clone = agent.clone();
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
+
+        // Initially num_to_publish and length of get_ops_to_publish should be 0.
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 0);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 0);
+
+        // Insert a chain op into the DB.
+        let facts = Facts {
+            has_required_receipts: false,
+            is_this_agent: true,
+            private: false,
+            store_entry: false,
+            within_min_period: false,
+            withold_publish: false,
+        };
+        let chain_op = create_and_insert_op(&db.to_db(), &agent, facts);
+        let chain_op_hash = chain_op.hash.clone();
+        db.test_write(move |txn| insert_op_authored(txn, &chain_op).unwrap());
+
+        // Should both be 1 now.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 1);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 1);
+
+        // Set validation receipts to complete to stop publishing.
+        db.test_write(move |txn| set_receipts_complete(txn, &chain_op_hash, true).unwrap());
+
+        // Should both be 0 again.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 0);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 0);
     }
 
     #[cfg(feature = "unstable-warrants")]
@@ -319,7 +371,7 @@ mod tests {
         db.test_write({
             let query_state = state.clone();
 
-            move |txn| -> DatabaseResult<()> {
+            move |txn| {
                 let hash = query_state.as_hash().clone();
                 insert_op_authored(txn, &query_state).unwrap();
                 set_last_publish_time(txn, &hash, last_publish).unwrap();
@@ -327,7 +379,6 @@ mod tests {
                 if facts.withold_publish {
                     set_withhold_publish(txn, &hash).unwrap();
                 }
-                Ok(())
             }
         });
         state
