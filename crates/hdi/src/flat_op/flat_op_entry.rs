@@ -116,7 +116,7 @@ where
     /// This operation registers an update from the original private
     /// [`Entry`](holochain_integrity_types::entry::Entry).
     PrivateEntry {
-        /// The hash of the original original
+        /// The hash of the original
         /// [`Action`](holochain_integrity_types::action::Action).
         original_action_hash: ActionHash,
         /// The unit version of the app defined entry type for the new entry.
@@ -130,7 +130,7 @@ where
         new_key: AgentPubKey,
         /// The original [`AgentPubKey`].
         original_key: AgentPubKey,
-        /// The hash of the original original
+        /// The hash of the original
         /// [`Action`](holochain_integrity_types::action::Action).
         original_action_hash: ActionHash,
         /// The [`Update`] action that updates the agent's key
@@ -138,7 +138,7 @@ where
     },
     /// This operation registers an update from a Capability Claim.
     CapClaim {
-        /// The hash of the original original
+        /// The hash of the original
         /// [`Action`](holochain_integrity_types::action::Action).
         original_action_hash: ActionHash,
         /// The [`Update`] action that updates the
@@ -147,7 +147,7 @@ where
     },
     /// This operation registers an update from a Capability Grant.
     CapGrant {
-        /// The hash of the original original
+        /// The hash of the original
         /// [`Action`](holochain_integrity_types::action::Action).
         original_action_hash: ActionHash,
         /// The [`Update`] action that updates the
