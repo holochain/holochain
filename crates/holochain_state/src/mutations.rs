@@ -10,9 +10,9 @@ use holo_hash::*;
 use holochain_nonce::Nonce256Bits;
 use holochain_sqlite::prelude::DatabaseResult;
 use holochain_sqlite::rusqlite;
-use holochain_sqlite::rusqlite::named_params;
 use holochain_sqlite::rusqlite::types::Null;
-use holochain_sqlite::rusqlite::Transaction;
+use holochain_sqlite::rusqlite::{named_params, params, OptionalExtension};
+use holochain_sqlite::rusqlite::{Row, Transaction};
 use holochain_sqlite::sql::sql_conductor;
 use holochain_types::prelude::*;
 use holochain_types::sql::AsSql;
@@ -1153,4 +1153,277 @@ pub fn remove_countersigning_session(
     tracing::debug!("Removed {} actions", count);
 
     Ok(())
+}
+
+/// Copy a DHT op from the cache database to the DHT database.
+///
+/// The op is identified by its action hash and chain op type. The function:
+/// - Takes out a write semaphore permit on the DHT database.
+/// - Checks if the op already exists in the DHT database; if it does, it returns early.
+/// - Reads the op from the cache database, including its associated action and entry.
+/// - If the op is not found in the cache, it returns the error [`StateMutationError::OpNotFoundInCache`].
+/// - If the op is found in the cache, it constructs a `DhtOp` and inserts it into the DHT database
+///   using the same permit.
+///
+/// This function will fail on database errors or serialization errors but succeed if there was
+/// nothing to be done.
+pub async fn copy_cached_op_to_dht(
+    dht: DbWrite<DbKindDht>,
+    cache: DbRead<DbKindCache>,
+    action_hash: ActionHash,
+    chain_op_type: ChainOpType,
+) -> StateMutationResult<()> {
+    let dht_permit = dht.acquire_write_permit().await?;
+
+    let (exists_in_dht, dht_permit) = dht
+        .write_async_with_permit(dht_permit, {
+            let action_hash = action_hash.clone();
+            move |txn| -> StateMutationResult<bool> {
+                let exists = txn.query_row(
+                    "SELECT EXISTS (SELECT 1 FROM DhtOp WHERE action_hash = ? AND type = ?)",
+                    params![action_hash, chain_op_type],
+                    |row| row.get::<_, bool>(0),
+                )?;
+
+                Ok(exists)
+            }
+        })
+        .await?;
+
+    // Nothing further to do, a DhtOp with the same action_hash and type already exists
+    if exists_in_dht {
+        return Ok(());
+    }
+
+    let maybe_action_entry = cache
+        .read_async(
+            move |txn| -> StateMutationResult<Option<(SignedAction, Option<Entry>)>> {
+                let mut stmt = txn.prepare(
+                    r#"
+                        SELECT
+                          Action.blob AS action_blob,
+                          Entry.blob AS entry_blob
+                        FROM DhtOp
+                        JOIN Action ON DhtOp.action_hash = Action.hash
+                        LEFT JOIN Entry ON Action.entry_hash = Entry.hash
+                        WHERE
+                          DhtOp.type == :dht_op_type
+                          AND DhtOp.action_hash = :action_hash
+                        "#
+                )?;
+
+                let maybe_action_entry = stmt
+                    .query_row(
+                        named_params! {
+                            ":dht_op_type": chain_op_type,
+                            ":action_hash": action_hash,
+                        },
+                        |row: &Row| -> rusqlite::Result<(Vec<u8>, Option<Vec<u8>>)> {
+                            let action_blob = row.get::<_, Vec<u8>>(0)?;
+
+                            let entry_blob = row
+                                .get::<_, Option<Vec<u8>>>(1)?;
+
+                            Ok((action_blob, entry_blob))
+                        },
+                    )
+                    .optional()?.map(| (action_blob, entry_blob): (Vec<u8>, Option<Vec<u8>>) | -> StateMutationResult < (SignedAction, Option < Entry >) > {
+                    let action =
+                        from_blob::<SignedAction>(action_blob)?;
+
+                    let entry: Option<Entry> = entry_blob
+                        .map(from_blob)
+                        .transpose()?;
+
+                    Ok((action, entry))
+                },
+                ).transpose()?;
+
+                Ok(maybe_action_entry)
+            },
+        )
+        .await?;
+
+    let Some((action, maybe_entry)) = maybe_action_entry else {
+        // The content does not exist in the cache, nothing to copy
+        return Err(StateMutationError::OpNotFoundInCache);
+    };
+
+    let dht_op = DhtOp::from(ChainOp::from_type(chain_op_type, action, maybe_entry)?);
+
+    let serialized_size = encode(&dht_op)?.len() as u32;
+    let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
+
+    let _ = dht
+        .write_async_with_permit(dht_permit, move |txn| {
+            insert_op_dht(txn, &dht_op_hashed, serialized_size, None)
+        })
+        .await?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::prelude::{test_cache_db, test_dht_db};
+    use ::fixt::fixt;
+    use holo_hash::fixt::ActionHashFixturator;
+    use holo_hash::fixt::AgentPubKeyFixturator;
+
+    #[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+    struct EntryData {
+        content: String,
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn copy_cached_op_to_dht_success() {
+        let dht_db = test_dht_db();
+        let cache_db = test_cache_db();
+
+        let (signed_action, chain_op_type, dht_op_hashed) = test_op();
+
+        cache_db
+            .test_write(move |txn| insert_op_cache(txn, &dht_op_hashed))
+            .unwrap();
+
+        copy_cached_op_to_dht(
+            dht_db.clone(),
+            cache_db.clone().into(),
+            signed_action.as_hash().clone(),
+            chain_op_type,
+        )
+        .await
+        .unwrap();
+
+        let found: bool = dht_db
+            .read_async(move |txn| -> StateMutationResult<bool> {
+                Ok(txn.query_row(
+                    "SELECT EXISTS (SELECT 1 FROM DhtOp WHERE action_hash = ? AND type = ?)",
+                    params![signed_action.as_hash().clone(), chain_op_type],
+                    |row| row.get::<_, bool>(0),
+                )?)
+            })
+            .await
+            .unwrap();
+        assert!(found, "Op should be present in DHT database");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn copy_cached_op_to_dht_target_exists() {
+        let dht_db = test_dht_db();
+        let cache_db = test_cache_db();
+
+        let (signed_action, chain_op_type, dht_op_hashed) = test_op();
+
+        dht_db
+            .test_write({
+                let dht_op_hashed = dht_op_hashed.clone();
+                move |txn| {
+                    insert_op_dht(txn, &dht_op_hashed, 0, None)?;
+
+                    // Set a flag, so we'll know if the op was overwritten
+                    set_validation_status(txn, dht_op_hashed.as_hash(), ValidationStatus::Valid)
+                }
+            })
+            .unwrap();
+        cache_db
+            .test_write(move |txn| insert_op_cache(txn, &dht_op_hashed))
+            .unwrap();
+
+        copy_cached_op_to_dht(
+            dht_db.clone(),
+            cache_db.clone().into(),
+            signed_action.as_hash().clone(),
+            chain_op_type,
+        )
+        .await
+        .unwrap();
+
+        let validation_status = dht_db
+            .read_async(
+                move |txn| -> StateMutationResult<Option<ValidationStatus>> {
+                    Ok(txn.query_row(
+                        "SELECT validation_status FROM DhtOp WHERE action_hash = ? AND type = ?",
+                        params![signed_action.as_hash().clone(), chain_op_type],
+                        |row| row.get::<_, Option<ValidationStatus>>(0),
+                    )?)
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            Some(ValidationStatus::Valid),
+            validation_status,
+            "Op should exist with a validation status of Valid, indicating it was not overwritten"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn copy_cached_op_to_dht_does_not_exist() {
+        let dht_db = test_dht_db();
+        let cache_db = test_cache_db();
+
+        // No activity expected, this just must not error.
+        let err = copy_cached_op_to_dht(
+            dht_db.clone(),
+            cache_db.clone().into(),
+            fixt!(ActionHash),
+            ChainOpType::StoreRecord,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, StateMutationError::OpNotFoundInCache),
+            "Should return OpNotFoundInCache error"
+        );
+
+        let count: usize = dht_db
+            .test_read(move |txn| -> StateMutationResult<usize> {
+                Ok(txn.query_row("SELECT count(*) FROM DhtOp", [], |row| {
+                    row.get::<_, usize>(0)
+                })?)
+            })
+            .unwrap();
+        assert_eq!(0, count, "No ops should be present in DHT database");
+    }
+
+    fn test_op() -> (SignedActionHashed, ChainOpType, DhtOpHashed) {
+        let entry = Entry::App(
+            AppEntryBytes::try_from(SerializedBytes::from(UnsafeBytes::from(
+                encode(&EntryData {
+                    content: "Hello, World!".to_string(),
+                })
+                .unwrap(),
+            )))
+            .unwrap(),
+        );
+
+        let entry_hash = EntryHash::with_data_sync(&entry);
+        let action = Action::Create(Create {
+            author: fixt!(AgentPubKey),
+            timestamp: Timestamp::now(),
+            action_seq: 44,
+            prev_action: fixt!(ActionHash),
+            entry_type: EntryType::App(fixt!(AppEntryDef)),
+            entry_hash,
+            weight: EntryRateWeight::default(),
+        });
+
+        let signature = Signature([3u8; 64]);
+        let hashed_action = HoloHashed::from_content_sync(action.clone());
+        let signed_action = SignedActionHashed::with_presigned(hashed_action, signature.clone());
+        let chain_op_type = ChainOpType::StoreEntry;
+        let dht_op = DhtOp::from(
+            ChainOp::from_type(
+                chain_op_type,
+                SignedAction::new(action, signature.clone()),
+                Some(entry.clone()),
+            )
+            .unwrap(),
+        );
+        let dht_op_hashed = DhtOpHashed::from_content_sync(dht_op);
+
+        (signed_action, chain_op_type, dht_op_hashed)
+    }
 }
