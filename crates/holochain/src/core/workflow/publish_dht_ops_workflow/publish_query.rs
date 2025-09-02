@@ -182,8 +182,7 @@ mod tests {
             within_min_period: false,
             withold_publish: false,
         };
-        let chain_op = create_and_insert_chain_op(&db.to_db(), &agent, facts);
-        db.test_write(move |txn| insert_op_authored(txn, &chain_op).unwrap());
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
 
         // Should both be 1 now.
         let agent_clone = agent.clone();
@@ -211,8 +210,7 @@ mod tests {
             withold_publish: false,
         };
         // Create chain op with different agent key.
-        let chain_op = create_and_insert_chain_op(&db.to_db(), &fixt!(AgentPubKey), facts);
-        db.test_write(move |txn| insert_op_authored(txn, &chain_op).unwrap());
+        let _ = create_and_insert_chain_op(&db.to_db(), &fixt!(AgentPubKey), facts);
 
         // num_to_publish and length of get_ops_to_publish should be 0.
         let agent_clone = agent.clone();
@@ -239,8 +237,7 @@ mod tests {
             within_min_period: false,
             withold_publish: false,
         };
-        let chain_op = create_and_insert_chain_op(&db.to_db(), &agent, facts);
-        db.test_write(move |txn| insert_op_authored(txn, &chain_op).unwrap());
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
 
         // num_to_publish and length of get_ops_to_publish should be 0.
         let agent_clone = agent.clone();
@@ -267,8 +264,7 @@ mod tests {
             within_min_period: false,
             withold_publish: false,
         };
-        let chain_op = create_and_insert_chain_op(&db.to_db(), &agent, facts);
-        db.test_write(move |txn| insert_op_authored(txn, &chain_op).unwrap());
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
 
         // num_to_publish and length of get_ops_to_publish should be 0.
         let agent_clone = agent.clone();
@@ -295,8 +291,7 @@ mod tests {
             within_min_period: false,
             withold_publish: false,
         };
-        let chain_op = create_and_insert_chain_op(&db.to_db(), &agent, facts);
-        db.test_write(move |txn| insert_op_authored(txn, &chain_op).unwrap());
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
 
         // num_to_publish and length of get_ops_to_publish should be 0.
         let agent_clone = agent.clone();
@@ -323,8 +318,7 @@ mod tests {
             within_min_period: true,
             withold_publish: false,
         };
-        let chain_op = create_and_insert_chain_op(&db.to_db(), &agent, facts);
-        db.test_write(move |txn| insert_op_authored(txn, &chain_op).unwrap());
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
 
         // num_to_publish should be 1 because the query does not consider whether the op
         // has been published recently.
@@ -353,8 +347,7 @@ mod tests {
             within_min_period: false,
             withold_publish: true,
         };
-        let chain_op = create_and_insert_chain_op(&db.to_db(), &agent, facts);
-        db.test_write(move |txn| insert_op_authored(txn, &chain_op).unwrap());
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
 
         // num_to_publish and length of get_ops_to_publish should be 0.
         let agent_clone = agent.clone();
@@ -452,8 +445,14 @@ mod tests {
         .content;
         let warrant_op = insert_invalid_chain_op_warrant_op(&db, &agent).content;
 
+        let agent_clone = agent.clone();
+        let num_to_publish = db
+            .to_db()
+            .test_read(move |txn| num_still_needing_publish(txn, agent_clone).unwrap());
+        assert_eq!(num_to_publish, 2);
+
         let ops_to_publish = get_ops_to_publish(
-            agent.clone(),
+            agent,
             &db.to_db(),
             ConductorTuningParams::default().min_publish_interval(),
         )
@@ -463,11 +462,6 @@ mod tests {
         .map(|(_, _, op)| op)
         .collect::<Vec<_>>();
         assert_eq!(ops_to_publish, vec![chain_op, warrant_op]);
-
-        let num_to_publish = db
-            .to_db()
-            .test_read(|txn| num_still_needing_publish(txn, agent).unwrap());
-        assert_eq!(num_to_publish, 2);
     }
 
     #[cfg(feature = "unstable-warrants")]
