@@ -148,147 +148,226 @@ mod tests {
     use holo_hash::HasHash;
     use holochain_conductor_api::conductor::ConductorTuningParams;
     use holochain_sqlite::db::DbWrite;
-    use holochain_sqlite::prelude::DatabaseResult;
 
     #[derive(Debug, Clone, Copy)]
     struct Facts {
         private: bool,
         within_min_period: bool,
         has_required_receipts: bool,
-        is_this_agent: bool,
         store_entry: bool,
         withold_publish: bool,
     }
 
-    struct Consistent {
-        this_agent: AgentPubKey,
-    }
-
-    struct Expected {
-        agent: AgentPubKey,
-        results: Vec<DhtOpHashed>,
-    }
-
     #[tokio::test(flavor = "multi_thread")]
-    async fn publish_query() {
-        holochain_trace::test_run();
-
-        let agent = fixt!(AgentPubKey);
+    async fn query_with_same_agent() {
         let db = test_authored_db();
-        let expected = test_data(&db.to_db(), agent.clone()).await;
-        let r = get_ops_to_publish(
-            expected.agent.clone(),
-            &db.to_db(),
-            ConductorTuningParams::default().min_publish_interval(),
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            r.into_iter().map(|t| t.1).collect::<Vec<_>>(),
-            expected
-                .results
-                .iter()
-                .cloned()
-                .map(|op| op.into_inner().1)
-                .collect::<Vec<_>>(),
-        );
+        let agent = fixt!(AgentPubKey);
+        let agent_clone = agent.clone();
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
 
-        let num_to_publish = db
-            .to_db()
-            .read_async(|txn| num_still_needing_publish(txn, agent))
+        // Initially num_to_publish and length of get_ops_to_publish should be 0.
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 0);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
             .await
             .unwrap();
+        assert_eq!(ops_to_publish.len(), 0);
 
-        // +1 because `get_ops_to_publish` will filter on `last_publish_time` where `num_still_needing_publish` should
-        // not because those ops may need publishing again in the future if we don't get enough validation receipts.
-        assert_eq!(expected.results.len() + 1, num_to_publish);
+        // Insert a chain op into the DB.
+        let facts = Facts {
+            has_required_receipts: false,
+            private: false,
+            store_entry: false,
+            within_min_period: false,
+            withold_publish: false,
+        };
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
+
+        // Should both be 1 now.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 1);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 1);
     }
 
-    #[cfg(feature = "unstable-warrants")]
     #[tokio::test(flavor = "multi_thread")]
-    async fn publish_query_includes_warrants() {
-        holochain_trace::test_run();
-
-        let agent = fixt!(AgentPubKey);
+    async fn query_with_different_agent() {
         let db = test_authored_db();
+        let agent = fixt!(AgentPubKey);
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
 
-        // Insert one chain op and one warrant op into database.
-        let chain_op = create_and_insert_op(
-            &db,
-            Facts {
-                private: false,
-                within_min_period: false,
-                has_required_receipts: false,
-                is_this_agent: true,
-                store_entry: false,
-                withold_publish: false,
-            },
-            &Consistent {
-                this_agent: agent.clone(),
-            },
-        )
-        .await
-        .content;
-        let warrant_op = insert_invalid_chain_op_warrant_op(&db, &agent).content;
+        // Insert a chain op into the DB.
+        let facts = Facts {
+            has_required_receipts: false,
+            private: false,
+            store_entry: false,
+            within_min_period: false,
+            withold_publish: false,
+        };
+        // Create chain op with different agent key.
+        let _ = create_and_insert_chain_op(&db.to_db(), &fixt!(AgentPubKey), facts);
 
-        let ops_to_publish = get_ops_to_publish(
-            agent.clone(),
-            &db.to_db(),
-            ConductorTuningParams::default().min_publish_interval(),
-        )
-        .await
-        .unwrap()
-        .into_iter()
-        .map(|(_, _, op)| op)
-        .collect::<Vec<_>>();
-        assert_eq!(ops_to_publish, vec![chain_op, warrant_op]);
-
-        let num_to_publish = db
-            .to_db()
-            .test_read(|txn| num_still_needing_publish(txn, agent).unwrap());
-        assert_eq!(num_to_publish, 2);
+        // num_to_publish and length of get_ops_to_publish should be 0.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 0);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 0);
     }
 
-    #[cfg(feature = "unstable-warrants")]
-    fn insert_invalid_chain_op_warrant_op(
+    #[tokio::test(flavor = "multi_thread")]
+    async fn query_store_entry_op_with_private_entry() {
+        let db = test_authored_db();
+        let agent = fixt!(AgentPubKey);
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
+
+        // Insert a chain op into the DB.
+        let facts = Facts {
+            has_required_receipts: false,
+            private: true,
+            store_entry: true,
+            within_min_period: false,
+            withold_publish: false,
+        };
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
+
+        // num_to_publish and length of get_ops_to_publish should be 0.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 0);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn query_other_store_entry_op() {
+        let db = test_authored_db();
+        let agent = fixt!(AgentPubKey);
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
+
+        // Insert a chain op into the DB.
+        let facts = Facts {
+            has_required_receipts: false,
+            private: false,
+            store_entry: true,
+            within_min_period: false,
+            withold_publish: false,
+        };
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
+
+        // num_to_publish and length of get_ops_to_publish should be 0.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 1);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn query_private_entry_op() {
+        let db = test_authored_db();
+        let agent = fixt!(AgentPubKey);
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
+
+        // Insert a chain op into the DB.
+        let facts = Facts {
+            has_required_receipts: false,
+            private: true,
+            store_entry: false,
+            within_min_period: false,
+            withold_publish: false,
+        };
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
+
+        // num_to_publish and length of get_ops_to_publish should be 0.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 1);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn query_op_within_min_publish_interval() {
+        let db = test_authored_db();
+        let agent = fixt!(AgentPubKey);
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
+
+        // Insert a chain op into the DB.
+        let facts = Facts {
+            has_required_receipts: false,
+            private: false,
+            store_entry: false,
+            within_min_period: true,
+            withold_publish: false,
+        };
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
+
+        // num_to_publish should be 1 because the query does not consider whether the op
+        // has been published recently.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 1);
+        // length of get_ops_to_publish should be 0.
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn query_withhold_publish() {
+        let db = test_authored_db();
+        let agent = fixt!(AgentPubKey);
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
+
+        // Insert a chain op into the DB.
+        let facts = Facts {
+            has_required_receipts: false,
+            private: false,
+            store_entry: false,
+            within_min_period: false,
+            withold_publish: true,
+        };
+        let _ = create_and_insert_chain_op(&db.to_db(), &agent, facts);
+
+        // num_to_publish and length of get_ops_to_publish should be 0.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 0);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 0);
+    }
+
+    fn create_and_insert_chain_op(
         db: &DbWrite<DbKindAuthored>,
         agent: &AgentPubKey,
-    ) -> DhtOpHashed {
-        let invalid_op_warrant = SignedWarrant::new(
-            Warrant::new(
-                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
-                    action_author: fixt!(AgentPubKey),
-                    action: (fixt!(ActionHash), fixt!(Signature)),
-                    validation_type: ValidationType::App,
-                    chain_op_type: ChainOpType::RegisterAddLink,
-                }),
-                agent.clone(),
-                Timestamp::now(),
-                fixt!(AgentPubKey),
-            ),
-            fixt!(Signature),
-        );
-        let invalid_op_warrant = DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(
-            WarrantOp::from(invalid_op_warrant),
-        )));
-        let warrant_op = invalid_op_warrant.clone();
-        db.test_write({
-            move |txn| {
-                insert_op_authored(txn, &invalid_op_warrant).unwrap();
-            }
-        });
-        warrant_op
-    }
-
-    async fn create_and_insert_op(
-        db: &DbWrite<DbKindAuthored>,
         facts: Facts,
-        consistent_data: &Consistent,
     ) -> DhtOpHashed {
-        let this_agent = consistent_data.this_agent.clone();
         let entry = Entry::App(fixt!(AppEntryBytes));
         let mut action = fixt!(Create);
-        action.author = this_agent.clone();
+        action.author = agent.clone();
         action.entry_hash = EntryHash::with_data_sync(&entry);
         if facts.private {
             // - Private: true
@@ -302,11 +381,6 @@ mod tests {
                 .map(EntryType::App)
                 .next()
                 .unwrap();
-        }
-
-        // - IsThisAgent: false.
-        if !facts.is_this_agent {
-            action.author = fixt!(AgentPubKey);
         }
 
         let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
@@ -332,10 +406,10 @@ mod tests {
             ))
         };
 
-        db.write_async({
+        db.test_write({
             let query_state = state.clone();
 
-            move |txn| -> DatabaseResult<()> {
+            move |txn| {
                 let hash = query_state.as_hash().clone();
                 insert_op_authored(txn, &query_state).unwrap();
                 set_last_publish_time(txn, &hash, last_publish).unwrap();
@@ -343,74 +417,133 @@ mod tests {
                 if facts.withold_publish {
                     set_withhold_publish(txn, &hash).unwrap();
                 }
-                Ok(())
             }
-        })
-        .await
-        .unwrap();
+        });
         state
     }
 
-    async fn test_data(db: &DbWrite<DbKindAuthored>, agent: AgentPubKey) -> Expected {
-        let mut results = Vec::new();
-        let cd = Consistent { this_agent: agent };
-        // We **do** expect any of these in the results:
-        // - Private: false.
-        // - WithinMinPeriod: false.
-        // - HasRequireReceipts: false.
-        // - IsThisAgent: true.
-        // - StoreEntry: true.
-        // - WitholdPublish: false.
-        let facts = Facts {
-            private: false,
-            within_min_period: false,
-            has_required_receipts: false,
-            is_this_agent: true,
-            store_entry: true,
-            withold_publish: false,
-        };
-        let op = create_and_insert_op(db, facts, &cd).await;
-        results.push(op);
+    #[cfg(feature = "unstable-warrants")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn publish_query_includes_warrants() {
+        holochain_trace::test_run();
 
-        // All facts are the same unless stated:
+        let agent = fixt!(AgentPubKey);
+        let db = test_authored_db();
 
-        // - Private: true.
-        // - StoreEntry: false.
-        let mut f = facts;
-        f.private = true;
-        f.store_entry = false;
-        let op = create_and_insert_op(db, f, &cd).await;
-        results.push(op);
+        // Insert one chain op and one warrant op into database.
+        let chain_op = create_and_insert_chain_op(
+            &db,
+            &agent,
+            Facts {
+                private: false,
+                within_min_period: false,
+                has_required_receipts: false,
+                store_entry: false,
+                withold_publish: false,
+            },
+        )
+        .content;
+        let warrant_op = insert_invalid_chain_op_warrant_op(&db, &agent).content;
 
-        // We **don't** expect any of these in the results:
-        // - Private: true.
-        let mut f = facts;
-        f.private = true;
-        create_and_insert_op(db, f, &cd).await;
+        let agent_clone = agent.clone();
+        let num_to_publish = db
+            .to_db()
+            .test_read(move |txn| num_still_needing_publish(txn, agent_clone).unwrap());
+        assert_eq!(num_to_publish, 2);
 
-        // - WithinMinPeriod: true.
-        let mut f = facts;
-        f.within_min_period = true;
-        create_and_insert_op(db, f, &cd).await;
+        let ops_to_publish = get_ops_to_publish(
+            agent,
+            &db.to_db(),
+            ConductorTuningParams::default().min_publish_interval(),
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|(_, _, op)| op)
+        .collect::<Vec<_>>();
+        assert_eq!(ops_to_publish, vec![chain_op, warrant_op]);
+    }
 
-        // - HasRequireReceipts: true.
-        let mut f = facts;
-        f.has_required_receipts = true;
-        create_and_insert_op(db, f, &cd).await;
+    #[cfg(feature = "unstable-warrants")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn query_warrants_with_different_agent() {
+        let db = test_authored_db();
+        let agent = fixt!(AgentPubKey);
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
 
-        // - IsThisAgent: false.
-        let mut f = facts;
-        f.is_this_agent = false;
-        create_and_insert_op(db, f, &cd).await;
+        // Insert a warrant op into the DB.
+        let _ = insert_invalid_chain_op_warrant_op(&db, &fixt!(AgentPubKey)).hash;
 
-        // - WitholdPublish: true.
-        let mut f = facts;
-        f.withold_publish = true;
-        create_and_insert_op(db, f, &cd).await;
+        // num_to_publish and length of get_ops_to_publish should be 0.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 0);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 0);
+    }
 
-        Expected {
-            agent: cd.this_agent.clone(),
-            results,
-        }
+    #[cfg(feature = "unstable-warrants")]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn query_warrant_op_already_published() {
+        let db = test_authored_db();
+        let agent = fixt!(AgentPubKey);
+        let min_publish_interval = ConductorTuningParams::default().min_publish_interval();
+
+        // Insert a warrant op into the DB.
+        let warrant_op_hash = insert_invalid_chain_op_warrant_op(&db, &agent).hash;
+
+        // num_to_publish and length of get_ops_to_publish should be 1.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 1);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 1);
+
+        // Set last publish time for warrant op to stop publishing.
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap() - min_publish_interval;
+        db.test_write(move |txn| set_last_publish_time(txn, &warrant_op_hash, now).unwrap());
+
+        // Should both be 0 again.
+        let agent_clone = agent.clone();
+        let num =
+            db.test_read(move |txn| num_still_needing_publish(txn, agent_clone.clone()).unwrap());
+        assert_eq!(num, 0);
+        let ops_to_publish = get_ops_to_publish(agent.clone(), &db.to_db(), min_publish_interval)
+            .await
+            .unwrap();
+        assert_eq!(ops_to_publish.len(), 0);
+    }
+
+    #[cfg(feature = "unstable-warrants")]
+    fn insert_invalid_chain_op_warrant_op(
+        db: &DbWrite<DbKindAuthored>,
+        agent: &AgentPubKey,
+    ) -> DhtOpHashed {
+        let invalid_op_warrant = SignedWarrant::new(
+            Warrant::new(
+                WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
+                    action_author: fixt!(AgentPubKey),
+                    action: (fixt!(ActionHash), fixt!(Signature)),
+                    validation_type: ValidationType::App,
+                    chain_op_type: ChainOpType::RegisterAddLink,
+                }),
+                agent.clone(),
+                Timestamp::now(),
+                fixt!(AgentPubKey),
+            ),
+            fixt!(Signature),
+        );
+        let invalid_op_warrant = DhtOpHashed::from_content_sync(DhtOp::WarrantOp(Box::new(
+            WarrantOp::from(invalid_op_warrant),
+        )));
+        let warrant_op = invalid_op_warrant.clone();
+        db.test_write(move |txn| insert_op_authored(txn, &invalid_op_warrant).unwrap());
+        warrant_op
     }
 }
