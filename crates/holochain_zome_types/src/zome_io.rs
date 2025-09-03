@@ -122,7 +122,6 @@ wasm_io_types! {
     fn send_remote_signal (zt::signal::RemoteSignal) -> ();
 
     // Schedule a schedulable function if it is not already.
-    #[cfg(feature = "unstable-functions")]
     fn schedule (String) -> ();
 
     // TODO deprecated, remove me
