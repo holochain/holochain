@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Upgrade `strum` and `strum_macros` to `0.27.x`. #4447
+ 
 ## 0.6.0-dev.20
 
 - Add a new `copy_cached_op_to_dht` function to `holochain_state`. \#5252
