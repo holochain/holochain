@@ -8,10 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Add tests for scheduling persisted functions across multiple cells.
-- Add a new `copy_cached_op_to_dht` function to `holochain_state`. #5252
-- Add a new function `get_dht_op_validation_state` to `holochain_state` for checking the state of a DHT op. #5246
-- Fix a reference to a method that no longer exists in the conductor documentation `list_dnas` -> `list_dna_hashes`. #5245
-- Remove generic type parameters in `SysValDeps` and related types that are always used with the default types. #5245
+
+## 0.6.0-dev.20
+
+- Add a new `copy_cached_op_to_dht` function to `holochain_state`. \#5252
+- Add a new function `get_dht_op_validation_state` to `holochain_state` for checking the state of a DHT op. \#5246
+- Fix a reference to a method that no longer exists in the conductor documentation `list_dnas` -\> `list_dna_hashes`. \#5245
+- Remove generic type parameters in `SysValDeps` and related types that are always used with the default types. \#5245
 - Add tests for `publish_query` to ensure that chain ops and warrant ops pending publish are counted correctly.
 
 ## 0.6.0-dev.19
