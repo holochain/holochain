@@ -185,7 +185,7 @@ host_fn_api_impls! {
     // Remotely signal many agents without waiting for responses
     fn send_remote_signal (zt::signal::RemoteSignal) -> ();
 
-    // Schedule a schedulable function if it is not already.
+    // Schedule a schedulable function if it is not already scheduled.
     fn schedule (String) -> ();
 
     // TODO deprecated, remove me
