@@ -334,7 +334,12 @@ async fn connect_with_custom_origin() {
         .await
         .unwrap();
     let app_port = admin_ws
-        .attach_app_interface(0, None, AllowedOrigins::from("my_cli_app".to_string()), None)
+        .attach_app_interface(
+            0,
+            None,
+            AllowedOrigins::from("my_cli_app".to_string()),
+            None,
+        )
         .await
         .unwrap();
 
@@ -395,7 +400,12 @@ async fn dump_network_stats() {
         .await
         .unwrap();
     let app_port = admin_ws
-        .attach_app_interface(0, None, AllowedOrigins::from("my_cli_app".to_string()), None)
+        .attach_app_interface(
+            0,
+            None,
+            AllowedOrigins::from("my_cli_app".to_string()),
+            None,
+        )
         .await
         .unwrap();
 
@@ -448,7 +458,12 @@ async fn dump_network_metrics() {
         .await
         .unwrap();
     let app_port = admin_ws
-        .attach_app_interface(0, None, AllowedOrigins::from("my_cli_app".to_string()), None)
+        .attach_app_interface(
+            0,
+            None,
+            AllowedOrigins::from("my_cli_app".to_string()),
+            None,
+        )
         .await
         .unwrap();
 
