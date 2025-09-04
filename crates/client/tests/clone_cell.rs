@@ -41,7 +41,7 @@ async fn clone_cell_management() {
         .unwrap();
     admin_ws.enable_app(app_id.clone()).await.unwrap();
     let app_api_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::Any, None)
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
         .await
         .unwrap();
 
@@ -197,7 +197,7 @@ pub async fn app_info_refresh() {
 
     // Create an app interface and connect an app agent to it
     let app_api_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::Any, None)
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
         .await
         .unwrap();
 

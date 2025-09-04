@@ -32,6 +32,8 @@ pub enum InterfaceError {
     WebsocketError(#[from] holochain_websocket::WebsocketError),
     #[error("Failed to find free port")]
     PortError,
+    #[error(transparent)]
+    AddrParseError(#[from] std::net::AddrParseError),
 }
 
 impl From<String> for InterfaceError {

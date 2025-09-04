@@ -626,7 +626,7 @@ impl SweetConductor {
     {
         let port = self
             .raw_handle()
-            .add_app_interface(either::Either::Left(0), AllowedOrigins::Any, None)
+            .add_app_interface(either::Either::Left(0), None, AllowedOrigins::Any, None)
             .await
             .expect("Couldn't create app interface");
         let (tx, rx) = websocket_client_by_port(port).await.unwrap();
