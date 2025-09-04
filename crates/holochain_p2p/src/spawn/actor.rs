@@ -862,6 +862,9 @@ impl HolochainP2pActor {
 
         let evt_sender = Arc::new(std::sync::OnceLock::new());
 
+        if let ReportConfig::JsonL(_) = &config.report {
+            builder.report = HcReportFactory::create();
+        }
         builder.peer_meta_store = Arc::new(HolochainPeerMetaStoreFactory {
             getter: config.get_db_peer_meta.clone(),
         });
@@ -887,6 +890,13 @@ impl HolochainP2pActor {
 
         // Load default configuration provided by the module factories.
         let builder = builder.with_default_config()?;
+
+        if let ReportConfig::JsonL(hc_report) = config.report {
+            builder
+                .config
+                .set_module_config(&hc_report::config::HcReportModConfig { hc_report })?;
+        }
+
         // Then override any configuration values provided by the user.
         if let Some(network_config) = config.network_config {
             builder.config.set_module_config(&network_config)?;

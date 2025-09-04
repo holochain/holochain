@@ -36,6 +36,7 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 thiserror = "2.0"
 tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
+tracing-appender = "0.2.3"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
 kitsune2 = "0.3.0-dev.2"
@@ -55,6 +56,7 @@ holochain_sqlite = { version = "^0.6.0-dev.19", path = "../holochain_sqlite", fe
   "test_utils",
 ] }
 holochain_state = { path = "../holochain_state", features = ["test_utils"] }
+tempfile = "3.21.0"
 
 [lints]
 workspace = true
