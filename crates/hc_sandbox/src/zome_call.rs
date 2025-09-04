@@ -377,6 +377,7 @@ async fn get_app_client(
             admin_client
                 .attach_app_interface(
                     0,
+                    None,
                     AllowedOrigins::Origins(vec!["sandbox".to_string()].into_iter().collect()),
                     None,
                 )

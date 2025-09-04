@@ -60,7 +60,7 @@ async fn signed_zome_call() {
 
     // Connect app agent client
     let app_ws_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::Any, None)
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
         .await
         .unwrap();
     let issued_token = admin_ws

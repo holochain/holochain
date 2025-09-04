@@ -55,7 +55,7 @@ pub async fn run(
     for app_port in app_ports {
         let admin_ws = AdminWebsocket::connect(format!("localhost:{admin_port}"), None).await?;
         let port = admin_ws
-            .attach_app_interface(app_port, AllowedOrigins::Any, None)
+            .attach_app_interface(app_port, None, AllowedOrigins::Any, None)
             .await?;
         launch_info.app_ports.push(port);
     }

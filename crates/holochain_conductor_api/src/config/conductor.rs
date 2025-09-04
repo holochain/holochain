@@ -753,6 +753,7 @@ mod tests {
                 admin_interfaces: Some(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket {
                         port: 1234,
+                        danger_addr: None,
                         allowed_origins: AllowedOrigins::Any
                     }
                 }]),
