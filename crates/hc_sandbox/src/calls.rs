@@ -111,6 +111,10 @@ pub struct AddAdminWs {
     /// Defaults to assigned by OS.
     pub port: Option<u16>,
 
+    /// Dangerously override the address to bind the interface to.
+    #[arg(long)]
+    pub danger_bind_addr: Option<String>,
+
     /// Optional allowed origins.
     ///
     /// This should be a comma separated list of origins, or `*` to allow any origin.
@@ -126,13 +130,19 @@ pub struct AddAdminWs {
 #[derive(Debug, Args, Clone)]
 pub struct AddAppWs {
     /// Optional port number.
-    /// Defaults to assigned by OS.
+    ///
+    /// Defaults to a port assigned by the OS.
     pub port: Option<u16>,
+
+    /// Dangerously override the address to bind the interface to.
+    #[arg(long)]
+    pub danger_bind_addr: Option<String>,
 
     /// Optional allowed origins.
     ///
-    /// This should be a comma separated list of origins, or `*` to allow any origin.
-    /// For example: `http://localhost:3000,http://localhost:3001`
+    /// This should be a comma-separated list of origins, or `*` to allow any origin.
+    ///
+    /// Example: `http://localhost:3000,http://localhost:3001`
     ///
     /// If not provided, defaults to `*` which allows any origin.
     #[arg(long, default_value_t = AllowedOrigins::Any)]
@@ -394,6 +404,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .add_admin_interfaces(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket {
                         port,
+                        danger_bind_addr: args.danger_bind_addr,
                         allowed_origins: args.allowed_origins,
                     },
                 }])
@@ -403,7 +414,12 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
         AdminRequestCli::AddAppWs(args) => {
             let port = args.port.unwrap_or(0);
             let port = client
-                .attach_app_interface(port, args.allowed_origins, args.installed_app_id)
+                .attach_app_interface(
+                    port,
+                    args.danger_bind_addr,
+                    args.allowed_origins,
+                    args.installed_app_id,
+                )
                 .await?;
             msg!("Added app port {}", port);
         }

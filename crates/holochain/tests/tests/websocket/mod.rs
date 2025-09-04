@@ -18,9 +18,11 @@ use holochain::{
     },
     fixt::*,
 };
-use holochain_conductor_api::ExternalApiWireError;
 use holochain_conductor_api::ZomeCallParamsSigned;
 use holochain_conductor_api::{AdminInterfaceConfig, AppRequest, InterfaceDriver};
+use holochain_conductor_api::{
+    AppAuthenticationRequest, ExternalApiWireError, IssueAppAuthenticationTokenPayload,
+};
 use holochain_types::websocket::AllowedOrigins;
 use holochain_types::{
     prelude::*,
@@ -30,7 +32,7 @@ use holochain_wasm_test_utils::TestWasm;
 use holochain_websocket::*;
 use matches::assert_matches;
 use rand_dalek::rngs::OsRng;
-use std::net::{Ipv4Addr, Ipv6Addr, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -853,6 +855,7 @@ async fn admin_allowed_origins() {
         .add_admin_interfaces(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket {
                 port: 0,
+                danger_bind_addr: None,
                 allowed_origins: "http://localhost:3000".to_string().into(),
             },
         }])
@@ -947,7 +950,7 @@ async fn holochain_websockets_listen_on_ipv4_and_ipv6() {
 
     let app_port = conductor
         .clone()
-        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .add_app_interface(Either::Left(0), None, AllowedOrigins::Any, None)
         .await
         .unwrap();
 
@@ -1003,7 +1006,7 @@ async fn emit_signal_after_app_connection_closed() {
     // Connect to the app interface
     let port = conductor
         .clone()
-        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .add_app_interface(Either::Left(0), None, AllowedOrigins::Any, None)
         .await
         .expect("Couldn't create app interface");
     let (tx, mut rx) = websocket_client_by_port(port).await.unwrap();
@@ -1128,6 +1131,149 @@ async fn filter_messages_that_do_not_deserialize() {
             r => panic!("unexpected response: {:?}", r),
         }
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn bind_ipv6_unspecified() {
+    holochain_trace::test_run();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .0;
+
+    conductor.setup_app("app", &[dna_file]).await.unwrap();
+
+    let admin_ports = conductor
+        .clone()
+        .add_admin_interfaces(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                danger_bind_addr: Some("::".to_string()),
+                allowed_origins: AllowedOrigins::Any,
+            },
+        }])
+        .await
+        .unwrap();
+    let new_admin_port = *admin_ports.first().unwrap();
+
+    let new_app_port = conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            Some("::".to_string()),
+            AllowedOrigins::Any,
+            None,
+        )
+        .await
+        .unwrap();
+
+    let admin_conn = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), new_admin_port),
+    )
+    .await
+    .unwrap();
+    let _p = WsPollRecv::new::<AdminResponse>(admin_conn.1);
+    admin_conn
+        .0
+        .request::<_, AdminResponse>(AdminRequest::ListAppInterfaces)
+        .await
+        .unwrap();
+
+    let res = admin_conn
+        .0
+        .request::<_, AdminResponse>(AdminRequest::IssueAppAuthenticationToken(
+            IssueAppAuthenticationTokenPayload::from("app".to_string()),
+        ))
+        .await
+        .unwrap();
+    let token = match res {
+        AdminResponse::AppAuthenticationTokenIssued(token) => token.token,
+        r => panic!("unexpected response: {:?}", r),
+    };
+
+    let app_conn = connect(
+        Arc::new(WebsocketConfig::CLIENT_DEFAULT),
+        SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), new_app_port),
+    )
+    .await
+    .unwrap();
+    let _p = WsPollRecv::new::<AppResponse>(app_conn.1);
+    app_conn
+        .0
+        .authenticate(AppAuthenticationRequest { token })
+        .await
+        .unwrap();
+    app_conn
+        .0
+        .request::<_, AppResponse>(AppRequest::AppInfo)
+        .await
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn bind_invalid_addrs() {
+    holochain_trace::test_run();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .0;
+
+    conductor.setup_app("app", &[dna_file]).await.unwrap();
+
+    conductor
+        .clone()
+        .add_admin_interfaces(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                danger_bind_addr: Some("some-hostname".to_string()),
+                allowed_origins: AllowedOrigins::Any,
+            },
+        }])
+        .await
+        .unwrap_err();
+
+    conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            Some("some-hostname".to_string()),
+            AllowedOrigins::Any,
+            None,
+        )
+        .await
+        .unwrap_err();
+
+    // No equivalent IPv4 address. Will bind to IPv6 only on the provided address and bind IPv4
+    // localhost only
+    conductor
+        .clone()
+        .add_admin_interfaces(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                danger_bind_addr: Some("2a0a:ef40:406:4f01:7819:603e:151c:b6d2".to_string()),
+                allowed_origins: AllowedOrigins::Any,
+            },
+        }])
+        .await
+        .unwrap();
+
+    // No equivalent IPv4 address. Will bind to IPv6 only on the provided address and bind IPv4
+    // localhost only
+    conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            Some("2a0a:ef40:406:4f01:7819:603e:151c:b6d2".to_string()),
+            AllowedOrigins::Any,
+            None,
+        )
+        .await
+        .unwrap();
 }
 
 struct TestCase {

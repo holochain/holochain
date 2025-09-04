@@ -238,6 +238,7 @@ impl AppInterfaceConfig {
     /// Create config for a websocket interface
     pub fn websocket(
         port: u16,
+        danger_bind_addr: Option<String>,
         allowed_origins: AllowedOrigins,
         installed_app_id: Option<InstalledAppId>,
     ) -> Self {
@@ -246,6 +247,7 @@ impl AppInterfaceConfig {
             installed_app_id,
             driver: InterfaceDriver::Websocket {
                 port,
+                danger_bind_addr,
                 allowed_origins,
             },
         }

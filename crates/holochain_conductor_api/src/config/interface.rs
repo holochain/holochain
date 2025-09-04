@@ -7,7 +7,8 @@ use serde::Serialize;
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
 pub struct AdminInterfaceConfig {
     /// By what means the interface will be exposed.
-    /// Currently the only option is a local websocket running on a configurable port.
+    ///
+    /// Currently, the only option is a local websocket running on a configurable port.
     pub driver: InterfaceDriver,
 }
 
@@ -28,6 +29,16 @@ pub enum InterfaceDriver {
         /// The port on which to establish the WebsocketListener
         port: u16,
 
+        /// An optional address to bind the interface to.
+        ///
+        /// This is dangerous to set to anything other than `localhost`. If no value is set then
+        /// the interface will bind to `localhost`.
+        ///
+        /// Holochain has minimal security protections in place for websocket connections. The app
+        /// websockets are protected by the admin websocket, but if you expose the admin websocket
+        /// to the network, then anyone who can connect to it can control your conductor.
+        danger_bind_addr: Option<String>,
+
         /// Allowed origins for this interface.
         ///
         /// This should be one of:
@@ -45,6 +56,15 @@ impl InterfaceDriver {
     pub fn port(&self) -> u16 {
         match self {
             InterfaceDriver::Websocket { port, .. } => *port,
+        }
+    }
+
+    /// The address override to bind the interface to, if any.
+    pub fn danger_bind_addr(&self) -> Option<&String> {
+        match self {
+            InterfaceDriver::Websocket {
+                danger_bind_addr, ..
+            } => danger_bind_addr.as_ref(),
         }
     }
 

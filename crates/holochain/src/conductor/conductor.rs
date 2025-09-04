@@ -389,9 +389,12 @@ mod interface_impls {
                     match driver {
                         InterfaceDriver::Websocket {
                             port,
+                            danger_bind_addr,
                             allowed_origins,
                         } => {
-                            let listener = spawn_websocket_listener(port, allowed_origins).await?;
+                            let listener =
+                                spawn_websocket_listener(port, danger_bind_addr, allowed_origins)
+                                    .await?;
                             let port = listener.local_addrs()?[0].port();
                             spawn_admin_interface_tasks(
                                 tm.clone(),
@@ -431,6 +434,7 @@ mod interface_impls {
         pub async fn add_app_interface(
             self: Arc<Self>,
             port: either::Either<u16, AppInterfaceId>,
+            danger_bind_addr: Option<String>,
             allowed_origins: AllowedOrigins,
             installed_app_id: Option<InstalledAppId>,
         ) -> ConductorResult<u16> {
@@ -448,6 +452,7 @@ mod interface_impls {
             let port = spawn_app_interface_task(
                 tm.clone(),
                 port,
+                danger_bind_addr.clone(),
                 allowed_origins.clone(),
                 installed_app_id.clone(),
                 app_api,
@@ -456,7 +461,12 @@ mod interface_impls {
             .await
             .map_err(Box::new)?;
 
-            let config = AppInterfaceConfig::websocket(port, allowed_origins, installed_app_id);
+            let config = AppInterfaceConfig::websocket(
+                port,
+                danger_bind_addr,
+                allowed_origins,
+                installed_app_id,
+            );
             self.update_state(|mut state| {
                 state.app_interfaces.insert(interface_id, config);
 
@@ -500,6 +510,7 @@ mod interface_impls {
                     .clone()
                     .add_app_interface(
                         either::Right(id.clone()),
+                        config.driver.danger_bind_addr().cloned(),
                         config.driver.allowed_origins().clone(),
                         config.installed_app_id.clone(),
                     )

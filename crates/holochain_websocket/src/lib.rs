@@ -903,6 +903,7 @@ impl WebsocketListener {
                     return Self::bind(config, addr_v4).await;
                 }
                 Err(e) => {
+                    tracing::error!("Failed to bind IPv6 listener: {:?}", e);
                     return Err(e);
                 }
             };
@@ -922,6 +923,18 @@ impl WebsocketListener {
                         listener: Box::new(v6_listener),
                     });
                 }
+                // This is expected if `[::]` is bound for IPv6 and this OS automatically handles receiving IPv4
+                // connections on the IPv6 socket. In this case we just use the IPv6 socket and ignore IPv4.
+                Err(e) if addr_v6.ip().is_unspecified() && e.kind() == ErrorKind::AddrInUse => {
+                    tracing::info!(?e, "Failed to bind IPv4 listener because the address is already in use, falling back to IPv6 only");
+                    // No need to re-bind the v6 listener, it's already bound. Just create a new Self
+                    // from the v6 listener and return it.
+                    return Ok(Self {
+                        config,
+                        access_control,
+                        listener: Box::new(v6_listener),
+                    });
+                }
                 // If the port for IPv6 was selected by the OS but it isn't available for IPv4, retry and let the OS pick a new port for IPv6
                 // and hopefully it will be available for IPv4.
                 Err(e) if addr_v6.port() == 0 && e.kind() == ErrorKind::AddrInUse => {
@@ -929,6 +942,7 @@ impl WebsocketListener {
                     continue;
                 }
                 Err(e) => {
+                    tracing::error!("Failed to bind IPv4 listener: {:?}", e);
                     return Err(e);
                 }
             };

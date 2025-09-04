@@ -180,10 +180,20 @@ pub enum AdminRequest {
         /// Optional port number
         port: Option<u16>,
 
+        /// An optional address to bind the interface to.
+        ///
+        /// This is dangerous to set to anything other than `localhost`. If no value is set then
+        /// the interface will bind to `localhost`.
+        ///
+        /// Holochain has minimal security protections in place for websocket connections. The app
+        /// websockets are protected by the admin websocket, but if you expose the admin websocket
+        /// to the network, then anyone who can connect to it can control your conductor.
+        danger_bind_addr: Option<String>,
+
         /// Allowed origins for this app interface.
         ///
         /// This should be one of:
-        /// - A comma separated list of origins - `http://localhost:3000,http://localhost:3001`,
+        /// - A comma-separated list of origins - `http://localhost:3000,http://localhost:3001`,
         /// - A single origin - `http://localhost:3000`,
         /// - Any origin - `*`
         ///

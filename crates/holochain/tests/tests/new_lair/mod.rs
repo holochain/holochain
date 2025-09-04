@@ -47,6 +47,7 @@ async fn test_new_lair_conductor_integration() {
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket {
                 port: ADMIN_PORT,
+                danger_bind_addr: None,
                 allowed_origins: AllowedOrigins::Any,
             },
         }]),

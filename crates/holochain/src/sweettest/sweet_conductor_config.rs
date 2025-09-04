@@ -36,6 +36,7 @@ impl From<NetworkConfig> for SweetConductorConfig {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
                     port: 0,
+                    danger_bind_addr: None,
                     allowed_origins: AllowedOrigins::Any,
                 },
             }]),
