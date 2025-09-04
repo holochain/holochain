@@ -7,9 +7,6 @@ pub enum StateMutationError {
     Sql(#[from] holochain_sqlite::rusqlite::Error),
 
     #[error(transparent)]
-    Infallible(#[from] std::convert::Infallible),
-
-    #[error(transparent)]
     DatabaseError(#[from] holochain_sqlite::error::DatabaseError),
 
     #[error(transparent)]
