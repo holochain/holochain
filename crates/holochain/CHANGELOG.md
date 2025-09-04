@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Add tests for scheduling persisted functions across multiple cells.
+- Remove unused enum variant `Infallible` from `StateMutationError`. #5270
 
 ## 0.6.0-dev.20
 
