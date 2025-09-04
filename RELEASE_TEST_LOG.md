@@ -2,6 +2,20 @@
 
 This file documents results of release tests as described in the [Holochain release process](RELEASE.md).
 
+## 2025-09-01: v0.5.6-rc.0
+
+*Success*
+- Ran a test with 5 nodes.
+- Peer discovery was fast.
+- Initial sync took around a minute. This was a sync of around 600 ops, enough data to make sure the sync is handling
+  more than just a few ops.
+- Signals were sent with 100% reliability.
+- Entries created by all nodes were received by all peers, within a couple of minutes.
+- After shutting down one node and creating data with the other nodes, when the offline node came back online, it took
+  around 10 minutes for all data to be synced. This is a little slower than expected but a performance improvement
+  is likely needed, rather than this preventing data from syncing at all.
+- Started a 6th node and waited for it to sync with the network. It took around 3-4 minutes to sync which is acceptable.
+
 ## 2025-08-05: v0.5.5-rc.2
 
 *Success*
