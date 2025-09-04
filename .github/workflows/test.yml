@@ -94,6 +94,9 @@ jobs:
           echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ runner.os }}-${{ matrix.target }}
+          shared-key: ${{ hashFiles('**/Cargo.lock') }}
 
       - name: install build dependencies (macos-latest, wasmer_wamr)
         if: matrix.os == 'macos-latest' && matrix.target == 'wasmer_wamr'
@@ -222,6 +225,9 @@ jobs:
           echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ runner.os }}-${{ matrix.target }}
+          shared-key: ${{ hashFiles('**/Cargo.lock') }}
 
       - name: test (windows-latest)
         if: matrix.os == 'windows-latest'
