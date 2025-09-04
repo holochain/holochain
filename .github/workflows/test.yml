@@ -119,6 +119,8 @@ jobs:
         uses: ./.github/actions/common-post
 
   test-job-id:
+    needs:
+      - build-job-id
     name: test ${{ matrix.target }} on ${{ matrix.os }} (partition ${{ matrix.partition }})
     runs-on: ${{ matrix.os }}
     strategy:
