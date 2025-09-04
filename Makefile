@@ -84,7 +84,8 @@ test-workspace-wasmer_sys:
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_sys
+		--features $(DEFAULT_FEATURES),wasmer_sys \
+		$(if $(PARTITION_COUNT), --partition count:$(PARTITION)/$(PARTITION_COUNT),)
 
 # executes tests on all crates with wasmer compiler
 test-workspace-wasmer_sys-unstable:
@@ -92,7 +93,8 @@ test-workspace-wasmer_sys-unstable:
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(UNSTABLE_FEATURES),wasmer_sys
+		--features $(UNSTABLE_FEATURES),wasmer_sys \
+		$(if $(PARTITION_COUNT), --partition count:$(PARTITION)/$(PARTITION_COUNT),)
 
 # execute tests on all crates with wasmer interpreter
 test-workspace-wasmer_wamr:
@@ -100,4 +102,5 @@ test-workspace-wasmer_wamr:
 		--workspace \
 		--locked \
 		--no-default-features \
-		--features $(DEFAULT_FEATURES),wasmer_wamr
+		--features $(DEFAULT_FEATURES),wasmer_wamr \
+		$(if $(PARTITION_COUNT), --partition count:$(PARTITION)/$(PARTITION_COUNT),)
