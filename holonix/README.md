@@ -1,13 +1,13 @@
 # Holonix
 
-this implementation of holonix uses the flake- and crane-based nix expressions.
+This implementation of holonix uses the `flake-` and crane-based nix expressions.
 
-more advanced customization features are now possible via the flake's native
+More advanced customization features are now possible via the flake native
 input override feature.
 
-## recommended versioning specification in a consumer's flake.nix
+## recommended versioning specification in a consumer's `flake.nix`
 
-#### use the "versions" flake as a separate input in their flake.nix and configuring the holochain flake to follow the versions flake, as in:
+#### Use the "versions" flake as a separate input in their flake.nix and configuring the holochain flake to follow the versions flake, as in:
 
 ```nix
 inputs = {
@@ -18,7 +18,7 @@ inputs = {
 };
 ```
 
-#### override single components either via the holochain versions flake:
+#### Override single components either via the holochain versions flake:
 
 ```nix
 inputs = {
@@ -30,7 +30,7 @@ inputs = {
 };
 ```
 
-or via their the toplevel component input:
+or via their the top-level component input:
 
 ```nix
 inputs = {
@@ -43,7 +43,7 @@ inputs = {
 };
 ```
 
-please see the following examples to learn more about common and more specific use cases:
+Please see the following examples to learn more about common and more specific use cases:
 
 * [specifying custom component versions](examples/custom_versions/flake.nix)
 
