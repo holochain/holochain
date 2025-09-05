@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, Weak};
 const MOD: &str = "HCREPORT";
 
 /// HcReport configuration types.
-pub mod config {
+mod config {
     /// Configuration parameters for [HcReportFactory](super::HcReportFactory).
     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -41,7 +41,7 @@ pub mod config {
     }
 }
 
-use config::*;
+pub use config::*;
 
 /// A default no-op report module.
 #[derive(Debug)]
@@ -78,7 +78,9 @@ impl ReportFactory for HcReportFactory {
     }
 }
 
+/// Type sent on our internal command channel.
 enum Cmd {
+    /// Indicates we have received op data from a remote peer.
     FetchedOp {
         space_id: SpaceId,
         source: Url,
@@ -87,13 +89,28 @@ enum Cmd {
 }
 
 struct HcReport {
+    /// Weak self reference.
     this: Weak<Self>,
+
+    /// Timing loop task.
     task: tokio::task::AbortHandle,
+
+    /// Map of LocalAgentStores letting us sign reports.
     spaces: Mutex<HashMap<SpaceId, DynLocalAgentStore>>,
+
+    /// Sender side of command channel.
     cmd_send: tokio::sync::mpsc::Sender<Cmd>,
+
+    /// Receiver side of command channel.
     cmd_recv: Mutex<tokio::sync::mpsc::Receiver<Cmd>>,
+
+    /// Transport for sending messages to remote peers.
     tx: DynTransport,
+
+    /// The log file writer.
     file_writer: Mutex<tracing_appender::non_blocking::NonBlocking>,
+
+    /// The guard that shuts down the non-blocking task on drop.
     _file_guard: tracing_appender::non_blocking::WorkerGuard,
 }
 
@@ -119,13 +136,17 @@ impl TxModuleHandler for HcReport {
         _module: String,
         data: bytes::Bytes,
     ) -> K2Result<()> {
+        // on receiving a report, write it to our report file
         self.write_bytes(&data);
+
         Ok(())
     }
 }
 
 impl HcReport {
     pub fn create(config: HcReportConfig, tx: DynTransport) -> K2Result<DynReport> {
+        // we're not hooking this up to the tracing library,
+        // just using it for the log rotation functionality
         let file = tracing_appender::rolling::Builder::new()
             .rotation(tracing_appender::rolling::Rotation::DAILY)
             .max_log_files(config.days_retained as usize)
@@ -134,6 +155,7 @@ impl HcReport {
             .build(config.path)
             .map_err(K2Error::other)?;
 
+        // use it in non-blocking mode so we can call it within async functions
         let (file_writer, _file_guard) = tracing_appender::non_blocking(file);
 
         let (cmd_send, cmd_recv) = tokio::sync::mpsc::channel(4096);
@@ -143,6 +165,9 @@ impl HcReport {
         let out = Arc::new_cyclic(move |this: &Weak<Self>| {
             let freq = config.fetched_op_interval_s;
             let this2 = this.clone();
+
+            // this task will periodically invoke the process_reports()
+            // function at the configured frequency
             let task = tokio::task::spawn(async move {
                 loop {
                     tokio::time::sleep(std::time::Duration::from_secs_f64(freq)).await;
@@ -169,17 +194,20 @@ impl HcReport {
             }
         });
 
+        // write a start entry indicating holochain has started
         out.write(ReportEntry::start());
 
         Ok(out)
     }
 
+    /// Lowest-level write function, actually calls write on the writer.
     fn write_raw(&self, b: &[u8]) {
         if let Err(err) = std::io::Write::write_all(&mut *self.file_writer.lock().unwrap(), b) {
             tracing::error!(?err, "failed to write data to hc-report writer");
         }
     }
 
+    /// Write bytes to the file.
     fn write_bytes(&self, b: &[u8]) {
         let mut out = Vec::with_capacity(b.len() + 1);
         out.extend_from_slice(b);
@@ -187,6 +215,7 @@ impl HcReport {
         self.write_raw(&out);
     }
 
+    /// Encode a report entry, and write it to the file.
     fn write(&self, data: ReportEntry) {
         let mut data = match serde_json::to_string(&data) {
             Ok(data) => data,
@@ -199,10 +228,13 @@ impl HcReport {
         self.write_raw(data.as_bytes());
     }
 
+    /// Aggregate the reports we received during the interval time
+    /// and forward them to the remote peer for writing.
     async fn process_reports(&self) {
         let mut fetched_ops: HashMap<(SpaceId, Url), (u64, u64)> = HashMap::new();
 
         {
+            // pull the reports out of our channel
             let mut lock = self.cmd_recv.lock().unwrap();
             while let Ok(cmd) = lock.try_recv() {
                 match cmd {
@@ -225,6 +257,7 @@ impl HcReport {
         }
 
         for ((space_id, source), (op_count, total_bytes)) in fetched_ops {
+            // get the local agent store for the space we are encoding
             let local_agent_store = match self.spaces.lock().unwrap().get(&space_id) {
                 Some(s) => s.clone(),
                 None => {
@@ -233,6 +266,7 @@ impl HcReport {
                 }
             };
 
+            // get all the local agents, because we will sign with all of them
             let local_agents = match local_agent_store.get_all().await {
                 Ok(a) => a,
                 Err(err) => {
@@ -241,44 +275,60 @@ impl HcReport {
                 }
             };
 
+            if local_agents.is_empty() {
+                // if there are no local agents, the report would be
+                // invalid... abort
+                tracing::warn!("no local agents, aborting fetch op reporting");
+                continue;
+            }
+
+            // first, write out the pubkeys
             let mut agent_pubkeys = Vec::with_capacity(local_agents.len());
             for a in local_agents.iter() {
                 agent_pubkeys.push(a.agent().to_string());
             }
 
+            // The report format uses all strings so they can
+            // be concatonated in order and signed deterministically.
+            // (json can loose information with big integers)
             let timestamp = Timestamp::now().as_micros().to_string();
             let space = space_id.to_string();
             let op_count = op_count.to_string();
             let total_bytes = total_bytes.to_string();
 
-            let mut to_sign = Vec::new();
-            to_sign.extend_from_slice(timestamp.as_bytes());
-            to_sign.extend_from_slice(space.as_bytes());
-            to_sign.extend_from_slice(op_count.as_bytes());
-            to_sign.extend_from_slice(total_bytes.as_bytes());
-            for a in agent_pubkeys.iter() {
-                to_sign.extend_from_slice(a.as_bytes());
-            }
+            let mut entry = ReportEntryFetchedOps {
+                timestamp,
+                space,
+                op_count,
+                total_bytes,
+                agent_pubkeys,
+                signatures: Vec::with_capacity(local_agents.len()),
+            };
 
-            let mut signatures = Vec::with_capacity(local_agents.len());
+            // do the actual concatenation for generating the signatures
+            let to_sign = entry.encode_for_verification();
 
             const STUB_ID: bytes::Bytes = bytes::Bytes::from_static(b"");
             let stub_ts = Timestamp::now();
             for a in local_agents.iter() {
-                let signature = match a.sign(
-                    // hc local agent doesn't use any agent info
-                    // for signing, so we can use a stub here
-                    &AgentInfo {
-                        agent: STUB_ID.into(),
-                        space: STUB_ID.into(),
-                        created_at: stub_ts.into(),
-                        expires_at: stub_ts.into(),
-                        is_tombstone: false,
-                        url: None,
-                        storage_arc: DhtArc::default(),
-                    },
-                    &to_sign,
-                ).await {
+                // generate a signature for each local agent
+                let signature = match a
+                    .sign(
+                        // hc local agent doesn't use any agent info
+                        // for signing, so we can use a stub here
+                        &AgentInfo {
+                            agent: STUB_ID.into(),
+                            space: STUB_ID.into(),
+                            created_at: stub_ts.into(),
+                            expires_at: stub_ts.into(),
+                            is_tombstone: false,
+                            url: None,
+                            storage_arc: DhtArc::default(),
+                        },
+                        &to_sign,
+                    )
+                    .await
+                {
                     Ok(s) => s,
                     Err(err) => {
                         tracing::warn!(?err, "failed to sign message for fetch op reporting");
@@ -287,20 +337,18 @@ impl HcReport {
                 };
 
                 use base64::Engine;
-                signatures.push(base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(signature));
+                entry
+                    .signatures
+                    .push(base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(signature));
             }
 
-            let entry = ReportEntry::FetchedOps(ReportEntryFetchedOps {
-                timestamp,
-                space,
-                op_count,
-                total_bytes,
-                agent_pubkeys,
-                signatures,
-            });
+            // create the report entry
+            let entry = ReportEntry::FetchedOps(entry);
 
+            // serialize the report entry
             let entry = serde_json::to_string(&entry).expect("json serialize");
 
+            // forward the report to the op data source
             if let Err(err) = self
                 .tx
                 .send_module(source, space_id, MOD.into(), entry.into())
@@ -320,16 +368,21 @@ impl Report for HcReport {
 
     fn space(&self, space_id: SpaceId, local_agent_store: DynLocalAgentStore) {
         if let Some(this) = self.this.upgrade() {
+            // keep the local_agent_store so we can sign
             self.spaces
                 .lock()
                 .unwrap()
                 .insert(space_id.clone(), local_agent_store);
+
+            // register to receive reports from remote peers
             self.tx
                 .register_module_handler(space_id.clone(), MOD.into(), this);
         }
     }
 
     fn fetched_op(&self, space_id: SpaceId, source: Url, _op_id: OpId, size_bytes: u64) {
+        // send the fetched op notification to our channel,
+        // we will aggregate them next time process_reports() is called
         if let Err(err) = self.cmd_send.try_send(Cmd::FetchedOp {
             space_id,
             source,
@@ -356,12 +409,13 @@ mod test {
 
     impl Test {
         pub async fn new() -> Self {
+            // unique temp dir per test kitsune instance
             let dir = tempfile::tempdir().unwrap();
 
-            let verifier: DynVerifier = Arc::new(
-                kitsune2_test_utils::agent::TestVerifier
-            );
+            // use the test verifier
+            let verifier: DynVerifier = Arc::new(kitsune2_test_utils::agent::TestVerifier);
 
+            // set up the builder with our report factory
             let b = kitsune2_api::Builder {
                 verifier: verifier.clone(),
                 report: HcReportFactory::create(),
@@ -370,6 +424,7 @@ mod test {
             .with_default_config()
             .unwrap();
 
+            // configure the report factory
             b.config
                 .set_module_config(&HcReportModConfig {
                     hc_report: HcReportConfig {
@@ -382,8 +437,10 @@ mod test {
                 })
                 .unwrap();
 
+            // build the kitsune instance
             let kitsune = b.build().await.unwrap();
 
+            // set up space handler
             #[derive(Debug)]
             struct S;
             impl SpaceHandler for S {
@@ -397,6 +454,7 @@ mod test {
                 }
             }
 
+            // set up kitsune handler
             #[derive(Debug)]
             struct K;
             impl KitsuneHandler for K {
@@ -408,16 +466,26 @@ mod test {
                     Box::pin(async move { Ok(s) })
                 }
             }
+
+            // register the handler
+            // (this is where the report instance is created)
             kitsune.register_handler(Arc::new(K)).await.unwrap();
+
+            // get the space
             let space = kitsune
                 .space(kitsune2_test_utils::space::TEST_SPACE_ID)
                 .await
                 .unwrap();
+
+            // register a local agent
             let local_agent: DynLocalAgent =
                 Arc::new(kitsune2_test_utils::agent::TestLocalAgent::default());
             space.local_agent_join(local_agent.clone()).await.unwrap();
+
+            // get the url
             let url = space.current_url().unwrap();
 
+            // return the test instance
             Self {
                 dir,
                 kitsune,
@@ -428,6 +496,7 @@ mod test {
             }
         }
 
+        /// List report files in the test temp directory.
         pub async fn list_files(&self) -> Vec<std::path::PathBuf> {
             let mut out = Vec::new();
             let mut d = tokio::fs::read_dir(self.dir.path()).await.unwrap();
@@ -442,6 +511,7 @@ mod test {
             out
         }
 
+        /// Decode all entries in the report files in the test temp directory.
         pub async fn read_entries(&self) -> Vec<ReportEntry> {
             let mut out = Vec::new();
             for file in self.list_files().await {
@@ -459,6 +529,7 @@ mod test {
         }
     }
 
+    /// Generic sanity test ensure a start entry is written in the report file.
     #[tokio::test]
     async fn report_entry_start() {
         let test = Test::new().await;
@@ -476,6 +547,8 @@ mod test {
         panic!("failed to write report file");
     }
 
+    /// E2e test ensures a report is written on a remote peer
+    /// when an fetched op report is generated on the local peer.
     #[tokio::test]
     async fn report_entry_fetched_ops() {
         let test1 = Test::new().await;
@@ -494,6 +567,7 @@ mod test {
             3,
         );
 
+        // trigger the report process explicitly
         test2
             .kitsune
             .report()

@@ -39,7 +39,7 @@ pub enum ReportConfig {
     None,
 
     /// Write reports to a rotating on-disk JsonL file.
-    JsonL(hc_report::config::HcReportConfig),
+    JsonL(hc_report::HcReportConfig),
 }
 
 /// HolochainP2p config struct.

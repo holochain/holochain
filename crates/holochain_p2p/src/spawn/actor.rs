@@ -894,7 +894,7 @@ impl HolochainP2pActor {
         if let ReportConfig::JsonL(hc_report) = config.report {
             builder
                 .config
-                .set_module_config(&hc_report::config::HcReportModConfig { hc_report })?;
+                .set_module_config(&hc_report::HcReportModConfig { hc_report })?;
         }
 
         // Then override any configuration values provided by the user.

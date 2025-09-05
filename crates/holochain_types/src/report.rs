@@ -4,7 +4,7 @@ use kitsune2_api::Timestamp;
 
 /// Holochain reporting entry.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "k", rename_all="camelCase")]
+#[serde(tag = "k", rename_all = "camelCase")]
 pub enum ReportEntry {
     /// Indicates that the holochain process has started.
     Start(ReportEntryStart),
@@ -24,7 +24,7 @@ impl ReportEntry {
 
 /// Indicates that the holochain process has started.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ReportEntryStart {
     /// Timestamp microseconds since unix epoch.
     #[serde(rename = "t")]
@@ -33,7 +33,7 @@ pub struct ReportEntryStart {
 
 /// Reports a receipt indicating that a peer received fetched ops from us.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ReportEntryFetchedOps {
     /// Timestamp microseconds since unix epoch.
     #[serde(rename = "t")]
@@ -64,18 +64,30 @@ pub struct ReportEntryFetchedOps {
 }
 
 impl ReportEntryFetchedOps {
+    /// Generate the canonical encoded byte array of this entry
+    /// for signing and verification.
+    pub fn encode_for_verification(&self) -> Vec<u8> {
+        let mut len =
+            self.timestamp.len() + self.space.len() + self.op_count.len() + self.total_bytes.len();
+        for a in self.agent_pubkeys.iter() {
+            len += a.len();
+        }
+        let mut out = Vec::with_capacity(len);
+        out.extend_from_slice(self.timestamp.as_bytes());
+        out.extend_from_slice(self.space.as_bytes());
+        out.extend_from_slice(self.op_count.as_bytes());
+        out.extend_from_slice(self.total_bytes.as_bytes());
+        for a in self.agent_pubkeys.iter() {
+            out.extend_from_slice(a.as_bytes());
+        }
+        out
+    }
+
     /// Verify the signatures.
     pub fn verify(&self, verifier: &kitsune2_api::DynVerifier) -> bool {
         use base64::prelude::*;
 
-        let mut to_verify = Vec::new();
-        to_verify.extend_from_slice(self.timestamp.as_bytes());
-        to_verify.extend_from_slice(self.space.as_bytes());
-        to_verify.extend_from_slice(self.op_count.as_bytes());
-        to_verify.extend_from_slice(self.total_bytes.as_bytes());
-        for a in self.agent_pubkeys.iter() {
-            to_verify.extend_from_slice(a.as_bytes());
-        }
+        let to_verify = self.encode_for_verification();
 
         const STUB_ID: bytes::Bytes = bytes::Bytes::from_static(b"");
         let stub_ts = Timestamp::now();
