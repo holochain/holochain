@@ -4,7 +4,9 @@ use holochain_state::prelude::*;
 
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
-/// - Ordered by type then timestamp (See [`OpOrder`])
+/// - Ordered by:
+///  - The number of validation attempts from least to most, then
+///  - Type then timestamp (see [`OpOrder`]).
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn get_ops_to_app_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(db, false).await
@@ -12,7 +14,9 @@ pub async fn get_ops_to_app_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<V
 
 /// Get all ops that need to sys or app validated in order.
 /// - Pending or awaiting sys dependencies.
-/// - Ordered by type then timestamp (See [`OpOrder`])
+/// - Ordered by:
+///  - The number of validation attempts from least to most, then
+///  - Type then timestamp (see [`OpOrder`]).
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn get_ops_to_sys_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(db, true).await
@@ -23,12 +27,16 @@ async fn get_ops_to_validate(
     system: bool,
 ) -> WorkflowResult<Vec<DhtOpHashed>> {
     let mut sql = "
+        SELECT * FROM (
+
         SELECT
         Action.blob as action_blob,
         Action.author as author,
         Entry.blob as entry_blob,
         DhtOp.type as dht_type,
-        DhtOp.hash as dht_hash
+        DhtOp.hash as dht_hash,
+        DhtOp.num_validation_attempts,
+        DhtOp.op_order
         FROM DhtOp
         JOIN
         Action ON DhtOp.action_hash = Action.hash
@@ -46,6 +54,30 @@ async fn get_ops_to_validate(
                 DhtOp.validation_stage IS NULL
                 OR DhtOp.validation_stage = 0
             )
+
+            UNION ALL
+
+            SELECT
+            -- Note the odd field name, this is mapped later based on the DhtOp.type
+            Warrant.blob as action_blob,
+            Warrant.author as author,
+            NULL as entry_blob,
+            DhtOp.type as dht_type,
+            DhtOp.hash as dht_hash,
+            DhtOp.num_validation_attempts,
+            DhtOp.op_order
+            FROM DhtOp
+            JOIN Warrant ON DhtOp.action_hash = Warrant.hash
+
+            WHERE
+            DhtOp.when_integrated IS NULL
+            AND DhtOp.validation_status IS NULL
+            AND (
+                DhtOp.validation_stage IS NULL
+                OR DhtOp.validation_stage = 0
+            )
+
+            ) union_table
             ",
         );
     } else {
@@ -58,6 +90,8 @@ async fn get_ops_to_validate(
                 DhtOp.validation_stage = 1
                 OR DhtOp.validation_stage = 2
             )
+
+            ) union_table
             ",
         );
     }
@@ -68,8 +102,8 @@ async fn get_ops_to_validate(
     sql.push_str(
         "
         ORDER BY
-        DhtOp.num_validation_attempts ASC,
-        DhtOp.op_order ASC
+        union_table.num_validation_attempts ASC,
+        union_table.op_order ASC
         LIMIT 10000
         ",
     );
