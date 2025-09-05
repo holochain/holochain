@@ -251,14 +251,10 @@ pub async fn sys_validation_workflow(
         );
     }
 
-    if num_fetched > 0 {
-        // If we fetched anything then we can re-run sys validation
-        trigger_self.trigger(&"sys_validation_workflow");
-    }
-
-    if outcome_summary.warrant_deps_copied > 0 {
-        // If any warrant dependencies were copied, the workflow could attempt validation for those
-        // right away, so trigger it again.
+    if num_fetched > 0 || outcome_summary.warrant_deps_copied > 0 {
+        // - If we fetched anything then we can re-run sys validation
+        // - If any warrant dependencies were copied, the workflow could attempt validation for those
+        //   right away, so trigger it again.
         trigger_self.trigger(&"sys_validation_workflow");
     }
 
