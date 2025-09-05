@@ -77,7 +77,7 @@ serde_with = { version = "3.12.0", features = ["json"] }
 shrinkwraprs = "0.3.0"
 sodoken = "0.1.0"
 structopt = "0.3.11"
-strum = "0.18.0"
+strum = "0.27"
 subtle-encoding = "0.5"
 tempfile = "3.3"
 thiserror = "2.0"

@@ -59,7 +59,6 @@ pub use crate::p2p::call_remote;
 pub use crate::p2p::emit_signal;
 pub use crate::p2p::send_remote_signal;
 pub use crate::random::*;
-#[cfg(feature = "unstable-functions")]
 pub use crate::time::schedule;
 pub use crate::time::sys_time;
 pub use crate::validation_receipt::get_validation_receipts;
@@ -170,7 +169,8 @@ macro_rules! holochain_externs {
             delete_clone_cell:1,
             close_chain:1,
             open_chain:1,
-            get_validation_receipts:1
+            get_validation_receipts:1,
+            schedule:1
         );
 
         #[cfg(feature = "unstable-countersigning")]
@@ -181,8 +181,7 @@ macro_rules! holochain_externs {
         #[cfg(feature = "unstable-functions")]
         holochain_wasmer_guest::host_externs!(
             block_agent:1,
-            unblock_agent:1,
-            schedule:1
+            unblock_agent:1
         );
     };
 }
