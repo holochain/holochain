@@ -1,5 +1,4 @@
 #![crate_type = "proc-macro"]
-#![allow(clippy::manual_unwrap_or_default)] // Fixing requires a `darling` upgrade
 
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
@@ -44,16 +43,22 @@ impl Parse for EntryDef {
         for var in vars {
             if let Some(segment) = var.path.segments.first() {
                 match segment.ident.to_string().as_str() {
-                    "id" => match var.lit {
-                        syn::Lit::Str(s) => {
+                    "id" => match var.value {
+                        syn::Expr::Lit(syn::ExprLit {
+                            lit: syn::Lit::Str(s),
+                            ..
+                        }) => {
                             id = holochain_integrity_types::entry_def::EntryDefId::App(
                                 s.value().to_string().into(),
                             )
                         }
                         _ => unreachable!(),
                     },
-                    "required_validations" => match var.lit {
-                        syn::Lit::Int(i) => {
+                    "required_validations" => match var.value {
+                        syn::Expr::Lit(syn::ExprLit {
+                            lit: syn::Lit::Int(i),
+                            ..
+                        }) => {
                             required_validations =
                                 holochain_integrity_types::entry_def::RequiredValidations::from(
                                     i.base10_parse::<u8>()?,
@@ -62,8 +67,11 @@ impl Parse for EntryDef {
                         _ => unreachable!(),
                     },
                     "visibility" => {
-                        match var.lit {
-                            syn::Lit::Str(s) => visibility = match s.value().as_str() {
+                        match var.value {
+                            syn::Expr::Lit(syn::ExprLit {
+                                lit: syn::Lit::Str(s),
+                                ..
+                            }) => visibility = match s.value().as_str() {
                                 "public" => {
                                     holochain_integrity_types::entry_def::EntryVisibility::Public
                                 }

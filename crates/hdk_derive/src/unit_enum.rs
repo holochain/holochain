@@ -1,9 +1,12 @@
 use crate::util::get_unit_ident;
+use darling::ast::NestedMeta;
 use darling::FromDeriveInput;
 use darling::FromVariant;
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
-use syn::parse_macro_input;
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
+use syn::{parse_macro_input, Token};
 
 #[derive(FromVariant)]
 /// Type for gathering each variants ident and fields.
@@ -74,8 +77,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     // Forward any attributes that are meant for the unit enum.
     let unit_attrs: proc_macro2::TokenStream = match forward {
-        Some(syn::Meta::List(syn::MetaList { nested, .. })) => {
-            nested.iter().map(|a| quote::quote! {#[#a]}).collect()
+        Some(syn::Meta::List(syn::MetaList { tokens, .. })) => {
+            match Punctuated::<NestedMeta, Token![,]>::parse_terminated.parse2(tokens) {
+                Ok(nested) => nested.iter().map(|a| quote::quote! {#[#a]}).collect(),
+                Err(e) => return e.to_compile_error().into(),
+            }
         }
         _ => quote::quote! {},
     };

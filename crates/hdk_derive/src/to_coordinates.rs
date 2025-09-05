@@ -4,17 +4,17 @@ use crate::util::index_to_u8;
 use darling::FromMeta;
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
-use syn::parse_macro_input;
 use syn::punctuated::Punctuated;
-use syn::AttributeArgs;
 use syn::Item;
 use syn::ItemEnum;
 use syn::Variant;
+use syn::{parse, parse_macro_input};
 
 #[derive(Debug, FromMeta)]
+#[darling(derive_syn_parse)]
 /// Type for parsing the `#[hdk_to_coordinates(nested = true)]`
 /// attribute into. Defaults to false.
-pub struct MacroArgs {
+struct MacroArgs {
     #[darling(default)]
     nested: bool,
     #[darling(default)]
@@ -24,7 +24,12 @@ pub struct MacroArgs {
 pub fn build(args: TokenStream, input: TokenStream) -> TokenStream {
     // Parse input and attributes.
     let input = parse_macro_input!(input as Item);
-    let attr_args = parse_macro_input!(args as AttributeArgs);
+    let attr_args: MacroArgs = match parse(args) {
+        Ok(v) => v,
+        Err(e) => {
+            return e.to_compile_error().into();
+        }
+    };
 
     // Check the input is an enum.
     let (ident, variants) = match &input {
@@ -36,20 +41,14 @@ pub fn build(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
-    // Check if this is the nested version or not.
-    let (nested, entry) = match MacroArgs::from_list(&attr_args) {
-        Ok(a) => (a.nested, a.entry),
-        Err(e) => abort!(e.span(), "{}", e),
-    };
-
-    let entry_or_link = if entry {
+    let entry_or_link = if attr_args.entry {
         quote::quote! {EntryDefIndex}
     } else {
         quote::quote! {LinkType}
     };
     // Generate the output for mapping between variants
     // and local types.
-    let variant_to_index = if nested {
+    let variant_to_index = if attr_args.nested {
         nesting(ident, variants, entry_or_link.clone())
     } else {
         no_nesting(ident, variants, entry_or_link.clone())
