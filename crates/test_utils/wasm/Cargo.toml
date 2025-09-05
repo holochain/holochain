@@ -21,8 +21,8 @@ unstable-functions = []
 # reminder - do not use workspace deps
 [dependencies]
 holochain_types = { version = "^0.6.0-dev.20", path = "../../holochain_types" }
-strum = "0.18.0"
-strum_macros = "0.18.0"
+strum = "0.27"
+strum_macros = "0.27"
 
 [build-dependencies]
 toml = "0.8"
