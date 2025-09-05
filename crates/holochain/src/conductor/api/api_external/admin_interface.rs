@@ -166,7 +166,7 @@ impl AdminInterfaceApi {
             }
             AttachAppInterface {
                 port,
-                danger_addr,
+                danger_bind_addr,
                 allowed_origins,
                 installed_app_id,
             } => {
@@ -176,7 +176,7 @@ impl AdminInterfaceApi {
                     .clone()
                     .add_app_interface(
                         either::Either::Left(port),
-                        danger_addr,
+                        danger_bind_addr,
                         allowed_origins,
                         installed_app_id,
                     )

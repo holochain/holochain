@@ -113,7 +113,7 @@ pub struct AddAdminWs {
 
     /// Dangerously override the address to bind the interface to.
     #[arg(long)]
-    pub danger_addr: Option<String>,
+    pub danger_bind_addr: Option<String>,
 
     /// Optional allowed origins.
     ///
@@ -136,7 +136,7 @@ pub struct AddAppWs {
 
     /// Dangerously override the address to bind the interface to.
     #[arg(long)]
-    pub danger_addr: Option<String>,
+    pub danger_bind_addr: Option<String>,
 
     /// Optional allowed origins.
     ///
@@ -404,7 +404,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
                 .add_admin_interfaces(vec![AdminInterfaceConfig {
                     driver: InterfaceDriver::Websocket {
                         port,
-                        danger_addr: args.danger_addr,
+                        danger_bind_addr: args.danger_bind_addr,
                         allowed_origins: args.allowed_origins,
                     },
                 }])
@@ -416,7 +416,7 @@ async fn call_inner(client: &mut AdminWebsocket, call: AdminRequestCli) -> anyho
             let port = client
                 .attach_app_interface(
                     port,
-                    args.danger_addr,
+                    args.danger_bind_addr,
                     args.allowed_origins,
                     args.installed_app_id,
                 )

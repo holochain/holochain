@@ -188,7 +188,7 @@ pub enum AdminRequest {
         /// Holochain has minimal security protections in place for websocket connections. The app
         /// websockets are protected by the admin websocket, but if you expose the admin websocket
         /// to the network, then anyone who can connect to it can control your conductor.
-        danger_addr: Option<String>,
+        danger_bind_addr: Option<String>,
 
         /// Allowed origins for this app interface.
         ///

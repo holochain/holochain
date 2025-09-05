@@ -37,7 +37,7 @@ pub enum InterfaceDriver {
         /// Holochain has minimal security protections in place for websocket connections. The app
         /// websockets are protected by the admin websocket, but if you expose the admin websocket
         /// to the network, then anyone who can connect to it can control your conductor.
-        danger_addr: Option<String>,
+        danger_bind_addr: Option<String>,
 
         /// Allowed origins for this interface.
         ///
@@ -60,9 +60,11 @@ impl InterfaceDriver {
     }
 
     /// The address override to bind the interface to, if any.
-    pub fn danger_addr(&self) -> Option<String> {
+    pub fn danger_bind_addr(&self) -> Option<&String> {
         match self {
-            InterfaceDriver::Websocket { danger_addr, .. } => danger_addr.clone(),
+            InterfaceDriver::Websocket {
+                danger_bind_addr, ..
+            } => danger_bind_addr.as_ref(),
         }
     }
 

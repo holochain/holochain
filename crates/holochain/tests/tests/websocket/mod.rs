@@ -855,7 +855,7 @@ async fn admin_allowed_origins() {
         .add_admin_interfaces(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket {
                 port: 0,
-                danger_addr: None,
+                danger_bind_addr: None,
                 allowed_origins: "http://localhost:3000".to_string().into(),
             },
         }])
@@ -1150,7 +1150,7 @@ async fn bind_ipv6_unspecified() {
         .add_admin_interfaces(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket {
                 port: 0,
-                danger_addr: Some("::".to_string()),
+                danger_bind_addr: Some("::".to_string()),
                 allowed_origins: AllowedOrigins::Any,
             },
         }])
@@ -1209,6 +1209,69 @@ async fn bind_ipv6_unspecified() {
     app_conn
         .0
         .request::<_, AppResponse>(AppRequest::AppInfo)
+        .await
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn bind_invalid_addrs() {
+    holochain_trace::test_run();
+
+    let mut conductor = SweetConductor::from_standard_config().await;
+
+    let dna_file = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::EmitSignal])
+        .await
+        .0;
+
+    conductor.setup_app("app", &[dna_file]).await.unwrap();
+
+    conductor
+        .clone()
+        .add_admin_interfaces(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                danger_bind_addr: Some("some-hostname".to_string()),
+                allowed_origins: AllowedOrigins::Any,
+            },
+        }])
+        .await
+        .unwrap_err();
+
+    conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            Some("some-hostname".to_string()),
+            AllowedOrigins::Any,
+            None,
+        )
+        .await
+        .unwrap_err();
+
+    // No equivalent IPv4 address. Will bind to IPv6 only on the provided address and bind IPv4
+    // localhost only
+    conductor
+        .clone()
+        .add_admin_interfaces(vec![AdminInterfaceConfig {
+            driver: InterfaceDriver::Websocket {
+                port: 0,
+                danger_bind_addr: Some("2a0a:ef40:406:4f01:7819:603e:151c:b6d2".to_string()),
+                allowed_origins: AllowedOrigins::Any,
+            },
+        }])
+        .await
+        .unwrap();
+
+    // No equivalent IPv4 address. Will bind to IPv6 only on the provided address and bind IPv4
+    // localhost only
+    conductor
+        .clone()
+        .add_app_interface(
+            Either::Left(0),
+            Some("2a0a:ef40:406:4f01:7819:603e:151c:b6d2".to_string()),
+            AllowedOrigins::Any,
+            None,
+        )
         .await
         .unwrap();
 }
