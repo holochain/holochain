@@ -13,6 +13,7 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 async-trait = "0.1"
+base64 = "0.22"
 blake2b_simd = "1.0.3"
 fixt = { path = "../fixt", version = "^0.6.0-dev.3" }
 futures = "0.3"
@@ -56,6 +57,7 @@ holochain_sqlite = { version = "^0.6.0-dev.19", path = "../holochain_sqlite", fe
   "test_utils",
 ] }
 holochain_state = { path = "../holochain_state", features = ["test_utils"] }
+kitsune2_test_utils = "0.3.0-dev.2"
 tempfile = "3.21.0"
 
 [lints]

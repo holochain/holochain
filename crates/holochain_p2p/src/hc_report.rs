@@ -89,8 +89,9 @@ enum Cmd {
 struct HcReport {
     this: Weak<Self>,
     task: tokio::task::AbortHandle,
-    spaces: Arc<Mutex<HashMap<SpaceId, DynLocalAgentStore>>>,
+    spaces: Mutex<HashMap<SpaceId, DynLocalAgentStore>>,
     cmd_send: tokio::sync::mpsc::Sender<Cmd>,
+    cmd_recv: Mutex<tokio::sync::mpsc::Receiver<Cmd>>,
     tx: DynTransport,
     file_writer: Mutex<tracing_appender::non_blocking::NonBlocking>,
     _file_guard: tracing_appender::non_blocking::WorkerGuard,
@@ -135,103 +136,37 @@ impl HcReport {
 
         let (file_writer, _file_guard) = tracing_appender::non_blocking(file);
 
-        let (cmd_send, mut cmd_recv) = tokio::sync::mpsc::channel(4096);
+        let (cmd_send, cmd_recv) = tokio::sync::mpsc::channel(4096);
 
-        let spaces: Arc<Mutex<HashMap<SpaceId, DynLocalAgentStore>>> =
-            Arc::new(Mutex::new(HashMap::new()));
-        let spaces2 = spaces.clone();
-        let tx2 = tx.clone();
+        let spaces: Mutex<HashMap<SpaceId, DynLocalAgentStore>> = Mutex::new(HashMap::new());
 
-        let task = tokio::task::spawn(async move {
-            loop {
-                tokio::time::sleep(std::time::Duration::from_secs_f64(
-                    config.fetched_op_interval_s,
-                ))
-                .await;
+        let out = Arc::new_cyclic(move |this: &Weak<Self>| {
+            let freq = config.fetched_op_interval_s;
+            let this2 = this.clone();
+            let task = tokio::task::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs_f64(freq)).await;
 
-                let mut fetched_ops: HashMap<(SpaceId, Url), (u64, u64)> = HashMap::new();
-
-                while let Ok(cmd) = cmd_recv.try_recv() {
-                    match cmd {
-                        Cmd::FetchedOp {
-                            space_id,
-                            source,
-                            size_bytes,
-                        } => {
-                            let e = fetched_ops.entry((space_id, source)).or_default();
-                            e.0 += 1;
-                            e.1 += size_bytes;
-                        }
+                    if let Some(this) = this2.upgrade() {
+                        this.process_reports().await;
+                    } else {
+                        tracing::debug!("hc report loop ending");
+                        return;
                     }
                 }
+            })
+            .abort_handle();
 
-                if fetched_ops.is_empty() {
-                    continue;
-                }
-
-                for ((space_id, source), (op_count, total_bytes)) in fetched_ops {
-                    let local_agent_store = match spaces2.lock().unwrap().get(&space_id) {
-                        Some(s) => s.clone(),
-                        None => {
-                            tracing::warn!(?space_id, "space not found for fetched op reporting");
-                            continue;
-                        }
-                    };
-
-                    let local_agents = match local_agent_store.get_all().await {
-                        Ok(a) => a,
-                        Err(err) => {
-                            tracing::warn!(
-                                ?err,
-                                "failed to fetch local agents for fetch op reporting"
-                            );
-                            continue;
-                        }
-                    };
-
-                    let mut agent_pubkeys = Vec::with_capacity(local_agents.len());
-                    for a in local_agents.iter() {
-                        agent_pubkeys.push(a.agent().to_string());
-                    }
-
-                    let mut signatures = Vec::with_capacity(local_agents.len());
-
-                    for _a in local_agents.iter() {
-                        //TODO
-                        signatures.push("test-sig".to_string());
-                    }
-
-                    let entry = ReportEntry::FetchedOps(ReportEntryFetchedOps {
-                        timestamp: Timestamp::now().as_micros().to_string(),
-                        space: space_id.to_string(),
-                        op_count: op_count.to_string(),
-                        total_bytes: total_bytes.to_string(),
-                        agent_pubkeys,
-                        signatures,
-                    });
-
-                    let entry = serde_json::to_string(&entry).expect("json serialize");
-
-                    if let Err(err) = tx2
-                        .send_module(source, space_id, MOD.into(), entry.into())
-                        .await
-                    {
-                        tracing::warn!(?err, "failed to send fetched ops report to remote peer");
-                        continue;
-                    }
-                }
+            HcReport {
+                this: this.clone(),
+                task,
+                spaces,
+                cmd_send,
+                cmd_recv: Mutex::new(cmd_recv),
+                tx,
+                file_writer: Mutex::new(file_writer),
+                _file_guard,
             }
-        })
-        .abort_handle();
-
-        let out = Arc::new_cyclic(move |this| HcReport {
-            this: this.clone(),
-            task,
-            spaces,
-            cmd_send,
-            tx,
-            file_writer: Mutex::new(file_writer),
-            _file_guard,
         });
 
         out.write(ReportEntry::start());
@@ -263,9 +198,126 @@ impl HcReport {
         data.push_str("\n");
         self.write_raw(data.as_bytes());
     }
+
+    async fn process_reports(&self) {
+        let mut fetched_ops: HashMap<(SpaceId, Url), (u64, u64)> = HashMap::new();
+
+        {
+            let mut lock = self.cmd_recv.lock().unwrap();
+            while let Ok(cmd) = lock.try_recv() {
+                match cmd {
+                    Cmd::FetchedOp {
+                        space_id,
+                        source,
+                        size_bytes,
+                    } => {
+                        let e = fetched_ops.entry((space_id, source)).or_default();
+                        e.0 += 1;
+                        e.1 += size_bytes;
+                    }
+                }
+            }
+        }
+
+        if fetched_ops.is_empty() {
+            // nothing to do
+            return;
+        }
+
+        for ((space_id, source), (op_count, total_bytes)) in fetched_ops {
+            let local_agent_store = match self.spaces.lock().unwrap().get(&space_id) {
+                Some(s) => s.clone(),
+                None => {
+                    tracing::warn!(?space_id, "space not found for fetched op reporting");
+                    continue;
+                }
+            };
+
+            let local_agents = match local_agent_store.get_all().await {
+                Ok(a) => a,
+                Err(err) => {
+                    tracing::warn!(?err, "failed to fetch local agents for fetch op reporting");
+                    continue;
+                }
+            };
+
+            let mut agent_pubkeys = Vec::with_capacity(local_agents.len());
+            for a in local_agents.iter() {
+                agent_pubkeys.push(a.agent().to_string());
+            }
+
+            let timestamp = Timestamp::now().as_micros().to_string();
+            let space = space_id.to_string();
+            let op_count = op_count.to_string();
+            let total_bytes = total_bytes.to_string();
+
+            let mut to_sign = Vec::new();
+            to_sign.extend_from_slice(timestamp.as_bytes());
+            to_sign.extend_from_slice(space.as_bytes());
+            to_sign.extend_from_slice(op_count.as_bytes());
+            to_sign.extend_from_slice(total_bytes.as_bytes());
+            for a in agent_pubkeys.iter() {
+                to_sign.extend_from_slice(a.as_bytes());
+            }
+
+            let mut signatures = Vec::with_capacity(local_agents.len());
+
+            const STUB_ID: bytes::Bytes = bytes::Bytes::from_static(b"");
+            let stub_ts = Timestamp::now();
+            for a in local_agents.iter() {
+                let signature = match a.sign(
+                    // hc local agent doesn't use any agent info
+                    // for signing, so we can use a stub here
+                    &AgentInfo {
+                        agent: STUB_ID.into(),
+                        space: STUB_ID.into(),
+                        created_at: stub_ts.into(),
+                        expires_at: stub_ts.into(),
+                        is_tombstone: false,
+                        url: None,
+                        storage_arc: DhtArc::default(),
+                    },
+                    &to_sign,
+                ).await {
+                    Ok(s) => s,
+                    Err(err) => {
+                        tracing::warn!(?err, "failed to sign message for fetch op reporting");
+                        continue;
+                    }
+                };
+
+                use base64::Engine;
+                signatures.push(base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(signature));
+            }
+
+            let entry = ReportEntry::FetchedOps(ReportEntryFetchedOps {
+                timestamp,
+                space,
+                op_count,
+                total_bytes,
+                agent_pubkeys,
+                signatures,
+            });
+
+            let entry = serde_json::to_string(&entry).expect("json serialize");
+
+            if let Err(err) = self
+                .tx
+                .send_module(source, space_id, MOD.into(), entry.into())
+                .await
+            {
+                tracing::warn!(?err, "failed to send fetched ops report to remote peer");
+                continue;
+            }
+        }
+    }
 }
 
 impl Report for HcReport {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn space(&self, space_id: SpaceId, local_agent_store: DynLocalAgentStore) {
         if let Some(this) = self.this.upgrade() {
             self.spaces
@@ -292,54 +344,176 @@ impl Report for HcReport {
 mod test {
     use super::*;
 
-    #[tokio::test]
-    async fn report_entry_start() {
-        let dir = tempfile::tempdir().unwrap();
+    #[allow(dead_code)]
+    struct Test {
+        pub dir: tempfile::TempDir,
+        pub kitsune: DynKitsune,
+        pub space: DynSpace,
+        pub local_agent: DynLocalAgent,
+        pub url: Url,
+        pub verifier: DynVerifier,
+    }
 
-        let b = kitsune2_api::Builder {
-            report: HcReportFactory::create(),
-            ..kitsune2_core::default_test_builder()
-        }
-        .with_default_config()
-        .unwrap();
+    impl Test {
+        pub async fn new() -> Self {
+            let dir = tempfile::tempdir().unwrap();
 
-        b.config
-            .set_module_config(&HcReportModConfig {
-                hc_report: HcReportConfig {
-                    days_retained: 5,
-                    path: dir.path().into(),
-                    fetched_op_interval_s: 0.001,
-                },
-            })
+            let verifier: DynVerifier = Arc::new(
+                kitsune2_test_utils::agent::TestVerifier
+            );
+
+            let b = kitsune2_api::Builder {
+                verifier: verifier.clone(),
+                report: HcReportFactory::create(),
+                ..kitsune2_core::default_test_builder()
+            }
+            .with_default_config()
             .unwrap();
 
-        let kitsune = b.build().await.unwrap();
+            b.config
+                .set_module_config(&HcReportModConfig {
+                    hc_report: HcReportConfig {
+                        days_retained: 5,
+                        path: dir.path().into(),
+                        // set this really high, and manually
+                        // call process reports
+                        fetched_op_interval_s: 60.0 * 60.0 * 24.0,
+                    },
+                })
+                .unwrap();
 
-        #[derive(Debug)]
-        struct H;
-        impl KitsuneHandler for H {
-            fn create_space(&self, _space_id: SpaceId) -> BoxFut<'_, K2Result<DynSpaceHandler>> {
-                unimplemented!()
+            let kitsune = b.build().await.unwrap();
+
+            #[derive(Debug)]
+            struct S;
+            impl SpaceHandler for S {
+                fn recv_notify(
+                    &self,
+                    _from_peer: Url,
+                    _space_id: SpaceId,
+                    _data: bytes::Bytes,
+                ) -> K2Result<()> {
+                    Ok(())
+                }
+            }
+
+            #[derive(Debug)]
+            struct K;
+            impl KitsuneHandler for K {
+                fn create_space(
+                    &self,
+                    _space_id: SpaceId,
+                ) -> BoxFut<'_, K2Result<DynSpaceHandler>> {
+                    let s: DynSpaceHandler = Arc::new(S);
+                    Box::pin(async move { Ok(s) })
+                }
+            }
+            kitsune.register_handler(Arc::new(K)).await.unwrap();
+            let space = kitsune
+                .space(kitsune2_test_utils::space::TEST_SPACE_ID)
+                .await
+                .unwrap();
+            let local_agent: DynLocalAgent =
+                Arc::new(kitsune2_test_utils::agent::TestLocalAgent::default());
+            space.local_agent_join(local_agent.clone()).await.unwrap();
+            let url = space.current_url().unwrap();
+
+            Self {
+                dir,
+                kitsune,
+                space,
+                local_agent,
+                url,
+                verifier,
             }
         }
-        kitsune.register_handler(Arc::new(H)).await.unwrap();
 
-        for _ in 0..100 {
-            let mut d = tokio::fs::read_dir(dir.path()).await.unwrap();
+        pub async fn list_files(&self) -> Vec<std::path::PathBuf> {
+            let mut out = Vec::new();
+            let mut d = tokio::fs::read_dir(self.dir.path()).await.unwrap();
             while let Ok(Some(e)) = d.next_entry().await {
                 let name = e.file_name().to_string_lossy().to_string();
                 if name.starts_with("hc-report.") && name.ends_with(".jsonl") {
-                    let data = tokio::fs::read_to_string(dir.path().join(name))
-                        .await
-                        .unwrap();
-                    if let Some(first_line) = data.split("\n").next() {
-                        eprintln!("{first_line}");
-                        if let Ok(ReportEntry::Start { .. }) =
-                            serde_json::from_str::<ReportEntry>(first_line)
-                        {
-                            // test pass
-                            return;
+                    if e.file_type().await.unwrap().is_file() {
+                        out.push(self.dir.path().join(e.file_name()));
+                    }
+                }
+            }
+            out
+        }
+
+        pub async fn read_entries(&self) -> Vec<ReportEntry> {
+            let mut out = Vec::new();
+            for file in self.list_files().await {
+                let data = tokio::fs::read_to_string(file).await.unwrap();
+                for line in data.split('\n') {
+                    let line = line.trim();
+                    if !line.is_empty() {
+                        if let Ok(entry) = serde_json::from_str::<ReportEntry>(line) {
+                            out.push(entry);
                         }
+                    }
+                }
+            }
+            return out;
+        }
+    }
+
+    #[tokio::test]
+    async fn report_entry_start() {
+        let test = Test::new().await;
+
+        for _ in 0..100 {
+            for entry in test.read_entries().await {
+                if let ReportEntry::Start(_) = entry {
+                    // test pass
+                    return;
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+
+        panic!("failed to write report file");
+    }
+
+    #[tokio::test]
+    async fn report_entry_fetched_ops() {
+        let test1 = Test::new().await;
+        let test2 = Test::new().await;
+
+        test2.kitsune.report().unwrap().fetched_op(
+            kitsune2_test_utils::space::TEST_SPACE_ID,
+            test1.url.clone(),
+            bytes::Bytes::from_static(b"fake-op-id").into(),
+            10,
+        );
+        test2.kitsune.report().unwrap().fetched_op(
+            kitsune2_test_utils::space::TEST_SPACE_ID,
+            test1.url.clone(),
+            bytes::Bytes::from_static(b"fake-op-id").into(),
+            3,
+        );
+
+        test2
+            .kitsune
+            .report()
+            .unwrap()
+            .as_any()
+            .downcast_ref::<HcReport>()
+            .unwrap()
+            .process_reports()
+            .await;
+
+        for _ in 0..100 {
+            for entry in test1.read_entries().await {
+                if let ReportEntry::FetchedOps(rep) = entry {
+                    eprintln!("{rep:#?}");
+                    if !rep.verify(&test1.verifier) {
+                        continue;
+                    }
+                    if rep.op_count == "2" && rep.total_bytes == "13" {
+                        // test pass
+                        return;
                     }
                 }
             }

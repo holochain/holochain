@@ -62,3 +62,49 @@ pub struct ReportEntryFetchedOps {
     #[serde(rename = "s")]
     pub signatures: Vec<String>,
 }
+
+impl ReportEntryFetchedOps {
+    /// Verify the signatures.
+    pub fn verify(&self, verifier: &kitsune2_api::DynVerifier) -> bool {
+        use base64::prelude::*;
+
+        let mut to_verify = Vec::new();
+        to_verify.extend_from_slice(self.timestamp.as_bytes());
+        to_verify.extend_from_slice(self.space.as_bytes());
+        to_verify.extend_from_slice(self.op_count.as_bytes());
+        to_verify.extend_from_slice(self.total_bytes.as_bytes());
+        for a in self.agent_pubkeys.iter() {
+            to_verify.extend_from_slice(a.as_bytes());
+        }
+
+        const STUB_ID: bytes::Bytes = bytes::Bytes::from_static(b"");
+        let stub_ts = Timestamp::now();
+        for (agent, sig) in self.agent_pubkeys.iter().zip(self.signatures.iter()) {
+            let agent = match BASE64_URL_SAFE_NO_PAD.decode(agent) {
+                Ok(agent) => agent,
+                Err(_) => return false,
+            };
+            let sig = match BASE64_URL_SAFE_NO_PAD.decode(sig) {
+                Ok(sig) => sig,
+                Err(_) => return false,
+            };
+            // for ed25519 verification, we only need
+            // the agent part of the agent info, so the rest can be stubbed
+            let agent = kitsune2_api::AgentInfo {
+                agent: bytes::Bytes::copy_from_slice(&agent).into(),
+                space: STUB_ID.into(),
+                created_at: stub_ts.into(),
+                expires_at: stub_ts.into(),
+                is_tombstone: false,
+                url: None,
+                storage_arc: kitsune2_api::DhtArc::default(),
+            };
+
+            if !verifier.verify(&agent, &to_verify, &sig) {
+                return false;
+            }
+        }
+
+        true
+    }
+}

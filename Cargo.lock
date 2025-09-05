@@ -3093,6 +3093,7 @@ name = "holochain_p2p"
 version = "0.6.0-dev.20"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "blake2b_simd",
  "bytes",
  "fixt",
@@ -3113,6 +3114,7 @@ dependencies = [
  "kitsune2_api",
  "kitsune2_core",
  "kitsune2_gossip",
+ "kitsune2_test_utils",
  "lair_keystore_api",
  "mockall",
  "opentelemetry_api",
@@ -3301,6 +3303,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "backtrace",
+ "base64 0.22.1",
  "bytes",
  "contrafact",
  "derive_builder",
