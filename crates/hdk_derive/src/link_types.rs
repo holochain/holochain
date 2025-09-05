@@ -1,23 +1,28 @@
 use darling::FromMeta;
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
-use syn::parse_macro_input;
-use syn::AttributeArgs;
 use syn::Item;
 use syn::ItemEnum;
+use syn::{parse, parse_macro_input};
 
 #[derive(Debug, FromMeta)]
+#[darling(derive_syn_parse)]
 /// Optional attribute for skipping `#[no_mangle]`.
 /// Useful for testing.
-pub struct MacroArgs {
+struct MacroArgs {
     #[darling(default)]
     skip_no_mangle: bool,
 }
 
 pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
     // Parse the attributes and input.
-    let attr_args = parse_macro_input!(attrs as AttributeArgs);
     let input = parse_macro_input!(input as Item);
+    let attr_args: MacroArgs = match parse(attrs) {
+        Ok(v) => v,
+        Err(e) => {
+            return e.to_compile_error().into();
+        }
+    };
 
     // Extract the enums ident and variants.
     let (ident, variants) = match &input {
@@ -38,14 +43,8 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    // Check no mangle attribute.
-    let skip_no_mangle = match MacroArgs::from_list(&attr_args) {
-        Ok(a) => a.skip_no_mangle,
-        Err(e) => abort!(ident, "{}", e),
-    };
-
     // Generate no mangle if needed.
-    let no_mangle = if skip_no_mangle {
+    let no_mangle = if attr_args.skip_no_mangle {
         quote::quote! {}
     } else {
         quote::quote! {#[no_mangle]}
