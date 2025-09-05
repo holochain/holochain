@@ -126,8 +126,6 @@ impl ValidationDependencies {
             return false;
         }
 
-        self.retained_deps.insert(hash.clone());
-
         if let Some(s) = self.states.get_mut(hash) {
             s.set_action_dep(action);
             s.set_source(source);
@@ -151,8 +149,6 @@ impl ValidationDependencies {
             tracing::warn!(hash = ?hash, "Attempted to insert a dependency that was already present, this is not expected");
             return false;
         }
-
-        self.retained_deps.insert(hash.clone());
 
         if let Some(s) = self.states.get_mut(hash) {
             s.set_pending_validation_warranted(action, chain_op_type);
@@ -296,9 +292,10 @@ impl ValidationDependencyState {
         }
     }
 
+    /// Provide the missing [`SignedActionHashed`] for this action dependency.
     pub(super) fn set_action_dep(&mut self, action: SignedActionHashed) {
-        if let ValidationDependencyType::Warranted(_) = self.dependency_type {
-            tracing::warn!("Attempted to set a record on a dependency that is not of type Record, this is a bug");
+        if !matches!(self.dependency_type, ValidationDependencyType::Action) {
+            tracing::warn!("Attempted to set an action dependency for a validation dependency that is not expecting an action, this is a bug");
             return;
         }
 
@@ -310,18 +307,22 @@ impl ValidationDependencyState {
                 });
             }
             _ => {
-                tracing::warn!("Attempted to set a record on a dependency that already has a value, this is a bug")
+                tracing::warn!(
+                    "Attempted to set an action dependency that already has a value, this is a bug"
+                )
             }
         }
     }
 
+    /// Provide the missing [`SignedActionHashed`] for this warranted record dependency, marking it
+    /// as pending validation.
     pub(super) fn set_pending_validation_warranted(
         &mut self,
         action: SignedActionHashed,
         op_type: ChainOpType,
     ) {
-        if self.dependency_type == ValidationDependencyType::Action {
-            tracing::warn!("Attempted to set an action on a dependency that is not of type Action, this is a bug");
+        if !matches!(self.dependency_type, ValidationDependencyType::Warranted(_)) {
+            tracing::warn!("Attempted to set a warranted record dependency for a validation dependency that is not expecting Warranted, this is a bug");
             return;
         }
 
@@ -335,16 +336,17 @@ impl ValidationDependencyState {
                 });
             }
             _ => {
-                tracing::warn!("Attempted to set a record on a dependency that already has a value, this is a bug")
+                tracing::warn!("Attempted to set a warranted record dependency that already has a value, this is a bug")
             }
         }
     }
 
+    /// Set the validation status for a warranted record dependency that has now been validated.
     pub(super) fn set_validation_status_for_warranted(
         &mut self,
         validation_status: ValidationStatus,
     ) {
-        if self.dependency_type == ValidationDependencyType::Action {
+        if !matches!(self.dependency_type, ValidationDependencyType::Warranted(_)) {
             tracing::warn!("Attempted to set an action on a dependency that is not of type Action, this is a bug");
             return;
         }
@@ -371,7 +373,7 @@ impl ValidationDependencyState {
     /// Set the source of the dependency.
     ///
     /// This is used to track where the dependency was found.
-    pub(super) fn set_source(&mut self, new_source: CascadeSource) {
+    fn set_source(&mut self, new_source: CascadeSource) {
         if let Some(ValidationDependency { fetched_from, .. }) = &mut self.dependency {
             *fetched_from = new_source;
         }

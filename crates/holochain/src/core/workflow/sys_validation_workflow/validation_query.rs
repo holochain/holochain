@@ -4,7 +4,9 @@ use holochain_state::prelude::*;
 
 /// Get all ops that need to sys or app validated in order.
 /// - Sys validated or awaiting app dependencies.
-/// - Ordered by type then timestamp (See [`OpOrder`])
+/// - Ordered by:
+///  - The number of validation attempts from least to most, then
+///  - Type then timestamp (see [`OpOrder`]).
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn get_ops_to_app_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(db, false).await
@@ -12,7 +14,9 @@ pub async fn get_ops_to_app_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<V
 
 /// Get all ops that need to sys or app validated in order.
 /// - Pending or awaiting sys dependencies.
-/// - Ordered by type then timestamp (See [`OpOrder`])
+/// - Ordered by:
+///  - The number of validation attempts from least to most, then
+///  - Type then timestamp (see [`OpOrder`]).
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn get_ops_to_sys_validate(db: &DbRead<DbKindDht>) -> WorkflowResult<Vec<DhtOpHashed>> {
     get_ops_to_validate(db, true).await
@@ -73,7 +77,7 @@ async fn get_ops_to_validate(
                 OR DhtOp.validation_stage = 0
             )
 
-            ) t
+            ) union_table
             ",
         );
     } else {
@@ -87,7 +91,7 @@ async fn get_ops_to_validate(
                 OR DhtOp.validation_stage = 2
             )
 
-            ) t
+            ) union_table
             ",
         );
     }
@@ -98,8 +102,8 @@ async fn get_ops_to_validate(
     sql.push_str(
         "
         ORDER BY
-        t.num_validation_attempts ASC,
-        t.op_order ASC
+        union_table.num_validation_attempts ASC,
+        union_table.op_order ASC
         LIMIT 10000
         ",
     );

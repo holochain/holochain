@@ -200,13 +200,16 @@ pub async fn sys_validation_workflow(
                         }
                     }
                     ValidationDependencyType::Warranted(chain_op_type) => {
+                        println!("Fetching warranted dependency from network: {}", hash);
                         match network_cascade
-                            .retrieve(hash.into(), Default::default())
+                            .retrieve(hash.clone().into(), Default::default())
                             .await
                         {
                             Ok(Some((record, source))) => {
                                 let mut deps =
                                     current_validation_dependencies.lock().expect("poisoned");
+
+                                println!("Fetched warranted dependency from network: {}", hash);
 
                                 if deps.insert_pending_validation_warranted(
                                     record.signed_action,
@@ -491,11 +494,12 @@ async fn move_and_check_warrant_deps(
         )
         .await
         {
-            Ok(copied) => {
-                // It's either in the DHT already or was successfully copied.
-                if copied {
-                    *warrant_deps_copied += 1;
-                }
+            Ok(copied) if copied => {
+                println!("Copied warranted op {} to DHT", action_hash);
+                *warrant_deps_copied += 1;
+            }
+            Ok(_) => {
+                // It's in the DHT already.
             }
             Err(StateMutationError::OpNotFoundInCache) => {
                 tracing::debug!("Warranted op {} not found in cache", action_hash);
