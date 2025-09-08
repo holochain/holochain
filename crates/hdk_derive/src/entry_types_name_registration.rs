@@ -3,19 +3,24 @@ use darling::FromMeta;
 use proc_macro::TokenStream;
 use proc_macro_error::abort;
 use syn::parse_macro_input;
-use syn::AttributeArgs;
-use syn::Item;
 use syn::ItemEnum;
+use syn::{parse, Item};
 
 #[derive(Debug, FromMeta)]
-pub struct MacroArgs {
+#[darling(derive_syn_parse)]
+struct MacroArgs {
     #[darling(default)]
     skip_hdk_extern: bool,
 }
 
 pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as Item);
-    let attr_args = parse_macro_input!(attrs as AttributeArgs);
+    let attr_args: MacroArgs = match parse(attrs) {
+        Ok(v) => v,
+        Err(e) => {
+            return e.to_compile_error().into();
+        }
+    };
 
     let (ident, variants, attrs) = match &input {
         Item::Enum(ItemEnum {
@@ -41,18 +46,13 @@ pub fn build(attrs: TokenStream, input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    let skip_hdk_extern = match MacroArgs::from_list(&attr_args) {
-        Ok(a) => a.skip_hdk_extern,
-        Err(e) => abort!(ident, "{}", e),
-    };
-
-    let hdk_extern = if skip_hdk_extern {
+    let hdk_extern = if attr_args.skip_hdk_extern {
         quote::quote! {}
     } else {
         quote::quote! {#[hdk_extern]}
     };
 
-    let no_mangle = if skip_hdk_extern {
+    let no_mangle = if attr_args.skip_hdk_extern {
         quote::quote! {}
     } else {
         quote::quote! {#[no_mangle]}

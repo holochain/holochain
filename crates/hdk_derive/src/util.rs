@@ -1,7 +1,10 @@
+use darling::ast::NestedMeta;
 use heck::ToSnakeCase;
 use proc_macro_error::abort;
 use proc_macro_error::abort_call_site;
-use syn::Fields;
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
+use syn::{Fields, Token};
 
 pub fn to_snake_case(name: Option<String>, v_ident: &syn::Ident) -> String {
     match name {
@@ -12,9 +15,9 @@ pub fn to_snake_case(name: Option<String>, v_ident: &syn::Ident) -> String {
 
 pub fn ignore_enum_data(fields: &Fields) -> proc_macro2::TokenStream {
     match fields {
-        syn::Fields::Named(_) => quote::quote! {{..}},
-        syn::Fields::Unit => quote::quote! {},
-        syn::Fields::Unnamed(_) => quote::quote! {(_)},
+        Fields::Named(_) => quote::quote! {{..}},
+        Fields::Unit => quote::quote! {},
+        Fields::Unnamed(_) => quote::quote! {(_)},
     }
 }
 
@@ -22,18 +25,22 @@ pub fn get_unit_ident(attrs: &[syn::Attribute]) -> syn::Ident {
     attrs
         .iter()
         .find(|a| {
-            a.path
+            a.path()
                 .segments
                 .last()
                 .is_some_and(|s| s.ident == "unit_enum")
         })
         .and_then(|a| darling::util::parse_attribute_to_meta_list(a).ok())
-        .and_then(|syn::MetaList { path, nested, .. }| {
+        .and_then(|syn::MetaList { path, tokens, .. }| {
+            let Ok(nested) = Punctuated::<NestedMeta, Token![,]>::parse_terminated.parse2(tokens)
+            else {
+                return None;
+            };
             nested
                 .first()
                 .filter(|_| path.is_ident("unit_enum"))
                 .and_then(|f| match f {
-                    syn::NestedMeta::Meta(syn::Meta::Path(path)) => path.get_ident().cloned(),
+                    NestedMeta::Meta(syn::Meta::Path(path)) => path.get_ident().cloned(),
                     _ => None,
                 })
         })
