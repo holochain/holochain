@@ -1167,12 +1167,14 @@ pub fn remove_countersigning_session(
 ///
 /// This function will fail on database errors or serialization errors but succeed if there was
 /// nothing to be done.
+///
+/// Returns `true` if the op was copied, `false` if it already existed in the DHT database.
 pub async fn copy_cached_op_to_dht(
     dht: DbWrite<DbKindDht>,
     cache: DbRead<DbKindCache>,
     action_hash: ActionHash,
     chain_op_type: ChainOpType,
-) -> StateMutationResult<()> {
+) -> StateMutationResult<bool> {
     let dht_permit = dht.acquire_write_permit().await?;
 
     let (exists_in_dht, dht_permit) = dht
@@ -1192,7 +1194,7 @@ pub async fn copy_cached_op_to_dht(
 
     // Nothing further to do, a DhtOp with the same action_hash and type already exists
     if exists_in_dht {
-        return Ok(());
+        return Ok(false);
     }
 
     let maybe_action_entry = cache
@@ -1260,7 +1262,7 @@ pub async fn copy_cached_op_to_dht(
         })
         .await?;
 
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -1287,7 +1289,7 @@ mod tests {
             .test_write(move |txn| insert_op_cache(txn, &dht_op_hashed))
             .unwrap();
 
-        copy_cached_op_to_dht(
+        let copied = copy_cached_op_to_dht(
             dht_db.clone(),
             cache_db.clone().into(),
             signed_action.as_hash().clone(),
@@ -1295,6 +1297,7 @@ mod tests {
         )
         .await
         .unwrap();
+        assert!(copied, "Op should have been copied to DHT database");
 
         let found: bool = dht_db
             .read_async(move |txn| -> StateMutationResult<bool> {
@@ -1331,7 +1334,7 @@ mod tests {
             .test_write(move |txn| insert_op_cache(txn, &dht_op_hashed))
             .unwrap();
 
-        copy_cached_op_to_dht(
+        let copied = copy_cached_op_to_dht(
             dht_db.clone(),
             cache_db.clone().into(),
             signed_action.as_hash().clone(),
@@ -1339,6 +1342,7 @@ mod tests {
         )
         .await
         .unwrap();
+        assert!(!copied, "Op should not have been copied to DHT database");
 
         let validation_status = dht_db
             .read_async(
