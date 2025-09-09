@@ -32,9 +32,6 @@ holochain_serialized_bytes = { version = "=0.0.56", optional = true }
 holochain_util = { version = "^0.6.0-dev.3", path = "../holochain_util", default-features = false }
 kitsune2_api = { version = "0.2.15", optional = true }
 must_future = { version = "0.1", optional = true }
-proptest = { version = "1", optional = true }
-proptest-derive = { version = "0", optional = true }
-rand = { version = "0.9", optional = true }
 rusqlite = { version = "0.36", optional = true }
 serde = { version = "1", optional = true }
 serde_bytes = { version = "0.11", optional = true }
@@ -53,8 +50,8 @@ default = ["serialization", "holochain-wasmer"]
 full = ["fixturators", "hashing", "encoding", "sqlite"]
 
 test_utils = ["fixturators"]
-fixturators = ["fixt", "rand", "hashing", "encoding"]
-fuzzing = ["proptest", "proptest-derive", "holochain_serialized_bytes?/fuzzing"]
+fixturators = ["fixt", "hashing", "encoding"]
+fuzzing = ["holochain_serialized_bytes?/fuzzing"]
 
 hashing = ["futures", "must_future", "dep:blake2b_simd", "serialization"]
 kitsune2 = ["dep:bytes", "dep:kitsune2_api"]

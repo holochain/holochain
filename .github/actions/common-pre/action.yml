@@ -1,15 +1,15 @@
-name: 'Common Test Setup Actions'
+name: "Common Test Setup Actions"
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     - name: Maximize build space (Linux)
       if: runner.os == 'Linux'
       uses: AdityaGarg8/remove-unwanted-software@v5
       with:
-        remove-dotnet: 'true'
-        remove-android: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
+        remove-dotnet: "true"
+        remove-android: "true"
+        remove-codeql: "true"
+        remove-docker-images: "true"
 
     - name: Maximise build space (Mac OS)
       if: runner.os == 'macOS'
@@ -23,11 +23,8 @@ runs:
     - name: go toolchain
       uses: actions/setup-go@v5
       with:
-        go-version: '=1.20.0'
-        cache: 'false'
-
-    - name: rust cache
-      uses: Swatinem/rust-cache@v2
+        go-version: "=1.20.0"
+        cache: "false"
 
     - name: cargo sweep stamp
       shell: bash

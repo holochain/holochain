@@ -50,20 +50,8 @@ derive_builder = { version = "0.20", optional = true }
 uuid = { version = "1.17", features = ["v4", "rng-getrandom"], optional = true }
 shrinkwraprs = { version = "0.3", optional = true }
 
-# fuzzing
-proptest = { version = "1", optional = true }
-proptest-derive = { version = "0", optional = true }
-
-# contrafact
-contrafact = { version = "0.2.0-rc.1", optional = true }
-once_cell = { version = "1.4", optional = true }
-
 # Enabled with the `schema` feature
 schemars = { version = "0.9", optional = true }
-
-[dev-dependencies]
-holochain_zome_types = { path = ".", features = ["test_utils"] }
-once_cell = { version = "1.4", optional = false }
 
 [lints]
 workspace = true
@@ -100,21 +88,8 @@ fixturators = [
 
 properties = ["serde_yaml"]
 
-fuzzing = [
-  "contrafact",
-  "proptest",
-  "proptest-derive",
-  "holochain_integrity_types/fuzzing",
-  "holochain_serialized_bytes/fuzzing",
-  "holo_hash/fuzzing",
-  "rand",
-  "fixt",
-]
-
 test_utils = [
-  "fuzzing",
   "fixturators",
-  "once_cell",
   "holo_hash/hashing",
   "holo_hash/test_utils",
   "full-dna-def",

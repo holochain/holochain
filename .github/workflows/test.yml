@@ -52,7 +52,7 @@ jobs:
         uses: ./.github/actions/common-post
 
   test-job-id:
-    name: build ${{ matrix.target }} on ${{ matrix.os }}
+    name: Test ${{ matrix.target }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -85,6 +85,16 @@ jobs:
         uses: jwlawson/actions-setup-cmake@v2
         with:
           cmake-version: "3.31.x"
+
+      - name: Install mold
+        if: runner.os == 'linux'
+        uses: rui314/setup-mold@v1
+
+      - name: Use mold
+        if: runner.os == 'linux'
+        run: |
+          sudo apt install clang
+
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 

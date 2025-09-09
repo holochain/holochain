@@ -558,7 +558,6 @@ dependencies = [
  "holochain_util",
  "holochain_wasmer_common",
  "must_future",
- "rand",
  "serde",
  "serde_bytes",
  "sha2",

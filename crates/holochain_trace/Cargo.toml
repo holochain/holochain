@@ -13,7 +13,7 @@ repository = "https://github.com/holochain/holochain"
 
 [features]
 default = []
-channels = ["tokio", "shrinkwraprs"]
+channels = ["tokio"]
 
 # reminder - do not use workspace deps
 [dependencies]
@@ -32,7 +32,6 @@ tracing-subscriber = { version = "0.3.16", features = [
 ] }
 
 tokio = { version = "1.27", features = ["sync"], optional = true }
-shrinkwraprs = { version = "0.3.0", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.27", features = ["full"] }

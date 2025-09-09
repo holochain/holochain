@@ -44,7 +44,6 @@ kitsune2_core = "0.2.15"
 kitsune2_gossip = "0.2.15"
 bytes = "1.10"
 holochain_sqlite = { version = "^0.6.0-dev.20", path = "../holochain_sqlite" }
-lair_keystore_api = "=0.6.2"
 parking_lot = "0.12.3"
 holochain_state = { version = "^0.6.0-dev.21", path = "../holochain_state" }
 holochain_timestamp = { version = "^0.6.0-dev.3", path = "../timestamp" }
