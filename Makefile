@@ -3,6 +3,8 @@
 # All default features of binaries excluding mutually exclusive features wasmer_sys & wasmer_wamr
 DEFAULT_FEATURES=slow_tests,build_wasms,sqlite-encrypted,hc_demo_cli/build_demo
 UNSTABLE_FEATURES=chc,unstable-sharding,unstable-warrants,unstable-functions,unstable-countersigning,unstable-migration,$(DEFAULT_FEATURES)
+CARGO_PROFILE ?= dev
+
 
 # mark everything as phony because it doesn't represent a file-system output
 .PHONY: default \
@@ -59,6 +61,7 @@ build-workspace-wasmer_sys:
 		--workspace \
 		--locked \
 		--all-targets \
+		--profile $(CARGO_PROFILE) \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_sys
 
@@ -67,6 +70,7 @@ build-workspace-wasmer_sys-unstable:
 		--workspace \
 		--locked \
 		--all-targets \
+		--profile $(CARGO_PROFILE) \
 		--no-default-features \
 		--features $(UNSTABLE_FEATURES),wasmer_sys
 
@@ -75,6 +79,7 @@ build-workspace-wasmer_wamr:
 		--workspace \
 		--locked \
 		--all-targets \
+		--profile $(CARGO_PROFILE) \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr
 
@@ -84,6 +89,7 @@ test-workspace-wasmer_sys:
 		--workspace \
 		--locked \
 		--no-default-features \
+		--cargo-profile $(CARGO_PROFILE) \
 		--features $(DEFAULT_FEATURES),wasmer_sys \
 		$(if $(PARTITION_COUNT), --partition count:$(PARTITION)/$(PARTITION_COUNT),)
 
@@ -92,6 +98,7 @@ test-workspace-wasmer_sys-unstable:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
 		--locked \
+		--cargo-profile $(CARGO_PROFILE) \
 		--no-default-features \
 		--features $(UNSTABLE_FEATURES),wasmer_sys \
 		$(if $(PARTITION_COUNT), --partition count:$(PARTITION)/$(PARTITION_COUNT),)
@@ -100,6 +107,7 @@ test-workspace-wasmer_sys-unstable:
 test-workspace-wasmer_wamr:
 	RUST_BACKTRACE=1 cargo nextest run \
 		--workspace \
+		--cargo-profile $(CARGO_PROFILE) \
 		--locked \
 		--no-default-features \
 		--features $(DEFAULT_FEATURES),wasmer_wamr \

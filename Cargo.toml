@@ -82,6 +82,12 @@ overflow-checks = false
 incremental = false
 codegen-units = 16
 
+[profile.ci]
+inherits = "dev"
+debug = false
+opt-level = 0
+incremental = true
+
 [profile.release]
 opt-level = "z"
 lto = true
