@@ -675,7 +675,6 @@ impl TestCase {
                             warranted_action.as_hash().clone(),
                             warranted_action.signature.clone(),
                         ),
-                        validation_type: holochain_zome_types::prelude::ValidationType::Sys,
                         chain_op_type,
                     },
                 ),

@@ -285,7 +285,6 @@ async fn app_validation_workflow_inner(
                             keystore,
                             _representative_agent.clone(),
                             &chain_op,
-                            ValidationType::App,
                         )
                         .await?;
 

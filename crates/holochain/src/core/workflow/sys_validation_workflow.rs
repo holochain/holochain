@@ -432,7 +432,6 @@ async fn sys_validation_workflow_inner(
                     &_keystore,
                     _representative_agent.clone(),
                     chain_op,
-                    ValidationType::Sys,
                 )
                 .await?;
             warrants.push(warrant_op);
@@ -1439,7 +1438,6 @@ pub async fn make_invalid_chain_warrant_op(
     keystore: &MetaLairClient,
     warrant_author: AgentPubKey,
     op: &ChainOp,
-    validation_type: ValidationType,
 ) -> WorkflowResult<DhtOpHashed> {
     let action = op.action();
     let action_author = action.author().clone();
@@ -1448,7 +1446,6 @@ pub async fn make_invalid_chain_warrant_op(
     let proof = WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
         action_author: action_author.clone(),
         action: (action.to_hash().clone(), op.signature().clone()),
-        validation_type,
         chain_op_type: op.get_type(),
     });
     let warrant = Warrant::new(proof, warrant_author, Timestamp::now(), action_author);
