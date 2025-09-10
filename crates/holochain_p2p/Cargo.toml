@@ -14,7 +14,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 blake2b_simd = "1.0.3"
-fixt = { path = "../fixt", version = "^0.6.0-dev.4"}
+fixt = { path = "../fixt", version = "^0.6.0-dev.4" }
 futures = "0.3"
 holo_hash = { version = "^0.6.0-dev.12", path = "../holo_hash", features = [
   "kitsune2",
