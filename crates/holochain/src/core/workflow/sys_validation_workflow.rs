@@ -177,84 +177,8 @@ pub async fn sys_validation_workflow(
     }
 
     // Now go to the network to try to fetch missing dependencies
-    let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
-    let missing_dependencies = current_validation_dependencies
-        .lock()
-        .expect("poisoned")
-        .get_missing_dependencies();
-    let num_fetched: usize =
-        futures::stream::iter(missing_dependencies.into_iter().map(|(hash, dep_type)| {
-            let network_cascade = network_cascade.clone();
-            let current_validation_dependencies = current_validation_dependencies.clone();
-            async move {
-                match dep_type {
-                    ValidationDependencyType::Action => {
-                        match network_cascade
-                            .retrieve_action(hash, Default::default())
-                            .await
-                        {
-                            Ok(Some((action, source))) => {
-                                let mut deps =
-                                    current_validation_dependencies.lock().expect("poisoned");
-
-                                if deps.insert_action(action, source) {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            Ok(None) => {
-                                // This is fine, we didn't find it on the network, so we'll have to try again.
-                                // TODO This will hit the network again fairly quickly if sys validation is triggered again soon.
-                                //      It would be more efficient to wait a bit before trying again.
-                                0
-                            }
-                            Err(err) => {
-                                tracing::error!(?err, "Error fetching missing dependency");
-                                0
-                            }
-                        }
-                    }
-                    ValidationDependencyType::Warranted(chain_op_type) => {
-                        match network_cascade
-                            .retrieve(hash.clone().into(), Default::default())
-                            .await
-                        {
-                            Ok(Some((record, source))) => {
-                                let mut deps =
-                                    current_validation_dependencies.lock().expect("poisoned");
-
-                                if deps.insert_pending_validation_warranted(
-                                    record.signed_action,
-                                    chain_op_type,
-                                    source,
-                                ) {
-                                    1
-                                } else {
-                                    0
-                                }
-                            }
-                            Ok(None) => {
-                                // This is fine, we didn't find it on the network, so we'll have to try again.
-                                // TODO This will hit the network again fairly quickly if sys validation is triggered again soon.
-                                //      It would be more efficient to wait a bit before trying again.
-                                0
-                            }
-                            Err(err) => {
-                                tracing::error!(?err, "Error fetching missing dependency");
-                                0
-                            }
-                        }
-                    }
-                }
-            }
-            .boxed()
-        }))
-        .buffer_unordered(10)
-        .collect::<Vec<usize>>()
-        .await
-        .into_iter()
-        .sum();
+    let num_fetched =
+        fetch_missing_dependencies(&workspace, network, current_validation_dependencies).await;
 
     if outcome_summary.missing > 0 {
         tracing::debug!(
@@ -265,7 +189,7 @@ pub async fn sys_validation_workflow(
     }
 
     if num_fetched > 0 || outcome_summary.warrant_deps_copied > 0 {
-        // - If we fetched anything then we can re-run sys validation
+        // - If we fetched anything, then we can re-run sys validation
         // - If any warrant dependencies were copied, the workflow could attempt validation for those
         //   right away, so trigger it again.
         trigger_self.trigger(&"sys_validation_workflow");
@@ -479,6 +403,91 @@ async fn sys_validation_workflow_inner(
     );
 
     Ok(summary)
+}
+
+async fn fetch_missing_dependencies(
+    workspace: &SysValidationWorkspace,
+    network: DynHolochainP2pDna,
+    current_validation_dependencies: SysValDeps,
+) -> usize {
+    let network_cascade = Arc::new(workspace.network_and_cache_cascade(network));
+    let missing_dependencies = current_validation_dependencies
+        .lock()
+        .expect("poisoned")
+        .get_missing_dependencies();
+
+    futures::stream::iter(missing_dependencies.into_iter().map(|(hash, dep_type)| {
+        let network_cascade = network_cascade.clone();
+        let current_validation_dependencies = current_validation_dependencies.clone();
+        async move {
+            match dep_type {
+                ValidationDependencyType::Action => {
+                    match network_cascade
+                        .retrieve_action(hash, Default::default())
+                        .await
+                    {
+                        Ok(Some((action, source))) => {
+                            let mut deps =
+                                current_validation_dependencies.lock().expect("poisoned");
+
+                            if deps.insert_action(action, source) {
+                                1
+                            } else {
+                                0
+                            }
+                        }
+                        Ok(None) => {
+                            // This is fine, we didn't find it on the network, so we'll have to try again.
+                            // TODO This will hit the network again fairly quickly if sys validation is triggered again soon.
+                            //      It would be more efficient to wait a bit before trying again.
+                            0
+                        }
+                        Err(err) => {
+                            tracing::error!(?err, "Error fetching missing dependency");
+                            0
+                        }
+                    }
+                }
+                ValidationDependencyType::Warranted(chain_op_type) => {
+                    match network_cascade
+                        .retrieve(hash.clone().into(), Default::default())
+                        .await
+                    {
+                        Ok(Some((record, source))) => {
+                            let mut deps =
+                                current_validation_dependencies.lock().expect("poisoned");
+
+                            if deps.insert_pending_validation_warranted(
+                                record.signed_action,
+                                chain_op_type,
+                                source,
+                            ) {
+                                1
+                            } else {
+                                0
+                            }
+                        }
+                        Ok(None) => {
+                            // This is fine, we didn't find it on the network, so we'll have to try again.
+                            // TODO This will hit the network again fairly quickly if sys validation is triggered again soon.
+                            //      It would be more efficient to wait a bit before trying again.
+                            0
+                        }
+                        Err(err) => {
+                            tracing::error!(?err, "Error fetching missing dependency");
+                            0
+                        }
+                    }
+                }
+            }
+        }
+        .boxed()
+    }))
+    .buffer_unordered(10)
+    .collect::<Vec<usize>>()
+    .await
+    .into_iter()
+    .sum()
 }
 
 // - Move any cached warranted ops because they need to be validated now.
