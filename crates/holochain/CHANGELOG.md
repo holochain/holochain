@@ -7,12 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
-- Validate warrants in the sys validation workflow. #5249
-- Upgrade `syn` to `2.0` and `darling` to `0.21.3`. #4446
-- Mark `schedule` host fn as stable in code. #5240
-- Upgrade `strum` and `strum_macros` to `0.27.x`. #4447
+## 0.6.0-dev.21
+
+- Validate warrants in the sys validation workflow. \#5249
+- Upgrade `syn` to `2.0` and `darling` to `0.21.3`. \#4446
+- Mark `schedule` host fn as stable in code. \#5240
+- Upgrade `strum` and `strum_macros` to `0.27.x`. \#4447
 - Add tests for scheduling persisted functions across multiple cells.
-- Remove unused enum variant `Infallible` from `StateMutationError`. #5270
+- Remove unused enum variant `Infallible` from `StateMutationError`. \#5270
 
 ## 0.6.0-dev.20
 
