@@ -117,7 +117,6 @@ jobs:
       - name: build (windows-latest)
         if: matrix.os == 'windows-latest'
         env:
-          CARGO_PROFILE: "ci"
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
         run: |-
@@ -131,7 +130,6 @@ jobs:
         env:
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
-          CARGO_PROFILE: "ci"
 
       - name: install nextest
         uses: taiki-e/install-action@v2
@@ -140,16 +138,12 @@ jobs:
 
       - name: test (windows-latest)
         if: matrix.os == 'windows-latest'
-        env:
-          CARGO_PROFILE: "ci"
         run: |-
           $env:SODIUM_LIB_DIR="$(pwd)\vcpkg\packages\libsodium_x64-windows-release\lib"
           make test-workspace-${{ matrix.target }}
 
       - name: test
         if: matrix.os != 'windows-latest'
-        env:
-          CARGO_PROFILE: "ci"
         run: make test-workspace-${{ matrix.target }}
 
       - name: "Common Test Teardown Actions"
