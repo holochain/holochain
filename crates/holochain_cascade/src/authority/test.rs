@@ -184,7 +184,6 @@ async fn get_agent_activity() {
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author: td.agent.clone(),
             action: (fixt!(ActionHash), fixt!(Signature)),
-            validation_type: ValidationType::Sys,
             chain_op_type: ChainOpType::StoreRecord,
         }),
         fixt!(AgentPubKey),
@@ -194,7 +193,6 @@ async fn get_agent_activity() {
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author: td.agent.clone(),
             action: (fixt!(ActionHash), fixt!(Signature)),
-            validation_type: ValidationType::Sys,
             chain_op_type: ChainOpType::StoreRecord,
         }),
         fixt!(AgentPubKey),

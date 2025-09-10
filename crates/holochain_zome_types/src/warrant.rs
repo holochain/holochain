@@ -143,8 +143,6 @@ pub enum ChainIntegrityWarrant {
         action_author: AgentPubKey,
         /// The action hash and its signature.
         action: ActionHashAndSig,
-        /// The type of validation that produced the warrant.
-        validation_type: ValidationType,
         /// The chain op type that was the validation context for this action being judged invalid.
         chain_op_type: ChainOpType,
     },
@@ -185,17 +183,6 @@ impl WarrantProof {
             Self::ChainIntegrity(_) => WarrantType::ChainIntegrityWarrant,
         }
     }
-}
-
-/// The type of validation discovered the validation failure that led to a warrant.
-#[derive(
-    Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
-)]
-pub enum ValidationType {
-    /// Sys validation
-    Sys,
-    /// App validation
-    App,
 }
 
 /// A signed warrant with a timestamp
