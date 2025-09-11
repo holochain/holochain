@@ -50,8 +50,8 @@ holochain_conductor_config = { version = "^0.6.0-dev.21", path = "../holochain_c
 holochain_timestamp = { version = "^0.6.0-dev.3", path = "../timestamp" }
 human-panic = "2.0"
 itertools = { version = "0.14" }
-kitsune2_api = "0.2.15"
-kitsune2_core = "0.2.15"
+kitsune2_api = "0.3.0-dev.2"
+kitsune2_core = "0.3.0-dev.2"
 mockall = "0.13"
 mr_bundle = { version = "^0.6.0-dev.6", path = "../mr_bundle", features = [
   "fs",
@@ -104,7 +104,7 @@ matches = { version = "0.1.8", optional = true }
 holochain_wasm_test_utils = { version = "^0.6.0-dev.21", path = "../test_utils/wasm", optional = true }
 holochain_test_wasm_common = { version = "^0.6.0-dev.16", path = "../test_utils/wasm_common", optional = true }
 unwrap_to = { version = "0.1.0", optional = true }
-kitsune2_bootstrap_srv = { version = "0.2.15", optional = true }
+kitsune2_bootstrap_srv = { version = "0.3.0-dev.2", optional = true }
 async-once-cell = { version = "0.5", optional = true }
 get_if_addrs = { version = "0.5.3", optional = true }
 schemars = "0.9"
@@ -145,7 +145,7 @@ tokio = { version = "1.36.0", features = ["full", "test-util"] }
 tokio-tungstenite = "0.27"
 predicates = "3.1"
 assert2 = "0.3.15"
-kitsune2_test_utils = "0.2.15"
+kitsune2_test_utils = "0.3.0-dev.2"
 rand_dalek = { version = "0.8", package = "rand" }
 
 [build-dependencies]

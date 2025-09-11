@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Add query `are_all_blocked`, taking a vector of `BlockTargetId`s to `holochain_state`.
+- Upgrade to kitsune2 0.3.0.
 
 ## 0.6.0-dev.21
 
