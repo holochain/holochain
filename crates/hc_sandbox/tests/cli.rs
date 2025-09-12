@@ -773,7 +773,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
     .clone();
 
     let other_agent = AgentBuilder {
-        space: Some(space.clone()),
+        space_id: Some(space.clone()),
         ..Default::default()
     }
     .build(Arc::new(Ed25519LocalAgent::default()) as DynLocalAgent)

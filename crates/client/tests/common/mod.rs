@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 pub fn make_agent(space: &SpaceId) -> String {
     AgentBuilder {
-        space: Some(space.clone()),
+        space_id: Some(space.clone()),
         ..Default::default()
     }
     .build(Arc::new(Ed25519LocalAgent::default()) as DynLocalAgent)

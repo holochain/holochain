@@ -10,6 +10,10 @@ pub const DATABASES_DIRECTORY: &str = "databases";
 /// compiled wasm.
 pub const WASM_DIRECTORY: &str = "wasm";
 
+/// Subdirectory of the data directory where the conductor stores its
+/// generated reports.
+pub const REPORTS_DIRECTORY: &str = "reports";
+
 /// Name of the file that conductor config is written to.
 pub const CONDUCTOR_CONFIG: &str = "conductor-config.yaml";
 
@@ -120,6 +124,30 @@ impl TryFrom<DataRootPath> for WasmRootPath {
     type Error = std::io::Error;
     fn try_from(data_path: DataRootPath) -> Result<Self, Self::Error> {
         let path = data_path.0.join(WASM_DIRECTORY);
+        if let Ok(false) = path.try_exists() {
+            std::fs::create_dir_all(path.clone())?;
+        }
+        Ok(Self::from(path))
+    }
+}
+
+/// Newtype to make sure we never accidentaly use or not use the reports path.
+/// Intentionally has no default value.
+#[derive(
+    shrinkwraprs::Shrinkwrap,
+    derive_more::From,
+    Debug,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+)]
+pub struct ReportsRootPath(pub PathBuf);
+
+impl TryFrom<DataRootPath> for ReportsRootPath {
+    type Error = std::io::Error;
+    fn try_from(data_path: DataRootPath) -> Result<Self, Self::Error> {
+        let path = data_path.0.join(REPORTS_DIRECTORY);
         if let Ok(false) = path.try_exists() {
             std::fs::create_dir_all(path.clone())?;
         }

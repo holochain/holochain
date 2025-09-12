@@ -28,6 +28,9 @@ pub use local_agent::*;
 mod op_store;
 pub use op_store::*;
 
+mod hc_report;
+pub use hc_report::*;
+
 mod metrics;
 
 #[automock]

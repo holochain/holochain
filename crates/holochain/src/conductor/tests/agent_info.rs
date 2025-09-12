@@ -317,7 +317,7 @@ async fn app_agent_info() {
 
     // test when adding an new "external" agent_info
     let other_agent = AgentBuilder {
-        space: Some(dna1_hash.to_k2_space()),
+        space_id: Some(dna1_hash.to_k2_space()),
         ..Default::default()
     }
     .build(Arc::new(Ed25519LocalAgent::default()) as DynLocalAgent)

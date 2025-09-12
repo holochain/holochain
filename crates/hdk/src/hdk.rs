@@ -66,7 +66,6 @@ pub trait HdkT: HdiT {
     fn random_bytes(&self, number_of_bytes: u32) -> ExternResult<Bytes>;
     // Time
     fn sys_time(&self, sys_time_input: ()) -> ExternResult<Timestamp>;
-    #[cfg(feature = "unstable-functions")]
     fn schedule(&self, scheduled_fn: String) -> ExternResult<()>;
     // XSalsa20Poly1305
     fn x_salsa20_poly1305_shared_secret_create_random(
@@ -394,7 +393,6 @@ impl HdkT for ErrHdk {
     fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
         Self::err()
     }
-    #[cfg(feature = "unstable-functions")]
     fn schedule(&self, _: String) -> ExternResult<()> {
         Self::err()
     }
@@ -645,7 +643,6 @@ impl HdkT for HostHdk {
     fn sys_time(&self, _: ()) -> ExternResult<Timestamp> {
         host_call::<(), Timestamp>(__hc__sys_time_1, ())
     }
-    #[cfg(feature = "unstable-functions")]
     fn schedule(&self, scheduled_fn: String) -> ExternResult<()> {
         host_call::<String, ()>(__hc__schedule_1, scheduled_fn)
     }

@@ -61,7 +61,6 @@ use crate::core::ribosome::host_fn::must_get_valid_record::must_get_valid_record
 use crate::core::ribosome::host_fn::open_chain::open_chain;
 use crate::core::ribosome::host_fn::query::query;
 use crate::core::ribosome::host_fn::random_bytes::random_bytes;
-#[cfg(feature = "unstable-functions")]
 use crate::core::ribosome::host_fn::schedule::schedule;
 use crate::core::ribosome::host_fn::send_remote_signal::send_remote_signal;
 use crate::core::ribosome::host_fn::sign::sign;
@@ -607,6 +606,7 @@ impl RealRibosome {
             .with_host_function(&mut ns, "__hc__delete_clone_cell_1", delete_clone_cell)
             .with_host_function(&mut ns, "__hc__close_chain_1", close_chain)
             .with_host_function(&mut ns, "__hc__open_chain_1", open_chain)
+            .with_host_function(&mut ns, "__hc__schedule_1", schedule)
             .with_host_function(
                 &mut ns,
                 "__hc__get_validation_receipts_1",
@@ -622,7 +622,6 @@ impl RealRibosome {
         #[cfg(feature = "unstable-functions")]
         host_fn_builder
             .with_host_function(&mut ns, "__hc__block_agent_1", block_agent)
-            .with_host_function(&mut ns, "__hc__schedule_1", schedule)
             .with_host_function(&mut ns, "__hc__unblock_agent_1", unblock_agent)
             // TODO deprecated, remove me
             .with_host_function(&mut ns, "__hc__sleep_1", sleep);
@@ -1346,7 +1345,6 @@ pub mod wasm_test {
                 "__hc__open_chain_1",
                 "__hc__query_1",
                 "__hc__random_bytes_1",
-                #[cfg(feature = "unstable-functions")]
                 "__hc__schedule_1",
                 "__hc__send_remote_signal_1",
                 "__hc__sign_1",

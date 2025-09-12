@@ -611,50 +611,56 @@ impl kitsune2_api::KitsuneHandler for HolochainP2pActor {
         })
     }
 
-    fn preflight_gather_outgoing(&self, _peer_url: Url) -> K2Result<bytes::Bytes> {
-        Ok(self.preflight.lock().unwrap().clone())
+    fn preflight_gather_outgoing(&self, _peer_url: Url) -> BoxFut<'_, K2Result<bytes::Bytes>> {
+        Box::pin(async move { Ok(self.preflight.lock().unwrap().clone()) })
     }
 
-    fn preflight_validate_incoming(&self, _peer_url: Url, data: bytes::Bytes) -> K2Result<()> {
-        // decode the preflight that the remote sent us
-        let rem = crate::wire::WirePreflightMessage::decode(&data)
-            .map_err(|err| K2Error::other_src("Invalid remote preflight", err))?;
+    fn preflight_validate_incoming(
+        &self,
+        _peer_url: Url,
+        data: bytes::Bytes,
+    ) -> BoxFut<'_, K2Result<()>> {
+        Box::pin(async move {
+            // decode the preflight that the remote sent us
+            let rem = crate::wire::WirePreflightMessage::decode(&data)
+                .map_err(|err| K2Error::other_src("Invalid remote preflight", err))?;
 
-        // if the compats don't match, reject the connection
-        if rem.compat != self.compat {
-            return Err(K2Error::other(format!(
-                "Invalid remote preflight, wanted {:?}, got: {:?}",
-                self.compat, rem.compat
-            )));
-        }
+            // if the compats don't match, reject the connection
+            if rem.compat != self.compat {
+                return Err(K2Error::other(format!(
+                    "Invalid remote preflight, wanted {:?}, got: {:?}",
+                    self.compat, rem.compat
+                )));
+            }
 
-        let mut agents = Vec::with_capacity(rem.agents.len());
+            let mut agents = Vec::with_capacity(rem.agents.len());
 
-        // decode the agents inline, so we can reject the connection
-        // if they sent us bad agent data
-        for agent in rem.agents {
-            agents.push(AgentInfoSigned::decode(
-                &kitsune2_core::Ed25519Verifier,
-                agent.as_bytes(),
-            )?);
-        }
+            // decode the agents inline, so we can reject the connection
+            // if they sent us bad agent data
+            for agent in rem.agents {
+                agents.push(AgentInfoSigned::decode(
+                    &kitsune2_core::Ed25519Verifier,
+                    agent.as_bytes(),
+                )?);
+            }
 
-        // if they sent us agents, spawn a task to insert them into the store
-        if !agents.is_empty() {
-            let kitsune = self.kitsune.clone();
-            tokio::task::spawn(async move {
-                for agent in agents {
-                    let space = match kitsune.space_if_exists(agent.space.clone()).await {
-                        None => continue,
-                        Some(space) => space,
-                    };
-                    space.peer_store().insert(vec![agent]).await?;
-                }
-                K2Result::Ok(())
-            });
-        }
+            // if they sent us agents, spawn a task to insert them into the store
+            if !agents.is_empty() {
+                let kitsune = self.kitsune.clone();
+                tokio::task::spawn(async move {
+                    for agent in agents {
+                        let space = match kitsune.space_if_exists(agent.space.clone()).await {
+                            None => continue,
+                            Some(space) => space,
+                        };
+                        space.peer_store().insert(vec![agent]).await?;
+                    }
+                    K2Result::Ok(())
+                });
+            }
 
-        Ok(())
+            Ok(())
+        })
     }
 }
 
@@ -856,6 +862,9 @@ impl HolochainP2pActor {
 
         let evt_sender = Arc::new(std::sync::OnceLock::new());
 
+        if let ReportConfig::JsonLines(_) = &config.report {
+            builder.report = HcReportFactory::create(lair_client.clone());
+        }
         builder.peer_meta_store = Arc::new(HolochainPeerMetaStoreFactory {
             getter: config.get_db_peer_meta.clone(),
         });
@@ -881,6 +890,13 @@ impl HolochainP2pActor {
 
         // Load default configuration provided by the module factories.
         let builder = builder.with_default_config()?;
+
+        if let ReportConfig::JsonLines(hc_report) = config.report {
+            builder
+                .config
+                .set_module_config(&hc_report::HcReportModConfig { hc_report })?;
+        }
+
         // Then override any configuration values provided by the user.
         if let Some(network_config) = config.network_config {
             builder.config.set_module_config(&network_config)?;

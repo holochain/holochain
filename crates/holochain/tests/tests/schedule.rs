@@ -170,6 +170,168 @@ async fn schedule_persisted_fn_then_unschedule() {
     assert!(!is_scheduled(&host_fn_caller, &cell).await);
 }
 
+/// Test schedule the same persisted function in two different cells using the same agent pub key.
+/// Assuming a scheduler interval of 100ms
+#[tokio::test(flavor = "multi_thread")]
+async fn schedule_same_agent() {
+    holochain_trace::test_run();
+    // Set schedule to always trigger every 3 secs
+    let zome = create_schedule_zome(|_api, input| {
+        Ok(Some(input.unwrap_or(Schedule::Persisted(
+            "*/3 * * * * * *".to_string(),
+        ))))
+    });
+    let dna_0 = SweetDnaFile::unique_from_inline_zomes(zome.clone()).await;
+    let dna_1 = SweetDnaFile::unique_from_inline_zomes(zome).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
+    // Set up 1 app with two different dnas but same agent pub key
+    let app = conductor
+        .setup_app("app", &[dna_0.0.clone(), dna_1.0.clone()])
+        .await
+        .unwrap();
+    let cells = app.into_cells();
+    let cell_0 = cells[0].clone();
+    let pubkey_0 = cell_0.agent_pubkey().clone();
+    let host_fn_caller_0 =
+        HostFnCaller::create_for_zome(cell_0.cell_id(), &conductor.raw_handle(), &dna_0.0, 0).await;
+    let cell_1 = cells[1].clone();
+    let pubkey_1 = cell_1.agent_pubkey().clone();
+    let host_fn_caller_1 =
+        HostFnCaller::create_for_zome(cell_1.cell_id(), &conductor.raw_handle(), &dna_1.0, 0).await;
+
+    assert_eq!(pubkey_0, pubkey_1);
+    assert_ne!(cell_0.dna_hash(), cell_1.dna_hash());
+
+    // Start test: schedule first cell
+    conductor
+        .call::<(), ()>(&cell_0.zome(COORDINATOR), SCHEDULING_FN, ())
+        .await;
+    assert!(is_scheduled(&host_fn_caller_0, &cell_0).await);
+    assert!(!is_scheduled(&host_fn_caller_1, &cell_1).await);
+
+    // schedule second cell
+    conductor
+        .call::<(), ()>(&cell_1.zome(COORDINATOR), SCHEDULING_FN, ())
+        .await;
+    assert!(is_scheduled(&host_fn_caller_0, &cell_0).await);
+    assert!(is_scheduled(&host_fn_caller_1, &cell_1).await);
+
+    // Unschedule first one
+    host_fn_caller_0
+        .authored_db
+        .write_async(move |txn| {
+            unschedule_fn(
+                txn,
+                &pubkey_0,
+                &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+            );
+            Result::<(), DatabaseError>::Ok(())
+        })
+        .await
+        .unwrap();
+    assert!(!is_scheduled(&host_fn_caller_0, &cell_0).await);
+    assert!(is_scheduled(&host_fn_caller_1, &cell_1).await);
+
+    // Unschedule second one
+    host_fn_caller_1
+        .authored_db
+        .write_async(move |txn| {
+            unschedule_fn(
+                txn,
+                &pubkey_1,
+                &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+            );
+            Result::<(), DatabaseError>::Ok(())
+        })
+        .await
+        .unwrap();
+    assert!(!is_scheduled(&host_fn_caller_0, &cell_0).await);
+    assert!(!is_scheduled(&host_fn_caller_1, &cell_1).await);
+}
+
+/// Test schedule the same persisted function in two different cells using the same dna.
+/// Assuming a scheduler interval of 100ms
+#[tokio::test(flavor = "multi_thread")]
+async fn schedule_same_dna() {
+    holochain_trace::test_run();
+    // Set schedule to always trigger every 3 secs
+    let zome = create_schedule_zome(|_api, input| {
+        Ok(Some(input.unwrap_or(Schedule::Persisted(
+            "*/3 * * * * * *".to_string(),
+        ))))
+    });
+    let dna_0 = SweetDnaFile::unique_from_inline_zomes(zome.clone()).await;
+    let mut conductor = SweetConductor::from_standard_config().await;
+    // Set up 2 apps each using the same dna but with different agent pub key
+    let app0 = conductor
+        .setup_app("app0", &[dna_0.0.clone()])
+        .await
+        .unwrap();
+    let app1 = conductor
+        .setup_app("app1", &[dna_0.0.clone()])
+        .await
+        .unwrap();
+    let cell_0 = app0.into_cells()[0].clone();
+    let dna_hash_0 = cell_0.dna_hash().clone();
+    let pubkey_0 = cell_0.agent_pubkey().clone();
+    let host_fn_caller_0 =
+        HostFnCaller::create_for_zome(cell_0.cell_id(), &conductor.raw_handle(), &dna_0.0, 0).await;
+    let cell_1 = app1.into_cells()[0].clone();
+    let dna_hash_1 = cell_1.dna_hash().clone();
+    let pubkey_1 = cell_1.agent_pubkey().clone();
+    let host_fn_caller_1 =
+        HostFnCaller::create_for_zome(cell_1.cell_id(), &conductor.raw_handle(), &dna_0.0, 0).await;
+
+    assert_ne!(pubkey_0, pubkey_1);
+    assert_eq!(dna_hash_0, dna_hash_1);
+
+    // Start test: schedule first cell
+    conductor
+        .call::<(), ()>(&cell_0.zome(COORDINATOR), SCHEDULING_FN, ())
+        .await;
+    assert!(is_scheduled(&host_fn_caller_0, &cell_0).await);
+    assert!(!is_scheduled(&host_fn_caller_1, &cell_1).await);
+
+    // schedule second cell
+    conductor
+        .call::<(), ()>(&cell_1.zome(COORDINATOR), SCHEDULING_FN, ())
+        .await;
+    assert!(is_scheduled(&host_fn_caller_0, &cell_0).await);
+    assert!(is_scheduled(&host_fn_caller_1, &cell_1).await);
+
+    // Unschedule first one
+    host_fn_caller_0
+        .authored_db
+        .write_async(move |txn| {
+            unschedule_fn(
+                txn,
+                &pubkey_0,
+                &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+            );
+            Result::<(), DatabaseError>::Ok(())
+        })
+        .await
+        .unwrap();
+    assert!(!is_scheduled(&host_fn_caller_0, &cell_0).await);
+    assert!(is_scheduled(&host_fn_caller_1, &cell_1).await);
+
+    // Unschedule second one
+    host_fn_caller_1
+        .authored_db
+        .write_async(move |txn| {
+            unschedule_fn(
+                txn,
+                &pubkey_1,
+                &ScheduledFn::new(COORDINATOR.into(), SCHEDULED_FN.into()),
+            );
+            Result::<(), DatabaseError>::Ok(())
+        })
+        .await
+        .unwrap();
+    assert!(!is_scheduled(&host_fn_caller_0, &cell_0).await);
+    assert!(!is_scheduled(&host_fn_caller_1, &cell_1).await);
+}
+
 /// Test persisted schedule with invalid crontab output which should unschedule the function.
 /// Assuming a scheduler interval of 100ms
 #[tokio::test(flavor = "multi_thread")]

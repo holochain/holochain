@@ -313,6 +313,272 @@ async fn validate_op_with_wrong_sequence_number_rejected_and_not_forwarded_to_ap
     test_case.expect_app_validation_not_triggered().await;
 }
 
+/// Happy path test where the warranted op has already been fetched into the cache database.
+/// It will have to be copied to the DHT and validated. The warrant will then be seen as valid.
+#[cfg(feature = "unstable-warrants")]
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_valid_warrant_with_cached_dependency() {
+    holochain_trace::test_run();
+
+    let mut network = MockHolochainP2pDnaT::new();
+    network
+        .expect_target_arcs()
+        .return_once(move || Ok(vec![kitsune2_api::DhtArc::FULL]));
+
+    let mut test_case = TestCase::new().await;
+    test_case.with_network_behaviour(network);
+
+    let bad_agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+    let warrant_agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+
+    // Warranted op, to be found in the cache
+    let mut create = fixt!(Create);
+    create.author = bad_agent.clone();
+    create.action_seq = 0; // Not allowed to have a 0 seq number for a Create
+    let warranted_action = test_case.sign_action(Action::Create(create.clone())).await;
+    let warranted_op = ChainOp::StoreRecord(
+        fixt!(Signature),
+        Action::Create(create),
+        crate::prelude::RecordEntry::NA,
+    )
+    .into();
+    test_case
+        .save_op_to_db(test_case.cache_db_handle(), warranted_op)
+        .await
+        .unwrap();
+
+    let warrant_op = test_case
+        .create_and_store_warrant(
+            &warranted_action,
+            &warrant_agent,
+            holochain_zome_types::op::ChainOpType::StoreRecord,
+        )
+        .await
+        .unwrap();
+
+    let warrant_op_hash = DhtOpHashed::from_content_sync(warrant_op.clone()).hash;
+
+    test_case
+        .save_op_to_db(
+            test_case.dht_db_handle(),
+            DhtOp::WarrantOp(warrant_op.into()),
+        )
+        .await
+        .unwrap();
+
+    // Discover the warranted op in the cache and copy it to the DHT
+    test_case.run().await;
+
+    // Validate the dependency
+    let work_complete = test_case.check_trigger_and_rerun().await;
+    // The warrant dep might need to go to app validation, so WorkIncomplete is about the best we
+    // can really do here. It means it will take a bit of time to validate the warrant itself.
+    assert!(matches!(work_complete, WorkComplete::Incomplete(_)));
+
+    // Validate the warrant itself
+    test_case.run().await;
+
+    let status = test_case
+        .get_warrant_validation_outcome(warrant_op_hash)
+        .unwrap();
+
+    assert!(
+        matches!(
+            status,
+            Some(holochain_zome_types::prelude::ValidationStatus::Valid)
+        ),
+        "Warrant was not valid as expected, got: {:?}",
+        status
+    );
+}
+
+/// Happy path test where the warranted op has to be fetched from the network and cached. It will
+/// have to be copied to the DHT and validated. The warrant will then be seen as valid.
+#[cfg(feature = "unstable-warrants")]
+#[tokio::test(flavor = "multi_thread")]
+async fn validate_valid_warrant_with_fetched_dependency() {
+    holochain_trace::test_run();
+
+    let mut test_case = TestCase::new().await;
+
+    let mut network = MockHolochainP2pDnaT::new();
+    network
+        .expect_target_arcs()
+        .return_once(move || Ok(vec![kitsune2_api::DhtArc::FULL]));
+
+    let bad_agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+    let warrant_agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+
+    // Warranted op, to be fetched from the network
+    let mut create = fixt!(Create);
+    create.author = bad_agent.clone();
+    create.action_seq = 0; // Not allowed to have a 0 seq number for a Create
+    let warranted_action = test_case.sign_action(Action::Create(create.clone())).await;
+
+    network.expect_get().return_once({
+        let warranted_action = warranted_action.clone();
+        move |_hash| {
+            let mut ops: WireRecordOps = WireRecordOps::new();
+            ops.action = Some(Judged::valid(warranted_action.clone().into()));
+            let response = WireOps::Record(ops);
+            Ok(vec![response])
+        }
+    });
+
+    test_case.with_network_behaviour(network);
+
+    let warrant_op = test_case
+        .create_and_store_warrant(
+            &warranted_action,
+            &warrant_agent,
+            holochain_zome_types::op::ChainOpType::StoreRecord,
+        )
+        .await
+        .unwrap();
+
+    let warrant_op_hash = DhtOpHashed::from_content_sync(warrant_op.clone()).hash;
+
+    test_case
+        .save_op_to_db(
+            test_case.dht_db_handle(),
+            DhtOp::WarrantOp(warrant_op.into()),
+        )
+        .await
+        .unwrap();
+
+    // Discover the warrant op dependency and fetch it from the network
+    test_case.run().await;
+
+    // Copy the warrant dependency to the DHT
+    let work_complete = test_case.check_trigger_and_rerun().await;
+    assert!(matches!(work_complete, WorkComplete::Incomplete(_)));
+
+    // Validate the dependency
+    let work_complete = test_case.check_trigger_and_rerun().await;
+    assert!(matches!(work_complete, WorkComplete::Incomplete(_)));
+
+    // Validate the warrant itself
+    test_case.run().await;
+
+    let status = test_case
+        .get_warrant_validation_outcome(warrant_op_hash)
+        .unwrap();
+
+    assert!(
+        matches!(
+            status,
+            Some(holochain_zome_types::prelude::ValidationStatus::Valid)
+        ),
+        "Warrant was not valid as expected, got: {:?}",
+        status
+    );
+}
+
+/// Invalid warrant test. A valid DHT op is put in the DHT database, then a warrant is issued for
+/// it. Once the op is judged valid, the warrant is judged invalid and rejected.
+#[cfg(feature = "unstable-warrants")]
+#[tokio::test(flavor = "multi_thread")]
+async fn reject_invalid_warrant() {
+    holochain_trace::test_run();
+
+    let mut network = MockHolochainP2pDnaT::new();
+    network
+        .expect_target_arcs()
+        .return_once(move || Ok(vec![kitsune2_api::DhtArc::FULL]));
+
+    let mut test_case = TestCase::new().await;
+    test_case.with_network_behaviour(network);
+
+    let good_agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+    let bad_warrant_agent = test_case.keystore.new_sign_keypair_random().await.unwrap();
+
+    // Valid op, to be found in the DHT database
+    let mut create = fixt!(Create);
+    create.author = good_agent.clone();
+    create.action_seq = 30;
+    let valid_action = test_case.sign_action(Action::Create(create.clone())).await;
+    let valid_op = ChainOp::StoreRecord(
+        fixt!(Signature),
+        Action::Create(create),
+        crate::prelude::RecordEntry::NA,
+    );
+    let valid_op_hash = DhtOpHashed::from_content_sync(valid_op.clone()).hash;
+    test_case
+        .save_op_to_db(test_case.dht_db_handle(), valid_op.into())
+        .await
+        .unwrap();
+
+    // Invalid warrant against a valid action
+    let warrant_op = test_case
+        .create_and_store_warrant(
+            &valid_action,
+            &bad_warrant_agent,
+            holochain_zome_types::op::ChainOpType::StoreRecord,
+        )
+        .await
+        .unwrap();
+
+    let warrant_op_hash = DhtOpHashed::from_content_sync(warrant_op.clone()).hash;
+
+    test_case
+        .save_op_to_db(
+            test_case.dht_db_handle(),
+            DhtOp::WarrantOp(warrant_op.into()),
+        )
+        .await
+        .unwrap();
+
+    // Validate the valid dependency and discover the warrant op in the DHT
+    let work_complete = test_case.run().await;
+    assert!(matches!(work_complete, WorkComplete::Incomplete(_)));
+
+    // Check that the dependency got sys validated
+    let (stage, state) = holochain_state::validation_db::get_dht_op_validation_state(
+        &test_case.dht_db_handle().into(),
+        valid_action.as_hash().clone(),
+        holochain_zome_types::op::ChainOpType::StoreRecord,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(matches!(
+        stage,
+        Some(holochain_state::validation_db::ValidationStage::SysValidated)
+    ));
+    assert!(state.is_none());
+
+    // Mark the sys validated dependency as valid because this test can't run the app validation workflow.
+    test_case
+        .dht_db_handle()
+        .write_async(move |txn| -> StateMutationResult<()> {
+            holochain_state::mutations::set_validation_status(
+                txn,
+                &valid_op_hash,
+                holochain_zome_types::prelude::ValidationStatus::Valid,
+            )?;
+            holochain_state::mutations::set_when_integrated(txn, &valid_op_hash, Timestamp::now())?;
+            Ok(())
+        })
+        .await
+        .unwrap();
+
+    // Validate the warrant itself
+    test_case.run().await;
+
+    let status = test_case
+        .get_warrant_validation_outcome(warrant_op_hash)
+        .unwrap();
+
+    assert!(
+        matches!(
+            status,
+            Some(holochain_zome_types::prelude::ValidationStatus::Rejected)
+        ),
+        "Warrant was not rejected as expected, got: {:?}",
+        status
+    );
+}
+
 struct TestCase {
     dna_hash: DnaDefHashed,
     test_space: TestSpace,
@@ -392,6 +658,35 @@ impl TestCase {
         Ok(test_op_hash)
     }
 
+    #[cfg(feature = "unstable-warrants")]
+    async fn create_and_store_warrant(
+        &self,
+        warranted_action: &SignedActionHashed,
+        issuing_agent: &AgentPubKey,
+        chain_op_type: holochain_zome_types::op::ChainOpType,
+    ) -> lair_keystore_api::LairResult<holochain_types::prelude::WarrantOp> {
+        holochain_types::prelude::WarrantOp::sign(
+            &self.keystore,
+            holochain_zome_types::prelude::Warrant::new(
+                holochain_zome_types::prelude::WarrantProof::ChainIntegrity(
+                    holochain_zome_types::prelude::ChainIntegrityWarrant::InvalidChainOp {
+                        action_author: warranted_action.action().author().clone(),
+                        action: (
+                            warranted_action.as_hash().clone(),
+                            warranted_action.signature.clone(),
+                        ),
+                        validation_type: holochain_zome_types::prelude::ValidationType::Sys,
+                        chain_op_type,
+                    },
+                ),
+                issuing_agent.clone(),
+                Timestamp::now(),
+                warranted_action.action().author().clone(),
+            ),
+        )
+        .await
+    }
+
     async fn run(&mut self) -> WorkComplete {
         let workspace = SysValidationWorkspace::new(
             self.test_space
@@ -463,5 +758,37 @@ impl TestCase {
         .await
         .err()
         .is_some());
+    }
+
+    #[cfg(feature = "unstable-warrants")]
+    fn get_warrant_validation_outcome(
+        &self,
+        warrant_op_hash: DhtOpHash,
+    ) -> holochain_state::prelude::StateQueryResult<
+        Option<holochain_zome_types::prelude::ValidationStatus>,
+    > {
+        self.dht_db_handle().test_read(
+            move |txn| -> holochain_state::prelude::StateQueryResult<
+                Option<holochain_zome_types::prelude::ValidationStatus>,
+            > {
+                let status = txn.query_row(
+                    r#"
+            SELECT
+              DhtOp.validation_status
+            FROM
+              DhtOp
+              JOIN Warrant ON DhtOp.action_hash = Warrant.hash
+            WHERE
+              DhtOp.hash = :hash
+            "#,
+                    rusqlite::named_params! {
+                        ":hash": &warrant_op_hash,
+                    },
+                    |row| row.get::<_, Option<holochain_zome_types::prelude::ValidationStatus>>(0),
+                )?;
+
+                Ok(status)
+            },
+        )
     }
 }

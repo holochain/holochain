@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
+- fix: ensure panic hook prints payload information. [\#5282](https://github.com/holochain/holochain/issues/5282)
+
+## 0.6.0-dev.20
+
 ## 0.6.0-dev.19
 
 ## 0.6.0-dev.18
