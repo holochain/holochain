@@ -184,6 +184,13 @@ impl ConductorConfig {
         }
     }
 
+    /// Get the reports directory for this config.
+    pub fn reports_path(&self) -> std::path::PathBuf {
+        crate::conductor::paths::ReportsRootPath::try_from(self.data_root_path_or_die())
+            .expect("can get reports path")
+            .0
+    }
+
     /// Get the conductor tuning params for this config (default if not set)
     pub fn conductor_tuning_params(&self) -> ConductorTuningParams {
         self.tuning_params.clone().unwrap_or_default()
@@ -207,6 +214,24 @@ fn one() -> u32 {
 #[cfg(feature = "test-utils")]
 fn default_mem_bootstrap() -> bool {
     true
+}
+
+/// Configure Kitsune2 Reporting.
+#[derive(Clone, Default, Deserialize, Serialize, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case", rename_all_fields = "snake_case")]
+pub enum ReportConfig {
+    /// Default to no reporting.
+    #[default]
+    None,
+
+    /// Enable JsonL(ines) reporting.
+    JsonLines {
+        /// How many days worth of report files to retain.
+        days_retained: u32,
+
+        /// How often to report Fetched-Op aggregated data in seconds.
+        fetched_op_interval_s: u32,
+    },
 }
 
 /// All the network config information for the conductor.
@@ -236,6 +261,10 @@ pub struct NetworkConfig {
     /// To take on additional gossip burden, set to > 1.
     #[serde(default = "one")]
     pub target_arc_factor: u32,
+
+    /// Configure Kitsune2 Reporting.
+    #[serde(default)]
+    pub report: ReportConfig,
 
     /// Use this advanced field to directly configure kitsune2.
     ///
@@ -273,6 +302,7 @@ impl Default for NetworkConfig {
             signal_url: url2::Url2::parse("wss://dev-test-bootstrap2.holochain.org"),
             webrtc_config: None,
             target_arc_factor: 1,
+            report: Default::default(),
             advanced: None,
             #[cfg(feature = "test-utils")]
             disable_bootstrap: false,

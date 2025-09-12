@@ -3073,6 +3073,7 @@ name = "holochain_p2p"
 version = "0.6.0-dev.21"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "blake2b_simd",
  "bytes",
  "fixt",
@@ -3093,6 +3094,7 @@ dependencies = [
  "kitsune2_api",
  "kitsune2_core",
  "kitsune2_gossip",
+ "kitsune2_test_utils",
  "lair_keystore_api",
  "mockall",
  "opentelemetry_api",
@@ -3101,9 +3103,11 @@ dependencies = [
  "rmp-serde",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.16",
  "tokio",
  "tracing",
+ "tracing-appender",
 ]
 
 [[package]]
@@ -3279,6 +3283,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "backtrace",
+ "base64 0.22.1",
  "bytes",
  "contrafact",
  "derive_builder",
@@ -4167,9 +4172,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2"
-version = "0.2.17"
+version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24181d4f2a67e95d066a7bcb67f20550ff106ac50326aa4cc4f0c51a3a7014e3"
+checksum = "7914a4e8d048ffba9762ace3e58fef73b0a68b5e4b2c3c57100ec549402dfd1e"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4181,9 +4186,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_api"
-version = "0.2.17"
+version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c73cb5e344991b11c61352a66958394a167d6a6c1a82fcdd74a46bf3214933ab"
+checksum = "43ae0f0bbfed0be8a204c5c2e624286d7eba020aaa390b69929ecfdc114ac3fe"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -4198,9 +4203,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_client"
-version = "0.2.17"
+version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d44b6c847ef3617269041ffbf5c093e2a9ccca99e1e1f1ea8119f5f529f1d923"
+checksum = "654e72d9cef55e8cc31600022b0dad0ef86b73cf98d5fe60a4285fb503cd0028"
 dependencies = [
  "base64 0.22.1",
  "kitsune2_api",
@@ -4213,9 +4218,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_bootstrap_srv"
-version = "0.2.17"
+version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05d6be5acc869179826fc3bb5b4a7f3f64d4971cc8a3ef30eee6de232b9bf5db"
+checksum = "4f0413c780526cbf4c0c785fa285ab9f5fe11bd0cd5f5caad69c9bd25cbae426"
 dependencies = [
  "async-channel",
  "axum",
@@ -4239,9 +4244,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_core"
-version = "0.2.17"
+version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7374b9ab13edb058398628702e1bdd34ab5a16d204c34873f235966768160ac"
+checksum = "0b8b09e18aa0d40837e716f52dee69131f29159f02683f348377db0e78eae9d9"
 dependencies = [
  "bytes",
  "ed25519-dalek",
@@ -4260,9 +4265,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_dht"
-version = "0.2.17"
+version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83f154134c657a5354539022ad1b5a265c35a31f591f425fef2f91a20f2468f7"
+checksum = "0d34b306be3d032d065d416e2c7bb73f2c8cd1e3f7649036c3f5d337e1183af9"
 dependencies = [
  "bytes",
  "kitsune2_api",
@@ -4271,9 +4276,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_gossip"
-version = "0.2.17"
+version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fc811e7a175611bb83fd241fe7a41fca5eb466ab4a30968c8384d8d8bbe74a6"
+checksum = "0cb237747bed25f36d57e5b4ee6bb7d411c71737540757e87b86ccaef4013dd0"
 dependencies = [
  "bytes",
  "futures",
@@ -4292,9 +4297,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_test_utils"
-version = "0.2.17"
+version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76b74ded5af0b60d25cab335d633534fa927ff9bc59e1ddaec56eabb0ea98fc1"
+checksum = "90e980418d329dffc58e265fe4eeab5b59b0619faabd37bf186ce72e7e110b46"
 dependencies = [
  "axum",
  "bytes",
@@ -4308,9 +4313,9 @@ dependencies = [
 
 [[package]]
 name = "kitsune2_transport_tx5"
-version = "0.2.17"
+version = "0.3.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da2c223bbbd1a5aa87bc57071419077a4eba578ce0892b156698ba5b0c942b00"
+checksum = "8b94be75d7317a4c8019b2130bbde6e83d026a20ee093951533a321de316684a"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -7708,6 +7713,18 @@ dependencies = [
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-appender"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3566e8ce28cc0a3fe42519fc80e6b4c943cc4c8cef275620eb8dac2d3d4e06cf"
+dependencies = [
+ "crossbeam-channel",
+ "thiserror 1.0.69",
+ "time",
+ "tracing-subscriber",
 ]
 
 [[package]]

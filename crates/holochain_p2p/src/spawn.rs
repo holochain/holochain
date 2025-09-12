@@ -31,6 +31,17 @@ pub type GetDbOpStore = Arc<
         + Sync,
 >;
 
+/// Configure reporting.
+#[derive(Default)]
+pub enum ReportConfig {
+    /// No reporting.
+    #[default]
+    None,
+
+    /// Write reports to a rotating on-disk JsonL file.
+    JsonLines(hc_report::HcReportConfig),
+}
+
 /// HolochainP2p config struct.
 pub struct HolochainP2pConfig {
     /// Callback function to retrieve a peer meta database handle for a dna hash.
@@ -62,6 +73,11 @@ pub struct HolochainP2pConfig {
     ///
     /// Defaults to 60 seconds.
     pub request_timeout: Duration,
+
+    /// Configure reporting.
+    ///
+    /// If `None`, will not report.
+    pub report: ReportConfig,
 
     /// If true, will use kitsune core test bootstrap / transport / etc.
     #[cfg(feature = "test_utils")]
@@ -121,6 +137,7 @@ impl Default for HolochainP2pConfig {
             network_config: None,
             compat: Default::default(),
             request_timeout: Duration::from_secs(60),
+            report: ReportConfig::default(),
             #[cfg(feature = "test_utils")]
             k2_test_builder: false,
             #[cfg(feature = "test_utils")]

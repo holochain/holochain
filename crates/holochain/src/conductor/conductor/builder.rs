@@ -187,6 +187,20 @@ impl ConductorBuilder {
             ..Default::default()
         };
 
+        let report = match config.network.report {
+            holochain_conductor_api::conductor::ReportConfig::None => {
+                holochain_p2p::ReportConfig::None
+            }
+            holochain_conductor_api::conductor::ReportConfig::JsonLines {
+                days_retained,
+                fetched_op_interval_s,
+            } => holochain_p2p::ReportConfig::JsonLines(holochain_p2p::HcReportConfig {
+                path: config.reports_path(),
+                days_retained,
+                fetched_op_interval_s,
+            }),
+        };
+
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
@@ -209,6 +223,7 @@ impl ConductorBuilder {
             }),
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
+            report,
             compat,
             request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
             ..Default::default()
@@ -385,6 +400,20 @@ impl ConductorBuilder {
 
         let compat = NetworkCompatParams::default();
 
+        let report = match config.network.report {
+            holochain_conductor_api::conductor::ReportConfig::None => {
+                holochain_p2p::ReportConfig::None
+            }
+            holochain_conductor_api::conductor::ReportConfig::JsonLines {
+                days_retained,
+                fetched_op_interval_s,
+            } => holochain_p2p::ReportConfig::JsonLines(holochain_p2p::HcReportConfig {
+                path: config.reports_path(),
+                days_retained,
+                fetched_op_interval_s,
+            }),
+        };
+
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
@@ -407,6 +436,7 @@ impl ConductorBuilder {
             }),
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
+            report,
             compat,
             request_timeout: std::time::Duration::from_secs(config.request_timeout_s),
             k2_test_builder: !builder.test_builder_uses_production_k2_builder,
