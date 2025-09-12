@@ -27,17 +27,17 @@ pub(super) static DATABASE_HANDLES: Lazy<Databases> = Lazy::new(|| {
     std::panic::set_hook(Box::new(move |panic_info| {
         // print the panic message
         // NOTE: print with debug won't provide any payload information; see <https://doc.rust-lang.org/std/panic/struct.PanicHookInfo.html>
-        eprintln!("FATAL PANIC: ");
+        eprintln!("FATAL PANIC:");
         if let Some(s) = panic_info.payload().downcast_ref::<&'static str>() {
-            eprintln!("Payload: {s}",);
+            eprintln!("\tPayload: {s}",);
         } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
-            eprintln!("Payload: {s}",);
+            eprintln!("\tPayload: {s}",);
         } else {
-            eprintln!("Payload: Unknown");
+            eprintln!("\tPayload: Unknown");
         }
         if let Some(location) = panic_info.location() {
             eprintln!(
-                "Location: file '{}' at line {}:{}",
+                "\tLocation: file '{}' at line {}:{}",
                 location.file(),
                 location.line(),
                 location.column()
