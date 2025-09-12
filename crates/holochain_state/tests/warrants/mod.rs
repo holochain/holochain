@@ -10,8 +10,7 @@ use holochain_state::{
 use holochain_types::{
     fixt::SignatureFixturator,
     prelude::{
-        ChainIntegrityWarrant, SignedWarrant, Timestamp, ValidationType, Warrant, WarrantProof,
-        WarrantType,
+        ChainIntegrityWarrant, SignedWarrant, Timestamp, Warrant, WarrantProof, WarrantType,
     },
 };
 use holochain_zome_types::prelude::ChainOpType;
@@ -23,7 +22,6 @@ async fn write_invalid_op_warrant_to_database() {
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author: fixt!(AgentPubKey),
             action: (fixt!(ActionHash), fixt!(Signature)),
-            validation_type: ValidationType::Sys,
             chain_op_type: ChainOpType::StoreRecord,
         }),
         fixt!(AgentPubKey),

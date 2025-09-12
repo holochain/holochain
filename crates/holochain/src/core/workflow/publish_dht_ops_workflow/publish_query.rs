@@ -530,7 +530,6 @@ mod tests {
                 WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
                     action_author: fixt!(AgentPubKey),
                     action: (fixt!(ActionHash), fixt!(Signature)),
-                    validation_type: ValidationType::App,
                     chain_op_type: ChainOpType::RegisterAddLink,
                 }),
                 agent.clone(),

@@ -1230,7 +1230,6 @@ async fn app_validation_produces_warrants() {
         WarrantProof::ChainIntegrity(ChainIntegrityWarrant::InvalidChainOp {
             action_author,
             action: (hash, _),
-            validation_type: _,
             chain_op_type: _,
         }) => {
             assert_eq!(action_author, alice.agent_pubkey());
