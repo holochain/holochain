@@ -325,7 +325,7 @@ mod test {
     async fn query_are_all_blocked_false_when_outside_of_interval() {
         let db = crate::test_utils::test_conductor_db();
 
-        // Create two distinct targets: one will be blocked, the other not.
+        // Create a target to be blocked.
         let blocked_cell_id = fixt!(CellId);
         let target_blocked = BlockTarget::Cell(blocked_cell_id.clone(), CellBlockReason::BadCrypto);
 
