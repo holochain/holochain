@@ -197,7 +197,9 @@ impl From<kitsune_p2p_block::BlockTarget> for BlockTarget {
     }
 }
 
-#[derive(Debug, serde::Serialize, Clone)]
+#[derive(
+    Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, SerializedBytes, Clone,
+)]
 pub enum BlockTargetId {
     Cell(CellId),
     NodeDna(kitsune_p2p_block::NodeId, DnaHash),
