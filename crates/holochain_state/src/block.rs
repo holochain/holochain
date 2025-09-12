@@ -49,7 +49,7 @@ pub fn query_is_blocked(
     )?)
 }
 
-/// Query whether all BlockTargetId in the provided vector are blocked at the given timestamp.
+/// Query whether all [`BlockTargetId`]s in the provided vector are blocked at the given timestamp.
 pub fn query_are_all_blocked(
     txn: &Transaction<'_>,
     target_ids: Vec<BlockTargetId>,
