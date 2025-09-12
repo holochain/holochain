@@ -64,7 +64,7 @@ pub fn query_are_all_blocked(
     // query depends on counts.
     let unique_ids: Vec<Value> = {
         let set: HashSet<BlockTargetId> = target_ids.into_iter().collect();
-        let mut values = Vec::new();
+        let mut values = Vec::with_capacity(set.len());
         for block_target_id in set {
             let value = Value::Blob(SerializedBytes::try_from(block_target_id)?.bytes().to_vec());
             values.push(value);
