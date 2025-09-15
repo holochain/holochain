@@ -1,3 +1,6 @@
+// Temporarily allowing deprecation because of [`BlockTarget::NodeDna`] and [`BlockTarget::Node`].
+#![allow(deprecated)]
+
 use crate::prelude::*;
 use holo_hash::AgentPubKey;
 use holo_hash::DhtOpHash;
@@ -21,6 +24,7 @@ mod kitsune_p2p_block {
     }
 
     /// Reason for a Node Block.
+    #[deprecated(since = "0.6.0")]
     #[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
     pub enum NodeBlockReason {
         /// The node did some bad cryptography.
@@ -30,6 +34,7 @@ mod kitsune_p2p_block {
     }
 
     /// Reason for a Node/Space Block.
+    #[deprecated(since = "0.6.0")]
     #[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
     pub enum NodeSpaceBlockReason {
         /// Bad message encoding.
@@ -174,12 +179,14 @@ type IpV4 = std::net::Ipv4Addr;
 /// Each target type has an ID and associated reason.
 #[derive(Clone, Debug)]
 pub enum BlockTarget {
-    /// Some cell did bad at the happ level.
+    /// Block an agent for a DNA, encoded in a cell ID.
     Cell(CellId, CellBlockReason),
+    #[deprecated(since = "0.6.0", note = "not respected, use cell instead")]
     NodeDna(kitsune_p2p_block::NodeId, DnaHash, NodeSpaceBlockReason),
     /// Some node is playing silly buggers.
+    #[deprecated(since = "0.6.0", note = "not respected")]
     Node(kitsune_p2p_block::NodeId, NodeBlockReason),
-    /// An entire college campus has it out for us.
+    /// Currently not supported
     Ip(IpV4, IpBlockReason),
 }
 
@@ -197,10 +204,14 @@ impl From<kitsune_p2p_block::BlockTarget> for BlockTarget {
     }
 }
 
-#[derive(Debug, serde::Serialize, Clone)]
+#[derive(
+    Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, SerializedBytes, Clone,
+)]
 pub enum BlockTargetId {
     Cell(CellId),
+    #[deprecated(since = "0.6.0", note = "not respected, use cell instead")]
     NodeDna(kitsune_p2p_block::NodeId, DnaHash),
+    #[deprecated(since = "0.6.0", note = "not respected")]
     Node(kitsune_p2p_block::NodeId),
     Ip(IpV4),
 }
@@ -242,7 +253,9 @@ impl ToSql for BlockTargetId {
 #[derive(Debug, serde::Serialize, Clone)]
 pub enum BlockTargetReason {
     Cell(CellBlockReason),
+    #[deprecated(since = "0.6.0", note = "not respected, use cell instead")]
     NodeDna(NodeSpaceBlockReason),
+    #[deprecated(since = "0.6.0", note = "not respected")]
     Node(NodeBlockReason),
     Ip(IpBlockReason),
 }
