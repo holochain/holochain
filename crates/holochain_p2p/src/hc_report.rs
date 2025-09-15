@@ -8,8 +8,8 @@ use kitsune2_api::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, Weak};
 
-/// Accept reports within 5 minutes.
-const REPORT_WINDOW_MS: i64 = 1000 * 1000 * 60 * 5;
+/// Accept reports within 5 minutes (microseconds).
+const REPORT_WINDOW_US: i64 = 1000 * 1000 * 60 * 5;
 
 const MOD: &str = "hcReport";
 
@@ -203,8 +203,12 @@ impl TxModuleHandler for HcReport {
                 }
             };
             let now = Timestamp::now().as_micros();
-            let diff = now - timestamp;
-            if diff.abs() > REPORT_WINDOW_MS {
+            let diff = if now >= timestamp {
+                now - timestamp
+            } else {
+                timestamp - now
+            };
+            if diff > REPORT_WINDOW_US {
                 tracing::warn!("ignoring received fetch op report outside of reporting window");
                 return;
             }
