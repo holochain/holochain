@@ -105,21 +105,32 @@ impl ReportEntryFetchedOps {
 
         let to_verify = self.encode_for_verification();
 
+        tracing::trace!(to_verify = %String::from_utf8_lossy(&to_verify), report = ?self, "verify");
+
+        if self.agent_pubkeys.is_empty() || self.agent_pubkeys.len() != self.signatures.len() {
+            tracing::trace!("report signatures invalid");
+            return false;
+        }
+
         for (agent, sig) in self.agent_pubkeys.iter().zip(self.signatures.iter()) {
+            let agent = agent.trim_start_matches("u");
             let agent = match BASE64_URL_SAFE_NO_PAD.decode(agent) {
                 Ok(agent) => agent,
                 Err(_) => return false,
             };
+            if agent.len() != 39 {
+                return false;
+            }
             let sig = match BASE64_URL_SAFE_NO_PAD.decode(sig) {
                 Ok(sig) => sig,
                 Err(_) => return false,
             };
-            let sig: [u8; 64] = sig.try_into().expect("array convesion failed");
+            if sig.len() != 64 {
+                return false;
+            }
+            let sig: [u8; 64] = sig.try_into().expect("array conversion failed");
 
-            let mut pk = Vec::with_capacity(36);
-            pk.extend_from_slice(&agent);
-            pk.extend_from_slice(&[0, 0, 0, 0]);
-            let pk = crate::prelude::AgentPubKey::from_raw_36(pk);
+            let pk = crate::prelude::AgentPubKey::from_raw_39(agent);
             use holochain_keystore::AgentPubKeyExt;
             match pk
                 .verify_signature_raw(&sig.into(), to_verify.clone().into())

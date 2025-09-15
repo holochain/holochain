@@ -414,8 +414,8 @@ impl HcReport {
                 {
                     Ok(s) => s,
                     Err(err) => {
-                        tracing::warn!(?err, "failed to sign message for fetch op reporting");
-                        continue;
+                        tracing::error!(?err, "failed to sign message for fetch op reporting");
+                        return;
                     }
                 };
 
@@ -492,11 +492,17 @@ mod test {
 
     impl Test {
         pub async fn new() -> Self {
+            holochain_trace::test_run();
+
+            crate::check_k2_init();
+
+            let keystore = holochain_keystore::test_keystore();
+
             // unique temp dir per test kitsune instance
             let dir = tempfile::tempdir().unwrap();
 
             let report_factory = Arc::new(HcReportFactory {
-                lair_client: holochain_keystore::test_keystore(),
+                lair_client: keystore.clone(),
                 test_instance: Mutex::new(None),
             });
 
@@ -558,8 +564,11 @@ mod test {
             // get the space
             let space = kitsune.space(TEST_SPACE_ID).await.unwrap();
 
+            let agent = keystore.new_sign_keypair_random().await.unwrap();
+            let agent = crate::HolochainP2pLocalAgent::new(agent, DhtArc::FULL, 1, keystore);
+
             // register a local agent
-            let local_agent: DynLocalAgent = Arc::new(kitsune2_core::Ed25519LocalAgent::default());
+            let local_agent: DynLocalAgent = Arc::new(agent);
             space.local_agent_join(local_agent.clone()).await.unwrap();
 
             // get the url
