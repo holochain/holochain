@@ -255,10 +255,12 @@ impl Spaces {
     ) -> ConductorResult<bool> {
         let cell_ids = match &target_id {
             BlockTargetId::Cell(cell_id) => vec![cell_id.to_owned()],
+            #[allow(deprecated)]
             BlockTargetId::NodeDna(node_id, dna_hash) => {
                 self.node_agents_in_spaces(node_id, vec![dna_hash.clone()], holochain_p2p)
                     .await?
             }
+            #[allow(deprecated)]
             BlockTargetId::Node(node_id) => {
                 self.node_agents_in_spaces(
                     node_id,
