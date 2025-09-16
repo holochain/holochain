@@ -825,6 +825,9 @@ impl HolochainP2pActor {
         if let ReportConfig::JsonLines(_) = &config.report {
             builder.report = HcReportFactory::create(lair_client.clone());
         }
+        builder.blocks = Arc::new(HolochainBlocksFactory {
+            getter: config.get_conductor_db.clone(),
+        });
         builder.peer_meta_store = Arc::new(HolochainPeerMetaStoreFactory {
             getter: config.get_db_peer_meta.clone(),
         });
@@ -1159,6 +1162,34 @@ impl HolochainP2pActor {
             .await
             .map_err(HolochainP2pError::K2Error)
     }
+
+    // async fn invalid_op_block(&self,
+    //     dna_hash: DnaHash,
+    //     agent_pub_key: AgentPubKey) -> HolochainP2pResult<()> {
+    // let BlockTarget::Agent(agent_id) = target else {
+    //         return Box::pin(async move { Err(K2Error::other("only agents can be blocked")) });
+    //     };
+    //     let db = self.db.clone();
+    //     let cell_id = CellId::new(self.dna_hash.clone(), AgentPubKey::from_k2_agent(&agent_id));
+    //     Box::pin(async move {
+    //         block(
+    //             &db,
+    //             Block::new(
+    //                 holochain_types::prelude::BlockTarget::Cell(
+    //                     cell_id,
+    //                     CellBlockReason::App(App(vec![]),
+    //                 ),
+    //                 InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::MAX).map_err(
+    //                     |err| K2Error::other_src("failed to set interval for block", err),
+    //                 )?,
+    //             ),
+    //         )
+    //         .await
+    //         .map_err(|err| K2Error::other_src("failed to block agent", err))
+    //     }
+    //         self.kitsune.space(dna_hash.to_k2_space()).await?.blocks().
+    //         self.kitsune.space(dna_hash.to_k2_space()).await?.blocks().block(BlockTarget::Agent(agent_pub_key.to_k2_agent())).await
+    //     }
 }
 
 macro_rules! timing_trace_out {
