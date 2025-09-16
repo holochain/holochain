@@ -14,6 +14,7 @@ edition = "2021"
 anyhow = "1.0"
 async-trait = "0.1"
 backtrace = "0.3.27"
+base64 = "0.22"
 derive_builder = "0.20"
 derive_more = { version = "2.0", features = ["constructor", "into_iterator"] }
 futures = "0.3"
@@ -33,7 +34,7 @@ holochain_zome_types = { path = "../holochain_zome_types", version = "^0.6.0-dev
   "full",
 ] }
 holochain_timestamp = { version = "^0.6.0-dev.3", path = "../timestamp" }
-kitsune2_api = "0.3.0-dev.2"
+kitsune2_api = "0.3.0-dev.3"
 itertools = { version = "0.14" }
 mr_bundle = { path = "../mr_bundle", features = [
   "fs",

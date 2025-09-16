@@ -13,6 +13,7 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 async-trait = "0.1"
+base64 = "0.22"
 blake2b_simd = "1.0.3"
 fixt = { path = "../fixt", version = "^0.6.0-dev.4" }
 futures = "0.3"
@@ -36,12 +37,13 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 thiserror = "2.0"
 tokio = { version = "1.27", features = ["full"] }
 tracing = "0.1"
+tracing-appender = "0.2.3"
 opentelemetry_api = { version = "=0.20.0", features = ["metrics"] }
 
-kitsune2 = "0.3.0-dev.2"
-kitsune2_api = "0.3.0-dev.2"
-kitsune2_core = "0.3.0-dev.2"
-kitsune2_gossip = "0.3.0-dev.2"
+kitsune2 = "0.3.0-dev.3"
+kitsune2_api = "0.3.0-dev.3"
+kitsune2_core = "0.3.0-dev.3"
+kitsune2_gossip = "0.3.0-dev.3"
 bytes = "1.10"
 holochain_sqlite = { version = "^0.6.0-dev.20", path = "../holochain_sqlite" }
 lair_keystore_api = "=0.6.2"
@@ -55,6 +57,8 @@ holochain_sqlite = { version = "^0.6.0-dev.20", path = "../holochain_sqlite", fe
   "test_utils",
 ] }
 holochain_state = { path = "../holochain_state", features = ["test_utils"] }
+kitsune2_test_utils = "0.3.0-dev.3"
+tempfile = "3.21.0"
 
 [lints]
 workspace = true

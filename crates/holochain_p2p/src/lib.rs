@@ -28,7 +28,54 @@ pub use local_agent::*;
 mod op_store;
 pub use op_store::*;
 
+mod hc_report;
+pub use hc_report::*;
+
 mod metrics;
+
+fn check_k2_init() {
+    static K2_CONFIG: std::sync::Once = std::sync::Once::new();
+    K2_CONFIG.call_once(|| {
+        // Set up some kitsune2 specializations specific to holochain.
+
+        kitsune2_api::OpId::set_loc_callback(|bytes| {
+            u32::from_le_bytes(
+                bytes[HOLO_HASH_CORE_LEN..HOLO_HASH_UNTYPED_LEN]
+                    .try_into()
+                    .unwrap(),
+            )
+        });
+
+        // Kitsune2 by default just xors subsequent bytes of the hash
+        // itself and treats that result as a LE u32.
+        // Holochain, instead, first does a blake2b hash, and
+        // then xors those bytes.
+        kitsune2_api::Id::set_global_loc_callback(|bytes| {
+            let hash = blake2b_simd::Params::new().hash_length(16).hash(bytes);
+            let hash = hash.as_bytes();
+            let mut out = [hash[0], hash[1], hash[2], hash[3]];
+            for i in (4..16).step_by(4) {
+                out[0] ^= hash[i];
+                out[1] ^= hash[i + 1];
+                out[2] ^= hash[i + 2];
+                out[3] ^= hash[i + 3];
+            }
+            u32::from_le_bytes(out)
+        });
+
+        // Kitsune2 just displays the bytes as direct base64.
+        // Holochain prepends some prefix bytes and appends the loc bytes.
+        kitsune2_api::SpaceId::set_global_display_callback(|bytes, f| {
+            write!(f, "{}", DnaHash::from_raw_32(bytes.to_vec()))
+        });
+        kitsune2_api::AgentId::set_global_display_callback(|bytes, f| {
+            write!(f, "{}", AgentPubKey::from_raw_32(bytes.to_vec()))
+        });
+        kitsune2_api::OpId::set_global_display_callback(|bytes, f| {
+            write!(f, "{}", DhtOpHash::from_raw_32(bytes[0..32].to_vec()))
+        });
+    });
+}
 
 #[automock]
 #[allow(clippy::too_many_arguments)]
