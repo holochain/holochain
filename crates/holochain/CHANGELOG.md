@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+## 0.6.0-dev.22
+
 - Add query `are_all_blocked`, taking a vector of `BlockTargetId`s, to `holochain_state`.
 - Upgrade to kitsune2 0.3.0.
 - Deprecate `BlockTarget::NodeDna` and `BlockTarget::Node`. These block variants are not currently respected and will be removed with the 0.6.0 minor release.

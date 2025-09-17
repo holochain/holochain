@@ -1,6 +1,6 @@
 [package]
 name = "holochain_zome_types"
-version = "0.6.0-dev.15"
+version = "0.6.0-dev.16"
 description = "Holochain zome types"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
@@ -12,10 +12,10 @@ edition = "2021"
 # reminder - do not use workspace deps
 [dependencies]
 holochain_timestamp = { version = "^0.6.0-dev.3", path = "../timestamp" }
-holo_hash = { version = "^0.6.0-dev.12", path = "../holo_hash", features = [
+holo_hash = { version = "^0.6.0-dev.13", path = "../holo_hash", features = [
   "encoding",
 ] }
-holochain_integrity_types = { version = "^0.6.0-dev.13", path = "../holochain_integrity_types", features = [
+holochain_integrity_types = { version = "^0.6.0-dev.14", path = "../holochain_integrity_types", features = [
   "tracing",
 ] }
 holochain_nonce = { version = "^0.6.0-dev.3", path = "../holochain_nonce" }
