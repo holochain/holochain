@@ -55,6 +55,8 @@ impl Default for ChainQueryFilterRange {
 }
 
 /// Specifies arguments to a query of the source chain, including ordering and filtering.
+/// This is used by both [ `query` ] and [ `get_agent_activity`], although the
+/// latter function ignores it if [ `ActivityRequest::Status` ] is used.
 ///
 /// This struct is used to construct an actual SQL query on the database, and also has methods
 /// to allow filtering in-memory.
@@ -76,7 +78,7 @@ pub struct ChainQueryFilter {
     // NB: if this filter is set, you can't verify the results, so don't
     //     use this in validation
     pub action_type: Option<Vec<ActionType>>,
-    /// Include the entries in the records
+    /// Include the entries in the records. This value is ignored for [ `get_agent_activity` ].
     pub include_entries: bool,
     /// The query should be ordered in descending order (default is ascending),
     /// when run as a database query. There is no provisioning for in-memory ordering.
@@ -105,42 +107,74 @@ pub struct LinkQuery {
     pub author: Option<AgentPubKey>,
 }
 
-/// An agent's chain records, returned from an agent activity query.
+/// An agent's chain records, returned from a `hdk::chain::get_agent_activity` query.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AgentActivity {
-    /// Valid actions on this chain. `(sequence, action_hash)`.
+    /// Valid actions on this chain matching the filters passed to the query,
+    /// as a vector of `(sequence_index, action_hash)` tuples. **Note**:
+    /// Warrants received from other sources are not reflected in this field;
+    /// it simply contains actions whose [ `RegisterAgentActivity` ] operations
+    /// are valid.
     pub valid_activity: Vec<(u32, ActionHash)>,
-    /// Rejected actions on this chain. `(sequence, action_hash)`.
+    /// Rejected actions on this chain matching the filters passed to the
+    /// query, as a vector of `(sequence_index, action_hash)` tuples.  **Note**:
+    /// Warrants received from other sources are not reflected in this field;
+    /// it simply contains actions whose [ `RegisterAgentActivity` ] operations
+    /// are invalid.
     pub rejected_activity: Vec<(u32, ActionHash)>,
-    /// The status of this chain.
+    /// The current status of this chain including details about the current
+    /// chain head, last valid action, and any forks, irrespective of
+    /// what chain actions match the filters. **Note**: warrants received from
+    /// other sources are not reflected in this status; check the value of the
+    /// [ `warrants` ] field.
     pub status: ChainStatus,
-    /// The highest chain action that has
-    /// been observed by this authority.
+    /// The highest chain action that has been observed by this authority,
+    /// irrespective of the filters. This includes actions that have been
+    /// received by the authority but not yet validated or integrated.
     pub highest_observed: Option<HighestObserved>,
-    /// Warrants about this AgentActivity.
-    /// Placeholder for future.
-    pub warrants: Vec<SignedWarrant>,
+    /// Warrants collected for this agent. These warrants may be produced by
+    /// various authorities around the DHT when they discover invalid DHT
+    /// operations produced by the agent; they have been published to this
+    /// authority as part of their responsibility to keep track of the
+    /// agent's status.
+    pub warrants: Vec<Warrant>,
 }
 
-/// Get either the full activity or just the status of the chain
+/// When calling [ `get_agent_activity` ], specify whether to get either a
+/// summary of the chain's status, or a summary plus the hashes of the chain
+/// actions that match the given [ `ChainQueryFilter` ]. **Note**: See the notes
+/// on [ `AgentActivity` ] about the perspective-dependent nature of the agent's
+/// status and valid/rejected activity.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum ActivityRequest {
-    /// Just request the status of the chain
+    /// Just request a summary consisting of the [status of the chain](ChainStatus),
+    /// the highest observed chain action, and any [ `Warrant` ]s collected
+    /// for the agent.
     Status,
-    /// Request all the activity
+    /// Request the status summary plus the hashes of all valid and invalid
+    /// chain actions matching the filter.
     Full,
 }
 
-/// The highest action sequence observed by this authority.
-/// This also includes the actions at this sequence.
-/// If there is more then one then there is a fork.
+/// The highest action sequence index for an agent's chain that has been
+/// _observed_, but not necessarily validated and integrated, by this
+/// authority. This struct is seen in the [`AgentActivity`] response from
+/// the `hdk::chain::get_agent_activity` query.
 ///
-/// This type is to prevent actions being hidden by
-/// withholding the previous action.
+/// This struct also includes the hash(es) of the action(s) at this sequence
+/// index. If there is more than one, then there is a fork.
 ///
-/// The information is tracked at the edge of holochain before
-/// validation (but after drop checks).
-#[derive(Clone, Debug, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
+/// Because it may come from an unintegrated DHT operation, the given hash
+/// shouldn't be used as a dependency when constructing another action that
+/// depends on its validity. Instead, check that value of
+/// [ `AgentActivity::status` ] is [ `ChainStatus::Valid` ], an enum variant
+/// which will contain the highest sequence index and action hash for a locally
+/// validated action; and the [ `AgentActivity::warrants` ] field, which may
+/// contain warrants from other DHT authorities that have found the action to be
+/// invalid from the perspective of the DHT operations they've validated.
+
+// The information is tracked at the edge of holochain before
+// validation (but after drop checks).
 pub struct HighestObserved {
     /// The highest sequence number observed.
     pub action_seq: u32,
@@ -149,7 +183,9 @@ pub struct HighestObserved {
     pub hash: Vec<ActionHash>,
 }
 
-/// Status of the agent activity chain
+/// Status of the agent activity chain, as part of the return value from
+/// [ `get_agent_activity` ]. If the chain is both forked and invalid, the
+/// [ `ChainStatus::Forked` ] variant will be used.
 // TODO: In the future we will most likely be replaced
 // by warrants instead of Forked / Invalid so we can provide
 // evidence of why the chain has a status.
@@ -158,33 +194,60 @@ pub enum ChainStatus {
     /// This authority has no information on the chain.
     #[default]
     Empty,
-    /// The chain is valid as at this action sequence and action hash.
+    /// The chain is valid from the perspective of this authority, and the
+    /// highest integrated action is at the given sequence index and action
+    /// hash. This does not indicate that the chain is valid from the
+    /// perspective of _all_ authorities; check the contents of
+    /// [ `AgentActivity::warrants` ] for notices of invalidity found by
+    /// other authorities.
     Valid(ChainHead),
-    /// Chain is forked.
+    /// The chain is forked at the given sequence index by at least two
+    /// conflicting actions, indicated by the two given action hashes. See
+    /// the note about the action hashes on [ `ChainFork` ].
+    ///
+    /// The chain may also have invalid records in addition to being forked;
+    /// in this case, `Forked` is still used. To check for invalid records,
+    /// look at the value of [ `AgentActivity::warrants` ] and/or call
+    /// [ `get_agent_activity` ] with [ `ActivityRequest::Full` ] and look at
+    /// the values in [ `AgentActivity::rejected_activity` ].
     Forked(ChainFork),
-    /// Chain is invalid because of this action.
+    /// The chain is not forked, but is invalid from the given sequence index
+    /// and action hash forward, by virtue of this authority finding a
+    /// [ `RegisterAgentActivity` ] DHT operation for that action to be
+    /// invalid. There may be other types of operations for the chain's
+    /// actions which other authorities have found to be invalid; this
+    /// information is not reflected here but is instead found in the
+    //// [ `AgentActivity::warrants` ] field.
     Invalid(ChainHead),
 }
 
-/// The action at the head of the complete chain.
-/// This is as far as this authority can see a
-/// chain with no gaps.
+/// A pairing of a sequence index and its corresponding action hash in a chain.
+/// This is used for both [ `ChainStatus::Valid` ], where the given value is the
+/// most recent item in a valid and contiguous chain, and
+/// [ `ChainStatus::Invalid` ], where the value is the first invalid item in a
+/// previously valid and contiguous chain.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ChainHead {
     /// Sequence number of this chain head.
     pub action_seq: u32,
-    /// Hash of this chain head
+    /// Hash of this chain head.
     pub hash: ActionHash,
 }
 
-/// The chain has been forked by these two actions
+/// The chain has been forked by these two actions at this point. The ordering
+/// of the values in `first_action` and `second_action` is not guaranteed to be
+/// identical across peers; and, in cases of three or more actions (A, B, C)
+/// causing a fork at the same spot, the values are not guaranteed to be
+/// identical either (some authorities may report A and B, others may report C
+/// and A, and so on).
 #[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ChainFork {
     /// The point where the chain has forked.
     pub fork_seq: u32,
-    /// The first action at this sequence position.
+    /// The hash of one of the conflicting actions at this sequence position.
     pub first_action: ActionHash,
-    /// The second action at this sequence position.
+    /// The hash of another of the conflicting actions at this sequence
+    /// position.
     pub second_action: ActionHash,
 }
 
@@ -239,7 +302,9 @@ impl ChainQueryFilter {
         self
     }
 
-    /// Include the entries in the RecordsVec that is returned.
+    /// Include the entries in the RecordsVec that is returned. The source of
+    /// chain data being used must include entries -- when used with
+    /// [ `get_agent_activity` ], or when invoking [ `ChainQueryFilter::]
     pub fn include_entries(mut self, include_entries: bool) -> Self {
         self.include_entries = include_entries;
         self
