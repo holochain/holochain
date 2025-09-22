@@ -18,7 +18,7 @@ use holochain_websocket::WebsocketListener;
 use holochain_websocket::WebsocketReceiver;
 use holochain_websocket::WebsocketSender;
 use holochain_websocket::{ReceiveMessage, WebsocketError};
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
 use tokio::pin;
 use tokio::sync::broadcast;
@@ -37,6 +37,7 @@ pub const MAX_CONNECTIONS: usize = 400;
 /// Create a WebsocketListener to be used in interfaces
 pub async fn spawn_websocket_listener(
     port: u16,
+    danger_bind_addr: Option<String>,
     allowed_origins: AllowedOrigins,
 ) -> InterfaceResult<WebsocketListener> {
     trace!("Initializing Admin interface");
@@ -44,14 +45,62 @@ pub async fn spawn_websocket_listener(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::dual_bind(
-        Arc::new(config),
-        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
-        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
-    )
-    .await?;
+    let (ipv4_sock_addr, ipv6_sock_addr) = determine_bind_socket_addrs(port, danger_bind_addr)?;
+
+    tracing::info!(
+        "Binding admin interface to IPv4: {}, IPv6: {}",
+        ipv4_sock_addr,
+        ipv6_sock_addr
+    );
+
+    let listener =
+        WebsocketListener::dual_bind(Arc::new(config), ipv4_sock_addr, ipv6_sock_addr).await?;
     trace!("LISTENING AT: {:?}", listener.local_addrs()?);
     Ok(listener)
+}
+
+fn determine_bind_socket_addrs(
+    port: u16,
+    danger_bind_addr: Option<String>,
+) -> InterfaceResult<(SocketAddrV4, SocketAddrV6)> {
+    let maybe_danger_bind_addr = danger_bind_addr.map(|d| d.parse::<IpAddr>()).transpose()?;
+    Ok(match maybe_danger_bind_addr {
+        Some(IpAddr::V4(addr)) => {
+            let v6_addr = if addr.is_loopback() {
+                Ipv6Addr::LOCALHOST
+            } else if addr.is_unspecified() {
+                Ipv6Addr::UNSPECIFIED
+            } else {
+                addr.to_ipv6_mapped()
+            };
+
+            (
+                SocketAddrV4::new(addr, port),
+                SocketAddrV6::new(v6_addr, port, 0, 0),
+            )
+        }
+        Some(IpAddr::V6(addr)) => {
+            let v4_addr = if addr.is_loopback() {
+                Ipv4Addr::LOCALHOST
+            } else if addr.is_unspecified() {
+                Ipv4Addr::UNSPECIFIED
+            } else {
+                addr.to_ipv4().unwrap_or_else(|| {
+                    warn!("The provided danger_bind_addr is an IPv6 address that does not have an IPv4 compatible address. Falling back to using `localhost` for the IPv4 interface.");
+                    Ipv4Addr::LOCALHOST
+                })
+            };
+
+            (
+                SocketAddrV4::new(v4_addr, port),
+                SocketAddrV6::new(addr, port, 0, 0),
+            )
+        }
+        None => (
+            SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+            SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
+        ),
+    })
 }
 
 type TaskListInner = Arc<parking_lot::Mutex<Vec<JoinHandle<()>>>>;
@@ -118,6 +167,7 @@ pub fn spawn_admin_interface_tasks(
 pub async fn spawn_app_interface_task(
     tm: TaskManagerClient,
     port: u16,
+    danger_bind_addr: Option<String>,
     allowed_origins: AllowedOrigins,
     installed_app_id: Option<InstalledAppId>,
     api: AppInterfaceApi,
@@ -128,12 +178,10 @@ pub async fn spawn_app_interface_task(
     let mut config = WebsocketConfig::LISTENER_DEFAULT;
     config.allowed_origins = Some(allowed_origins);
 
-    let listener = WebsocketListener::dual_bind(
-        Arc::new(config),
-        SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
-        SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0),
-    )
-    .await?;
+    let (ipv4_sock_addr, ipv6_sock_addr) = determine_bind_socket_addrs(port, danger_bind_addr)?;
+
+    let listener =
+        WebsocketListener::dual_bind(Arc::new(config), ipv4_sock_addr, ipv6_sock_addr).await?;
     let addrs = listener.local_addrs()?;
     trace!("LISTENING AT: {:?}", addrs);
     let port = addrs[0].port();
@@ -234,7 +282,7 @@ fn authenticate_incoming_app_connection(
                             warn!("Connection to Holochain app port {port} tried to send a message before authenticating. Dropping connection.");
                             Err(())
                         }
-                    }
+                    };
                 }
 
                 warn!("Could not receive authentication message, the client either disconnected or sent a message that didn't decode to an authentication request. Dropping connection.");
@@ -568,6 +616,7 @@ mod test {
             .add_admin_interfaces(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
                     port: 0,
+                    danger_bind_addr: None,
                     allowed_origins: AllowedOrigins::Any,
                 },
             }])
@@ -616,6 +665,7 @@ mod test {
         // Attach App Interface
         let request = AdminRequest::AttachAppInterface {
             port: None,
+            danger_bind_addr: None,
             allowed_origins: AllowedOrigins::Any,
             installed_app_id: None,
         };
@@ -1098,6 +1148,7 @@ mod test {
         let admin_api = AdminInterfaceApi::new(conductor_handle.clone());
         let msg = AdminRequest::AttachAppInterface {
             port: None,
+            danger_bind_addr: None,
             allowed_origins: AllowedOrigins::Any,
             installed_app_id: None,
         };
@@ -1174,6 +1225,7 @@ mod test {
             .clone()
             .add_app_interface(
                 either::Either::Left(12345),
+                None,
                 AllowedOrigins::Any,
                 Some("test app".into()),
             )

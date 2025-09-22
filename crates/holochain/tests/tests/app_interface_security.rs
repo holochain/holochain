@@ -24,6 +24,7 @@ async fn app_allowed_origins() {
         .clone()
         .add_app_interface(
             either::Either::Left(0),
+            None,
             "http://localhost:3000".to_string().into(),
             None,
         )
@@ -60,6 +61,7 @@ async fn app_allowed_origins_independence() {
         .clone()
         .add_app_interface(
             Either::Left(0),
+            None,
             "http://localhost:3001".to_string().into(),
             None,
         )
@@ -70,6 +72,7 @@ async fn app_allowed_origins_independence() {
         .clone()
         .add_app_interface(
             Either::Left(0),
+            None,
             "http://localhost:3002".to_string().into(),
             None,
         )
@@ -123,7 +126,7 @@ async fn app_interface_requires_auth() {
     // App interface with no restrictions, but should still require auth
     let app_port = conductor
         .clone()
-        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .add_app_interface(Either::Left(0), None, AllowedOrigins::Any, None)
         .await
         .unwrap();
 
@@ -175,7 +178,7 @@ async fn app_interface_can_handle_bad_auth_payload() {
 
     let app_port = conductor
         .clone()
-        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .add_app_interface(Either::Left(0), None, AllowedOrigins::Any, None)
         .await
         .unwrap();
 
@@ -228,6 +231,7 @@ async fn app_interfaces_can_be_bound_to_apps() {
         .clone()
         .add_app_interface(
             Either::Left(0),
+            None,
             AllowedOrigins::Any,
             Some("test-app".to_string()),
         )
@@ -307,6 +311,7 @@ async fn signals_are_not_sent_until_after_auth() {
         .clone()
         .add_app_interface(
             Either::Left(0),
+            None,
             AllowedOrigins::Any,
             Some("test-app".to_string()),
         )
@@ -386,6 +391,7 @@ async fn signals_are_restricted_by_app() {
         .clone()
         .add_app_interface(
             Either::Left(0),
+            None,
             AllowedOrigins::Any,
             Some("test-app-1".to_string()),
         )
@@ -397,6 +403,7 @@ async fn signals_are_restricted_by_app() {
         .clone()
         .add_app_interface(
             Either::Left(0),
+            None,
             AllowedOrigins::Any,
             Some("test-app-2".to_string()),
         )
@@ -406,7 +413,7 @@ async fn signals_are_restricted_by_app() {
     // App interface without an app restriction
     let app_3_port = conductor
         .clone()
-        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .add_app_interface(Either::Left(0), None, AllowedOrigins::Any, None)
         .await
         .unwrap();
 
@@ -508,7 +515,7 @@ async fn revoke_app_auth_token() {
 
     let app_port = conductor
         .clone()
-        .add_app_interface(Either::Left(0), AllowedOrigins::Any, None)
+        .add_app_interface(Either::Left(0), None, AllowedOrigins::Any, None)
         .await
         .unwrap();
 

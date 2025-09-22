@@ -196,6 +196,7 @@ where
 pub async fn attach_app_interface(client: &WebsocketSender, port: Option<u16>) -> u16 {
     let request = AdminRequest::AttachAppInterface {
         port,
+        danger_bind_addr: None,
         allowed_origins: AllowedOrigins::Any,
         installed_app_id: None,
     };
@@ -378,6 +379,7 @@ pub fn create_config(port: u16, data_root_path: DataRootPath) -> ConductorConfig
         admin_interfaces: Some(vec![AdminInterfaceConfig {
             driver: InterfaceDriver::Websocket {
                 port,
+                danger_bind_addr: None,
                 allowed_origins: AllowedOrigins::Any,
             },
         }]),

@@ -405,6 +405,7 @@ async fn generate_sandbox_and_call_list_dna_with_origin() {
             *admin_interface = AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
                     port: admin_interface.driver.port(),
+                    danger_bind_addr: None,
                     allowed_origins: AllowedOrigins::Origins(
                         vec!["test-origin".to_string()].into_iter().collect(),
                     ),

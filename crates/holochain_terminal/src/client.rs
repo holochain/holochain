@@ -87,7 +87,7 @@ impl AdminClient {
             interface.port
         } else {
             self.client
-                .attach_app_interface(0, HC_TERM_ORIGIN.to_string().into(), None)
+                .attach_app_interface(0, None, HC_TERM_ORIGIN.to_string().into(), None)
                 .await?
         };
 

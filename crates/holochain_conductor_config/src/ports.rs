@@ -16,6 +16,7 @@ pub fn set_admin_port(config: &mut ConductorConfig, port: u16) {
             *admin_interface = AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
                     port,
+                    danger_bind_addr: admin_interface.driver.danger_bind_addr().cloned(),
                     allowed_origins: admin_interface.driver.allowed_origins().to_owned(),
                 },
             };
@@ -24,6 +25,7 @@ pub fn set_admin_port(config: &mut ConductorConfig, port: u16) {
             config.admin_interfaces = Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
                     port,
+                    danger_bind_addr: None,
                     allowed_origins: AllowedOrigins::Any,
                 },
             }])

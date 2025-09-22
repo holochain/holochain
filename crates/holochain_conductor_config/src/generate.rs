@@ -172,6 +172,7 @@ mod test {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
                     port: 0,
+                    danger_bind_addr: None,
                     allowed_origins: AllowedOrigins::Any,
                 },
             }]),
@@ -225,6 +226,7 @@ mod test {
             admin_interfaces: Some(vec![AdminInterfaceConfig {
                 driver: InterfaceDriver::Websocket {
                     port: 0,
+                    danger_bind_addr: None,
                     allowed_origins: AllowedOrigins::Any,
                 },
             }]),

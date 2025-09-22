@@ -54,7 +54,7 @@ async fn handle_signal() {
 
     // Connect app agent client
     let app_ws_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::Any, None)
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
         .await
         .unwrap();
     let token_issued = admin_ws
@@ -150,7 +150,7 @@ async fn close_on_drop_is_clone_safe() {
 
     // Connect app client
     let app_ws_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::Any, None)
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
         .await
         .unwrap();
     let token_issued = admin_ws
@@ -218,7 +218,7 @@ async fn deferred_memproof_installation() {
 
     // Connect app client
     let app_ws_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::Any, None)
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
         .await
         .unwrap();
     let token_issued = admin_ws
@@ -278,7 +278,7 @@ async fn connect_multiple_addresses() {
         .await
         .unwrap();
     let app_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::Any, None)
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
         .await
         .unwrap();
 
@@ -334,7 +334,12 @@ async fn connect_with_custom_origin() {
         .await
         .unwrap();
     let app_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::from("my_cli_app".to_string()), None)
+        .attach_app_interface(
+            0,
+            None,
+            AllowedOrigins::from("my_cli_app".to_string()),
+            None,
+        )
         .await
         .unwrap();
 
@@ -395,7 +400,12 @@ async fn dump_network_stats() {
         .await
         .unwrap();
     let app_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::from("my_cli_app".to_string()), None)
+        .attach_app_interface(
+            0,
+            None,
+            AllowedOrigins::from("my_cli_app".to_string()),
+            None,
+        )
         .await
         .unwrap();
 
@@ -448,7 +458,12 @@ async fn dump_network_metrics() {
         .await
         .unwrap();
     let app_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::from("my_cli_app".to_string()), None)
+        .attach_app_interface(
+            0,
+            None,
+            AllowedOrigins::from("my_cli_app".to_string()),
+            None,
+        )
         .await
         .unwrap();
 
@@ -517,7 +532,7 @@ async fn agent_info() {
 
     // Connect app client
     let app_ws_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::Any, None)
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
         .await
         .unwrap();
     let token_issued = admin_ws
@@ -582,7 +597,7 @@ async fn peer_meta_info() {
 
     // Connect app client
     let app_ws_port = admin_ws
-        .attach_app_interface(0, AllowedOrigins::Any, None)
+        .attach_app_interface(0, None, AllowedOrigins::Any, None)
         .await
         .unwrap();
     let token_issued = admin_ws

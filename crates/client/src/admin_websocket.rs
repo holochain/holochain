@@ -268,11 +268,13 @@ impl AdminWebsocket {
     pub async fn attach_app_interface(
         &self,
         port: u16,
+        danger_bind_addr: Option<String>,
         allowed_origins: AllowedOrigins,
         installed_app_id: Option<String>,
     ) -> ConductorApiResult<u16> {
         let msg = AdminRequest::AttachAppInterface {
             port: Some(port),
+            danger_bind_addr,
             allowed_origins,
             installed_app_id,
         };
