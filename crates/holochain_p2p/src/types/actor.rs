@@ -4,7 +4,7 @@
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
-use kitsune2_api::{BlockTarget, SpaceId, StoredOp};
+use kitsune2_api::{SpaceId, StoredOp};
 use std::collections::HashMap;
 
 /// Get options help control how the get is processed at various levels.
