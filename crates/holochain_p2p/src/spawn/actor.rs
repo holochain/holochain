@@ -7,7 +7,7 @@ use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_peer_meta_store;
 use holochain_state::prelude::named_params;
-use kitsune2_api::*;
+use kitsune2_api::{BlockTarget, *};
 use kitsune2_core::get_responsive_remote_agents_near_location;
 use rand::prelude::IndexedRandom;
 use std::collections::HashMap;
@@ -2159,7 +2159,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<kitsune2_api::DhtArc>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id).await?;
 
             Ok(space
                 .local_agent_store()
@@ -2168,6 +2168,22 @@ impl actor::HcP2p for HolochainP2pActor {
                 .into_iter()
                 .map(|a| a.get_tgt_storage_arc())
                 .collect())
+        })
+    }
+
+    fn block(
+        &self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        Box::pin(async move {
+            let space_id = dna_hash.to_k2_space();
+            let space = self.kitsune.space(space_id).await?;
+
+            Ok(space
+                .blocks()
+                .block(BlockTarget::Agent(agent_pub_key.to_k2_agent()))
+                .await?)
         })
     }
 }

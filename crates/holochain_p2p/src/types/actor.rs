@@ -4,7 +4,7 @@
 use crate::*;
 use holochain_types::activity::AgentActivityResponse;
 use holochain_types::prelude::ValidationReceiptBundle;
-use kitsune2_api::{SpaceId, StoredOp};
+use kitsune2_api::{BlockTarget, SpaceId, StoredOp};
 use std::collections::HashMap;
 
 /// Get options help control how the get is processed at various levels.
@@ -369,6 +369,13 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
         &self,
         dna_hash: DnaHash,
     ) -> BoxFut<'_, HolochainP2pResult<Vec<kitsune2_api::DhtArc>>>;
+
+    /// Block an agent for a DNA.
+    fn block(
+        &self,
+        dna_hash: DnaHash,
+        agent_pub_key: AgentPubKey,
+    ) -> BoxFut<'_, HolochainP2pResult<()>>;
 }
 
 /// Trait-object HcP2p
