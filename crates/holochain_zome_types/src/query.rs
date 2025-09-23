@@ -168,7 +168,7 @@ pub enum ActivityRequest {
 /// the `hdk::chain::get_agent_activity` query. It also includes the hash(es) of
 /// the action(s) at this action sequence.
 ///
-/// Because it may come from an unintegrated DHT operation, the given hash
+/// Because they may come from unintegrated DHT operations, the given hashes
 /// shouldn't be used as a dependency when constructing another action that
 /// depends on its validity. Instead, check that value of
 /// [`AgentActivity::status`] is [`ChainStatus::Valid`], an enum variant which
@@ -180,8 +180,9 @@ pub enum ActivityRequest {
 pub struct HighestObserved {
     /// The highest sequence number observed.
     pub action_seq: u32,
-    /// Hashes of any actions claiming to be at this
-    /// action sequence.
+    /// Hashes of any actions claiming to be at this action sequence. Note that
+    /// this is a vector and may contain more than one hash in the case of a
+    /// chain fork.
     pub hash: Vec<ActionHash>,
 }
 
@@ -220,7 +221,7 @@ pub enum ChainStatus {
     /// invalid. There may be other types of operations for the chain's
     /// actions which other authorities have found to be invalid; this
     /// information is not reflected here but is instead found in the
-    //// [`AgentActivity::warrants`] field.
+    /// [`AgentActivity::warrants`] field.
     Invalid(ChainHead),
 }
 
