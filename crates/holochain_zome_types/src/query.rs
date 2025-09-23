@@ -122,8 +122,8 @@ pub struct AgentActivity {
     pub warrants: Vec<SignedWarrant>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// Get either the full activity or just the status of the chain
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum ActivityRequest {
     /// Just request the status of the chain
     Status,
@@ -131,7 +131,6 @@ pub enum ActivityRequest {
     Full,
 }
 
-#[derive(Clone, Debug, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
 /// The highest action sequence observed by this authority.
 /// This also includes the actions at this sequence.
 /// If there is more then one then there is a fork.
@@ -141,6 +140,7 @@ pub enum ActivityRequest {
 ///
 /// The information is tracked at the edge of holochain before
 /// validation (but after drop checks).
+#[derive(Clone, Debug, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
 pub struct HighestObserved {
     /// The highest sequence number observed.
     pub action_seq: u32,
@@ -149,12 +149,11 @@ pub struct HighestObserved {
     pub hash: Vec<ActionHash>,
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Status of the agent activity chain
 // TODO: In the future we will most likely be replaced
 // by warrants instead of Forked / Invalid so we can provide
 // evidence of why the chain has a status.
-#[derive(Default)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize, Default)]
 pub enum ChainStatus {
     /// This authority has no information on the chain.
     #[default]
@@ -167,10 +166,10 @@ pub enum ChainStatus {
     Invalid(ChainHead),
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The action at the head of the complete chain.
 /// This is as far as this authority can see a
 /// chain with no gaps.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ChainHead {
     /// Sequence number of this chain head.
     pub action_seq: u32,
@@ -178,8 +177,8 @@ pub struct ChainHead {
     pub hash: ActionHash,
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 /// The chain has been forked by these two actions
+#[derive(Clone, Debug, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ChainFork {
     /// The point where the chain has forked.
     pub fork_seq: u32,

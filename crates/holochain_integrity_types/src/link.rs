@@ -45,8 +45,8 @@ impl LinkTag {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
 /// Filter on a set of [`LinkType`]s.
+#[derive(PartialEq, Eq, Hash, Clone, Debug, Serialize, Deserialize)]
 pub enum LinkTypeFilter {
     /// Return links that match any of these types.
     Types(Vec<(ZomeIndex, Vec<LinkType>)>),

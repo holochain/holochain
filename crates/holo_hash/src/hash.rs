@@ -238,9 +238,9 @@ impl<P: PrimitiveHashType> HoloHash<P> {
         Self::from_raw_36_and_type(hash, P::new())
     }
 
-    #[cfg(feature = "hashing")]
     /// Construct a HoloHash from a prehashed raw 32-byte slice.
     /// The location bytes will be calculated.
+    #[cfg(feature = "hashing")]
     pub fn from_raw_32(hash: Vec<u8>) -> Self {
         Self::from_raw_32_and_type(hash, P::new())
     }

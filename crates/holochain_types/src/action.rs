@@ -14,10 +14,10 @@ use derive_more::From;
 use holo_hash::EntryHash;
 use holochain_zome_types::op::EntryCreationAction;
 
+/// A action of one of the two types that create a new entry.
 #[derive(
     Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Hash, derive_more::From,
 )]
-/// A action of one of the two types that create a new entry.
 pub enum NewEntryAction {
     /// A action which simply creates a new entry
     Create(Create),
@@ -26,25 +26,25 @@ pub enum NewEntryAction {
     Update(Update),
 }
 
+/// Same as NewEntryAction but takes actions as reference
 #[allow(missing_docs)]
 #[derive(Debug, From)]
-/// Same as NewEntryAction but takes actions as reference
 pub enum NewEntryActionRef<'a> {
     Create(&'a Create),
     Update(&'a Update),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
 /// A action of one of the two types that create a new entry.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, SerializedBytes, Ord, PartialOrd)]
 pub enum WireNewEntryAction {
     Create(WireCreate),
     Update(WireUpdate),
 }
 
+/// A action of one of the two types that create a new entry.
 #[derive(
     Debug, Clone, derive_more::Constructor, Serialize, Deserialize, PartialEq, Eq, Ord, PartialOrd,
 )]
-/// A action of one of the two types that create a new entry.
 pub struct WireActionStatus<W> {
     /// Skinny action for sending over the wire.
     pub action: W,

@@ -6,9 +6,9 @@ pub fn make_subscriber() -> impl Drop {
     crate::prelude::tracing::subscriber::set_default(crate::trace::WasmSubscriber::default())
 }
 
+/// Needed as a noop for map_extern! when trace is off.
 #[cfg(not(feature = "trace"))]
 #[doc(hidden)]
-/// Needed as a noop for map_extern! when trace is off.
 pub fn make_subscriber() -> impl Drop {
     struct Noop;
     impl Drop for Noop {

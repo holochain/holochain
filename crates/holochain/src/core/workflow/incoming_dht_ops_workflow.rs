@@ -197,8 +197,8 @@ pub async fn incoming_dht_ops_workflow(
         .map_err(|_| super::error::WorkflowError::RecvError)?
 }
 
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(op)))]
 /// If this op fails the counterfeit check it should be dropped
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(op)))]
 async fn should_keep(op: &DhtOp) -> WorkflowResult<()> {
     match op {
         DhtOp::ChainOp(op) => {

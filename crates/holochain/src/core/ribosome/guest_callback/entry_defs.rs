@@ -92,8 +92,8 @@ mod test {
     use holochain_types::prelude::*;
     use std::collections::BTreeMap;
 
-    #[test]
     /// this is a non-standard fold test because the result is not so simple
+    #[test]
     fn entry_defs_callback_result_fold() {
         let mut zome_name_fixturator = ZomeNameFixturator::new(::fixt::Unpredictable);
         let mut entry_defs_fixturator = EntryDefsFixturator::new(::fixt::Unpredictable);

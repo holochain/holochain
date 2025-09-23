@@ -223,8 +223,8 @@ pub struct CapAccessInfo {
 
 /// a single zome/function pair
 pub type GrantedFunction = (ZomeName, FunctionName);
-/// A collection of zome/function pairs
 
+/// A collection of zome/function pairs
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum GrantedFunctions {

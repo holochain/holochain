@@ -111,8 +111,8 @@ mod tests {
     };
     use mr_bundle::Manifest;
 
-    #[test]
     /// Replicate this test for any new version of the manifest that gets created
+    #[test]
     fn web_app_manifest_v0_helper_functions() {
         let ui_location = "./path/to/my/ui.zip".to_string();
         let happ_location = "./path/to/my/happ-bundle.happ".to_string();

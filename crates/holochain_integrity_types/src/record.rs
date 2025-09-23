@@ -185,8 +185,8 @@ impl AsRef<SignedActionHashed> for SignedActionHashed {
     }
 }
 
-#[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 /// Any content that has been hashed and signed.
+#[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 pub struct SignedHashed<T>
 where
     T: HashableContent,

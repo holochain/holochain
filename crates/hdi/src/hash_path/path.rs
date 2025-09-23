@@ -159,7 +159,6 @@ impl TryFrom<&Component> for String {
 #[repr(transparent)]
 pub struct Path(pub Vec<Component>);
 
-#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, SerializedBytes)]
 /// A [`LinkType`] applied to a [`Path`].
 ///
 /// All links committed from this path will have this link type.
@@ -168,6 +167,7 @@ pub struct Path(pub Vec<Component>);
 /// ```ignore
 /// let typed_path = path.typed(LinkTypes::MyLink)?;
 /// ```
+#[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize, SerializedBytes)]
 pub struct TypedPath {
     /// The [`LinkType`] within the scope of the zome where it's defined.
     pub link_type: ScopedLinkType,

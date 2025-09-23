@@ -23,10 +23,10 @@ pub trait ToSqlStatement {
     fn to_sql_statement(&self) -> String;
 }
 
-#[derive(Clone, Debug, PartialEq)]
 /// A wrapper around [`rusqlite::types::ToSqlOutput`].
 /// This allows implementing `From<Foo> for SqlOutput`
 /// for types defined outside this crate.
+#[derive(Clone, Debug, PartialEq)]
 pub struct SqlOutput<'a>(pub ToSqlOutput<'a>);
 
 impl rusqlite::ToSql for SqlOutput<'_> {

@@ -205,9 +205,9 @@ pub enum HolochainMetricsConfig {
         otel_config: influxive::InfluxiveMeterProviderConfig,
     },
 
-    #[cfg(feature = "influxive")]
     /// Use influxive to connect to an already running InfluxDB instance.
     /// NOTE: this means we cannot initialize any dashboards.
+    #[cfg(feature = "influxive")]
     InfluxiveExternal {
         /// The writer config for connecting to the external influxdb instance.
         writer_config: influxive::InfluxiveWriterConfig,
@@ -226,8 +226,8 @@ pub enum HolochainMetricsConfig {
         token: String,
     },
 
-    #[cfg(feature = "influxive")]
     /// Use influxive as a child service to write metrics.
+    #[cfg(feature = "influxive")]
     InfluxiveChildSvc {
         /// The child service config for running the influxd server.
         child_svc_config: Box<influxive::InfluxiveChildSvcConfig>,

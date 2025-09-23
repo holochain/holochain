@@ -103,8 +103,8 @@ pub use open::{Config, Context, MsgWrap, OpenSpanExt};
 pub use tracing;
 use tracing_subscriber::fmt::MakeWriter;
 
-#[derive(Debug, Clone, Display)]
 /// Sets the kind of structured logging output you want
+#[derive(Debug, Clone, Display)]
 pub enum Output {
     /// More compact version of above
     Compact,

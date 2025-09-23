@@ -163,9 +163,9 @@ impl Expected {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
 /// Test that all ops are created and the correct zomes
 /// are called for each op.
+#[tokio::test(flavor = "multi_thread")]
 async fn app_validation_ops() {
     holochain_trace::test_run();
     let entry_def_a = EntryDef::default_from_id("a");

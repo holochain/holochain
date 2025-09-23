@@ -49,8 +49,8 @@ pub(crate) async fn get_entry_def(
     }
 }
 
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(ribosome)))]
 /// Get all the [EntryDef] for this dna
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(ribosome)))]
 pub(crate) async fn get_entry_defs(
     ribosome: RealRibosome,
 ) -> EntryDefStoreResult<Vec<(EntryDefBufferKey, EntryDef)>> {

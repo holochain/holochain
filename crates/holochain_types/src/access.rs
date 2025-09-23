@@ -25,8 +25,8 @@ pub struct HostFnAccess {
     pub keystore_deterministic: Permission,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
 /// Permission granted to a call
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Permission {
     /// Host functions with this access will be included
     Allow,
@@ -35,8 +35,8 @@ pub enum Permission {
 }
 
 impl HostFnAccess {
-    #[allow(clippy::too_many_arguments)]
     /// Constructor.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         agent_info: Permission,
         read_workspace: Permission,

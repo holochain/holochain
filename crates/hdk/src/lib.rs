@@ -532,7 +532,7 @@ pub mod info;
 /// - Many links can point from/to the same hash
 /// - Links reference entry hashes not actions
 ///
-/// Links are retrived from the DHT by performing [ `link::get_links` ] or [ `link::get_links_details` ] against the _base_ of a link.
+/// Links are retrived from the DHT by performing [`link::get_links`] or [`link::get_links_details`] against the _base_ of a link.
 ///
 /// Links also support short (about 500 bytes) binary data to encode contextual data on a domain specific basis.
 ///
@@ -557,7 +557,7 @@ pub mod p2p;
 /// The functions and structs in this module do _not_ need to be used directly.
 /// The [`hdk_extern!`] attribute on functions exposed externally all set the `WasmSubscriber` as the global default.
 ///
-/// This module defines a [ `trace::WasmSubscriber` ] that forwards all tracing macro calls to another subscriber on the host.
+/// This module defines a [`trace::WasmSubscriber`] that forwards all tracing macro calls to another subscriber on the host.
 /// The logging level can be changed for the host at runtime using the `WASM_LOG` environment variable that works exactly as `RUST_LOG` for other tracing.
 ///
 /// [`hdk_extern!`]: hdk_derive::hdk_extern

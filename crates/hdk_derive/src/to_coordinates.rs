@@ -10,10 +10,10 @@ use syn::ItemEnum;
 use syn::Variant;
 use syn::{parse, parse_macro_input};
 
-#[derive(Debug, FromMeta)]
-#[darling(derive_syn_parse)]
 /// Type for parsing the `#[hdk_to_coordinates(nested = true)]`
 /// attribute into. Defaults to false.
+#[derive(Debug, FromMeta)]
+#[darling(derive_syn_parse)]
 struct MacroArgs {
     #[darling(default)]
     nested: bool,

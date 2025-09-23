@@ -17,11 +17,11 @@ mod error;
 
 pub type BoxApi = Box<dyn HostFnApiT>;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A type marker for an integrity [`InlineZome`].
-pub struct IntegrityZomeMarker;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct IntegrityZomeMarker;
 /// A type marker for a coordinator [`InlineZome`].
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CoordinatorZomeMarker;
 
 pub type InlineIntegrityZome = InlineZome<IntegrityZomeMarker>;
@@ -141,8 +141,8 @@ impl InlineCoordinatorZome {
     }
 }
 
-#[derive(Debug, Clone)]
 /// An inline zome clonable type object.
+#[derive(Debug, Clone)]
 pub struct DynInlineZome(pub Arc<dyn InlineZomeT + Send + Sync>);
 
 pub trait InlineZomeT: std::fmt::Debug {

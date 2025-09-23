@@ -120,8 +120,8 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasmPair;
     use std::sync::Arc;
 
-    #[tokio::test(flavor = "multi_thread")]
     /// we can get an entry hash out of the fn directly
+    #[tokio::test(flavor = "multi_thread")]
     async fn create_entry_test() {
         let ribosome =
             RealRibosomeFixturator::new(crate::fixt::Zomes(vec![TestWasm::Create]))

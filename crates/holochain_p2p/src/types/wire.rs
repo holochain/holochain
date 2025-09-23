@@ -1,7 +1,7 @@
 use crate::*;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
 /// Struct for encoding DhtOp as bytes.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct WireDhtOpData {
     /// The dht op.
     pub op_data: holochain_types::dht_op::DhtOp,

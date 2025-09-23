@@ -14,12 +14,12 @@ pub type ShardWidth = u32;
 /// e.g. abcdef with a depth of 1 and width 1 shards to a.abcdef and depth 2 shards to a.b.abcdef.
 pub type ShardDepth = u32;
 
-#[derive(Debug)]
 /// A valid strategy for sharding requires both a width and a depth.
 /// At the moment sharding only works well for data that is reliably longer than width/depth.
 /// For example, sharding the username foo with width 4 doesn't make sense.
 /// There is no magic padding or extending of the provided data to make up undersized shards.
 // @todo stretch short shards out in a nice balanced way (append some bytes from the hash?)
+#[derive(Debug)]
 pub struct ShardStrategy(ShardWidth, ShardDepth);
 
 /// impl [`ShardStrategy`] as an immutable/read-only thingy.

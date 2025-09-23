@@ -20,16 +20,16 @@ pub struct FullStateDump {
     pub integration_dump: FullIntegrationStateDump,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
 /// A collection of many cells dumps for easy viewing.
 /// Use display to see a nice printout.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IntegrationStateDumps(pub Vec<IntegrationStateDump>);
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
 /// A high level view of the incoming ops and where
 /// they are currently.
 /// Ops start in the validation limbo then proceed
 /// to the integration limbo then finally are integrated.
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IntegrationStateDump {
     /// Ops in validation limbo awaiting sys
     /// or app validation.
@@ -41,10 +41,10 @@ pub struct IntegrationStateDump {
     pub integrated: usize,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 /// A full view of the DHT shard of the Cell.
 /// Ops start in the validation limbo then proceed
 /// to the integration limbo then finally are integrated.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct FullIntegrationStateDump {
     /// Ops in validation limbo awaiting sys
     /// or app validation.
@@ -63,8 +63,8 @@ pub struct FullIntegrationStateDump {
     pub dht_ops_cursor: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 /// State dump of all the peer info
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct P2pAgentsDump {
     /// The info of this agents cell.
     pub this_agent_info: Option<AgentInfoDump>,
@@ -76,10 +76,10 @@ pub struct P2pAgentsDump {
     pub peers: Vec<AgentInfoDump>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 /// Agent info dump with the agent,
 /// space, signed time, expires in and
 /// urls printed in a pretty way.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AgentInfoDump {
     pub kitsune_agent: Arc<kitsune2_api::AgentId>,
     pub kitsune_space: Arc<kitsune2_api::SpaceId>,

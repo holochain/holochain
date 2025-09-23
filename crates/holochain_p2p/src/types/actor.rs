@@ -7,11 +7,11 @@ use holochain_types::prelude::ValidationReceiptBundle;
 use kitsune2_api::{SpaceId, StoredOp};
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
 /// Get options help control how the get is processed at various levels.
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
 /// remote agent processing this `Get` request.
+#[derive(Clone, Debug)]
 pub struct GetOptions {
     /// `[Network]`
     /// How many remote nodes should we make requests of / aggregate.
@@ -115,11 +115,11 @@ impl Default for GetMetaOptions {
     }
 }
 
-#[derive(Debug, Clone, Default)]
 /// Get links from the DHT.
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
 /// remote agent processing this `GetLinks` request.
+#[derive(Debug, Clone, Default)]
 pub struct GetLinksOptions {
     /// `[Network]`
     /// Timeout to await responses for aggregation.
@@ -132,11 +132,11 @@ pub struct GetLinksOptions {
     pub get_options: holochain_zome_types::entry::GetOptions,
 }
 
-#[derive(Debug, Clone)]
 /// Get agent activity from the DHT.
 /// Fields tagged with `[Network]` are network-level controls.
 /// Fields tagged with `[Remote]` are controls that will be forwarded to the
 /// remote agent processing this `GetLinks` request.
+#[derive(Debug, Clone)]
 pub struct GetActivityOptions {
     /// `[Network]`
     /// Timeout to await responses for aggregation.

@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// State and data of an ongoing countersigning session.
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CountersigningSessionState {
     /// This is the entry state. Accepting a countersigning session through the HDK will immediately

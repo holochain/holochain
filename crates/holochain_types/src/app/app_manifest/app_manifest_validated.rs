@@ -57,12 +57,12 @@ pub enum AppRoleManifestValidated {
         modifiers: DnaModifiersOpt,
         installed_hash: Option<DnaHashB64>,
     },
+    /// Require that a Cell is already installed which has a DNA that's compatible with the
+    /// `compatible_hash` specified in the manifest.
     #[deprecated(
         since = "0.6.0-dev.17",
         note = "For late binding, update the coordinators of a DNA. For calling cells of other apps, use bridge calls."
     )]
-    /// Require that a Cell is already installed which has a DNA that's compatible with the
-    /// `compatible_hash` specified in the manifest.
     UseExisting {
         compatible_hash: DnaHashB64,
         protected: bool,

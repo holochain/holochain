@@ -87,11 +87,11 @@ macro_rules! assert_eq_retry_5m {
     };
 }
 
-#[derive(Debug, Clone)]
 /// Generic waiting for some test property to
 /// be true. This allows early exit from waiting when
 /// the condition becomes true but will wait up to a
 /// maximum if the condition is not true.
+#[derive(Debug, Clone)]
 pub struct WaitFor {
     num_attempts: u32,
     attempt: u32,

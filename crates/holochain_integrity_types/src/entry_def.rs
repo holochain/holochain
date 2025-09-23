@@ -56,8 +56,8 @@ pub struct EntryDef {
     pub cache_at_agent_activity: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 /// All definitions for all entry types in an integrity zome.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct EntryDefs(pub Vec<EntryDef>);
 
 #[derive(

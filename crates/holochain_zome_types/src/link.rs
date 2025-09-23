@@ -133,9 +133,9 @@ impl GetLinksInput {
 }
 
 type CreateLinkWithDeleteLinks = Vec<(SignedActionHashed, Vec<SignedActionHashed>)>;
-#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// CreateLinks with and DeleteLinks on them
 /// `[CreateLink, [DeleteLink]]`
+#[derive(Clone, PartialEq, Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct LinkDetails(CreateLinkWithDeleteLinks);
 
 impl From<CreateLinkWithDeleteLinks> for LinkDetails {

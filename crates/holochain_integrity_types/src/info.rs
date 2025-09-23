@@ -51,8 +51,8 @@ impl ZomeInfo {
 /// Placeholder for a real network seed type. See [`DnaModifiers`].
 pub type NetworkSeed = String;
 
-#[derive(Debug, Serialize, Deserialize)]
 /// Information about the current DNA.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DnaInfoV1 {
     /// The name of this DNA.
     pub name: String,
@@ -65,8 +65,8 @@ pub struct DnaInfoV1 {
     pub zome_names: Vec<ZomeName>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
 /// Information about the current DNA.
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DnaInfoV2 {
     /// The name of this DNA.
     pub name: String,
@@ -82,8 +82,8 @@ pub struct DnaInfoV2 {
 /// Convenience alias to the latest `DnaInfoN`.
 pub type DnaInfo = DnaInfoV2;
 
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
 /// The set of [`EntryDefIndex`] and [`LinkType`]s in scope for the calling zome.
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq, Default)]
 pub struct ScopedZomeTypesSet {
     /// All the entry [`EntryDefIndex`]s in scope for this zome.
     pub entries: ScopedZomeTypes<EntryDefIndex>,
@@ -91,8 +91,8 @@ pub struct ScopedZomeTypesSet {
     pub links: ScopedZomeTypes<LinkType>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 /// zome types that are in scope for the calling zome.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ScopedZomeTypes<T>(pub Vec<(ZomeIndex, Vec<T>)>);
 
 impl<T> Default for ScopedZomeTypes<T> {
@@ -101,8 +101,8 @@ impl<T> Default for ScopedZomeTypes<T> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A key to the [`ScopedZomeTypes`] container.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ZomeTypesKey<T>
 where
     T: U8Index + Copy,
@@ -118,12 +118,12 @@ pub type ZomeEntryTypesKey = ZomeTypesKey<EntryDefIndex>;
 /// A key to the [`ScopedZomeTypes<LinkType>`] container.
 pub type ZomeLinkTypesKey = ZomeTypesKey<LinkType>;
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// The index into the [`ZomeIndex`] vec.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ZomeDependencyIndex(pub u8);
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A type with the zome that it is defined in.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ScopedZomeType<T> {
     /// The zome that defines this type.
     pub zome_index: ZomeIndex,
@@ -218,23 +218,23 @@ impl From<LinkType> for ZomeLinkTypesKey {
     }
 }
 
-#[doc(hidden)]
 /// This is an internally used trait for checking
 /// enum lengths at compile time.
 /// This is used by proc macros in the
 /// `hdk_derive` crate and should not be used directly.
+#[doc(hidden)]
 pub trait EnumLen {
     /// The total length of an enum (possibly recusively)
     /// known at compile time.
     const ENUM_LEN: u8;
 }
 
-#[doc(hidden)]
 /// This is an internally used trait for checking
 /// enum variant lengths at compile time.
 /// This is used by proc macros in the
 /// `hdk_derive` crate and should not be used directly.
 /// `V` is the variant index.
+#[doc(hidden)]
 pub trait EnumVariantLen<const V: u8> {
     /// The starting point of this enum variant.
     const ENUM_VARIANT_START: u8;

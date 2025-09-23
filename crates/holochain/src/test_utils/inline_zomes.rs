@@ -67,6 +67,7 @@ pub fn batch_create_zome() -> InlineIntegrityZome {
         })
 }
 
+/// Newtype for simple_crud_zome entry type
 #[derive(
     Debug,
     Clone,
@@ -81,7 +82,6 @@ pub fn batch_create_zome() -> InlineIntegrityZome {
 )]
 #[serde(transparent)]
 #[repr(transparent)]
-/// Newtype for simple_crud_zome entry type
 pub struct AppString(pub String);
 
 impl AppString {

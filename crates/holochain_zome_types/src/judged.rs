@@ -12,8 +12,8 @@
 
 use crate::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// Data with an optional validation status.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Judged<T> {
     /// The data that the status applies to.
     pub data: T,

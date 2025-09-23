@@ -26,11 +26,11 @@ pub enum DnaManifest {
     V0(DnaManifestV0),
 }
 
+/// A dna manifest that has been successfully validated.
 #[derive(
     Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, shrinkwraprs::Shrinkwrap,
 )]
 #[serde(try_from = "DnaManifest")]
-/// A dna manifest that has been successfully validated.
 pub struct ValidatedDnaManifest(pub DnaManifest);
 
 impl mr_bundle::Manifest for ValidatedDnaManifest {

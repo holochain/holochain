@@ -296,8 +296,8 @@ pub async fn wait_for_integration<Db: ReadAccess<DbKindDht>>(
     ))
 }
 
-#[cfg_attr(feature = "instrument", tracing::instrument(skip(envs)))]
 /// Show authored data for each cell environment
+#[cfg_attr(feature = "instrument", tracing::instrument(skip(envs)))]
 pub async fn show_authored<Db: ReadAccess<DbKindAuthored>>(envs: &[&Db]) {
     for (i, &db) in envs.iter().enumerate() {
         db.read_async(move |txn| -> DatabaseResult<()> {

@@ -34,10 +34,10 @@ use std::{
     sync::Arc,
 };
 
-#[derive(Clone)]
 /// This is the set of all current
 /// [`DnaHash`] spaces for all cells
 /// installed on this conductor.
+#[derive(Clone)]
 pub struct Spaces {
     map: RwShare<HashMap<DnaHash, Space>>,
     pub(crate) db_dir: Arc<DatabasesRootPath>,
@@ -49,11 +49,11 @@ pub struct Spaces {
     db_key: DbKey,
 }
 
-#[derive(Clone)]
 /// This is the set of data required at the
 /// [`DnaHash`] space level.
 /// All cells in the same [`DnaHash`] space
 /// will share these.
+#[derive(Clone)]
 pub struct Space {
     /// The dna hash for this space.
     pub dna_hash: Arc<DnaHash>,

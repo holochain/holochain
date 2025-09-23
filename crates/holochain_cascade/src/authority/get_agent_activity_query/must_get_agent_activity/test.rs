@@ -86,9 +86,9 @@ use test_case::test_case;
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]),
     ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[3])).until_timestamp(Timestamp::from_micros(4000)).take(8)
     => agent_chain(&[(0, 4..9)]) ; "Until 3 Until timestamp 4 take 8")]
-#[tokio::test(flavor = "multi_thread")]
 /// Extracts the smallest range from the chain filter
 /// and then returns all actions within that range
+#[tokio::test(flavor = "multi_thread")]
 async fn returns_full_sequence_from_filter(
     chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,
@@ -146,8 +146,8 @@ async fn returns_full_sequence_from_filter(
 #[test_case(
     agent_chain(&[(0, 0..2)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[1])).take(0)
     => MustGetAgentActivityResponse::EmptyRange; "Take nothing produces an empty range")]
-#[tokio::test(flavor = "multi_thread")]
 /// Check the query returns the appropriate responses.
+#[tokio::test(flavor = "multi_thread")]
 async fn test_responses(
     chain: Vec<(AgentPubKey, Vec<TestChainItem>)>,
     agent: AgentPubKey,

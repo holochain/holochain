@@ -17,23 +17,23 @@ use tokio_tungstenite::tungstenite::handshake::server::{Callback, ErrorResponse,
 use tokio_tungstenite::tungstenite::http::{HeaderMap, HeaderValue, StatusCode};
 use tokio_tungstenite::tungstenite::protocol::Message;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
-#[serde(rename_all = "snake_case", tag = "type")]
 /// The messages actually sent over the wire by this library.
 /// If you want to implement your own server or client you
 /// will need this type or be able to serialize / deserialize it.
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes)]
+#[serde(rename_all = "snake_case", tag = "type")]
 pub enum WireMessage {
     /// A message without a response.
     Signal {
-        #[serde(with = "serde_bytes")]
         /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
+        #[serde(with = "serde_bytes")]
         data: Vec<u8>,
     },
 
     /// An authentication message, sent by the client if the server requires it.
     Authenticate {
-        #[serde(with = "serde_bytes")]
         /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
+        #[serde(with = "serde_bytes")]
         data: Vec<u8>,
     },
 
@@ -41,8 +41,8 @@ pub enum WireMessage {
     Request {
         /// The id of this request.
         id: u64,
-        #[serde(with = "serde_bytes")]
         /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
+        #[serde(with = "serde_bytes")]
         data: Vec<u8>,
     },
 
@@ -50,8 +50,8 @@ pub enum WireMessage {
     Response {
         /// The id of the request that this response is for.
         id: u64,
-        #[serde(with = "serde_bytes")]
         /// Actual bytes of the message serialized as [message pack](https://msgpack.org/).
+        #[serde(with = "serde_bytes")]
         data: Option<Vec<u8>>,
     },
 }

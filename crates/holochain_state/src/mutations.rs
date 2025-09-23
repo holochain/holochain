@@ -735,8 +735,8 @@ pub fn set_receipts_complete_redundantly_in_dht_db(
     Ok(())
 }
 
-#[cfg(feature = "unstable-warrants")]
 /// Insert a [`Warrant`] into the Warrant table.
+#[cfg(feature = "unstable-warrants")]
 pub fn insert_warrant(txn: &mut Transaction, warrant: SignedWarrant) -> StateMutationResult<usize> {
     let warrant_type = warrant.get_type();
     let hash = warrant.to_hash();

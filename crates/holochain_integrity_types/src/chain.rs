@@ -11,7 +11,6 @@ use std::collections::HashSet;
 #[cfg(test)]
 mod test;
 
-#[derive(Serialize, Deserialize, SerializedBytes, Debug, PartialEq, Eq, Hash, Clone)]
 /// Filter source chain items.
 /// Starting from some chain position given as an [`ActionHash`]
 /// the chain is walked backwards to genesis.
@@ -23,6 +22,7 @@ mod test;
 /// Timestamp newer than the provided one. In the case of multiple actions having the same
 /// Timestamp as the limit condition, the filter will stop at the action with the lowest sequence.
 /// Multiple limit conditions can be set. Whichever is the smaller set will be kept.
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// The starting position of the filter.
     pub chain_top: H,
@@ -34,8 +34,8 @@ pub struct ChainFilter<H: Eq + Ord + std::hash::Hash = ActionHash> {
     pub include_cached_entries: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Eq, Clone)]
 /// Specify when to stop walking down the chain.
+#[derive(Serialize, Deserialize, Debug, Eq, Clone)]
 pub enum LimitConditions<H: Eq + Ord + std::hash::Hash = ActionHash> {
     /// Allow all up to genesis.
     ToGenesis,
@@ -98,8 +98,8 @@ impl<H: Eq + Ord + std::hash::Hash> core::cmp::PartialEq for LimitConditions<H> 
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 /// Input to the `must_get_agent_activity` call.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MustGetAgentActivityInput {
     /// The author of the chain that you are requesting
     /// activity from.

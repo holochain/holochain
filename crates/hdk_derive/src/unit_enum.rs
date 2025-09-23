@@ -8,17 +8,17 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::{parse_macro_input, Token};
 
-#[derive(FromVariant)]
 /// Type for gathering each variants ident and fields.
+#[derive(FromVariant)]
 struct VarOpts {
     ident: syn::Ident,
     fields: darling::ast::Fields<darling::util::Ignored>,
 }
 
-#[derive(FromDeriveInput)]
-#[darling(attributes(unit_attrs), forward_attrs(unit_enum))]
 /// Type for parsing the input and extracting the
 /// unit_name attribute like: `#[unit_enum(UnitFoo)]`.
+#[derive(FromDeriveInput)]
+#[darling(attributes(unit_attrs), forward_attrs(unit_enum))]
 struct Opts {
     ident: syn::Ident,
     attrs: Vec<syn::Attribute>,

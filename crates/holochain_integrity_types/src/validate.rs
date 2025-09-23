@@ -12,9 +12,9 @@ pub enum ValidateCallbackResult {
     UnresolvedDependencies(UnresolvedDependencies),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 /// Unresolved dependencies that are either a set of hashes
 /// or an agent activity query.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UnresolvedDependencies {
     Hashes(Vec<AnyDhtHash>),
     AgentActivity(AgentPubKey, ChainFilter),

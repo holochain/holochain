@@ -127,11 +127,11 @@ pub struct StoreRecord {
     pub record: Record,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 /// Stores a new [`Entry`] in the DHT.
 /// This is the act of creating a either a [`Action::Create`] or
 /// a [`Action::Update`] and publishing it to the DHT.
 /// These actions create a new instance of an [`Entry`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct StoreEntry {
     /// The signed and hashed [`EntryCreationAction`] that creates
     /// a new instance of the [`Entry`].
@@ -334,9 +334,9 @@ impl Op {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Eq)]
 /// Either a [`Action::Create`] or a [`Action::Update`].
 /// These actions both create a new instance of an [`Entry`].
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Eq)]
 pub enum EntryCreationAction {
     /// A [`Action::Create`] that creates a new instance of an [`Entry`].
     Create(Create),

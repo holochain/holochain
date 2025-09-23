@@ -6,8 +6,8 @@ pub use crate::entry::must_get_action;
 pub use crate::entry::must_get_entry;
 pub use crate::entry::must_get_valid_record;
 pub use crate::entry_types;
-#[cfg(not(feature = "trace"))]
 /// Needed as a noop for map_extern! when trace is off.
+#[cfg(not(feature = "trace"))]
 pub use crate::error;
 pub use crate::flat_op::*;
 pub use crate::hash::*;
@@ -61,10 +61,10 @@ pub use tracing;
 #[cfg(feature = "trace")]
 pub use tracing::{debug, error, info, instrument, trace, warn};
 
+/// Needed as a noop for map_extern! when trace is off.
 #[doc(hidden)]
 #[cfg(not(feature = "trace"))]
 #[macro_export]
-/// Needed as a noop for map_extern! when trace is off.
 macro_rules! error {
     ($($field:tt)*) => {};
 }

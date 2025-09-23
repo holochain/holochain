@@ -5,10 +5,10 @@ use syn::Item;
 use syn::ItemEnum;
 use syn::{parse, parse_macro_input};
 
-#[derive(Debug, FromMeta)]
-#[darling(derive_syn_parse)]
 /// Optional attribute for skipping `#[no_mangle]`.
 /// Useful for testing.
+#[derive(Debug, FromMeta)]
+#[darling(derive_syn_parse)]
 struct MacroArgs {
     #[darling(default)]
     skip_no_mangle: bool,

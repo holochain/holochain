@@ -40,7 +40,6 @@ pub enum DhtOp {
     Clone, Debug, Serialize, Deserialize, SerializedBytes, Eq, PartialEq, Hash, derive_more::Display,
 )]
 pub enum ChainOp {
-    #[display("StoreRecord")]
     /// Used to notify the authority for an action that it has been created.
     ///
     /// Conceptually, authorities receiving this `ChainOp` do three things:
@@ -50,9 +49,9 @@ pub enum ChainOp {
     /// - Store the entry into their CAS.
     ///   - Note: they do not become responsible for keeping the set of
     ///     references from that entry up-to-date.
+    #[display("StoreRecord")]
     StoreRecord(Signature, Action, RecordEntry),
 
-    #[display("StoreEntry")]
     /// Used to notify the authority for an entry that it has been created
     /// anew. (The same entry can be created more than once.)
     ///
@@ -67,9 +66,9 @@ pub enum ChainOp {
     ///
     // TODO: document how those "created-by" references are stored in
     // reality.
+    #[display("StoreEntry")]
     StoreEntry(Signature, NewEntryAction, Entry),
 
-    #[display("RegisterAgentActivity")]
     /// Used to notify the authority for an agent's public key that that agent
     /// has committed a new action.
     ///
@@ -83,36 +82,37 @@ pub enum ChainOp {
     ///
     // TODO: document how those "agent-activity" references are stored in
     // reality.
+    #[display("RegisterAgentActivity")]
     RegisterAgentActivity(Signature, Action),
 
-    #[display("RegisterUpdatedContent")]
     /// Op for updating an entry.
     /// This is sent to the entry authority.
     // TODO: This entry is here for validation by the entry update action holder
     // link's don't do this. The entry is validated by store entry. Maybe we either
     // need to remove the Entry here or add it to link.
+    #[display("RegisterUpdatedContent")]
     RegisterUpdatedContent(Signature, action::Update, RecordEntry),
 
-    #[display("RegisterUpdatedRecord")]
     /// Op for updating a record.
     /// This is sent to the record authority.
+    #[display("RegisterUpdatedRecord")]
     RegisterUpdatedRecord(Signature, action::Update, RecordEntry),
 
-    #[display("RegisterDeletedBy")]
     /// Op for registering an action deletion with the Action authority
+    #[display("RegisterDeletedBy")]
     RegisterDeletedBy(Signature, action::Delete),
 
-    #[display("RegisterDeletedEntryAction")]
     /// Op for registering an action deletion with the Entry authority, so that
     /// the Entry can be marked Dead if all of its Actions have been deleted
+    #[display("RegisterDeletedEntryAction")]
     RegisterDeletedEntryAction(Signature, action::Delete),
 
-    #[display("RegisterAddLink")]
     /// Op for adding a link
+    #[display("RegisterAddLink")]
     RegisterAddLink(Signature, action::CreateLink),
 
-    #[display("RegisterRemoveLink")]
     /// Op for removing a link
+    #[display("RegisterRemoveLink")]
     RegisterRemoveLink(Signature, action::DeleteLink),
 }
 
@@ -1202,8 +1202,8 @@ impl HashableContent for ChainOpUniqueForm<'_> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 /// Condensed version of ops for sending across the wire.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub enum WireOps {
     /// Response for get entry.
     Entry(WireEntryOps),
@@ -1229,8 +1229,8 @@ impl WireOps {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
 /// The data rendered from a wire op to place in the database.
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RenderedOp {
     /// The action to insert into the database.
     pub action: SignedActionHashed,
@@ -1267,10 +1267,10 @@ impl RenderedOp {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
 /// The full data for insertion into the database.
 /// The reason we don't use [`DhtOp`] is because we don't
 /// want to clone the entry for every action.
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct RenderedOps {
     /// Entry for the ops if there is one.
     pub entry: Option<EntryHashed>,

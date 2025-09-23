@@ -1,10 +1,10 @@
 use super::*;
 use holochain_integrity_types::MigrationTarget;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// Data specific to the
 /// [`Op::RegisterAgentActivity`](holochain_integrity_types::op::Op::RegisterAgentActivity)
 /// operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpActivity<UnitType, LT> {
     /// This operation registers the [`Action`](holochain_integrity_types::action::Action) for an
     /// app defined entry type to the author's chain.

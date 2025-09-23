@@ -1,9 +1,9 @@
 use super::*;
 use holochain_integrity_types::MigrationTarget;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// Data specific to the [`Op::StoreRecord`](holochain_integrity_types::op::Op::StoreRecord)
 /// operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpRecord<ET: UnitEnum, LT> {
     /// This operation stores the [`Record`](holochain_integrity_types::record::Record) for an app
     /// defined entry type.
