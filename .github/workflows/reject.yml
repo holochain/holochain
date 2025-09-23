@@ -1,0 +1,24 @@
+name: reject.yml
+
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  build:
+    if: ${{ github.event.label.name == 'reject-pr' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Comment and close PR
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment \
+            $PR_NUMBER \
+            --repo holochain/holochain \
+            --body "This pull request does not follow the contribution guidelines and has been rejected. Please refer to the [contributing guide](https://github.com/holochain/holochain/blob/develop/CONTRIBUTING.md) and get in touch through an issue or our [Discord](https://discord.gg/k55DS5dmPH) if you have any questions."
+          gh pr close \
+            $PR_NUMBER \
+            --repo holochain/holochain
