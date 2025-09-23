@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 - Support binding admin and app websocket interfaces on designated listen addresses. #5271
+- Add tests for filtered `AgentInfo` calls. #5293
 
 ## 0.6.0-dev.22
 
