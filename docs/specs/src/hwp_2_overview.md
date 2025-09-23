@@ -116,7 +116,7 @@ A Record consists of an Action which holds context and points to an Entry which 
 
 3. The hash of the previous Action (to create the chain)
 
-4. The sequence index of the Action in the chain
+4. The action sequence of the Action in the chain
 
 5. The hash of the Entry
 

@@ -6,9 +6,9 @@ pub use hdi::chain::*;
 /// * The highest observed chain item (or items, in the case of a chain fork),
 /// * A summary of whether the chain contains only valid items, contains at
 /// least one invalid item, is forked, or is empty,
-/// * Any warrants collected for invalid actions committed by the agent,
-/// * Sequence indices and action hashes of valid and rejected actions if
-/// desired (see [`ActivityRequest::Full`]).
+/// * Any warrants collected for invalid actions committed by the agent, and
+/// * Action sequences and hashes of valid and rejected actions if desired (see
+///   [`ActivityRequest::Full`]).
 ///
 /// The agent activity is held by the neighborhood of the agent's public key.
 ///
