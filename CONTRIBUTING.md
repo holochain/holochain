@@ -138,6 +138,18 @@ It is NOT OK to change the behaviour of tests/CI in otherwise unrelated PRs. SOM
 
 Use your best judgement and respect that other people, across all timezones, rely on this repository remaining a productive working environment 24/7/365.
 
+## Automated changes
+
+Pull requests that appear to only contain automated changes, such as removing duplicate words in comments, are discouraged. 
+Our experience has been that these PRs will make a mixture of valid and invalid changes, and the cost of reviewing them 
+outweighs the benefits.
+
+If you choose to submit such a PR, please review your own changes before submitting to ensure that all changes are valid 
+to the best of your knowledge.
+
+The Holochain team may choose to reject PRs at our discretion if the changes appear to be low-value. If we do, we will
+leave a comment explaining why and refer you to this section of our contributing guidelines.
+
 ## License
 Holochain is licensed under the Cryptographic Autonomy License [![License: CAL v1](https://img.shields.io/badge/License-CAL%201.0-blue.svg)](https://github.com/holochain/cryptographic-autonomy-license) which is the first [Open Source Initiative approved](https://opensource.org/licenses/CAL-1.0) license designed for distributed software. As such it is designed to protect the rights of end-users of applications built on Holochain to own their own data and cryptographic keys. See [this article](https://medium.com/holochain/understanding-the-cryptographic-autonomy-license-172ac920966d) for more detail about licensing requirements of P2P software.
 
