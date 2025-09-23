@@ -14,23 +14,31 @@ async fn setup_tests() -> (
     DnaHash,
     DnaHash,
     DnaHash,
+    DnaHash,
+    String,
     String,
     String,
     ClonedCell,
-    SweetConductor,
+    SweetConductorBatch,
 ) {
-    // Create three different DNAs
+    // Create four different DNAs
     let dna1 = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let dna2 = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
     let dna3 = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+    let dna4 = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
 
-    // Install two different apps on a conductor: app1 (dna1, dna2) and app2 (dna3)
-    let mut conductor = SweetConductor::from_standard_config().await;
+    // Install two different apps on one conductor: app1 (dna1, dna2) and app2 (dna3)
+    // Install another app on both conductors: app3 (dna4)
+    let mut conductors =
+        SweetConductorBatch::from_config(2, SweetConductorConfig::standard()).await;
+    conductors.exchange_peer_info().await;
 
     let app1_id: InstalledAppId = "app1".into();
     let app2_id: InstalledAppId = "app2".into();
+    let app3_id: InstalledAppId = "app3".into();
 
-    let installed_app1_id = conductor
+    // Install app1
+    let installed_app1_id = conductors[0]
         .setup_app(&app1_id, &[dna1.0.clone(), dna2.0.clone()])
         .await
         .unwrap()
@@ -38,7 +46,7 @@ async fn setup_tests() -> (
         .clone();
 
     // Install app2
-    let installed_app2_id = conductor
+    let installed_app2_id = conductors[0]
         .setup_app(&app2_id, &[dna3.0.clone()])
         .await
         .unwrap()
@@ -46,7 +54,7 @@ async fn setup_tests() -> (
         .clone();
 
     // Create a disabled clone cell for app1
-    let clone_cell = conductor
+    let clone_cell = conductors[0]
         .create_clone_cell(
             &installed_app1_id,
             CreateCloneCellPayload {
@@ -59,7 +67,20 @@ async fn setup_tests() -> (
         .await
         .unwrap();
 
-    // Wait until all peers are added to the peer stores.
+    // Install app3 on both conductors
+    let _ = conductors[0]
+        .setup_app(&app3_id, &[dna4.0.clone()])
+        .await
+        .unwrap();
+
+    let installed_app3_id = conductors[1]
+        .setup_app(&app3_id, &[dna4.0.clone()])
+        .await
+        .unwrap()
+        .installed_app_id()
+        .clone();
+
+    // Wait until all peers are added to the peer stores of both conductors
     retry_fn_until_timeout(
         || async {
             futures::future::join_all(
@@ -70,7 +91,7 @@ async fn setup_tests() -> (
                     clone_cell.cell_id.dna_hash(),
                 ]
                 .map(|dna_hash| async {
-                    conductor
+                    conductors[0]
                         .holochain_p2p()
                         .peer_store(dna_hash.clone())
                         .await
@@ -84,6 +105,26 @@ async fn setup_tests() -> (
             .await
             .iter()
             .all(|num_agents| *num_agents == 1)
+                && conductors[0]
+                    .holochain_p2p()
+                    .peer_store(dna4.0.dna_hash().clone())
+                    .await
+                    .unwrap()
+                    .get_all()
+                    .await
+                    .unwrap()
+                    .len()
+                    == 2
+                && conductors[1]
+                    .holochain_p2p()
+                    .peer_store(dna4.0.dna_hash().clone())
+                    .await
+                    .unwrap()
+                    .get_all()
+                    .await
+                    .unwrap()
+                    .len()
+                    == 2
         },
         None,
         None,
@@ -95,10 +136,12 @@ async fn setup_tests() -> (
         dna1.0.dna_hash().clone(),
         dna2.0.dna_hash().clone(),
         dna3.0.dna_hash().clone(),
+        dna4.0.dna_hash().clone(),
         installed_app1_id,
         installed_app2_id,
+        installed_app3_id,
         clone_cell,
-        conductor,
+        conductors,
     )
 }
 
@@ -110,14 +153,16 @@ async fn admin_agent_info() {
         dna1_hash,
         dna2_hash,
         dna3_hash,
+        dna4_hash,
         _installed_app1_id,
         _installed_app2_id,
+        _installed_app3_id,
         clone_cell,
-        conductor,
+        conductors,
     ) = setup_tests().await;
 
-    // Get admin interface for conductor
-    let (admin_sender, _admin_receiver) = conductor.admin_ws_client::<AdminResponse>().await;
+    // Get admin interface for conductor 1
+    let (admin_sender, _admin_receiver) = conductors[0].admin_ws_client::<AdminResponse>().await;
 
     // Get all agent infos via admin interface
     let response = admin_sender
@@ -129,7 +174,11 @@ async fn admin_agent_info() {
         _ => panic!("Expected AgentInfo response"),
     };
 
-    assert_eq!(agent_infos.len(), 4, "Should have agent_info for each dna");
+    assert_eq!(
+        agent_infos.len(),
+        6,
+        "Should have agent_info for each dna on both conductors"
+    );
 
     let mut seen_spaces = std::collections::HashSet::new();
     let mut seen_agents = std::collections::HashSet::new();
@@ -142,7 +191,7 @@ async fn admin_agent_info() {
     // Should have seen all DNA spaces
     assert_eq!(
         seen_spaces.len(),
-        4,
+        5,
         "The agent_infos should cover the 4 dnas"
     );
     assert!(seen_spaces.contains(&dna1_hash.to_k2_space()));
@@ -152,8 +201,8 @@ async fn admin_agent_info() {
 
     assert_eq!(
         seen_agents.len(),
-        2,
-        "The agent_infos should cover the two agents (one for each app)"
+        4,
+        "The agent_infos should cover the two agents (one for each app and conductor)"
     );
 
     let clone_cell_dna = clone_cell.cell_id.dna_hash();
@@ -186,6 +235,23 @@ async fn admin_agent_info() {
             "Agent info should be for the clone cell's DNA"
         );
     }
+
+    // Test getting remote agent info for the DNA that is run by both conductors
+    let response = admin_sender
+        .request(AdminRequest::AgentInfo {
+            dna_hashes: Some(vec![dna4_hash.clone()]),
+        })
+        .await
+        .unwrap();
+    let infos = match response {
+        AdminResponse::AgentInfo(infos) => infos,
+        _ => panic!("Expected AgentInfo response"),
+    };
+    assert_eq!(
+        infos.len(),
+        2,
+        "Should have agent info for agents in local and remote conductors"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -196,14 +262,16 @@ async fn app_agent_info() {
         dna1_hash,
         dna2_hash,
         dna3_hash,
+        dna4_hash,
         installed_app1_id,
         installed_app2_id,
+        installed_app3_id,
         clone_cell,
-        conductor,
+        conductors,
     ) = setup_tests().await;
 
     // Test app1's agent info
-    let (app1_sender, _app1_receiver) = conductor
+    let (app1_sender, _app1_receiver) = conductors[0]
         .app_ws_client::<AppResponse>(installed_app1_id.to_string())
         .await;
 
@@ -255,7 +323,7 @@ async fn app_agent_info() {
     }
 
     // Test app2's agent info
-    let (app2_sender, _app2_receiver) = conductor
+    let (app2_sender, _app2_receiver) = conductors[0]
         .app_ws_client::<AppResponse>(installed_app2_id.to_string())
         .await;
 
@@ -324,7 +392,7 @@ async fn app_agent_info() {
     .encode()
     .unwrap();
 
-    let (admin_sender, _admin_receiver) = conductor.admin_ws_client::<AdminResponse>().await;
+    let (admin_sender, _admin_receiver) = conductors[0].admin_ws_client::<AdminResponse>().await;
     let _: AdminResponse = admin_sender
         .request(AdminRequest::AddAgentInfo {
             agent_infos: vec![other_agent],
@@ -345,4 +413,26 @@ async fn app_agent_info() {
     };
 
     assert_eq!(agent_infos_dna1_from_app1.len(), 2);
+
+    // Test app3's agent info
+    let (app3_sender, _app3_receiver) = conductors[0]
+        .app_ws_client::<AppResponse>(installed_app3_id.to_string())
+        .await;
+
+    // Test getting remote agent info for the DNA that is run by both conductors
+    let response = app3_sender
+        .request(AppRequest::AgentInfo {
+            dna_hashes: Some(vec![dna4_hash.clone()]),
+        })
+        .await
+        .unwrap();
+    let infos = match response {
+        AppResponse::AgentInfo(infos) => infos,
+        _ => panic!("Expected AgentInfo response"),
+    };
+    assert_eq!(
+        infos.len(),
+        2,
+        "Should have agent info for agents in local and remote conductors"
+    );
 }
