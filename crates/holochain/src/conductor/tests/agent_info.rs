@@ -427,7 +427,7 @@ async fn app_agent_info() {
         .await
         .unwrap();
     let infos = match response {
-        AdminResponse::AgentInfo(infos) => infos,
+        AppResponse::AgentInfo(infos) => infos,
         _ => panic!("Expected AgentInfo response"),
     };
     assert_eq!(
