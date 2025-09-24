@@ -1,5 +1,5 @@
-#[derive(Debug, PartialEq, Eq)]
 /// The outcome of sys validation
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Outcome {
     /// Moves to app validation
     Accepted,

@@ -24,9 +24,9 @@ pub fn option_entry_hashed(entry: RecordEntry) -> Option<EntryHashed> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
 /// Condensed data needed for a get entry request.
 // TODO: Could use actual compression to get even smaller.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
 pub struct WireEntryOps {
     /// Any actions that created this entry.
     pub creates: Vec<Judged<WireNewEntryAction>>,
@@ -40,8 +40,8 @@ pub struct WireEntryOps {
     pub entry: Option<EntryData>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 /// All entry data common to an get entry request.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes)]
 pub struct EntryData {
     /// The entry shared across all actions.
     pub entry: Entry,

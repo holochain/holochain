@@ -5,8 +5,8 @@ use holo_hash::AgentPubKey;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// An agents chain records returned from a agent_activity_query
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub struct AgentActivityResponse {
     /// The agent this activity is for
     pub agent: AgentPubKey,
@@ -77,8 +77,8 @@ impl AgentActivityResponse {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 /// The type of agent activity returned in this request
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize, SerializedBytes)]
 pub enum ChainItems {
     /// The full records
     Full(Vec<Record>),

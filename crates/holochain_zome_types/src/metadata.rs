@@ -5,11 +5,11 @@ use crate::validate::ValidationStatus;
 use crate::Entry;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
-#[serde(tag = "type", content = "content")]
 /// Return type for get_details calls.
 /// ActionHash returns a Record.
 /// EntryHash returns an Entry.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
+#[serde(tag = "type", content = "content")]
 pub enum Details {
     /// Variant holding a specific record. Returned when an action hash was passed.
     Record(RecordDetails),
@@ -17,9 +17,9 @@ pub enum Details {
     Entry(EntryDetails),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 /// A specific Record with any updates and deletes.
 /// This is all the metadata available for a record.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 pub struct RecordDetails {
     /// The specific record.
     /// Either a Create or an Update.
@@ -32,8 +32,8 @@ pub struct RecordDetails {
     pub updates: Vec<SignedActionHashed>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 /// An Entry with all its metadata.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, SerializedBytes)]
 pub struct EntryDetails {
     /// The data
     pub entry: Entry,

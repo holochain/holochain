@@ -31,9 +31,9 @@ pub use hashable_content::*;
 #[cfg(feature = "serialization")]
 mod ser;
 
-#[cfg(feature = "serialization")]
 /// A convenience type, for specifying a hash by HashableContent rather than
 /// by its HashType
+#[cfg(feature = "serialization")]
 pub type HoloHashOf<C> = HoloHash<<C as HashableContent>::HashType>;
 
 // feature: encoding

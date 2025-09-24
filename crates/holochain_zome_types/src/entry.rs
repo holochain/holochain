@@ -17,14 +17,14 @@ mod app_entry_bytes;
 pub use app_entry_bytes::*;
 pub use holochain_integrity_types::entry::*;
 
-#[derive(
-    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
-)]
 /// Either an [`EntryDefIndex`] or one of:
 /// - [EntryType::CapGrant]
 /// - [EntryType::CapClaim]
 ///
 /// Which don't have an index.
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum EntryDefLocation {
     /// App defined entries always have a unique [`u8`] index
     /// within the Dna.
@@ -37,10 +37,10 @@ pub enum EntryDefLocation {
     CapGrant,
 }
 
+/// The location of an app entry definition.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
-/// The location of an app entry definition.
 pub struct AppEntryDefLocation {
     /// The zome that defines this entry type.
     pub zome_index: ZomeIndex,
@@ -48,8 +48,8 @@ pub struct AppEntryDefLocation {
     pub entry_def_index: EntryDefIndex,
 }
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 /// Options for controlling how get is executed.
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct GetOptions {
     /// Configure whether data should be fetched from the network or only from the local
     /// databases.

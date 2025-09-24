@@ -47,9 +47,9 @@ impl<'a, 'txn, D: DbKindT> From<&'a mut Transaction<'txn>> for Txn<'a, 'txn, D> 
     }
 }
 
-#[async_trait::async_trait]
 /// A trait for being generic over [`DbWrite`] and [`DbRead`] that
 /// both implement read access.
+#[async_trait::async_trait]
 pub trait ReadAccess<Kind: DbKindT>: Clone + Into<DbRead<Kind>> {
     /// Run an async read transaction on a background thread.
     async fn read_async<E, R, F>(&self, f: F) -> Result<R, E>

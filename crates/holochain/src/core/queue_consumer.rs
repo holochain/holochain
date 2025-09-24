@@ -222,8 +222,8 @@ pub async fn spawn_queue_consumer_tasks(
     ))
 }
 
-#[derive(Clone)]
 /// Map of running queue consumers workflows per dna space.
+#[derive(Clone)]
 pub struct QueueConsumerMap {
     map: RwShare<HashMap<QueueEntry, TriggerSender>>,
 }

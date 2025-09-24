@@ -34,8 +34,6 @@ pub trait AgentActivityExt {
 
 impl AgentActivityExt for AgentActivityResponse {}
 
-#[must_use = "Iterator doesn't do anything unless consumed."]
-#[derive(Debug)]
 /// Iterate over a source chain and apply the [`ChainFilter`] to each element.
 /// This iterator will:
 /// - Ignore any ops that are not a direct ancestor to the starting position.
@@ -47,15 +45,17 @@ impl AgentActivityExt for AgentActivityResponse {}
 /// [`take`]: ChainFilter::take
 /// [`until_timestamp`]: ChainFilter::until_timestamp
 /// [`until_hash`]: ChainFilter::until_hash
+#[must_use = "Iterator doesn't do anything unless consumed."]
+#[derive(Debug)]
 pub struct ChainFilterIter<I: AsRef<A>, A: ChainItem = SignedActionHashed> {
     filter: ChainFilter<A::Hash>,
     iter: Peekable<std::vec::IntoIter<I>>,
     end: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// A [`ChainFilter`] with the action sequences for the
 /// starting position and any `until` hashes.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChainFilterRange {
     /// The filter for this chain.
     filter: ChainFilter,
@@ -68,8 +68,8 @@ pub struct ChainFilterRange {
     chain_bottom_type: ChainBottomType,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// The type of chain item that forms the bottom of the chain.
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ChainBottomType {
     /// The bottom of the chain is genesis.
     Genesis,
@@ -84,8 +84,8 @@ enum ChainBottomType {
     UntilHash,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// Outcome of trying to find the action sequences in a filter.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Sequences {
     /// Found all action sequences
     Found(ChainFilterRange),
@@ -95,9 +95,9 @@ pub enum Sequences {
     EmptyRange,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, SerializedBytes, Serialize, Deserialize)]
 /// Intermediate data structure used during a `must_get_agent_activity` call.
 /// Note that this is not the final return value of `must_get_agent_activity`.
+#[derive(Debug, Clone, PartialEq, Eq, SerializedBytes, Serialize, Deserialize)]
 pub enum MustGetAgentActivityResponse {
     /// The activity was found.
     Activity {

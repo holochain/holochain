@@ -127,6 +127,7 @@ impl DnaManifestV0 {
     }
 }
 
+/// Manifest for all items that will change the [`DnaHash`].
 #[serde_as]
 #[derive(
     Serialize,
@@ -140,7 +141,6 @@ impl DnaManifestV0 {
     derive_builder::Builder,
 )]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
-/// Manifest for all items that will change the [`DnaHash`].
 pub struct IntegrityManifest {
     /// A network seed for uniquifying this DNA. See [`DnaDef`].
     pub network_seed: Option<String>,
@@ -154,9 +154,9 @@ pub struct IntegrityManifest {
     pub zomes: Vec<ZomeManifest>,
 }
 
+/// Coordinator zomes.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
-/// Coordinator zomes.
 pub struct CoordinatorManifest {
     /// Coordinator zomes to install with this dna.
     pub zomes: Vec<ZomeManifest>,

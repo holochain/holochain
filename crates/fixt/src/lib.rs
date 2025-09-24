@@ -30,7 +30,7 @@ pub use rng::rng;
 /// their inner types by constructing an inner Fixturator directly with the outer index passed in.
 /// If we can always assume the inner fixturators can be efficiently constructed at any index this
 /// allows us to efficiently compose fixturators.
-/// See [ `newtype_fixturator!` ](newtype_fixturator) macro defined below for an example of this.
+/// See [`newtype_fixturator!`](newtype_fixturator) macro defined below for an example of this.
 ///
 /// Fixturator implements Clone for convenience but note that this will clone the current index.
 ///
@@ -515,7 +515,6 @@ macro_rules! get_fixt_curve {
     }};
 }
 
-#[macro_export]
 /// implement Iterator for a FooFixturator for a given curve
 ///
 /// curve!(Foo, Unpredictable, /* make an Unpredictable Foo here */ );
@@ -525,6 +524,7 @@ macro_rules! get_fixt_curve {
 /// ability to return an Option - i.e. return a value of type Foo _not_ `Option<Foo>`
 /// if the body of the expression changes the index it will be respected, if not then it will be
 /// incremented by 1 automatically by the macro
+#[macro_export]
 macro_rules! curve {
     ( $type:ident, $curve:ident, $e:expr ) => {
         $crate::prelude::paste! {
@@ -550,10 +550,10 @@ macro_rules! curve {
     };
 }
 
-#[macro_export]
 /// tiny convenience macro to make it easy to get the first Foo from its fixturator without using
 /// the iterator interface to save a little typing
 /// c.f. fixt!(Foo) vs. FooFixturator::new(Unpredictable).next().unwrap();
+#[macro_export]
 macro_rules! fixt {
     ( $name:tt ) => {
         $crate::fixt!($name, $crate::prelude::Unpredictable)
@@ -618,8 +618,8 @@ pub struct Predictable;
 #[derive(Clone, Copy)]
 pub struct Empty;
 
-#[macro_export]
 /// a direct delegation of fixtures to the inner type for new types
+#[macro_export]
 macro_rules! newtype_fixturator {
     ( $outer:ident<Vec<$inner:ty>> ) => {
         fixturator!(
@@ -682,9 +682,9 @@ macro_rules! newtype_fixturator {
     };
 }
 
-#[macro_export]
 /// a direct delegation of fixtures to the inner type for wasm io types
 /// See zome types crate
+#[macro_export]
 macro_rules! wasm_io_fixturator {
     ( $outer:ident<$inner:ty> ) => {
         fixturator!(
@@ -711,11 +711,11 @@ macro_rules! wasm_io_fixturator {
     };
 }
 
-#[macro_export]
 /// Creates a simple way to generate enums that use the strum way of iterating
 /// <https://docs.rs/strum/0.27.0/strum/>
 /// iterates over all the variants (Predictable) or selects random variants (Unpredictable)
 /// You do still need to BYO "empty" variant as the macro doesn't know what to use there
+#[macro_export]
 macro_rules! enum_fixturator {
     ( $enum:ident, $empty:expr ) => {
         use rand::seq::IteratorRandom;

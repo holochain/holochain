@@ -22,9 +22,9 @@ impl SweetZome {
     }
 }
 
-#[derive(Default, Clone)]
 /// A helper for creating an [`InlineZomeSet`] consisting of a single
 /// integrity zome and a single coordinator zome.
+#[derive(Default, Clone)]
 pub struct SweetInlineZomes(pub InlineZomeSet);
 
 impl SweetInlineZomes {

@@ -6,8 +6,8 @@ use holochain_state::prelude::{mutations_helpers, *};
 use std::{path::Path, sync::Arc};
 use tempfile::TempDir;
 
-#[tokio::test(flavor = "multi_thread")]
 /// Checks a corrupt cache will be wiped on load.
+#[tokio::test(flavor = "multi_thread")]
 async fn corrupt_cache_creates_new_db() {
     holochain_trace::test_run();
 

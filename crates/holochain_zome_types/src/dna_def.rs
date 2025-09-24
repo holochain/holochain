@@ -69,9 +69,9 @@ pub struct DnaDef {
     pub lineage: HashSet<DnaHash>,
 }
 
+/// A reference to for creating the hash for [`DnaDef`].
 #[cfg(feature = "full-dna-def")]
 #[derive(Serialize, Debug, PartialEq, Eq)]
-/// A reference to for creating the hash for [`DnaDef`].
 struct DnaDefHash<'a> {
     modifiers: &'a DnaModifiers,
     integrity_zomes: &'a IntegrityZomes,

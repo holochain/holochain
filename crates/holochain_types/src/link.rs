@@ -12,8 +12,8 @@ use holochain_zome_types::op::ChainOpType;
 use holochain_zome_types::prelude::*;
 use regex::Regex;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// Link key for sending across the wire for get links requests.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct WireLinkKey {
     /// Base the links are on.
     pub base: AnyLinkableHash,
@@ -29,8 +29,8 @@ pub struct WireLinkKey {
     pub author: Option<AgentPubKey>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Default)]
 /// Condensed link ops for sending across the wire in response to get links.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes, Default)]
 pub struct WireLinkOps {
     /// create links that match this query.
     pub creates: Vec<WireCreateLink>,
@@ -57,9 +57,9 @@ impl WireLinkOps {
     }
 }
 
+/// Condensed version of a [`CreateLink`]
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-/// Condensed version of a [`CreateLink`]
 pub struct WireCreateLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,
@@ -75,9 +75,9 @@ pub struct WireCreateLink {
     pub weight: RateWeight,
 }
 
+/// Condensed version of a [`DeleteLink`]
 #[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
-/// Condensed version of a [`DeleteLink`]
 pub struct WireDeleteLink {
     pub author: AgentPubKey,
     pub timestamp: Timestamp,

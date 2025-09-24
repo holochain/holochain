@@ -5,10 +5,10 @@ pub use subtle;
 mod types;
 pub use types::*;
 
-#[macro_export]
 /// Serialization for fixed arrays is generally not available in a way that can be derived.
 /// Being able to wrap fixed size arrays is important e.g. for crypto safety etc. so this is a
 /// simple way to implement serialization so that we can send these types between the host/guest.
+#[macro_export]
 macro_rules! fixed_array_serialization {
     ($t:ty, $len:expr) => {
         $crate::paste::paste! {
@@ -74,7 +74,6 @@ macro_rules! fixed_array_serialization {
     };
 }
 
-#[macro_export]
 /// Cryptographic secrets are fiddly at the best of times.
 ///
 /// In wasm it is somewhat impossible to have true secrets because wasm memory is not secure.
@@ -105,6 +104,7 @@ macro_rules! fixed_array_serialization {
 //
 // @todo implement explicit zeroing, moving and copying of memory for sensitive data.
 //       - e.g. the secrecy crate <https://crates.io/crates/secrecy>
+#[macro_export]
 macro_rules! secure_primitive {
     ($t:ty, $len:expr) => {
         $crate::fixed_array_serialization!($t, $len);

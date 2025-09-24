@@ -3,8 +3,8 @@ use holochain_zome_types::prelude::*;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
-#[derive(Default, Clone)]
 /// A set of inline integrity and coordinator zomes.
+#[derive(Default, Clone)]
 pub struct InlineZomeSet {
     /// The set of inline zomes that will be installed as the integrity zomes.
     /// Only these affect the [`DnaHash`].
@@ -18,8 +18,8 @@ pub struct InlineZomeSet {
     pub dependencies: HashMap<ZomeName, ZomeName>,
 }
 
-#[allow(missing_docs)]
 /// Some blank entry types to use for testing.
+#[allow(missing_docs)]
 pub enum InlineEntryTypes {
     A,
     B,

@@ -312,7 +312,6 @@ pub mod ed25519;
 /// - The function call itself
 pub mod info;
 
-#[cfg(feature = "trace")]
 /// Integrates HDI with the Rust tracing crate.
 ///
 /// The functions and structs in this module do _not_ need to be used directly.
@@ -323,6 +322,7 @@ pub mod info;
 /// another subscriber on the host.
 /// The logging level can be changed for the host at runtime using the `WASM_LOG` environment
 /// variable that works exactly as `RUST_LOG` for other tracing.
+#[cfg(feature = "trace")]
 pub mod trace;
 
 /// The interface between the host and guest is implemented as an [`hdi::HdiT`] trait.

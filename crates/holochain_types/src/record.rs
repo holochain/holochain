@@ -16,9 +16,9 @@ use std::collections::BTreeSet;
 mod error;
 pub use error::*;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
 /// A condensed version of get record request.
 /// This saves bandwidth by removing duplicated and implied data.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, SerializedBytes, Default)]
 pub struct WireRecordOps {
     /// The action this request was for.
     pub action: Option<Judged<SignedAction>>,
@@ -92,9 +92,9 @@ impl WireRecordOps {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 /// Record without the hashes for sending across the network
 /// TODO: Remove this as it's no longer needed.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, SerializedBytes)]
 pub struct WireRecord {
     /// The signed action for this record
     signed_action: SignedAction,

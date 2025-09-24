@@ -88,11 +88,11 @@ impl Display for Action {
     }
 }
 
-#[derive(Clone, Debug, Serialize, PartialEq, Eq, Hash)]
-#[serde(tag = "type")]
 /// This allows action types to be serialized to bytes without requiring
 /// an owned value. This produces the same bytes as if they were
 /// serialized with the [`Action`] type.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, Hash)]
+#[serde(tag = "type")]
 pub(crate) enum ActionRef<'a> {
     Dna(&'a Dna),
     AgentValidationPkg(&'a AgentValidationPkg),

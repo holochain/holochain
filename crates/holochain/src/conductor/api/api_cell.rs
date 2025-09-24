@@ -113,10 +113,10 @@ pub trait CellConductorApiT: Send + Sync {
     async fn post_commit_permit(&self) -> Result<OwnedPermit<PostCommitArgs>, SendError<()>>;
 }
 
-#[async_trait]
-#[cfg_attr(feature = "test_utils", mockall::automock)]
 /// A minimal set of functionality needed from the conductor by
 /// host functions.
+#[async_trait]
+#[cfg_attr(feature = "test_utils", mockall::automock)]
 pub trait CellConductorReadHandleT: Send + Sync {
     /// Get this cell id
     fn cell_id(&self) -> &CellId;
@@ -193,8 +193,8 @@ pub trait CellConductorReadHandleT: Send + Sync {
     /// Expose delete_clone_cell functionality to zomes.
     async fn delete_clone_cell(&self, payload: DeleteCloneCellPayload) -> ConductorResult<()>;
 
-    #[cfg(feature = "unstable-countersigning")]
     /// Accept a countersigning session.
+    #[cfg(feature = "unstable-countersigning")]
     async fn accept_countersigning_session(
         &self,
         cell_id: CellId,

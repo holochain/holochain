@@ -51,8 +51,8 @@ fn to_local_types_test_unit() {
     assert_eq!(to_coords(Unit::C), (0, 2));
 }
 
-#[test]
 /// Setting the discriminant explicitly should have no effect.
+#[test]
 fn to_local_types_test_discriminant() {
     #[hdk_to_coordinates]
     enum Unit {

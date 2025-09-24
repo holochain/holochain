@@ -46,24 +46,24 @@ pub trait DbKindT: Clone + std::fmt::Debug + Send + Sync + 'static {
 
 pub trait DbKindOp {}
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used for authoring data by all cells on the same [`DnaHash`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub struct DbKindAuthored(pub Arc<CellId>);
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used for dht data by all cells on the same [`DnaHash`].
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub struct DbKindDht(pub Arc<DnaHash>);
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used by each Cache (one per dna).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub struct DbKindCache(pub Arc<DnaHash>);
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used by a Conductor
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub struct DbKindConductor;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 /// Specifies the environment used to save wasm
+#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
 pub struct DbKindWasm;
 
 /// Database kind for [DbKind::PeerMetaStore]

@@ -52,8 +52,8 @@ pub mod wasm_test {
     use holochain_wasm_test_utils::TestWasm;
     use std::sync::Arc;
 
-    #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn directly
+    #[tokio::test(flavor = "multi_thread")]
     async fn random_bytes_test() {
         let ribosome = RealRibosomeFixturator::new(crate::fixt::Zomes(vec![]))
             .next()
@@ -72,8 +72,8 @@ pub mod wasm_test {
         assert_ne!(&[0; LEN as usize], output.as_ref(),);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_random_bytes_test() {
         holochain_trace::test_run();
         let RibosomeTestFixture {
@@ -85,8 +85,8 @@ pub mod wasm_test {
         assert_ne!(&vec![0; LEN as usize], &output.to_vec());
     }
 
-    #[tokio::test(flavor = "multi_thread")]
     /// we can get some random data out of the fn via. a wasm call
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_rand_random_bytes_test() {
         holochain_trace::test_run();
         let RibosomeTestFixture {

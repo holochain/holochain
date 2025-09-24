@@ -13,8 +13,8 @@
 //! ```
 use crate::prelude::*;
 
-#[hdk_link_types]
 /// This is an example of declaring your link types.
+#[hdk_link_types]
 pub enum SomeLinkTypes {
     SomeLinkType,
     SomeOtherLinkType,

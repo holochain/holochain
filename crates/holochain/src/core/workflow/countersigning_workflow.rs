@@ -17,24 +17,24 @@ use {
     tokio::task::AbortHandle,
 };
 
-#[cfg(feature = "unstable-countersigning")]
 /// Accept handler for starting countersigning sessions.
+#[cfg(feature = "unstable-countersigning")]
 mod accept;
 
-#[cfg(feature = "unstable-countersigning")]
 /// Inner workflow for resolving an incomplete countersigning session.
+#[cfg(feature = "unstable-countersigning")]
 mod incomplete;
 
-#[cfg(feature = "unstable-countersigning")]
 /// Inner workflow for completing a countersigning session based on received signatures.
+#[cfg(feature = "unstable-countersigning")]
 mod complete;
 
-#[cfg(feature = "unstable-countersigning")]
 /// State integrity function to ensure that the database and the workspace are in sync.
+#[cfg(feature = "unstable-countersigning")]
 mod refresh;
 
-#[cfg(feature = "unstable-countersigning")]
 /// Success handler for receiving signature bundles from the network.
+#[cfg(feature = "unstable-countersigning")]
 mod success;
 
 #[cfg(feature = "unstable-countersigning")]
@@ -806,8 +806,8 @@ pub async fn countersigning_publish(
     Ok(())
 }
 
-#[cfg(feature = "unstable-countersigning")]
 /// Abandon a countersigning session.
+#[cfg(feature = "unstable-countersigning")]
 async fn abandon_session(
     authored_db: DbWrite<DbKindAuthored>,
     author: AgentPubKey,

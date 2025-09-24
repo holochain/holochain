@@ -2,8 +2,8 @@
 
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 /// Metadata that can be requested on a basis
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct MetadataRequest {
     /// Get all the actions on an entry.
     /// Invalid request on an action.

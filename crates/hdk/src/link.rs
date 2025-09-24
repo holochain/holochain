@@ -110,7 +110,7 @@ where
 ///   former leads to flakiness as above and the latter means it would be impossible to create a
 ///   link after any previous delete of any link.
 ///
-/// All of this is bad so link creates point to entries (See [ `create_link` ]) and deletes point to
+/// All of this is bad so link creates point to entries (See [`create_link`]) and deletes point to
 /// creates.
 pub fn delete_link(address: ActionHash, get_options: GetOptions) -> ExternResult<ActionHash> {
     HDK.with(|h| {

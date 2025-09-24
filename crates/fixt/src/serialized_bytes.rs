@@ -2,9 +2,9 @@
 use crate::prelude::*;
 use holochain_serialized_bytes::prelude::*;
 
-#[derive(Clone, Copy)]
 /// there are many different types of things that we could reasonably serialize in our examples
 /// a list of things that we serialize iteratively (Predictable) or randomly (Unpredictable)
+#[derive(Clone, Copy)]
 pub enum ThingsToSerialize {
     Unit,
     Bool,

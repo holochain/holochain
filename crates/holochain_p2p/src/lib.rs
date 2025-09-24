@@ -77,11 +77,11 @@ fn check_k2_init() {
     });
 }
 
+/// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
+/// I.e. a sender that is tied to a specific cell.
 #[automock]
 #[allow(clippy::too_many_arguments)]
 #[async_trait::async_trait]
-/// A wrapper around HolochainP2pSender that partially applies the dna_hash / agent_pub_key.
-/// I.e. a sender that is tied to a specific cell.
 pub trait HolochainP2pDnaT: Send + Sync + 'static {
     /// owned getter
     fn dna_hash(&self) -> DnaHash;

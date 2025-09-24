@@ -649,11 +649,11 @@ impl ExternalApiWireError {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
-#[serde(rename_all = "snake_case")]
 /// Filter for [`AdminRequest::ListApps`].
 ///
 /// Apps can be either enabled or disabled, set by the user via the conductor interface.
+#[derive(Debug, serde::Serialize, serde::Deserialize, SerializedBytes, Clone)]
+#[serde(rename_all = "snake_case")]
 pub enum AppStatusFilter {
     /// Filter on apps which are Enabled.
     Enabled,

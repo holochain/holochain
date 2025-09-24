@@ -12,8 +12,8 @@ impl std::ops::Add for CounTree {
 }
 
 impl CounTree {
-    #[allow(clippy::new_ret_no_self)]
     /// ensures that a default countree exists and returns the action
+    #[allow(clippy::new_ret_no_self)]
     pub fn new() -> ExternResult<ActionHash> {
         Self::ensure(Self::default())
     }

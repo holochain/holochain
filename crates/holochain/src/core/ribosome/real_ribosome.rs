@@ -1249,9 +1249,9 @@ pub mod wasm_test {
         );
     }
 
-    #[tokio::test(flavor = "multi_thread")]
     /// Basic checks that we can call externs internally and externally the way we want using the
     /// hdk macros rather than low level rust extern syntax.
+    #[tokio::test(flavor = "multi_thread")]
     async fn ribosome_extern_test() {
         holochain_trace::test_run();
 

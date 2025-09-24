@@ -104,8 +104,8 @@ pub fn test_dbs_in(path: impl AsRef<Path>) -> TestDbs {
 /// A test database in a temp directory
 #[derive(Shrinkwrap)]
 pub struct TestDb<Kind: DbKindT> {
-    #[shrinkwrap(main_field)]
     /// sqlite database
+    #[shrinkwrap(main_field)]
     db: DbWrite<Kind>,
     /// temp directory for this environment
     dir: TestDir,

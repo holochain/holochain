@@ -29,8 +29,8 @@ fn update_private_entry(_: ()) -> ExternResult<ActionHash> {
     hdk::prelude::update_entry(action_hash, &msg_private())
 }
 
-#[hdk_extern]
 /// Updates to a different entry, this will fail
+#[hdk_extern]
 fn invalid_update_entry(_: ()) -> ExternResult<ActionHash> {
     let action_hash = hdk::prelude::create_entry(&IntegrityUpdateEntry(post()))?;
     hdk::prelude::update_entry(action_hash, &msg())

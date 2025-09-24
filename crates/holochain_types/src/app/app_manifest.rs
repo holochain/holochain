@@ -150,8 +150,8 @@ mod tests {
     use crate::app::app_manifest::{AppManifest, AppManifestV0Builder, AppRoleManifest};
     use mr_bundle::{resource_id_for_path, Manifest};
 
-    #[test]
     /// Replicate this test for any new version of the manifest that gets created
+    #[test]
     fn app_manifest_v0_helper_functions() {
         let app_name = String::from("sample-app");
 

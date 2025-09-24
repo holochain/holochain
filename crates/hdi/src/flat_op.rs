@@ -14,8 +14,8 @@ pub use flat_op_activity::*;
 pub use flat_op_entry::*;
 pub use flat_op_record::*;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// A convenience type for validation [`Op`](holochain_integrity_types::op::Op)s.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlatOp<ET, LT>
 where
     ET: UnitEnum,

@@ -462,8 +462,8 @@ impl CascadeImpl {
         Ok(results)
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// Fetch hash bounded agent activity from the network.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     async fn fetch_must_get_agent_activity(
         &self,
         author: AgentPubKey,
@@ -728,11 +728,11 @@ impl CascadeImpl {
             .await
     }
 
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     /// Updates the cache with the latest network authority data
     /// and returns what is in the cache.
     /// This gives you the latest possible picture of the current dht state.
     /// Data from your zome call is also added to the cache.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip(self)))]
     pub async fn dht_get(
         &self,
         hash: AnyDhtHash,

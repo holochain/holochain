@@ -32,8 +32,8 @@ async fn ser_entry_hash_test() {
     let _eh: EntryHash = extern_io.decode().unwrap();
 }
 
-#[tokio::test(flavor = "multi_thread")]
 /// we can call a fn on a remote
+#[tokio::test(flavor = "multi_thread")]
 async fn ser_regression_test() {
     holochain_trace::test_run();
     // ////////////

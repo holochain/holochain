@@ -11,8 +11,8 @@ use holochain_types::prelude::*;
 use holochain_zome_types::op::Op;
 use std::sync::Arc;
 
-#[derive(Clone, Debug)]
 /// An invocation of the validate callback function.
+#[derive(Clone, Debug)]
 pub struct ValidateInvocation {
     /// The zomes this invocation will invoke.
     zomes_to_invoke: ZomesToInvoke,
