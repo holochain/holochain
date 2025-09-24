@@ -45,10 +45,12 @@ mod test {
     use crate::test_utils::RibosomeTestFixture;
     use holo_hash::ActionHash;
     use holo_hash::AgentPubKey;
+    use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
     use holochain_types::prelude::CapSecret;
     use holochain_types::prelude::Record;
     use holochain_types::prelude::ZomeCallResponse;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::block::{Block, BlockTarget, BlockTargetId, BlockTargetReason};
 
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
     pub struct CapFor(CapSecret, AgentPubKey);
@@ -176,5 +178,59 @@ mod test {
         // Bob can get data from alice via. carol.
         let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
         assert!(bob_get2.is_some());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn hdk_cell_block_adds_block_to_blockspan_database() {
+        holochain_trace::test_run();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app = conductor.setup_app("", [&dna_file]).await.unwrap();
+
+        let blocks_count = conductor
+            .spaces
+            .conductor_db
+            .test_read(|txn| {
+                txn.query_row("SELECT COUNT(*) FROM BlockSpan", [], |row| {
+                    row.get::<_, u32>(0)
+                })
+            })
+            .unwrap();
+        assert_eq!(blocks_count, 0);
+
+        let agent_key = app.agent().clone();
+        let cell_id = app.cells()[0].cell_id().clone();
+        let zome = app.cells()[0].zome(TestWasm::Create);
+        let _block: () = conductor.call(&zome, "block_agent", agent_key).await;
+
+        let blocks = conductor
+            .spaces
+            .conductor_db
+            .test_read(move |txn| {
+                let mut stmt = txn
+                    .prepare("SELECT target_id, target_reason, start_us, end_us FROM BlockSpan")
+                    .unwrap();
+                let mut rows = stmt.query([]).unwrap();
+                let mut blocks = Vec::new();
+                while let Some(row) = rows.next().unwrap() {
+                    let target_id = row.get::<_, BlockTargetId>(0).unwrap();
+                    let target_reason = row.get::<_, BlockTargetReason>(1).unwrap();
+                    let start_us = row.get::<_, i64>(2).unwrap();
+                    let end_us = row.get::<_, i64>(3).unwrap();
+                    if let (BlockTargetId::Cell(block_cell_id), BlockTargetReason::Cell(reason)) = (&target_id, &target_reason) {
+                        assert_eq!(*block_cell_id, cell_id, "expected agent's cell id but found a different cell id");
+                        blocks.push(Block::new(
+                            BlockTarget::Cell(block_cell_id.clone(), reason.clone()),
+                            InclusiveTimestampInterval::try_new(Timestamp::from_micros(start_us), Timestamp::from_micros(end_us)).unwrap(),
+                        ));
+                    } else {
+                        panic!("expected cell block target id and reason, but found id {:?} and reason {:?}", target_id, target_reason);
+                    }
+                }
+                blocks
+            });
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].start(), Timestamp::MIN);
+        assert_eq!(blocks[0].end(), Timestamp::MAX);
     }
 }

@@ -1,5 +1,3 @@
-use std::{sync::Arc, time::Duration};
-
 use ::fixt::fixt;
 use holo_hash::fixt::{AgentPubKeyFixturator, DnaHashFixturator};
 use holo_hash::{AgentPubKey, DnaHash};
