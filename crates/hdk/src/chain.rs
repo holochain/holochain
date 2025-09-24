@@ -5,7 +5,7 @@ pub use hdi::chain::*;
 ///
 /// * The highest observed chain item (or items, in the case of a chain fork),
 /// * A summary of whether the chain contains only valid items, contains at
-/// least one invalid item, is forked, or is empty,
+///   least one invalid item, is forked, or is empty,
 /// * Any warrants collected for invalid actions committed by the agent, and
 /// * Action sequences and hashes of valid and rejected actions if desired (see
 ///   [`ActivityRequest::Full`]).
@@ -25,7 +25,7 @@ pub use hdi::chain::*;
 ///   and [`AgentActivity::rejected_activity`] values. This is only used when
 ///   the `request` argument is [`ActivityRequest::Full`].
 /// * `request`: The type of data to retrieve -- a summary of current state, or
-/// the summary plus hashes of chain actions matching the filter.
+///   the summary plus hashes of chain actions matching the filter.
 pub fn get_agent_activity(
     agent: AgentPubKey,
     query: ChainQueryFilter,
