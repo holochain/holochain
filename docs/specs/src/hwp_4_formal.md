@@ -568,7 +568,7 @@ Holochain is designed to be used to build micro-services that can be assembled i
 
 ## Holochain Implementation
 
-Given the above formal description of our local state model (Source Chain) and shared data model (Graph DHT) we can now present a high-level implementation specification of different components of the Holochain architecture. The components include:
+Given the above formal description of our local state model (Source Chain) and shared data model (Graph DHT) we can now present a high-level implementation of different components of the Holochain architecture. The components include:
 
 * App Virtual Machine (Ribosome)
 * State Management (Workflows)
@@ -576,4 +576,8 @@ Given the above formal description of our local state model (Source Chain) and s
 * Application Interface (Conductor API)
 * Secure Private Key Management (lair-keystore)
 
-Please see the [Implementation Spec (Appendix A)](hwp_A_implementation_spec.md) for details.
+For the source code of the current implementation, which constitutes a 'living specification' of the state model and network protocol, we refer the reader to the various source code repositories in the [`holochain` GitHub organization](https://github.com/holochain), particularly the following:
+
+* [`holochain/holochain`](https://github.com/holochain/holochain), which provides an implementation of the core Holochain state logic and an example conductor implementation, along with tests and various tools and libraries necessary for building applications,
+* [`holochain/kitsune2`](https://github.com/holochain/kitsune2), which provides an implementation of a network protocol for synchronizing state among conductors, and
+* [`holochain/lair`](https://github.com/holochain/lair), which provides an implementation of a secure key store.
