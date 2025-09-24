@@ -168,14 +168,13 @@ pub enum ActivityRequest {
 /// the `hdk::chain::get_agent_activity` query. It also includes the hash(es) of
 /// the action(s) at this action sequence.
 ///
-/// Because they may come from unintegrated DHT operations, the given hashes
+/// Because it may come from an unintegrated DHT operation, a given hash
 /// shouldn't be used as a dependency when constructing another action that
-/// depends on its validity. Instead, check that value of
-/// [`AgentActivity::status`] is [`ChainStatus::Valid`], an enum variant which
-/// will contain the highest action sequence and action hash for a locally
-/// validated action; and the [`AgentActivity::warrants`] field, which may
-/// contain warrants from other DHT authorities that have found the action to be
-/// invalid from the perspective of the DHT operations they've validated.
+/// depends on its validity. Instead, check that the hash exists in
+/// [`AgentActivity::valid_activity`] and does not exist in
+/// [`AgentActivity::warrants`]; this will tell you that the action has been
+/// integrated and presumably found valid by all validators. It's also
+/// recommended to check that [`AgentActivity::status`] is [`ChainStatus::Valid`].
 #[derive(Clone, Debug, PartialEq, Hash, Eq, serde::Serialize, serde::Deserialize)]
 pub struct HighestObserved {
     /// The highest sequence number observed.
