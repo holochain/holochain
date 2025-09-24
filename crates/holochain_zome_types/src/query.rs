@@ -143,7 +143,7 @@ pub struct AgentActivity {
     /// operations produced by the agent; they have been published to this
     /// authority as part of their responsibility to keep track of the
     /// agent's status.
-    pub warrants: Vec<Warrant>,
+    pub warrants: Vec<SignedWarrant>,
 }
 
 /// When calling `hdk::chain::get_agent_activity`, specify whether to get either a
