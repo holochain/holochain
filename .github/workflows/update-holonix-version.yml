@@ -9,10 +9,6 @@ on:
         default: "false"
         type: choice
         options:
-          - "0_2"
-          - "0_2_rc"
-          - "0_3"
-          - "0_3_rc"
           - "0_4"
           - "0_4_rc"
           - "weekly"
