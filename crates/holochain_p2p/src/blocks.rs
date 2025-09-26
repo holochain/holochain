@@ -69,7 +69,7 @@ impl HolochainBlocks {
 impl Blocks for HolochainBlocks {
     fn is_blocked(&self, target: BlockTarget) -> BoxFut<'static, K2Result<bool>> {
         let BlockTarget::Agent(agent_id) = target else {
-            return Box::pin(async move { Err(K2Error::other("only agents can be blocked")) });
+            return Box::pin(async move { Ok(false) });
         };
         let db = self.db.clone();
         let cell_id = CellId::new(self.dna_hash.clone(), AgentPubKey::from_k2_agent(&agent_id));
