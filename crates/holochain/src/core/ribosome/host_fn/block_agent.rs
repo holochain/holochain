@@ -187,16 +187,11 @@ mod test {
         let mut conductor = SweetConductor::from_standard_config().await;
         let app = conductor.setup_app("", [&dna_file]).await.unwrap();
 
-        let blocks_count = conductor
+        let blocks = conductor
             .spaces
             .conductor_db
-            .test_read(|txn| {
-                txn.query_row("SELECT COUNT(*) FROM BlockSpan", [], |row| {
-                    row.get::<_, u32>(0)
-                })
-            })
-            .unwrap();
-        assert_eq!(blocks_count, 0);
+            .test_read(|txn| get_all_cell_blocks(txn));
+        assert!(blocks.is_empty());
 
         let agent_key = app.agent().clone();
         let cell_id = app.cells()[0].cell_id().clone();
