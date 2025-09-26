@@ -128,6 +128,9 @@ holochain = { path = ".", default-features = false, features = [
   "slow_tests",
   "metrics_influxive",
 ] }
+holochain_state = { version = "^0.6.0-dev.23", path = "../holochain_state", features = [
+  "test_utils",
+] }
 
 anyhow = "1.0"
 assert_cmd = "2"
