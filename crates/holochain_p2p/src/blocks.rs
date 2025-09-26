@@ -85,13 +85,12 @@ impl Blocks for HolochainBlocks {
     fn are_all_blocked(&self, targets: Vec<BlockTarget>) -> BoxFut<'static, K2Result<bool>> {
         let mut cell_ids = Vec::new();
         for target in targets {
-            let BlockTarget::Agent(agent_id) = target else {
-                return Box::pin(async move { Err(K2Error::other("only agents can be blocked")) });
-            };
-            cell_ids.push(BlockTargetId::Cell(CellId::new(
-                self.dna_hash.clone(),
-                AgentPubKey::from_k2_agent(&agent_id),
-            )));
+            if let BlockTarget::Agent(agent_id) = target {
+                cell_ids.push(BlockTargetId::Cell(CellId::new(
+                    self.dna_hash.clone(),
+                    AgentPubKey::from_k2_agent(&agent_id),
+                )));
+            }
         }
         let db = self.db.clone();
         Box::pin(async move {
