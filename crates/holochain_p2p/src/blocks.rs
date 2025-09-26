@@ -104,7 +104,7 @@ impl Blocks for HolochainBlocks {
     }
 
     fn block(&self, _target: BlockTarget) -> BoxFut<'static, K2Result<()>> {
-        // Holochain-based blocking is implemented in the actor.
+        // Holochain can insert blocks directly into the conductor database. Blocks created by Kitsune2 are not yet supported
         Box::pin(async move { Ok(()) })
     }
 }
