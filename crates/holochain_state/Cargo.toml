@@ -31,6 +31,7 @@ holochain_zome_types = { version = "^0.6.0-dev.17", path = "../holochain_zome_ty
 ] }
 holochain_state_types = { version = "^0.6.0-dev.14", path = "../holochain_state_types" }
 holochain_nonce = { version = "^0.6.0-dev.3", path = "../holochain_nonce" }
+holochain_timestamp = { version = "^0.6.0-dev.3", path = "../timestamp", optional = true }
 one_err = "0.0.8"
 shrinkwraprs = "0.3.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -77,6 +78,7 @@ test_utils = [
   "holochain_types/test_utils",
   "holochain_zome_types/test_utils",
   "holochain_sqlite/test_utils",
+  "dep:holochain_timestamp",
   "base64",
   "contrafact",
   "tempfile",

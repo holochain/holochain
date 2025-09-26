@@ -6,8 +6,9 @@ use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_peer_meta_store;
+use holochain_state::block::block;
 use holochain_state::prelude::named_params;
-use kitsune2_api::{BlockTarget, *};
+use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
 use rand::prelude::IndexedRandom;
 use std::collections::HashMap;
@@ -258,6 +259,7 @@ pub(crate) struct HolochainP2pActor {
     evt_sender: Arc<std::sync::OnceLock<WrapEvtSender>>,
     lair_client: holochain_keystore::MetaLairClient,
     kitsune: DynKitsune,
+    blocks_db_getter: GetDbConductor,
     pending: Arc<Mutex<Pending>>,
     request_duration_metric: metrics::P2pRequestDurationMetric,
     pruning_task_abort_handle: AbortHandle,
@@ -890,6 +892,7 @@ impl HolochainP2pActor {
             evt_sender,
             lair_client,
             kitsune,
+            blocks_db_getter: config.get_conductor_db.clone(),
             pending,
             request_duration_metric: create_p2p_request_duration_metric(),
             pruning_task_abort_handle,
@@ -1162,34 +1165,6 @@ impl HolochainP2pActor {
             .await
             .map_err(HolochainP2pError::K2Error)
     }
-
-    // async fn invalid_op_block(&self,
-    //     dna_hash: DnaHash,
-    //     agent_pub_key: AgentPubKey) -> HolochainP2pResult<()> {
-    // let BlockTarget::Agent(agent_id) = target else {
-    //         return Box::pin(async move { Err(K2Error::other("only agents can be blocked")) });
-    //     };
-    //     let db = self.db.clone();
-    //     let cell_id = CellId::new(self.dna_hash.clone(), AgentPubKey::from_k2_agent(&agent_id));
-    //     Box::pin(async move {
-    //         block(
-    //             &db,
-    //             Block::new(
-    //                 holochain_types::prelude::BlockTarget::Cell(
-    //                     cell_id,
-    //                     CellBlockReason::App(App(vec![]),
-    //                 ),
-    //                 InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::MAX).map_err(
-    //                     |err| K2Error::other_src("failed to set interval for block", err),
-    //                 )?,
-    //             ),
-    //         )
-    //         .await
-    //         .map_err(|err| K2Error::other_src("failed to block agent", err))
-    //     }
-    //         self.kitsune.space(dna_hash.to_k2_space()).await?.blocks().
-    //         self.kitsune.space(dna_hash.to_k2_space()).await?.blocks().block(BlockTarget::Agent(agent_pub_key.to_k2_agent())).await
-    //     }
 }
 
 macro_rules! timing_trace_out {
@@ -2171,19 +2146,34 @@ impl actor::HcP2p for HolochainP2pActor {
         })
     }
 
+    fn conductor_db_getter(&self) -> GetDbConductor {
+        self.blocks_db_getter.clone()
+    }
+
     fn block(
         &self,
-        dna_hash: DnaHash,
-        agent_pub_key: AgentPubKey,
+        block_target: holochain_zome_types::block::BlockTarget,
     ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        Box::pin(async move {
-            let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id).await?;
+        use holochain_timestamp::Timestamp;
+        use holochain_zome_types::block::BlockTarget;
 
-            Ok(space
-                .blocks()
-                .block(BlockTarget::Agent(agent_pub_key.to_k2_agent()))
-                .await?)
+        Box::pin(async move {
+            let db = self.conductor_db_getter()().await;
+            match block_target {
+                BlockTarget::Cell(cell_id, cell_block_reason) => block(
+                    &db,
+                    Block::new(
+                        BlockTarget::Cell(cell_id, cell_block_reason),
+                        InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::MAX)
+                            .map_err(|err| HolochainP2pError::other(format!("Could not create a timestamp interval while writing a block: {err}")))?,
+                    ),
+                )
+                .await
+                .map_err(|err| HolochainP2pError::other(format!("Could not write block to database: {err}"))),
+                _ => Err(HolochainP2pError::Other(
+                    "only cell block targets are supported".into(),
+                )),
+            }
         })
     }
 }

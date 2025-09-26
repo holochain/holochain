@@ -45,12 +45,12 @@ mod test {
     use crate::test_utils::RibosomeTestFixture;
     use holo_hash::ActionHash;
     use holo_hash::AgentPubKey;
-    use holochain_timestamp::{InclusiveTimestampInterval, Timestamp};
+    use holochain_state::block::get_all_cell_blocks;
     use holochain_types::prelude::CapSecret;
     use holochain_types::prelude::Record;
     use holochain_types::prelude::ZomeCallResponse;
     use holochain_wasm_test_utils::TestWasm;
-    use holochain_zome_types::block::{Block, BlockTarget, BlockTargetId, BlockTargetReason};
+    use holochain_zome_types::block::{BlockTarget, CellBlockReason};
 
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
     pub struct CapFor(CapSecret, AgentPubKey);
@@ -201,36 +201,19 @@ mod test {
         let agent_key = app.agent().clone();
         let cell_id = app.cells()[0].cell_id().clone();
         let zome = app.cells()[0].zome(TestWasm::Create);
-        let _block: () = conductor.call(&zome, "block_agent", agent_key).await;
+        let _: () = conductor.call(&zome, "block_agent", agent_key).await;
 
         let blocks = conductor
             .spaces
             .conductor_db
-            .test_read(move |txn| {
-                let mut stmt = txn
-                    .prepare("SELECT target_id, target_reason, start_us, end_us FROM BlockSpan")
-                    .unwrap();
-                let mut rows = stmt.query([]).unwrap();
-                let mut blocks = Vec::new();
-                while let Some(row) = rows.next().unwrap() {
-                    let target_id = row.get::<_, BlockTargetId>(0).unwrap();
-                    let target_reason = row.get::<_, BlockTargetReason>(1).unwrap();
-                    let start_us = row.get::<_, i64>(2).unwrap();
-                    let end_us = row.get::<_, i64>(3).unwrap();
-                    if let (BlockTargetId::Cell(block_cell_id), BlockTargetReason::Cell(reason)) = (&target_id, &target_reason) {
-                        assert_eq!(*block_cell_id, cell_id, "expected agent's cell id but found a different cell id");
-                        blocks.push(Block::new(
-                            BlockTarget::Cell(block_cell_id.clone(), reason.clone()),
-                            InclusiveTimestampInterval::try_new(Timestamp::from_micros(start_us), Timestamp::from_micros(end_us)).unwrap(),
-                        ));
-                    } else {
-                        panic!("expected cell block target id and reason, but found id {:?} and reason {:?}", target_id, target_reason);
-                    }
-                }
-                blocks
-            });
+            .test_read(|txn| get_all_cell_blocks(txn));
+
+        let expected_cell_block_reason = CellBlockReason::App(vec![]);
         assert_eq!(blocks.len(), 1);
-        assert_eq!(blocks[0].start(), Timestamp::MIN);
-        assert_eq!(blocks[0].end(), Timestamp::MAX);
+        assert!(
+            matches!(blocks[0].target(), BlockTarget::Cell(id, reason) if *id == cell_id && *reason == expected_cell_block_reason)
+        );
+        assert_eq!(blocks[0].start(), holochain_timestamp::Timestamp::MIN);
+        assert_eq!(blocks[0].end(), holochain_timestamp::Timestamp::MAX);
     }
 }
