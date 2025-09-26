@@ -1,12 +1,31 @@
 use crate::prelude::*;
 pub use hdi::chain::*;
 
-/// Query the _actions_ of a remote agent's chain.
+/// Query the current state of an agent's chain, including:
 ///
-/// The agent activity is only the actions of their source chain.
-/// The agent activity is held by the neighbourhood of the agent's public key, rather than a content hash like the rest of the DHT.
+/// * The highest observed chain item (or items, in the case of a chain fork),
+/// * A summary of whether the chain contains only valid items, contains at
+///   least one invalid item, is forked, or is empty,
+/// * Any warrants collected for invalid actions committed by the agent, and
+/// * Action sequences and hashes of valid and rejected actions if desired (see
+///   [`ActivityRequest::Full`]).
 ///
-/// The agent activity can be filtered with [`ChainQueryFilter`] like a local chain query.
+/// The agent activity is held by the neighborhood of the agent's public key.
+///
+/// If retrieving chain items along with the current state using
+/// [`ActivityRequest::Full`], the chain items in
+/// [`AgentActivity::valid_activity`] and [`AgentActivity::rejected_activity`]
+/// can be filtered with [`ChainQueryFilter`] like a local chain query. This
+/// filtering happens at the source before it sends the data to the receiver.
+///
+/// Parameters:
+///
+/// * `agent`: The agent to retrieve the status of.
+/// * `query`: An optional filter for the resulting [`AgentActivity::valid_activity`]
+///   and [`AgentActivity::rejected_activity`] values. This is only used when
+///   the `request` argument is [`ActivityRequest::Full`].
+/// * `request`: The type of data to retrieve -- a summary of current state, or
+///   the summary plus hashes of chain actions matching the filter.
 pub fn get_agent_activity(
     agent: AgentPubKey,
     query: ChainQueryFilter,
