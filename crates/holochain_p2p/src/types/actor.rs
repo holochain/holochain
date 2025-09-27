@@ -371,7 +371,7 @@ pub trait HcP2p: 'static + Send + Sync + std::fmt::Debug {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<kitsune2_api::DhtArc>>>;
 
     /// Block an agent for a DNA with a block reason.
-    fn block(&self, block_target: BlockTarget) -> BoxFut<'_, HolochainP2pResult<()>>;
+    fn block(&self, block: Block) -> BoxFut<'_, HolochainP2pResult<()>>;
 
     /// Get the conductor database getter.
     fn conductor_db_getter(&self) -> crate::GetDbConductor;

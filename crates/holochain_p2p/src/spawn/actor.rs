@@ -6,7 +6,6 @@ use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_peer_meta_store;
-use holochain_state::block::block;
 use holochain_state::prelude::named_params;
 use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
@@ -2150,42 +2149,27 @@ impl actor::HcP2p for HolochainP2pActor {
         self.blocks_db_getter.clone()
     }
 
-    fn block(
-        &self,
-        block_target: holochain_zome_types::block::BlockTarget,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        use holochain_timestamp::Timestamp;
-        use holochain_zome_types::block::BlockTarget;
-
+    fn block(&self, block: Block) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
             let db = self.conductor_db_getter()().await;
-            match block_target {
-                BlockTarget::Cell(cell_id, cell_block_reason) => {
-                    // Write block to database.
-                    block(
-                        &db,
-                        Block::new(
-                            BlockTarget::Cell(cell_id.clone(), cell_block_reason),
-                            InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::MAX)
-                                .map_err(|err| HolochainP2pError::other(format!("Could not create a timestamp interval while writing a block: {err}")))?,
-                        ),
-                    )
-                    .await
-                    .map_err(|err| HolochainP2pError::other(format!("Could not write block to database: {err}")))?;
+            // Write block to database.
+            holochain_state::block::block(&db, block.clone())
+                .await
+                .map_err(|err| {
+                    HolochainP2pError::other(format!("Could not write block to database: {err}"))
+                })?;
 
-                    // Remove agent from peer store.
-                    self.kitsune
-                        .space(cell_id.dna_hash().to_k2_space())
-                        .await?
-                        .peer_store()
-                        .remove(cell_id.agent_pubkey().to_k2_agent())
-                        .await?;
-                    Ok(())
-                }
-                _ => Err(HolochainP2pError::Other(
-                    "only cell block targets are supported".into(),
-                )),
+            if let holochain_zome_types::block::BlockTarget::Cell(cell_id, _) = block.target() {
+                // Remove agent from peer store.
+                self.kitsune
+                    .space(cell_id.dna_hash().to_k2_space())
+                    .await?
+                    .peer_store()
+                    .remove(cell_id.agent_pubkey().to_k2_agent())
+                    .await?;
             }
+
+            Ok(())
         })
     }
 }
