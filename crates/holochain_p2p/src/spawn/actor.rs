@@ -2160,16 +2160,28 @@ impl actor::HcP2p for HolochainP2pActor {
         Box::pin(async move {
             let db = self.conductor_db_getter()().await;
             match block_target {
-                BlockTarget::Cell(cell_id, cell_block_reason) => block(
-                    &db,
-                    Block::new(
-                        BlockTarget::Cell(cell_id, cell_block_reason),
-                        InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::MAX)
-                            .map_err(|err| HolochainP2pError::other(format!("Could not create a timestamp interval while writing a block: {err}")))?,
-                    ),
-                )
-                .await
-                .map_err(|err| HolochainP2pError::other(format!("Could not write block to database: {err}"))),
+                BlockTarget::Cell(cell_id, cell_block_reason) => {
+                    // Write block to database.
+                    block(
+                        &db,
+                        Block::new(
+                            BlockTarget::Cell(cell_id.clone(), cell_block_reason),
+                            InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::MAX)
+                                .map_err(|err| HolochainP2pError::other(format!("Could not create a timestamp interval while writing a block: {err}")))?,
+                        ),
+                    )
+                    .await
+                    .map_err(|err| HolochainP2pError::other(format!("Could not write block to database: {err}")))?;
+
+                    // Remove agent from peer store.
+                    self.kitsune
+                        .space(cell_id.dna_hash().to_k2_space())
+                        .await?
+                        .peer_store()
+                        .remove(cell_id.agent_pubkey().to_k2_agent())
+                        .await?;
+                    Ok(())
+                }
                 _ => Err(HolochainP2pError::Other(
                     "only cell block targets are supported".into(),
                 )),

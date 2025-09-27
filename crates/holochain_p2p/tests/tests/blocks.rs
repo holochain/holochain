@@ -3,9 +3,10 @@ use holo_hash::{
     fixt::{AgentPubKeyFixturator, DhtOpHashFixturator, DnaHashFixturator},
     DnaHash,
 };
-use holochain_keystore::test_keystore;
+use holochain_keystore::{test_keystore, MetaLairClient};
 use holochain_p2p::{
     actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
+    HolochainP2pLocalAgent,
 };
 use holochain_state::{block::get_all_cell_blocks, prelude::test_conductor_db};
 use holochain_types::{
@@ -13,23 +14,16 @@ use holochain_types::{
     prelude::{CellBlockReason, CellId},
 };
 use holochain_zome_types::block::BlockTarget;
-use kitsune2_api::DynBlocks;
-use std::sync::Arc;
+use kitsune2_api::{AgentInfo, AgentInfoSigned, DhtArc, DynBlocks, Timestamp};
+use std::{i64, sync::Arc};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cell_blocks_are_committed_to_database() {
-    let conductor_db = test_conductor_db().to_db();
-    let conductor_db2 = conductor_db.clone();
-    let config = HolochainP2pConfig {
-        get_conductor_db: Arc::new(move || {
-            let conductor_db2 = conductor_db2.clone();
-            Box::pin(async move { conductor_db2 })
-        }),
-        k2_test_builder: true,
-        ..Default::default()
-    };
-    let actor = spawn_holochain_p2p(config, test_keystore()).await.unwrap();
-    let cell_id = CellId::new(fixt!(DnaHash), fixt!(AgentPubKey));
+    let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
+    let dna_hash = fixt!(DnaHash);
+    let TestCase { actor, .. } =
+        TestCase::new_with_conductor_db(&dna_hash, conductor_db.clone()).await;
+    let cell_id = CellId::new(dna_hash, fixt!(AgentPubKey));
     let cell_block_reason = CellBlockReason::InvalidOp(fixt!(DhtOpHash));
     let block_target = BlockTarget::Cell(cell_id.clone(), cell_block_reason.clone());
 
@@ -80,6 +74,50 @@ async fn block_someone() {
         .unwrap());
     // Empty target vector is still not blocked.
     assert!(!blocks_module.are_all_blocked(vec![]).await.unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn agent_is_removed_from_peer_store_when_blocked() {
+    let dna_hash = fixt!(DnaHash);
+    let keystore = test_keystore();
+    let agent = keystore.new_sign_keypair_random().await.unwrap();
+    let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+
+    let TestCase { actor, .. } = TestCase::new_with_keystore(&dna_hash, &keystore).await;
+    let space = actor
+        .test_kitsune()
+        .space(dna_hash.to_k2_space())
+        .await
+        .unwrap();
+    let peer_store = space.peer_store();
+
+    let local_agent = HolochainP2pLocalAgent::new(agent.clone(), DhtArc::FULL, 1, keystore.clone());
+    let agent_info_signed = AgentInfoSigned::sign(
+        &local_agent,
+        AgentInfo {
+            agent: agent.to_k2_agent(),
+            created_at: Timestamp::now(),
+            expires_at: Timestamp::from_micros(i64::MAX),
+            space: dna_hash.to_k2_space(),
+            is_tombstone: false,
+            storage_arc: DhtArc::Empty,
+            url: None,
+        },
+    )
+    .await
+    .unwrap();
+    peer_store.insert(vec![agent_info_signed]).await.unwrap();
+
+    assert!(peer_store.get(agent.to_k2_agent()).await.unwrap().is_some());
+
+    // Block an agent.
+    actor
+        .block(BlockTarget::Cell(cell_id, CellBlockReason::BadCrypto))
+        .await
+        .unwrap();
+
+    // Check agent has been removed from peer store.
+    assert!(peer_store.get(agent.to_k2_agent()).await.unwrap().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -269,22 +307,34 @@ struct TestCase {
 
 impl TestCase {
     async fn new(dna_hash: &DnaHash) -> Self {
-        let conductor_db = test_conductor_db().to_db();
-        Self::new_with_conductor_db(dna_hash, conductor_db).await
+        let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
+        Self::create_test_case(dna_hash, conductor_db, test_keystore()).await
     }
 
     async fn new_with_conductor_db(
         dna_hash: &DnaHash,
         conductor_db: DbWrite<DbKindConductor>,
     ) -> Self {
+        Self::create_test_case(dna_hash, conductor_db, test_keystore()).await
+    }
+
+    async fn new_with_keystore(dna_hash: &DnaHash, keystore: &MetaLairClient) -> Self {
+        let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
+        Self::create_test_case(dna_hash, conductor_db, keystore.clone()).await
+    }
+
+    async fn create_test_case(
+        dna_hash: &DnaHash,
+        conductor_db: DbWrite<DbKindConductor>,
+        keystore: MetaLairClient,
+    ) -> Self {
         let op_db = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
         let peer_meta_db =
             DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
-        let conductor_db2 = conductor_db.clone();
         let config = HolochainP2pConfig {
             get_conductor_db: Arc::new(move || {
-                let conductor_db2 = conductor_db2.clone();
-                Box::pin(async move { conductor_db2 })
+                let conductor_db = conductor_db.clone();
+                Box::pin(async move { conductor_db })
             }),
             get_db_op_store: Arc::new(move |_| {
                 let op_db = op_db.clone();
@@ -297,7 +347,7 @@ impl TestCase {
             k2_test_builder: true,
             ..Default::default()
         };
-        let actor = spawn_holochain_p2p(config, test_keystore()).await.unwrap();
+        let actor = spawn_holochain_p2p(config, keystore).await.unwrap();
         actor
             .register_handler(Arc::new(MockHcP2pHandler::new()))
             .await
