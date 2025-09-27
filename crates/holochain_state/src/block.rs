@@ -83,6 +83,45 @@ pub fn query_are_all_blocked(
     )?)
 }
 
+/// Get all blocks from the `BlockSpan` table. Useful for testing.
+#[cfg(any(test, feature = "test_utils"))]
+pub fn get_all_cell_blocks(txn: &Transaction) -> Vec<Block> {
+    use holochain_timestamp::InclusiveTimestampInterval;
+    use holochain_zome_types::block::{BlockTarget, BlockTargetReason};
+
+    let mut stmt = txn
+        .prepare("SELECT target_id, target_reason, start_us, end_us FROM BlockSpan")
+        .unwrap();
+    let mut rows = stmt.query([]).unwrap();
+    let mut blocks = Vec::new();
+    while let Some(row) = rows.next().unwrap() {
+        let target_id: BlockTargetId = row.get(0).unwrap();
+        let target_reason: BlockTargetReason = row.get(1).unwrap();
+        let start_us: i64 = row.get(2).unwrap();
+        let end_us: i64 = row.get(3).unwrap();
+
+        let target = match (target_id, target_reason) {
+            (BlockTargetId::Cell(cell_id), BlockTargetReason::Cell(reason)) => {
+                BlockTarget::Cell(cell_id, reason)
+            }
+            _ => {
+                // Not supported
+                panic!("only cell block targets are supported")
+            }
+        };
+
+        blocks.push(Block::new(
+            target,
+            InclusiveTimestampInterval::try_new(
+                Timestamp::from_micros(start_us),
+                Timestamp::from_micros(end_us),
+            )
+            .unwrap(),
+        ));
+    }
+    blocks
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

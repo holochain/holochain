@@ -45,10 +45,12 @@ mod test {
     use crate::test_utils::RibosomeTestFixture;
     use holo_hash::ActionHash;
     use holo_hash::AgentPubKey;
+    use holochain_state::block::get_all_cell_blocks;
     use holochain_types::prelude::CapSecret;
     use holochain_types::prelude::Record;
     use holochain_types::prelude::ZomeCallResponse;
     use holochain_wasm_test_utils::TestWasm;
+    use holochain_zome_types::block::{BlockTarget, CellBlockReason};
 
     #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
     pub struct CapFor(CapSecret, AgentPubKey);
@@ -176,5 +178,37 @@ mod test {
         // Bob can get data from alice via. carol.
         let bob_get2: Option<Record> = bob_conductor.call(&bob, "get_post", action1).await;
         assert!(bob_get2.is_some());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn hdk_cell_block_adds_block_to_blockspan_database() {
+        holochain_trace::test_run();
+        let (dna_file, _, _) = SweetDnaFile::unique_from_test_wasms(vec![TestWasm::Create]).await;
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app = conductor.setup_app("", [&dna_file]).await.unwrap();
+
+        let blocks = conductor
+            .spaces
+            .conductor_db
+            .test_read(|txn| get_all_cell_blocks(txn));
+        assert!(blocks.is_empty());
+
+        let agent_key = app.agent().clone();
+        let cell_id = app.cells()[0].cell_id().clone();
+        let zome = app.cells()[0].zome(TestWasm::Create);
+        let _: () = conductor.call(&zome, "block_agent", agent_key).await;
+
+        let blocks = conductor
+            .spaces
+            .conductor_db
+            .test_read(|txn| get_all_cell_blocks(txn));
+
+        let expected_cell_block_reason = CellBlockReason::App(vec![]);
+        assert_eq!(blocks.len(), 1);
+        assert!(
+            matches!(blocks[0].target(), BlockTarget::Cell(id, reason) if *id == cell_id && *reason == expected_cell_block_reason)
+        );
+        assert_eq!(blocks[0].start(), holochain_timestamp::Timestamp::MIN);
+        assert_eq!(blocks[0].end(), holochain_timestamp::Timestamp::MAX);
     }
 }

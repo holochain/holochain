@@ -8,6 +8,8 @@ use holo_hash::DnaHash;
 use holochain_integrity_types::Timestamp;
 use holochain_timestamp::InclusiveTimestampInterval;
 #[cfg(feature = "rusqlite")]
+use rusqlite::types::FromSql;
+#[cfg(feature = "rusqlite")]
 use rusqlite::types::ToSqlOutput;
 #[cfg(feature = "rusqlite")]
 use rusqlite::ToSql;
@@ -37,7 +39,7 @@ pub enum CellBlockReason {
 
 /// Reason why we might want to block a node.
 #[deprecated(since = "0.6.0")]
-#[derive(Clone, serde::Serialize, Debug)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
 pub enum NodeBlockReason {
     /// The node did some bad cryptography.
     BadCrypto,
@@ -47,14 +49,14 @@ pub enum NodeBlockReason {
 
 /// Reason for a Node/Space Block.
 #[deprecated(since = "0.6.0")]
-#[derive(Clone, serde::Serialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum NodeSpaceBlockReason {
     /// Bad message encoding.
     BadWire,
 }
 
 /// Reason why we might want to block an IP.
-#[derive(Clone, serde::Serialize, Debug)]
+#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
 pub enum IpBlockReason {
     /// Classic DoS.
     DoS,
@@ -116,7 +118,26 @@ impl ToSql for BlockTargetId {
     }
 }
 
-#[derive(Debug, serde::Serialize, Clone)]
+#[cfg(feature = "rusqlite")]
+impl FromSql for BlockTargetId {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        let bytes = match value {
+            rusqlite::types::ValueRef::Blob(b) => b,
+            _ => {
+                // Anything else is a type‑mismatch.
+                return Err(rusqlite::types::FromSqlError::InvalidType);
+            }
+        };
+
+        // Decode the byte slice back into a [`BlockTargetId`].
+        holochain_serialized_bytes::decode::<_, BlockTargetId>(bytes).map_err(|_| {
+            // Propagate the decoding error as an invalid type error.
+            rusqlite::types::FromSqlError::InvalidType
+        })
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum BlockTargetReason {
     Cell(CellBlockReason),
     #[deprecated(since = "0.6.0", note = "not respected, use cell instead")]
@@ -134,6 +155,25 @@ impl ToSql for BlockTargetReason {
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?
                 .into(),
         ))
+    }
+}
+
+#[cfg(feature = "rusqlite")]
+impl FromSql for BlockTargetReason {
+    fn column_result(value: rusqlite::types::ValueRef<'_>) -> rusqlite::types::FromSqlResult<Self> {
+        let bytes = match value {
+            rusqlite::types::ValueRef::Blob(b) => b,
+            _ => {
+                // Anything else is a type‑mismatch.
+                return Err(rusqlite::types::FromSqlError::InvalidType);
+            }
+        };
+
+        // Decode the byte slice back into a [`BlockTargetReason`].
+        holochain_serialized_bytes::decode::<_, BlockTargetReason>(bytes).map_err(|_| {
+            // Propagate the decoding error as an invalid type error.
+            rusqlite::types::FromSqlError::InvalidType
+        })
     }
 }
 

@@ -1,3 +1,4 @@
+mod blocks;
 mod local_agent;
 mod node_messaging;
 mod op_store;

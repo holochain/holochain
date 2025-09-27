@@ -31,6 +31,9 @@ pub use op_store::*;
 mod hc_report;
 pub use hc_report::*;
 
+mod blocks;
+pub use blocks::*;
+
 mod metrics;
 
 fn check_k2_init() {

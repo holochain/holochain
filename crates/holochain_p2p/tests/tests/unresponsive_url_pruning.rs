@@ -6,7 +6,7 @@ use holochain_p2p::{
     HolochainP2pLocalAgent,
 };
 use holochain_state::prelude::{named_params, test_db_dir};
-use holochain_types::db::{DbKindDht, DbKindPeerMetaStore, DbWrite};
+use holochain_types::db::{DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite};
 use kitsune2_api::{
     AgentId, AgentInfo, AgentInfoSigned, DhtArc, DynPeerMetaStore, Id, SpaceId, Timestamp, Url,
     KEY_PREFIX_ROOT, META_KEY_UNRESPONSIVE,
@@ -109,7 +109,7 @@ async fn urls_are_pruned_when_updated_agent_info_available() {
     let updated_agent_info = AgentInfoSigned::sign(
         &local_agent,
         AgentInfo {
-            agent: AgentId(Id(Bytes::from_static(b"a"))),
+            agent: AgentId(Id(Bytes::from_static(&[0xaa; 32]))),
             created_at: Timestamp::now(),
             expires_at: Timestamp::from_micros(Timestamp::now().as_micros() + 10_000_000),
             is_tombstone: false,
@@ -172,6 +172,7 @@ impl TestCase {
         let db_peer_meta =
             DbWrite::test(&db_dir, DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
         let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
+        let db_conductor = DbWrite::test_in_mem(DbKindConductor).unwrap();
         let lair_client = test_keystore();
         let db_peer_meta2 = db_peer_meta.clone();
         let p2p = spawn_holochain_p2p(
@@ -184,6 +185,10 @@ impl TestCase {
                 get_db_op_store: Arc::new(move |_| {
                     let db_op = db_op.clone();
                     Box::pin(async move { Ok(db_op) })
+                }),
+                get_conductor_db: Arc::new(move || {
+                    let db_conductor = db_conductor.clone();
+                    Box::pin(async move { db_conductor })
                 }),
                 k2_test_builder: true,
                 ..Default::default()

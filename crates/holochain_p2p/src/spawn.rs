@@ -31,6 +31,10 @@ pub type GetDbOpStore = Arc<
         + Sync,
 >;
 
+/// Callback function to retrieve a conductor database.
+pub type GetDbConductor =
+    Arc<dyn Fn() -> BoxFut<'static, DbWrite<DbKindConductor>> + 'static + Send + Sync>;
+
 /// Configure reporting.
 #[derive(Default)]
 pub enum ReportConfig {
@@ -54,6 +58,9 @@ pub struct HolochainP2pConfig {
 
     /// Callback function to retrieve an op store database handle for a dna hash.
     pub get_db_op_store: GetDbOpStore,
+
+    /// Callback function to retrieve the conductor database handle.
+    pub get_conductor_db: GetDbConductor,
 
     /// The arc factor to apply to target arc hints.
     pub target_arc_factor: u32,
@@ -132,6 +139,7 @@ impl Default for HolochainP2pConfig {
             get_db_peer_meta: Arc::new(|_| unimplemented!()),
             peer_meta_pruning_interval_ms: 10_000,
             get_db_op_store: Arc::new(|_| unimplemented!()),
+            get_conductor_db: Arc::new(|| unimplemented!()),
             target_arc_factor: 1,
             auth_material: None,
             network_config: None,

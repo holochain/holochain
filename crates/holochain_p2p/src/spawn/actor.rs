@@ -6,6 +6,7 @@ use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_peer_meta_store;
+use holochain_state::block::block;
 use holochain_state::prelude::named_params;
 use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
@@ -258,6 +259,7 @@ pub(crate) struct HolochainP2pActor {
     evt_sender: Arc<std::sync::OnceLock<WrapEvtSender>>,
     lair_client: holochain_keystore::MetaLairClient,
     kitsune: DynKitsune,
+    blocks_db_getter: GetDbConductor,
     pending: Arc<Mutex<Pending>>,
     request_duration_metric: metrics::P2pRequestDurationMetric,
     pruning_task_abort_handle: AbortHandle,
@@ -825,6 +827,9 @@ impl HolochainP2pActor {
         if let ReportConfig::JsonLines(_) = &config.report {
             builder.report = HcReportFactory::create(lair_client.clone());
         }
+        builder.blocks = Arc::new(HolochainBlocksFactory {
+            getter: config.get_conductor_db.clone(),
+        });
         builder.peer_meta_store = Arc::new(HolochainPeerMetaStoreFactory {
             getter: config.get_db_peer_meta.clone(),
         });
@@ -887,6 +892,7 @@ impl HolochainP2pActor {
             evt_sender,
             lair_client,
             kitsune,
+            blocks_db_getter: config.get_conductor_db.clone(),
             pending,
             request_duration_metric: create_p2p_request_duration_metric(),
             pruning_task_abort_handle,
@@ -2128,7 +2134,7 @@ impl actor::HcP2p for HolochainP2pActor {
     ) -> BoxFut<'_, HolochainP2pResult<Vec<kitsune2_api::DhtArc>>> {
         Box::pin(async move {
             let space_id = dna_hash.to_k2_space();
-            let space = self.kitsune.space(space_id.clone()).await?;
+            let space = self.kitsune.space(space_id).await?;
 
             Ok(space
                 .local_agent_store()
@@ -2137,6 +2143,37 @@ impl actor::HcP2p for HolochainP2pActor {
                 .into_iter()
                 .map(|a| a.get_tgt_storage_arc())
                 .collect())
+        })
+    }
+
+    fn conductor_db_getter(&self) -> GetDbConductor {
+        self.blocks_db_getter.clone()
+    }
+
+    fn block(
+        &self,
+        block_target: holochain_zome_types::block::BlockTarget,
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
+        use holochain_timestamp::Timestamp;
+        use holochain_zome_types::block::BlockTarget;
+
+        Box::pin(async move {
+            let db = self.conductor_db_getter()().await;
+            match block_target {
+                BlockTarget::Cell(cell_id, cell_block_reason) => block(
+                    &db,
+                    Block::new(
+                        BlockTarget::Cell(cell_id, cell_block_reason),
+                        InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::MAX)
+                            .map_err(|err| HolochainP2pError::other(format!("Could not create a timestamp interval while writing a block: {err}")))?,
+                    ),
+                )
+                .await
+                .map_err(|err| HolochainP2pError::other(format!("Could not write block to database: {err}"))),
+                _ => Err(HolochainP2pError::Other(
+                    "only cell block targets are supported".into(),
+                )),
+            }
         })
     }
 }

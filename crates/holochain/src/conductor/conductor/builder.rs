@@ -203,6 +203,7 @@ impl ConductorBuilder {
 
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
+        let conductor_db = spaces.conductor_db.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
             auth_material: config
                 .network
@@ -220,6 +221,10 @@ impl ConductorBuilder {
             get_db_op_store: Arc::new(move |dna_hash| {
                 let res = net_spaces2.dht_db(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
+            }),
+            get_conductor_db: Arc::new(move || {
+                let conductor_db = conductor_db.clone();
+                Box::pin(async move { conductor_db })
             }),
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),
@@ -416,6 +421,7 @@ impl ConductorBuilder {
 
         let net_spaces1 = spaces.clone();
         let net_spaces2 = spaces.clone();
+        let conductor_db = spaces.conductor_db.clone();
         let p2p_config = holochain_p2p::HolochainP2pConfig {
             auth_material: config
                 .network
@@ -433,6 +439,10 @@ impl ConductorBuilder {
             get_db_op_store: Arc::new(move |dna_hash| {
                 let res = net_spaces2.dht_db(&dna_hash);
                 Box::pin(async move { res.map_err(holochain_p2p::HolochainP2pError::other) })
+            }),
+            get_conductor_db: Arc::new(move || {
+                let conductor_db = conductor_db.clone();
+                Box::pin(async move { conductor_db })
             }),
             target_arc_factor: config.network.target_arc_factor,
             network_config: Some(config.network.to_k2_config()?),

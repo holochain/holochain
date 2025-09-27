@@ -1,0 +1,316 @@
+use ::fixt::fixt;
+use holo_hash::{
+    fixt::{AgentPubKeyFixturator, DhtOpHashFixturator, DnaHashFixturator},
+    DnaHash,
+};
+use holochain_keystore::test_keystore;
+use holochain_p2p::{
+    actor::DynHcP2p, event::MockHcP2pHandler, spawn_holochain_p2p, HolochainP2pConfig,
+};
+use holochain_state::{block::get_all_cell_blocks, prelude::test_conductor_db};
+use holochain_types::{
+    db::{DbKindConductor, DbKindDht, DbKindPeerMetaStore, DbWrite},
+    prelude::{CellBlockReason, CellId},
+};
+use holochain_zome_types::block::BlockTarget;
+use kitsune2_api::DynBlocks;
+use std::sync::Arc;
+
+#[tokio::test(flavor = "multi_thread")]
+async fn cell_blocks_are_committed_to_database() {
+    let conductor_db = test_conductor_db().to_db();
+    let conductor_db2 = conductor_db.clone();
+    let config = HolochainP2pConfig {
+        get_conductor_db: Arc::new(move || {
+            let conductor_db2 = conductor_db2.clone();
+            Box::pin(async move { conductor_db2 })
+        }),
+        k2_test_builder: true,
+        ..Default::default()
+    };
+    let actor = spawn_holochain_p2p(config, test_keystore()).await.unwrap();
+    let cell_id = CellId::new(fixt!(DnaHash), fixt!(AgentPubKey));
+    let cell_block_reason = CellBlockReason::InvalidOp(fixt!(DhtOpHash));
+    let block_target = BlockTarget::Cell(cell_id.clone(), cell_block_reason.clone());
+
+    actor.block(block_target).await.unwrap();
+
+    let blocks = conductor_db.test_read(|txn| get_all_cell_blocks(txn));
+    assert_eq!(blocks.len(), 1);
+    assert!(
+        matches!(blocks[0].target(), BlockTarget::Cell(id, reason) if *id == cell_id && *reason == cell_block_reason)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn block_someone() {
+    let dna_hash = fixt!(DnaHash);
+    let agent = fixt!(AgentPubKey);
+    let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+
+    let TestCase {
+        actor,
+        blocks_module,
+    } = TestCase::new(&dna_hash).await;
+
+    assert!(!blocks_module
+        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+        .await
+        .unwrap());
+    assert!(!blocks_module.are_all_blocked(vec![]).await.unwrap());
+    assert!(!blocks_module
+        .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+        .await
+        .unwrap());
+
+    // Block an agent.
+    actor
+        .block(BlockTarget::Cell(cell_id, CellBlockReason::BadCrypto))
+        .await
+        .unwrap();
+
+    // Check agent is blocked now.
+    assert!(blocks_module
+        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+        .await
+        .unwrap());
+    assert!(blocks_module
+        .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+        .await
+        .unwrap());
+    // Empty target vector is still not blocked.
+    assert!(!blocks_module.are_all_blocked(vec![]).await.unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn are_all_blocked_mixed_then_all_blocked() {
+    let dna_hash = fixt!(DnaHash);
+    let agent_1 = fixt!(AgentPubKey);
+    let agent_2 = fixt!(AgentPubKey);
+    let cell_id1 = CellId::new(dna_hash.clone(), agent_1.clone());
+    let cell_id2 = CellId::new(dna_hash.clone(), agent_2.clone());
+
+    let TestCase {
+        actor,
+        blocks_module,
+    } = TestCase::new(&dna_hash).await;
+
+    // Initially not blocked.
+    assert!(!blocks_module
+        .are_all_blocked(vec![
+            kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
+            kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
+        ])
+        .await
+        .unwrap());
+
+    // Block agent1 only.
+    actor
+        .block(BlockTarget::Cell(cell_id1, CellBlockReason::BadCrypto))
+        .await
+        .unwrap();
+
+    // Mixed list should yield false.
+    assert!(!blocks_module
+        .are_all_blocked(vec![
+            kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
+            kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
+        ])
+        .await
+        .unwrap());
+
+    // Block agent2 as well.
+    actor
+        .block(BlockTarget::Cell(cell_id2, CellBlockReason::BadCrypto))
+        .await
+        .unwrap();
+
+    // Now all should be blocked.
+    assert!(blocks_module
+        .are_all_blocked(vec![
+            kitsune2_api::BlockTarget::Agent(agent_1.to_k2_agent()),
+            kitsune2_api::BlockTarget::Agent(agent_2.to_k2_agent()),
+        ])
+        .await
+        .unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn are_all_blocked_with_duplicate_targets() {
+    let dna_hash = fixt!(DnaHash);
+    let agent = fixt!(AgentPubKey);
+    let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+
+    let TestCase {
+        actor,
+        blocks_module,
+    } = TestCase::new(&dna_hash).await;
+
+    // Not blocked initially even with duplicates in query.
+    assert!(!blocks_module
+        .are_all_blocked(vec![
+            kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
+            kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
+            kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
+        ])
+        .await
+        .unwrap());
+
+    // Block the agent.
+    actor
+        .block(BlockTarget::Cell(cell_id, CellBlockReason::BadCrypto))
+        .await
+        .unwrap();
+
+    // Duplicates in the query should still resolve to true once blocked.
+    assert!(blocks_module
+        .are_all_blocked(vec![
+            kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
+            kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()),
+        ])
+        .await
+        .unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn blocking_same_agent_twice_is_ok() {
+    let dna_hash = fixt!(DnaHash);
+    let agent = fixt!(AgentPubKey);
+    let cell_id = CellId::new(dna_hash.clone(), agent.clone());
+
+    let TestCase {
+        actor,
+        blocks_module,
+    } = TestCase::new(&dna_hash).await;
+
+    // First block.
+    actor
+        .block(BlockTarget::Cell(
+            cell_id.clone(),
+            CellBlockReason::BadCrypto,
+        ))
+        .await
+        .unwrap();
+
+    // Second block should not error.
+    actor
+        .block(BlockTarget::Cell(cell_id, CellBlockReason::App(vec![])))
+        .await
+        .unwrap();
+
+    // Still blocked.
+    assert!(blocks_module
+        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+        .await
+        .unwrap());
+}
+
+// Same conductor DB, but two different DNA hashes.
+#[tokio::test(flavor = "multi_thread")]
+async fn block_is_scoped_per_dna() {
+    let agent = fixt!(AgentPubKey);
+    let dna_hash_1 = fixt!(DnaHash);
+    let dna_hash_2 = fixt!(DnaHash);
+    let cell_id_1 = CellId::new(dna_hash_1.clone(), agent.clone());
+
+    let conductor_db = test_conductor_db().to_db();
+    let TestCase {
+        actor: actor_1,
+        blocks_module: blocks_module_1,
+    } = TestCase::new_with_conductor_db(&dna_hash_1, conductor_db.clone()).await;
+    let TestCase {
+        blocks_module: blocks_module_2,
+        ..
+    } = TestCase::new_with_conductor_db(&dna_hash_2, conductor_db).await;
+
+    // Initially not blocked in either DNA.
+    assert!(!blocks_module_1
+        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+        .await
+        .unwrap());
+    assert!(!blocks_module_2
+        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+        .await
+        .unwrap());
+
+    // Block in DNA1 only.
+    actor_1
+        .block(BlockTarget::Cell(cell_id_1, CellBlockReason::BadCrypto))
+        .await
+        .unwrap();
+
+    // Blocked in DNA1.
+    assert!(blocks_module_1
+        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+        .await
+        .unwrap());
+
+    // Still not blocked in DNA2.
+    assert!(!blocks_module_2
+        .is_blocked(kitsune2_api::BlockTarget::Agent(agent.to_k2_agent()))
+        .await
+        .unwrap());
+
+    // All-blocked checks respect DNA scoping too.
+    assert!(blocks_module_1
+        .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+        .await
+        .unwrap());
+    assert!(!blocks_module_2
+        .are_all_blocked(vec![kitsune2_api::BlockTarget::Agent(agent.to_k2_agent())])
+        .await
+        .unwrap());
+}
+
+struct TestCase {
+    actor: DynHcP2p,
+    blocks_module: DynBlocks,
+}
+
+impl TestCase {
+    async fn new(dna_hash: &DnaHash) -> Self {
+        let conductor_db = test_conductor_db().to_db();
+        Self::new_with_conductor_db(dna_hash, conductor_db).await
+    }
+
+    async fn new_with_conductor_db(
+        dna_hash: &DnaHash,
+        conductor_db: DbWrite<DbKindConductor>,
+    ) -> Self {
+        let op_db = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
+        let peer_meta_db =
+            DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
+        let conductor_db2 = conductor_db.clone();
+        let config = HolochainP2pConfig {
+            get_conductor_db: Arc::new(move || {
+                let conductor_db2 = conductor_db2.clone();
+                Box::pin(async move { conductor_db2 })
+            }),
+            get_db_op_store: Arc::new(move |_| {
+                let op_db = op_db.clone();
+                Box::pin(async move { Ok(op_db) })
+            }),
+            get_db_peer_meta: Arc::new(move |_| {
+                let peer_meta_db = peer_meta_db.clone();
+                Box::pin(async move { Ok(peer_meta_db) })
+            }),
+            k2_test_builder: true,
+            ..Default::default()
+        };
+        let actor = spawn_holochain_p2p(config, test_keystore()).await.unwrap();
+        actor
+            .register_handler(Arc::new(MockHcP2pHandler::new()))
+            .await
+            .unwrap();
+        let space = actor
+            .test_kitsune()
+            .space(dna_hash.to_k2_space())
+            .await
+            .unwrap();
+        let blocks_module = space.blocks().clone();
+        Self {
+            actor,
+            blocks_module,
+        }
+    }
+}

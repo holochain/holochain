@@ -1442,6 +1442,7 @@ async fn spawn_test(
     let db_peer_meta =
         DbWrite::test_in_mem(DbKindPeerMetaStore(Arc::new(dna_hash.clone()))).unwrap();
     let db_op = DbWrite::test_in_mem(DbKindDht(Arc::new(dna_hash.clone()))).unwrap();
+    let conductor_db = DbWrite::test_in_mem(DbKindConductor).unwrap();
     let lair_client = test_keystore();
 
     let agent = lair_client.new_sign_keypair_random().await.unwrap();
@@ -1455,6 +1456,10 @@ async fn spawn_test(
             get_db_op_store: Arc::new(move |_| {
                 let db_op = db_op.clone();
                 Box::pin(async move { Ok(db_op.clone()) })
+            }),
+            get_conductor_db: Arc::new(move || {
+                let conductor_db = conductor_db.clone();
+                Box::pin(async move { conductor_db })
             }),
             k2_test_builder: true,
             request_timeout: Duration::from_secs(1),
