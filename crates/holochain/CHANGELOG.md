@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 
+- Permit `must_get_valid_record` to retrieve data from the network when called from a coordinator zome. #5304
 - Remove agents from peer store when they are blocked.
 - Refactor HDK call `block_agent` to use `HolochainP2pActor::block`.
 
