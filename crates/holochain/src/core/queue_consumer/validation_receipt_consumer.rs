@@ -35,7 +35,7 @@ pub fn spawn_validation_receipt_consumer(
                     move |block| {
                         let conductor = conductor.clone();
                         // This can be cleaned up when the compiler is smarter - https://github.com/rust-lang/rust/issues/69663
-                        async move { conductor.block(block).await }.boxed()
+                        async move { conductor.holochain_p2p().block(block).await }.boxed()
                     }
                 },
             )

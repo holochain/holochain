@@ -3,7 +3,7 @@ use crate::core::queue_consumer::WorkComplete;
 use futures::future::BoxFuture;
 use futures::{stream, StreamExt};
 use holochain_keystore::MetaLairClient;
-use holochain_p2p::DynHolochainP2pDna;
+use holochain_p2p::{DynHolochainP2pDna, HolochainP2pResult};
 use holochain_state::prelude::*;
 use holochain_zome_types::block::Block;
 use holochain_zome_types::block::BlockTarget;
@@ -33,7 +33,7 @@ pub async fn validation_receipt_workflow<B>(
     apply_block: B,
 ) -> WorkflowResult<WorkComplete>
 where
-    B: Fn(Block) -> BoxFuture<'static, DatabaseResult<()>> + Clone,
+    B: Fn(Block) -> BoxFuture<'static, HolochainP2pResult<()>> + Clone,
 {
     if running_cell_ids.is_empty() {
         return Ok(WorkComplete::Complete);
@@ -114,7 +114,7 @@ async fn sign_and_send_receipts_to_author<B>(
     apply_block: B,
 ) -> WorkflowResult<()>
 where
-    B: Fn(Block) -> BoxFuture<'static, DatabaseResult<()>>,
+    B: Fn(Block) -> BoxFuture<'static, HolochainP2pResult<()>>,
 {
     // Don't send receipt to self. Don't block self.
     if validators.contains(op_author) {
