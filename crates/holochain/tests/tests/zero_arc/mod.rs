@@ -68,10 +68,15 @@ async fn must_get_valid_record() {
     let (test_dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
 
     // Standard config with target arc factor 1
-    let standard_config = SweetConductorConfig::rendezvous(true);
+    let standard_config = SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
+        nc.disable_gossip = true;
+        nc.disable_publish = true;
+    });
     // Standard config with target arc factor 0
     let empty_arc_conductor_config =
-        SweetConductorConfig::rendezvous(true).tune_network_config(|nc| {
+        SweetConductorConfig::rendezvous(false).tune_network_config(|nc| {
+            nc.disable_gossip = true;
+            nc.disable_publish = true;
             nc.target_arc_factor = 0;
         });
     let mut conductors =
@@ -81,19 +86,28 @@ async fn must_get_valid_record() {
     let apps = conductors.setup_app("", [&test_dna]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
-    conductors[0]
-        .declare_full_storage_arcs(test_dna.dna_hash())
-        .await;
-    conductors.exchange_peer_info().await;
-
-    tracing::info!("Creating record for Alice");
+    // Alice creates an entry
     let alice_zome = alice.zome(SweetInlineZomes::COORDINATOR);
     let _: () = conductors[0].call(&alice_zome, "create", ()).await;
 
-    tracing::info!("Getting record for Bob");
+    // Ensure Bob cannot see Alice's entry
     let bob_zome = bob.zome(SweetInlineZomes::COORDINATOR);
     let records: Vec<Record> = conductors[1].call(&bob_zome, "get", ()).await;
 
+    assert!(
+        records.is_empty(),
+        "Expected Bob to not be able to get Alice's record"
+    );
+
+    // Simulate Alice reaching a full storage arc
+    conductors[0]
+        .declare_full_storage_arcs(test_dna.dna_hash())
+        .await;
+    // and ensure Bob knows about Alice's full arc.
+    conductors.exchange_peer_info().await;
+
+    // Now Bob should be able to get Alice's entry
+    let records: Vec<Record> = conductors[1].call(&bob_zome, "get", ()).await;
     assert_eq!(
         records.len(),
         1,
