@@ -51,7 +51,7 @@ pub fn must_get_valid_record(
                             &workspace,
                             call_context.host_context.network().clone(),
                         ),
-                        GetOptions::local(),
+                        GetOptions::network(),
                     ),
                 };
                 match cascade
