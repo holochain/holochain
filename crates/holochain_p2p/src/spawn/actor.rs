@@ -2151,24 +2151,44 @@ impl actor::HcP2p for HolochainP2pActor {
 
     fn block(&self, block: Block) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
+            // Capture the target up front so we can move `block` into the DB call without cloning.
+            let target = block.target().clone();
             let db = self.conductor_db_getter()().await;
             // Write block to database.
-            holochain_state::block::block(&db, block.clone())
+            holochain_state::block::block(&db, block)
                 .await
                 .map_err(|err| {
                     HolochainP2pError::other(format!("Could not write block to database: {err}"))
                 })?;
 
-            if let holochain_zome_types::block::BlockTarget::Cell(cell_id, _) = block.target() {
-                // Remove agent from peer store.
-                self.kitsune
-                    .space(cell_id.dna_hash().to_k2_space())
-                    .await?
-                    .peer_store()
-                    .remove(cell_id.agent_pubkey().to_k2_agent())
-                    .await?;
+            if let holochain_zome_types::block::BlockTarget::Cell(cell_id, _) = target {
+                // Best-effort removal: do not error if the space is missing or removal fails.
+                match self
+                    .kitsune
+                    .space_if_exists(cell_id.dna_hash().to_k2_space())
+                    .await
+                {
+                    Some(space) => {
+                        if let Err(err) = space
+                            .peer_store()
+                            .remove(cell_id.agent_pubkey().to_k2_agent())
+                            .await
+                        {
+                            tracing::warn!(
+                                ?err,
+                                ?cell_id,
+                                "Failed to remove agent from peer store after writing block"
+                            );
+                        }
+                    }
+                    None => {
+                        tracing::debug!(
+                            ?cell_id,
+                            "No Kitsune space exists for this DNA; skipping peer removal"
+                        );
+                    }
+                }
             }
-
             Ok(())
         })
     }
