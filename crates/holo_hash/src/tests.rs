@@ -48,13 +48,6 @@ fn holo_hash_parse() {
         &format!("{:?}", h),
     );
 
-    let h = NetIdHash::try_from("uhCIkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
-    assert_eq!(expected_loc, h.get_loc());
-    assert_eq!(
-        "NetIdHash(uhCIkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm)",
-        &format!("{:?}", h),
-    );
-
     let h = ActionHash::try_from("uhCkkWCsAgoKkkfwyJAglj30xX_GLLV-3BXuFy436a2SqpcEwyBzm").unwrap();
     assert_eq!(expected_loc, h.get_loc());
     assert_eq!(

@@ -17,8 +17,6 @@ use crate::EntryHash;
 use crate::EntryHashB64;
 use crate::ExternalHash;
 use crate::ExternalHashB64;
-use crate::NetIdHash;
-use crate::NetIdHashB64;
 use crate::WasmHash;
 use crate::WasmHashB64;
 use ::fixt::prelude::*;
@@ -136,15 +134,6 @@ fixturator!(
 fixturator!(
     ActionHashB64;
     constructor fn new(ActionHash);
-);
-
-fixturator!(
-    NetIdHash;
-    constructor fn from_raw_32(ThirtyTwoHashBytes);
-);
-fixturator!(
-    NetIdHashB64;
-    constructor fn new(NetIdHash);
 );
 
 fixturator!(
