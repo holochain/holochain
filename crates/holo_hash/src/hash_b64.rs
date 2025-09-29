@@ -83,9 +83,6 @@ pub type EntryHashB64 = HoloHashB64<hash_type::Entry>;
 /// Base64-ready version of ActionHash
 pub type ActionHashB64 = HoloHashB64<hash_type::Action>;
 
-/// Base64-ready version of NetIdHash
-pub type NetIdHashB64 = HoloHashB64<hash_type::NetId>;
-
 /// Base64-ready version of WasmHash
 pub type WasmHashB64 = HoloHashB64<hash_type::Wasm>;
 

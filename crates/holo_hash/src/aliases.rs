@@ -28,9 +28,6 @@ pub type EntryHash = HoloHash<hash_type::Entry>;
 /// The hash of an action
 pub type ActionHash = HoloHash<hash_type::Action>;
 
-/// The hash of a network ID
-pub type NetIdHash = HoloHash<hash_type::NetId>;
-
 /// The hash of some wasm bytecode
 pub type WasmHash = HoloHash<hash_type::Wasm>;
 

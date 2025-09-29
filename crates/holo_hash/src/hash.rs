@@ -325,10 +325,6 @@ mod tests {
             DnaHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );
         assert_type(
-            "NetIdHash",
-            NetIdHash::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
-        );
-        assert_type(
             "AgentPubKey",
             AgentPubKey::from_raw_36(vec![0xdb; HOLO_HASH_UNTYPED_LEN]),
         );

@@ -7,7 +7,7 @@ use std::convert::TryInto;
 // Valid Holochain options for prefixes:
 // hCAk 4100 <Buffer 84 20 24> * AGENT
 // hCEk 4228 <Buffer 84 21 24> * ENTRY
-// hCIk 4356 <Buffer 84 22 24> * NET_ID
+// hCIk 4356 <Buffer 84 22 24> * reserved
 // hCMk 4484 <Buffer 84 23 24>
 // hCQk 4612 <Buffer 84 24 24> * DHTOP
 // hCUk 4740 <Buffer 84 25 24>
@@ -45,7 +45,6 @@ pub(crate) const ENTRY_PREFIX: &[u8] = &[0x84, 0x21, 0x24]; // uhCEk [132, 33, 3
 pub(crate) const DHTOP_PREFIX: &[u8] = &[0x84, 0x24, 0x24]; // uhCQk [132, 36, 36]
 pub(crate) const WARRANT_PREFIX: &[u8] = &[0x84, 0x2c, 0x24]; // uhCwk [132, 44, 36]
 pub(crate) const DNA_PREFIX: &[u8] = &[0x84, 0x2d, 0x24]; // uhC0k [132, 45, 36]
-pub(crate) const NET_ID_PREFIX: &[u8] = &[0x84, 0x22, 0x24]; // uhCIk [132, 34, 36]
 pub(crate) const ACTION_PREFIX: &[u8] = &[0x84, 0x29, 0x24]; // uhCkk [132, 41, 36]
 pub(crate) const WASM_PREFIX: &[u8] = &[0x84, 0x2a, 0x24]; // uhCok [132, 42, 36]
 pub(crate) const EXTERNAL_PREFIX: &[u8] = &[0x84, 0x2f, 0x24]; // uhC8k [132, 47, 36]
@@ -167,7 +166,6 @@ primitive_hash_type!(Entry, EntryHash, EntryVisitor, ENTRY_PREFIX);
 primitive_hash_type!(Dna, DnaHash, DnaVisitor, DNA_PREFIX);
 primitive_hash_type!(DhtOp, DhtOpHash, DhtOpVisitor, DHTOP_PREFIX);
 primitive_hash_type!(Action, ActionHash, ActionVisitor, ACTION_PREFIX);
-primitive_hash_type!(NetId, NetIdHash, NetIdVisitor, NET_ID_PREFIX);
 primitive_hash_type!(Wasm, WasmHash, WasmVisitor, WASM_PREFIX);
 primitive_hash_type!(Warrant, WarrantHash, WarrantVisitor, WARRANT_PREFIX);
 primitive_hash_type!(External, ExternalHash, ExternalVisitor, EXTERNAL_PREFIX);
@@ -195,7 +193,6 @@ impl HashTypeSync for Warrant {}
 /// data into an external hash (support all data, opaque result).
 impl HashTypeAsync for External {}
 
-impl HashTypeAsync for NetId {}
 impl HashTypeAsync for Wasm {}
 
 impl From<AgentPubKey> for EntryHash {

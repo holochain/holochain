@@ -23,7 +23,6 @@ Each primitive HashType has a unique 3-byte prefix associated with it, to easily
 | Entry     | EntryHash      | uhCEk  |
 | DhtOp     | DhtOpHash      | uhCQk  |
 | Dna       | DnaHash        | uhC0k  |
-| NetId     | NetIdHash      | uhCIk  |
 | Action    | ActionHash     | uhCkk  |
 | Wasm      | DnaWasmHash    | uhCok  |
 
