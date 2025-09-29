@@ -193,14 +193,6 @@ impl Spaces {
         })
     }
 
-    /// Block some target.
-    pub async fn block(&self, input: Block) -> DatabaseResult<()> {
-        tracing::warn!(
-            "Creating block, but this is currently not being respected by holochain_p2p!"
-        );
-        holochain_state::block::block(&self.conductor_db, input).await
-    }
-
     /// Unblock some target.
     pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
         holochain_state::block::unblock(&self.conductor_db, input).await

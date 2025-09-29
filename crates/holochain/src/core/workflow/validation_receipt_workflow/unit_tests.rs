@@ -11,6 +11,7 @@ use holo_hash::fixt::AgentPubKeyFixturator;
 use holo_hash::fixt::DnaHashFixturator;
 use holo_hash::HasHash;
 use holo_hash::{AgentPubKey, DhtOpHash};
+use holochain_p2p::HolochainP2pResult;
 use holochain_p2p::MockHolochainP2pDnaT;
 use holochain_sqlite::error::DatabaseResult;
 use holochain_sqlite::prelude::{DbKindDht, DbWrite};
@@ -129,7 +130,7 @@ async fn block_invalid_op_author() {
         vec![validator].into_iter().collect(),
         {
             let blocks = blocks.clone();
-            move |block| -> BoxFuture<DatabaseResult<()>> {
+            move |block| -> BoxFuture<HolochainP2pResult<()>> {
                 blocks.write().push(block);
                 async move { Ok(()) }.boxed()
             }

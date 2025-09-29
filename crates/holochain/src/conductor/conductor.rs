@@ -947,11 +947,6 @@ mod network_impls {
             .await?)
         }
 
-        /// Block some target.
-        pub async fn block(&self, input: Block) -> DatabaseResult<()> {
-            self.spaces.block(input).await
-        }
-
         /// Unblock some target.
         pub async fn unblock(&self, input: Block) -> DatabaseResult<()> {
             self.spaces.unblock(input).await

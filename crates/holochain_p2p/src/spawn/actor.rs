@@ -6,7 +6,6 @@ use holochain_sqlite::error::{DatabaseError, DatabaseResult};
 use holochain_sqlite::helpers::BytesSql;
 use holochain_sqlite::rusqlite::types::Value;
 use holochain_sqlite::sql::sql_peer_meta_store;
-use holochain_state::block::block;
 use holochain_state::prelude::named_params;
 use kitsune2_api::*;
 use kitsune2_core::get_responsive_remote_agents_near_location;
@@ -2150,30 +2149,47 @@ impl actor::HcP2p for HolochainP2pActor {
         self.blocks_db_getter.clone()
     }
 
-    fn block(
-        &self,
-        block_target: holochain_zome_types::block::BlockTarget,
-    ) -> BoxFut<'_, HolochainP2pResult<()>> {
-        use holochain_timestamp::Timestamp;
-        use holochain_zome_types::block::BlockTarget;
-
+    fn block(&self, block: Block) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(async move {
+            // Capture the target up front so we can move `block` into the DB call without cloning.
+            let target = block.target().clone();
             let db = self.conductor_db_getter()().await;
-            match block_target {
-                BlockTarget::Cell(cell_id, cell_block_reason) => block(
-                    &db,
-                    Block::new(
-                        BlockTarget::Cell(cell_id, cell_block_reason),
-                        InclusiveTimestampInterval::try_new(Timestamp::now(), Timestamp::MAX)
-                            .map_err(|err| HolochainP2pError::other(format!("Could not create a timestamp interval while writing a block: {err}")))?,
-                    ),
-                )
+            // Write block to database.
+            holochain_state::block::block(&db, block)
                 .await
-                .map_err(|err| HolochainP2pError::other(format!("Could not write block to database: {err}"))),
-                _ => Err(HolochainP2pError::Other(
-                    "only cell block targets are supported".into(),
-                )),
+                .map_err(|err| {
+                    HolochainP2pError::other(format!("Could not write block to database: {err}"))
+                })?;
+
+            if let holochain_zome_types::block::BlockTarget::Cell(cell_id, _) = target {
+                // Best-effort removal: do not error if the space is missing or removal fails.
+                match self
+                    .kitsune
+                    .space_if_exists(cell_id.dna_hash().to_k2_space())
+                    .await
+                {
+                    Some(space) => {
+                        if let Err(err) = space
+                            .peer_store()
+                            .remove(cell_id.agent_pubkey().to_k2_agent())
+                            .await
+                        {
+                            tracing::warn!(
+                                ?err,
+                                ?cell_id,
+                                "Failed to remove agent from peer store after writing block"
+                            );
+                        }
+                    }
+                    None => {
+                        tracing::debug!(
+                            ?cell_id,
+                            "No Kitsune space exists for this DNA; skipping peer removal"
+                        );
+                    }
+                }
             }
+            Ok(())
         })
     }
 }
