@@ -32,3 +32,4 @@ mod validate;
 mod warrant_issuance;
 mod websocket;
 mod websocket_stress;
+mod zero_arc;
