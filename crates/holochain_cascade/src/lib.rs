@@ -922,7 +922,7 @@ impl CascadeImpl {
         if i_am_authority {
             // If I am an authority and I didn't get a result before
             // this point then the chain is incomplete for this request.
-            Ok(result)
+            Ok(MustGetAgentActivityResponse::IncompleteChain)
         } else {
             Ok(self
                 .fetch_must_get_agent_activity(author.clone(), filter)
