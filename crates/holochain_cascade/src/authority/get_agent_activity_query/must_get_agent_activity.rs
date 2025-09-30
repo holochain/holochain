@@ -48,7 +48,7 @@ pub fn get_bounded_activity(
                 }
             })
         }
-        // One of the actions specified in the filter does not exist in the database.
+        // The chain top ActionHash specified in the filter was not found in the database.
         Sequences::ChainTopNotFound(a) => {
             Ok(BoundedMustGetAgentActivityResponse::ChainTopNotFound(a))
         }
@@ -68,17 +68,17 @@ pub fn filter_then_check(
             filter,
             warrants,
         } => {
-            // Filter the activity from the database and check the invariants of the
-            // filter still hold.
+            // Filter the activity from the database and check that we have a complete chain of activity within the filter.
             filter.filter_then_check(activity, warrants)
         }
-        BoundedMustGetAgentActivityResponse::IncompleteChain => {
-            MustGetAgentActivityResponse::IncompleteChain
+        BoundedMustGetAgentActivityResponse::IncompleteChain(s) => {
+            MustGetAgentActivityResponse::IncompleteChain(s)
         }
         BoundedMustGetAgentActivityResponse::ChainTopNotFound(a) => {
             MustGetAgentActivityResponse::ChainTopNotFound(a)
         }
         BoundedMustGetAgentActivityResponse::EmptyRange => MustGetAgentActivityResponse::EmptyRange,
+        BoundedMustGetAgentActivityResponse::NoResponse => MustGetAgentActivityResponse::NoResponse,
     }
 }
 

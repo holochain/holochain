@@ -7,6 +7,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
+use std::collections::BTreeSet;
 use std::iter::Peekable;
 use std::ops::RangeInclusive;
 
@@ -95,8 +96,7 @@ pub enum Sequences {
     EmptyRange,
 }
 
-/// Intermediate data structure used during a `must_get_agent_activity` call.
-/// Note that this is not the final return value of `must_get_agent_activity`.
+/// Response to a `must_get_agent_activity` request.
 #[derive(Debug, Clone, PartialEq, Eq, SerializedBytes, Serialize, Deserialize)]
 pub enum MustGetAgentActivityResponse {
     /// The activity was found.
@@ -106,12 +106,21 @@ pub enum MustGetAgentActivityResponse {
         /// Any warrants issued to the agent for this activity.
         warrants: Vec<WarrantOp>,
     },
-    /// The requested chain range was incomplete.
-    IncompleteChain,
-    /// The requested chain top was not found in the chain.
-    ChainTopNotFound(ActionHash),
+
     /// The filter produces an empty range.
     EmptyRange,
+
+    /// The requested chain range could only be partially retrieved,
+    /// and is missing the included list of action sequences.
+    IncompleteChain(BTreeSet<u32>),
+
+    /// The requested chain top could not be retrieved.
+    /// Additional actions might *also* not be retrievable, but we can't know that
+    /// until we have retrieved the top action so that we can then look for its prior actions.
+    ChainTopNotFound(ActionHash),
+
+    /// Error Response: We have received no data from this request
+    NoResponse,
 }
 
 impl MustGetAgentActivityResponse {
@@ -140,12 +149,22 @@ pub enum BoundedMustGetAgentActivityResponse {
         /// The filter used to produce this response.
         filter: ChainFilterRange,
     },
-    /// The requested chain range was incomplete.
-    IncompleteChain,
-    /// The requested chain top was not found in the chain.
-    ChainTopNotFound(ActionHash),
     /// The filter produces an empty range.
     EmptyRange,
+
+    /// Response does not contain the complete chain range,
+    /// as it is missing the specified action seqs.
+    IncompleteChain(BTreeSet<u32>),
+
+    /// The requested chain top was not found in the chain.
+    ///
+    /// Additional activity in the chain may *also* be missing,
+    /// but we won't know until we find the chain top,
+    /// so we can query its prior activity.
+    ChainTopNotFound(ActionHash),
+
+    /// Did not receive any data in response.
+    NoResponse,
 }
 
 impl BoundedMustGetAgentActivityResponse {
@@ -460,6 +479,11 @@ impl Sequences {
             // that was determined earlier.
             None => chain_top - distance,
         };
+
+        if chain_top - start == 0 {
+            return Ok(Self::EmptyRange);
+        }
+
         Ok(Self::Found(ChainFilterRange {
             filter,
             range: start..=chain_top,
@@ -473,48 +497,47 @@ impl ChainFilterRange {
     pub fn range(&self) -> &RangeInclusive<u32> {
         &self.range
     }
-    /// Filter the chain items then check the invariants hold.
+    /// Filter the chain items then check the chain is complete
     pub fn filter_then_check(
         self,
         chain: Vec<RegisterAgentActivity>,
         warrants: Vec<WarrantOp>,
     ) -> MustGetAgentActivityResponse {
-        let until_hashes = self.filter.get_until_hash().cloned();
+        if chain.len() == 0 {
+            return MustGetAgentActivityResponse::NoResponse;
+        }
 
-        // Create the filter iterator and collect the filtered actions.
-        let actions: Vec<_> = ChainFilterIter::new(self.filter, chain).collect();
+        // Filter the actions
+        let actions: Vec<RegisterAgentActivity> =
+            ChainFilterIter::new(self.filter, chain).collect();
 
-        // Check the invariants hold.
-        match actions.last().zip(actions.first()) {
-            // The actual results after the filter must match the range.
-            Some((lowest, highest))
-                if (lowest.action.action().action_seq()..=highest.action.action().action_seq())
-                    == self.range =>
-            {
-                // If the range start was an until hash then the first action must
-                // actually be an action from the until set.
-                if let Some(hashes) = until_hashes {
-                    if matches!(self.chain_bottom_type, ChainBottomType::UntilHash)
-                        && !hashes.contains(lowest.action.action_address())
-                    {
-                        return MustGetAgentActivityResponse::IncompleteChain;
-                    }
-                }
+        // Check that the filtered actions include the complete range of chain action seqs
+        let chain_action_seqs_set: BTreeSet<u32> =
+            (actions.last().unwrap().action.action().action_seq()
+                ..=actions.first().unwrap().action.action().action_seq())
+                .into_iter()
+                .collect();
+        let filter_range_seqs_set: BTreeSet<u32> = self.range.into_iter().collect();
+        let missing_seqs: BTreeSet<u32> = filter_range_seqs_set
+            .difference(&chain_action_seqs_set)
+            .cloned()
+            .collect();
+        if missing_seqs.len() > 0 {
+            return MustGetAgentActivityResponse::IncompleteChain(missing_seqs);
+        }
 
-                // The constraints are met the activity can be returned.
-                MustGetAgentActivityResponse::Activity {
-                    activity: actions,
-                    warrants,
-                }
-            }
-            // The constraints are not met so the chain is not complete.
-            _ => MustGetAgentActivityResponse::IncompleteChain,
+        // Return the filtered activity, which has the complete range of chain action seqs
+        MustGetAgentActivityResponse::Activity {
+            activity: actions,
+            warrants,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::BoundedMustGetAgentActivityResponse;
     use super::ChainBottomType;
     use super::ChainFilter;

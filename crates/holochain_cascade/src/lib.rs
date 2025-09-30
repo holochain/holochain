@@ -367,7 +367,7 @@ impl CascadeImpl {
 
         let cache = some_or_return!(
             self.cache.as_ref(),
-            response.unwrap_or(MustGetAgentActivityResponse::IncompleteChain)
+            response.unwrap_or(MustGetAgentActivityResponse::NoResponse)
         );
 
         // Commit the activity to the chain.
@@ -392,8 +392,8 @@ impl CascadeImpl {
                 Ok(MustGetAgentActivityResponse::Activity { activity, warrants })
             }
             Some(response) => Ok(response),
-            // Got no responses so the chain is incomplete.
-            None => Ok(MustGetAgentActivityResponse::IncompleteChain),
+            // Got no responses
+            None => Ok(MustGetAgentActivityResponse::NoResponse),
         }
     }
 
@@ -471,7 +471,7 @@ impl CascadeImpl {
     ) -> CascadeResult<MustGetAgentActivityResponse> {
         let network = some_or_return!(
             self.network.as_ref(),
-            MustGetAgentActivityResponse::IncompleteChain
+            MustGetAgentActivityResponse::NoResponse
         );
         let results = match network.must_get_agent_activity(author, filter).await {
             Ok(response) => response,

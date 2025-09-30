@@ -126,13 +126,13 @@ fn matches_chain(a: &Vec<RegisterAgentActivity>, seq: &[u32]) -> bool {
     => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[15, 14]) ; "chain_top 15 until 10 take 2 chain 10 to 15")]
 #[test_case(
     chain(1..6), ChainFilter::new(action_hash(&[5])).until_hash(action_hash(&[0])).take(6), hash_to_seq(&[0, 5])
-    => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top 5 until 0 take 6 chain 1 to 5")]
+    => matches MustGetAgentActivityResponse::IncompleteChain(_) ; "chain_top 5 until 0 take 6 chain 1 to 5")]
 #[test_case(
     chain(0..5), ChainFilter::new(action_hash(&[5])).until_hash(action_hash(&[0])).take(6), hash_to_seq(&[0, 5])
-    => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top 5 until 0 take 6 chain 0 to 4")]
+    => matches MustGetAgentActivityResponse::IncompleteChain(_) ; "chain_top 5 until 0 take 6 chain 0 to 4")]
 #[test_case(
     gap_chain(&[0..4, 5..10]), ChainFilter::new(action_hash(&[7])).until_hash(action_hash(&[0])).take(8), hash_to_seq(&[0, 7])
-    => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top 7 until 0 take 8 chain 0 to 3 then 5 to 10")]
+    => matches MustGetAgentActivityResponse::IncompleteChain(_) ; "chain_top 7 until 0 take 8 chain 0 to 3 then 5 to 10")]
 #[test_case(
     gap_chain(&[0..4, 5..10]), ChainFilter::new(action_hash(&[7])).until_hash(action_hash(&[5])).take(8), hash_to_seq(&[5, 7])
     => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[7, 6, 5]) ; "chain_top 7 until 5 take 8 chain 0 to 3 then 5 to 10")]
@@ -147,7 +147,7 @@ fn matches_chain(a: &Vec<RegisterAgentActivity>, seq: &[u32]) -> bool {
     => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[7, 6, 5, 4, 3, 2, 1, 0]) ; "chain_top (7,1) take 8 chain 0 to 5 and 3 to 7")]
 #[test_case(
     forked_chain(&[4..6, 3..8]), ChainFilter::new(action_hash(&[5, 0])).until_hash(action_hash(&[4, 1])), |h| if *h == action_hash(&[5, 0]) { Some(5) } else { Some(4) }
-    => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top (5,0) until (4,1) chain (0,0) to (5,0) and (3,1) to (7,1)")]
+    => matches MustGetAgentActivityResponse::IncompleteChain(_) ; "chain_top (5,0) until (4,1) chain (0,0) to (5,0) and (3,1) to (7,1)")]
 fn test_filter_then_check(
     chain: Vec<TestChainItem>,
     filter: ChainFilter,

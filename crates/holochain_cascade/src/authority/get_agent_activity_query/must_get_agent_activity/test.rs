@@ -123,7 +123,7 @@ async fn returns_full_sequence_from_filter(
 
 #[test_case(
     agent_chain(&[(0, 0..3), (0, 5..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8]))
-    => MustGetAgentActivityResponse::IncompleteChain ; "8 to genesis with 0 till 2 and 5 till 9")]
+    => MustGetAgentActivityResponse::IncompleteChain(std::collections::BTreeSet::from([3, 4])) ; "8 to genesis with 0 till 2 and 5 till 9")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[1]), ChainFilter::new(action_hash(&[8]))
     => MustGetAgentActivityResponse::ChainTopNotFound(action_hash(&[8])) ; "Different agent")]
@@ -139,7 +139,7 @@ async fn returns_full_sequence_from_filter(
 #[test_case(
     vec![(agent_hash(&[0]), forked_chain(&[0..6, 3..8]))], agent_hash(&[0]),
     ChainFilter::new(action_hash(&[5, 0])).until_hash(action_hash(&[4, 1]))
-    => MustGetAgentActivityResponse::IncompleteChain ; "Unit hash on fork")]
+    => MustGetAgentActivityResponse::IncompleteChain(std::collections::BTreeSet::from([0, 1, 2])) ; "Unit hash on fork")]
 #[test_case(
     agent_chain(&[(0, 0..10)]), agent_hash(&[0]), ChainFilter::new(action_hash(&[8])).until_hash(action_hash(&[9]))
     => matches MustGetAgentActivityResponse::Activity { .. }; "Until is higher then chain_top")]
