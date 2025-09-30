@@ -217,14 +217,12 @@ pub fn merge_bounded_agent_activity_responses(
 
         // Verify chain filters in all Activity responses are equivalent
         //
-        // If chain filters are different it indicates a bug or invalid behavior.
-        // It should should not be able to occur without modified conductors, or bugs.
-        //
-        // This should be an error response, rather than an incomplete chain response.
-        // However to preserve the existing logic I am keeping it.
-        if chain_filter_ranges.len() == 0 {
+        // Non-equivalent chin filters indicates a bug or invalid behavior,
+        // and should never occur.
+        if chain_filter_ranges.is_empty() {
             return BoundedMustGetAgentActivityResponse::IncompleteChain;
         }
+
         let first_chain_filter_range = chain_filter_ranges.first().unwrap();
         let chain_filters_match = chain_filter_ranges
             .iter()
