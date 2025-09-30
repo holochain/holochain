@@ -185,12 +185,12 @@ pub fn merge_bounded_agent_activity_responses(
     let any_responses_activity = responses
         .iter()
         .any(|r| matches!(r, BoundedMustGetAgentActivityResponse::Activity { .. }));
+    let any_responses_chain_incomplete_chain = responses
+        .iter()
+        .any(|r| matches!(r, BoundedMustGetAgentActivityResponse::IncompleteChain));
     let all_responses_chain_top_not_found = responses
         .iter()
         .all(|r| matches!(r, BoundedMustGetAgentActivityResponse::ChainTopNotFound(_)));
-    let all_responses_chain_incomplete_chain = responses
-        .iter()
-        .any(|r| matches!(r, BoundedMustGetAgentActivityResponse::IncompleteChain));
 
     // If any responses are Activity, return Activity,
     // merging the activity data.
@@ -251,7 +251,7 @@ pub fn merge_bounded_agent_activity_responses(
         return BoundedMustGetAgentActivityResponse::EmptyRange;
     }
     // If any responses are IncompleteChain, return IncompleteChain
-    else if all_responses_chain_incomplete_chain {
+    else if any_responses_chain_incomplete_chain {
         return BoundedMustGetAgentActivityResponse::IncompleteChain;
     }
     // If all responses are ChainTopNotFound, return ChainTopNotFound
