@@ -905,16 +905,11 @@ impl CascadeImpl {
         })
             .await??;
 
-        let merged_results = results.iter().fold(
-            // It's sort of arbitrary what the initial value is as long as it's
-            // not an activity response.
-            BoundedMustGetAgentActivityResponse::EmptyRange,
-            holochain_types::chain::merge_bounded_agent_activity_responses,
-        );
-
+        let merged_response =
+            holochain_types::chain::merge_bounded_agent_activity_responses(results);
         let result =
             authority::get_agent_activity_query::must_get_agent_activity::filter_then_check(
-                merged_results,
+                merged_response,
             );
 
         // Short circuit if we have a result.
@@ -927,7 +922,7 @@ impl CascadeImpl {
         if i_am_authority {
             // If I am an authority and I didn't get a result before
             // this point then the chain is incomplete for this request.
-            Ok(MustGetAgentActivityResponse::IncompleteChain)
+            Ok(result)
         } else {
             Ok(self
                 .fetch_must_get_agent_activity(author.clone(), filter)
