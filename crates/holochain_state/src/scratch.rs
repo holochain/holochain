@@ -221,6 +221,7 @@ impl Store for Scratch {
             .cloned())
     }
 
+    #[cfg(feature = "unstable-warrants")]
     fn get_warrants_for_basis(
         &self,
         _hash: &AnyLinkableHash,

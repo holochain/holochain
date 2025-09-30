@@ -14,7 +14,7 @@ use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
 use holochain_state::query::link::GetLinksQuery;
 use holochain_state::query::CascadeTxnWrapper;
-use holochain_state::query::{Query, Store};
+use holochain_state::query::Query;
 use holochain_types::prelude::*;
 use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
 
@@ -66,6 +66,7 @@ pub async fn handle_get_agent_activity(
         .read_async(move |txn| -> CascadeResult<AgentActivityResponse> {
             let txn = CascadeTxnWrapper::from(txn);
 
+            #[cfg(feature = "unstable-warrants")]
             let warrants =
                 txn.get_warrants_for_basis(&AnyLinkableHash::from(agent.clone()), true)?;
 
@@ -77,6 +78,7 @@ pub async fn handle_get_agent_activity(
                 GetAgentActivityHashesQuery::new(agent, query, options).run(txn)?
             };
 
+            #[cfg(feature = "unstable-warrants")]
             if !warrants.is_empty() {
                 // TODO why did we retrieve warrants in the activity query if we're going to overwrite them here?
                 activity_response.warrants =
