@@ -76,7 +76,7 @@ serde_yaml = "0.9"
 serde_with = { version = "3.12.0", features = ["json"] }
 shrinkwraprs = "0.3.0"
 sodoken = "0.1.0"
-structopt = "0.3.11"
+clap = "4.0"
 strum = "0.27"
 subtle-encoding = "0.5"
 tempfile = "3.3"
@@ -134,7 +134,6 @@ holochain_state = { version = "^0.6.0-dev.23", path = "../holochain_state", feat
 
 anyhow = "1.0"
 assert_cmd = "2"
-clap = "4.0"
 contrafact = "0.2.0-rc.1"
 criterion = { version = "0.6", features = ["async_tokio"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }

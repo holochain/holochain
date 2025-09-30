@@ -1,3 +1,4 @@
+use clap::Parser;
 use holochain::conductor::config::ConductorConfig;
 use holochain::conductor::manager::handle_shutdown;
 use holochain::conductor::Conductor;
@@ -12,34 +13,27 @@ use holochain_util::tokio_helper;
 #[cfg(unix)]
 use sd_notify::{notify, NotifyState};
 use std::path::PathBuf;
-use structopt::StructOpt;
 use tracing::*;
 
 const MAGIC_CONDUCTOR_READY_STRING: &str = "Conductor ready.";
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "holochain", about = "The Holochain Conductor.")]
+/// The Holochain Conductor.
+#[derive(Debug, Parser)]
 struct Opt {
-    #[structopt(
-        long,
-        help = "Outputs structured json from logging:
-    - None: No logging at all (fastest)
-    - Log: Output logs to stdout with spans (human readable)
-    - Compact: Same as Log but with less information
-    - Json: Output logs as structured json (machine readable)
-    ",
-        default_value = "Log"
-    )]
+    /// Outputs structured json from logging:
+    ///     - None: No logging at all (fastest)
+    ///     - Log: Output logs to stdout with spans (human readable)
+    ///     - Compact: Same as Log but with less information
+    ///     - Json: Output logs as structured json (machine readable)
+    #[arg(long, default_value_t = Output::Log)]
     structured: Output,
 
-    #[structopt(
-        short = "c",
-        long,
-        help = "Path to a YAML file containing conductor configuration"
-    )]
+    /// Path to a YAML file containing conductor configuration.
+    #[arg(long, short = 'c')]
     config_path: Option<PathBuf>,
 
-    #[structopt(long, help = "Print out the conductor config's json schema")]
+    /// Print out the conductor config's json schema
+    #[arg(long)]
     config_schema: bool,
 
     /// Instead of the normal "interactive" method of passphrase
@@ -47,23 +41,22 @@ struct Opt {
     /// how you make use of this, as it could be less secure,
     /// for example, make sure it is not saved in your
     /// `~/.bash_history`.
-    #[structopt(short = "p", long)]
+    #[arg(long, short = 'p')]
     pub piped: bool,
 
-    #[structopt(
-        long,
-        help = "Display version information such as git revision and HDK version"
-    )]
+    /// Display version information such as git revision and HDK version
+    #[arg(long)]
     build_info: bool,
 
-    #[structopt(long, help = "Create default conductor configuration.")]
+    /// Create a default conductor configuration file and exit.
+    #[arg(long)]
     create_config: bool,
 
     /// WARNING!! DANGER!! This exposes your database decryption secrets!
     /// Print the database decryption secrets to stderr.
     /// With these PRAGMA commands, you'll be able to run sqlcipher
     /// directly to manipulate holochain databases.
-    #[structopt(long)]
+    #[arg(long)]
     pub danger_print_db_secrets: bool,
 }
 
@@ -84,7 +77,7 @@ async fn async_main() {
     // See https://docs.rs/human-panic/1.0.3/human_panic/
     human_panic::setup_panic!();
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     if opt.build_info {
         println!("{}", option_env!("BUILD_INFO").unwrap_or("{}"));
