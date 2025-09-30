@@ -38,10 +38,7 @@ pub struct CloneId(pub String);
 impl CloneId {
     /// Construct a clone id from role name and clone index.
     pub fn new(role_name: &RoleName, clone_index: u32) -> Self {
-        CloneId(format!(
-            "{}{}{}",
-            role_name, CLONE_ID_DELIMITER, clone_index
-        ))
+        CloneId(format!("{role_name}{CLONE_ID_DELIMITER}{clone_index}"))
     }
 
     /// Get the clone's base cell's role name.

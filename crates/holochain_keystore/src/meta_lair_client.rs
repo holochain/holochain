@@ -386,11 +386,9 @@ impl MetaLairClient {
                 Ok(info) => match info {
                     LairEntryInfo::WkaTlsCert { cert_info, .. } => cert_info,
                     oth => {
-                        return Err(format!(
-                            "invalid entry type, expecting wka tls cert: {:?}",
-                            oth
+                        return Err(
+                            format!("invalid entry type, expecting wka tls cert: {oth:?}").into(),
                         )
-                        .into())
                     }
                 },
                 Err(_) => {

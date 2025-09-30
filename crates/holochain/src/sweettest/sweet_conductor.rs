@@ -516,7 +516,7 @@ impl SweetConductor {
         let roles: Vec<RoleName> = dnas_with_roles.iter().map(|dr| dr.role()).collect();
 
         for &agent in agents.iter() {
-            let installed_app_id = format!("{}{}", app_id_prefix, agent);
+            let installed_app_id = format!("{app_id_prefix}{agent}");
             self.install_and_enable_app(
                 &installed_app_id,
                 Some(agent.to_owned()),
@@ -528,7 +528,7 @@ impl SweetConductor {
 
         let mut apps = Vec::new();
         for agent in agents {
-            let installed_app_id = format!("{}{}", app_id_prefix, agent);
+            let installed_app_id = format!("{app_id_prefix}{agent}");
             apps.push(
                 self.create_sweet_app_for_installed_app(&installed_app_id, agent.clone(), &roles)
                     .await?,
@@ -551,7 +551,7 @@ impl SweetConductor {
 
         for i in 0..num {
             let app = self
-                .setup_app(&format!("{}{}", app_id_prefix, i), &dnas_with_roles)
+                .setup_app(&format!("{app_id_prefix}{i}"), &dnas_with_roles)
                 .await?;
             apps.push(app);
         }

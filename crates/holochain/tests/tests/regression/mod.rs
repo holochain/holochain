@@ -138,7 +138,7 @@ async fn zero_arc_can_link_to_uncached_base() {
     .await;
 
     let apps = conductors
-        .setup_app("app", &[dna_file.clone()])
+        .setup_app("app", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
 
@@ -256,7 +256,7 @@ async fn zero_arc_can_delete_link() {
         .0;
 
     let apps = conductors
-        .setup_app("app", &[dna_file.clone()])
+        .setup_app("app", std::slice::from_ref(&dna_file))
         .await
         .unwrap();
 

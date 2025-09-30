@@ -72,7 +72,7 @@ where
         let mut values = EventFieldVisitor::new();
         event.record(&mut values);
         let json = json!({"time": now, "name": name, "level": level.as_serde(), "target": target, "module_path": module_path, "file": file, "line": line, "fields": values.json, "spans": parents});
-        writeln!(writer, "{}", json)
+        writeln!(writer, "{json}")
     }
 }
 
@@ -133,10 +133,10 @@ where
 fn event_data(meta: &Metadata) -> String {
     let mut event_data = String::new();
     if let Some(module) = meta.module_path() {
-        write!(event_data, "{}:", module).ok();
+        write!(event_data, "{module}:").ok();
     }
     if let Some(line) = meta.line() {
-        write!(event_data, "{}", line).ok();
+        write!(event_data, "{line}").ok();
     }
     write!(event_data, ":{}", meta.name()).ok();
     event_data
@@ -153,12 +153,12 @@ where
         let module = meta.module_path();
         let line = meta.line();
         if let Some(module) = module {
-            write!(stack, "{}:", module).ok();
+            write!(stack, "{module}:").ok();
         }
         if let Some(line) = line {
-            write!(stack, "{}", line).ok();
+            write!(stack, "{line}").ok();
         }
-        write!(stack, ":{}", name).ok();
+        write!(stack, ":{name}").ok();
         *stack += "; ";
         Ok(())
     })

@@ -18,7 +18,7 @@ impl tracing_core::field::Visit for StringVisitor<'_> {
     fn record_debug(&mut self, field: &tracing_core::Field, value: &dyn std::fmt::Debug) {
         // Special case the message field so that it doesn't appear in the key/value format.
         if field.name() == "message" {
-            let did_write = write!(self.message, "{:?}", value);
+            let did_write = write!(self.message, "{value:?}");
             if did_write.is_err() {
                 let _ = write!(self.message, "**failed to write message**");
             }

@@ -37,7 +37,7 @@ lazy_static! {
     static ref HELP: &'static str = {
         let extensions = external_subcommands::list_external_subcommands()
             .into_iter()
-            .map(|s| format!("  {}\t  Run \"hc {} help\" to see its help", s, s))
+            .map(|s| format!("  {s}\t  Run \"hc {s} help\" to see its help"))
             .collect::<Vec<String>>()
             .join("\n");
 
@@ -104,7 +104,7 @@ impl CliSubcommand {
             CliSubcommand::Sandbox(cmd) => cmd.run().await?,
             CliSubcommand::External(args) => {
                 let command_suffix = args.first().expect("Missing subcommand name");
-                Command::new(format!("hc-{}", command_suffix))
+                Command::new(format!("hc-{command_suffix}"))
                     .args(&args[1..])
                     .status()
                     .expect("Failed to run external subcommand");

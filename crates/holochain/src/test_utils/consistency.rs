@@ -37,11 +37,10 @@ where
         let r = if let Some(author) = author {
             txn.prepare(&format!(
                 "
-                        {}
+                        {sql_common}
                         AND
                         Action.author = :author
-                    ",
-                sql_common
+                    "
             ))?
             .query_and_then(
                 named_params! {

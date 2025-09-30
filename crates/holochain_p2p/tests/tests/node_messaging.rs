@@ -221,7 +221,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         _to_agent: AgentPubKey,
         _zome_call_params_serialized: ExternIO,
         _signature: Signature,
-    ) -> BoxFut<HolochainP2pResult<SerializedBytes>> {
+    ) -> BoxFut<'_, HolochainP2pResult<SerializedBytes>> {
         Box::pin(std::future::pending())
     }
 
@@ -230,7 +230,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         _dna_hash: DnaHash,
         _request_validation_receipt: bool,
         _ops: Vec<holochain_types::dht_op::DhtOp>,
-    ) -> BoxFut<HolochainP2pResult<()>> {
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(std::future::pending())
     }
 
@@ -239,7 +239,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         _dht_hash: holo_hash::AnyDhtHash,
-    ) -> BoxFut<HolochainP2pResult<WireOps>> {
+    ) -> BoxFut<'_, HolochainP2pResult<WireOps>> {
         Box::pin(std::future::pending())
     }
 
@@ -249,7 +249,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         _to_agent: AgentPubKey,
         _dht_hash: holo_hash::AnyDhtHash,
         _options: GetMetaOptions,
-    ) -> BoxFut<HolochainP2pResult<MetadataSet>> {
+    ) -> BoxFut<'_, HolochainP2pResult<MetadataSet>> {
         Box::pin(std::future::pending())
     }
 
@@ -259,7 +259,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         _to_agent: AgentPubKey,
         _link_key: WireLinkKey,
         _options: GetLinksOptions,
-    ) -> BoxFut<HolochainP2pResult<WireLinkOps>> {
+    ) -> BoxFut<'_, HolochainP2pResult<WireLinkOps>> {
         Box::pin(std::future::pending())
     }
 
@@ -268,7 +268,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         _query: WireLinkQuery,
-    ) -> BoxFut<HolochainP2pResult<CountLinksResponse>> {
+    ) -> BoxFut<'_, HolochainP2pResult<CountLinksResponse>> {
         Box::pin(std::future::pending())
     }
 
@@ -279,7 +279,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         _agent: AgentPubKey,
         _query: ChainQueryFilter,
         _options: GetActivityOptions,
-    ) -> BoxFut<HolochainP2pResult<AgentActivityResponse>> {
+    ) -> BoxFut<'_, HolochainP2pResult<AgentActivityResponse>> {
         Box::pin(std::future::pending())
     }
 
@@ -289,7 +289,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         _to_agent: AgentPubKey,
         _author: AgentPubKey,
         _filter: holochain_zome_types::chain::ChainFilter,
-    ) -> BoxFut<HolochainP2pResult<MustGetAgentActivityResponse>> {
+    ) -> BoxFut<'_, HolochainP2pResult<MustGetAgentActivityResponse>> {
         Box::pin(std::future::pending())
     }
 
@@ -298,7 +298,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         _receipts: ValidationReceiptBundle,
-    ) -> BoxFut<HolochainP2pResult<()>> {
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(std::future::pending())
     }
 
@@ -306,7 +306,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         &self,
         _dna_hash: DnaHash,
         _op: holochain_types::dht_op::ChainOp,
-    ) -> BoxFut<HolochainP2pResult<()>> {
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(std::future::pending())
     }
 
@@ -315,7 +315,7 @@ impl HcP2pHandler for UnresponsiveHandler {
         _dna_hash: DnaHash,
         _to_agent: AgentPubKey,
         _message: CountersigningSessionNegotiationMessage,
-    ) -> BoxFut<HolochainP2pResult<()>> {
+    ) -> BoxFut<'_, HolochainP2pResult<()>> {
         Box::pin(std::future::pending())
     }
 }

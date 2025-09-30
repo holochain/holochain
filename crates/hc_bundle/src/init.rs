@@ -9,7 +9,7 @@ use std::{io, path::PathBuf};
 fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {
     let mut input = String::new();
     if let Some(prompt) = prompt {
-        print!("{} ", prompt);
+        print!("{prompt} ");
         io::stdout().flush()?;
     }
     io::stdin().read_line(&mut input)?;
@@ -23,7 +23,7 @@ fn readline(prompt: Option<&str>) -> io::Result<Option<String>> {
 
 fn prompt_default<S: Into<String>>(prompt: &str, default: S) -> io::Result<String> {
     let default = default.into();
-    let prompt = format!("{} ({})", prompt, default);
+    let prompt = format!("{prompt} ({default})");
     Ok(readline(Some(&prompt))?.unwrap_or(default))
 }
 

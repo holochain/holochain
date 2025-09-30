@@ -31,7 +31,7 @@ pub type KeystoreResult<T> = Result<T, KeystoreError>;
 
 impl std::cmp::PartialEq for KeystoreError {
     fn eq(&self, o: &Self) -> bool {
-        format!("{:?}", self) == format!("{:?}", o)
+        format!("{self:?}") == format!("{o:?}")
     }
 }
 

@@ -49,7 +49,7 @@ async fn main() {
     .unwrap();
 
     let config = keystore.get_config();
-    println!("{}", config);
+    println!("{config}");
 
     println!("OK");
 

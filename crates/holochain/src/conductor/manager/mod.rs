@@ -329,19 +329,19 @@ fn produce_task_outcome(kind: &TaskKind, result: ManagedTaskResult, name: String
     use TaskOutcome::*;
     match kind {
         TaskKind::Ignore => match result {
-            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Ok(_) => LogInfo(format!("task completed: {name}")),
             Err(err) => MinorError(Box::new(err), name),
         },
         TaskKind::Unrecoverable => match result {
-            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Ok(_) => LogInfo(format!("task completed: {name}")),
             Err(err) => ShutdownConductor(Box::new(err), name),
         },
         TaskKind::CellCritical(cell_id) => match result {
-            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Ok(_) => LogInfo(format!("task completed: {name}")),
             Err(err) => StopApps(cell_id.to_owned(), Box::new(err), name),
         },
         TaskKind::DnaCritical(dna_hash) => match result {
-            Ok(_) => LogInfo(format!("task completed: {}", name)),
+            Ok(_) => LogInfo(format!("task completed: {name}")),
             Err(err) => StopAppsWithDna(dna_hash.to_owned(), Box::new(err), name),
         },
     }
@@ -362,7 +362,7 @@ pub fn handle_shutdown(result: Result<TaskManagerResult, tokio::task::JoinError>
                 // Resume the panic on the main task
                 std::panic::resume_unwind(reason);
             }
-            Err(error) => panic!("Error while joining threads during shutdown {:?}", error),
+            Err(error) => panic!("Error while joining threads during shutdown {error:?}"),
         },
     }
 }

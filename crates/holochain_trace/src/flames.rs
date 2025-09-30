@@ -47,7 +47,7 @@ impl FlameTimed {
         let out = std::fs::File::create(
             toml_path()
                 .unwrap_or_else(|| PathBuf::from("."))
-                .join(format!("tracing_flame_{}.svg", now)),
+                .join(format!("tracing_flame_{now}.svg")),
         )
         .ok()
         .or_else(|| {
@@ -77,7 +77,7 @@ pub(crate) fn toml_path() -> Option<PathBuf> {
 }
 
 fn parse_time(samples: &mut usize, value: &dyn std::fmt::Debug) {
-    let v = format!("{:?}", value);
+    let v = format!("{value:?}");
     if v.ends_with("ns") {
         if let Ok(v) = v.trim_end_matches("ns").parse::<f64>() {
             *samples = v as usize;

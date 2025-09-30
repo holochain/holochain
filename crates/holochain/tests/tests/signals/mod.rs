@@ -49,7 +49,7 @@ async fn remote_signals_work_after_sbd_restart() {
         .0;
 
     let (app1,) = c1
-        .setup_app("app", &[dna_file.clone()])
+        .setup_app("app", std::slice::from_ref(&dna_file))
         .await
         .unwrap()
         .into_tuple();
@@ -176,7 +176,7 @@ async fn remote_signals_batch() {
                 RemoteSignal {
                     agents: vec![bob.agent_pubkey().clone(), carol.agent_pubkey().clone()],
                     signal: ExternIO::encode(SignalMessage {
-                        value: format!("message {}", i),
+                        value: format!("message {i}"),
                     })
                     .unwrap(),
                 },

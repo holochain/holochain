@@ -30,9 +30,7 @@ impl core::fmt::Display for EntryError {
         match self {
             EntryError::EntryTooLarge(bytes)=> write!(
                 f,
-                "Attempted to create an Entry whose size exceeds the limit.\nEntry size: {}\nLimit: {}",
-                bytes,
-                ENTRY_SIZE_LIMIT
+                "Attempted to create an Entry whose size exceeds the limit.\nEntry size: {bytes}\nLimit: {ENTRY_SIZE_LIMIT}"
             ),
             EntryError::SerializedBytes(s) => s.fmt(f),
         }

@@ -87,7 +87,7 @@ pub fn must_get_valid_record(
                         | HostContext::GenesisSelfCheckV2(_)
                         | HostContext::PostCommit(_)
                         | HostContext::ZomeCall(_) => Err(wasm_error!(WasmErrorInner::Host(
-                            format!("Failed to get Record {}", action_hash)
+                            format!("Failed to get Record {action_hash}")
                         ))
                         .into()),
                         HostContext::Init(_) => Err(wasm_error!(WasmErrorInner::HostShortCircuit(
@@ -231,7 +231,7 @@ mod tests {
                 ValidateCallbackResult::Invalid(msg) => {
                     assert_eq!(msg, "Found a record, but it is invalid".to_string());
                 }
-                other => panic!("Expected ValidateCallbackResult::Invalid, got {:?}", other),
+                other => panic!("Expected ValidateCallbackResult::Invalid, got {other:?}"),
             }
         } else {
             panic!("Expected WasmErrorInner::HostShortCircuit");

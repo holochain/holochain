@@ -86,10 +86,10 @@ pub mod wasm_test {
             Err(ConductorApiError::CellError(CellError::WorkflowError(workflow_error))) => {
                 match *workflow_error {
                     WorkflowError::SourceChainError(SourceChainError::ChainLocked) => {}
-                    _ => panic!("{:?}", workflow_error),
+                    _ => panic!("{workflow_error:?}"),
                 }
             }
-            something_else => panic!("{:?}", something_else),
+            something_else => panic!("{something_else:?}"),
         };
     }
 
@@ -104,10 +104,10 @@ pub mod wasm_test {
                     WorkflowError::SourceChainError(
                         SourceChainError::CountersigningWriteWithoutSession,
                     ) => {}
-                    _ => panic!("{:?}", workflow_error),
+                    _ => panic!("{workflow_error:?}"),
                 }
             }
-            something_else => panic!("{:?}", something_else),
+            something_else => panic!("{something_else:?}"),
         };
     }
 

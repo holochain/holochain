@@ -310,8 +310,7 @@ impl RawGetEntryResponse {
             h => panic!(
                 "Get entry responses cannot be created from actions
                     other then Create or Update.
-                    Tried to with: {:?}",
-                h
+                    Tried to with: {h:?}"
             ),
         };
         (new_entry_action, entry_type, entry)

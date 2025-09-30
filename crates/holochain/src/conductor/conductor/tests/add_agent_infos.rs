@@ -14,7 +14,10 @@ async fn add_agent_infos_to_peer_store() {
     let agent_infos = conductor.get_agent_infos(None).await.unwrap();
     assert_eq!(agent_infos, vec![]);
 
-    let app = conductor.setup_app("", &[dna_file.clone()]).await.unwrap();
+    let app = conductor
+        .setup_app("", std::slice::from_ref(&dna_file))
+        .await
+        .unwrap();
 
     let cell_id = app.cells()[0].cell_id().clone();
     let cell_peer_store = conductor

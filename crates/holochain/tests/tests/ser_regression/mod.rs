@@ -115,7 +115,7 @@ async fn ser_regression_test() {
 
     let channel_hash: EntryHash = match output {
         ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
-        _ => panic!("{:?}", output),
+        _ => panic!("{output:?}"),
     };
 
     let message = CreateMessageInput {
@@ -161,6 +161,6 @@ async fn ser_regression_test() {
 
     let _msg_hash: EntryHash = match output {
         ZomeCallResponse::Ok(guest_output) => guest_output.decode().unwrap(),
-        _ => panic!("{:?}", output),
+        _ => panic!("{output:?}"),
     };
 }

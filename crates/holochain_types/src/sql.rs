@@ -58,7 +58,7 @@ where
     }
 }
 
-fn via_display(data: &impl std::fmt::Display) -> SqlOutput {
+fn via_display(data: &impl std::fmt::Display) -> SqlOutput<'_> {
     SqlOutput(ToSqlOutput::Owned(data.to_string().into()))
 }
 

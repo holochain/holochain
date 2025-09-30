@@ -54,7 +54,7 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
 
     let (admin_tx, _admin_rx) = new_websocket_client_for_port::<AdminResponse>(admin_port)
         .await
-        .unwrap_or_else(|_| panic!("Failed to connect to conductor on port [{}]", admin_port));
+        .unwrap_or_else(|_| panic!("Failed to connect to conductor on port [{admin_port}]"));
 
     let issue_token_response = admin_tx
         .request(AdminRequest::IssueAppAuthenticationToken(
@@ -64,12 +64,12 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
         .unwrap();
     let token = match issue_token_response {
         AdminResponse::AppAuthenticationTokenIssued(issued) => issued.token,
-        _ => panic!("Unexpected response {:?}", issue_token_response),
+        _ => panic!("Unexpected response {issue_token_response:?}"),
     };
 
     let (app_tx, _rx) = new_websocket_client_for_port::<AppResponse>(port)
         .await
-        .unwrap_or_else(|_| panic!("Failed to connect to conductor on port [{}]", port));
+        .unwrap_or_else(|_| panic!("Failed to connect to conductor on port [{port}]"));
     app_tx
         .authenticate(AppAuthenticationRequest { token })
         .await
@@ -91,7 +91,7 @@ async fn get_app_info(admin_port: u16, installed_app_id: InstalledAppId, port: u
                     tokio::time::sleep(Duration::from_millis(100)).await;
                 }
                 _ => {
-                    panic!("Unexpected response {:?}", r);
+                    panic!("Unexpected response {r:?}");
                 }
             }
         }
@@ -107,7 +107,7 @@ async fn check_timeout<T>(response: impl Future<Output = WebsocketResult<T>>) ->
     match tokio::time::timeout(WEBSOCKET_TIMEOUT, response).await {
         Ok(response) => response.expect("Calling websocket failed"),
         Err(_) => {
-            panic!("Timed out on request after {:?}", WEBSOCKET_TIMEOUT);
+            panic!("Timed out on request after {WEBSOCKET_TIMEOUT:?}");
         }
     }
 }
@@ -781,7 +781,7 @@ async fn generate_sandbox_and_add_and_list_agent() {
     .encode()
     .unwrap();
 
-    let agent_infos_to_add = format!("[{}]", other_agent); // add-agents expects a JSON array
+    let agent_infos_to_add = format!("[{other_agent}]"); // add-agents expects a JSON array
 
     let mut cmd = get_sandbox_command();
     cmd.env("RUST_BACKTRACE", "1")
@@ -851,7 +851,7 @@ async fn generate_sandbox_and_call_peer_meta_info() {
                 .into_iter()
                 .map(|(_, cell_infos)| cell_infos)
                 .collect();
-            println!("cell_ids: {:?}", cell_ids);
+            println!("cell_ids: {cell_ids:?}");
             let dna_hash_1 = match cell_ids[0].first().unwrap() {
                 CellInfo::Provisioned(cell) => cell.cell_id.dna_hash().clone(),
                 _ => panic!("Cell not provisioned"),
@@ -872,7 +872,7 @@ async fn generate_sandbox_and_call_peer_meta_info() {
                 .into_iter()
                 .collect::<Vec<DnaHash>>()
         }
-        r => panic!("AppResponse does not contain app info: {:?}", r),
+        r => panic!("AppResponse does not contain app info: {r:?}"),
     };
 
     // Needs to get converted to a String (not DnaHashB64) so that the sorting will
@@ -1063,7 +1063,7 @@ async fn call_zome_function() {
     let mut hc_admin = input_piped_password(&mut cmd).await;
     let launch_info = get_launch_info(&mut hc_admin).await;
 
-    println!("Got launch info: {:?}", launch_info);
+    println!("Got launch info: {launch_info:?}");
 
     // Wait for the app to be available
     let app_info = get_app_info(
@@ -1080,7 +1080,7 @@ async fn call_zome_function() {
                 _ => panic!("Cell not provisioned"),
             }
         }
-        r => panic!("AppResponse does not contain app info: {:?}", r),
+        r => panic!("AppResponse does not contain app info: {r:?}"),
     };
 
     // Generate signing credentials
@@ -1108,7 +1108,7 @@ async fn call_zome_function() {
         .unwrap();
 
     let exit_code = child.wait().await.unwrap();
-    assert!(exit_code.success(), "Failed with exit code {:?}", exit_code);
+    assert!(exit_code.success(), "Failed with exit code {exit_code:?}");
 
     // Make the call
     let mut cmd = get_sandbox_command();
@@ -1182,7 +1182,7 @@ async fn zome_function_can_return_hash() {
     let mut hc_admin = input_piped_password(&mut cmd).await;
     let launch_info = get_launch_info(&mut hc_admin).await;
 
-    println!("Got launch info: {:?}", launch_info);
+    println!("Got launch info: {launch_info:?}");
 
     // Wait for the app to be available
     let app_info = get_app_info(
@@ -1199,7 +1199,7 @@ async fn zome_function_can_return_hash() {
                 _ => panic!("Cell not provisioned"),
             }
         }
-        r => panic!("AppResponse does not contain app info: {:?}", r),
+        r => panic!("AppResponse does not contain app info: {r:?}"),
     };
 
     // Generate signing credentials
@@ -1227,7 +1227,7 @@ async fn zome_function_can_return_hash() {
         .unwrap();
 
     let exit_code = child.wait().await.unwrap();
-    assert!(exit_code.success(), "Failed with exit code {:?}", exit_code);
+    assert!(exit_code.success(), "Failed with exit code {exit_code:?}");
 
     // Call function that returns the DNA hash
     let mut cmd = get_sandbox_command();

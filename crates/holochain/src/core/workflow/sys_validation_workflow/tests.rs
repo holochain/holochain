@@ -249,7 +249,7 @@ async fn run_test(
     // Validation should be empty
     alice_dht_db.read_async(move |txn| -> DatabaseResult<()> {
         let limbo = show_limbo(txn);
-        assert!(limbo_is_empty(txn), "{:?}", limbo);
+        assert!(limbo_is_empty(txn), "{limbo:?}");
 
         let num_valid_ops: usize = txn
             .query_row("SELECT COUNT(hash) FROM DhtOp WHERE when_integrated IS NOT NULL AND validation_status = :status",
@@ -331,7 +331,7 @@ async fn run_test(
         .await
         .unwrap();
 
-    assert!(empty, "{:?}", limbo);
+    assert!(empty, "{limbo:?}");
 
     let valid_ops = alice_db
         .read_async(move |txn| num_valid_ops(txn))
