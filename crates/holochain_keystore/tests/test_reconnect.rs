@@ -75,7 +75,7 @@ async fn connect_cli(connection_url: url2::Url2) -> Cli {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reconnect() {
-    let tmpdir = tempdir::TempDir::new("lair keystore test").unwrap();
+    let tmpdir = tempfile::TempDir::with_prefix("lair keystore test").unwrap();
     let tag: Arc<str> = "test-tag".into();
 
     let start = std::time::Instant::now();

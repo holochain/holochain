@@ -39,7 +39,7 @@ url2 = "0.0.6"
 [dev-dependencies]
 assert_cmd = "2.0.4"
 serde_yaml = "0.9.10"
-tempdir = "0.3.7"
+tempfile = "3.23"
 
 [lints]
 workspace = true
