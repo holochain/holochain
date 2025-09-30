@@ -169,12 +169,12 @@ impl BoundedMustGetAgentActivityResponse {
     }
 }
 
-/// Merges a list of agent activity responses.
-/// Chain filter range mismatches are considered invalid, and treated as NoResponse.
-///
-/// Merging should only be done on responses that originate from the same authority,
-/// so the chain filters should always match, or at least their mismatch
-/// is the responsibility of a single authority.
+/// Merges a list of agent activity responses, along with their chain filters if
+/// present. Chain filter range mismatches are treated as an incomplete
+/// chain for the purpose of merging. Merging should only be done on
+/// responses that originate from the same authority, so the chain filters
+/// should always match, or at least their mismatch is the responsibility of
+/// a single authority.
 pub fn merge_bounded_agent_activity_responses(
     responses: Vec<BoundedMustGetAgentActivityResponse>,
 ) -> BoundedMustGetAgentActivityResponse {
