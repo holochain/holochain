@@ -171,7 +171,7 @@ impl BoundedMustGetAgentActivityResponse {
 
 /// Merges a list of agent activity responses
 ///
-///  Chain filter range mismatches are treated as an incomplete
+/// Chain filter range mismatches are treated as an incomplete
 /// chain for the purpose of merging. Merging should only be done on
 /// responses that originate from the same authority, so the chain filters
 /// should always match, or at least their mismatch is the responsibility of
