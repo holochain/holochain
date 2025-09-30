@@ -1,9 +1,11 @@
-use hdk::prelude::{
-    Entry, EntryDef, EntryDefIndex, EntryHashed, EntryVisibility, MustGetActionInput,
-    MustGetEntryInput, Record,
-};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use holochain_serialized_bytes::{SerializedBytes, UnsafeBytes};
+use schemars::_private::NoSerialize;
+use hdk::prelude::{Deserialize, Entry, EntryDef, EntryDefIndex, EntryHashed, EntryType, EntryVisibility, MustGetActionInput, MustGetEntryInput, Op, Record, Serialize, ValidateCallbackResult};
 use holo_hash::{ActionHash, EntryHash};
-use holochain::prelude::SignedActionHashed;
+use holochain::core::ValidationOutcome;
+use holochain::prelude::{SerializedBytes, SignedActionHashed};
 use holochain::sweettest::{
     SweetConductorBatch, SweetConductorConfig, SweetDnaFile, SweetInlineZomes,
 };
@@ -21,7 +23,7 @@ async fn get_missing_from_coordinator() {
 
     let entry_def = EntryDef::default_from_id("entry");
     let zomes = SweetInlineZomes::new(vec![entry_def], 0)
-        .function("create", {
+        .function("create",
             move |api, _: ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
@@ -43,7 +45,7 @@ async fn get_missing_from_coordinator() {
 
                 Ok((hash, entry_hash))
             }
-        })
+        )
         .function("get", move |api, hash: ActionHash| {
             let records = api.get(vec![GetInput::new(hash.into(), GetOptions::network())])?;
             Ok(records)
@@ -57,12 +59,12 @@ async fn get_missing_from_coordinator() {
             let record = api.must_get_valid_record(MustGetValidRecordInput::new(hash))?;
             Ok(record)
         })
-        .function("must_get_action", {
+        .function("must_get_action",
             move |api, hash: ActionHash| {
                 let action = api.must_get_action(MustGetActionInput::new(hash))?;
                 Ok(action)
             }
-        })
+        )
         .function("must_get_entry", move |api, hash: EntryHash| {
             let action = api.must_get_entry(MustGetEntryInput::new(hash))?;
             Ok(action)
@@ -88,7 +90,7 @@ async fn get_missing_from_coordinator() {
             .await;
 
     let apps = conductors.setup_app("", [&test_dna]).await.unwrap();
-    let ((alice,), (bob,)) = apps.into_tuples();
+    let ((alice, ), (bob, )) = apps.into_tuples();
 
     // Alice creates several entries
     let alice_zome = alice.zome(SweetInlineZomes::COORDINATOR);
@@ -188,4 +190,93 @@ async fn get_missing_from_coordinator() {
         .call::<_, EntryHashed>(&bob_zome, "must_get_entry", entry_hash.clone())
         .await;
     assert_eq!(entry_hash, entry.hash);
+}
+
+/// Test that zero arc nodes can retrieve missing data during self validation.
+#[tokio::test(flavor = "multi_thread")]
+async fn self_validation_get_missing() {
+    holochain_trace::test_run();
+
+    #[derive(Serialize, Deserialize, SerializedBytes, Debug)]
+    struct TestDepEntry {
+        action_hash: ActionHash,
+        num: u8,
+    }
+
+    let invoked_must_get_valid_record = Arc::new(AtomicBool::new(false));
+
+    let entry_def = EntryDef::default_from_id("entry");
+    let dep_entry_def = EntryDef::default_from_id("dep_entry");
+    let zomes = SweetInlineZomes::new(vec![entry_def, dep_entry_def], 0)
+        // A "create" function that can be used to create entries on a full arc node
+        .function("create",
+                  move |api, _: ()| {
+                      let entry = Entry::app(().try_into().unwrap()).unwrap();
+                      let hash = api.create(CreateInput::new(
+                          InlineZomeSet::get_entry_location(&api, EntryDefIndex(0)),
+                          EntryVisibility::Public,
+                          entry,
+                          ChainTopOrdering::default(),
+                      ))?;
+
+                      Ok(hash)
+                  },
+        )
+        // A "createWithDep" function that creates an entry that depends on another entry
+        .function("create_with_dep", async move |api, (num, dep_hash): (u8, ActionHash)| {
+            let data = TestDepEntry {
+                action_hash: dep_hash,
+                num,
+            };
+            let app_bytes: Vec<u8> = data.try_into().unwrap();
+            let entry = Entry::app(SerializedBytes::from(UnsafeBytes::from(app_bytes))).unwrap();
+            api.create(CreateInput::new(
+                InlineZomeSet::get_entry_location(&api, EntryDefIndex(1)),
+                EntryVisibility::Public,
+                entry,
+                ChainTopOrdering::default(),
+            ))?;
+
+            Ok(())
+        })
+        .integrity_function("validate", {
+            let invoked_must_get_valid_record = invoked_must_get_valid_record.clone();
+            move |api, op: Op| {
+                match op {
+                    Op::StoreRecord(store_record) => {
+                        match store_record.record.action().entry_type() {
+                            Some(EntryType::App(app_entry_def)) => {
+                                if app_entry_def.entry_index.0 != 1 {
+                                    return Ok(ValidateCallbackResult::Valid);
+                                }
+                            }
+                            _ => {
+                                return Ok(ValidateCallbackResult::Valid);
+                            }
+                        }
+
+                        let app_entry: Option<TestDepEntry> = store_record.record.entry.to_app_option().unwrap();
+                        let app_entry = app_entry.unwrap();
+
+                        match app_entry.num {
+                            0 => {
+                                let _record = api.must_get_valid_record(MustGetValidRecordInput::new(
+                                    app_entry.action_hash.clone(),
+                                ))?;
+                                invoked_must_get_valid_record.store(true, Ordering::Relaxed);
+                                Ok(ValidateCallbackResult::Valid)
+                            }
+                            _ => {
+                                Ok(ValidateCallbackResult::Invalid(
+                                    "Unhandled value for num".to_string()
+                                ))
+                            }
+                        }
+
+                    }
+                    _ => Ok(ValidateCallbackResult::Valid)
+                }
+            }
+        })
+            .0;
 }
