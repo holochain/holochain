@@ -201,48 +201,43 @@ pub fn merge_bounded_agent_activity_responses(
 
         // Merge all Activity responses received
         for r in responses {
-            match r {
-                BoundedMustGetAgentActivityResponse::Activity {
-                    mut activity,
-                    mut warrants,
-                    filter,
-                } => {
-                    merged_activity.append(&mut activity);
-                    merged_warrants.append(&mut warrants);
-                    chain_filter_ranges.push(filter);
-                }
-                _ => {}
+            if let BoundedMustGetAgentActivityResponse::Activity {
+                mut activity,
+                mut warrants,
+                filter,
+            } = r
+            {
+                merged_activity.append(&mut activity);
+                merged_warrants.append(&mut warrants);
+                chain_filter_ranges.push(filter);
             };
         }
 
         // Verify chain filters in all Activity responses are equivalent
         //
-        // Non-equivalent chin filters indicates a bug or invalid behavior,
+        // Non-equivalent chain filters indicates a bug or invalid behavior,
         // and should never occur.
-        if chain_filter_ranges.is_empty() {
-            return BoundedMustGetAgentActivityResponse::IncompleteChain;
+        if let Some(first_chain_filter_range) = chain_filter_ranges.first() {
+            let chain_filters_match = chain_filter_ranges
+                .iter()
+                .all(|r| r == first_chain_filter_range);
+            if !chain_filters_match {
+                tracing::error!(
+                    "ChainFilterRange do not match for the same bounded agent activity query"
+                );
+                return BoundedMustGetAgentActivityResponse::IncompleteChain;
+            }
+
+            // Sort & return merged Activity
+            let mut merged_response = BoundedMustGetAgentActivityResponse::Activity {
+                activity: merged_activity,
+                warrants: merged_warrants,
+                filter: first_chain_filter_range.clone(),
+            };
+            merged_response.normalize();
+
+            return merged_response;
         }
-
-        let first_chain_filter_range = chain_filter_ranges.first().unwrap();
-        let chain_filters_match = chain_filter_ranges
-            .iter()
-            .all(|r| r == first_chain_filter_range);
-        if !chain_filters_match {
-            tracing::error!(
-                "ChainFilterRange do not match for the same bounded agent activity query"
-            );
-            return BoundedMustGetAgentActivityResponse::IncompleteChain;
-        }
-
-        // Sort & return merged Activity
-        let mut merged_response = BoundedMustGetAgentActivityResponse::Activity {
-            activity: merged_activity,
-            warrants: merged_warrants,
-            filter: first_chain_filter_range.clone(),
-        };
-        merged_response.normalize();
-
-        return merged_response;
     }
     // If any responses are EmptyRange, return EmptyRange
     else if any_responses_empty_chain {
@@ -254,14 +249,13 @@ pub fn merge_bounded_agent_activity_responses(
     }
     // If all responses are ChainTopNotFound, return ChainTopNotFound
     else if all_responses_chain_top_not_found {
-        return responses.first().unwrap().clone();
+        if let Some(first_response) = responses.first() {
+            return first_response.clone();
+        }
     }
+
     // Otherwise, return IncompleteChain
-    // This is an inconclusive *failure* response.
-    // Really this is a NoResponse and should error
-    else {
-        return BoundedMustGetAgentActivityResponse::IncompleteChain;
-    }
+    BoundedMustGetAgentActivityResponse::IncompleteChain
 }
 
 impl<I: AsRef<A>, A: ChainItem> ChainFilterIter<I, A> {
