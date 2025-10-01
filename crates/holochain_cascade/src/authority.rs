@@ -12,13 +12,13 @@ use crate::authority::get_agent_activity_query::hashes::GetAgentActivityHashesQu
 use crate::authority::get_agent_activity_query::records::GetAgentActivityRecordsQuery;
 use holo_hash::ActionHash;
 use holo_hash::AgentPubKey;
+#[cfg(feature = "unstable-warrants")]
+use holochain_state::prelude::Store;
 use holochain_state::query::link::GetLinksQuery;
 use holochain_state::query::CascadeTxnWrapper;
 use holochain_state::query::Query;
 use holochain_types::prelude::*;
 use holochain_zome_types::agent_activity::DeterministicGetAgentActivityFilter;
-#[cfg(feature = "unstable-warrants")]
-use holochain_state::prelude::Store;
 
 #[cfg(test)]
 mod test;
