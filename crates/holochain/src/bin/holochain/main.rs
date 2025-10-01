@@ -19,6 +19,7 @@ const MAGIC_CONDUCTOR_READY_STRING: &str = "Conductor ready.";
 
 /// The Holochain Conductor.
 #[derive(Debug, Parser)]
+#[clap(version, about, long_about = None)]
 struct Opt {
     /// Outputs structured json from logging:
     ///     - None: No logging at all (fastest)
