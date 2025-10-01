@@ -582,14 +582,12 @@ mod tests {
         BoundedMustGetAgentActivityResponse::IncompleteChain]
         => BoundedMustGetAgentActivityResponse::IncompleteChain
     )]
-    // This seems like the opposite of the previous test
     #[test_case(
         vec![
             BoundedMustGetAgentActivityResponse::IncompleteChain,
         BoundedMustGetAgentActivityResponse::EmptyRange]
         => BoundedMustGetAgentActivityResponse::EmptyRange
     )]
-    // What is the difference between IncompleteChain and ChainTopNotFound
     #[test_case(
         vec![
             BoundedMustGetAgentActivityResponse::IncompleteChain,
