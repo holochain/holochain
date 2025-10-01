@@ -7,9 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- The feature flag `unstable-warrants` must be enabled for `handle_get_agent_activity` to query for warrants. If the feature is disabled the returned list of warrants will always be empty.
-- The feature flag `unstable-warrants` must be enabled for `get_bounded_activity` to query for warrants. If the feature is disabled the returned list of warrants will always be empty.
-
 ## 0.5.6
 
 ## 0.5.6-rc.0

@@ -7,8 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## \[Unreleased\]
 
-- The feature flag `unstable-warrants` must now be enabled to use the `get_warrants_for_basis` function.
-
 ## 0.5.6
 
 ## 0.5.6-rc.0
