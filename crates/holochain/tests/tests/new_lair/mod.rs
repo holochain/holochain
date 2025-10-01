@@ -15,10 +15,6 @@ use std::sync::{Arc, Mutex};
 const ADMIN_PORT: u16 = 12909;
 
 #[tokio::test(flavor = "multi_thread")]
-#[cfg_attr(
-    target_os = "macos",
-    ignore = "processes fail to launch on macos, broken!"
-)]
 async fn test_new_lair_conductor_integration() {
     // working temp dir
     let tmp = tempfile::tempdir().unwrap();
@@ -68,8 +64,7 @@ async fn test_new_lair_conductor_integration() {
     // start a conductor using the new config
     let cmd = std::process::Command::cargo_bin("holochain").unwrap();
     let mut cmd = tokio::process::Command::from(cmd);
-    cmd.arg("--structured")
-        .arg("--config-path")
+    cmd.arg("--config-path")
         .arg(cc_path)
         .arg("--piped")
         .env("RUST_LOG", "trace")

@@ -1,29 +1,27 @@
-use hdk::link::GetLinksInputBuilder;
 use hdk::prelude::{
-    Entry, EntryDef, EntryDefIndex, EntryVisibility, LinkType, LinkTypeFilter, Op, Record,
-    ValidateCallbackResult,
+    Entry, EntryDef, EntryDefIndex, EntryHashed, EntryVisibility, MustGetActionInput,
+    MustGetEntryInput, Record,
 };
-use holo_hash::ExternalHash;
+use holo_hash::{ActionHash, EntryHash};
+use holochain::prelude::SignedActionHashed;
 use holochain::sweettest::{
     SweetConductorBatch, SweetConductorConfig, SweetDnaFile, SweetInlineZomes,
 };
 use holochain_state::prelude::MustGetValidRecordInput;
 use holochain_types::inline_zome::InlineZomeSet;
 use holochain_zome_types::action::ChainTopOrdering;
-use holochain_zome_types::entry::CreateInput;
-use holochain_zome_types::prelude::CreateLinkInput;
+use holochain_zome_types::entry::{CreateInput, GetInput};
+use holochain_zome_types::prelude::{Details, GetOptions};
 
-/// Test that zero arc nodes can use must_get_valid_record to get dependencies during validation.
+/// Test that zero arc nodes can use the various get host functions to get missing records, actions
+/// and entries from authorities.
 #[tokio::test(flavor = "multi_thread")]
-async fn must_get_valid_record() {
+async fn get_missing_from_coordinator() {
     holochain_trace::test_run();
 
-    let base_addr = ExternalHash::from_raw_32(vec![0; 32]);
-
     let entry_def = EntryDef::default_from_id("entry");
-    let zomes = SweetInlineZomes::new(vec![entry_def], 1)
+    let zomes = SweetInlineZomes::new(vec![entry_def], 0)
         .function("create", {
-            let base_addr = base_addr.clone();
             move |api, _: ()| {
                 let entry = Entry::app(().try_into().unwrap()).unwrap();
                 let hash = api.create(CreateInput::new(
@@ -32,37 +30,43 @@ async fn must_get_valid_record() {
                     entry,
                     ChainTopOrdering::default(),
                 ))?;
-                api.create_link(CreateLinkInput::new(
-                    base_addr.clone().into(),
-                    hash.into(),
-                    0.into(),
-                    LinkType(0),
-                    ().into(),
-                    ChainTopOrdering::default(),
-                ))?;
+                let details = api.get_details(vec![GetInput::new(
+                    hash.clone().into(),
+                    GetOptions::local(),
+                )])?;
+                let entry_hash = match details[0].as_ref().unwrap() {
+                    Details::Record(record_details) => {
+                        record_details.record.action().entry_hash().unwrap().clone()
+                    }
+                    _ => panic!("Expected record details"),
+                };
 
-                Ok(())
+                Ok((hash, entry_hash))
             }
         })
-        .function("get", move |api, _: ()| {
-            let links = api.get_links(vec![GetLinksInputBuilder::try_new(
-                base_addr.clone(),
-                LinkTypeFilter::Types(vec![(0.into(), vec![LinkType(0)])]),
-            )
-            .unwrap()
-            .build()])?;
-
-            let mut out = vec![];
-            for link in links.into_iter().flatten() {
-                let record = api.must_get_valid_record(MustGetValidRecordInput::new(
-                    link.target.try_into().unwrap(),
-                ))?;
-                out.push(record);
-            }
-
-            Ok(out)
+        .function("get", move |api, hash: ActionHash| {
+            let records = api.get(vec![GetInput::new(hash.into(), GetOptions::network())])?;
+            Ok(records)
         })
-        .integrity_function("validate", |_, _: Op| Ok(ValidateCallbackResult::Valid))
+        .function("get_details", move |api, hash: ActionHash| {
+            let details =
+                api.get_details(vec![GetInput::new(hash.into(), GetOptions::network())])?;
+            Ok(details)
+        })
+        .function("must_get_valid_record", move |api, hash: ActionHash| {
+            let record = api.must_get_valid_record(MustGetValidRecordInput::new(hash))?;
+            Ok(record)
+        })
+        .function("must_get_action", {
+            move |api, hash: ActionHash| {
+                let action = api.must_get_action(MustGetActionInput::new(hash))?;
+                Ok(action)
+            }
+        })
+        .function("must_get_entry", move |api, hash: EntryHash| {
+            let action = api.must_get_entry(MustGetEntryInput::new(hash))?;
+            Ok(action)
+        })
         .0;
 
     let (test_dna, _, _) = SweetDnaFile::unique_from_inline_zomes(zomes).await;
@@ -86,18 +90,53 @@ async fn must_get_valid_record() {
     let apps = conductors.setup_app("", [&test_dna]).await.unwrap();
     let ((alice,), (bob,)) = apps.into_tuples();
 
-    // Alice creates an entry
+    // Alice creates several entries
     let alice_zome = alice.zome(SweetInlineZomes::COORDINATOR);
-    let _: () = conductors[0].call(&alice_zome, "create", ()).await;
+    let (get_hash, _): (ActionHash, EntryHash) =
+        conductors[0].call(&alice_zome, "create", ()).await;
+    let (get_details_hash, _): (ActionHash, EntryHash) =
+        conductors[0].call(&alice_zome, "create", ()).await;
+    let (must_get_valid_record_hash, _): (ActionHash, EntryHash) =
+        conductors[0].call(&alice_zome, "create", ()).await;
+    let (must_get_action_hash, _): (ActionHash, EntryHash) =
+        conductors[0].call(&alice_zome, "create", ()).await;
+    let (_, entry_hash): (ActionHash, EntryHash) =
+        conductors[0].call(&alice_zome, "create", ()).await;
 
-    // Ensure Bob cannot see Alice's entry
+    // Ensure Bob cannot see Alice's entries
     let bob_zome = bob.zome(SweetInlineZomes::COORDINATOR);
-    let records: Vec<Record> = conductors[1].call(&bob_zome, "get", ()).await;
-
+    let records: Vec<Option<Record>> = conductors[1].call(&bob_zome, "get", get_hash.clone()).await;
     assert!(
-        records.is_empty(),
+        records.into_iter().all(|r| r.is_none()),
         "Expected Bob to not be able to get Alice's record"
     );
+    let details: Vec<Option<Details>> = conductors[1]
+        .call(&bob_zome, "get_details", get_details_hash.clone())
+        .await;
+    assert!(
+        details.into_iter().all(|d| d.is_none()),
+        "Expected Bob to not be able to get_details of Alice's record"
+    );
+    conductors[1]
+        .call_fallible::<_, Record>(
+            &bob_zome,
+            "must_get_valid_record",
+            must_get_valid_record_hash.clone(),
+        )
+        .await
+        .expect_err("Expected Bob to not be able to must_get_valid_record of Alice's record");
+    conductors[1]
+        .call_fallible::<_, SignedActionHashed>(
+            &bob_zome,
+            "must_get_action",
+            must_get_action_hash.clone(),
+        )
+        .await
+        .expect_err("Expected Bob to not be able to must_get_action of Alice's record");
+    conductors[1]
+        .call_fallible::<_, EntryHashed>(&bob_zome, "must_get_entry", entry_hash.clone())
+        .await
+        .expect_err("Expected Bob to not be able to must_get_entry of Alice's record");
 
     // Simulate Alice reaching a full storage arc
     conductors[0]
@@ -107,10 +146,46 @@ async fn must_get_valid_record() {
     conductors.exchange_peer_info().await;
 
     // Now Bob should be able to get Alice's entry
-    let records: Vec<Record> = conductors[1].call(&bob_zome, "get", ()).await;
+    let records: Vec<Option<Record>> = conductors[1].call(&bob_zome, "get", get_hash).await;
     assert_eq!(
         records.len(),
         1,
         "Expected Bob to be able to get Alice's record"
     );
+    assert!(
+        records.into_iter().all(|r| r.is_some()),
+        "Expected Bob to be able to get Alice's record"
+    );
+
+    let details: Vec<Option<Details>> = conductors[1]
+        .call(&bob_zome, "get_details", get_details_hash)
+        .await;
+    assert_eq!(
+        details.len(),
+        1,
+        "Expected Bob to be able to get_details of Alice's record"
+    );
+    assert!(
+        details.into_iter().all(|d| d.is_some()),
+        "Expected Bob to be able to get_details of Alice's record"
+    );
+
+    let record = conductors[1]
+        .call::<_, Record>(
+            &bob_zome,
+            "must_get_valid_record",
+            must_get_valid_record_hash.clone(),
+        )
+        .await;
+    assert_eq!(must_get_valid_record_hash, record.action_address().clone());
+
+    let action = conductors[1]
+        .call::<_, SignedActionHashed>(&bob_zome, "must_get_action", must_get_action_hash.clone())
+        .await;
+    assert_eq!(must_get_action_hash, action.as_hash().clone());
+
+    let entry = conductors[1]
+        .call::<_, EntryHashed>(&bob_zome, "must_get_entry", entry_hash.clone())
+        .await;
+    assert_eq!(entry_hash, entry.hash);
 }

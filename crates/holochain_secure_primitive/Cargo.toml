@@ -1,7 +1,7 @@
 [package]
 name = "holochain_secure_primitive"
 description = "Crate for the secure primitive macros"
-version = "0.6.0-dev.1"
+version = "0.6.0-dev.2"
 license = "Apache-2.0"
 repository = "https://github.com/holochain/holochain"
 documentation = "https://docs.rs/holochain_secure_primitive"
