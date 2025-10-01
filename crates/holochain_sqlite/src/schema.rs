@@ -71,6 +71,9 @@ pub static SCHEMA_PEER_META_STORE: Lazy<Schema> = Lazy::new(|| Schema {
         M {
             forward: include_str!("sql/peer_meta_store/schema/1-up.sql").into(),
         },
+        M {
+            forward: include_str!("sql/peer_meta_store/schema/2-up.sql").into(),
+        },
     ],
 });
 
