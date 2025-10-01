@@ -14,17 +14,21 @@ mod test;
 /// Get the agent activity for a given agent and
 /// hash bounded range of actions.
 ///
-/// The full range must exist or this will return [`MustGetAgentActivityResponse::IncompleteChain`].
+/// If the filter produces an empty range, this will return [`MustGetAgentActivityResponse::EmptyRange`].
+/// If the chain top is not found, this will return [`MustGetAgentActivityResponse::ChainTopNotFound`].
+/// If the chain top is found, but the full range of activity within the filter was not found,
+/// this will return [`MustGetAgentActivityResponse::IncompleteChain`].
 #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
 pub async fn must_get_agent_activity(
     env: DbRead<DbKindDht>,
     author: AgentPubKey,
     filter: ChainFilter,
 ) -> StateQueryResult<MustGetAgentActivityResponse> {
-    let result = env
+    let bounded_response = env
         .read_async(move |txn| get_bounded_activity(txn, None, &author, filter))
         .await?;
-    Ok(filter_then_check(result))
+    let response: MustGetAgentActivityResponse = bounded_response.into();
+    Ok(response)
 }
 
 pub fn get_bounded_activity(
@@ -54,31 +58,6 @@ pub fn get_bounded_activity(
         }
         // The filter specifies a range that is empty.
         Sequences::EmptyRange => Ok(BoundedMustGetAgentActivityResponse::EmptyRange),
-    }
-}
-
-/// Consume the chain filter (if present) from a bounded response to produce an
-/// unbounded response.
-pub fn filter_then_check(
-    response: BoundedMustGetAgentActivityResponse,
-) -> MustGetAgentActivityResponse {
-    match response {
-        BoundedMustGetAgentActivityResponse::Activity {
-            activity,
-            filter,
-            warrants,
-        } => {
-            // Filter the activity from the database and check the invariants of the
-            // filter still hold.
-            filter.filter_then_check(activity, warrants)
-        }
-        BoundedMustGetAgentActivityResponse::IncompleteChain => {
-            MustGetAgentActivityResponse::IncompleteChain
-        }
-        BoundedMustGetAgentActivityResponse::ChainTopNotFound(a) => {
-            MustGetAgentActivityResponse::ChainTopNotFound(a)
-        }
-        BoundedMustGetAgentActivityResponse::EmptyRange => MustGetAgentActivityResponse::EmptyRange,
     }
 }
 
@@ -151,7 +130,6 @@ fn get_activity(
                  ":op_type": ChainOpType::RegisterAgentActivity,
                  ":lower_seq": range.start(),
                  ":upper_seq": range.end(),
-
             },
             |row| {
                 let action: SignedAction = from_blob(row.get("blob")?)?;

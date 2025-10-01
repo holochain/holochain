@@ -7,6 +7,7 @@ use holo_hash::AgentPubKey;
 use holo_hash::HasHash;
 use holochain_serialized_bytes::prelude::*;
 use holochain_zome_types::prelude::*;
+use std::collections::BTreeSet;
 use std::iter::Peekable;
 use std::ops::RangeInclusive;
 
@@ -169,9 +170,56 @@ impl BoundedMustGetAgentActivityResponse {
     }
 }
 
-/// Merges a list of agent activity responses
-///
-/// Chain filter range mismatches are treated as an incomplete
+impl From<BoundedMustGetAgentActivityResponse> for MustGetAgentActivityResponse {
+    fn from(val: BoundedMustGetAgentActivityResponse) -> Self {
+        match val {
+            BoundedMustGetAgentActivityResponse::Activity {
+                activity,
+                filter,
+                warrants,
+            } => {
+                // Check if we are missing any action seqs within the target filter range
+                let first_action = activity
+                    .first()
+                    .expect("MustGetAgentActivityResponse::Activity must contain activity");
+                let last_action = activity
+                    .last()
+                    .expect("MustGetAgentActivityResponse::Activity must contain activity");
+
+                println!("first action {}", first_action.action.action().action_seq());
+                println!("last action {}", last_action.action.action().action_seq());
+
+                let target_action_seqs: BTreeSet<u32> =
+                    filter.range().clone().collect();
+                let held_action_seqs: BTreeSet<u32> = (first_action.action.action().action_seq()
+                    ..=last_action.action.action().action_seq())
+                    .collect();
+                let missing_action_seqs: BTreeSet<u32> = held_action_seqs
+                    .difference(&target_action_seqs)
+                    .cloned()
+                    .collect();
+
+                if missing_action_seqs.is_empty() {
+                    MustGetAgentActivityResponse::Activity { activity, warrants }
+                } else {
+                    MustGetAgentActivityResponse::IncompleteChain
+                }
+            }
+            BoundedMustGetAgentActivityResponse::IncompleteChain => {
+                MustGetAgentActivityResponse::IncompleteChain
+            }
+            BoundedMustGetAgentActivityResponse::ChainTopNotFound(a) => {
+                MustGetAgentActivityResponse::ChainTopNotFound(a)
+            }
+            BoundedMustGetAgentActivityResponse::EmptyRange => {
+                MustGetAgentActivityResponse::EmptyRange
+            }
+        }
+    }
+}
+
+/// Merges two agent activity responses, along with their chain filters if
+/// present. Chain filter range mismatches are treated as an incomplete
 /// chain for the purpose of merging. Merging should only be done on
 /// responses that originate from the same authority, so the chain filters
 /// should always match, or at least their mismatch is the responsibility of
@@ -212,6 +260,10 @@ pub fn merge_bounded_agent_activity_responses(
                 chain_filter_ranges.push(filter);
             };
         }
+
+        // Sort activity by action seq ascending, to match the sql query
+        // which generates each individual BoundedMustGetAgentActivityResponse
+        merged_activity.sort_unstable_by_key(|a| a.action.action().action_seq());
 
         // Verify chain filters in all Activity responses are equivalent
         //
@@ -506,44 +558,6 @@ impl ChainFilterRange {
     /// Get the range of action sequences for this filter.
     pub fn range(&self) -> &RangeInclusive<u32> {
         &self.range
-    }
-    /// Filter the chain items then check the invariants hold.
-    pub fn filter_then_check(
-        self,
-        chain: Vec<RegisterAgentActivity>,
-        warrants: Vec<WarrantOp>,
-    ) -> MustGetAgentActivityResponse {
-        let until_hashes = self.filter.get_until_hash().cloned();
-
-        // Create the filter iterator and collect the filtered actions.
-        let actions: Vec<_> = ChainFilterIter::new(self.filter, chain).collect();
-
-        // Check the invariants hold.
-        match actions.last().zip(actions.first()) {
-            // The actual results after the filter must match the range.
-            Some((lowest, highest))
-                if (lowest.action.action().action_seq()..=highest.action.action().action_seq())
-                    == self.range =>
-            {
-                // If the range start was an until hash then the first action must
-                // actually be an action from the until set.
-                if let Some(hashes) = until_hashes {
-                    if matches!(self.chain_bottom_type, ChainBottomType::UntilHash)
-                        && !hashes.contains(lowest.action.action_address())
-                    {
-                        return MustGetAgentActivityResponse::IncompleteChain;
-                    }
-                }
-
-                // The constraints are met the activity can be returned.
-                MustGetAgentActivityResponse::Activity {
-                    activity: actions,
-                    warrants,
-                }
-            }
-            // The constraints are not met so the chain is not complete.
-            _ => MustGetAgentActivityResponse::IncompleteChain,
-        }
     }
 }
 

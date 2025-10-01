@@ -14,12 +14,6 @@ fn hash(i: u32) -> TestHash {
     i.into()
 }
 
-/// Build a chain of RegisterAgentActivity and then run them through the
-/// chain filter.
-fn build_chain(c: Vec<TestChainItem>, filter: TestFilter) -> Vec<TestChainItem> {
-    ChainFilterIter::new(filter, c).collect()
-}
-
 /// Useful for displaying diff of test_case failure.
 /// See <https://github.com/frondeus/test-case/wiki/Syntax#function-validator>
 fn pretty(expected: Vec<TestChainItem>) -> impl Fn(Vec<TestChainItem>) {
@@ -134,7 +128,9 @@ fn matches_chain(a: &Vec<RegisterAgentActivity>, seq: &[u32]) -> bool {
     gap_chain(&[0..4, 5..10]), ChainFilter::new(action_hash(&[7])).until_hash(action_hash(&[0])).take(8), hash_to_seq(&[0, 7])
     => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top 7 until 0 take 8 chain 0 to 3 then 5 to 10")]
 #[test_case(
-    gap_chain(&[0..4, 5..10]), ChainFilter::new(action_hash(&[7])).until_hash(action_hash(&[5])).take(8), hash_to_seq(&[5, 7])
+    gap_chain(&[0..4, 5..10]),
+    ChainFilter::new(action_hash(&[7])).until_hash(action_hash(&[5])).take(8),
+    hash_to_seq(&[5, 7])
     => matches MustGetAgentActivityResponse::Activity {activity, ..} if matches_chain(&activity, &[7, 6, 5]) ; "chain_top 7 until 5 take 8 chain 0 to 3 then 5 to 10")]
 #[test_case(
     gap_chain(&[0..4, 5..10]), ChainFilter::new(action_hash(&[7])).until_hash(action_hash(&[0])).take(3), hash_to_seq(&[0, 7])
@@ -148,14 +144,23 @@ fn matches_chain(a: &Vec<RegisterAgentActivity>, seq: &[u32]) -> bool {
 #[test_case(
     forked_chain(&[4..6, 3..8]), ChainFilter::new(action_hash(&[5, 0])).until_hash(action_hash(&[4, 1])), |h| if *h == action_hash(&[5, 0]) { Some(5) } else { Some(4) }
     => matches MustGetAgentActivityResponse::IncompleteChain ; "chain_top (5,0) until (4,1) chain (0,0) to (5,0) and (3,1) to (7,1)")]
-fn test_filter_then_check(
+fn test_bounded_must_get_agent_activity_response_into_must_get_agent_activity_response(
     chain: Vec<TestChainItem>,
     filter: ChainFilter,
     mut f: impl FnMut(&ActionHash) -> Option<u32>,
 ) -> MustGetAgentActivityResponse {
-    let chain = chain_to_ops(chain);
+    let activity = chain_to_ops(chain);
+
     match Sequences::find_sequences::<_, _, ()>(filter, |a| Ok(f(a)), |_ts| Ok(None)) {
-        Ok(Sequences::Found(s)) => s.filter_then_check(chain, vec![]),
+        Ok(Sequences::Found(s)) => {
+            let bounded_response = BoundedMustGetAgentActivityResponse::Activity {
+                activity,
+                filter: s,
+                warrants: vec![],
+            };
+
+            bounded_response.into()
+        }
         _ => unreachable!(),
     }
 }

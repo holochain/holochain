@@ -106,32 +106,297 @@ pub struct CascadeImpl {
     duration_metric: &'static CascadeDurationMetric,
 }
 
-
-pub struct DataStore {
-    LocalDatabase(DbRead),
-    RemoteAgent(AgentPubKey),
-    LocalAgent(AgentPubKey),
-    LocalScratch(SyncScratch),
-}
-pub struct CascadingQuery {
-    stores: Vec<DataStore>,
-}
-
-impl CascadingQuery {
-    pub fn new(stores: Vec<DataStore>) -> Self {
+impl CascadeImpl {
+    /// Add the authored env to the cascade.
+    pub fn with_authored(self, authored: DbRead<DbKindAuthored>) -> Self {
         Self {
-            stores
+            authored: Some(authored),
+            ..self
         }
     }
-}
 
-
-pub struct RemoteQuery { remote_agent: AgentPubKey }
-
-impl RemoteQuery {
-    pub fn new(remote_agent: AgentPubKey) -> Self {
-        Self { remote_agent }
+    /// Add the ability to access private entries for this agent.
+    pub fn with_private_data(self, author: Arc<AgentPubKey>) -> Self {
+        Self {
+            private_data: Some(author),
+            ..self
+        }
     }
+
+    /// Add the dht env to the cascade.
+    pub fn with_dht(self, dht: DbRead<DbKindDht>) -> Self {
+        Self {
+            dht: Some(dht),
+            ..self
+        }
+    }
+
+    /// Add the cache to the cascade.
+    pub fn with_cache(self, cache: DbWrite<DbKindCache>) -> Self {
+        Self {
+            cache: Some(cache),
+            ..self
+        }
+    }
+
+    /// Add the cache to the cascade.
+    pub fn with_scratch(self, scratch: SyncScratch) -> Self {
+        Self {
+            scratch: Some(scratch),
+            ..self
+        }
+    }
+
+    /// Add the network and cache to the cascade.
+    pub fn with_network(
+        self,
+        network: DynHolochainP2pDna,
+        cache_db: DbWrite<DbKindCache>,
+    ) -> CascadeImpl {
+        CascadeImpl {
+            authored: self.authored,
+            dht: self.dht,
+            scratch: self.scratch,
+            private_data: self.private_data,
+            cache: Some(cache_db),
+            network: Some(network),
+            duration_metric: create_cascade_duration_metric(),
+        }
+    }
+
+    /// Constructs an empty [Cascade].
+    pub fn empty() -> Self {
+        Self {
+            authored: None,
+            dht: None,
+            network: None,
+            cache: None,
+            scratch: None,
+            private_data: None,
+            duration_metric: create_cascade_duration_metric(),
+        }
+    }
+
+    /// Construct a [Cascade] with network access
+    pub fn from_workspace_and_network<AuthorDb, DhtDb>(
+        workspace: &HostFnWorkspace<AuthorDb, DhtDb>,
+        network: DynHolochainP2pDna,
+    ) -> CascadeImpl
+    where
+        AuthorDb: ReadAccess<DbKindAuthored>,
+        DhtDb: ReadAccess<DbKindDht>,
+    {
+        let HostFnStores {
+            authored,
+            dht,
+            cache,
+            scratch,
+        } = workspace.stores();
+        let private_data = workspace.author();
+        CascadeImpl {
+            authored: Some(authored),
+            dht: Some(dht),
+            cache: Some(cache),
+            private_data,
+            scratch,
+            network: Some(network),
+            duration_metric: create_cascade_duration_metric(),
+        }
+    }
+
+    /// Construct a [Cascade] with local-only access to the provided stores
+    pub fn from_workspace_stores(stores: HostFnStores, author: Option<Arc<AgentPubKey>>) -> Self {
+        let HostFnStores {
+            authored,
+            dht,
+            cache,
+            scratch,
+        } = stores;
+        Self {
+            authored: Some(authored),
+            dht: Some(dht),
+            cache: Some(cache),
+            scratch,
+            network: None,
+            private_data: author,
+            duration_metric: create_cascade_duration_metric(),
+        }
+    }
+
+    /// Getter
+    pub fn cache(&self) -> Option<&DbWrite<DbKindCache>> {
+        self.cache.as_ref()
+    }
+
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
+    fn insert_rendered_op(txn: &mut Txn<DbKindCache>, op: &RenderedOp) -> CascadeResult<()> {
+        let RenderedOp {
+            op_light,
+            op_hash,
+            action,
+            validation_status,
+        } = op;
+        let op_order = OpOrder::new(op_light.get_type(), action.action().timestamp());
+        let timestamp = action.action().timestamp();
+        insert_action(txn, action)?;
+        insert_op_lite(
+            txn,
+            op_light,
+            op_hash,
+            &op_order,
+            &timestamp,
+            // Using 0 value because this is the cache database and we only need sizes for gossip
+            // in the DHT database.
+            0,
+            todo_no_cache_transfer_data(),
+        )?;
+        if let Some(status) = validation_status {
+            set_validation_status(txn, op_hash, *status)?;
+        }
+        // We set the integrated to for the cache so it can match the
+        // same query as the vault. This can also be used for garbage collection.
+        set_when_integrated(txn, op_hash, Timestamp::now())?;
+        Ok(())
+    }
+
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
+    fn insert_rendered_ops(txn: &mut Txn<DbKindCache>, ops: &RenderedOps) -> CascadeResult<()> {
+        let RenderedOps {
+            ops,
+            entry,
+            warrant,
+        } = ops;
+
+        if let Some(warrant) = warrant {
+            let op = DhtOpHashed::from_content_sync(warrant.clone());
+            insert_op_cache(txn, &op)?;
+        }
+        if let Some(entry) = entry {
+            insert_entry(txn, entry.as_hash(), entry.as_content())?;
+        }
+        for op in ops {
+            Self::insert_rendered_op(txn, op)?;
+        }
+        Ok(())
+    }
+
+    /// Insert a set of agent activity into the Cache.
+    #[allow(clippy::result_large_err)] // TODO - investigate this lint
+    fn insert_activity(
+        txn: &mut Txn<DbKindCache>,
+        ops: Vec<RegisterAgentActivity>,
+    ) -> CascadeResult<()> {
+        for op in ops {
+            let RegisterAgentActivity {
+                action:
+                    SignedHashed {
+                        hashed: HoloHashed { content, .. },
+                        signature,
+                    },
+                ..
+            } = op;
+            let op =
+                DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(signature, content));
+            insert_op_cache(txn, &op)?;
+            // We set the integrated to for the cache so it can match the
+            // same query as the vault. This can also be used for garbage collection.
+            set_when_integrated(txn, op.as_hash(), Timestamp::now())?;
+        }
+        Ok(())
+    }
+
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
+        let cache = some_or_return!(self.cache.as_ref());
+        cache
+            .write_async(|txn| {
+                for response in responses {
+                    let ops = response.render()?;
+                    Self::insert_rendered_ops(txn, &ops)?;
+                }
+                CascadeResult::Ok(())
+            })
+            .await?;
+        Ok(())
+    }
+
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    async fn merge_link_ops_into_cache(
+        &self,
+        responses: Vec<WireLinkOps>,
+        key: WireLinkKey,
+    ) -> CascadeResult<()> {
+        let cache = some_or_return!(self.cache.as_ref());
+        cache
+            .write_async(move |txn| {
+                for response in responses {
+                    let ops = response.render(&key)?;
+                    Self::insert_rendered_ops(txn, &ops)?;
+                }
+                CascadeResult::Ok(())
+            })
+            .await?;
+        Ok(())
+    }
+
+    /// Add new activity to the Cache.
+    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
+    async fn add_activity_into_cache(
+        &self,
+        responses: Vec<MustGetAgentActivityResponse>,
+    ) -> CascadeResult<MustGetAgentActivityResponse> {
+        // Choose a response from all the responses.
+        let response = if responses
+            .iter()
+            .zip(responses.iter().skip(1))
+            .all(|(a, b)| a == b)
+        {
+            // All responses are the same so we can just use the first one.
+            responses.into_iter().next()
+        } else {
+            tracing::info!(
+                "Got different must_get_agent_activity responses from different authorities"
+            );
+            // TODO: Handle conflict.
+            // For now try to find one that has got the activity
+            responses
+                .iter()
+                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity { .. }))
+                .cloned()
+        };
+
+        let cache = some_or_return!(
+            self.cache.as_ref(),
+            response.unwrap_or(MustGetAgentActivityResponse::IncompleteChain)
+        );
+
+        // Commit the activity to the chain.
+        match response {
+            Some(MustGetAgentActivityResponse::Activity { activity, warrants }) => {
+                // TODO: Avoid this clone by committing the ops as references to the db.
+                cache
+                    .write_async({
+                        let activity = activity.clone();
+                        let warrants = warrants.clone();
+                        move |txn| {
+                            Self::insert_activity(txn, activity)?;
+                            for warrant in warrants {
+                                let op = DhtOpHashed::from_content_sync(warrant);
+                                insert_op_cache(txn, &op)?;
+                            }
+
+                            CascadeResult::Ok(())
+                        }
+                    })
+                    .await?;
+                Ok(MustGetAgentActivityResponse::Activity { activity, warrants })
+            }
+            Some(response) => Ok(response),
+            // Got no responses so the chain is incomplete.
+            None => Ok(MustGetAgentActivityResponse::IncompleteChain),
+        }
+    }
+
     /// Fetch a Record from the network, caching and returning the results
     #[cfg_attr(feature = "instrument", tracing::instrument(skip(self, options)))]
     pub async fn fetch_record(
@@ -218,6 +483,21 @@ impl RemoteQuery {
         };
 
         self.add_activity_into_cache(results).await
+    }
+
+    /// Get transactions for available databases.
+    async fn get_txn_guards(&self) -> CascadeResult<Vec<PTxnGuard>> {
+        let mut conns: Vec<_> = Vec::with_capacity(3);
+        if let Some(cache) = &self.cache {
+            conns.push(cache.get_read_txn().await?);
+        }
+        if let Some(dht) = &self.dht {
+            conns.push(dht.get_read_txn().await?);
+        }
+        if let Some(authored) = &self.authored {
+            conns.push(authored.get_read_txn().await?);
+        }
+        Ok(conns)
     }
 
     async fn cascading<Q>(&self, query: Q) -> CascadeResult<Q::Output>
@@ -847,181 +1127,6 @@ impl RemoteQuery {
         }
     }
 }
-
-
-pub struct PersistedState { }
-
-impl PersistedState {
-    #[allow(clippy::result_large_err)] // TODO - investigate this lint
-    fn insert_rendered_op(txn: &mut Txn<DbKindCache>, op: &RenderedOp) -> CascadeResult<()> {
-        let RenderedOp {
-            op_light,
-            op_hash,
-            action,
-            validation_status,
-        } = op;
-        let op_order = OpOrder::new(op_light.get_type(), action.action().timestamp());
-        let timestamp = action.action().timestamp();
-        insert_action(txn, action)?;
-        insert_op_lite(
-            txn,
-            op_light,
-            op_hash,
-            &op_order,
-            &timestamp,
-            // Using 0 value because this is the cache database and we only need sizes for gossip
-            // in the DHT database.
-            0,
-            todo_no_cache_transfer_data(),
-        )?;
-        if let Some(status) = validation_status {
-            set_validation_status(txn, op_hash, *status)?;
-        }
-        // We set the integrated to for the cache so it can match the
-        // same query as the vault. This can also be used for garbage collection.
-        set_when_integrated(txn, op_hash, Timestamp::now())?;
-        Ok(())
-    }
-
-    #[allow(clippy::result_large_err)] // TODO - investigate this lint
-    fn insert_rendered_ops(txn: &mut Txn<DbKindCache>, ops: &RenderedOps) -> CascadeResult<()> {
-        let RenderedOps {
-            ops,
-            entry,
-            warrant,
-        } = ops;
-
-        if let Some(warrant) = warrant {
-            let op = DhtOpHashed::from_content_sync(warrant.clone());
-            insert_op_cache(txn, &op)?;
-        }
-        if let Some(entry) = entry {
-            insert_entry(txn, entry.as_hash(), entry.as_content())?;
-        }
-        for op in ops {
-            Self::insert_rendered_op(txn, op)?;
-        }
-        Ok(())
-    }
-
-    /// Insert a set of agent activity into the Cache.
-    #[allow(clippy::result_large_err)] // TODO - investigate this lint
-    fn insert_activity(
-        txn: &mut Txn<DbKindCache>,
-        ops: Vec<RegisterAgentActivity>,
-    ) -> CascadeResult<()> {
-        for op in ops {
-            let RegisterAgentActivity {
-                action:
-                    SignedHashed {
-                        hashed: HoloHashed { content, .. },
-                        signature,
-                    },
-                ..
-            } = op;
-            let op =
-                DhtOpHashed::from_content_sync(ChainOp::RegisterAgentActivity(signature, content));
-            insert_op_cache(txn, &op)?;
-            // We set the integrated to for the cache so it can match the
-            // same query as the vault. This can also be used for garbage collection.
-            set_when_integrated(txn, op.as_hash(), Timestamp::now())?;
-        }
-        Ok(())
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn merge_ops_into_cache(&self, responses: Vec<WireOps>) -> CascadeResult<()> {
-        let cache = some_or_return!(self.cache.as_ref());
-        cache
-            .write_async(|txn| {
-                for response in responses {
-                    let ops = response.render()?;
-                    Self::insert_rendered_ops(txn, &ops)?;
-                }
-                CascadeResult::Ok(())
-            })
-            .await?;
-        Ok(())
-    }
-
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn merge_link_ops_into_cache(
-        &self,
-        responses: Vec<WireLinkOps>,
-        key: WireLinkKey,
-    ) -> CascadeResult<()> {
-        let cache = some_or_return!(self.cache.as_ref());
-        cache
-            .write_async(move |txn| {
-                for response in responses {
-                    let ops = response.render(&key)?;
-                    Self::insert_rendered_ops(txn, &ops)?;
-                }
-                CascadeResult::Ok(())
-            })
-            .await?;
-        Ok(())
-    }
-
-    /// Add new activity to the Cache.
-    #[cfg_attr(feature = "instrument", tracing::instrument(skip_all))]
-    async fn add_activity_into_cache(
-        &self,
-        responses: Vec<MustGetAgentActivityResponse>,
-    ) -> CascadeResult<MustGetAgentActivityResponse> {
-        // Choose a response from all the responses.
-        let response = if responses
-            .iter()
-            .zip(responses.iter().skip(1))
-            .all(|(a, b)| a == b)
-        {
-            // All responses are the same so we can just use the first one.
-            responses.into_iter().next()
-        } else {
-            tracing::info!(
-                "Got different must_get_agent_activity responses from different authorities"
-            );
-            // TODO: Handle conflict.
-            // For now try to find one that has got the activity
-            responses
-                .iter()
-                .find(|a| matches!(a, MustGetAgentActivityResponse::Activity { .. }))
-                .cloned()
-        };
-
-        let cache = some_or_return!(
-            self.cache.as_ref(),
-            response.unwrap_or(MustGetAgentActivityResponse::IncompleteChain)
-        );
-
-        // Commit the activity to the chain.
-        match response {
-            Some(MustGetAgentActivityResponse::Activity { activity, warrants }) => {
-                // TODO: Avoid this clone by committing the ops as references to the db.
-                cache
-                    .write_async({
-                        let activity = activity.clone();
-                        let warrants = warrants.clone();
-                        move |txn| {
-                            Self::insert_activity(txn, activity)?;
-                            for warrant in warrants {
-                                let op = DhtOpHashed::from_content_sync(warrant);
-                                insert_op_cache(txn, &op)?;
-                            }
-
-                            CascadeResult::Ok(())
-                        }
-                    })
-                    .await?;
-                Ok(MustGetAgentActivityResponse::Activity { activity, warrants })
-            }
-            Some(response) => Ok(response),
-            // Got no responses so the chain is incomplete.
-            None => Ok(MustGetAgentActivityResponse::IncompleteChain),
-        }
-    }
-}
-
 
 /// TODO
 #[async_trait::async_trait]

@@ -9,3 +9,6 @@ WHERE
   AND DhtOp.when_integrated IS NOT NULL
   AND Action.author = :author
   AND Action.seq BETWEEN :lower_seq AND :upper_seq
+SORT BY
+  Action.seq ASC,
+  Action.hash ASC
