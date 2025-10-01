@@ -70,7 +70,7 @@ pub async fn handle_get_agent_activity(
             let warrants =
                 txn.get_warrants_for_basis(&AnyLinkableHash::from(agent.clone()), true)?;
 
-            let mut activity_response = if options.include_full_records {
+            let activity_response = if options.include_full_records {
                 // If the caller wanted records, prioritise giving those back.
                 GetAgentActivityRecordsQuery::new(agent, query, options).run(txn)?
             } else {
