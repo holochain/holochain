@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-
 /// The location of all our sql scrips
 const SQL_DIR: &str = "./src/sql";
 

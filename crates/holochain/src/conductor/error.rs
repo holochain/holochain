@@ -1,7 +1,7 @@
 //! Error types for the conductor.
 
-use super::interface::error::InterfaceError;
 use super::entry_def_store::error::EntryDefStoreError;
+use super::interface::error::InterfaceError;
 use crate::conductor::cell::error::CellError;
 use crate::core::workflow::WorkflowError;
 use holochain_conductor_api::conductor::ConductorConfigError;
